@@ -1,0 +1,35 @@
+# Valhalla per gdanav, sul server gratuito di Oracle (Ampere A1: 4 core,
+# 24 GB). Valhalla non si espone: davanti c'è Caddy, che fa HTTPS e chiede la
+# chiave dell'app. Istruzioni in README.md.
+services:
+  valhalla:
+    image: ghcr.io/valhalla/valhalla-scripted:latest
+    restart: unless-stopped
+    volumes:
+      - ./dati:/custom_files
+    environment:
+      # Un file o più, separati da spazio. L'Italia intera sta nei 24 GB.
+      tile_urls: ${GDANAV_PBF:-https://download.geofabrik.de/europe/italy-latest.osm.pbf}
+      build_elevation: "True"
+      build_admins: "True"
+      build_time_zones: "True"
+      serve_tiles: "True"
+      server_threads: "4"
+      use_tiles_ignore_pbf: "True"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [valhalla]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      GDANAV_HOST: ${GDANAV_HOST:?scrivi GDANAV_HOST in .env}
+      GDANAV_CHIAVE: ${GDANAV_CHIAVE:?scrivi GDANAV_CHIAVE in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_dati:/data
+
+volumes:
+  caddy_dati:

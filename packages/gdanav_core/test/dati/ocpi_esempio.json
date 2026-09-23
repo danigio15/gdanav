@@ -1,0 +1,26 @@
+[
+  {
+    "country_code": "IT",
+    "party_id": "ION",
+    "id": "LOC1",
+    "name": "Secchia Ovest",
+    "coordinates": {"latitude": "44.60452", "longitude": "10.86515"},
+    "operator": {"name": "IONITY"},
+    "evses": [
+      {"uid": "1", "status": "CHARGING", "connectors": [{"id": "1", "standard": "IEC_62196_T2_COMBO", "power_type": "DC", "max_voltage": 920, "max_amperage": 500, "max_electric_power": 350000}]},
+      {"uid": "2", "status": "AVAILABLE", "connectors": [{"id": "1", "standard": "IEC_62196_T2_COMBO", "power_type": "DC", "max_voltage": 920, "max_amperage": 500, "max_electric_power": 350000}]},
+      {"uid": "3", "status": "OUTOFORDER", "connectors": [{"id": "1", "standard": "IEC_62196_T2_COMBO", "power_type": "DC", "max_voltage": 920, "max_amperage": 500}]},
+      {"uid": "4", "status": "PLANNED", "connectors": [{"id": "1", "standard": "IEC_62196_T2_COMBO", "power_type": "DC", "max_voltage": 920, "max_amperage": 500}]}
+    ]
+  },
+  {
+    "country_code": "IT",
+    "party_id": "ABC",
+    "id": "LOC2",
+    "name": "Piazza Grande",
+    "coordinates": {"latitude": "44.70", "longitude": "10.95"},
+    "evses": [
+      {"uid": "1", "status": "AVAILABLE", "connectors": [{"id": "1", "standard": "IEC_62196_T2", "power_type": "AC_3_PHASE", "max_voltage": 230, "max_amperage": 32}]}
+    ]
+  }
+]

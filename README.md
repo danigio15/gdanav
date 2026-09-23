@@ -13,6 +13,7 @@ arrivano gli abbonati.
 | [`app`](app) | L'app Android e iOS: mappa, switch «Fonte dati auto», abbinamento con Home Assistant | Flutter |
 | [`custom_components/gdanav`](custom_components/gdanav) | L'integrazione Home Assistant, da installare con HACS | Python |
 | [`relay`](relay) | Il punto d'incontro fra Home Assistant e l'app, cifrato end-to-end | Cloudflare Worker |
+| [`valhalla`](valhalla) | Il server dei percorsi, per Oracle Cloud Always Free | Docker + Caddy |
 | [`docs`](docs) | [Protocollo](docs/protocollo.md), [architettura](docs/architettura.md), vettore di prova condiviso | |
 
 `custom_components/` e `hacs.json` stanno nella radice perché HACS li cerca
@@ -62,9 +63,16 @@ carica): solo quelli, mai altro.
 
 Fatto e provato: motore consumi e soste, switch delle sorgenti con modalità
 automatica, protocollo cifrato identico fra Dart e Python, integrazione Home
-Assistant, relay, schermata con mappa OpenFreeMap e abbinamento.
+Assistant, relay, schermata con mappa OpenFreeMap e abbinamento. Il client di
+**Valhalla** (provato contro Valhalla 3.9 vero), le **colonnine** da Open
+Charge Map e da OCPI (il formato dei punti di accesso AFIR, come la PUN), la
+loro unione e il **pianificatore del viaggio** che mette tutto insieme.
 
-Da fare, in ordine: routing con Valhalla, navigazione passo-passo
-(Ferrostar), colonnine (Open Charge Map + PUN), il `CarAppService` Kotlin per
-Android Auto, OBD via Bluetooth, segnalazioni della community. Il piano è in
-[`docs/architettura.md`](docs/architettura.md).
+Da fare, in ordine: accendere Valhalla su Oracle ([`valhalla/`](valhalla),
+scritto ma non ancora provato su una macchina vera), l'indirizzo vero della
+PUN, la schermata del viaggio nell'app, navigazione passo-passo (Ferrostar),
+il `CarAppService` Kotlin per Android Auto, OBD via Bluetooth, segnalazioni
+della community.
+
+Le colonnine vanno citate: «© Open Charge Map contributors», e la PUN per i
+dati in tempo reale.

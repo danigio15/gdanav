@@ -1,3 +1,5 @@
+import '../colonnine/colonnina.dart';
+
 /// Un punto della curva di ricarica: con la batteria a [batteria]% l'auto
 /// accetta al massimo [potenzaKw].
 class PuntoCurva {
@@ -16,6 +18,7 @@ class ProfiloVeicolo {
     required this.crr,
     required this.capacitaUtileKwh,
     required this.curvaRicarica,
+    this.connettori = const {TipoConnettore.ccs2, TipoConnettore.tipo2},
     this.rendimentoTrazione = 0.90,
     this.rendimentoRecupero = 0.65,
     this.consumoFissoW = 300,
@@ -36,6 +39,9 @@ class ProfiloVeicolo {
 
   /// Punti ordinati per batteria crescente.
   final List<PuntoCurva> curvaRicarica;
+
+  /// Le prese che l'auto accetta.
+  final Set<TipoConnettore> connettori;
 
   /// Dalla batteria alla ruota.
   final double rendimentoTrazione;

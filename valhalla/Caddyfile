@@ -1,0 +1,18 @@
+# HTTPS automatico con Let's Encrypt su <ip-con-trattini>.sslip.io: niente
+# dominio da comprare. Passa solo chi manda la chiave, e solo verso le
+# richieste che l'app usa.
+{$GDANAV_HOST} {
+	request_body {
+		max_size 64KB
+	}
+
+	@app {
+		header X-Gdanav-Chiave {$GDANAV_CHIAVE}
+		path /route /height /status
+	}
+	handle @app {
+		reverse_proxy valhalla:8002
+	}
+
+	respond "Non autorizzato" 401
+}

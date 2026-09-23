@@ -1,0 +1,29 @@
+[
+  {
+    "ID": 101,
+    "StatusTypeID": 50,
+    "OperatorInfo": {"Title": "Ionity"},
+    "AddressInfo": {"Title": "Area di servizio Secchia Ovest", "Latitude": 44.6045, "Longitude": 10.8651},
+    "Connections": [
+      {"ConnectionTypeID": 33, "StatusTypeID": 50, "PowerKW": 350.0, "Quantity": 4},
+      {"ConnectionTypeID": 2, "StatusTypeID": 100, "PowerKW": 50.0, "Quantity": 1}
+    ]
+  },
+  {
+    "ID": 102,
+    "StatusTypeID": 50,
+    "AddressInfo": {"Title": "Parcheggio del Comune", "Latitude": 44.61, "Longitude": 10.9},
+    "Connections": [{"ConnectionTypeID": 25, "PowerKW": 22.0, "Quantity": 2}]
+  },
+  {
+    "ID": 103,
+    "StatusTypeID": 150,
+    "AddressInfo": {"Title": "Pianificata", "Latitude": 44.62, "Longitude": 10.91},
+    "Connections": [{"ConnectionTypeID": 33, "PowerKW": 150.0}]
+  },
+  {
+    "ID": 104,
+    "AddressInfo": {"Title": "Senza coordinate"},
+    "Connections": []
+  }
+]

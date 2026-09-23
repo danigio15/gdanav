@@ -61,6 +61,21 @@ Dijkstra sugli stati «colonnina, batteria all'arrivo», con la batteria a
 passi dell'1% arrotondati per difetto, soglie minime per sosta e arrivo e la
 curva di ricarica del modello.
 
+## Percorso e colonnine
+
+1. `ClienteValhalla.calcola` chiede `/route` con `elevation_interval: 30`.
+   Ogni segmento del tracciato diventa un `Tratto`: velocità dalla sua
+   manovra, dislivello dal profilo altimetrico (le quote a -500 vogliono dire
+   «niente modello del terreno» e si ignorano).
+2. Se la batteria basta, fine: niente richieste per le colonnine.
+3. Altrimenti `ClienteOpenChargeMap.lungo` chiede per `polyline` le
+   colonnine entro 3 km; `unisciColonnine` sostituisce le prese con quelle in
+   tempo reale di OCPI (PUN) quando una location è entro 60 m.
+4. `colonnineSulPercorso` le proietta sul tracciato (dove si esce, quanto si
+   devia, ×1,4 perché le strade girano) e tiene quelle compatibili sopra i
+   40 kW.
+5. `PianificatoreSoste` sceglie le soste.
+
 ## Costi
 
 Zero al lancio. Il primo server a pagamento (~50 €/mese) arriva con gli
