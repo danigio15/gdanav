@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:gdanav_core/gdanav_core.dart';
 import 'package:test/test.dart';
 
@@ -64,4 +66,38 @@ void main() {
     expect(v.colonnine, isEmpty);
     expect(v.piano, isNull);
   });
+
+  // Percorso da un Valhalla vero, colonnine finte:
+  // GDANAV_VALHALLA=http://127.0.0.1:8002/ (vedi il job «insieme» della CI).
+  final vero = Platform.environment['GDANAV_VALHALLA'];
+  test('con Valhalla vero, la batteria appena sufficiente chiede una sosta', () async {
+    final valhalla = ClienteValhalla(Uri.parse(vero!));
+    addTearDown(valhalla.chiudi);
+    // Utrecht, dal centro verso sud-est: pochi chilometri.
+    const partenza = Punto(52.0907, 5.1214), arrivo = Punto(52.064, 5.19);
+    final percorso = await valhalla.calcola(const [partenza, arrivo]);
+    final meta = percorso.punti[percorso.punti.length ~/ 2];
+    final fonti = FontiFinte([
+      Colonnina(
+        id: 'utrecht',
+        nome: 'A metà strada',
+        posizione: meta,
+        connettori: const [Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 50)],
+      ),
+    ]);
+    final p = PianificatoreViaggio(percorsi: valhalla.calcola, colonnine: fonti, profilo: ProfiloVeicolo.esempio);
+
+    final comodo = await p.pianifica(partenza: partenza, arrivo: arrivo, batteria: 60);
+    expect(comodo.piano!.soste, isEmpty);
+    expect(fonti.chiamate, 0);
+
+    // Si parte con la soglia di arrivo (15%) più metà del consumo del
+    // viaggio: si arriverebbe sotto, serve la colonnina a metà strada.
+    final kWh = percorso.tratti.fold(0.0, (s, t) => s + energiaTrattoWh(t, ProfiloVeicolo.esempio)) / 1000;
+    final percento = kWh / ProfiloVeicolo.esempio.capacitaUtileKwh * 100;
+    final tirato = await p.pianifica(partenza: partenza, arrivo: arrivo, batteria: 15 + percento / 2);
+    expect(fonti.chiamate, 1);
+    expect(tirato.colonnine.single.id, 'utrecht');
+    expect(tirato.piano!.soste.single.colonnina.id, 'utrecht');
+  }, skip: vero == null ? 'serve GDANAV_VALHALLA' : false);
 }

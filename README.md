@@ -38,6 +38,8 @@ lì: questa repository si aggiunge a HACS così com'è.
 
 E la prova che conta, con tutti i pezzi veri insieme:
 
+    pip install pyvalhalla && valhalla/prova_locale.sh    # Valhalla vero, mappa di Utrecht
+    cd packages/gdanav_core && GDANAV_VALHALLA=http://127.0.0.1:8002/ dart test
     cd relay && npx wrangler dev --port 8799 &
     GDANAV_RELAY=ws://127.0.0.1:8799 pytest tests/test_relay_vero.py
     cd packages/gdanav_core && GDANAV_RELAY=ws://127.0.0.1:8799 dart test test/relay_vero_test.dart
@@ -69,11 +71,13 @@ automatica, protocollo cifrato identico fra Dart e Python, integrazione Home
 Assistant, relay, schermata con mappa OpenFreeMap e abbinamento. Il client di
 **Valhalla** (provato contro Valhalla 3.9 vero), le **colonnine** da Open
 Charge Map e da OCPI (il formato dei punti di accesso AFIR, come la PUN), la
-loro unione e il **pianificatore del viaggio** che mette tutto insieme.
+loro unione e il **pianificatore del viaggio** che mette tutto insieme. Nell'app
+la **schermata del viaggio**: ricerca della destinazione (Photon), percorso e
+soste sulla mappa, la scheda con batteria all'arrivo e ricariche.
 
 Da fare, in ordine: accendere Valhalla su Oracle ([`valhalla/`](valhalla),
 scritto ma non ancora provato su una macchina vera), l'indirizzo vero della
-PUN, la schermata del viaggio nell'app, navigazione passo-passo (Ferrostar),
+PUN, la scelta del modello d'auto, navigazione passo-passo (Ferrostar),
 il `CarAppService` Kotlin per Android Auto, OBD via Bluetooth, segnalazioni
 della community.
 

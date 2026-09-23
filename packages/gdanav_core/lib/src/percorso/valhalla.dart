@@ -132,11 +132,18 @@ class ClienteValhalla {
       headers: {'content-type': 'application/json', if (chiave != null) 'x-gdanav-chiave': chiave!},
       body: jsonEncode(corpo),
     );
-    final json = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>;
+    final testo = utf8.decode(r.bodyBytes);
     if (r.statusCode != 200) {
-      throw ErroreValhalla(json['error'] as String? ?? 'errore ${r.statusCode}', stato: r.statusCode);
+      // Valhalla risponde in JSON; Caddy davanti (chiave sbagliata) no.
+      String? messaggio;
+      try {
+        messaggio = (jsonDecode(testo) as Map<String, Object?>)['error'] as String?;
+      } on FormatException {
+        messaggio = testo.trim().isEmpty ? null : testo.trim();
+      }
+      throw ErroreValhalla(messaggio ?? 'errore ${r.statusCode}', stato: r.statusCode);
     }
-    return PercorsoCalcolato.daValhalla(json);
+    return PercorsoCalcolato.daValhalla(jsonDecode(testo) as Map<String, Object?>);
   }
 
   void chiudi() => _http.close();

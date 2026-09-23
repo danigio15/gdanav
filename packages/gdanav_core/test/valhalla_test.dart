@@ -83,6 +83,17 @@ void main() {
         throwsA(isA<ErroreValhalla>().having((e) => e.messaggio, 'messaggio', 'No path could be found')),
       );
     });
+
+    test('la chiave sbagliata (risposta di Caddy, non JSON) si capisce', () async {
+      final client = MockClient((_) async => http.Response('Non autorizzato', 401));
+      final v = ClienteValhalla(Uri.parse('https://valhalla.esempio.dev/'), client: client);
+      expect(
+        v.calcola(const [Punto(0, 0), Punto(1, 1)]),
+        throwsA(isA<ErroreValhalla>()
+            .having((e) => e.stato, 'stato', 401)
+            .having((e) => e.messaggio, 'messaggio', 'Non autorizzato')),
+      );
+    });
   });
 
   // Contro un Valhalla vero: GDANAV_VALHALLA=http://127.0.0.1:8002/

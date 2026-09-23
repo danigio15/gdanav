@@ -39,7 +39,7 @@ dependencies:
   flutter_secure_storage: ^11.2.0
   gdanav_core:
     path: ../packages/gdanav_core
-
+  geolocator: ^14.0.3
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -1,0 +1,25 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [11.3426, 44.4938]},
+      "properties": {"osm_type": "N", "osm_id": 1, "osm_key": "place", "osm_value": "city", "name": "Bologna", "county": "Bologna", "state": "Emilia-Romagna", "country": "Italia", "countrycode": "IT"}
+    },
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [11.3464, 44.4949]},
+      "properties": {"osm_key": "amenity", "osm_value": "charging_station", "name": "Stazione di ricarica Piazza Maggiore", "street": "Piazza Maggiore", "housenumber": "6", "city": "Bologna", "state": "Emilia-Romagna"}
+    },
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [9.19, 45.4642]},
+      "properties": {"osm_key": "building", "street": "Via Torino", "housenumber": "12", "city": "Milano", "state": "Lombardia"}
+    },
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point"},
+      "properties": {"name": "Senza coordinate"}
+    }
+  ]
+}

@@ -6,6 +6,7 @@ export 'src/colonnine/lungo_percorso.dart';
 export 'src/colonnine/ocpi.dart';
 export 'src/colonnine/open_charge_map.dart';
 export 'src/geo/geo.dart';
+export 'src/luoghi/luoghi.dart';
 export 'src/motore/modello_consumo.dart';
 export 'src/motore/pianificatore_soste.dart';
 export 'src/percorso/valhalla.dart';

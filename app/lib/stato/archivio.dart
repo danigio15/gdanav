@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -10,6 +12,7 @@ class Archivio {
 
   static const _abbinamento = 'abbinamento_home_assistant';
   static const _fonte = 'fonte_dati_auto';
+  static const _impostazioni = 'impostazioni';
 
   Future<Abbinamento?> abbinamento() async {
     final uri = await _p.read(key: _abbinamento);
@@ -38,4 +41,51 @@ class Archivio {
       Fissa(:final sorgente) => sorgente.name,
     },
   );
+
+  Future<Impostazioni> impostazioni() async {
+    final testo = await _p.read(key: _impostazioni);
+    if (testo == null) return Impostazioni.predefinite();
+    try {
+      return Impostazioni.daJson(jsonDecode(testo) as Map<String, Object?>);
+    } on FormatException {
+      return Impostazioni.predefinite();
+    }
+  }
+
+  Future<void> salvaImpostazioni(Impostazioni i) => _p.write(key: _impostazioni, value: jsonEncode(i.toJson()));
+}
+
+/// Dove stanno i servizi. Si scrivono nelle impostazioni dell'app, oppure si
+/// danno alla compilazione:
+///
+///     flutter run --dart-define=GDANAV_VALHALLA=https://1-2-3-4.sslip.io/ \
+///                 --dart-define=GDANAV_VALHALLA_CHIAVE=... \
+///                 --dart-define=GDANAV_OCM_CHIAVE=...
+class Impostazioni {
+  const Impostazioni({this.valhalla = '', this.chiaveValhalla = '', this.chiaveOcm = ''});
+
+  factory Impostazioni.predefinite() => const Impostazioni(
+    valhalla: String.fromEnvironment('GDANAV_VALHALLA'),
+    chiaveValhalla: String.fromEnvironment('GDANAV_VALHALLA_CHIAVE'),
+    chiaveOcm: String.fromEnvironment('GDANAV_OCM_CHIAVE'),
+  );
+
+  factory Impostazioni.daJson(Map<String, Object?> j) => Impostazioni(
+    valhalla: j['valhalla'] as String? ?? '',
+    chiaveValhalla: j['chiave_valhalla'] as String? ?? '',
+    chiaveOcm: j['chiave_ocm'] as String? ?? '',
+  );
+
+  final String valhalla;
+  final String chiaveValhalla;
+  final String chiaveOcm;
+
+  /// Cosa manca per pianificare un viaggio, in parole. `null` se c'è tutto.
+  String? get mancante {
+    if (valhalla.isEmpty) return "Manca l'indirizzo del server dei percorsi: scrivilo nelle impostazioni.";
+    if (chiaveOcm.isEmpty) return 'Manca la chiave di Open Charge Map: scrivila nelle impostazioni.';
+    return null;
+  }
+
+  Map<String, Object?> toJson() => {'valhalla': valhalla, 'chiave_valhalla': chiaveValhalla, 'chiave_ocm': chiaveOcm};
 }
