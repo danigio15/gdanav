@@ -83,7 +83,7 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
                   controller: _chiaveOcm,
                   decoration: const InputDecoration(
                     labelText: 'Chiave di Open Charge Map',
-                    helperText: 'Gratis su openchargemap.org → My Profile → My Apps',
+                    helperText: 'Gratis su openchargemap.org, da My Profile, poi My Apps',
                   ),
                 ),
                 const SizedBox(height: 24),

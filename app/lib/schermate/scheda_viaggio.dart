@@ -102,7 +102,7 @@ class _Pronto extends StatelessWidget {
               title: Text(s.colonnina.nome),
               subtitle: Text(
                 '${(s.colonnina.distanzaM / 1000).round()} km · ${s.colonnina.potenzaKw.round()} kW · '
-                '${s.batteriaArrivo.round()}% → ${s.batteriaPartenza.round()}% in ${durata(s.ricarica)}',
+                'dal ${s.batteriaArrivo.round()}% al ${s.batteriaPartenza.round()}% in ${durata(s.ricarica)}',
               ),
             ),
         const SizedBox(height: 4),
