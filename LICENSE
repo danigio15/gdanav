@@ -1,0 +1,177 @@
+gdanav License
+Version 1.0 — effective 23 September 2026
+
+Copyright (c) 2026 Giovanni d'Aniello (github.com/danigio15).
+All rights reserved.
+
+This is a proprietary license. It is NOT an open source license and it is not
+approved by the Open Source Initiative. No right beyond those stated below is
+granted, and nothing here is granted by implication or estoppel.
+
+1. DEFINITIONS
+
+   "Software" means the contents of the repository
+   https://github.com/danigio15/gdanav — the gdanav mobile application, the
+   gdanav_core engine, the gdanav Home Assistant integration, the relay, the
+   routing server configuration, their source code, assets, documentation and
+   the release artifacts built from them, including any application package
+   distributed through an application store.
+
+   "Owner" means Giovanni d'Aniello (github.com/danigio15), the copyright
+   holder.
+
+   "Repository" means the repository named above, as operated by the Owner.
+
+   "You" means the individual or legal entity exercising the permissions
+   granted by this license.
+
+2. GRANT OF USE
+
+   Subject to Your compliance with this license, the Owner grants You a
+   personal, non-exclusive, non-transferable, revocable and royalty-free
+   permission to:
+
+   (a) install and run the Software — the application on devices You own or
+       control, the Home Assistant integration on Home Assistant instances
+       You own or administer — for personal, non-commercial purposes;
+
+   (b) download and read the source code, in order to audit what the Software
+       does with Your vehicle, Your location and Your data;
+
+   (c) modify Your own installed copy for Your own use, provided that the
+       modified copy is neither distributed nor made available to anyone else,
+       and provided that Section 3(e) is respected.
+
+3. RESTRICTIONS
+
+   Except as expressly permitted by Section 2, by Section 4, or by mandatory
+   applicable law, You may not:
+
+   (a) redistribute, publish, mirror, re-upload, sideload for others, or
+       otherwise make the Software, or any part of it, available to third
+       parties, whether in source or in built form, whether modified or not,
+       and whether or not for a fee;
+
+   (b) publish the Software, or any application or integration derived from
+       it, to any application store, package repository, HACS repository or
+       similar distribution channel;
+
+   (c) fork, clone-and-republish or otherwise reproduce the Repository as a
+       separate public copy, except as allowed by Section 4;
+
+   (d) distribute derivative works, ports, translations, re-brandings or
+       modified versions of the Software;
+
+   (e) remove, alter, obscure or circumvent any copyright notice, license
+       notice or attribution contained in or produced by the Software —
+       including the attributions required by the map and charging data
+       sources listed in Section 7 — or present the Software or any part of it
+       as not originating from the Owner;
+
+   (f) sublicense, sell, rent, lease, or include the Software in a paid
+       product, a hosted service, or a commercial installation, integration or
+       support offering, including operating the relay or the routing server
+       for third parties;
+
+   (g) use the name "gdanav", the project logo or marks, or any confusingly
+       similar name, to identify a derivative, a competing product, or a
+       service.
+
+   Nothing in this Section restricts any act that applicable mandatory law
+   permits notwithstanding contract, including acts of decompilation permitted
+   for interoperability purposes.
+
+4. FORKS AND CONTRIBUTIONS
+
+   Because the Repository is public on GitHub, GitHub's Terms of Service give
+   every user the technical ability to view and fork it. That platform-level
+   ability does not, by itself, grant any right to use, keep or publish the
+   copy so created. Accordingly, for as long as the Repository is public:
+
+   (a) a fork is permitted only as the technical means of preparing a
+       contribution to be submitted back to the Repository as a pull request;
+
+   (b) such a fork must not be modified beyond what the intended contribution
+       requires, must not be advertised, distributed or presented as an
+       independent project, and should be deleted once the pull request has
+       been merged or closed;
+
+   (c) any other use of a fork — including simply keeping it publicly
+       available as a standalone copy of the Software — constitutes a
+       distribution and is prohibited by Section 3.
+
+   By submitting a contribution to the Repository, You grant the Owner a
+   perpetual, worldwide, irrevocable, royalty-free and sublicensable license
+   to use, modify, publish and distribute that contribution as part of the
+   Software, under this license or any other license the Owner chooses, and
+   You confirm that You have the right to grant that permission.
+
+5. PAID FEATURES
+
+   Some features of the Software may require a purchase or a subscription. An
+   entitlement to such a feature is granted to the purchasing account, is not
+   transferable, and does not enlarge the permissions granted by Section 2.
+   The Owner may add, change or withdraw paid features; an entitlement already
+   granted remains valid for what it stated when it was granted.
+
+6. TERMINATION
+
+   The permissions granted by Section 2 terminate automatically if You breach
+   any term of this license. Upon termination You must stop using the Software
+   and delete every copy in Your possession, except copies You are required to
+   retain by law. The Owner may grant broader permissions, including
+   commercial, redistribution or white-label rights, only in writing; requests
+   may be sent through the Repository's issue tracker.
+
+7. THIRD-PARTY SOFTWARE AND DATA
+
+   The Software depends on third-party open source components, each governed
+   by its own license. Those licenses are unaffected by this one.
+
+   The Software displays and processes data it does not own, each under its
+   own terms, including map and road data from OpenStreetMap contributors
+   (Open Database License), map tiles served by OpenFreeMap, charging point
+   data from Open Charge Map contributors, and charging point data published
+   by national access points under Regulation (EU) 2023/1804 (in Italy the
+   Piattaforma Unica Nazionale). Nothing in this license grants any right in
+   that data beyond what its own terms grant.
+
+8. DRIVING AND SAFETY
+
+   The Software is an aid, not a substitute for the driver's judgement. Road
+   signs, traffic rules and the conditions of the road always prevail over
+   directions given by the Software. Range, consumption, arrival charge and
+   charging times are estimates and may be wrong; community reports may be
+   inaccurate or outdated. Do not interact with the Software in a way that
+   distracts You from driving.
+
+9. NO WARRANTY
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. The Software must not
+   be relied upon for safety or for any purpose where its failure could cause
+   injury or damage, including running out of charge.
+
+10. LIMITATION OF LIABILITY
+
+   IN NO EVENT SHALL THE OWNER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE SOFTWARE.
+
+   Nothing in this license excludes or limits liability that cannot be
+   excluded or limited under applicable mandatory law, including liability for
+   death or personal injury caused by negligence, or for fraud.
+
+11. CONSUMER RIGHTS
+
+   Where You obtain the Software as a consumer, this license does not affect
+   the rights granted to You by mandatory consumer protection law, which
+   prevail over any conflicting term.
+
+12. GOVERNING LAW
+
+   This license is governed by the laws of Italy, without regard to conflict
+   of law rules. If any provision is held unenforceable, the remaining
+   provisions remain in full force.

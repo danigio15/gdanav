@@ -1,5 +1,8 @@
 # gdanav
 
+[![Le prove](https://github.com/danigio15/gdanav/actions/workflows/prove.yml/badge.svg)](https://github.com/danigio15/gdanav/actions/workflows/prove.yml)
+[![Licenza proprietaria](https://img.shields.io/badge/licenza-proprietaria-64748b)](LICENSE)
+
 Il navigatore per auto elettriche: la community di Waze (traffico,
 incidenti, autovelox, colonnine guaste) e la pianificazione dei consumi di
 ABRP, **collegato a Home Assistant**. Costruito per costare zero finché non
@@ -76,3 +79,11 @@ della community.
 
 Le colonnine vanno citate: «© Open Charge Map contributors», e la PUN per i
 dati in tempo reale.
+
+## Licenza
+
+Il codice è pubblico perché si possa leggere e controllare cosa fa con
+l'auto, la posizione e i dati di chi lo usa. Non è open source:
+[licenza proprietaria](LICENSE), tutti i diritti riservati. Si può
+installare e usare per sé; non si può ripubblicare, distribuire modificato o
+usare commercialmente senza permesso scritto.
