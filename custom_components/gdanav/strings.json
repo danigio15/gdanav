@@ -1,0 +1,100 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect a car to gdanav",
+        "description": "Pick your car's entities among the ones you already have in Home Assistant. Only the battery is required. Then open the gdanav device and scan the QR code with the app.",
+        "data": {
+          "nome_auto": "Car name",
+          "entita_batteria": "Battery (%)",
+          "entita_autonomia": "Range (km)",
+          "entita_in_carica": "Charging",
+          "entita_potenza_carica": "Charging power",
+          "entita_temperatura_batteria": "Battery temperature",
+          "entita_posizione": "Car location",
+          "relay": "Relay"
+        },
+        "data_description": {
+          "relay": "Keep the default unless you run your own relay."
+        }
+      }
+    },
+    "error": {
+      "relay_non_valido": "The relay must start with wss:// (or ws:// for testing)."
+    },
+    "abort": {
+      "already_configured": "This car is already connected."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Commands from the app",
+        "description": "The scripts, buttons and scenes the app may run, such as preconditioning. The app can do nothing else.",
+        "data": {
+          "comandi_consentiti": "Allowed commands"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "destinazione": {
+        "name": "Destination"
+      },
+      "eta": {
+        "name": "Estimated arrival"
+      },
+      "soc_arrivo": {
+        "name": "Battery on arrival"
+      },
+      "prossima_sosta": {
+        "name": "Next stop"
+      },
+      "soc_necessario": {
+        "name": "Battery needed"
+      }
+    },
+    "binary_sensor": {
+      "in_viaggio": {
+        "name": "On a trip"
+      },
+      "app_collegata": {
+        "name": "App connected"
+      }
+    },
+    "image": {
+      "abbinamento": {
+        "name": "Pairing QR code"
+      }
+    }
+  },
+  "services": {
+    "pianifica_viaggio": {
+      "name": "Plan trip",
+      "description": "Sends a trip to the app, which works out the route and charging stops.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Car",
+          "description": "If you have more than one. Empty: all of them."
+        },
+        "destinazione": {
+          "name": "Destination",
+          "description": "Address or place name."
+        },
+        "latitudine": {
+          "name": "Latitude",
+          "description": "Optional, if you know it."
+        },
+        "longitudine": {
+          "name": "Longitude",
+          "description": "Optional, if you know it."
+        },
+        "partenza": {
+          "name": "Departure",
+          "description": "When you leave. Empty: now."
+        }
+      }
+    }
+  }
+}

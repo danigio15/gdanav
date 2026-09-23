@@ -1,0 +1,13 @@
+{
+  "domain": "gdanav",
+  "name": "gdanav",
+  "codeowners": ["@danigio15"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/danigio15/gdanav",
+  "integration_type": "device",
+  "iot_class": "cloud_push",
+  "issue_tracker": "https://github.com/danigio15/gdanav/issues",
+  "requirements": ["segno==1.6.6"],
+  "version": "0.1.0"
+}

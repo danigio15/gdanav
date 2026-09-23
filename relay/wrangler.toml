@@ -1,0 +1,15 @@
+# Il relay di gdanav: una stanza per auto, dove si incontrano Home Assistant
+# e l'app. Sta tutto nel piano gratuito di Cloudflare: i Durable Object con
+# SQLite sono gratis, e i WebSocket in ibernazione non consumano tempo
+# mentre nessuno parla.
+name = "gdanav-relay"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+[[durable_objects.bindings]]
+name = "STANZE"
+class_name = "Stanza"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Stanza"]

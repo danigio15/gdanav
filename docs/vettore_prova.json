@@ -1,0 +1,10 @@
+{
+  "_nota": "Vettore di prova condiviso: Dart e Python devono leggerlo uguale. Chiave = byte 0..31, nonce = byte 0..11.",
+  "uri": "gdanav://abbina?v=1&k=AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8&r=wss%3A%2F%2Frelay.esempio.dev&n=Auto+di+prova",
+  "canale": "SgvbGqlToLe253ATOQaM3Y",
+  "accesso": "MYZGVfkpDP7ii6wViHk4xpzwRU77bJj1rT54UYw1EUk",
+  "busta_casa": "{\"v\": 1, \"n\": \"AAECAwQFBgcICQoL\", \"c\": \"PCCicrWK4CGvMuPqxYYnDPai6BbcWTYYGl3HtSxbM4Y0JpnElqBw-xDBGc-kpVxLzGNCv2rklfcPrgcrK7fE3soM9kDj4QhRLGTwTMOtaolM4-tYDUExCYmJ-74RkZu3_Mp304hjoXTBf1_AIRZAXYABA8eQoFjnEUIHU2VFbWenYcaVQSL74w\"}",
+  "ts": "2026-09-23T10:00:00.000Z",
+  "uri_dart": "gdanav://abbina?v=1&k=AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8&r=wss%3A%2F%2Frelay.esempio.dev&n=Auto+di+prova",
+  "busta_app_dart": "{\"v\":1,\"n\":\"DAsKCQgHBgUEAwIB\",\"c\":\"Z7OXMV4n8kfZaDqRstnQmOkzfi4SBvaimgrvfycUdnlvLPjgMaG3FNOeyLRif7Zv-2BGFmdbBmABKVbcD6_pGvHQCrkbjXgGpRIHl54e1YUwB2mfFRCVDKgwbyDKM2msis8uiFV4agl5T475bpxkZTsaYugV3Ww_M3EQD4xGwqK0GXCiWdMti77c\"}"
+}

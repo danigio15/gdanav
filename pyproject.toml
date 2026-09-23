@@ -1,0 +1,18 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "PIE", "FURB"]
+
+[tool.ruff.lint.isort]
+# Come in Home Assistant: homeassistant fra i terzi, ordinati dentro le sezioni.
+force-sort-within-sections = true
+known-first-party = ["custom_components"]
+known-third-party = ["homeassistant", "pytest_homeassistant_custom_component"]
+combine-as-imports = true

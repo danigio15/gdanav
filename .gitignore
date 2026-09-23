@@ -1,0 +1,17 @@
+# Dart / Flutter
+.dart_tool/
+build/
+pubspec_overrides.yaml
+
+# Node / Cloudflare
+node_modules/
+.wrangler/
+.dev.vars
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/

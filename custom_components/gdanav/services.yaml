@@ -1,0 +1,26 @@
+pianifica_viaggio:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: gdanav
+    destinazione:
+      required: true
+      example: "Milano, Piazza del Duomo"
+      selector:
+        text:
+    latitudine:
+      selector:
+        number:
+          min: -90
+          max: 90
+          step: any
+    longitudine:
+      selector:
+        number:
+          min: -180
+          max: 180
+          step: any
+    partenza:
+      selector:
+        datetime:

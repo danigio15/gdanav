@@ -1,0 +1,100 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Collega un'auto a gdanav",
+        "description": "Scegli le entità della tua auto fra quelle che hai già in Home Assistant. Serve solo la batteria: il resto aiuta. Dopo, apri il dispositivo gdanav e inquadra il QR con l'app.",
+        "data": {
+          "nome_auto": "Nome dell'auto",
+          "entita_batteria": "Batteria (%)",
+          "entita_autonomia": "Autonomia (km)",
+          "entita_in_carica": "In carica",
+          "entita_potenza_carica": "Potenza di carica",
+          "entita_temperatura_batteria": "Temperatura della batteria",
+          "entita_posizione": "Posizione dell'auto",
+          "relay": "Relay"
+        },
+        "data_description": {
+          "relay": "Lascia quello predefinito, a meno di avere un relay tuo."
+        }
+      }
+    },
+    "error": {
+      "relay_non_valido": "Il relay deve iniziare con wss:// (o ws:// per le prove)."
+    },
+    "abort": {
+      "already_configured": "Questa auto è già collegata."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Comandi dall'app",
+        "description": "Gli script, i pulsanti e le scene che l'app può avviare, per esempio il pre-condizionamento. L'app non può fare nient'altro.",
+        "data": {
+          "comandi_consentiti": "Comandi consentiti"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "destinazione": {
+        "name": "Destinazione"
+      },
+      "eta": {
+        "name": "Arrivo previsto"
+      },
+      "soc_arrivo": {
+        "name": "Batteria all'arrivo"
+      },
+      "prossima_sosta": {
+        "name": "Prossima sosta"
+      },
+      "soc_necessario": {
+        "name": "Batteria necessaria"
+      }
+    },
+    "binary_sensor": {
+      "in_viaggio": {
+        "name": "In viaggio"
+      },
+      "app_collegata": {
+        "name": "App collegata"
+      }
+    },
+    "image": {
+      "abbinamento": {
+        "name": "QR di abbinamento"
+      }
+    }
+  },
+  "services": {
+    "pianifica_viaggio": {
+      "name": "Pianifica viaggio",
+      "description": "Manda un viaggio all'app, che calcola percorso e soste.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Auto",
+          "description": "Se ne hai più di una. Vuoto: tutte."
+        },
+        "destinazione": {
+          "name": "Destinazione",
+          "description": "Indirizzo o nome del posto."
+        },
+        "latitudine": {
+          "name": "Latitudine",
+          "description": "Facoltativa, se la conosci."
+        },
+        "longitudine": {
+          "name": "Longitudine",
+          "description": "Facoltativa, se la conosci."
+        },
+        "partenza": {
+          "name": "Partenza",
+          "description": "Quando si parte. Vuoto: adesso."
+        }
+      }
+    }
+  }
+}
