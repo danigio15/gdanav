@@ -52,7 +52,12 @@ PianificatoreViaggio pianificatoreVero(Impostazioni i, ProfiloVeicolo profilo, P
   );
   return PianificatoreViaggio(
     percorsi: valhalla.calcola,
-    colonnine: ClienteOpenChargeMap(chiave: i.chiaveOcm),
+    // Open Charge Map se c'è la chiave (ha anche lo stato delle prese), e
+    // comunque OpenStreetMap, che non ne chiede.
+    colonnine: FonteColonnineConRiserva([
+      if (i.chiaveOcm.isNotEmpty) ClienteOpenChargeMap(chiave: i.chiaveOcm),
+      ClienteOverpass(),
+    ]),
     profilo: profilo,
     preferenze: preferenze,
   );
@@ -151,7 +156,7 @@ class GestoreViaggio extends ChangeNotifier {
       if (identical(stato, calcolo)) _imposta(ErroreViaggio(_spiega(e), destinazione: destinazione));
     } catch (e) {
       if (identical(stato, calcolo)) {
-        final messaggio = '$e'.contains('Open Charge Map')
+        final messaggio = '$e'.contains('colonnine')
             ? 'Per questo viaggio servono soste, ma le colonnine non sono arrivate. Riprova tra poco.'
             : 'Il viaggio non si è potuto calcolare: $e';
         _imposta(ErroreViaggio(messaggio, destinazione: destinazione));

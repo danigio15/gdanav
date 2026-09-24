@@ -29,6 +29,10 @@ async def async_setup_entry(
     )
 
 
+NESSUN_VIAGGIO = "Nessun viaggio"
+NESSUNA_SOSTA = "Nessuna sosta"
+
+
 class SensoreGdanav(EntitaGdanav):
     _dominio = "sensor"
 
@@ -36,7 +40,8 @@ class SensoreGdanav(EntitaGdanav):
 class Destinazione(SensoreGdanav, SensorEntity):
     @property
     def native_value(self) -> str | None:
-        return self.hub.viaggio.destinazione if self.hub.viaggio.in_viaggio else None
+        # «Sconosciuto» sembra un guasto: senza viaggio lo si dice.
+        return self.hub.viaggio.destinazione if self.hub.viaggio.in_viaggio else NESSUN_VIAGGIO
 
 
 class Eta(SensoreGdanav, SensorEntity):
@@ -60,7 +65,9 @@ class ProssimaSosta(SensoreGdanav, SensorEntity):
     @property
     def native_value(self) -> str | None:
         sosta = self.hub.viaggio.prossima_sosta
-        return sosta.get("nome") if sosta and self.hub.viaggio.in_viaggio else None
+        if not self.hub.viaggio.in_viaggio:
+            return NESSUN_VIAGGIO
+        return sosta.get("nome") if sosta else NESSUNA_SOSTA
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:

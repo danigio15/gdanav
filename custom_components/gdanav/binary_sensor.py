@@ -23,7 +23,7 @@ class BinarioGdanav(EntitaGdanav):
 
 
 class InViaggio(BinarioGdanav, BinarySensorEntity):
-    _attr_device_class = BinarySensorDeviceClass.MOVING
+    # Niente «si muove / non si muove»: gli stati hanno i loro nomi.
 
     @property
     def is_on(self) -> bool:

@@ -237,7 +237,8 @@ async def test_viaggio_diventa_sensori(hass: HomeAssistant, senza_relay: None) -
 
     await hub.async_ricevi(_dall_app(p.VIAGGIO, {"in_viaggio": False}))
     await hass.async_block_till_done()
-    assert hass.states.get("sensor.gdanav_destinazione").state == "unknown"
+    assert hass.states.get("sensor.gdanav_destinazione").state == "Nessun viaggio"
+    assert hass.states.get("sensor.gdanav_prossima_sosta").state == "Nessun viaggio"
 
 
 async def test_soc_necessario(hass: HomeAssistant, senza_relay: None) -> None:

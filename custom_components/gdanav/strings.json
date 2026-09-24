@@ -68,7 +68,11 @@
     },
     "binary_sensor": {
       "in_viaggio": {
-        "name": "On a trip"
+        "name": "On a trip",
+        "state": {
+          "on": "On a trip",
+          "off": "Not travelling"
+        }
       },
       "app_collegata": {
         "name": "App connected"

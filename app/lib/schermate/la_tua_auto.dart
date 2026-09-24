@@ -27,7 +27,29 @@ class LaTuaAuto extends StatefulWidget {
 }
 
 class _LaTuaAutoState extends State<LaTuaAuto> {
-  var _filtro = '';
+  // Con l'auto d'esempio e Home Assistant collegato, si parte dal nome che
+  // arriva da lì («Leapmotor B10»): basta scegliere la batteria.
+  late var _filtro = widget.auto.veicolo.id == ProfiloVeicolo.esempio.id
+      ? _parolePrincipali(widget.auto.abbinamento?.nomeAuto ?? '')
+      : '';
+  late final _campo = TextEditingController(text: _filtro);
+
+  /// Le parole del nome che stanno nel catalogo: «La mia Leapmotor B10» → «Leapmotor B10».
+  static String _parolePrincipali(String nome) {
+    final parole = semplice(nome).split(' ').where((p) => p.isNotEmpty);
+    final buone = [
+      for (final p in parole)
+        if (catalogoVeicoli.any((v) => semplice(v.nome).split(' ').contains(p))) p,
+    ];
+    final filtro = buone.join(' ');
+    return catalogoVeicoli.any((v) => corrisponde(v, filtro)) ? filtro : '';
+  }
+
+  @override
+  void dispose() {
+    _campo.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -105,6 +127,7 @@ class _LaTuaAutoState extends State<LaTuaAuto> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: TextField(
+                  controller: _campo,
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.search),
                     hintText: 'Cerca fra ${catalogoVeicoli.length} auto: marca o modello',
