@@ -166,6 +166,13 @@ jobs:
       - run: dart test test/viaggio_rete_test.dart --reporter expanded
         env:
           GDANAV_RETE: "1"
+      - name: Com'è fatto il traffico TomTom
+        working-directory: .
+        env:
+          TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
+        run: |
+          pip install mapbox-vector-tile
+          python3 tools/sonda_traffico.py
 
   # Le foto vere delle auto, da Wikimedia Commons: solo quando il commit lo
   # chiede con «[foto-auto]». Il JSON va nella release «anteprima», da
