@@ -17,10 +17,14 @@ from .const import (
     CONF_COMANDI,
     CONF_IN_CARICA,
     CONF_NOME_AUTO,
+    CONF_ODOMETRO,
     CONF_POSIZIONE,
+    CONF_POTENZA,
     CONF_POTENZA_CARICA,
     CONF_RELAY,
     CONF_TEMPERATURA_BATTERIA,
+    CONF_TEMPERATURA_ESTERNA,
+    CONF_VELOCITA,
     DOMAIN,
     RELAY_PREDEFINITO,
 )
@@ -42,6 +46,10 @@ SCHEMA = vol.Schema(
         vol.Optional(CONF_POTENZA_CARICA): _entita("sensor", device_class="power"),
         vol.Optional(CONF_TEMPERATURA_BATTERIA): _entita("sensor", device_class="temperature"),
         vol.Optional(CONF_POSIZIONE): _entita("device_tracker"),
+        vol.Optional(CONF_TEMPERATURA_ESTERNA): _entita("sensor", device_class="temperature"),
+        vol.Optional(CONF_VELOCITA): _entita("sensor", device_class="speed"),
+        vol.Optional(CONF_POTENZA): _entita("sensor", device_class="power"),
+        vol.Optional(CONF_ODOMETRO): _entita("sensor", device_class="distance"),
         vol.Required(CONF_RELAY, default=RELAY_PREDEFINITO): selector.TextSelector(
             selector.TextSelectorConfig(type=selector.TextSelectorType.URL)
         ),

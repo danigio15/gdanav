@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import 'gestore_auto.dart';
+import 'gestore_consumo.dart';
 import 'gestore_viaggio.dart';
 import 'voce.dart';
 
@@ -15,8 +16,25 @@ class GestoreGuida extends ChangeNotifier {
     required this.auto,
     required this.posizioni,
     required this.voce,
+    this.consumo,
     DateTime Function()? orologio,
   }) : _ora = orologio ?? DateTime.now;
+
+  /// Il consumo imparato: in guida lo si misura e lo si corregge.
+  final GestoreConsumo? consumo;
+
+  /// Di quanti punti la batteria vera può scostarsi dal piano prima di
+  /// ricalcolare le soste.
+  static const scartoPerRicalcolo = 3.0;
+
+  /// E non più spesso di così.
+  static const intervalloRicalcolo = Duration(minutes: 2);
+
+  MisuratoreConsumo? _misuratore;
+  double? _batteriaInizio;
+  var _kmMisurati = 0.0, _whMisurati = 0.0;
+  DateTime _ultimoRicalcolo = DateTime(0);
+  double _fattorePiano = 1;
 
   final GestoreViaggio viaggio;
   final GestoreAuto auto;
@@ -52,8 +70,8 @@ class GestoreGuida extends ChangeNotifier {
 
   DateTime? _partitoAlle;
 
-  /// La batteria quando si è partiti.
-  double? get batteriaPartenza => pronto?.batteriaPartenza;
+  /// La batteria quando si è partiti (anche dopo un ricalcolo).
+  double? get batteriaPartenza => _batteriaInizio ?? pronto?.batteriaPartenza;
 
   /// La batteria adesso: quella vera se l'auto l'ha mandata dopo la
   /// partenza (Home Assistant, Android Auto), altrimenti la stima del piano
@@ -87,11 +105,8 @@ class GestoreGuida extends ChangeNotifier {
   double? get consumoKwh100 {
     final p = pronto, ora = batteriaOra;
     if (p == null) return null;
-    final km = (avanzamento?.percorsiM ?? 0) / 1000;
-    if (ora != null && ora.misurata && km > 3) {
-      final kwh = (p.batteriaPartenza - ora.valore) / 100 * auto.veicolo.capacitaUtileKwh;
-      if (kwh > 0) return kwh / km * 100;
-    }
+    // Misurato sui tratti guidati con i dati dell'auto, ricariche escluse.
+    if (ora != null && ora.misurata && _kmMisurati >= 3) return _whMisurati / _kmMisurati / 10;
     final piano = p.viaggio.piano, totale = p.viaggio.percorso.lunghezzaM / 1000;
     if (piano == null || totale <= 0 || piano.energiaKwh <= 0) return null;
     return piano.energiaKwh / totale * 100;
@@ -130,6 +145,11 @@ class GestoreGuida extends ChangeNotifier {
     _partitoAlle = _ora();
     _vicinoDetto = false;
     _guida = Guida(p.viaggio.percorso);
+    _batteriaInizio = p.batteriaPartenza;
+    _kmMisurati = 0;
+    _whMisurati = 0;
+    _nuovoPiano(p);
+    auto.addListener(_datiAuto);
     _iscrizione = posizioni().listen(_posizione);
     _evento('partenza');
     _racconta();
@@ -138,6 +158,8 @@ class GestoreGuida extends ChangeNotifier {
 
   Future<void> ferma() async {
     attiva = false;
+    auto.removeListener(_datiAuto);
+    _misuratore = null;
     await _iscrizione?.cancel();
     _iscrizione = null;
     await voce.zitta();
@@ -177,15 +199,59 @@ class GestoreGuida extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _ricalcola() async {
+  /// Si comincia a misurare sul piano nuovo, col modello senza correttivo.
+  void _nuovoPiano(ViaggioPronto p) {
+    final senza = consumo?.condizioni(auto.stato, conFattore: false) ?? const Condizioni();
+    _fattorePiano = consumo?.imparato.fattore ?? 1;
+    _misuratore = MisuratoreConsumo(
+      percorso: p.viaggio.percorso,
+      capacitaKwh: auto.veicolo.capacitaUtileKwh,
+      profilo: (t) => energiaTrattoWh(t, auto.veicolo, senza),
+    );
+  }
+
+  /// Una lettura vera dall'auto: si misura il consumo e, se la batteria si
+  /// allontana dal piano, si ricalcolano le soste da dove si è.
+  void _datiAuto() {
+    final p = pronto, s = auto.stato, ora = batteriaOra;
+    if (!attiva || p == null || s == null || ora == null || !ora.misurata) return;
+    final metri = avanzamento?.percorsiM ?? 0;
+    final misura = _misuratore?.registra(batteria: s.batteria, metri: metri, inCarica: s.inCarica == true);
+    if (misura != null) {
+      _kmMisurati += misura.km;
+      _whMisurati += misura.realeWh;
+      unawaited(consumo?.registra(misura));
+    }
+    if (s.inCarica == true || ricalcolando) return;
+    if (_ora().difference(_ultimoRicalcolo) < intervalloRicalcolo) return;
+    final scarto = (ora.valore - _prevista(p, metri / 1000)).abs();
+    final fattoreCambiato = ((consumo?.imparato.fattore ?? 1) - _fattorePiano).abs() > 0.05;
+    if (scarto >= scartoPerRicalcolo || fattoreCambiato) unawaited(_ricalcola(perConsumo: true));
+  }
+
+  Future<void> _ricalcola({bool perConsumo = false}) async {
     final d = viaggio.destinazione;
     if (d == null) return;
     ricalcolando = true;
+    _ultimoRicalcolo = _ora();
+    final prima = pronto?.viaggio.piano?.soste.map((s) => s.colonnina.id).toList();
+    // Le soste scelte già passate non valgono più: si riparte da qui.
+    final fatti = avanzamento?.percorsiM ?? 0;
+    for (final c in pronto?.viaggio.colonnine ?? const <ColonninaSulPercorso>[]) {
+      if (c.distanzaM <= fatti) viaggio.obbligate.remove(c.id);
+    }
     notifyListeners();
-    if (!muto) unawaited(voce.parla('Ricalcolo il percorso.'));
+    if (!perConsumo && !muto) unawaited(voce.parla('Ricalcolo il percorso.'));
     await viaggio.pianifica(d);
     ricalcolando = false;
-    if (pronto case final p?) _guida = Guida(p.viaggio.percorso);
+    if (pronto case final p?) {
+      _guida = Guida(p.viaggio.percorso);
+      _nuovoPiano(p);
+      final dopo = p.viaggio.piano?.soste.map((s) => s.colonnina.id).toList();
+      if (perConsumo && !listEquals(prima, dopo) && !muto) {
+        unawaited(voce.parla('Ho aggiornato le soste in base al consumo reale.'));
+      }
+    }
     notifyListeners();
   }
 

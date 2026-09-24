@@ -51,6 +51,10 @@ class SorgenteHomeAssistant implements SorgenteDatiAuto {
       temperaturaBatteriaC: (d['temperatura_batteria_c'] as num?)?.toDouble(),
       latitudine: (d['latitudine'] as num?)?.toDouble(),
       longitudine: (d['longitudine'] as num?)?.toDouble(),
+      temperaturaEsternaC: (d['temperatura_esterna_c'] as num?)?.toDouble(),
+      velocitaKmh: (d['velocita_kmh'] as num?)?.toDouble(),
+      potenzaKw: (d['potenza_kw'] as num?)?.toDouble(),
+      odometroKm: (d['odometro_km'] as num?)?.toDouble(),
     );
   }
 }

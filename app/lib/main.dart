@@ -4,6 +4,7 @@ import 'auto/ponte_auto.dart';
 import 'schermate/schermata_principale.dart';
 import 'stato/archivio.dart';
 import 'stato/gestore_auto.dart';
+import 'stato/gestore_consumo.dart';
 import 'stato/gestore_guida.dart';
 import 'stato/gestore_luoghi.dart';
 import 'stato/gestore_posizione.dart';
@@ -18,8 +19,18 @@ Future<void> main() async {
   final archivio = Archivio();
   final auto = GestoreAuto(archivio: archivio);
   await auto.avvia();
-  final viaggio = GestoreViaggio(archivio: archivio, auto: auto, posizione: posizioneAttuale);
-  final guida = GestoreGuida(viaggio: viaggio, auto: auto, posizioni: posizioniGuida, voce: VoceTelefono());
+  // Il consumo imparato del modello scelto; cambiando auto si cambia storia.
+  final consumo = GestoreConsumo(archivio);
+  await consumo.carica(auto.veicolo.id);
+  auto.addListener(() => consumo.carica(auto.veicolo.id));
+  final viaggio = GestoreViaggio(archivio: archivio, auto: auto, posizione: posizioneAttuale, consumo: consumo);
+  final guida = GestoreGuida(
+    viaggio: viaggio,
+    auto: auto,
+    posizioni: posizioniGuida,
+    voce: VoceTelefono(),
+    consumo: consumo,
+  );
   final posizione = GestorePosizione(archivio: archivio, letture: lettureGps);
   await posizione.carica();
   final segnalazioni = GestoreSegnalazioni(posizione: posizione);
@@ -38,6 +49,7 @@ Future<void> main() async {
       posizione: posizione,
       segnalazioni: segnalazioni,
       luoghi: luoghi,
+      consumo: consumo,
       chiediPosizione: chiediPosizione,
     ),
   );
@@ -55,6 +67,7 @@ class GdanavApp extends StatelessWidget {
     this.chiediPosizione,
     this.segnalazioni,
     this.luoghi,
+    this.consumo,
   });
 
   final Archivio archivio;
@@ -65,6 +78,7 @@ class GdanavApp extends StatelessWidget {
   final Future<bool> Function()? chiediPosizione;
   final GestoreSegnalazioni? segnalazioni;
   final GestoreLuoghi? luoghi;
+  final GestoreConsumo? consumo;
 
   /// Nelle prove e nelle anteprime si passa un'altra mappa: quella vera vuole
   /// il codice nativo.
@@ -87,6 +101,7 @@ class GdanavApp extends StatelessWidget {
         chiediPosizione: chiediPosizione,
         segnalazioni: segnalazioni,
         luoghi: luoghi,
+        consumo: consumo,
       ),
     );
   }

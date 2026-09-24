@@ -9,6 +9,8 @@ import androidx.car.app.hardware.CarHardwareManager
 import androidx.car.app.hardware.common.CarValue
 import androidx.car.app.hardware.common.OnCarDataAvailableListener
 import androidx.car.app.hardware.info.EnergyLevel
+import androidx.car.app.hardware.info.Mileage
+import androidx.car.app.hardware.info.Speed
 import androidx.car.app.validation.HostValidator
 import androidx.core.content.ContextCompat
 
@@ -34,11 +36,17 @@ class SessioneGdanav : Session() {
         return SchermoNavigazione(carContext)
     }
 
-    /** Batteria e autonomia dall'auto, se le passa: molte non lo fanno. */
+    /** Batteria, autonomia, velocità e contachilometri dall'auto, se li passa: molte non lo fanno. */
     private fun ascoltaEnergia() {
+        val hardware = try {
+            carContext.getCarService(CarHardwareManager::class.java)
+        } catch (e: Exception) {
+            return
+        }
+        val esecutore = ContextCompat.getMainExecutor(carContext)
+        // Ogni ascolto per conto suo: un'auto può dare la velocità ma non la batteria.
         try {
-            val hardware = carContext.getCarService(CarHardwareManager::class.java)
-            val ascoltatore = OnCarDataAvailableListener<EnergyLevel> { energia ->
+            hardware.carInfo.addEnergyLevelListener(esecutore, OnCarDataAvailableListener<EnergyLevel> { energia ->
                 val batteria = energia.batteryPercent
                 val autonomia = energia.rangeRemainingMeters
                 if (batteria.status == CarValue.STATUS_SUCCESS) {
@@ -46,10 +54,30 @@ class SessioneGdanav : Session() {
                         PonteAuto.energiaDallAuto(b, if (autonomia.status == CarValue.STATUS_SUCCESS) autonomia.value else null)
                     }
                 }
-            }
-            hardware.carInfo.addEnergyLevelListener(ContextCompat.getMainExecutor(carContext), ascoltatore)
+            })
         } catch (e: Exception) {
             // Senza dati dell'auto si guida lo stesso: la batteria arriva da altre fonti.
+        }
+        try {
+            hardware.carInfo.addSpeedListener(esecutore, OnCarDataAvailableListener<Speed> { v ->
+                val ms = if (v.displaySpeedMetersPerSecond.status == CarValue.STATUS_SUCCESS) {
+                    v.displaySpeedMetersPerSecond.value
+                } else if (v.rawSpeedMetersPerSecond.status == CarValue.STATUS_SUCCESS) {
+                    v.rawSpeedMetersPerSecond.value
+                } else {
+                    null
+                }
+                ms?.let { PonteAuto.velocitaDallAuto(it) }
+            })
+        } catch (e: Exception) {
+        }
+        try {
+            hardware.carInfo.addMileageListener(esecutore, OnCarDataAvailableListener<Mileage> { m ->
+                if (m.odometerMeters.status == CarValue.STATUS_SUCCESS) {
+                    m.odometerMeters.value?.let { PonteAuto.contachilometriDallAuto(it) }
+                }
+            })
+        } catch (e: Exception) {
         }
     }
 }

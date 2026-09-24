@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav/main.dart';
 import 'package:gdanav/stato/archivio.dart';
 import 'package:gdanav/stato/gestore_auto.dart';
+import 'package:gdanav/stato/gestore_consumo.dart';
 import 'package:gdanav/stato/gestore_guida.dart';
 import 'package:gdanav/stato/gestore_posizione.dart';
 import 'package:gdanav/stato/gestore_segnalazioni.dart';
@@ -140,9 +141,12 @@ Future<Ambiente> ambiente(WidgetTester tester, {int km = 500, Punto? posizione =
   final auto = GestoreAuto(archivio: archivio);
   await tester.runAsync(auto.avvia);
   addTearDown(auto.dispose);
+  final consumo = GestoreConsumo(archivio);
+  await tester.runAsync(() => consumo.carica(auto.veicolo.id));
   final viaggio = GestoreViaggio(
     archivio: archivio,
     auto: auto,
+    consumo: consumo,
     posizione: () async => posizione,
     costruisci: pianificatoreFinto(km),
     luoghi: LuoghiFinti(),
@@ -150,7 +154,13 @@ Future<Ambiente> ambiente(WidgetTester tester, {int km = 500, Punto? posizione =
   final posizioni = StreamController<Punto>.broadcast();
   addTearDown(posizioni.close);
   final voce = VoceFinta();
-  final guida = GestoreGuida(viaggio: viaggio, auto: auto, posizioni: () => posizioni.stream, voce: voce);
+  final guida = GestoreGuida(
+    viaggio: viaggio,
+    auto: auto,
+    posizioni: () => posizioni.stream,
+    voce: voce,
+    consumo: consumo,
+  );
   addTearDown(guida.dispose);
   final gps = StreamController<Lettura>.broadcast();
   addTearDown(gps.close);

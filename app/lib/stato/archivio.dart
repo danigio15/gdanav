@@ -83,6 +83,20 @@ class Archivio {
 
   Future<void> salvaLuoghi(Map<String, Object?> j) => _p.write(key: _luoghi, value: jsonEncode(j));
 
+  /// Il consumo imparato di un modello.
+  Future<ConsumoImparato> consumo(String veicolo) async {
+    final testo = await _p.read(key: 'consumo_$veicolo');
+    if (testo == null) return const ConsumoImparato();
+    try {
+      return ConsumoImparato.daJson(jsonDecode(testo) as Map<String, Object?>);
+    } on FormatException {
+      return const ConsumoImparato();
+    }
+  }
+
+  Future<void> salvaConsumo(String veicolo, ConsumoImparato c) =>
+      _p.write(key: 'consumo_$veicolo', value: jsonEncode(c.toJson()));
+
   Future<void> salvaSegnaposto(Segnaposto s) => _p.write(key: _segnaposto, value: s.name);
 }
 

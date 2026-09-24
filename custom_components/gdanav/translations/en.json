@@ -12,7 +12,11 @@
           "entita_potenza_carica": "Charging power",
           "entita_temperatura_batteria": "Battery temperature",
           "entita_posizione": "Car location",
-          "relay": "Relay"
+          "relay": "Relay",
+          "entita_temperatura_esterna": "Outside temperature",
+          "entita_velocita": "Speed",
+          "entita_potenza": "Battery power (in use)",
+          "entita_odometro": "Odometer"
         },
         "data_description": {
           "relay": "Keep the default unless you run your own relay."

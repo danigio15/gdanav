@@ -31,10 +31,14 @@ from .const import (
     CONF_COMANDI,
     CONF_IN_CARICA,
     CONF_NOME_AUTO,
+    CONF_ODOMETRO,
     CONF_POSIZIONE,
+    CONF_POTENZA,
     CONF_POTENZA_CARICA,
     CONF_RELAY,
     CONF_TEMPERATURA_BATTERIA,
+    CONF_TEMPERATURA_ESTERNA,
+    CONF_VELOCITA,
     ENTITA_AUTO,
     EVENTI_APP,
     EVENTO,
@@ -69,6 +73,30 @@ def _numero(stato: State | None) -> float | None:
         return float(stato.state)
     except ValueError:
         return None
+
+
+# Le unità che l'app vuole, da quelle che Home Assistant può avere.
+_CONVERSIONI: dict[str, float] = {
+    "W": 0.001,
+    "kW": 1.0,
+    "mph": 1.609344,
+    "km/h": 1.0,
+    "m/s": 3.6,
+    "mi": 1.609344,
+    "km": 1.0,
+    "m": 0.001,
+}
+
+
+def _misura(stato: State | None) -> float | None:
+    """Il numero nell'unità dell'app: kW, km/h, km, °C."""
+    valore = _numero(stato)
+    if valore is None or stato is None:
+        return None
+    unita = stato.attributes.get("unit_of_measurement")
+    if unita == "°F":
+        return round((valore - 32) * 5 / 9, 2)
+    return round(valore * _CONVERSIONI.get(unita, 1.0), 4)
 
 
 def _data(testo: Any) -> datetime | None:
@@ -171,6 +199,14 @@ class Hub:
             dati["potenza_carica_kw"] = _numero(get(e[CONF_POTENZA_CARICA]))
         if CONF_TEMPERATURA_BATTERIA in e:
             dati["temperatura_batteria_c"] = _numero(get(e[CONF_TEMPERATURA_BATTERIA]))
+        for conf, chiave in (
+            (CONF_TEMPERATURA_ESTERNA, "temperatura_esterna_c"),
+            (CONF_VELOCITA, "velocita_kmh"),
+            (CONF_POTENZA, "potenza_kw"),
+            (CONF_ODOMETRO, "odometro_km"),
+        ):
+            if conf in e:
+                dati[chiave] = _misura(get(e[conf]))
         if CONF_POSIZIONE in e and (s := get(e[CONF_POSIZIONE])) is not None:
             dati["latitudine"] = s.attributes.get("latitude")
             dati["longitudine"] = s.attributes.get("longitude")

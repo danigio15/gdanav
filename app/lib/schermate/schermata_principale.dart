@@ -7,6 +7,7 @@ import '../mappa/controllo_mappa.dart';
 import '../mappa/mappa_viaggio.dart';
 import '../stato/archivio.dart';
 import '../stato/gestore_auto.dart';
+import '../stato/gestore_consumo.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_luoghi.dart';
 import '../stato/gestore_segnalazioni.dart';
@@ -38,6 +39,7 @@ class SchermataPrincipale extends StatefulWidget {
     this.chiediPosizione,
     this.luoghi,
     this.segnalazioni,
+    this.consumo,
   });
 
   final GestoreAuto auto;
@@ -51,6 +53,9 @@ class SchermataPrincipale extends StatefulWidget {
 
   /// Le segnalazioni della comunità; se manca se ne crea uno sui servizi cablati.
   final GestoreSegnalazioni? segnalazioni;
+
+  /// Il consumo imparato, da mostrare in «La tua auto».
+  final GestoreConsumo? consumo;
 
   /// Chiede il permesso della posizione; nelle prove non c'è.
   final Future<bool> Function()? chiediPosizione;
@@ -249,7 +254,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                   icona: Icons.electric_car,
                   titolo: 'La tua auto',
                   sotto: widget.auto.veicolo.nome,
-                  onTap: () => vai(LaTuaAuto(auto: widget.auto, posizione: widget.posizione)),
+                  onTap: () => vai(LaTuaAuto(auto: widget.auto, posizione: widget.posizione, consumo: widget.consumo)),
                 ),
                 _VoceMenu(
                   icona: Icons.ev_station,

@@ -3,6 +3,7 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import 'archivio.dart';
 import 'gestore_auto.dart';
+import 'gestore_consumo.dart';
 
 /// A che punto è il viaggio.
 sealed class StatoViaggio {
@@ -63,6 +64,7 @@ class GestoreViaggio extends ChangeNotifier {
     required this.auto,
     required this.posizione,
     this.costruisci = pianificatoreVero,
+    this.consumo,
     FonteLuoghi? luoghi,
     DateTime Function()? orologio,
   }) : luoghi = luoghi ?? ClientePhoton(),
@@ -74,6 +76,10 @@ class GestoreViaggio extends ChangeNotifier {
   /// Dove si è adesso. `null` se il telefono non lo sa o non lo vuole dire.
   final Future<Punto?> Function() posizione;
   final CostruisciPianificatore costruisci;
+
+  /// Il consumo imparato e la temperatura: le soste si calcolano su come
+  /// consuma davvero la tua auto.
+  final GestoreConsumo? consumo;
   final FonteLuoghi luoghi;
   final DateTime Function() _ora;
 
@@ -130,11 +136,13 @@ class GestoreViaggio extends ChangeNotifier {
     final calcolo = Calcolo(destinazione);
     _imposta(calcolo);
     try {
-      final viaggio = await costruisci(
-        impostazioni,
-        auto.veicolo,
-        preferenze,
-      ).pianifica(partenza: partenza, arrivo: destinazione.posizione, batteria: batteria, obbligate: Set.of(obbligate));
+      final viaggio = await costruisci(impostazioni, auto.veicolo, preferenze).pianifica(
+        partenza: partenza,
+        arrivo: destinazione.posizione,
+        batteria: batteria,
+        condizioni: consumo?.condizioni(auto.stato) ?? const Condizioni(),
+        obbligate: Set.of(obbligate),
+      );
       // Nel frattempo l'utente può aver annullato o scelto un'altra meta.
       if (identical(stato, calcolo)) {
         _imposta(ViaggioPronto(destinazione, viaggio, batteria, calcolatoAlle: _ora()));

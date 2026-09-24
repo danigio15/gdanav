@@ -19,8 +19,12 @@ from custom_components.gdanav.const import (
     CONF_COMANDI,
     CONF_IN_CARICA,
     CONF_NOME_AUTO,
+    CONF_ODOMETRO,
     CONF_POSIZIONE,
+    CONF_POTENZA,
     CONF_RELAY,
+    CONF_TEMPERATURA_ESTERNA,
+    CONF_VELOCITA,
     DOMAIN,
     EVENTO,
 )
@@ -118,6 +122,35 @@ async def test_entita_create(hass: HomeAssistant, senza_relay: None) -> None:
     ):
         assert hass.states.get(entity_id) is not None, entity_id
     assert hass.states.get("binary_sensor.gdanav_in_viaggio").state == "off"
+
+
+async def test_dati_per_il_consumo_con_le_unita_giuste(hass: HomeAssistant, senza_relay: None) -> None:
+    hass.states.async_set("sensor.auto_batteria", "72", {"device_class": "battery", "unit_of_measurement": "%"})
+    hass.states.async_set("sensor.fuori", "50", {"unit_of_measurement": "°F"})
+    hass.states.async_set("sensor.velocita", "60", {"unit_of_measurement": "mph"})
+    hass.states.async_set("sensor.potenza", "15200", {"unit_of_measurement": "W"})
+    hass.states.async_set("sensor.contachilometri", "10000", {"unit_of_measurement": "mi"})
+    voce = _voce()
+    voce = MockConfigEntry(
+        domain=DOMAIN,
+        title=voce.title,
+        unique_id=voce.unique_id,
+        data={
+            **voce.data,
+            CONF_TEMPERATURA_ESTERNA: "sensor.fuori",
+            CONF_VELOCITA: "sensor.velocita",
+            CONF_POTENZA: "sensor.potenza",
+            CONF_ODOMETRO: "sensor.contachilometri",
+        },
+    )
+    voce.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(voce.entry_id)
+    await hass.async_block_till_done()
+    stato = voce.runtime_data.stato_auto()
+    assert stato["temperatura_esterna_c"] == 10
+    assert abs(stato["velocita_kmh"] - 96.56) < 0.01
+    assert stato["potenza_kw"] == 15.2
+    assert abs(stato["odometro_km"] - 16093.44) < 0.01
 
 
 async def test_stato_auto(hass: HomeAssistant, senza_relay: None) -> None:

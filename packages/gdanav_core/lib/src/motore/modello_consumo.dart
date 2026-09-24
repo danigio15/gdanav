@@ -20,14 +20,19 @@ class Tratto {
 
 /// Quello che il meteo e l'abitacolo aggiungono.
 class Condizioni {
-  const Condizioni({this.temperaturaC = 20, this.ventoControMs = 0, this.climaW = 0});
+  const Condizioni({this.temperaturaC = 20, this.ventoControMs = 0, this.climaW = 0, this.fattoreConsumo = 1});
 
   /// Il clima stimato dalla temperatura esterna: niente fra 18 e 26 gradi,
   /// poi riscaldamento o raffrescamento proporzionali, con un tetto.
-  factory Condizioni.daMeteo({required double temperaturaC, double ventoControMs = 0}) {
+  factory Condizioni.daMeteo({required double temperaturaC, double ventoControMs = 0, double fattoreConsumo = 1}) {
     final caldo = math.min(3000.0, math.max(0.0, 18 - temperaturaC) * 150);
     final freddo = math.min(1500.0, math.max(0.0, temperaturaC - 26) * 100);
-    return Condizioni(temperaturaC: temperaturaC, ventoControMs: ventoControMs, climaW: caldo + freddo);
+    return Condizioni(
+      temperaturaC: temperaturaC,
+      ventoControMs: ventoControMs,
+      climaW: caldo + freddo,
+      fattoreConsumo: fattoreConsumo,
+    );
   }
 
   final double temperaturaC;
@@ -36,6 +41,10 @@ class Condizioni {
   final double ventoControMs;
 
   final double climaW;
+
+  /// Quanto la tua auto consuma rispetto al modello: lo impara
+  /// [ConsumoImparato] guidando (1,1 = il 10% in più).
+  final double fattoreConsumo;
 
   /// Densità dell'aria alla temperatura data, al livello del mare.
   double get densitaAria => 101325 / (287.05 * (temperaturaC + 273.15));
@@ -54,7 +63,9 @@ double energiaTrattoWh(Tratto tratto, ProfiloVeicolo p, [Condizioni c = const Co
 
   final batteria = ruota >= 0 ? ruota / p.rendimentoTrazione : ruota * p.rendimentoRecupero;
   final fissi = (p.consumoFissoW + c.climaW) * tratto.secondi;
-  return (batteria + fissi) / 3600;
+  final wh = (batteria + fissi) / 3600;
+  // Il correttivo vale per quello che si spende, non per il recupero.
+  return wh > 0 ? wh * c.fattoreConsumo : wh;
 }
 
 /// Consumo medio in Wh/km, il numero che si mostra all'utente.

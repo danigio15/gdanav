@@ -36,6 +36,10 @@ class StatoAuto {
     this.temperaturaBatteriaC,
     this.latitudine,
     this.longitudine,
+    this.temperaturaEsternaC,
+    this.velocitaKmh,
+    this.potenzaKw,
+    this.odometroKm,
   });
 
   final TipoSorgente sorgente;
@@ -53,6 +57,19 @@ class StatoAuto {
   final double? latitudine;
   final double? longitudine;
 
+  /// Per il clima nel modello di consumo.
+  final double? temperaturaEsternaC;
+
+  /// La velocità vista dall'auto: più precisa del GPS, per il tachimetro.
+  final double? velocitaKmh;
+
+  /// La potenza presa dalla batteria adesso, positiva quando consuma e
+  /// negativa quando recupera o si carica.
+  final double? potenzaKw;
+
+  /// Il contachilometri: i chilometri veri fra due letture.
+  final double? odometroKm;
+
   Duration eta(DateTime ora) => ora.difference(letto);
 
   StatoAuto conBatteria(double batteria, {TipoSorgente? sorgente, DateTime? letto}) => StatoAuto(
@@ -65,6 +82,10 @@ class StatoAuto {
         temperaturaBatteriaC: temperaturaBatteriaC,
         latitudine: latitudine,
         longitudine: longitudine,
+        temperaturaEsternaC: temperaturaEsternaC,
+        velocitaKmh: velocitaKmh,
+        potenzaKw: potenzaKw,
+        odometroKm: odometroKm,
       );
 
   @override

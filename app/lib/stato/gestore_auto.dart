@@ -45,7 +45,7 @@ class GestoreAuto extends ChangeNotifier {
     arbitro.modalita = await archivio.fonte();
     abbinamento = await archivio.abbinamento();
     await _accendi(manuale);
-    await _accendi(SorgenteAndroidAuto());
+    await _accendi(SorgenteAndroidAuto(onVelocita: _velocita));
     if (abbinamento != null) await _accendi(SorgenteHomeAssistant(ClienteRelay(abbinamento!)));
     // Anche senza letture nuove l'età del dato cambia: si ricalcola ogni tanto.
     _orologio = Timer.periodic(const Duration(seconds: 5), (_) => _aggiorna());
@@ -110,7 +110,26 @@ class GestoreAuto extends ChangeNotifier {
 
   void _aggiorna() {
     stato = arbitro.statoAttuale(DateTime.now());
+    if (stato?.velocitaKmh case final v?) _velocita(v, notifica: false);
     notifyListeners();
+  }
+
+  /// La velocità del cruscotto (Android Auto, Home Assistant), per il
+  /// tachimetro: più precisa del GPS.
+  double? _velocitaAuto;
+  DateTime? _velocitaLetta;
+
+  void _velocita(double kmh, {bool notifica = true}) {
+    _velocitaAuto = kmh;
+    _velocitaLetta = DateTime.now();
+    if (notifica) notifyListeners();
+  }
+
+  /// `null` se l'auto non la dice o tace da più di tre secondi.
+  double? velocitaAuto() {
+    final t = _velocitaLetta;
+    if (t == null || DateTime.now().difference(t) > const Duration(seconds: 3)) return null;
+    return _velocitaAuto;
   }
 
   @override

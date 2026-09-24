@@ -289,4 +289,51 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Se gdanav non compare sull\'auto'), findsOneWidget);
   });
+
+  testWidgets('in viaggio la batteria vera corregge il consumo e, se si scosta, le soste si ricalcolano', (
+    tester,
+  ) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final a = await ambiente(tester, km: 20);
+    await tester.pumpWidget(a.app());
+    a.auto.manuale.imposta(90);
+    await tester.pump();
+    await tester.runAsync(() => a.viaggio.vaiA(const Luogo(nome: 'Nord', posizione: Punto(42.18, 12))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Avvia'));
+    await tester.pumpAndSettle();
+    final primo = (a.viaggio.stato as ViaggioPronto).viaggio;
+    final punti = primo.percorso.punti;
+    final consumo = a.viaggio.consumo!;
+    expect(consumo.imparato.kmOsservati, 0);
+
+    Future<void> letturaVera(int i, double batteria) async {
+      a.posizioni.add(punti[i]);
+      await aspetta(tester);
+      a.auto.arbitro.registra(
+        StatoAuto(sorgente: TipoSorgente.homeAssistant, letto: DateTime.now(), batteria: batteria),
+      );
+      await tester.runAsync(() => a.auto.cambiaModalita(a.auto.modalita));
+      await aspetta(tester, 80);
+      await tester.pumpAndSettle();
+    }
+
+    // A 3 km la batteria è in linea col piano: nessun ricalcolo.
+    await letturaVera(3, a.guida.batteriaOra!.valore.roundToDouble());
+    expect(identical((a.viaggio.stato as ViaggioPronto).viaggio, primo), isTrue);
+
+    // A 8 km l'auto dice 6 punti in meno del previsto: si impara e si ricalcola.
+    final prevista = a.guida.batteriaOra!.valore;
+    await letturaVera(8, (prevista - 6).roundToDouble());
+    expect(consumo.imparato.kmOsservati, greaterThan(4));
+    expect(consumo.imparato.fattore, greaterThan(1.1));
+    expect(identical((a.viaggio.stato as ViaggioPronto).viaggio, primo), isFalse);
+    expect(a.guida.attiva, isTrue);
+    // Senza «Ricalcolo il percorso»: non si è sbagliata strada.
+    expect(a.voce.frasi, isNot(contains('Ricalcolo il percorso.')));
+    // Il consumo mostrato ora è quello misurato.
+    expect(a.guida.consumoKwh100, greaterThan(0));
+    await tester.tap(find.text('Fine'));
+    await tester.pumpAndSettle();
+  });
 }

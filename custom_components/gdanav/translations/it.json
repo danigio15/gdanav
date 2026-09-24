@@ -12,7 +12,11 @@
           "entita_potenza_carica": "Potenza di carica",
           "entita_temperatura_batteria": "Temperatura della batteria",
           "entita_posizione": "Posizione dell'auto",
-          "relay": "Relay"
+          "relay": "Relay",
+          "entita_temperatura_esterna": "Temperatura esterna",
+          "entita_velocita": "Velocità",
+          "entita_potenza": "Potenza della batteria (in uso)",
+          "entita_odometro": "Contachilometri"
         },
         "data_description": {
           "relay": "Lascia quello predefinito, a meno di avere un relay tuo."

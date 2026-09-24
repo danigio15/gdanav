@@ -3,6 +3,7 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import '../mappa/segnaposto.dart';
 import '../stato/gestore_auto.dart';
+import '../stato/gestore_consumo.dart';
 import '../stato/gestore_posizione.dart';
 import '../tema.dart';
 
@@ -15,10 +16,11 @@ String _n(double x) => x == x.roundToDouble() ? '${x.round()}' : x.toStringAsFix
 
 /// La scelta dell'auto: da lei dipendono consumi, tempi di ricarica e prese.
 class LaTuaAuto extends StatefulWidget {
-  const LaTuaAuto({super.key, required this.auto, required this.posizione});
+  const LaTuaAuto({super.key, required this.auto, required this.posizione, this.consumo});
 
   final GestoreAuto auto;
   final GestorePosizione posizione;
+  final GestoreConsumo? consumo;
 
   @override
   State<LaTuaAuto> createState() => _LaTuaAutoState();
@@ -76,6 +78,7 @@ class _LaTuaAutoState extends State<LaTuaAuto> {
                   ),
                 ),
               ),
+              if (widget.consumo case final c?) _ConsumoImparato(consumo: c),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
                 child: Text('Come ti vedi sulla mappa', style: t.titleSmall),
@@ -231,4 +234,57 @@ bool corrisponde(ProfiloVeicolo v, String filtro) {
     if (parola.isNotEmpty && !nome.contains(parola) && !compatto.contains(parola)) return false;
   }
   return true;
+}
+
+/// Quanto la tua auto consuma davvero rispetto alla scheda, imparato
+/// guidando con i dati dell'auto.
+class _ConsumoImparato extends StatelessWidget {
+  const _ConsumoImparato({required this.consumo});
+  final GestoreConsumo consumo;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final muto = Theme.of(context).colorScheme.onSurfaceVariant;
+    return ListenableBuilder(
+      listenable: consumo,
+      builder: (context, _) {
+        final c = consumo.imparato;
+        final km = c.kmOsservati.round();
+        final scarto = c.scartoPercento;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.insights_outlined),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Consumo imparato', style: t.titleSmall),
+                        Text(
+                          km == 0
+                              ? 'Ancora nessun dato: guida con Home Assistant o Android Auto collegati e gdanav '
+                                    'impara quanto consuma davvero la tua auto.'
+                              : '${scarto == 0 ? 'Come la scheda' : '${scarto > 0 ? '+' : ''}$scarto% rispetto '
+                                          'alla scheda'} · misurato su $km km',
+                          key: const Key('consumo-imparato'),
+                          style: t.bodySmall?.copyWith(color: muto),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (km > 0) TextButton(onPressed: consumo.azzera, child: const Text('Azzera')),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

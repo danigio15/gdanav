@@ -75,7 +75,7 @@ object PonteAuto {
         EventChannel(messenger, "gdanav/auto").setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
                 sinkEnergia = events
-                ultimaEnergia?.let { events.success(it) }
+                if (ultimaEnergia != null || ultimaVelocita != null) mandaAuto()
             }
 
             override fun onCancel(arguments: Any?) {
@@ -163,14 +163,36 @@ object PonteAuto {
 
     private fun avvisa() = principale.post { ascoltatori.forEach { it() } }
 
+    private var ultimaVelocita: Double? = null
+    private var ultimoOdometro: Double? = null
+
     /** Dall'auto: batteria in percentuale e autonomia in metri. */
     fun energiaDallAuto(batteria: Float, autonomiaM: Float?) {
-        val dati = mapOf(
+        ultimaEnergia = mapOf(
             "batteria" to batteria.toDouble(),
             "autonomia_km" to autonomiaM?.let { it / 1000.0 },
-            "letto_ms" to System.currentTimeMillis(),
         )
-        ultimaEnergia = dati
+        mandaAuto()
+    }
+
+    /** Dall'auto: la velocità del cruscotto, in m/s. */
+    fun velocitaDallAuto(ms: Float) {
+        ultimaVelocita = ms * 3.6
+        mandaAuto()
+    }
+
+    /** Dall'auto: il contachilometri, in metri. */
+    fun contachilometriDallAuto(metri: Float) {
+        ultimoOdometro = metri / 1000.0
+        mandaAuto()
+    }
+
+    /** Tutto quello che l'auto ha detto finora, in una lettura sola. */
+    private fun mandaAuto() {
+        val dati = HashMap<String, Any?>(ultimaEnergia ?: emptyMap())
+        dati["velocita_kmh"] = ultimaVelocita
+        dati["odometro_km"] = ultimoOdometro
+        dati["letto_ms"] = System.currentTimeMillis()
         principale.post { sinkEnergia?.success(dati) }
     }
 
