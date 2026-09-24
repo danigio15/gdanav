@@ -4,7 +4,7 @@ build/
 pubspec_overrides.yaml
 
 # Node / Cloudflare
-node_modules/
+node_modules
 .wrangler/
 .dev.vars
 

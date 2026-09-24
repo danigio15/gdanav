@@ -3,10 +3,14 @@ import 'dart:math' show Point;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:gdanav_core/gdanav_core.dart' show TipoSegnalazione;
 import 'package:maplibre_gl/maplibre_gl.dart';
 
+import '../componenti/icone_segnalazioni.dart';
+import '../servizi.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_posizione.dart';
+import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import 'controllo_mappa.dart';
 import 'dati_viaggio.dart';
@@ -24,6 +28,7 @@ class MappaViaggio extends StatefulWidget {
     required this.onColonnina,
     required this.posizione,
     this.guida,
+    this.segnalazioni,
   });
 
   final GestoreViaggio gestore;
@@ -41,6 +46,9 @@ class MappaViaggio extends StatefulWidget {
   /// In guida la mappa segue l'auto agganciata al percorso, inclinata e
   /// girata come la strada.
   final GestoreGuida? guida;
+
+  /// Polizia, incidenti, traffico segnalati da chi guida.
+  final GestoreSegnalazioni? segnalazioni;
 
   @override
   State<MappaViaggio> createState() => _MappaViaggioState();
@@ -62,6 +70,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.controllo.addListener(_comandi);
     widget.posizione.addListener(_io);
     widget.guida?.addListener(_io);
+    widget.segnalazioni?.addListener(_segnalazioni);
   }
 
   @override
@@ -70,6 +79,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.controllo.removeListener(_comandi);
     widget.posizione.removeListener(_io);
     widget.guida?.removeListener(_io);
+    widget.segnalazioni?.removeListener(_segnalazioni);
     super.dispose();
   }
 
@@ -129,6 +139,15 @@ class _MappaViaggioState extends State<MappaViaggio> {
       final byte = await rootBundle.load(s.asset);
       await m.addImage(s.immagine, byte.buffer.asUint8List());
     }
+    for (final t in TipoSegnalazione.values) {
+      await m.addImage(nomeIcona(t), await iconaSegnalazionePng(t));
+    }
+  }
+
+  Future<void> _segnalazioni() async {
+    final m = _mappa, g = widget.segnalazioni;
+    if (m == null || !_stileCaricato || g == null) return;
+    await m.setGeoJsonSource(sorgenteSegnalazioni, datiSegnalazioni(g.vicine).cast<String, dynamic>());
   }
 
   Future<void> _edifici(MapLibreMapController m) async {
@@ -178,7 +197,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     return MapLibreMap(
       // Cambia stile col tema: la chiave rifà la mappa.
       key: ValueKey(scuro),
-      styleString: jsonEncode(stileMappa(scuro: scuro)),
+      styleString: jsonEncode(stileMappa(scuro: scuro, chiaveTraffico: Servizi.chiaveTomTom)),
       initialCameraPosition: widget.guida != null
           ? const CameraPosition(target: LatLng(41.9, 12.5), zoom: 17, tilt: _inclinazione)
           : const CameraPosition(target: LatLng(41.9, 12.5), zoom: 5),
@@ -194,7 +213,10 @@ class _MappaViaggioState extends State<MappaViaggio> {
         if (_mappa case final m?) {
           _inclinata = widget.controllo.inclinata;
           _edifici(m);
-          _immagini(m).then((_) => _io());
+          _immagini(m).then((_) {
+            _io();
+            _segnalazioni();
+          });
         }
         _ridisegna();
       },

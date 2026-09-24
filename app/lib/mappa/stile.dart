@@ -10,6 +10,9 @@ const sorgentePercorso = 'gdanav-percorso';
 const sorgenteColonnine = 'gdanav-colonnine';
 const sorgenteArrivo = 'gdanav-arrivo';
 const sorgenteIo = 'gdanav-io';
+const sorgenteSegnalazioni = 'gdanav-segnalazioni';
+const stratoTraffico = 'traffico';
+const stratoIncidenti = 'incidenti';
 const stratiToccabili = ['gdanav-soste', 'gdanav-colonnine'];
 
 /// Dall'alto gli edifici sono piatti e puliti; inclinando la mappa si
@@ -21,6 +24,7 @@ class _Tavolozza {
   const _Tavolozza({
     required this.sfondo,
     required this.abitato,
+    required this.industria,
     required this.prato,
     required this.bosco,
     required this.acqua,
@@ -38,6 +42,7 @@ class _Tavolozza {
     required this.etichetta,
     required this.etichettaAlone,
     required this.luogo,
+    required this.poi,
     required this.percorso,
     required this.percorsoBordo,
     required this.contorno,
@@ -48,66 +53,74 @@ class _Tavolozza {
     required this.arrivo,
   });
 
-  final String sfondo, abitato, prato, bosco, acqua, edificio, edificioLato, edificioBordo;
+  final String sfondo, abitato, industria, prato, bosco, acqua, edificio, edificioLato, edificioBordo;
   final String autostrada, autostradaBordo, principale, principaleBordo, strada, stradaBordo, sentiero, ferrovia;
-  final String etichetta, etichettaAlone, luogo;
+  final String etichetta, etichettaAlone, luogo, poi;
   final String percorso, percorsoBordo, contorno;
   final String libera, piena, guasta, ignota, arrivo;
 }
 
+// I colori di Waze: fondo quasi bianco, strade tutte grigie col bordo più
+// scuro, nomi in grigio carbone e città in blu. Il colore lo prendono solo
+// il percorso, il traffico e le colonnine.
 const _chiaro = _Tavolozza(
-  sfondo: '#F6F4F0',
-  abitato: '#F0ECE6',
-  prato: '#D6EACB',
-  bosco: '#C2DEB2',
-  acqua: '#A3CFF2',
-  edificio: '#E7E1D9',
-  edificioLato: '#D9D1C6',
-  edificioBordo: '#D8CFC3',
-  autostrada: '#F9B866',
-  autostradaBordo: '#D98D3A',
-  principale: '#FFE39A',
-  principaleBordo: '#DDBB62',
-  strada: '#FFFFFF',
-  stradaBordo: '#D9D1C6',
-  sentiero: '#C9C0B4',
-  ferrovia: '#B8B0A6',
-  etichetta: '#475467',
+  sfondo: '#F6F7F8',
+  abitato: '#F1F2F4',
+  industria: '#E4E6EA',
+  prato: '#D4EDCB',
+  bosco: '#C6E5BA',
+  acqua: '#A9D7F6',
+  edificio: '#E3E5E9',
+  edificioLato: '#CDD1D7',
+  edificioBordo: '#D3D7DC',
+  autostrada: '#C3C9D0',
+  autostradaBordo: '#98A1AB',
+  principale: '#CDD2D8',
+  principaleBordo: '#A6AEB7',
+  strada: '#DCDFE3',
+  stradaBordo: '#B8BEC5',
+  sentiero: '#CBD0D6',
+  ferrovia: '#B4BAC2',
+  etichetta: '#3E434A',
   etichettaAlone: '#FFFFFF',
-  luogo: '#1F2937',
-  percorso: '#2F6BFF',
-  percorsoBordo: '#1638A8',
+  luogo: '#4F74A3',
+  poi: '#8A919A',
+  percorso: '#27A2F8',
+  percorsoBordo: '#0A6CC2',
   contorno: '#FFFFFF',
   libera: '#16A34A',
   piena: '#D97706',
   guasta: '#DC2626',
   ignota: '#64748B',
-  arrivo: '#DC2626',
+  arrivo: '#E5484D',
 );
 
+// La notte di Waze: blu notte, strade grigio ardesia, nomi chiari.
 const _scuro = _Tavolozza(
-  sfondo: '#0E1520',
-  abitato: '#111B28',
-  prato: '#132A1E',
-  bosco: '#11261A',
-  acqua: '#0C3050',
-  edificio: '#243044',
-  edificioLato: '#34445E',
-  edificioBordo: '#2C3A50',
-  autostrada: '#A2622A',
-  autostradaBordo: '#5B3514',
-  principale: '#6F6031',
-  principaleBordo: '#3B321A',
-  strada: '#2E3B4E',
-  stradaBordo: '#0A111B',
-  sentiero: '#3A4659',
-  ferrovia: '#3A4659',
-  etichetta: '#B8C4D6',
-  etichettaAlone: '#0E1520',
-  luogo: '#E5ECF5',
-  percorso: '#4C8DFF',
-  percorsoBordo: '#0B2A73',
-  contorno: '#0B1220',
+  sfondo: '#1B2130',
+  abitato: '#1F2636',
+  industria: '#252C3C',
+  prato: '#1C3027',
+  bosco: '#1A2E24',
+  acqua: '#1A3656',
+  edificio: '#283042',
+  edificioLato: '#3A4459',
+  edificioBordo: '#2F384B',
+  autostrada: '#56627A',
+  autostradaBordo: '#141925',
+  principale: '#48536A',
+  principaleBordo: '#141925',
+  strada: '#394356',
+  stradaBordo: '#141925',
+  sentiero: '#3A4457',
+  ferrovia: '#3A4457',
+  etichetta: '#D2D8E1',
+  etichettaAlone: '#1B2130',
+  luogo: '#8FB6E8',
+  poi: '#7D8797',
+  percorso: '#3AB0FF',
+  percorsoBordo: '#0B5AA6',
+  contorno: '#0F1420',
   libera: '#4ADE80',
   piena: '#FBBF24',
   guasta: '#F87171',
@@ -142,7 +155,12 @@ const _vuota = {'type': 'FeatureCollection', 'features': <Object>[]};
 
 /// Lo stile completo. [scuro] per la sera; le sorgenti del viaggio partono
 /// vuote.
-Map<String, Object> stileMappa({required bool scuro}) {
+///
+/// Con [chiaveTraffico] (una chiave gratuita di TomTom) sulle strade si
+/// vedono le code, come in Waze: solo dove si va più piano del solito, e
+/// gli incidenti e i lavori.
+Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}) {
+  final traffico = chiaveTraffico.trim();
   final t = scuro ? _scuro : _chiaro;
   final classi = {
     'autostrada': [
@@ -212,6 +230,29 @@ Map<String, Object> stileMappa({required bool scuro}) {
       sorgenteColonnine: {'type': 'geojson', 'data': _vuota},
       sorgenteArrivo: {'type': 'geojson', 'data': _vuota},
       sorgenteIo: {'type': 'geojson', 'data': _vuota},
+      sorgenteSegnalazioni: {'type': 'geojson', 'data': _vuota},
+      if (traffico.isNotEmpty) ...{
+        'traffico': {
+          'type': 'raster',
+          'tileSize': 512,
+          'maxzoom': 18,
+          'attribution': '© TomTom',
+          'tiles': [
+            'https://api.tomtom.com/traffic/map/4/tile/flow/relative-delay/{z}/{x}/{y}.png'
+                '?key=${Uri.encodeQueryComponent(traffico)}&tileSize=512&thickness=10',
+          ],
+        },
+        'incidenti': {
+          'type': 'raster',
+          'tileSize': 512,
+          'maxzoom': 18,
+          'attribution': '© TomTom',
+          'tiles': [
+            'https://api.tomtom.com/traffic/map/4/tile/incidents/${scuro ? 's0-dark' : 's0'}/{z}/{x}/{y}.png'
+                '?key=${Uri.encodeQueryComponent(traffico)}&tileSize=512',
+          ],
+        },
+      },
     },
     'layers': [
       {
@@ -232,6 +273,20 @@ Map<String, Object> stileMappa({required bool scuro}) {
           false,
         ],
         'paint': {'fill-color': t.abitato},
+      },
+      {
+        'id': 'industria',
+        'type': 'fill',
+        'source': 'openmaptiles',
+        'source-layer': 'landuse',
+        'filter': [
+          'match',
+          ['get', 'class'],
+          ['industrial', 'railway', 'garages', 'military', 'hospital', 'school', 'university'],
+          true,
+          false,
+        ],
+        'paint': {'fill-color': t.industria},
       },
       {
         'id': 'bosco',
@@ -283,14 +338,26 @@ Map<String, Object> stileMappa({required bool scuro}) {
       _strada('sentieri', classi['sentiero']!, t.sentiero, _largo(0.4, 2), minzoom: 14),
       _strada('ferrovie', classi['ferrovia']!, t.ferrovia, _largo(0.8, 3)),
       // Prima tutti i bordi, poi tutti i riempimenti: gli incroci restano puliti.
-      _strada('servizio-bordo', classi['servizio']!, t.stradaBordo, _largo(0.8, 9), minzoom: 14),
-      _strada('strade-bordo', classi['strada']!, t.stradaBordo, _largo(1.6, 19)),
-      _strada('principali-bordo', classi['principale']!, t.principaleBordo, _largo(2.6, 26)),
-      _strada('autostrade-bordo', classi['autostrada']!, t.autostradaBordo, _largo(3.4, 30)),
-      _strada('servizio', classi['servizio']!, t.strada, _largo(0.4, 7), minzoom: 14),
-      _strada('strade', classi['strada']!, t.strada, _largo(1, 16)),
-      _strada('principali', classi['principale']!, t.principale, _largo(1.8, 22)),
-      _strada('autostrade', classi['autostrada']!, t.autostrada, _largo(2.4, 26)),
+      _strada('servizio-bordo', classi['servizio']!, t.stradaBordo, _largo(1.2, 12), minzoom: 14),
+      _strada('strade-bordo', classi['strada']!, t.stradaBordo, _largo(2.4, 24)),
+      _strada('principali-bordo', classi['principale']!, t.principaleBordo, _largo(3.6, 32)),
+      _strada('autostrade-bordo', classi['autostrada']!, t.autostradaBordo, _largo(4.6, 38)),
+      _strada('servizio', classi['servizio']!, t.strada, _largo(0.6, 9), minzoom: 14),
+      _strada('strade', classi['strada']!, t.strada, _largo(1.6, 20)),
+      _strada('principali', classi['principale']!, t.principale, _largo(2.6, 27)),
+      _strada('autostrade', classi['autostrada']!, t.autostrada, _largo(3.4, 32)),
+      // Il traffico sopra le strade e sotto tutto il resto: giallo, arancio,
+      // rosso dove si rallenta.
+      if (traffico.isNotEmpty) ...[
+        {
+          'id': stratoTraffico,
+          'type': 'raster',
+          'source': 'traffico',
+          'minzoom': 6,
+          'paint': {'raster-opacity': 0.9},
+        },
+        {'id': stratoIncidenti, 'type': 'raster', 'source': 'incidenti', 'minzoom': 8},
+      ],
       {
         'id': stratoEdifici2d,
         'type': 'fill',
@@ -338,15 +405,52 @@ Map<String, Object> stileMappa({required bool scuro}) {
         'type': 'symbol',
         'source': 'openmaptiles',
         'source-layer': 'transportation_name',
-        'minzoom': 14,
+        'minzoom': 13,
         'layout': {
           'symbol-placement': 'line',
           'text-field': ['get', 'name'],
-          'text-font': ['Noto Sans Regular'],
-          'text-size': 12,
+          'text-font': ['Noto Sans Bold'],
+          'text-size': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            13,
+            11,
+            16,
+            13.5,
+            19,
+            16,
+          ],
           'text-max-angle': 30,
+          'text-padding': 8,
         },
-        'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 1.5},
+        'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 2},
+      },
+      {
+        // I nomi dei posti (distributori, scuole, negozi): piccoli e grigi,
+        // come in Waze.
+        'id': 'nomi-poi',
+        'type': 'symbol',
+        'source': 'openmaptiles',
+        'source-layer': 'poi',
+        'minzoom': 15.5,
+        'filter': [
+          '<=',
+          [
+            'coalesce',
+            ['get', 'rank'],
+            99,
+          ],
+          20,
+        ],
+        'layout': {
+          'text-field': ['get', 'name'],
+          'text-font': ['Noto Sans Regular'],
+          'text-size': 11.5,
+          'text-max-width': 8,
+          'text-padding': 4,
+        },
+        'paint': {'text-color': t.poi, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 1.5},
       },
       // Il percorso: un alone morbido, il bordo blu scuro, la linea blu e le
       // frecce della direzione. Sempre blu: nessuna strada ha quel colore.
@@ -452,6 +556,33 @@ Map<String, Object> stileMappa({required bool scuro}) {
         },
       },
       {
+        // Le segnalazioni: i fumetti colorati di Waze, in piedi anche con la
+        // mappa inclinata.
+        'id': 'segnalazioni',
+        'type': 'symbol',
+        'source': sorgenteSegnalazioni,
+        'layout': {
+          'icon-image': [
+            'concat',
+            'segnala-',
+            ['get', 'tipo'],
+          ],
+          'icon-anchor': 'bottom',
+          'icon-size': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            9,
+            0.45,
+            15,
+            0.7,
+            18,
+            0.9,
+          ],
+          'icon-allow-overlap': true,
+        },
+      },
+      {
         // Dove sei: la freccia o l'auto scelta, girata come vai, distesa sulla
         // mappa anche quando è inclinata.
         'id': 'io',
@@ -467,11 +598,13 @@ Map<String, Object> stileMappa({required bool scuro}) {
             ['linear'],
             ['zoom'],
             10,
-            0.38,
-            16,
+            0.45,
+            15,
             0.6,
-            19,
+            17,
             0.85,
+            19,
+            1.0,
           ],
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
@@ -496,10 +629,12 @@ Map<String, Object> stileMappa({required bool scuro}) {
             'match',
             ['get', 'class'],
             'city',
-            18,
+            22,
             'town',
+            18,
+            'village',
             15,
-            13,
+            14,
           ],
         },
         'paint': {'text-color': t.luogo, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 2},

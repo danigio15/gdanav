@@ -96,7 +96,7 @@ jobs:
       - run: pytest tests/test_relay_vero.py
         env:
           GDANAV_RELAY: ws://127.0.0.1:8799
-      - run: dart test test/relay_vero_test.dart
+      - run: dart test test/relay_vero_test.dart test/segnalazioni_test.dart
         working-directory: packages/gdanav_core
         env:
           GDANAV_RELAY: ws://127.0.0.1:8799

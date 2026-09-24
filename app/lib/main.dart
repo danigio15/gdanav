@@ -6,6 +6,7 @@ import 'stato/archivio.dart';
 import 'stato/gestore_auto.dart';
 import 'stato/gestore_guida.dart';
 import 'stato/gestore_posizione.dart';
+import 'stato/gestore_segnalazioni.dart';
 import 'stato/gestore_viaggio.dart';
 import 'stato/posizione.dart';
 import 'stato/voce.dart';
@@ -20,6 +21,7 @@ Future<void> main() async {
   final guida = GestoreGuida(viaggio: viaggio, auto: auto, posizioni: posizioniGuida, voce: VoceTelefono());
   final posizione = GestorePosizione(archivio: archivio, letture: lettureGps);
   await posizione.carica();
+  final segnalazioni = GestoreSegnalazioni(posizione: posizione);
   PonteAuto(viaggio: viaggio, guida: guida, posizione: posizione).avvia();
   runApp(
     GdanavApp(
@@ -28,6 +30,7 @@ Future<void> main() async {
       viaggio: viaggio,
       guida: guida,
       posizione: posizione,
+      segnalazioni: segnalazioni,
       chiediPosizione: chiediPosizione,
     ),
   );
@@ -43,6 +46,7 @@ class GdanavApp extends StatelessWidget {
     required this.posizione,
     this.mappa,
     this.chiediPosizione,
+    this.segnalazioni,
   });
 
   final Archivio archivio;
@@ -51,6 +55,7 @@ class GdanavApp extends StatelessWidget {
   final GestoreGuida guida;
   final GestorePosizione posizione;
   final Future<bool> Function()? chiediPosizione;
+  final GestoreSegnalazioni? segnalazioni;
 
   /// Nelle prove e nelle anteprime si passa un'altra mappa: quella vera vuole
   /// il codice nativo.
@@ -71,6 +76,7 @@ class GdanavApp extends StatelessWidget {
         posizione: posizione,
         mappa: mappa,
         chiediPosizione: chiediPosizione,
+        segnalazioni: segnalazioni,
       ),
     );
   }

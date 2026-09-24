@@ -36,7 +36,7 @@ class ClientePhoton implements FonteLuoghi {
     if (q.length < 3) return const [];
     final uri = indirizzo.replace(queryParameters: {
       'q': q,
-      'limit': '8',
+      'limit': '10',
       if (vicinoA != null) ...{'lat': '${vicinoA.lat}', 'lon': '${vicinoA.lon}'},
     });
     final r = await _http.get(uri, headers: {'user-agent': 'gdanav (github.com/danigio15/gdanav)'});

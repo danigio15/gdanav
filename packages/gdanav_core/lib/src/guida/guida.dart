@@ -17,6 +17,7 @@ class Avanzamento {
     required this.arrivato,
     required this.posizioneSulPercorso,
     required this.rotta,
+    this.limiteKmh,
     this.daDire,
   });
 
@@ -44,6 +45,9 @@ class Avanzamento {
   /// La direzione della strada in quel punto, in gradi da nord in senso
   /// orario: per girare l'auto e la mappa.
   final double rotta;
+
+  /// Il limite di velocità dove si è, se si conosce.
+  final int? limiteKmh;
 
   /// Una frase nuova da dire ad alta voce, se è il momento.
   final String? daDire;
@@ -106,6 +110,8 @@ class Guida {
       arrivato: arrivato,
       posizioneSulPercorso: _punto(i, p.t),
       rotta: _rotta(i),
+      // In fondo a un segmento si è già all'inizio del prossimo.
+      limiteKmh: percorso.limiteSul(p.t > 0.999 ? i + 1 : i),
       daDire: arrivato ? _una('arrivo', 'Sei arrivato.') : _annuncio(prossima, alla),
     );
   }

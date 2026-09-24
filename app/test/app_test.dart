@@ -13,7 +13,7 @@ void main() {
     final a = await ambiente(tester);
     await tester.pumpWidget(a.app());
     expect(find.text('Batteria sconosciuta'), findsOneWidget);
-    expect(find.text('Dove vuoi andare?'), findsOneWidget);
+    expect(find.text('Dove andiamo?'), findsOneWidget);
   });
 
   testWidgets('la batteria manuale compare con la sua sorgente', (tester) async {

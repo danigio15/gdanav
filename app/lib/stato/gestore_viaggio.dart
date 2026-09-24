@@ -143,9 +143,8 @@ class GestoreViaggio extends ChangeNotifier {
       if (identical(stato, calcolo)) _imposta(ErroreViaggio(_spiega(e), destinazione: destinazione));
     } catch (e) {
       if (identical(stato, calcolo)) {
-        final messaggio = impostazioni.chiaveOcm.isEmpty
-            ? 'Per questo viaggio servono soste, ma le colonnine non sono arrivate: aggiungi la chiave gratuita '
-                  'di Open Charge Map nelle impostazioni.'
+        final messaggio = '$e'.contains('Open Charge Map')
+            ? 'Per questo viaggio servono soste, ma le colonnine non sono arrivate. Riprova tra poco.'
             : 'Il viaggio non si è potuto calcolare: $e';
         _imposta(ErroreViaggio(messaggio, destinazione: destinazione));
       }
@@ -158,7 +157,8 @@ class GestoreViaggio extends ChangeNotifier {
   }
 
   static String _spiega(ErroreValhalla e) => switch (e.stato) {
-    401 => 'Il server dei percorsi rifiuta la chiave: controllala nelle impostazioni.',
+    401 || 403 => 'Il server dei percorsi non ci fa entrare in questo momento. Riprova tra poco.',
+    429 => 'Il server dei percorsi è molto carico. Riprova tra un minuto.',
     400 when e.messaggio.contains('No path') => 'Non esiste una strada fra qui e la destinazione.',
     _ => 'Il server dei percorsi ha risposto: ${e.messaggio}',
   };

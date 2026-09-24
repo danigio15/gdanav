@@ -50,6 +50,24 @@ void main() {
     expect(a.rotta, anyOf(lessThan(45), greaterThan(315)));
   });
 
+  test('il limite di velocità è quello del tratto in cui si è', () {
+    final limiti = ClienteValhalla.limitiDaTraccia(
+      jsonDecode(File('test/dati/valhalla_utrecht_limiti.json').readAsStringSync()) as Map<String, Object?>,
+      percorso.punti.length,
+    );
+    final g = Guida(percorso.conLimiti(limiti));
+    final visti = <int?>[for (final p in percorso.punti) g.aggiorna(p).limiteKmh];
+    expect(visti.first, limiti.first);
+    expect(visti.whereType<int>().toSet(), containsAll([30, 50]));
+    expect(Guida(percorso).aggiorna(percorso.punti[10]).limiteKmh, isNull);
+    // Su ogni punto del tracciato vale il limite del segmento che parte da lì.
+    final g2 = Guida(percorso.conLimiti(limiti));
+    for (var i = 0; i < percorso.punti.length - 1; i++) {
+      final a = g2.aggiorna(percorso.punti[i]);
+      if (a.lontanoM < 0.5 && limiti[i] != null && i > 0 && limiti[i - 1] == null) expect(a.limiteKmh, limiti[i]);
+    }
+  });
+
   test('uscendo di strada, dopo tre letture chiede di ricalcolare', () {
     final g = Guida(percorso);
     g.aggiorna(percorso.punti[40]);

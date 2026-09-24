@@ -13,3 +13,12 @@ class_name = "Stanza"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Stanza"]
+
+# Le segnalazioni della comunità: una zona di 0,2° per oggetto.
+[[durable_objects.bindings]]
+name = "ZONE"
+class_name = "Zona"
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Zona"]

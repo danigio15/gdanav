@@ -31,7 +31,7 @@ class ColoriGdanav extends ThemeExtension<ColoriGdanav> {
     guasta: Color(0xFFDC2626),
     ignota: Color(0xFF64748B),
     arrivo: Color(0xFFDC2626),
-    vetro: Color(0xF2FFFFFF),
+    vetro: Color(0xFFFFFFFF),
   );
 
   static const scuri = ColoriGdanav(
@@ -41,7 +41,7 @@ class ColoriGdanav extends ThemeExtension<ColoriGdanav> {
     guasta: Color(0xFFF87171),
     ignota: Color(0xFF94A3B8),
     arrivo: Color(0xFFF87171),
-    vetro: Color(0xF2141B26),
+    vetro: Color(0xFF232A38),
   );
 
   static ColoriGdanav di(BuildContext context) => Theme.of(context).extension<ColoriGdanav>()!;

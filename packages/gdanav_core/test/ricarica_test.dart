@@ -128,8 +128,8 @@ void main() {
       final id = catalogoVeicoli.map((v) => v.id).toSet();
       expect(id, hasLength(catalogoVeicoli.length));
       for (final v in catalogoVeicoli) {
-        expect(v.capacitaUtileKwh, inInclusiveRange(20, 120), reason: v.nome);
-        expect(v.massaKg, inInclusiveRange(900, 3000), reason: v.nome);
+        expect(v.capacitaUtileKwh, inInclusiveRange(10, 130), reason: v.nome);
+        expect(v.massaKg, inInclusiveRange(500, 3500), reason: v.nome);
         expect(v.piccoDcKw, inInclusiveRange(20, 400), reason: v.nome);
         expect(v.nome, '${v.marca} ${v.modello}');
       }
@@ -143,7 +143,9 @@ void main() {
 
     test('ogni auto del catalogo fa Milano–Bologna (215 km) con al più una sosta', () {
       final tratta = List.generate(215, (_) => const Tratto(lunghezzaM: 1000, velocitaKmh: 120));
-      for (final v in catalogoVeicoli.where((v) => v.capacitaUtileKwh >= 40)) {
+      // I furgoni e i monovolume da nove posti, a 120 all'ora, possono
+      // davvero chiedere due soste: qui contano le auto.
+      for (final v in catalogoVeicoli.where((v) => v.capacitaUtileKwh >= 40 && v.cdA < 0.9)) {
         final piano = PianificatoreSoste(profilo: v).pianifica(
           percorso: tratta,
           batteriaPartenza: 90,

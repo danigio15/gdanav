@@ -69,7 +69,7 @@ void main() {
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
     await tester.pumpAndSettle();
     expect(a.guida.attiva, isFalse);
-    expect(find.text('Dove vuoi andare?'), findsOneWidget);
+    expect(find.text('Dove andiamo?'), findsOneWidget);
   });
 
   testWidgets('la voce si silenzia', (tester) async {

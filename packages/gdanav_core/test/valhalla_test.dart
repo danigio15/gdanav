@@ -62,8 +62,9 @@ void main() {
     test('manda le tappe e legge il percorso', () async {
       late Map<String, Object?> chiesto;
       final client = MockClient((r) async {
-        expect(r.url.toString(), 'https://valhalla.esempio.dev/route');
         expect(r.headers['x-gdanav-chiave'], 'segreto');
+        if (r.url.path == '/trace_attributes') return http.Response('{"edges":[]}', 200);
+        expect(r.url.toString(), 'https://valhalla.esempio.dev/route');
         chiesto = jsonDecode(r.body) as Map<String, Object?>;
         return http.Response(jsonEncode(utrecht()), 200, headers: {'content-type': 'application/json'});
       });
@@ -73,6 +74,31 @@ void main() {
       expect(chiesto['elevation_interval'], 30);
       expect((chiesto['locations'] as List).first, {'lat': 52.0907, 'lon': 5.1214});
       expect(p.manovre, hasLength(14));
+    });
+
+    test('i limiti di velocità arrivano da trace_attributes, lungo le stesse strade', () async {
+      late Map<String, Object?> traccia;
+      final client = MockClient((r) async {
+        if (r.url.path == '/route') return http.Response(jsonEncode(utrecht()), 200);
+        traccia = jsonDecode(r.body) as Map<String, Object?>;
+        return http.Response(File('test/dati/valhalla_utrecht_limiti.json').readAsStringSync(), 200);
+      });
+      final v = ClienteValhalla(Uri.parse('https://valhalla.esempio.dev/'), client: client);
+      final p = await v.calcola(const [Punto(52.0907, 5.1214), Punto(52.064, 5.19)]);
+      expect(traccia['shape_match'], 'edge_walk');
+      expect(p.limiti, hasLength(p.punti.length - 1));
+      expect(p.limiteSul(0), isNotNull);
+      expect(p.limiti.whereType<int>().toSet(), containsAll([30, 50]));
+      expect(p.limiteSul(p.punti.length), isNull);
+    });
+
+    test('senza limiti dal server il percorso arriva lo stesso', () async {
+      final client = MockClient((r) async =>
+          r.url.path == '/route' ? http.Response(jsonEncode(utrecht()), 200) : http.Response('{"error":"no"}', 400));
+      final v = ClienteValhalla(Uri.parse('https://valhalla.esempio.dev/'), client: client);
+      final p = await v.calcola(const [Punto(52.0907, 5.1214), Punto(52.064, 5.19)]);
+      expect(p.manovre, hasLength(14));
+      expect(p.limiti, isEmpty);
     });
 
     test("un errore di Valhalla diventa un'eccezione leggibile", () async {
@@ -103,6 +129,7 @@ void main() {
     final p = await v.calcola(const [Punto(52.0907, 5.1214), Punto(52.064, 5.19)]);
     expect(p.lunghezzaM, greaterThan(1000));
     expect(p.tratti, isNotEmpty);
+    expect(p.limiti.whereType<int>(), isNotEmpty);
     v.chiudi();
   }, skip: vero == null ? 'serve GDANAV_VALHALLA' : false);
 }

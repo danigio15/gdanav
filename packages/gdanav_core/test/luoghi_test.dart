@@ -32,6 +32,6 @@ void main() {
     expect(chieste, isEmpty);
     final l = await p.cerca(' bologna ', vicinoA: const Punto(45, 9));
     expect(l, hasLength(3));
-    expect(chieste.single.queryParameters, {'q': 'bologna', 'limit': '8', 'lat': '45.0', 'lon': '9.0'});
+    expect(chieste.single.queryParameters, {'q': 'bologna', 'limit': '10', 'lat': '45.0', 'lon': '9.0'});
   });
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,9 +10,12 @@ import 'package:gdanav/stato/archivio.dart';
 import 'package:gdanav/stato/gestore_auto.dart';
 import 'package:gdanav/stato/gestore_guida.dart';
 import 'package:gdanav/stato/gestore_posizione.dart';
+import 'package:gdanav/stato/gestore_segnalazioni.dart';
 import 'package:gdanav/stato/gestore_viaggio.dart';
 import 'package:gdanav/stato/voce.dart';
 import 'package:gdanav_core/gdanav_core.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 /// Il portachiavi vuoto, e Android Auto collegato ma zitto: come un'auto
 /// che non passa i dati al telefono.
@@ -62,6 +66,8 @@ PercorsoCalcolato dritta(int km) {
         Tratto(lunghezzaM: linea.cumulate[i] - linea.cumulate[i - 1], velocitaKmh: 120),
     ],
     manovre: const [],
+    // Mezza strada in città, mezza fuori.
+    limiti: [for (var i = 0; i < km; i++) i < km / 2 ? 50 : 90],
   );
 }
 
@@ -85,7 +91,18 @@ class VoceFinta implements Voce {
 }
 
 class Ambiente {
-  Ambiente(this.archivio, this.auto, this.viaggio, this.guida, this.posizioni, this.voce, this.posizione, this.gps);
+  Ambiente(
+    this.archivio,
+    this.auto,
+    this.viaggio,
+    this.guida,
+    this.posizioni,
+    this.voce,
+    this.posizione,
+    this.gps,
+    this.segnalazioni,
+    this.relay,
+  );
   final Archivio archivio;
   final GestoreAuto auto;
   final GestoreViaggio viaggio;
@@ -99,12 +116,17 @@ class Ambiente {
   /// Il GPS finto del segnaposto.
   final StreamController<Lettura> gps;
 
+  /// Le segnalazioni, su un relay finto in memoria.
+  final GestoreSegnalazioni segnalazioni;
+  final RelayFinto relay;
+
   Widget app() => GdanavApp(
     posizione: posizione,
     archivio: archivio,
     auto: auto,
     viaggio: viaggio,
     guida: guida,
+    segnalazioni: segnalazioni,
     mappa: (_, _) => const ColoredBox(color: Colors.grey),
   );
 }
@@ -135,7 +157,13 @@ Future<Ambiente> ambiente(WidgetTester tester, {int km = 500, Punto? posizione =
   final segnaposto = GestorePosizione(archivio: archivio, letture: () => gps.stream);
   await tester.runAsync(segnaposto.carica);
   addTearDown(segnaposto.dispose);
-  return Ambiente(archivio, auto, viaggio, guida, posizioni, voce, segnaposto, gps);
+  final relay = RelayFinto();
+  final segnalazioni = GestoreSegnalazioni(
+    posizione: segnaposto,
+    cliente: ClienteSegnalazioni(Uri.parse('https://relay.esempio.dev/'), client: MockClient(relay.risponde)),
+  );
+  addTearDown(segnalazioni.dispose);
+  return Ambiente(archivio, auto, viaggio, guida, posizioni, voce, segnaposto, gps, segnalazioni, relay);
 }
 
 const impostazioniComplete = {
@@ -148,5 +176,25 @@ Future<void> scorriScheda(WidgetTester tester, {int volte = 2}) async {
   for (var i = 0; i < volte; i++) {
     await tester.drag(find.byType(ListView).last, const Offset(0, -600));
     await tester.pumpAndSettle();
+  }
+}
+
+/// Il relay delle segnalazioni, in memoria.
+class RelayFinto {
+  final segnalazioni = <Map<String, Object?>>[];
+  final voti = <(String, bool)>[];
+  var _n = 0;
+
+  Future<http.Response> risponde(http.Request r) async {
+    if (r.method == 'GET') return http.Response(jsonEncode({'segnalazioni': segnalazioni}), 200);
+    final corpo = jsonDecode(r.body) as Map<String, Object?>;
+    if (r.url.path.endsWith('/voto')) {
+      final id = r.url.pathSegments[2];
+      voti.add((id, corpo['ancora']! as bool));
+      return http.Response(jsonEncode(segnalazioni.firstWhere((s) => s['id'] == id)), 200);
+    }
+    final s = {...corpo, 'id': 'z~segnalazione${_n++}', 'creata': 0, 'conferme': 0};
+    segnalazioni.add(s);
+    return http.Response(jsonEncode(s), 201);
   }
 }

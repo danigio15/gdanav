@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../mappa/segnaposto.dart';
+import '../servizi.dart';
 
 /// Quello che l'app ricorda: l'abbinamento con Home Assistant (contiene la
 /// chiave, quindi sta nel portachiavi del telefono) e come è messo lo switch.
@@ -14,10 +15,10 @@ class Archivio {
 
   static const _abbinamento = 'abbinamento_home_assistant';
   static const _fonte = 'fonte_dati_auto';
-  static const _impostazioni = 'impostazioni';
   static const _veicolo = 'veicolo';
   static const _preferenze = 'preferenze_ricarica';
   static const _segnaposto = 'segnaposto';
+  static const _luoghi = 'luoghi';
 
   Future<Abbinamento?> abbinamento() async {
     final uri = await _p.read(key: _abbinamento);
@@ -47,15 +48,8 @@ class Archivio {
     },
   );
 
-  Future<Impostazioni> impostazioni() async {
-    final testo = await _p.read(key: _impostazioni);
-    if (testo == null) return Impostazioni.predefinite();
-    try {
-      return Impostazioni.daJson(jsonDecode(testo) as Map<String, Object?>);
-    } on FormatException {
-      return Impostazioni.predefinite();
-    }
-  }
+  /// I servizi sono cablati in [Servizi]: non si scrivono più a mano.
+  Future<Impostazioni> impostazioni() async => Impostazioni.predefinite();
 
   /// L'auto scelta; il profilo d'esempio finché non se ne sceglie una.
   Future<ProfiloVeicolo> veicolo() async => veicoloPerId(await _p.read(key: _veicolo) ?? '') ?? ProfiloVeicolo.esempio;
@@ -76,24 +70,30 @@ class Archivio {
 
   Future<Segnaposto> segnaposto() async => Segnaposto.perNome(await _p.read(key: _segnaposto));
 
-  Future<void> salvaSegnaposto(Segnaposto s) => _p.write(key: _segnaposto, value: s.name);
+  /// Casa, lavoro, i preferiti e le ultime mete, come JSON.
+  Future<Map<String, Object?>> luoghi() async {
+    final testo = await _p.read(key: _luoghi);
+    if (testo == null) return const {};
+    try {
+      return jsonDecode(testo) as Map<String, Object?>;
+    } on FormatException {
+      return const {};
+    }
+  }
 
-  Future<void> salvaImpostazioni(Impostazioni i) => _p.write(key: _impostazioni, value: jsonEncode(i.toJson()));
+  Future<void> salvaLuoghi(Map<String, Object?> j) => _p.write(key: _luoghi, value: jsonEncode(j));
+
+  Future<void> salvaSegnaposto(Segnaposto s) => _p.write(key: _segnaposto, value: s.name);
 }
 
-/// Dove stanno i servizi. Si scrivono nelle impostazioni dell'app, oppure si
-/// danno alla compilazione:
-///
-///     flutter run --dart-define=GDANAV_VALHALLA=https://1-2-3-4.sslip.io/ \
-///                 --dart-define=GDANAV_VALHALLA_CHIAVE=... \
-///                 --dart-define=GDANAV_OCM_CHIAVE=...
+/// Dove stanno i servizi: vedi [Servizi].
 class Impostazioni {
   const Impostazioni({this.valhalla = '', this.chiaveValhalla = '', this.chiaveOcm = ''});
 
   factory Impostazioni.predefinite() => const Impostazioni(
-    valhalla: String.fromEnvironment('GDANAV_VALHALLA', defaultValue: valhallaDiProva),
-    chiaveValhalla: String.fromEnvironment('GDANAV_VALHALLA_CHIAVE'),
-    chiaveOcm: String.fromEnvironment('GDANAV_OCM_CHIAVE'),
+    valhalla: Servizi.valhalla,
+    chiaveValhalla: Servizi.chiaveValhalla,
+    chiaveOcm: Servizi.chiaveOcm,
   );
 
   factory Impostazioni.daJson(Map<String, Object?> j) => Impostazioni(
@@ -102,17 +102,13 @@ class Impostazioni {
     chiaveOcm: j['chiave_ocm'] as String? ?? '',
   );
 
-  /// Il server pubblico di FOSSGIS: va bene per provare l'app, non per
-  /// distribuirla a tanti (chiede un uso moderato). Poi si mette il proprio.
-  static const valhallaDiProva = 'https://valhalla1.openstreetmap.de/';
-
   final String valhalla;
   final String chiaveValhalla;
   final String chiaveOcm;
 
   /// Cosa manca per pianificare un viaggio, in parole. `null` se c'è tutto.
   String? get mancante {
-    if (valhalla.isEmpty) return "Manca l'indirizzo del server dei percorsi: scrivilo nelle impostazioni.";
+    if (valhalla.isEmpty) return 'Il calcolo dei percorsi non è disponibile in questa versione.';
     // La chiave di Open Charge Map non blocca: senza, le colonnine si provano
     // a chiedere lo stesso.
     return null;

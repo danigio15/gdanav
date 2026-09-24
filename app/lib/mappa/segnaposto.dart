@@ -43,3 +43,19 @@ Map<String, Object?> datiIo(Punto? qui, double rotta, Segnaposto segnaposto) => 
       },
   ],
 };
+
+/// Le segnalazioni per la sorgente `gdanav-segnalazioni`.
+Map<String, Object?> datiSegnalazioni(List<Segnalazione> tutte) => {
+  'type': 'FeatureCollection',
+  'features': [
+    for (final s in tutte)
+      {
+        'type': 'Feature',
+        'geometry': {
+          'type': 'Point',
+          'coordinates': [s.punto.lon, s.punto.lat],
+        },
+        'properties': {'id': s.id, 'tipo': s.tipo.name},
+      },
+  ],
+};

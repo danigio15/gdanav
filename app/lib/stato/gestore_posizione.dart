@@ -24,6 +24,9 @@ class GestorePosizione extends ChangeNotifier {
 
   Punto? qui;
   double rotta = 0;
+
+  /// Dal GPS, per il tachimetro.
+  double velocitaKmh = 0;
   Segnaposto segnaposto = Segnaposto.autoBlu;
   StreamSubscription<Lettura>? _iscrizione;
 
@@ -45,6 +48,7 @@ class GestorePosizione extends ChangeNotifier {
       rotta = rottaGradi(prima, l.punto);
     }
     qui = l.punto;
+    velocitaKmh = l.velocitaMs * 3.6;
     notifyListeners();
   }
 

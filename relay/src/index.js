@@ -1,9 +1,25 @@
 import { DurableObject } from 'cloudflare:workers';
 
 import { MASSIMO_BYTE, destinatari, impronta, leggiRichiesta, presenza, puoEntrare } from './regole.js';
+import {
+  FINESTRA_MS,
+  MASSIMO_PER_FINESTRA,
+  crea,
+  leggiIndirizzo,
+  leggiNuova,
+  pubblica,
+  viva,
+  vota,
+  zona,
+  zoneVicine,
+} from './segnalazioni.js';
+
+const json = (dati, stato = 200) =>
+  new Response(JSON.stringify(dati), { status: stato, headers: { 'content-type': 'application/json' } });
 
 export default {
   async fetch(richiesta, env) {
+    if (new URL(richiesta.url).pathname.startsWith('/v1/segnalazioni')) return segnalazioni(richiesta, env);
     if (richiesta.headers.get('Upgrade') !== 'websocket') {
       return new Response('gdanav relay\n', { status: 426 });
     }
@@ -74,5 +90,79 @@ export class Stanza extends DurableObject {
         // Un filo che sta cadendo: ci pensa webSocketClose.
       }
     }
+  }
+}
+
+/** Le segnalazioni: si leggono dalle nove zone intorno, si scrivono nella propria. */
+async function segnalazioni(richiesta, env) {
+  const r = leggiIndirizzo(richiesta.method, richiesta.url);
+  if (r.errore) return json({ errore: r.errore }, r.stato);
+  const zonaDo = (z) => env.ZONE.get(env.ZONE.idFromName(z));
+  // Solo per contare le segnalazioni di ciascuno: l'indirizzo non si salva.
+  const chi = await impronta(richiesta.headers.get('cf-connecting-ip') ?? 'anonimo');
+
+  if (r.azione === 'elenco') {
+    const liste = await Promise.all(zoneVicine(r.lat, r.lon).map((z) => zonaDo(z).elenco()));
+    return json({ segnalazioni: liste.flat() }, 200);
+  }
+  if (r.azione === 'nuova') {
+    let corpo;
+    try {
+      corpo = await richiesta.json();
+    } catch {
+      return json({ errore: 'JSON non valido' }, 400);
+    }
+    const n = leggiNuova(corpo);
+    if (n.errore) return json({ errore: n.errore }, 400);
+    const esito = await zonaDo(zona(n.lat, n.lon)).aggiungi(n, chi);
+    return json(esito, esito.errore ? 429 : 201);
+  }
+  let corpo;
+  try {
+    corpo = await richiesta.json();
+  } catch {
+    return json({ errore: 'JSON non valido' }, 400);
+  }
+  if (typeof corpo?.ancora !== 'boolean') return json({ errore: 'ancora: vero o falso' }, 400);
+  return json(await zonaDo(r.zona).vota(r.id, corpo.ancora), 200);
+}
+
+/** Una zona di 0,2°: le sue segnalazioni, e chi ne ha fatte troppe di fila. */
+export class Zona extends DurableObject {
+  #recenti = new Map();
+
+  async elenco() {
+    const ora = Date.now();
+    const vive = [];
+    const scadute = [];
+    for (const [chiave, s] of await this.ctx.storage.list({ prefix: 's:' })) {
+      if (viva(s, ora)) vive.push(pubblica(s));
+      else scadute.push(chiave);
+    }
+    if (scadute.length) await this.ctx.storage.delete(scadute);
+    return vive;
+  }
+
+  async aggiungi(nuova, chi) {
+    const ora = Date.now();
+    const sue = (this.#recenti.get(chi) ?? []).filter((t) => ora - t < FINESTRA_MS);
+    if (sue.length >= MASSIMO_PER_FINESTRA) return { errore: 'troppe segnalazioni, riprova tra poco' };
+    this.#recenti.set(chi, [...sue, ora]);
+    const id = `${zona(nuova.lat, nuova.lon)}~${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`;
+    const s = crea(nuova, ora, id);
+    await this.ctx.storage.put(`s:${id}`, s);
+    return pubblica(s);
+  }
+
+  async vota(id, ancora) {
+    const s = await this.ctx.storage.get(`s:${id}`);
+    if (!s) return { tolta: true };
+    const n = vota(s, ancora, Date.now());
+    if (n === null) {
+      await this.ctx.storage.delete(`s:${id}`);
+      return { tolta: true };
+    }
+    await this.ctx.storage.put(`s:${id}`, n);
+    return pubblica(n);
   }
 }

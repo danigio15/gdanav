@@ -38,11 +38,21 @@ class Manovra {
 /// Un percorso pronto per il motore: la geometria per la mappa e le
 /// colonnine, i tratti per i consumi, le manovre per la guida.
 class PercorsoCalcolato {
-  const PercorsoCalcolato({required this.punti, required this.tratti, required this.manovre});
+  const PercorsoCalcolato({required this.punti, required this.tratti, required this.manovre, this.limiti = const []});
 
   final List<Punto> punti;
   final List<Tratto> tratti;
   final List<Manovra> manovre;
+
+  /// Il limite di velocità (km/h) di ogni segmento di [punti], `null` dove
+  /// OpenStreetMap non lo sa. Vuota se il server non l'ha dato.
+  final List<int?> limiti;
+
+  /// Il limite sul segmento [i], se si conosce.
+  int? limiteSul(int i) => i >= 0 && i < limiti.length ? limiti[i] : null;
+
+  PercorsoCalcolato conLimiti(List<int?> limiti) =>
+      PercorsoCalcolato(punti: punti, tratti: tratti, manovre: manovre, limiti: limiti);
 
   double get lunghezzaM => tratti.fold(0, (s, t) => s + t.lunghezzaM);
   Duration get durata => Duration(seconds: tratti.fold(0.0, (s, t) => s + t.secondi).round());
@@ -164,7 +174,54 @@ class ClienteValhalla {
       }
       throw ErroreValhalla(messaggio ?? 'errore ${r.statusCode}', stato: r.statusCode);
     }
-    return PercorsoCalcolato.daValhalla(jsonDecode(testo) as Map<String, Object?>);
+    final json = jsonDecode(testo) as Map<String, Object?>;
+    final percorso = PercorsoCalcolato.daValhalla(json);
+    // I limiti di velocità sono un di più: se il server non li dà, si guida
+    // lo stesso.
+    try {
+      final limiti = <int?>[];
+      for (final leg in ((json['trip'] as Map)['legs'] as List).cast<Map<String, Object?>>()) {
+        final forma = leg['shape'] as String;
+        final n = decodificaPolyline(forma).length;
+        limiti.addAll(await _limitiTratto(forma, n));
+      }
+      if (limiti.length == percorso.punti.length - 1) return percorso.conLimiti(limiti);
+    } catch (_) {}
+    return percorso;
+  }
+
+  /// Chiede a `/trace_attributes` i limiti lungo il tracciato di una tappa:
+  /// `edge_walk` segue esattamente le strade del percorso.
+  Future<List<int?>> _limitiTratto(String forma, int punti) async {
+    final r = await _http.post(
+      indirizzo.resolve('trace_attributes'),
+      headers: {'content-type': 'application/json', if (chiave != null) 'x-gdanav-chiave': chiave!},
+      body: jsonEncode({
+        'encoded_polyline': forma,
+        'shape_match': 'edge_walk',
+        'costing': 'auto',
+        'filters': {
+          'attributes': ['edge.speed_limit', 'edge.begin_shape_index', 'edge.end_shape_index'],
+          'action': 'include',
+        },
+      }),
+    );
+    if (r.statusCode != 200) throw ErroreValhalla('limiti: ${r.statusCode}', stato: r.statusCode);
+    return limitiDaTraccia(jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>, punti);
+  }
+
+  /// Da `edges` di `/trace_attributes` a un limite per segmento.
+  static List<int?> limitiDaTraccia(Map<String, Object?> json, int punti) {
+    final limiti = List<int?>.filled(punti - 1 < 0 ? 0 : punti - 1, null);
+    for (final e in ((json['edges'] as List?) ?? const []).cast<Map<String, Object?>>()) {
+      final v = e['speed_limit'];
+      final da = e['begin_shape_index'], a = e['end_shape_index'];
+      if (v is! num || v <= 0 || v > 200 || da is! int || a is! int) continue;
+      for (var i = da; i < a && i < limiti.length; i++) {
+        limiti[i] = v.round();
+      }
+    }
+    return limiti;
   }
 
   void chiudi() => _http.close();

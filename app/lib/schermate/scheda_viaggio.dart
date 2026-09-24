@@ -20,16 +20,9 @@ String orario(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.to
 /// Il riquadro in basso: sta calcolando, il viaggio con le sue soste, o
 /// cosa non va.
 class SchedaViaggio extends StatelessWidget {
-  const SchedaViaggio({
-    super.key,
-    required this.gestore,
-    required this.apriImpostazioni,
-    required this.onAvvia,
-    this.soglia = 15,
-  });
+  const SchedaViaggio({super.key, required this.gestore, required this.onAvvia, this.soglia = 15});
 
   final GestoreViaggio gestore;
-  final VoidCallback apriImpostazioni;
   final VoidCallback onAvvia;
   final double soglia;
 
@@ -73,11 +66,6 @@ class SchedaViaggio extends StatelessWidget {
                       onPressed: () => gestore.pianifica(destinazione),
                       child: const Text('Riprova'),
                     ),
-                  ),
-                if (destinazione != null && messaggio.contains('impostazioni')) const SizedBox(width: 10),
-                if (messaggio.contains('impostazioni'))
-                  Expanded(
-                    child: OutlinedButton(onPressed: apriImpostazioni, child: const Text('Impostazioni')),
                   ),
               ],
             ),

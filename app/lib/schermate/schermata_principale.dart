@@ -8,16 +8,19 @@ import '../mappa/mappa_viaggio.dart';
 import '../stato/archivio.dart';
 import '../stato/gestore_auto.dart';
 import '../stato/gestore_guida.dart';
+import '../stato/gestore_luoghi.dart';
+import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_viaggio.dart';
 import 'abbina_home_assistant.dart';
 import 'cerca_destinazione.dart';
 import 'dettaglio_colonnina.dart';
 import 'fonte_dati_auto.dart';
-import 'impostazioni.dart';
 import 'la_tua_auto.dart';
+import 'pannello_partenza.dart';
 import 'ricarica.dart';
 import 'scheda_viaggio.dart';
+import 'segnala.dart';
 import 'schermata_guida.dart';
 
 typedef CostruisciMappa = Widget Function(BuildContext context, ControlloMappa controllo);
@@ -32,6 +35,8 @@ class SchermataPrincipale extends StatefulWidget {
     required this.posizione,
     this.mappa,
     this.chiediPosizione,
+    this.luoghi,
+    this.segnalazioni,
   });
 
   final GestoreAuto auto;
@@ -39,6 +44,12 @@ class SchermataPrincipale extends StatefulWidget {
   final Archivio archivio;
   final GestoreGuida guida;
   final GestorePosizione posizione;
+
+  /// Casa, Lavoro e recenti; se manca se ne crea uno sull'archivio.
+  final GestoreLuoghi? luoghi;
+
+  /// Le segnalazioni della comunità; se manca se ne crea uno sui servizi cablati.
+  final GestoreSegnalazioni? segnalazioni;
 
   /// Chiede il permesso della posizione; nelle prove non c'è.
   final Future<bool> Function()? chiediPosizione;
@@ -54,6 +65,8 @@ class SchermataPrincipale extends StatefulWidget {
 class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   final controllo = ControlloMappa();
   PreferenzeRicarica _preferenze = const PreferenzeRicarica();
+  late final GestoreLuoghi luoghi = widget.luoghi ?? (GestoreLuoghi(widget.archivio)..carica());
+  late final GestoreSegnalazioni segnalazioni = widget.segnalazioni ?? GestoreSegnalazioni(posizione: widget.posizione);
 
   GestoreViaggio get viaggio => widget.viaggio;
 
@@ -64,17 +77,24 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
     widget.chiediPosizione?.call().then((ok) {
       if (ok) widget.posizione.avvia();
     });
+    segnalazioni.avvia();
   }
 
   void _avvia() => Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) => SchermataGuida(guida: widget.guida, posizione: widget.posizione, mappa: widget.mappa),
+      builder: (_) => SchermataGuida(
+        guida: widget.guida,
+        posizione: widget.posizione,
+        segnalazioni: segnalazioni,
+        mappa: widget.mappa,
+      ),
     ),
   );
 
   @override
   void dispose() {
     controllo.dispose();
+    if (widget.segnalazioni == null) segnalazioni.dispose();
     super.dispose();
   }
 
@@ -83,13 +103,100 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
     if (mounted) setState(() => _preferenze = p);
   }
 
+  Future<Luogo?> _scegli({String titolo = 'Dove andiamo?'}) => Navigator.of(context).push<Luogo>(
+    MaterialPageRoute(
+      builder: (_) => CercaDestinazione(
+        luoghi: viaggio.luoghi,
+        vicinoA: widget.posizione.qui ?? viaggio.ultimaPosizione,
+        salvati: luoghi,
+        titolo: titolo,
+      ),
+    ),
+  );
+
   Future<void> _cerca() async {
-    final luogo = await Navigator.of(context).push<Luogo>(
-      MaterialPageRoute(
-        builder: (_) => CercaDestinazione(luoghi: viaggio.luoghi, vicinoA: viaggio.ultimaPosizione),
+    final luogo = await _scegli();
+    if (luogo != null) await _vai(luogo);
+  }
+
+  Future<void> _vai(Luogo luogo) async {
+    await luoghi.usato(luogo);
+    await viaggio.vaiA(luogo);
+  }
+
+  Future<void> _preferito(TipoPreferito tipo) async {
+    final gia = tipo == TipoPreferito.casa ? luoghi.casa : luoghi.lavoro;
+    if (gia != null) return _vai(gia.luogo);
+    await _imposta(tipo);
+  }
+
+  Future<void> _imposta(TipoPreferito tipo, {Preferito? vecchio}) async {
+    final nome = switch (tipo) {
+      TipoPreferito.casa => 'Casa',
+      TipoPreferito.lavoro => 'Lavoro',
+      TipoPreferito.altro => 'un preferito',
+    };
+    final luogo = await _scegli(titolo: 'Indirizzo di ${nome == 'un preferito' ? nome : nome.toLowerCase()}');
+    if (luogo == null || !mounted) return;
+    var etichetta = vecchio?.nome ?? '';
+    if (tipo == TipoPreferito.altro) {
+      etichetta = await _chiediNome(luogo.nome) ?? '';
+      if (!mounted) return;
+    }
+    if (vecchio != null) await luoghi.togli(vecchio);
+    await luoghi.salva(Preferito(tipo, luogo, nome: etichetta));
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('${Preferito(tipo, luogo, nome: etichetta).etichetta} salvato')));
+    }
+  }
+
+  Future<String?> _chiediNome(String proposto) {
+    final c = TextEditingController(text: proposto);
+    return showDialog<String>(
+      context: context,
+      builder: (contesto) => AlertDialog(
+        title: const Text('Come lo chiami?'),
+        content: TextField(controller: c, autofocus: true, textCapitalization: TextCapitalization.sentences),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(contesto).pop(), child: const Text('Annulla')),
+          FilledButton(onPressed: () => Navigator.of(contesto).pop(c.text.trim()), child: const Text('Salva')),
+        ],
       ),
     );
-    if (luogo != null) await viaggio.vaiA(luogo);
+  }
+
+  void _modificaPreferito(Preferito p) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (contesto) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(p.etichetta, style: Theme.of(contesto).textTheme.titleLarge),
+              subtitle: Text(p.luogo.nome),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_location_alt_outlined),
+              title: const Text('Cambia indirizzo'),
+              onTap: () {
+                Navigator.of(contesto).pop();
+                _imposta(p.tipo, vecchio: p);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Rimuovi'),
+              onTap: () {
+                Navigator.of(contesto).pop();
+                luoghi.togli(p);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _apri(Widget schermata) async {
@@ -98,8 +205,6 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
     // Auto o preferenze cambiate: il viaggio aperto si ricalcola.
     if (viaggio.stato is ViaggioPronto && viaggio.destinazione != null) await viaggio.pianifica(viaggio.destinazione!);
   }
-
-  void _impostazioni() => _apri(SchermataImpostazioni(archivio: widget.archivio));
 
   void _menu() {
     showModalBottomSheet<void>(
@@ -142,12 +247,6 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                 sotto: ha == null ? 'Non collegata' : 'Collegata${ha.nomeAuto.isEmpty ? '' : ' a ${ha.nomeAuto}'}',
                 onTap: () => vai(AbbinaHomeAssistant(gestore: widget.auto)),
               ),
-              _VoceMenu(
-                icona: Icons.dns_outlined,
-                titolo: 'Servizi',
-                sotto: 'Server dei percorsi e colonnine',
-                onTap: () => vai(SchermataImpostazioni(archivio: widget.archivio)),
-              ),
               const SizedBox(height: 8),
             ],
           ),
@@ -158,6 +257,8 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
 
   @override
   Widget build(BuildContext context) {
+    final alto = MediaQuery.paddingOf(context).top;
+    final schermo = MediaQuery.sizeOf(context).height;
     return Scaffold(
       body: Stack(
         children: [
@@ -168,6 +269,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                   gestore: viaggio,
                   controllo: controllo,
                   posizione: widget.posizione,
+                  segnalazioni: segnalazioni,
                   onPuntoScelto: (p) => viaggio.vaiA(
                     Luogo(
                       nome: 'Punto sulla mappa',
@@ -178,58 +280,36 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                   onColonnina: (id) => mostraColonnina(context, viaggio, id),
                 ),
           ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Vetro(
-                    raggio: 28,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: InkWell(
-                            borderRadius: const BorderRadius.horizontal(left: Radius.circular(28)),
-                            onTap: _cerca,
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 16, 8, 16),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.search, color: Theme.of(context).colorScheme.primary),
-                                  const SizedBox(width: 12),
-                                  Flexible(
-                                    child: Text(
-                                      'Dove vuoi andare?',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context).textTheme.titleMedium
-                                          ?.copyWith(fontWeight: FontWeight.w500),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        IconButton(tooltip: 'Menu', icon: const Icon(Icons.menu), onPressed: _menu),
-                        const SizedBox(width: 6),
-                      ],
-                    ),
+          // In alto: il menu quadrato di Waze e la batteria.
+          Positioned(
+            left: 16,
+            right: 16,
+            top: alto + 10,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Tooltip(
+                  message: 'Menu',
+                  child: Vetro(
+                    raggio: 18,
+                    onTap: _menu,
+                    child: const SizedBox.square(dimension: 60, child: Icon(Icons.menu_rounded, size: 32)),
                   ),
-                  const SizedBox(height: 10),
-                  ListenableBuilder(
+                ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: ListenableBuilder(
                     listenable: widget.auto,
                     builder: (context, _) =>
                         IndicatoreBatteria(auto: widget.auto, onTap: () => mostraFonteDatiAuto(context, widget.auto)),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           Positioned(
-            right: 12,
-            top: MediaQuery.paddingOf(context).top + 150,
+            right: 16,
+            top: alto + 86,
             child: ListenableBuilder(
               listenable: controllo,
               builder: (context, _) => Column(
@@ -239,26 +319,46 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                     onPressed: controllo.alternaInclinazione,
                     child: Text(
                       controllo.inclinata ? '2D' : '3D',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 14),
                   _BottoneMappa(
                     tooltip: 'Dove sono',
                     onPressed: controllo.centra,
-                    child: Icon(Icons.my_location, color: Theme.of(context).colorScheme.primary),
+                    child: Icon(Icons.near_me_rounded, size: 28, color: Theme.of(context).colorScheme.primary),
                   ),
                 ],
               ),
             ),
           ),
-          Positioned.fill(
-            child: SchedaViaggio(
-              gestore: viaggio,
-              apriImpostazioni: _impostazioni,
-              onAvvia: _avvia,
-              soglia: _preferenze.minimoArrivo,
-            ),
+          ListenableBuilder(
+            listenable: viaggio,
+            builder: (context, _) {
+              final libero = viaggio.stato is NessunViaggio;
+              return Stack(
+                children: [
+                  if (libero)
+                    Positioned(
+                      right: 16,
+                      bottom: schermo * 0.36 + 14,
+                      child: BottoneSegnala(onTap: () => mostraSegnala(context, segnalazioni)),
+                    ),
+                  Positioned.fill(
+                    child: libero
+                        ? PannelloPartenza(
+                            luoghi: luoghi,
+                            onCerca: _cerca,
+                            onVai: _vai,
+                            onPreferito: _preferito,
+                            onNuovo: () => _imposta(TipoPreferito.altro),
+                            onModificaPreferito: _modificaPreferito,
+                          )
+                        : SchedaViaggio(gestore: viaggio, onAvvia: _avvia, soglia: _preferenze.minimoArrivo),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -279,7 +379,7 @@ class _BottoneMappa extends StatelessWidget {
     child: Vetro(
       forma: BoxShape.circle,
       onTap: onPressed,
-      child: SizedBox.square(dimension: 48, child: Center(child: child)),
+      child: SizedBox.square(dimension: 60, child: Center(child: child)),
     ),
   );
 }

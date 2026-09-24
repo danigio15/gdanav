@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 
+import '../servizi.dart';
 import '../mappa/dati_viaggio.dart';
 import '../mappa/segnaposto.dart';
 import '../mappa/stile.dart';
@@ -36,7 +37,10 @@ class PonteAuto {
       // «Fine» premuto sullo schermo dell'auto.
       if (call.method == 'ferma' && guida.attiva) await guida.ferma();
     });
-    _manda('stili', {'chiaro': jsonEncode(stileMappa(scuro: false)), 'scuro': jsonEncode(stileMappa(scuro: true))});
+    _manda('stili', {
+      'chiaro': jsonEncode(stileMappa(scuro: false, chiaveTraffico: Servizi.chiaveTomTom)),
+      'scuro': jsonEncode(stileMappa(scuro: true, chiaveTraffico: Servizi.chiaveTomTom)),
+    });
     viaggio.addListener(_viaggio);
     guida.addListener(_guida);
     posizione.addListener(_posizione);

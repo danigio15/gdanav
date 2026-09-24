@@ -82,6 +82,11 @@ class GestoreGuida extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Una frase fuori dalle manovre (una segnalazione più avanti).
+  void annuncia(String frase) {
+    if (!muto) unawaited(voce.parla(frase));
+  }
+
   void alternaVoce() {
     muto = !muto;
     if (muto) voce.zitta();
