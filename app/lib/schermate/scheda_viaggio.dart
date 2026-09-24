@@ -32,16 +32,24 @@ class SchedaViaggio extends StatelessWidget {
       listenable: gestore,
       builder: (context, _) => switch (gestore.stato) {
         NessunViaggio() => const SizedBox.shrink(),
-        Calcolo(:final destinazione) => _Piccola(
+        Calcolo(:final destinazione, :final fase) => _Piccola(
           titolo: destinazione.nome,
           onChiudi: gestore.annulla,
-          children: const [
-            Row(
-              children: [
-                SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 3)),
-                SizedBox(width: 14),
-                Expanded(child: Text('Calcolo percorso, colonnine e soste…')),
-              ],
+          children: [
+            Text(switch (fase) {
+              FaseViaggio.percorso => 'Calcolo il percorso…',
+              FaseViaggio.colonnine => 'Cerco le colonnine lungo la strada…',
+              FaseViaggio.soste => 'Scelgo le soste…',
+            }, key: const Key('fase-calcolo')),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(value: null, minHeight: 6),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Passo ${fase.index + 1} di ${FaseViaggio.values.length}',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ),

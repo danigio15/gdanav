@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -11,16 +12,28 @@ import 'colonnina.dart';
 /// prese e le potenze sì, quando i mappatori le hanno scritte. I dati vanno
 /// citati: «© OpenStreetMap contributors» (ODbL).
 class ClienteOverpass implements FonteColonnine {
-  ClienteOverpass({http.Client? client, List<Uri>? server})
-      : _http = client ?? http.Client(),
+  ClienteOverpass({
+    http.Client? client,
+    List<Uri>? server,
+    this.scaglione = const Duration(seconds: 12),
+    this.attesa = const Duration(seconds: 50),
+  })  : _http = client ?? http.Client(),
         server = server ??
             [
               Uri.parse('https://overpass-api.de/api/interpreter'),
+              Uri.parse('https://overpass.private.coffee/api/interpreter'),
               Uri.parse('https://overpass.kumi.systems/api/interpreter'),
             ];
 
-  /// Si prova il primo; se è occupato o giù, il successivo.
+  /// Si chiede al primo; se dopo [scaglione] non ha risposto (dal telefono,
+  /// con l'indirizzo condiviso dell'operatore, capita che ci metta in coda)
+  /// si chiede anche al successivo, e vince chi risponde prima. Se uno
+  /// sbaglia, si passa subito al prossimo.
   final List<Uri> server;
+  final Duration scaglione;
+
+  /// Quanto si aspetta ciascun server.
+  final Duration attesa;
   final http.Client _http;
 
   /// Le reti di ricarica rapida: le loro colonnine valgono anche se i
@@ -62,32 +75,49 @@ class ClienteOverpass implements FonteColonnine {
   }
 
   @override
-  Future<List<Colonnina>> lungo(List<Punto> percorso, {double distanzaKm = 3}) async {
+  Future<List<Colonnina>> lungo(List<Punto> percorso, {double distanzaKm = 3}) {
     final corpo = {'data': richiesta(percorso, distanzaKm)};
-    Object? ultimo;
-    for (final s in server) {
-      try {
-        final r = await _http.post(s,
-            body: corpo,
-            headers: {'user-agent': 'gdanav (github.com/danigio15/gdanav)'}).timeout(const Duration(seconds: 75));
-        if (r.statusCode != 200) {
-          ultimo = 'Overpass: ${r.statusCode}';
-          continue;
+    final esito = Completer<List<Colonnina>>();
+    final errori = <String>[];
+    var prossimo = 0;
+    Timer? sveglia;
+
+    void parti() {
+      sveglia?.cancel();
+      if (esito.isCompleted || prossimo >= server.length) return;
+      final s = server[prossimo++];
+      sveglia = Timer(scaglione, parti);
+      _chiedi(s, corpo).then((c) {
+        if (esito.isCompleted) return;
+        sveglia?.cancel();
+        esito.complete(c);
+      }, onError: (Object e) {
+        errori.add('${s.host}: $e');
+        if (esito.isCompleted) return;
+        if (errori.length == server.length) {
+          sveglia?.cancel();
+          esito.completeError(Exception('colonnine: ${errori.join('; ')}'));
+        } else {
+          parti();
         }
-        final json = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>;
-        // In tempo scaduto Overpass risponde 200 con un avviso e niente dati:
-        // non è «non ci sono colonnine».
-        final avviso = json['remark'];
-        if (avviso is String && avviso.contains('error')) {
-          ultimo = 'Overpass: $avviso';
-          continue;
-        }
-        return leggi(json);
-      } catch (e) {
-        ultimo = e;
-      }
+      });
     }
-    throw Exception('colonnine: $ultimo');
+
+    parti();
+    return esito.future;
+  }
+
+  Future<List<Colonnina>> _chiedi(Uri s, Map<String, String> corpo) async {
+    final r = await _http.post(s, body: corpo, headers: {'user-agent': 'gdanav (github.com/danigio15/gdanav)'}).timeout(
+      attesa,
+    );
+    if (r.statusCode != 200) throw 'Overpass: ${r.statusCode}';
+    final json = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>;
+    // In tempo scaduto Overpass risponde 200 con un avviso e niente dati:
+    // non è «non ci sono colonnine».
+    final avviso = json['remark'];
+    if (avviso is String && avviso.contains('error')) throw 'Overpass: $avviso';
+    return leggi(json);
   }
 
   static List<Colonnina> leggi(Map<String, Object?> json) => [

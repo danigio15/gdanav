@@ -124,6 +124,33 @@ void main() {
     expect(chiesti, ['uno.esempio', 'due.esempio']);
   });
 
+  test('se il primo server tace, dopo poco si chiede anche al secondo', () async {
+    final orologio = Stopwatch()..start();
+    final client = MockClient((r) async {
+      if (r.url.host == 'uno.esempio') await Future<void>.delayed(const Duration(seconds: 5));
+      return http.Response(jsonEncode(risposta), 200);
+    });
+    final o = ClienteOverpass(
+      client: client,
+      server: [Uri.parse('https://uno.esempio/api'), Uri.parse('https://due.esempio/api')],
+      scaglione: const Duration(milliseconds: 100),
+    );
+    final c = await o.lungo(const [Punto(44.5, 11.3), Punto(44.8, 11.6)]);
+    expect(c, hasLength(2));
+    expect(orologio.elapsed, lessThan(const Duration(seconds: 2)));
+  });
+
+  test('se sbagliano tutti, l\'errore dice di ciascuno', () async {
+    final o = ClienteOverpass(
+      client: MockClient((_) async => http.Response('occupato', 429)),
+      server: [Uri.parse('https://uno.esempio/api'), Uri.parse('https://due.esempio/api')],
+    );
+    expect(
+      o.lungo(const [Punto(44.5, 11.3), Punto(44.8, 11.6)]),
+      throwsA(predicate((e) => '$e'.contains('uno.esempio') && '$e'.contains('due.esempio'))),
+    );
+  });
+
   test('la riserva: se Open Charge Map non risponde, OpenStreetMap', () async {
     final ocm = ClienteOpenChargeMap(
       chiave: '',

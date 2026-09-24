@@ -83,6 +83,9 @@ class PreferenzeRicarica {
       };
 }
 
+/// A che punto è il calcolo, per dirlo a chi aspetta.
+enum FaseViaggio { percorso, colonnine, soste }
+
 /// Mette insieme Valhalla, le colonnine e il pianificatore delle soste.
 class PianificatoreViaggio {
   PianificatoreViaggio({
@@ -104,7 +107,9 @@ class PianificatoreViaggio {
     required double batteria,
     Condizioni condizioni = const Condizioni(),
     Set<String> obbligate = const {},
+    void Function(FaseViaggio fase)? avanzamento,
   }) async {
+    avanzamento?.call(FaseViaggio.percorso);
     final percorso = await percorsi([partenza, arrivo]);
     final p = preferenze;
     final pianificatore = PianificatoreSoste(
@@ -122,6 +127,7 @@ class PianificatoreViaggio {
     // Le colonnine si chiedono sempre, anche quando non servono: sulla mappa
     // si vedono lungo la strada, e se ne può scegliere una. Ma se il servizio
     // non risponde e la batteria basta, il viaggio si fa lo stesso.
+    avanzamento?.call(FaseViaggio.colonnine);
     List<Colonnina> trovate;
     try {
       trovate = await colonnine.lungo(percorso.punti);
@@ -131,6 +137,7 @@ class PianificatoreViaggio {
     }
     // Proiettare migliaia di colonnine e cercare le soste è lavoro pesante:
     // si fa su un altro filo, così l'interfaccia non si blocca.
+    avanzamento?.call(FaseViaggio.soste);
     final prese = profilo.connettori;
     final (vicine, piano) = await Isolate.run(() {
       final vicine = colonnineSulPercorso(

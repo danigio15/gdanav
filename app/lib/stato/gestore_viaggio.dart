@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -15,8 +17,11 @@ class NessunViaggio extends StatoViaggio {
 }
 
 class Calcolo extends StatoViaggio {
-  const Calcolo(this.destinazione);
+  Calcolo(this.destinazione);
   final Luogo destinazione;
+
+  /// A che punto è: cambia mentre si calcola.
+  FaseViaggio fase = FaseViaggio.percorso;
 }
 
 class ViaggioPronto extends StatoViaggio {
@@ -90,6 +95,9 @@ class GestoreViaggio extends ChangeNotifier {
 
   StatoViaggio stato = const NessunViaggio();
 
+  /// Oltre questo si smette di aspettare e lo si dice.
+  static const tempoMassimo = Duration(minutes: 2);
+
   /// Le colonnine dove l'utente ha deciso di fermarsi, per questo viaggio.
   final obbligate = <String>{};
 
@@ -141,16 +149,32 @@ class GestoreViaggio extends ChangeNotifier {
     final calcolo = Calcolo(destinazione);
     _imposta(calcolo);
     try {
-      final viaggio = await costruisci(impostazioni, auto.veicolo, preferenze).pianifica(
-        partenza: partenza,
-        arrivo: destinazione.posizione,
-        batteria: batteria,
-        condizioni: consumo?.condizioni(auto.stato) ?? const Condizioni(),
-        obbligate: Set.of(obbligate),
-      );
+      final viaggio = await costruisci(impostazioni, auto.veicolo, preferenze)
+          .pianifica(
+            partenza: partenza,
+            arrivo: destinazione.posizione,
+            batteria: batteria,
+            condizioni: consumo?.condizioni(auto.stato) ?? const Condizioni(),
+            obbligate: Set.of(obbligate),
+            avanzamento: (f) {
+              if (!identical(stato, calcolo)) return;
+              calcolo.fase = f;
+              notifyListeners();
+            },
+          )
+          .timeout(tempoMassimo);
       // Nel frattempo l'utente può aver annullato o scelto un'altra meta.
       if (identical(stato, calcolo)) {
         _imposta(ViaggioPronto(destinazione, viaggio, batteria, calcolatoAlle: _ora()));
+      }
+    } on TimeoutException {
+      if (identical(stato, calcolo)) {
+        _imposta(
+          ErroreViaggio(switch (calcolo.fase) {
+            FaseViaggio.colonnine => 'I server delle colonnine non rispondono. Riprova tra poco.',
+            _ => 'Il calcolo ci mette troppo: i server sono lenti. Riprova tra poco.',
+          }, destinazione: destinazione),
+        );
       }
     } on ErroreValhalla catch (e) {
       if (identical(stato, calcolo)) _imposta(ErroreViaggio(_spiega(e), destinazione: destinazione));
