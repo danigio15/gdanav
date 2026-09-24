@@ -5,6 +5,7 @@ export 'src/colonnine/colonnina.dart';
 export 'src/colonnine/lungo_percorso.dart';
 export 'src/colonnine/ocpi.dart';
 export 'src/colonnine/open_charge_map.dart';
+export 'src/colonnine/colonnine_locali.dart';
 export 'src/colonnine/colonnine_relay.dart';
 export 'src/colonnine/overpass.dart';
 export 'src/geo/geo.dart';

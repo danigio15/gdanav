@@ -64,8 +64,11 @@ class ClienteColonnineRelay implements FonteColonnine {
   static const mancantiAmmessi = 0.25;
 
   @override
-  Future<List<Colonnina>> lungo(List<Punto> percorso, {double distanzaKm = 3}) async {
-    final coda = riquadri(percorso, distanzaKm).toList();
+  Future<List<Colonnina>> lungo(List<Punto> percorso, {double distanzaKm = 3}) => nei(riquadri(percorso, distanzaKm));
+
+  /// Le colonnine di questi riquadri, [insieme] alla volta.
+  Future<List<Colonnina>> nei(Set<(int, int)> scelti) async {
+    final coda = scelti.toList();
     final trovate = <String, Colonnina>{};
     final errori = <Object>[];
     var prossimo = 0;
