@@ -12,7 +12,7 @@ const sorgenteArrivo = 'gdanav-arrivo';
 const sorgenteIo = 'gdanav-io';
 const sorgenteSegnalazioni = 'gdanav-segnalazioni';
 const stratoTraffico = 'traffico';
-const stratoIncidenti = 'incidenti';
+const stratoTrafficoLocale = 'traffico-locale';
 const stratiToccabili = ['gdanav-soste', 'gdanav-colonnine'];
 
 /// Dall'alto gli edifici sono piatti e puliti; inclinando la mappa si
@@ -231,28 +231,16 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}
       sorgenteArrivo: {'type': 'geojson', 'data': _vuota},
       sorgenteIo: {'type': 'geojson', 'data': _vuota},
       sorgenteSegnalazioni: {'type': 'geojson', 'data': _vuota},
-      if (traffico.isNotEmpty) ...{
+      if (traffico.isNotEmpty)
         'traffico': {
-          'type': 'raster',
-          'tileSize': 512,
-          'maxzoom': 18,
+          'type': 'vector',
+          'maxzoom': 22,
           'attribution': '© TomTom',
           'tiles': [
-            'https://api.tomtom.com/traffic/map/4/tile/flow/relative-delay/{z}/{x}/{y}.png'
-                '?key=${Uri.encodeQueryComponent(traffico)}&tileSize=512&thickness=10',
+            'https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.pbf'
+                '?key=${Uri.encodeQueryComponent(traffico)}',
           ],
         },
-        'incidenti': {
-          'type': 'raster',
-          'tileSize': 512,
-          'maxzoom': 18,
-          'attribution': '© TomTom',
-          'tiles': [
-            'https://api.tomtom.com/traffic/map/4/tile/incidents/${scuro ? 's0-dark' : 's0'}/{z}/{x}/{y}.png'
-                '?key=${Uri.encodeQueryComponent(traffico)}&tileSize=512',
-          ],
-        },
-      },
     },
     'layers': [
       {
@@ -346,17 +334,11 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}
       _strada('strade', classi['strada']!, t.strada, _largo(1.6, 20)),
       _strada('principali', classi['principale']!, t.principale, _largo(2.6, 27)),
       _strada('autostrade', classi['autostrada']!, t.autostrada, _largo(3.4, 32)),
-      // Il traffico sopra le strade e sotto tutto il resto: giallo, arancio,
-      // rosso dove si rallenta.
+      // Il traffico come in Waze: solo dove si rallenta, arancio se lento e
+      // rosso se quasi fermi; da lontano solo sulle strade principali.
       if (traffico.isNotEmpty) ...[
-        {
-          'id': stratoTraffico,
-          'type': 'raster',
-          'source': 'traffico',
-          'minzoom': 6,
-          'paint': {'raster-opacity': 0.9},
-        },
-        {'id': stratoIncidenti, 'type': 'raster', 'source': 'incidenti', 'minzoom': 8},
+        _coda(stratoTraffico, principali: true, minzoom: 7),
+        _coda(stratoTrafficoLocale, principali: false, minzoom: 13),
       ],
       {
         'id': stratoEdifici2d,
@@ -640,5 +622,70 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}
         'paint': {'text-color': t.luogo, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 2},
       },
     ],
+  };
+}
+
+/// Le strade dove TomTom misura una coda. `traffic_level` è la velocità
+/// rispetto a quella libera: sotto 0,6 si rallenta, sotto 0,3 si è fermi.
+Map<String, Object> _coda(String id, {required bool principali, required double minzoom}) {
+  const grandi = ['Motorway', 'International road', 'Major road', 'Secondary road'];
+  return {
+    'id': id,
+    'type': 'line',
+    'source': 'traffico',
+    'source-layer': 'Traffic flow',
+    'minzoom': minzoom,
+    'filter': [
+      'all',
+      [
+        '<',
+        [
+          'to-number',
+          ['get', 'traffic_level'],
+          1,
+        ],
+        0.6,
+      ],
+      principali
+          ? [
+              'in',
+              ['get', 'road_type'],
+              ['literal', grandi],
+            ]
+          : [
+              '!',
+              [
+                'in',
+                ['get', 'road_type'],
+                ['literal', grandi],
+              ],
+            ],
+    ],
+    'layout': {'line-cap': 'round', 'line-join': 'round'},
+    'paint': {
+      'line-color': [
+        'step',
+        [
+          'to-number',
+          ['get', 'traffic_level'],
+          1,
+        ],
+        '#E5302A',
+        0.3,
+        '#F5A623',
+      ],
+      'line-width': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        7,
+        1.2,
+        12,
+        2.5,
+        16,
+        5,
+      ],
+      'line-opacity': 0.9,
+    },
   };
 }
