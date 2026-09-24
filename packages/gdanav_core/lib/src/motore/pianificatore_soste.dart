@@ -181,6 +181,8 @@ class PianificatoreSoste {
       if (i == n) return _ricostruisci(ordinate, da, (i, arrivo), secondi, prog, batteriaPartenza);
 
       final c = ordinate[i];
+      // A una colonnina tutta guasta non si ricarica.
+      if (c.disponibilita.guasta) continue;
       final primo = ((arrivo ~/ passoRicarica) + 1) * passoRicarica;
       // A una sosta scelta dall'utente ci si ferma comunque, anche se la
       // batteria è già sopra il massimo abituale.

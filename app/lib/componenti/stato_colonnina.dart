@@ -18,7 +18,8 @@ Color coloreStato(BuildContext context, StatoColonnina s) {
 String testoDisponibilita(Disponibilita d) {
   final funzionanti = d.totali - d.guaste;
   return switch (statoDi(d)) {
-    StatoColonnina.libera => d.libere == 1 && funzionanti == 1 ? 'Libera' : '${d.libere} libere su $funzionanti',
+    StatoColonnina.libera =>
+      funzionanti == 1 ? 'Libera' : '${d.libere} ${d.libere == 1 ? 'libera' : 'libere'} su $funzionanti',
     StatoColonnina.piena => funzionanti == 1 ? 'Occupata' : 'Piena · $funzionanti occupate',
     StatoColonnina.guasta => 'Fuori servizio',
     StatoColonnina.ignota => 'Stato non disponibile',

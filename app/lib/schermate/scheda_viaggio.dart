@@ -224,8 +224,12 @@ class _Pronta extends StatelessWidget {
                   Expanded(
                     child: _Dato(
                       icona: Icon(Icons.ev_station, color: ColoriGdanav.di(context).libera),
-                      valore: soste.isEmpty ? 'Nessuna' : '${soste.length} · ${durata(piano.ricarica)}',
-                      etichetta: soste.length == 1 ? 'sosta' : 'soste',
+                      valore: soste.isEmpty ? 'Nessuna' : durata(piano.ricarica),
+                      etichetta: switch (soste.length) {
+                        0 => 'sosta',
+                        1 => '1 sosta',
+                        final n => '$n soste',
+                      },
                     ),
                   ),
                   const SizedBox(width: 8),

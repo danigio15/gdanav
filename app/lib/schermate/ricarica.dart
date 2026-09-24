@@ -65,12 +65,12 @@ class _PreferenzeRicaricaSchermataState extends State<PreferenzeRicaricaSchermat
                   onChanged: (v) => _cambia(p.copia(massimoRicarica: v)),
                 ),
                 const SizedBox(height: 12),
-                Text('Colonnine da proporre', style: t.titleSmall),
+                Text('Colonnine da proporre (kW)', style: t.titleSmall),
                 const SizedBox(height: 8),
                 SegmentedButton<double>(
                   segments: const [
                     ButtonSegment(value: 22, label: Text('Tutte')),
-                    ButtonSegment(value: 50, label: Text('≥ 50 kW')),
+                    ButtonSegment(value: 50, label: Text('≥ 50')),
                     ButtonSegment(value: 100, label: Text('≥ 100')),
                     ButtonSegment(value: 150, label: Text('≥ 150')),
                   ],

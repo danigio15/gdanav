@@ -8,7 +8,7 @@ enum StatoColonnina { libera, piena, guasta, ignota }
 StatoColonnina statoDi(Disponibilita d) {
   if (d.libere > 0) return StatoColonnina.libera;
   if (d.piena) return StatoColonnina.piena;
-  if (d.guaste > 0 && d.guaste == d.totali) return StatoColonnina.guasta;
+  if (d.guasta) return StatoColonnina.guasta;
   return StatoColonnina.ignota;
 }
 

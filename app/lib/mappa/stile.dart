@@ -11,6 +11,11 @@ const sorgenteColonnine = 'gdanav-colonnine';
 const sorgenteArrivo = 'gdanav-arrivo';
 const stratiToccabili = ['gdanav-soste', 'gdanav-colonnine'];
 
+/// Dall'alto gli edifici sono piatti e puliti; inclinando la mappa si
+/// accendono quelli in 3D e si spengono i piatti.
+const stratoEdifici2d = 'edifici';
+const stratoEdifici3d = 'edifici-3d';
+
 class _Tavolozza {
   const _Tavolozza({
     required this.sfondo,
@@ -20,6 +25,7 @@ class _Tavolozza {
     required this.acqua,
     required this.edificio,
     required this.edificioLato,
+    required this.edificioBordo,
     required this.autostrada,
     required this.autostradaBordo,
     required this.principale,
@@ -40,20 +46,21 @@ class _Tavolozza {
     required this.arrivo,
   });
 
-  final String sfondo, abitato, prato, bosco, acqua, edificio, edificioLato;
+  final String sfondo, abitato, prato, bosco, acqua, edificio, edificioLato, edificioBordo;
   final String autostrada, autostradaBordo, principale, principaleBordo, strada, stradaBordo, sentiero, ferrovia;
   final String etichetta, etichettaAlone, luogo;
   final String percorso, percorsoBordo, libera, piena, guasta, ignota, arrivo;
 }
 
 const _chiaro = _Tavolozza(
-  sfondo: '#F4F1EC',
-  abitato: '#EEE9E1',
-  prato: '#D5E8C4',
-  bosco: '#C3DDAE',
-  acqua: '#9CC9F0',
-  edificio: '#E2DAD0',
-  edificioLato: '#D6CCBF',
+  sfondo: '#F6F4F0',
+  abitato: '#F0ECE6',
+  prato: '#D6EACB',
+  bosco: '#C2DEB2',
+  acqua: '#A3CFF2',
+  edificio: '#E7E1D9',
+  edificioLato: '#D9D1C6',
+  edificioBordo: '#D8CFC3',
   autostrada: '#F9B866',
   autostradaBordo: '#D98D3A',
   principale: '#FFE39A',
@@ -80,8 +87,9 @@ const _scuro = _Tavolozza(
   prato: '#132A1E',
   bosco: '#11261A',
   acqua: '#0C3050',
-  edificio: '#1B2533',
-  edificioLato: '#233044',
+  edificio: '#243044',
+  edificioLato: '#34445E',
+  edificioBordo: '#2C3A50',
   autostrada: '#A2622A',
   autostradaBordo: '#5B3514',
   principale: '#6F6031',
@@ -186,6 +194,13 @@ Map<String, Object> stileMappa({required bool scuro}) {
     'version': 8,
     'name': scuro ? 'gdanav scuro' : 'gdanav chiaro',
     'glyphs': 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+    // La luce che dà volume agli edifici in 3D: da sud-ovest, morbida.
+    'light': {
+      'anchor': 'viewport',
+      'color': '#FFFFFF',
+      'intensity': scuro ? 0.25 : 0.32,
+      'position': [1.2, 200, 35],
+    },
     'sources': {
       'openmaptiles': {'type': 'vector', 'url': 'https://tiles.openfreemap.org/planet'},
       sorgentePercorso: {'type': 'geojson', 'data': _vuota},
@@ -271,13 +286,20 @@ Map<String, Object> stileMappa({required bool scuro}) {
       _strada('principali', classi['principale']!, t.principale, _largo(1.8, 22)),
       _strada('autostrade', classi['autostrada']!, t.autostrada, _largo(2.4, 26)),
       {
-        // Gli edifici sono sempre estrusi: dall'alto sono piatti, inclinando
-        // la mappa diventano 3D.
-        'id': 'edifici-3d',
+        'id': stratoEdifici2d,
+        'type': 'fill',
+        'source': 'openmaptiles',
+        'source-layer': 'building',
+        'minzoom': 14,
+        'paint': {'fill-color': t.edificio, 'fill-outline-color': t.edificioBordo},
+      },
+      {
+        'id': stratoEdifici3d,
         'type': 'fill-extrusion',
         'source': 'openmaptiles',
         'source-layer': 'building',
         'minzoom': 14,
+        'layout': {'visibility': 'none'},
         'paint': {
           'fill-extrusion-color': [
             'interpolate',
@@ -285,7 +307,7 @@ Map<String, Object> stileMappa({required bool scuro}) {
             ['get', 'render_height'],
             0,
             t.edificio,
-            40,
+            60,
             t.edificioLato,
           ],
           'fill-extrusion-height': [
@@ -302,7 +324,7 @@ Map<String, Object> stileMappa({required bool scuro}) {
             ['get', 'render_min_height'],
             0,
           ],
-          'fill-extrusion-opacity': 0.9,
+          'fill-extrusion-opacity': 0.94,
         },
       },
       {

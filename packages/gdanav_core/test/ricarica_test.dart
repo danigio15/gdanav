@@ -161,4 +161,52 @@ void main() {
     expect(letto.toJson(), p.toJson());
     expect(PreferenzeRicarica.daJson(const {}).toJson(), const PreferenzeRicarica().toJson());
   });
+
+  group('prese che contano', () {
+    const rapida = Colonnina(
+      id: 'r',
+      nome: 'Rapida',
+      posizione: Punto(45, 9),
+      connettori: [
+        Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150, stato: StatoPresa.occupata),
+        Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150, stato: StatoPresa.occupata),
+        Connettore(tipo: TipoConnettore.tipo2, potenzaKw: 22, stato: StatoPresa.disponibile),
+      ],
+    );
+    const rotta = Colonnina(
+      id: 'g',
+      nome: 'Guasta',
+      posizione: Punto(45, 9.001),
+      connettori: [
+        Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150, stato: StatoPresa.fuoriServizio),
+        Connettore(tipo: TipoConnettore.tipo2, potenzaKw: 22, stato: StatoPresa.disponibile),
+      ],
+    );
+    final linea = Linea(const [Punto(45, 8.99), Punto(45, 9.02)]);
+    final sul = colonnineSulPercorso(
+      linea,
+      [rapida, rotta],
+      compatibili: const {TipoConnettore.ccs2, TipoConnettore.tipo2},
+      potenzaMinimaKw: 50,
+    );
+
+    test('una Tipo 2 libera non fa libera una rapida con le CCS occupate', () {
+      final d = sul.firstWhere((c) => c.id == 'r').disponibilita;
+      expect(d.piena, isTrue);
+      expect((d.libere, d.occupate, d.totali), (0, 2, 2));
+    });
+
+    test('la guasta si mostra ma non ci si ferma', () {
+      final g = sul.firstWhere((c) => c.id == 'g');
+      expect(g.disponibilita.guasta, isTrue);
+      expect(g.potenzaKw, 150);
+      final lungo = List.generate(450, (_) => const Tratto(lunghezzaM: 1000, velocitaKmh: 120));
+      final piano = PianificatoreSoste(profilo: p).pianifica(
+        percorso: lungo,
+        batteriaPartenza: 90,
+        colonnine: [for (var km = 50; km < 450; km += 50) c(km, d: const Disponibilita(guaste: 2, totali: 2))],
+      );
+      expect(piano, isNull);
+    });
+  });
 }

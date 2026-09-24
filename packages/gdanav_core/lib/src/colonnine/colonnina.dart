@@ -31,6 +31,9 @@ class Disponibilita {
   /// Tutte le prese funzionanti sono occupate: si rischia di aspettare.
   bool get piena => libere == 0 && occupate > 0;
 
+  /// Tutte le prese sono guaste: non ci si ricarica.
+  bool get guasta => totali > 0 && guaste == totali;
+
   static const sconosciuta = Disponibilita();
 }
 
@@ -54,6 +57,16 @@ class Colonnina {
   /// `ocm`, `ocpi`…: per citare la fonte, come chiedono le licenze.
   final String fonte;
 
+  /// La potenza massima fra le prese che l'auto può usare, anche guaste:
+  /// quella di targa.
+  double potenzaNominalePer(Set<TipoConnettore> compatibili) {
+    var massima = 0.0;
+    for (final c in connettori) {
+      if (compatibili.contains(c.tipo) && c.potenzaKw > massima) massima = c.potenzaKw;
+    }
+    return massima;
+  }
+
   /// La potenza massima fra le prese che l'auto può usare e che non sono
   /// guaste. 0 se nessuna va bene.
   double potenzaPer(Set<TipoConnettore> compatibili) {
@@ -66,9 +79,12 @@ class Colonnina {
     return massima;
   }
 
-  Disponibilita disponibilitaPer(Set<TipoConnettore> compatibili) {
+  /// Contando solo le prese adatte all'auto e, con [minimaKw], solo quelle
+  /// abbastanza potenti: una Tipo 2 libera non fa libera una colonnina rapida
+  /// con tutte le CCS occupate.
+  Disponibilita disponibilitaPer(Set<TipoConnettore> compatibili, {double minimaKw = 0}) {
     var libere = 0, occupate = 0, guaste = 0, totali = 0;
-    for (final c in connettori.where((c) => compatibili.contains(c.tipo))) {
+    for (final c in connettori.where((c) => compatibili.contains(c.tipo) && c.potenzaKw >= minimaKw)) {
       totali++;
       switch (c.stato) {
         case StatoPresa.disponibile:

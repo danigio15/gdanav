@@ -61,6 +61,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     if (m == null) return;
     if (widget.controllo.inclinata != _inclinata) {
       _inclinata = widget.controllo.inclinata;
+      await _edifici(m);
       await m.animateCamera(CameraUpdate.tiltTo(_inclinata ? _inclinazione : 0));
     }
     if (widget.controllo.richiesteCentra != _centrate) {
@@ -72,6 +73,12 @@ class _MappaViaggioState extends State<MappaViaggio> {
         );
       }
     }
+  }
+
+  Future<void> _edifici(MapLibreMapController m) async {
+    if (!_stileCaricato) return;
+    await m.setLayerVisibility(stratoEdifici2d, !_inclinata);
+    await m.setLayerVisibility(stratoEdifici3d, _inclinata);
   }
 
   Future<void> _ridisegna() async {
@@ -125,6 +132,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
       onStyleLoadedCallback: () {
         _stileCaricato = true;
         _disegnato = null;
+        if (_mappa case final m?) _edifici(m);
         _ridisegna();
       },
       onMapClick: (p, _) => _tocco(p),
