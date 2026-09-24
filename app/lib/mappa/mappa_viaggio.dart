@@ -10,6 +10,7 @@ import '../componenti/icone_segnalazioni.dart';
 import '../servizi.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_posizione.dart';
+import '../stato/gestore_premium.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import 'controllo_mappa.dart';
@@ -72,6 +73,11 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.posizione.addListener(_io);
     widget.guida?.addListener(_io);
     widget.segnalazioni?.addListener(_segnalazioni);
+    GestorePremium.attivo.addListener(_premium);
+  }
+
+  void _premium() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -81,6 +87,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.posizione.removeListener(_io);
     widget.guida?.removeListener(_io);
     widget.segnalazioni?.removeListener(_segnalazioni);
+    GestorePremium.attivo.removeListener(_premium);
     super.dispose();
   }
 
@@ -210,10 +217,12 @@ class _MappaViaggioState extends State<MappaViaggio> {
   @override
   Widget build(BuildContext context) {
     final scuro = Theme.of(context).brightness == Brightness.dark;
+    // Il traffico è Premium.
+    final traffico = GestorePremium.attivo.value ? Servizi.chiaveTomTom : '';
     final mappa = MapLibreMap(
-      // Cambia stile col tema: la chiave rifà la mappa.
-      key: ValueKey(scuro),
-      styleString: jsonEncode(stileMappa(scuro: scuro, chiaveTraffico: Servizi.chiaveTomTom)),
+      // Cambia stile col tema (e col traffico): la chiave rifà la mappa.
+      key: ValueKey((scuro, traffico.isNotEmpty)),
+      styleString: jsonEncode(stileMappa(scuro: scuro, chiaveTraffico: traffico)),
       initialCameraPosition: widget.guida != null
           ? const CameraPosition(target: LatLng(41.9, 12.5), zoom: 17, tilt: _inclinazione)
           : const CameraPosition(target: LatLng(41.9, 12.5), zoom: 5),

@@ -2,53 +2,102 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 
 import '../servizi.dart';
 import 'archivio.dart';
 
-/// Il prodotto da creare nella Play Console: Monetizza → Prodotti → Prodotti
-/// in-app, non consumabile.
+/// L'abbonamento da creare nella Play Console (Monetizza → Prodotti →
+/// Abbonamenti), con due piani base e, per ciascuno, l'offerta di prova.
 const idPremium = 'gdanav_premium';
+const pianoMensile = 'mensile';
+const pianoAnnuale = 'annuale';
+
+/// Un piano dell'abbonamento come lo propone il negozio.
+class PianoPremium {
+  const PianoPremium({required this.id, required this.prezzo, this.giorniProva = 0});
+
+  /// [pianoMensile] o [pianoAnnuale].
+  final String id;
+
+  /// Il prezzo che si paga dopo la prova, come lo scrive il negozio.
+  final String prezzo;
+
+  /// 0: senza prova (già usata, o nessuna offerta).
+  final int giorniProva;
+}
 
 /// Il negozio, visto dall'app: Google Play, o uno finto nelle prove.
 abstract interface class NegozioPremium {
   Future<bool> disponibile();
 
-  /// Il prezzo del Premium come lo scrive il negozio («2,99 €»); `null` se
-  /// il prodotto non c'è (non ancora creato nella Play Console).
-  Future<String?> prezzo();
+  /// I piani in vendita; vuoto se l'abbonamento non c'è (non ancora creato
+  /// nella Play Console).
+  Future<List<PianoPremium>> piani();
 
   /// Gli acquisti: nuovi, ripristinati, falliti.
   Stream<List<PurchaseDetails>> get acquisti;
 
-  Future<void> compra();
+  Future<void> compra(String piano);
   Future<void> ripristina();
   Future<void> completa(PurchaseDetails p);
 }
 
 class NegozioGooglePlay implements NegozioPremium {
   final _iap = InAppPurchase.instance;
-  ProductDetails? _prodotto;
+  final _perPiano = <String, GooglePlayProductDetails>{};
 
   @override
   Future<bool> disponibile() => _iap.isAvailable();
 
   @override
-  Future<String?> prezzo() async {
+  Future<List<PianoPremium>> piani() async {
     final r = await _iap.queryProductDetails({idPremium});
-    _prodotto = r.productDetails.where((p) => p.id == idPremium).firstOrNull;
-    return _prodotto?.price;
+    final piani = <String, PianoPremium>{};
+    _perPiano.clear();
+    for (final d in r.productDetails.whereType<GooglePlayProductDetails>()) {
+      final i = d.subscriptionIndex;
+      final offerta = i == null ? null : d.productDetails.subscriptionOfferDetails?[i];
+      if (offerta == null || offerta.pricingPhases.isEmpty) continue;
+      final fasi = offerta.pricingPhases;
+      // La prova: una prima fase a prezzo zero («P14D» = 14 giorni).
+      final prova = fasi.length > 1 && fasi.first.priceAmountMicros == 0 ? _giorni(fasi.first.billingPeriod) : 0;
+      final gia = piani[offerta.basePlanId];
+      // Per ogni piano si propone l'offerta con la prova, se c'è.
+      if (gia == null || prova > gia.giorniProva) {
+        piani[offerta.basePlanId] = PianoPremium(
+          id: offerta.basePlanId,
+          prezzo: fasi.last.formattedPrice,
+          giorniProva: prova,
+        );
+        _perPiano[offerta.basePlanId] = d;
+      }
+    }
+    return piani.values.toList();
+  }
+
+  /// «P14D», «P2W», «P1M» → giorni.
+  static int _giorni(String periodo) {
+    final m = RegExp(r'P(\d+)([DWM])').firstMatch(periodo);
+    if (m == null) return 0;
+    final n = int.parse(m.group(1)!);
+    return switch (m.group(2)) {
+      'W' => n * 7,
+      'M' => n * 30,
+      _ => n,
+    };
   }
 
   @override
   Stream<List<PurchaseDetails>> get acquisti => _iap.purchaseStream;
 
   @override
-  Future<void> compra() async {
-    if (_prodotto == null) await prezzo();
-    final p = _prodotto;
-    if (p == null) throw StateError('Premium non disponibile nel negozio');
-    await _iap.buyNonConsumable(purchaseParam: PurchaseParam(productDetails: p));
+  Future<void> compra(String piano) async {
+    if (_perPiano.isEmpty) await piani();
+    final d = _perPiano[piano];
+    if (d == null) throw StateError('Piano $piano non disponibile nel negozio');
+    // L'offerta (con la prova) la sceglie il dettaglio stesso.
+    await _iap.buyNonConsumable(purchaseParam: GooglePlayPurchaseParam(productDetails: d));
   }
 
   @override
@@ -58,12 +107,23 @@ class NegozioGooglePlay implements NegozioPremium {
   Future<void> completa(PurchaseDetails p) => _iap.completePurchase(p);
 }
 
-/// gdanav Premium: sblocca Android Auto e l'integrazione con Home Assistant.
-/// Un acquisto solo, per sempre, legato all'account Google: si ripristina
-/// reinstallando o cambiando telefono.
+/// gdanav Premium, in abbonamento (mensile o annuale, con la prova gratuita):
+/// Android Auto, Home Assistant, traffico, colonnine libere/occupate,
+/// autovelox. Si ritrova su un altro telefono con lo stesso account Google;
+/// se l'abbonamento scade, si torna alla versione gratuita.
 class GestorePremium extends ChangeNotifier {
-  GestorePremium({required this.archivio, this.negozio, bool? tuttoSbloccato})
-    : _tuttoSbloccato = tuttoSbloccato ?? Servizi.tuttoSbloccato;
+  /// Premium attivo adesso, per chi non ha il gestore in mano (la mappa col
+  /// traffico, il pianificatore con le colonnine in tempo reale, gli
+  /// autovelox). Vero finché l'app non dice altro: le prove non passano dal
+  /// negozio.
+  static final attivo = ValueNotifier<bool>(true);
+
+  GestorePremium({
+    required this.archivio,
+    this.negozio,
+    bool? tuttoSbloccato,
+    this.attesaConferma = const Duration(seconds: 8),
+  }) : _tuttoSbloccato = tuttoSbloccato ?? Servizi.tuttoSbloccato;
 
   final Archivio archivio;
 
@@ -74,10 +134,14 @@ class GestorePremium extends ChangeNotifier {
   /// tutto sbloccato.
   final bool _tuttoSbloccato;
 
+  /// Quanto si aspetta che il Play Store confermi l'abbonamento, prima di
+  /// considerarlo scaduto.
+  final Duration attesaConferma;
+
   var sbloccato = false;
 
-  /// Il prezzo da mostrare; `null` se il negozio non risponde.
-  String? prezzo;
+  /// I piani da proporre; vuoto se il negozio non risponde.
+  var piani = <PianoPremium>[];
 
   /// Mentre Google Play lavora (acquisto in corso).
   var inCorso = false;
@@ -86,6 +150,13 @@ class GestorePremium extends ChangeNotifier {
   String? errore;
 
   StreamSubscription<List<PurchaseDetails>>? _iscrizione;
+  var _confermato = false;
+
+  @override
+  void notifyListeners() {
+    attivo.value = sbloccato;
+    super.notifyListeners();
+  }
 
   /// Quello che si sa subito (dal telefono); il Play Store risponde dopo,
   /// senza far aspettare l'avvio dell'app.
@@ -101,23 +172,31 @@ class GestorePremium extends ChangeNotifier {
     try {
       if (!await n.disponibile()) return;
       _iscrizione = n.acquisti.listen(_acquisti, onError: (Object e) => _errore('$e'));
-      prezzo = await n.prezzo();
+      piani = await n.piani();
       notifyListeners();
-      // Chi l'ha già comprato (altro telefono, reinstallazione) lo ritrova.
+      // Gli abbonamenti attivi tornano da soli (altro telefono, reinstallazione).
       await n.ripristina();
+      // Il negozio risponde ma non c'è un abbonamento attivo: scaduto o
+      // disdetto. Senza rete non si arriva qui, e resta com'era.
+      await Future<void>.delayed(attesaConferma);
+      if (sbloccato && !_confermato && !inCorso) {
+        sbloccato = false;
+        await archivio.salvaPremium(false);
+        notifyListeners();
+      }
     } catch (e) {
       debugPrint('premium: $e');
     }
   }
 
-  Future<void> compra() async {
+  Future<void> compra(String piano) async {
     final n = negozio;
     if (n == null || sbloccato) return;
     errore = null;
     inCorso = true;
     notifyListeners();
     try {
-      await n.compra();
+      await n.compra(piano);
     } catch (e) {
       _errore('Il Play Store non risponde. Riprova tra poco.');
     }
@@ -153,6 +232,7 @@ class GestorePremium extends ChangeNotifier {
   }
 
   Future<void> _sblocca() async {
+    _confermato = true;
     inCorso = false;
     errore = null;
     if (!sbloccato) {

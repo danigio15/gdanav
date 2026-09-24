@@ -9,6 +9,7 @@ import '../servizi.dart';
 import 'archivio.dart';
 import 'gestore_auto.dart';
 import 'gestore_consumo.dart';
+import 'gestore_premium.dart';
 
 /// A che punto è il viaggio.
 sealed class StatoViaggio {
@@ -91,8 +92,8 @@ PianificatoreViaggio pianificatoreVero(
     ]),
     profilo: profilo,
     preferenze: preferenze,
-    // Libere e occupate in tempo reale, se c'è la chiave TomTom.
-    disponibilita: _disponibilita,
+    // Libere e occupate in tempo reale (Premium), se c'è la chiave TomTom.
+    disponibilita: GestorePremium.attivo.value ? _disponibilita : null,
   );
 }
 

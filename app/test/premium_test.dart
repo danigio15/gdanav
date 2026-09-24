@@ -20,7 +20,7 @@ class NegozioFinto implements NegozioPremium {
   final PurchaseStatus esito;
   final _flusso = StreamController<List<PurchaseDetails>>.broadcast();
   final completati = <String>[];
-  var comprati = 0;
+  final comprati = <String>[];
 
   PurchaseDetails _acquisto(PurchaseStatus s) => PurchaseDetails(
     productID: idPremium,
@@ -37,11 +37,14 @@ class NegozioFinto implements NegozioPremium {
   Future<bool> disponibile() async => true;
 
   @override
-  Future<String?> prezzo() async => '2,99 €';
+  Future<List<PianoPremium>> piani() async => const [
+    PianoPremium(id: pianoMensile, prezzo: '3,00 €', giorniProva: 14),
+    PianoPremium(id: pianoAnnuale, prezzo: '20,00 €', giorniProva: 14),
+  ];
 
   @override
-  Future<void> compra() async {
-    comprati++;
+  Future<void> compra(String piano) async {
+    comprati.add(piano);
     _flusso.add([_acquisto(esito)]);
   }
 
@@ -58,18 +61,26 @@ Future<void> pausa() => Future<void>.delayed(const Duration(milliseconds: 20));
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  tearDown(() => GestorePremium.attivo.value = true);
 
   test('si compra: sbloccato, confermato a Google Play, e ricordato', () async {
     preparaPiattaforma();
     final negozio = NegozioFinto();
-    final p = GestorePremium(archivio: Archivio(), negozio: negozio, tuttoSbloccato: false);
+    final p = GestorePremium(
+      archivio: Archivio(),
+      negozio: negozio,
+      tuttoSbloccato: false,
+      attesaConferma: const Duration(milliseconds: 50),
+    );
     await p.carica();
     await pausa();
     expect(p.sbloccato, isFalse);
-    expect(p.prezzo, '2,99 €');
-    await p.compra();
+    expect(p.piani.map((x) => x.id), [pianoMensile, pianoAnnuale]);
+    await p.compra(pianoAnnuale);
     await pausa();
     expect(p.sbloccato, isTrue);
+    expect(GestorePremium.attivo.value, isTrue);
+    expect(negozio.comprati, [pianoAnnuale]);
     expect(negozio.completati, ['ordine-1']);
     expect(await Archivio().premium(), isTrue);
 
@@ -81,10 +92,39 @@ void main() {
 
   test('già comprato su un altro telefono: si ripristina da solo', () async {
     preparaPiattaforma();
-    final p = GestorePremium(archivio: Archivio(), negozio: NegozioFinto(giaComprato: true), tuttoSbloccato: false);
+    final p = GestorePremium(
+      archivio: Archivio(),
+      negozio: NegozioFinto(giaComprato: true),
+      tuttoSbloccato: false,
+      attesaConferma: const Duration(milliseconds: 50),
+    );
     await p.carica();
-    await pausa();
+    await Future<void>.delayed(const Duration(milliseconds: 100));
     expect(p.sbloccato, isTrue);
+  });
+
+  test("abbonamento scaduto o disdetto: il Play Store non lo conferma e Premium si chiude", () async {
+    preparaPiattaforma();
+    await Archivio().salvaPremium(true);
+    final p = GestorePremium(
+      archivio: Archivio(),
+      negozio: NegozioFinto(),
+      tuttoSbloccato: false,
+      attesaConferma: const Duration(milliseconds: 50),
+    );
+    await p.carica();
+    expect(p.sbloccato, isTrue); // subito: quello che si sapeva
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    expect(p.sbloccato, isFalse);
+    expect(GestorePremium.attivo.value, isFalse);
+    expect(await Archivio().premium(), isFalse);
+
+    // Senza negozio (niente rete, niente Play Store) resta com'era.
+    await Archivio().salvaPremium(true);
+    final senza = GestorePremium(archivio: Archivio(), tuttoSbloccato: false);
+    await senza.carica();
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(senza.sbloccato, isTrue);
   });
 
   test('annullato o fallito: resta bloccato, e l\'errore si dice', () async {
@@ -96,7 +136,7 @@ void main() {
     );
     await annullato.carica();
     await pausa();
-    await annullato.compra();
+    await annullato.compra(pianoMensile);
     await pausa();
     expect(annullato.sbloccato, isFalse);
     expect(annullato.inCorso, isFalse);
@@ -108,7 +148,7 @@ void main() {
     );
     await fallito.carica();
     await pausa();
-    await fallito.compra();
+    await fallito.compra(pianoMensile);
     await pausa();
     expect(fallito.sbloccato, isFalse);
     expect(fallito.errore, isNotNull);
@@ -134,26 +174,46 @@ void main() {
     expect(auto.disponibili, contains(TipoSorgente.homeAssistant));
   });
 
-  testWidgets('la schermata Premium: prezzo, sblocca, e poi «attivo»', (tester) async {
+  testWidgets('la schermata Premium: i due piani, la prova di 14 giorni, e poi «attivo»', (tester) async {
     preparaPiattaforma();
-    final p = GestorePremium(archivio: Archivio(), negozio: NegozioFinto(), tuttoSbloccato: false);
+    final negozio = NegozioFinto();
+    final p = GestorePremium(
+      archivio: Archivio(),
+      negozio: negozio,
+      tuttoSbloccato: false,
+      attesaConferma: const Duration(milliseconds: 20),
+    );
     await tester.runAsync(() async {
       await p.carica();
-      await pausa();
+      await Future<void>.delayed(const Duration(milliseconds: 60));
     });
     await tester.pumpWidget(
       MaterialApp(
         theme: temaGdanav(Brightness.light),
-        home: SchermataPremium(premium: p, perche: 'Android Auto'),
+        home: SchermataPremium(premium: p, perche: 'Il traffico'),
       ),
     );
-    expect(find.textContaining('Android Auto fa parte di Premium'), findsOneWidget);
-    expect(find.text('Sblocca a 2,99 €'), findsOneWidget);
+    expect(find.textContaining('Il traffico fa parte di Premium'), findsOneWidget);
+    expect(find.text('Previsioni meteo'), findsOneWidget);
+    expect(find.text('20,00 €/anno'), findsOneWidget);
+    expect(find.text('3,00 €/mese'), findsOneWidget);
+    expect(find.text('Risparmi il 44%'), findsOneWidget);
+    expect(find.text('Prova gratis per 14 giorni'), findsOneWidget);
+    expect(find.textContaining('Poi 20,00 €/anno, rinnovo automatico'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('piano-mensile')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('piano-mensile')));
+    await tester.pump();
+    expect(find.textContaining('Poi 3,00 €/mese'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('compra-premium')));
+    await tester.pumpAndSettle();
     await tester.runAsync(() async {
       await tester.tap(find.byKey(const Key('compra-premium')));
       await pausa();
     });
     await tester.pump();
+    expect(negozio.comprati, [pianoMensile]);
     expect(find.text('Premium è attivo: grazie!'), findsOneWidget);
     expect(find.byKey(const Key('compra-premium')), findsNothing);
   });

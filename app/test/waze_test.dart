@@ -8,6 +8,7 @@ import 'package:gdanav/tema.dart';
 import 'package:gdanav/schermate/cerca_destinazione.dart';
 import 'package:gdanav/stato/archivio.dart';
 import 'package:gdanav/stato/gestore_posizione.dart';
+import 'package:gdanav/stato/gestore_premium.dart';
 import 'package:gdanav/stato/gestore_viaggio.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -215,6 +216,10 @@ void main() {
     a.gps.add(Lettura(punti[0]));
     await aspetta(tester, 60);
     expect(a.segnalazioni.vicine.where((s) => s.fissa), hasLength(2));
+    // Senza Premium gli autovelox non ci sono.
+    GestorePremium.attivo.value = false;
+    expect(a.segnalazioni.vicine.where((s) => s.fissa), isEmpty);
+    GestorePremium.attivo.value = true;
 
     await tester.tap(find.text('Avvia'));
     await tester.pumpAndSettle();
