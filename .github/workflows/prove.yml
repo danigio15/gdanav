@@ -224,13 +224,17 @@ jobs:
             nome=$(basename $zona)
             curl -sSfL --retry 5 -o $nome.osm.pbf https://download.geofabrik.de/$zona-latest.osm.pbf
             osmium tags-filter $nome.osm.pbf nwr/amenity=charging_station -o $nome-cs.osm.pbf
-            osmium export $nome-cs.osm.pbf -f geojsonseq --add-unique-id=type_id -o $nome.geojsonseq
-            echo "$nome: $(wc -l < $nome.geojsonseq)"
+            osmium export $nome-cs.osm.pbf -f geojsonseq --add-unique-id=type_id -o $nome.colonnine.geojsonseq
+            osmium tags-filter $nome.osm.pbf n/highway=speed_camera -o $nome-av.osm.pbf
+            osmium export $nome-av.osm.pbf -f geojsonseq -o $nome.autovelox.geojsonseq
+            echo "$nome: $(wc -l < $nome.colonnine.geojsonseq) colonnine, $(wc -l < $nome.autovelox.geojsonseq) autovelox"
             rm $nome.osm.pbf
           done
       - run: dart pub get
         working-directory: packages/gdanav_core
-      - run: dart run tool/colonnine_osm.dart colonnine.json ${{ runner.temp }}/*.geojsonseq
+      - run: dart run tool/colonnine_osm.dart colonnine.json ${{ runner.temp }}/*.colonnine.geojsonseq
+        working-directory: packages/gdanav_core
+      - run: dart run tool/autovelox_osm.dart autovelox.json ${{ runner.temp }}/*.autovelox.geojsonseq
         working-directory: packages/gdanav_core
       - name: Nella release
         working-directory: packages/gdanav_core
@@ -238,7 +242,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
-          gh release upload anteprima colonnine.json --clobber
+          gh release upload anteprima colonnine.json autovelox.json --clobber
 
   # L'APK da provare: a ogni push su main finisce nella release «anteprima»,
   # da scaricare dal telefono.

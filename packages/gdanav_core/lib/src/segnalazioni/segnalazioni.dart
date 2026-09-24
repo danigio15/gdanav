@@ -29,6 +29,9 @@ class Segnalazione {
     required this.punto,
     required this.creata,
     this.conferme = 0,
+    this.fissa = false,
+    this.limiteKmh,
+    this.direzioneGradi,
   });
 
   final String id;
@@ -36,6 +39,28 @@ class Segnalazione {
   final Punto punto;
   final DateTime creata;
   final int conferme;
+
+  /// Un autovelox fisso da OpenStreetMap, non una segnalazione: non scade e
+  /// non si vota.
+  final bool fissa;
+
+  /// Il limite che controlla, se si sa.
+  final int? limiteKmh;
+
+  /// Verso dove guarda (gradi da nord), se si sa: si avvisa solo chi va in
+  /// quella direzione.
+  final double? direzioneGradi;
+
+  /// Quello che dice la voce, prima di «tra 500 metri».
+  String get avviso => limiteKmh == null ? tipo.avviso : '${tipo.avviso}, limite $limiteKmh';
+
+  /// Se riguarda chi va verso [rotta] (gradi da nord): senza direzione sì.
+  bool riguarda(double rotta) {
+    final d = direzioneGradi;
+    if (d == null) return true;
+    final diff = ((rotta - d) % 360 + 360) % 360;
+    return diff <= 60 || diff >= 300;
+  }
 
   static Segnalazione? daJson(Object? j) {
     if (j is! Map) return null;

@@ -26,6 +26,7 @@ export 'src/protocollo/busta.dart';
 export 'src/protocollo/cliente_relay.dart';
 export 'src/protocollo/codice.dart';
 export 'src/protocollo/messaggio.dart';
+export 'src/segnalazioni/autovelox.dart';
 export 'src/segnalazioni/segnalazioni.dart';
 export 'src/veicolo/arbitro_sorgenti.dart';
 export 'src/veicolo/catalogo.dart';
