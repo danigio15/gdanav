@@ -32,7 +32,15 @@ class GestoreGuida extends ChangeNotifier {
 
   /// Ogni quanto, in viaggio, si chiedono dati freschi a Home Assistant.
   static const intervalloDatiAuto = Duration(minutes: 1);
-  Timer? _chiediDati;
+  DateTime _ultimaRichiestaDati = DateTime(0);
+
+  /// Si chiede a ogni posizione, se è passato un minuto: niente timer.
+  void _forseChiediDati() {
+    final ora = _ora();
+    if (ora.difference(_ultimaRichiestaDati) < intervalloDatiAuto) return;
+    _ultimaRichiestaDati = ora;
+    unawaited(auto.chiediAggiornamento());
+  }
 
   MisuratoreConsumo? _misuratore;
   double? _batteriaInizio;
@@ -159,8 +167,8 @@ class GestoreGuida extends ChangeNotifier {
     _nuovoPiano(p);
     auto.addListener(_datiAuto);
     _iscrizione = posizioni().listen(_posizione);
-    unawaited(auto.chiediAggiornamento());
-    _chiediDati = Timer.periodic(intervalloDatiAuto, (_) => unawaited(auto.chiediAggiornamento()));
+    _ultimaRichiestaDati = DateTime(0);
+    _forseChiediDati();
     _evento('partenza');
     _racconta();
     notifyListeners();
@@ -168,8 +176,6 @@ class GestoreGuida extends ChangeNotifier {
 
   Future<void> ferma() async {
     attiva = false;
-    _chiediDati?.cancel();
-    _chiediDati = null;
     auto.removeListener(_datiAuto);
     _misuratore = null;
     await _iscrizione?.cancel();
@@ -191,6 +197,7 @@ class GestoreGuida extends ChangeNotifier {
   }
 
   Future<void> _posizione(Punto qui) async {
+    _forseChiediDati();
     final g = _guida;
     if (g == null || !attiva) return;
     final a = g.aggiorna(qui);
@@ -331,7 +338,6 @@ class GestoreGuida extends ChangeNotifier {
 
   @override
   void dispose() {
-    _chiediDati?.cancel();
     _iscrizione?.cancel();
     super.dispose();
   }

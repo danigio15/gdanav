@@ -265,6 +265,8 @@ void main() {
     expect(c.libera, isTrue);
     await tester.pump(const Duration(seconds: 11));
     expect(c.libera, isFalse);
+    await tester.tap(find.text('Fine'));
+    await tester.pumpAndSettle();
   });
 
   test('senza velocità dal GPS la si ricava dagli spostamenti, e da fermi torna a zero', () {
