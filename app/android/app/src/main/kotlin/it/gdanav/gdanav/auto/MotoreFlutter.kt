@@ -18,7 +18,7 @@ object MotoreFlutter {
         val cache = FlutterEngineCache.getInstance()
         cache.get(ID)?.let { return it }
         val motore = FlutterEngine(context.applicationContext)
-        PonteAuto.collega(motore.dartExecutor.binaryMessenger)
+        PonteAuto.collega(motore.dartExecutor.binaryMessenger, context)
         motore.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())
         cache.put(ID, motore)
         return motore

@@ -61,6 +61,21 @@ class GestoreAuto extends ChangeNotifier {
   /// Le sorgenti che questo telefono può usare adesso, per lo switch.
   Iterable<TipoSorgente> get disponibili => _sorgenti.keys;
 
+  /// Home Assistant fa parte di Premium: senza, l'abbinamento resta salvato
+  /// ma il collegamento non parte.
+  var homeAssistantConsentito = true;
+
+  Future<void> consentiHomeAssistant(bool si) async {
+    if (si == homeAssistantConsentito) return;
+    homeAssistantConsentito = si;
+    if (!si) {
+      await _spegni(TipoSorgente.homeAssistant);
+    } else if (abbinamento case final a?) {
+      await _accendi(SorgenteHomeAssistant(ClienteRelay(a)));
+    }
+    notifyListeners();
+  }
+
   /// In viaggio: che Home Assistant rilegga l'auto e mandi i dati freschi.
   Future<void> chiediAggiornamento() async {
     if (_sorgenti[TipoSorgente.homeAssistant] case final SorgenteHomeAssistant h) await h.chiediAggiornamento();
@@ -73,7 +88,9 @@ class GestoreAuto extends ChangeNotifier {
     abbinamento = await archivio.abbinamento();
     await _accendi(manuale);
     await _accendi(SorgenteAndroidAuto(onVelocita: _velocita));
-    if (abbinamento != null) await _accendi(SorgenteHomeAssistant(ClienteRelay(abbinamento!)));
+    if (abbinamento != null && homeAssistantConsentito) {
+      await _accendi(SorgenteHomeAssistant(ClienteRelay(abbinamento!)));
+    }
     foto = await archivio.fotoAuto();
     dongle = await archivio.dongleObd();
     if (dongle != null) unawaited(_accendiObd());
@@ -108,7 +125,7 @@ class GestoreAuto extends ChangeNotifier {
     await _spegni(TipoSorgente.homeAssistant);
     abbinamento = a;
     await archivio.salvaAbbinamento(a);
-    await _accendi(SorgenteHomeAssistant(ClienteRelay(a)));
+    if (homeAssistantConsentito) await _accendi(SorgenteHomeAssistant(ClienteRelay(a)));
     notifyListeners();
   }
 

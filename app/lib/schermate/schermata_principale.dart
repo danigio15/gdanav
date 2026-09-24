@@ -13,6 +13,7 @@ import '../stato/archivio.dart';
 import '../stato/gestore_auto.dart';
 import '../stato/foto_auto.dart';
 import '../stato/gestore_consumo.dart';
+import '../stato/gestore_premium.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_luoghi.dart';
 import '../stato/gestore_mappe_offline.dart';
@@ -28,6 +29,7 @@ import 'la_tua_auto.dart';
 import 'mappe_offline.dart';
 import 'opzioni_percorso.dart';
 import 'pannello_partenza.dart';
+import 'premium.dart';
 import 'ricarica.dart';
 import 'scheda_viaggio.dart';
 import 'segnala.dart';
@@ -49,6 +51,7 @@ class SchermataPrincipale extends StatefulWidget {
     this.segnalazioni,
     this.consumo,
     this.fotoAuto,
+    this.premium,
     this.mappeOffline,
   });
 
@@ -67,6 +70,9 @@ class SchermataPrincipale extends StatefulWidget {
   /// Il consumo imparato, da mostrare in «La tua auto».
   final GestoreConsumo? consumo;
   final GestoreFotoAuto? fotoAuto;
+
+  /// Android Auto e Home Assistant; `null` (prove): tutto sbloccato.
+  final GestorePremium? premium;
 
   /// Le mappe scaricate; se manca, quelle vere di MapLibre.
   final GestoreMappeOffline? mappeOffline;
@@ -303,6 +309,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
         }
 
         final ha = widget.auto.abbinamento;
+        final sbloccato = widget.premium?.sbloccato ?? true;
         return SafeArea(
           top: false,
           child: SingleChildScrollView(
@@ -342,8 +349,16 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                 _VoceMenu(
                   icona: Icons.home_outlined,
                   titolo: 'Home Assistant',
-                  sotto: ha == null ? 'Non collegata' : 'Collegata${ha.nomeAuto.isEmpty ? '' : ' a ${ha.nomeAuto}'}',
-                  onTap: () => vai(AbbinaHomeAssistant(gestore: widget.auto)),
+                  sotto: !sbloccato
+                      ? 'Premium'
+                      : ha == null
+                      ? 'Non collegata'
+                      : 'Collegata${ha.nomeAuto.isEmpty ? '' : ' a ${ha.nomeAuto}'}',
+                  onTap: () => vai(
+                    sbloccato
+                        ? AbbinaHomeAssistant(gestore: widget.auto)
+                        : SchermataPremium(premium: widget.premium!, perche: 'Home Assistant'),
+                  ),
                 ),
                 _VoceMenu(
                   icona: Icons.offline_pin_outlined,
@@ -359,12 +374,22 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                 _VoceMenu(
                   icona: Icons.directions_car_filled_outlined,
                   titolo: 'Android Auto',
-                  sotto: 'Controlla perché non compare sull\'auto',
+                  sotto: sbloccato ? 'Controlla perché non compare sull\'auto' : 'Premium',
                   onTap: () {
+                    if (!sbloccato) return vai(SchermataPremium(premium: widget.premium!, perche: 'Android Auto'));
                     Navigator.of(contesto).pop();
                     mostraDiagnosiAuto(context);
                   },
                 ),
+                if (widget.premium case final p?)
+                  _VoceMenu(
+                    icona: Icons.workspace_premium,
+                    titolo: 'Premium',
+                    sotto: p.sbloccato
+                        ? 'Attivo: Android Auto e Home Assistant'
+                        : 'Sblocca Android Auto e Home Assistant',
+                    onTap: () => vai(SchermataPremium(premium: p)),
+                  ),
               ],
             ),
           ),

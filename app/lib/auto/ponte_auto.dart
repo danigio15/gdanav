@@ -146,6 +146,9 @@ class PonteAuto {
     });
   }
 
+  /// Premium sbloccato o no: l'auto lo ricorda anche a telefono spento.
+  void premium(bool sbloccato) => _manda('premium', {'sbloccato': sbloccato});
+
   void _manda(String metodo, Map<String, Object?> dati) {
     if (!_attivo) return;
     _canale.invokeMethod<void>(metodo, dati).catchError((Object e) {

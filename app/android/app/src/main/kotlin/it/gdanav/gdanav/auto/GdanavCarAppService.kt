@@ -33,7 +33,8 @@ class SessioneGdanav : Session() {
         // Se l'app sul telefono non è aperta, la si accende qui.
         MotoreFlutter.assicura(carContext)
         ascoltaEnergia()
-        return SchermoNavigazione(carContext)
+        // Android Auto fa parte di gdanav Premium.
+        return if (PonteAuto.premium(carContext)) SchermoNavigazione(carContext) else SchermoPremium(carContext)
     }
 
     /** Batteria, autonomia, velocità e contachilometri dall'auto, se li passa: molte non lo fanno. */

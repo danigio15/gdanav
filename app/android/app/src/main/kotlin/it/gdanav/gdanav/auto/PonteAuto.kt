@@ -1,5 +1,7 @@
 package it.gdanav.gdanav.auto
 
+import android.content.Context
+import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 import io.flutter.plugin.common.BinaryMessenger
@@ -55,6 +57,12 @@ object PonteAuto {
     /** Cosa dire quando non si guida: «Calcolo il percorso…», o cosa non va. */
     @Volatile var messaggio: String? = null
 
+    /** gdanav Premium: l'app lo dice, l'auto lo ricorda anche a telefono spento. */
+    private var preferenze: SharedPreferences? = null
+
+    fun premium(context: Context): Boolean =
+        context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).getBoolean("premium", false)
+
     private val principale = Handler(Looper.getMainLooper())
     private val ascoltatori = CopyOnWriteArrayList<() -> Unit>()
     private var canale: MethodChannel? = null
@@ -65,7 +73,8 @@ object PonteAuto {
 
     fun smetti(f: () -> Unit) = ascoltatori.remove(f)
 
-    fun collega(messenger: BinaryMessenger) {
+    fun collega(messenger: BinaryMessenger, context: Context) {
+        preferenze = context.applicationContext.getSharedPreferences("gdanav", Context.MODE_PRIVATE)
         canale = MethodChannel(messenger, "gdanav/schermo_auto").also { c ->
             c.setMethodCallHandler { call, risultato ->
                 gestisci(call)
@@ -105,6 +114,7 @@ object PonteAuto {
                 luoghi = (call.argument<List<Map<String, Any?>>>("elenco") ?: emptyList()).mapNotNull(::luogo)
             }
             "messaggio" -> messaggio = call.argument<String>("testo")
+            "premium" -> preferenze?.edit()?.putBoolean("premium", call.argument<Boolean>("sbloccato") == true)?.apply()
             "guida" -> {
                 guida = if (call.argument<Boolean>("attiva") == true) {
                     Guida(

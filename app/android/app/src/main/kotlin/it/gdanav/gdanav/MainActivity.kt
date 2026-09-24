@@ -19,7 +19,7 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         // Il filo fra l'app sul telefono e lo schermo dell'auto.
-        PonteAuto.collega(flutterEngine.dartExecutor.binaryMessenger)
+        PonteAuto.collega(flutterEngine.dartExecutor.binaryMessenger, applicationContext)
         Diagnosi.collega(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
         permessi.collega(flutterEngine.dartExecutor.binaryMessenger)
     }

@@ -20,6 +20,10 @@ abstract final class Servizi {
   /// Le segnalazioni della comunità (incidenti, polizia, pericoli): il relay
   /// di gdanav su Cloudflare.
   static const segnalazioni = String.fromEnvironment('GDANAV_SEGNALAZIONI', defaultValue: _segnalazioni);
+
+  /// Le build d'anteprima (l'APK da GitHub, che non passa dal Play Store)
+  /// hanno Premium già sbloccato; quella per il Play Store no.
+  static const tuttoSbloccato = bool.fromEnvironment('GDANAV_TUTTO_SBLOCCATO');
 }
 
 // Le chiavi di gdanav.

@@ -8,6 +8,7 @@ import 'stato/archivio.dart';
 import 'stato/gestore_auto.dart';
 import 'stato/foto_auto.dart';
 import 'stato/gestore_consumo.dart';
+import 'stato/gestore_premium.dart';
 import 'stato/gestore_guida.dart';
 import 'stato/gestore_luoghi.dart';
 import 'stato/gestore_posizione.dart';
@@ -20,8 +21,13 @@ import 'tema.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final archivio = Archivio();
-  final auto = GestoreAuto(archivio: archivio);
+  // Premium (Android Auto e Home Assistant): si sa subito se è sbloccato,
+  // il Play Store conferma dopo.
+  final premium = GestorePremium(archivio: archivio, negozio: NegozioGooglePlay());
+  await premium.carica();
+  final auto = GestoreAuto(archivio: archivio)..homeAssistantConsentito = premium.sbloccato;
   await auto.avvia();
+  premium.addListener(() => auto.consentiHomeAssistant(premium.sbloccato));
   // Il consumo imparato del modello scelto; cambiando auto si cambia storia.
   final consumo = GestoreConsumo(archivio);
   await consumo.carica(auto.veicolo.id);
@@ -47,7 +53,9 @@ Future<void> main() async {
   // Aperta da Android Auto la schermata del telefono non c'è: la posizione
   // parte subito, se il permesso è già stato dato.
   if (await haPosizione()) posizione.avvia();
-  PonteAuto(viaggio: viaggio, guida: guida, posizione: posizione, luoghi: luoghi).avvia();
+  final ponte = PonteAuto(viaggio: viaggio, guida: guida, posizione: posizione, luoghi: luoghi)..avvia();
+  ponte.premium(premium.sbloccato);
+  premium.addListener(() => ponte.premium(premium.sbloccato));
   runApp(
     GdanavApp(
       archivio: archivio,
@@ -59,6 +67,7 @@ Future<void> main() async {
       luoghi: luoghi,
       consumo: consumo,
       fotoAuto: fotoAuto,
+      premium: premium,
       chiediPosizione: chiediPosizione,
     ),
   );
@@ -78,6 +87,7 @@ class GdanavApp extends StatelessWidget {
     this.luoghi,
     this.consumo,
     this.fotoAuto,
+    this.premium,
   });
 
   final Archivio archivio;
@@ -90,6 +100,9 @@ class GdanavApp extends StatelessWidget {
   final GestoreLuoghi? luoghi;
   final GestoreConsumo? consumo;
   final GestoreFotoAuto? fotoAuto;
+
+  /// `null` nelle prove: tutto sbloccato.
+  final GestorePremium? premium;
 
   /// Nelle prove e nelle anteprime si passa un'altra mappa: quella vera vuole
   /// il codice nativo.
@@ -114,6 +127,7 @@ class GdanavApp extends StatelessWidget {
         luoghi: luoghi,
         consumo: consumo,
         fotoAuto: fotoAuto,
+        premium: premium,
       ),
     );
   }

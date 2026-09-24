@@ -18,6 +18,7 @@ class Archivio {
   static const _veicolo = 'veicolo';
   static const _preferenze = 'preferenze_ricarica';
   static const _opzioniPercorso = 'opzioni_percorso';
+  static const _premium = 'premium';
   static const _segnaposto = 'segnaposto';
   static const _luoghi = 'luoghi';
 
@@ -79,6 +80,12 @@ class Archivio {
       return const OpzioniPercorso();
     }
   }
+
+  /// gdanav Premium comprato: si ricorda anche senza rete (il Play Store lo
+  /// riconferma all'avvio).
+  Future<bool> premium() async => await _p.read(key: _premium) == 'sì';
+
+  Future<void> salvaPremium(bool v) => v ? _p.write(key: _premium, value: 'sì') : _p.delete(key: _premium);
 
   Future<void> salvaOpzioniPercorso(OpzioniPercorso o) =>
       _p.write(key: _opzioniPercorso, value: jsonEncode(o.toJson()));
