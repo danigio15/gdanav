@@ -33,7 +33,15 @@ class ColonnineFinte implements FonteColonnine {
         id: 'c$km',
         nome: 'Area $km',
         posizione: Punto(42 + km * 0.009, 12.002),
-        connettori: const [Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150)],
+        // Ogni seconda area è piena; le altre hanno 2 prese libere su 4.
+        connettori: [
+          for (var i = 0; i < 4; i++)
+            Connettore(
+              tipo: TipoConnettore.ccs2,
+              potenzaKw: 150,
+              stato: km % 120 == 0 || i >= 2 ? StatoPresa.occupata : StatoPresa.disponibile,
+            ),
+        ],
       ),
   ];
 }
@@ -53,7 +61,12 @@ PercorsoCalcolato dritta(int km) {
 }
 
 CostruisciPianificatore pianificatoreFinto(int km) =>
-    (_, profilo) => PianificatoreViaggio(percorsi: (_) async => dritta(km), colonnine: ColonnineFinte(), profilo: profilo);
+    (_, profilo, preferenze) => PianificatoreViaggio(
+      percorsi: (_) async => dritta(km),
+      colonnine: ColonnineFinte(),
+      profilo: profilo,
+      preferenze: preferenze,
+    );
 
 class Ambiente {
   Ambiente(this.archivio, this.auto, this.viaggio);
@@ -65,11 +78,15 @@ class Ambiente {
     archivio: archivio,
     auto: auto,
     viaggio: viaggio,
-    mappa: (_) => const ColoredBox(color: Colors.grey),
+    mappa: (_, _) => const ColoredBox(color: Colors.grey),
   );
 }
 
 Future<Ambiente> ambiente(WidgetTester tester, {int km = 500, Punto? posizione = const Punto(42, 12)}) async {
+  // Uno schermo da telefono, non gli 800×600 delle prove.
+  tester.view.physicalSize = const Size(1170, 2532);
+  tester.view.devicePixelRatio = 3;
+  addTearDown(tester.view.reset);
   final archivio = Archivio();
   final auto = GestoreAuto(archivio: archivio);
   await tester.runAsync(auto.avvia);
@@ -87,3 +104,12 @@ Future<Ambiente> ambiente(WidgetTester tester, {int km = 500, Punto? posizione =
 const impostazioniComplete = {
   'impostazioni': '{"valhalla":"https://valhalla.esempio.dev/","chiave_valhalla":"","chiave_ocm":"ocm"}',
 };
+
+/// Tira su la scheda del viaggio e la scorre: i contenuti in fondo si
+/// costruiscono solo quando si vedono.
+Future<void> scorriScheda(WidgetTester tester, {int volte = 2}) async {
+  for (var i = 0; i < volte; i++) {
+    await tester.drag(find.byType(ListView).last, const Offset(0, -600));
+    await tester.pumpAndSettle();
+  }
+}

@@ -19,10 +19,15 @@ class Calcolo extends StatoViaggio {
 }
 
 class ViaggioPronto extends StatoViaggio {
-  const ViaggioPronto(this.destinazione, this.viaggio, this.batteriaPartenza);
+  const ViaggioPronto(this.destinazione, this.viaggio, this.batteriaPartenza, {required this.calcolatoAlle});
   final Luogo destinazione;
   final Viaggio viaggio;
   final double batteriaPartenza;
+
+  /// Per dire l'ora d'arrivo: partenza adesso più la durata.
+  final DateTime calcolatoAlle;
+
+  DateTime? get arrivoAlle => viaggio.piano == null ? null : calcolatoAlle.add(viaggio.piano!.durata);
 }
 
 class ErroreViaggio extends StatoViaggio {
@@ -33,9 +38,13 @@ class ErroreViaggio extends StatoViaggio {
 
 /// Costruisce il pianificatore con le impostazioni del momento: nelle prove
 /// se ne passa uno finto.
-typedef CostruisciPianificatore = PianificatoreViaggio Function(Impostazioni impostazioni, ProfiloVeicolo profilo);
+typedef CostruisciPianificatore = PianificatoreViaggio Function(
+  Impostazioni impostazioni,
+  ProfiloVeicolo profilo,
+  PreferenzeRicarica preferenze,
+);
 
-PianificatoreViaggio pianificatoreVero(Impostazioni i, ProfiloVeicolo profilo) {
+PianificatoreViaggio pianificatoreVero(Impostazioni i, ProfiloVeicolo profilo, PreferenzeRicarica preferenze) {
   final valhalla = ClienteValhalla(
     Uri.parse(i.valhalla.endsWith('/') ? i.valhalla : '${i.valhalla}/'),
     chiave: i.chiaveValhalla.isEmpty ? null : i.chiaveValhalla,
@@ -44,6 +53,7 @@ PianificatoreViaggio pianificatoreVero(Impostazioni i, ProfiloVeicolo profilo) {
     percorsi: valhalla.calcola,
     colonnine: ClienteOpenChargeMap(chiave: i.chiaveOcm),
     profilo: profilo,
+    preferenze: preferenze,
   );
 }
 
@@ -53,9 +63,10 @@ class GestoreViaggio extends ChangeNotifier {
     required this.auto,
     required this.posizione,
     this.costruisci = pianificatoreVero,
-    this.profilo = ProfiloVeicolo.esempio,
     FonteLuoghi? luoghi,
-  }) : luoghi = luoghi ?? ClientePhoton();
+    DateTime Function()? orologio,
+  }) : luoghi = luoghi ?? ClientePhoton(),
+       _ora = orologio ?? DateTime.now;
 
   final Archivio archivio;
   final GestoreAuto auto;
@@ -63,13 +74,43 @@ class GestoreViaggio extends ChangeNotifier {
   /// Dove si è adesso. `null` se il telefono non lo sa o non lo vuole dire.
   final Future<Punto?> Function() posizione;
   final CostruisciPianificatore costruisci;
-  final ProfiloVeicolo profilo;
   final FonteLuoghi luoghi;
+  final DateTime Function() _ora;
 
   StatoViaggio stato = const NessunViaggio();
 
+  /// Le colonnine dove l'utente ha deciso di fermarsi, per questo viaggio.
+  final obbligate = <String>{};
+
   /// L'ultimo punto noto, per cercare i luoghi vicino a chi cerca.
   Punto? ultimaPosizione;
+
+  Luogo? get destinazione => switch (stato) {
+    NessunViaggio() => null,
+    Calcolo(:final destinazione) || ViaggioPronto(:final destinazione) => destinazione,
+    ErroreViaggio(:final destinazione) => destinazione,
+  };
+
+  /// Una meta nuova: le soste scelte per la vecchia non valgono più.
+  Future<void> vaiA(Luogo destinazione) {
+    obbligate.clear();
+    return pianifica(destinazione);
+  }
+
+  /// «Fermati qui»: la colonnina diventa una sosta, e si ricalcola.
+  Future<void> fermatiA(String idColonnina) async {
+    final d = destinazione;
+    if (d == null) return;
+    obbligate.add(idColonnina);
+    await pianifica(d);
+  }
+
+  Future<void> togliSosta(String idColonnina) async {
+    final d = destinazione;
+    if (d == null) return;
+    obbligate.remove(idColonnina);
+    await pianifica(d);
+  }
 
   Future<void> pianifica(Luogo destinazione) async {
     final impostazioni = await archivio.impostazioni();
@@ -82,29 +123,35 @@ class GestoreViaggio extends ChangeNotifier {
     }
     final partenza = await posizione();
     if (partenza == null) {
-      return _imposta(
-        ErroreViaggio('Non so dove sei: attiva la posizione per gdanav.', destinazione: destinazione),
-      );
+      return _imposta(ErroreViaggio('Non so dove sei: attiva la posizione per gdanav.', destinazione: destinazione));
     }
     ultimaPosizione = partenza;
-    _imposta(Calcolo(destinazione));
+    final preferenze = await archivio.preferenze();
+    final calcolo = Calcolo(destinazione);
+    _imposta(calcolo);
     try {
       final viaggio = await costruisci(
         impostazioni,
-        profilo,
-      ).pianifica(partenza: partenza, arrivo: destinazione.posizione, batteria: batteria);
+        auto.veicolo,
+        preferenze,
+      ).pianifica(partenza: partenza, arrivo: destinazione.posizione, batteria: batteria, obbligate: Set.of(obbligate));
       // Nel frattempo l'utente può aver annullato o scelto un'altra meta.
-      if (stato case Calcolo(destinazione: final d) when identical(d, destinazione)) {
-        _imposta(ViaggioPronto(destinazione, viaggio, batteria));
+      if (identical(stato, calcolo)) {
+        _imposta(ViaggioPronto(destinazione, viaggio, batteria, calcolatoAlle: _ora()));
       }
     } on ErroreValhalla catch (e) {
-      _imposta(ErroreViaggio(_spiega(e), destinazione: destinazione));
+      if (identical(stato, calcolo)) _imposta(ErroreViaggio(_spiega(e), destinazione: destinazione));
     } catch (e) {
-      _imposta(ErroreViaggio('Il viaggio non si è potuto calcolare: $e', destinazione: destinazione));
+      if (identical(stato, calcolo)) {
+        _imposta(ErroreViaggio('Il viaggio non si è potuto calcolare: $e', destinazione: destinazione));
+      }
     }
   }
 
-  void annulla() => _imposta(const NessunViaggio());
+  void annulla() {
+    obbligate.clear();
+    _imposta(const NessunViaggio());
+  }
 
   static String _spiega(ErroreValhalla e) => switch (e.stato) {
     401 => 'Il server dei percorsi rifiuta la chiave: controllala nelle impostazioni.',

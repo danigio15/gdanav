@@ -10,8 +10,8 @@ import 'archivio.dart';
 /// Tiene accese le sorgenti dei dati dell'auto e dice all'interfaccia
 /// quale stato vale adesso, secondo lo switch «Fonte dati auto».
 class GestoreAuto extends ChangeNotifier {
-  GestoreAuto({required this.archivio, ProfiloVeicolo profilo = ProfiloVeicolo.esempio})
-    : arbitro = ArbitroSorgenti(capacitaUtileKwh: profilo.capacitaUtileKwh);
+  GestoreAuto({required this.archivio})
+    : arbitro = ArbitroSorgenti(capacitaUtileKwh: ProfiloVeicolo.esempio.capacitaUtileKwh);
 
   final Archivio archivio;
   final ArbitroSorgenti arbitro;
@@ -22,6 +22,9 @@ class GestoreAuto extends ChangeNotifier {
   Timer? _orologio;
 
   Abbinamento? abbinamento;
+
+  /// L'auto dell'utente: da lei dipendono consumi, soste e prese.
+  ProfiloVeicolo veicolo = ProfiloVeicolo.esempio;
   StatoAuto? stato;
 
   ModalitaFonte get modalita => arbitro.modalita;
@@ -30,6 +33,8 @@ class GestoreAuto extends ChangeNotifier {
   Iterable<TipoSorgente> get disponibili => _sorgenti.keys;
 
   Future<void> avvia() async {
+    veicolo = await archivio.veicolo();
+    arbitro.capacitaUtileKwh = veicolo.capacitaUtileKwh;
     arbitro.modalita = await archivio.fonte();
     abbinamento = await archivio.abbinamento();
     await _accendi(manuale);
@@ -37,6 +42,23 @@ class GestoreAuto extends ChangeNotifier {
     if (abbinamento != null) await _accendi(SorgenteHomeAssistant(ClienteRelay(abbinamento!)));
     // Anche senza letture nuove l'età del dato cambia: si ricalcola ogni tanto.
     _orologio = Timer.periodic(const Duration(seconds: 5), (_) => _aggiorna());
+  }
+
+  Future<void> scegliVeicolo(ProfiloVeicolo v) async {
+    veicolo = v;
+    arbitro.capacitaUtileKwh = v.capacitaUtileKwh;
+    await archivio.salvaVeicolo(v);
+    notifyListeners();
+  }
+
+  /// I chilometri che restano: quelli dell'auto se li dice, altrimenti una
+  /// stima a 90 km/h in piano con il modello di consumo.
+  double? autonomiaKm() {
+    final s = stato;
+    if (s == null) return null;
+    if (s.autonomiaKm != null && s.sorgente != TipoSorgente.stima) return s.autonomiaKm;
+    final whKm = consumoMedioWhKm(const [Tratto(lunghezzaM: 1000, velocitaKmh: 90)], veicolo);
+    return s.batteria / 100 * veicolo.capacitaUtileKwh * 1000 / whKm;
   }
 
   Future<void> cambiaModalita(ModalitaFonte m) async {

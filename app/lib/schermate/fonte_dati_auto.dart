@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../stato/gestore_auto.dart';
-import 'schermata_principale.dart';
+import '../componenti/indicatore_batteria.dart';
 
 /// Lo switch «Fonte dati auto»: Automatica, oppure una sorgente fissa.
 Future<void> mostraFonteDatiAuto(BuildContext context, GestoreAuto gestore) {

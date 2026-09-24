@@ -29,10 +29,16 @@ void main() {
     await cercaBologna(tester);
 
     expect(a.viaggio.stato, isA<ViaggioPronto>());
-    expect(find.textContaining('arrivi con il'), findsOneWidget);
+    expect(find.textContaining('Arrivo '), findsOneWidget);
+    await scorriScheda(tester, volte: 1);
+    expect(find.text("all'arrivo"), findsOneWidget);
     expect(find.textContaining('Area '), findsWidgets);
+    await scorriScheda(tester);
     expect(find.textContaining('© Open Charge Map'), findsOneWidget);
 
+    // Si torna in cima alla scheda per chiuderla.
+    await tester.drag(find.byType(ListView).last, const Offset(0, 3000));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Chiudi'));
     await tester.pumpAndSettle();
     expect(a.viaggio.stato, isA<NessunViaggio>());
@@ -45,7 +51,8 @@ void main() {
     a.auto.manuale.imposta(80);
     await tester.pump();
     await cercaBologna(tester);
-    expect(find.text('Nessuna sosta: ci arrivi con una carica.'), findsOneWidget);
+    await scorriScheda(tester, volte: 1);
+    expect(find.text('Ci arrivi senza fermarti.'), findsOneWidget);
   });
 
   testWidgets('senza server dice di aprire le impostazioni, e le salva', (tester) async {

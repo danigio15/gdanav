@@ -45,7 +45,8 @@ class ArbitroSorgenti {
     TipoSorgente.manuale: Duration.zero,
   };
 
-  final double capacitaUtileKwh;
+  /// Cambia quando si cambia auto.
+  double capacitaUtileKwh;
   final Map<TipoSorgente, Duration> freschezza;
   ModalitaFonte modalita;
 

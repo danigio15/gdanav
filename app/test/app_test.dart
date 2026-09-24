@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gdanav/componenti/indicatore_batteria.dart';
 import 'package:gdanav/stato/archivio.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -21,13 +21,14 @@ void main() {
     await tester.pumpWidget(a.app());
     a.auto.manuale.imposta(64);
     await tester.pump();
-    expect(find.text('64% · Manuale · adesso'), findsOneWidget);
+    expect(find.textContaining('64% · ≈'), findsOneWidget);
+    expect(find.textContaining('Manuale · adesso'), findsOneWidget);
   });
 
   testWidgets('lo switch cambia la fonte e la ricorda', (tester) async {
     final a = await ambiente(tester);
     await tester.pumpWidget(a.app());
-    await tester.tap(find.byType(ActionChip));
+    await tester.tap(find.byType(IndicatoreBatteria));
     await tester.pumpAndSettle();
     expect(find.text('Fonte dati auto'), findsOneWidget);
 

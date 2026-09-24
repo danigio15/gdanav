@@ -13,6 +13,8 @@ class Archivio {
   static const _abbinamento = 'abbinamento_home_assistant';
   static const _fonte = 'fonte_dati_auto';
   static const _impostazioni = 'impostazioni';
+  static const _veicolo = 'veicolo';
+  static const _preferenze = 'preferenze_ricarica';
 
   Future<Abbinamento?> abbinamento() async {
     final uri = await _p.read(key: _abbinamento);
@@ -51,6 +53,23 @@ class Archivio {
       return Impostazioni.predefinite();
     }
   }
+
+  /// L'auto scelta; il profilo d'esempio finché non se ne sceglie una.
+  Future<ProfiloVeicolo> veicolo() async => veicoloPerId(await _p.read(key: _veicolo) ?? '') ?? ProfiloVeicolo.esempio;
+
+  Future<void> salvaVeicolo(ProfiloVeicolo v) => _p.write(key: _veicolo, value: v.id);
+
+  Future<PreferenzeRicarica> preferenze() async {
+    final testo = await _p.read(key: _preferenze);
+    if (testo == null) return const PreferenzeRicarica();
+    try {
+      return PreferenzeRicarica.daJson(jsonDecode(testo) as Map<String, Object?>);
+    } on FormatException {
+      return const PreferenzeRicarica();
+    }
+  }
+
+  Future<void> salvaPreferenze(PreferenzeRicarica p) => _p.write(key: _preferenze, value: jsonEncode(p.toJson()));
 
   Future<void> salvaImpostazioni(Impostazioni i) => _p.write(key: _impostazioni, value: jsonEncode(i.toJson()));
 }

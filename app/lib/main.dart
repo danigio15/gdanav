@@ -5,6 +5,7 @@ import 'stato/archivio.dart';
 import 'stato/gestore_auto.dart';
 import 'stato/gestore_viaggio.dart';
 import 'stato/posizione.dart';
+import 'tema.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,16 +23,17 @@ class GdanavApp extends StatelessWidget {
   final GestoreAuto auto;
   final GestoreViaggio viaggio;
 
-  /// Nelle prove si passa un segnaposto: la mappa vera vuole il codice
-  /// nativo.
-  final WidgetBuilder? mappa;
+  /// Nelle prove e nelle anteprime si passa un'altra mappa: quella vera vuole
+  /// il codice nativo.
+  final CostruisciMappa? mappa;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'gdanav',
-      theme: ThemeData(colorSchemeSeed: const Color(0xFF1D5BA8), useMaterial3: true),
-      darkTheme: ThemeData(colorSchemeSeed: const Color(0xFF1D5BA8), brightness: Brightness.dark, useMaterial3: true),
+      debugShowCheckedModeBanner: false,
+      theme: temaGdanav(Brightness.light),
+      darkTheme: temaGdanav(Brightness.dark),
       home: SchermataPrincipale(auto: auto, viaggio: viaggio, archivio: archivio, mappa: mappa),
     );
   }

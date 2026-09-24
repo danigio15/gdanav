@@ -1,114 +1,236 @@
 import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
+import '../componenti/indicatore_batteria.dart';
+import '../mappa/controllo_mappa.dart';
+import '../mappa/mappa_viaggio.dart';
 import '../stato/archivio.dart';
 import '../stato/gestore_auto.dart';
 import '../stato/gestore_viaggio.dart';
+import '../tema.dart';
 import 'abbina_home_assistant.dart';
 import 'cerca_destinazione.dart';
+import 'dettaglio_colonnina.dart';
 import 'fonte_dati_auto.dart';
 import 'impostazioni.dart';
-import 'mappa.dart';
+import 'la_tua_auto.dart';
+import 'ricarica.dart';
 import 'scheda_viaggio.dart';
 
-class SchermataPrincipale extends StatelessWidget {
-  const SchermataPrincipale({
-    super.key,
-    required this.auto,
-    required this.viaggio,
-    required this.archivio,
-    this.mappa,
-  });
+typedef CostruisciMappa = Widget Function(BuildContext context, ControlloMappa controllo);
+
+class SchermataPrincipale extends StatefulWidget {
+  const SchermataPrincipale({super.key, required this.auto, required this.viaggio, required this.archivio, this.mappa});
 
   final GestoreAuto auto;
   final GestoreViaggio viaggio;
   final Archivio archivio;
 
-  /// Nelle prove si passa un segnaposto: la mappa vera vuole il codice
-  /// nativo.
-  final WidgetBuilder? mappa;
+  /// Nelle prove e nelle anteprime si passa un'altra mappa: quella vera vuole
+  /// il codice nativo.
+  final CostruisciMappa? mappa;
 
-  Future<void> _cerca(BuildContext context) async {
+  @override
+  State<SchermataPrincipale> createState() => _SchermataPrincipaleState();
+}
+
+class _SchermataPrincipaleState extends State<SchermataPrincipale> {
+  final controllo = ControlloMappa();
+  PreferenzeRicarica _preferenze = const PreferenzeRicarica();
+
+  GestoreViaggio get viaggio => widget.viaggio;
+
+  @override
+  void initState() {
+    super.initState();
+    _ricaricaPreferenze();
+  }
+
+  @override
+  void dispose() {
+    controllo.dispose();
+    super.dispose();
+  }
+
+  Future<void> _ricaricaPreferenze() async {
+    final p = await widget.archivio.preferenze();
+    if (mounted) setState(() => _preferenze = p);
+  }
+
+  Future<void> _cerca() async {
     final luogo = await Navigator.of(context).push<Luogo>(
       MaterialPageRoute(
         builder: (_) => CercaDestinazione(luoghi: viaggio.luoghi, vicinoA: viaggio.ultimaPosizione),
       ),
     );
-    if (luogo != null) await viaggio.pianifica(luogo);
+    if (luogo != null) await viaggio.vaiA(luogo);
   }
 
-  void _impostazioni(BuildContext context) => Navigator.of(
-    context,
-  ).push(MaterialPageRoute<void>(builder: (_) => SchermataImpostazioni(archivio: archivio)));
+  Future<void> _apri(Widget schermata) async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => schermata));
+    await _ricaricaPreferenze();
+    // Auto o preferenze cambiate: il viaggio aperto si ricalcola.
+    if (viaggio.stato is ViaggioPronto && viaggio.destinazione != null) await viaggio.pianifica(viaggio.destinazione!);
+  }
+
+  void _impostazioni() => _apri(SchermataImpostazioni(archivio: widget.archivio));
+
+  void _menu() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (contesto) {
+        void vai(Widget w) {
+          Navigator.of(contesto).pop();
+          _apri(w);
+        }
+
+        final ha = widget.auto.abbinamento;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _VoceMenu(
+                icona: Icons.electric_car,
+                titolo: 'La tua auto',
+                sotto: widget.auto.veicolo.nome,
+                onTap: () => vai(LaTuaAuto(auto: widget.auto)),
+              ),
+              _VoceMenu(
+                icona: Icons.ev_station,
+                titolo: 'Ricarica',
+                sotto: riassuntoPreferenze(_preferenze),
+                onTap: () => vai(PreferenzeRicaricaSchermata(archivio: widget.archivio)),
+              ),
+              _VoceMenu(
+                icona: Icons.battery_charging_full,
+                titolo: 'Fonte dati auto',
+                sotto: 'Da dove arriva la batteria',
+                onTap: () {
+                  Navigator.of(contesto).pop();
+                  mostraFonteDatiAuto(context, widget.auto);
+                },
+              ),
+              _VoceMenu(
+                icona: Icons.home_outlined,
+                titolo: 'Home Assistant',
+                sotto: ha == null ? 'Non collegata' : 'Collegata${ha.nomeAuto.isEmpty ? '' : ' a ${ha.nomeAuto}'}',
+                onTap: () => vai(AbbinaHomeAssistant(gestore: widget.auto)),
+              ),
+              _VoceMenu(
+                icona: Icons.dns_outlined,
+                titolo: 'Servizi',
+                sotto: 'Server dei percorsi e colonnine',
+                onTap: () => vai(SchermataImpostazioni(archivio: widget.archivio)),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final vetro = ColoriGdanav.di(context).vetro;
     return Scaffold(
       body: Stack(
         children: [
           Positioned.fill(
-            child: (mappa ??
-                    (_) => MappaViaggio(
-                      gestore: viaggio,
-                      onPuntoScelto: (p) => viaggio.pianifica(
-                        Luogo(nome: 'Punto sulla mappa', posizione: p, descrizione: '${p.lat}, ${p.lon}'),
-                      ),
-                    ))(context),
+            child:
+                widget.mappa?.call(context, controllo) ??
+                MappaViaggio(
+                  gestore: viaggio,
+                  controllo: controllo,
+                  onPuntoScelto: (p) => viaggio.vaiA(
+                    Luogo(
+                      nome: 'Punto sulla mappa',
+                      posizione: Punto(p.latitude, p.longitude),
+                      descrizione: '${p.latitude.toStringAsFixed(5)}, ${p.longitude.toStringAsFixed(5)}',
+                    ),
+                  ),
+                  onColonnina: (id) => mostraColonnina(context, viaggio, id),
+                ),
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Card(
+                  Material(
+                    color: vetro,
+                    elevation: 4,
+                    shadowColor: Colors.black26,
+                    borderRadius: BorderRadius.circular(28),
                     child: Row(
                       children: [
                         Expanded(
                           child: InkWell(
-                            onTap: () => _cerca(context),
-                            child: const Padding(
-                              padding: EdgeInsets.all(16),
+                            borderRadius: const BorderRadius.horizontal(left: Radius.circular(28)),
+                            onTap: _cerca,
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 16, 8, 16),
                               child: Row(
                                 children: [
-                                  Icon(Icons.search),
-                                  SizedBox(width: 12),
-                                  Text('Dove vuoi andare?'),
+                                  Icon(Icons.search, color: Theme.of(context).colorScheme.primary),
+                                  const SizedBox(width: 12),
+                                  Flexible(
+                                    child: Text(
+                                      'Dove vuoi andare?',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context).textTheme.titleMedium
+                                          ?.copyWith(fontWeight: FontWeight.w500),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
                           ),
                         ),
-                        IconButton(
-                          tooltip: 'Home Assistant',
-                          icon: const Icon(Icons.home_outlined),
-                          onPressed: () => Navigator.of(
-                            context,
-                          ).push(MaterialPageRoute<void>(builder: (_) => AbbinaHomeAssistant(gestore: auto))),
-                        ),
-                        IconButton(
-                          tooltip: 'Impostazioni',
-                          icon: const Icon(Icons.settings_outlined),
-                          onPressed: () => _impostazioni(context),
-                        ),
+                        IconButton(tooltip: 'Menu', icon: const Icon(Icons.menu), onPressed: _menu),
+                        const SizedBox(width: 6),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   ListenableBuilder(
-                    listenable: auto,
+                    listenable: widget.auto,
                     builder: (context, _) =>
-                        PastigliaBatteria(stato: auto.stato, onTap: () => mostraFonteDatiAuto(context, auto)),
+                        IndicatoreBatteria(auto: widget.auto, onTap: () => mostraFonteDatiAuto(context, widget.auto)),
                   ),
                 ],
               ),
             ),
           ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: SafeArea(
-              child: SchedaViaggio(gestore: viaggio, apriImpostazioni: () => _impostazioni(context)),
+          Positioned(
+            right: 12,
+            top: MediaQuery.paddingOf(context).top + 150,
+            child: ListenableBuilder(
+              listenable: controllo,
+              builder: (context, _) => Column(
+                children: [
+                  _BottoneMappa(
+                    tooltip: controllo.inclinata ? 'Vista dall\'alto' : 'Vista 3D',
+                    onPressed: controllo.alternaInclinazione,
+                    child: Text(
+                      controllo.inclinata ? '2D' : '3D',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _BottoneMappa(
+                    tooltip: 'Dove sono',
+                    onPressed: controllo.centra,
+                    child: Icon(Icons.my_location, color: Theme.of(context).colorScheme.primary),
+                  ),
+                ],
+              ),
             ),
+          ),
+          Positioned.fill(
+            child: SchedaViaggio(gestore: viaggio, apriImpostazioni: _impostazioni, soglia: _preferenze.minimoArrivo),
           ),
         ],
       ),
@@ -116,39 +238,50 @@ class SchermataPrincipale extends StatelessWidget {
   }
 }
 
-/// «82% · Home Assistant · 12 min fa»: la batteria, da dove arriva e quanto
-/// è vecchia. Toccandola si apre lo switch della fonte.
-class PastigliaBatteria extends StatelessWidget {
-  const PastigliaBatteria({super.key, required this.stato, required this.onTap});
+class _BottoneMappa extends StatelessWidget {
+  const _BottoneMappa({required this.tooltip, required this.onPressed, required this.child});
 
-  final StatoAuto? stato;
+  final String tooltip;
+  final VoidCallback onPressed;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: Material(
+      color: ColoriGdanav.di(context).vetro,
+      elevation: 4,
+      shadowColor: Colors.black26,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: SizedBox.square(dimension: 48, child: Center(child: child)),
+      ),
+    ),
+  );
+}
+
+class _VoceMenu extends StatelessWidget {
+  const _VoceMenu({required this.icona, required this.titolo, required this.sotto, required this.onTap});
+
+  final IconData icona;
+  final String titolo;
+  final String sotto;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final s = stato;
-    final testo = s == null
-        ? 'Batteria sconosciuta'
-        : '${s.batteria.round()}% · ${nomeSorgente(s.sorgente)} · ${eta(DateTime.now().difference(s.letto))}';
-    return ActionChip(
-      avatar: Icon(s?.inCarica == true ? Icons.battery_charging_full : Icons.battery_std),
-      label: Text(testo),
-      onPressed: onTap,
+    final s = Theme.of(context).colorScheme;
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: s.primaryContainer,
+        child: Icon(icona, color: s.onPrimaryContainer),
+      ),
+      title: Text(titolo, style: Theme.of(context).textTheme.titleMedium),
+      subtitle: Text(sotto, maxLines: 1, overflow: TextOverflow.ellipsis),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: onTap,
     );
   }
-}
-
-String nomeSorgente(TipoSorgente t) => switch (t) {
-  TipoSorgente.automotive => 'Auto',
-  TipoSorgente.androidAuto => 'Android Auto',
-  TipoSorgente.obd => 'OBD',
-  TipoSorgente.homeAssistant => 'Home Assistant',
-  TipoSorgente.manuale => 'Manuale',
-  TipoSorgente.stima => 'Stima',
-};
-
-String eta(Duration d) {
-  if (d.inSeconds < 60) return 'adesso';
-  if (d.inMinutes < 60) return '${d.inMinutes} min fa';
-  return '${d.inHours} h fa';
 }
