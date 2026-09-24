@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../servizi.dart';
@@ -51,6 +53,21 @@ typedef CostruisciPianificatore = PianificatoreViaggio Function(
   PreferenzeRicarica preferenze,
 );
 
+/// L'archivio delle colonnine dentro l'app: si legge una volta, su un altro
+/// filo (sono decine di migliaia).
+Future<ArchivioColonnine> archivioColonnine() => _archivio ??= _leggiArchivio();
+Future<ArchivioColonnine>? _archivio;
+
+Future<ArchivioColonnine> _leggiArchivio() async {
+  try {
+    final testo = await rootBundle.loadString('assets/colonnine.json');
+    return await Isolate.run(() => ArchivioColonnine.leggi(testo));
+  } catch (e) {
+    debugPrint('archivio colonnine: $e');
+    return ArchivioColonnine.vuoto;
+  }
+}
+
 PianificatoreViaggio pianificatoreVero(Impostazioni i, ProfiloVeicolo profilo, PreferenzeRicarica preferenze) {
   final valhalla = ClienteValhalla(
     Uri.parse(i.valhalla.endsWith('/') ? i.valhalla : '${i.valhalla}/'),
@@ -59,17 +76,21 @@ PianificatoreViaggio pianificatoreVero(Impostazioni i, ProfiloVeicolo profilo, P
   return PianificatoreViaggio(
     percorsi: valhalla.calcola,
     // Open Charge Map se c'è la chiave (ha anche lo stato delle prese), e
-    // comunque OpenStreetMap, che non ne chiede: dalla cache del relay di
-    // gdanav, e se il relay non risponde direttamente da Overpass.
+    // comunque OpenStreetMap: dall'archivio dentro l'app, fuori archivio dal
+    // relay di gdanav, e se tutto manca direttamente da Overpass.
     colonnine: FonteColonnineConRiserva([
       if (i.chiaveOcm.isNotEmpty) ClienteOpenChargeMap(chiave: i.chiaveOcm),
-      ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni)),
+      ColonnineLocali(archivioColonnine(), riserva: ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni))),
       ClienteOverpass(),
     ]),
     profilo: profilo,
     preferenze: preferenze,
+    // Libere e occupate in tempo reale, se c'è la chiave TomTom.
+    disponibilita: _disponibilita,
   );
 }
+
+final _disponibilita = Servizi.chiaveTomTom.isEmpty ? null : DisponibilitaTomTom(Servizi.chiaveTomTom);
 
 class GestoreViaggio extends ChangeNotifier {
   GestoreViaggio({

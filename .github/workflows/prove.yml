@@ -239,7 +239,15 @@ jobs:
           flutter-version: 3.47.5
           channel: stable
       - run: flutter pub get
-      - run: flutter build apk --release
+      # Le chiavi facoltative (TomTom: traffico e colonnine libere/occupate;
+      # Open Charge Map) arrivano dai segreti del repository.
+      - run: >-
+          flutter build apk --release
+          --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM"
+          --dart-define=GDANAV_OCM_CHIAVE="$OCM"
+        env:
+          TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
+          OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
       - run: cp build/app/outputs/flutter-apk/app-release.apk gdanav.apk
       - uses: actions/upload-artifact@v4
         with:

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'auto/ponte_auto.dart';
@@ -37,6 +39,8 @@ Future<void> main() async {
   final segnalazioni = GestoreSegnalazioni(posizione: posizione);
   final luoghi = GestoreLuoghi(archivio);
   await luoghi.carica();
+  // Le colonnine dentro l'app: si leggono mentre si guarda la mappa.
+  unawaited(archivioColonnine());
   final fotoAuto = GestoreFotoAuto();
   await fotoAuto.carica();
   // Aperta da Android Auto la schermata del telefono non c'è: la posizione

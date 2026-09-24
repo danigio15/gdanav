@@ -1,6 +1,7 @@
 import 'dart:isolate';
 
 import '../colonnine/colonnina.dart';
+import '../colonnine/disponibilita_tomtom.dart';
 import '../colonnine/lungo_percorso.dart';
 import '../geo/geo.dart';
 import '../motore/modello_consumo.dart';
@@ -93,12 +94,16 @@ class PianificatoreViaggio {
     required this.colonnine,
     required this.profilo,
     this.preferenze = const PreferenzeRicarica(),
+    this.disponibilita,
   });
 
   final Future<PercorsoCalcolato> Function(List<Punto> tappe) percorsi;
   final FonteColonnine colonnine;
   final ProfiloVeicolo profilo;
   final PreferenzeRicarica preferenze;
+
+  /// Lo stato delle prese in tempo reale, per controllare le soste.
+  final FonteDisponibilita? disponibilita;
 
   /// [obbligate]: gli id delle colonnine dove l'utente vuole fermarsi.
   Future<Viaggio> pianifica({
@@ -139,19 +144,47 @@ class PianificatoreViaggio {
     // si fa su un altro filo, così l'interfaccia non si blocca.
     avanzamento?.call(FaseViaggio.soste);
     final prese = profilo.connettori;
-    final (vicine, piano) = await Isolate.run(() {
-      final vicine = colonnineSulPercorso(
-        Linea(percorso.punti),
-        trovate,
-        compatibili: prese,
-        potenzaMinimaKw: p.potenzaMinimaKw,
-        obbligate: obbligate,
-      );
-      return (
-        vicine,
-        senzaSoste ?? pianificatore.pianifica(percorso: percorso.tratti, batteriaPartenza: batteria, colonnine: vicine),
-      );
-    });
+    Future<(List<ColonninaSulPercorso>, PianoViaggio?)> calcola(List<Colonnina> tutte) => Isolate.run(() {
+          final vicine = colonnineSulPercorso(
+            Linea(percorso.punti),
+            tutte,
+            compatibili: prese,
+            potenzaMinimaKw: p.potenzaMinimaKw,
+            obbligate: obbligate,
+          );
+          return (
+            vicine,
+            senzaSoste ??
+                pianificatore.pianifica(percorso: percorso.tratti, batteriaPartenza: batteria, colonnine: vicine),
+          );
+        });
+    var (vicine, piano) = await calcola(trovate);
+
+    // Come ABRP: le soste scelte si controllano adesso (libere, occupate,
+    // guaste); se una è piena o guasta si ripianifica, e si ricontrollano
+    // le nuove. Due giri al massimo.
+    final fonte = disponibilita;
+    if (fonte != null) {
+      final controllate = <String>{};
+      for (var giro = 0; giro < 2 && piano != null; giro++) {
+        final daControllare = [
+          for (final s in piano.soste)
+            if (s.colonnina.dettaglio case final c? when controllate.add(c.id)) c,
+        ];
+        if (daControllare.isEmpty) break;
+        final aggiornate = await Future.wait([
+          for (final c in daControllare) fonte.aggiorna(c).timeout(const Duration(seconds: 15)).catchError((_) => c),
+        ]);
+        final perId = {for (final c in aggiornate) c.id: c};
+        trovate = [for (final c in trovate) perId[c.id] ?? c];
+        final cambiata = aggiornate.any((c) {
+          final d = c.disponibilitaPer(prese, minimaKw: p.potenzaMinimaKw);
+          return d.piena || d.guasta;
+        });
+        (vicine, piano) = await calcola(trovate);
+        if (!cambiata) break;
+      }
+    }
     return Viaggio(percorso: percorso, colonnine: vicine, piano: piano);
   }
 }

@@ -60,9 +60,7 @@ class GestoreFotoAuto extends ChangeNotifier {
   Future<void> carica() async {
     try {
       final j = jsonDecode(await _elenco()) as Map<String, Object?>;
-      _foto = {
-        for (final MapEntry(:key, :value) in j.entries) key: ?FotoCatalogo.daJson(value),
-      };
+      _foto = {for (final MapEntry(:key, :value) in j.entries) key: ?FotoCatalogo.daJson(value)};
     } catch (e) {
       debugPrint('foto delle auto: $e');
     }
