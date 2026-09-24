@@ -4,7 +4,16 @@
 // stesso tratto di strada si chiede una volta sola per tutti.
 
 export const LATO = 0.5;
-export const DURATA_CACHE_S = 7 * 24 * 3600;
+
+/** Dopo una settimana si prova a rinfrescare; se Overpass non risponde si
+ * serve la copia vecchia, che resta in cache fino a due mesi. */
+export const FRESCA_MS = 7 * 24 * 3600 * 1000;
+export const DURATA_CACHE_S = 60 * 24 * 3600;
+
+/** Si riprova ancora dopo una risposta di «troppo occupato». */
+export const occupato = (stato) => stato === 429 || stato === 503 || stato === 504;
+
+export const fresca = (salvata, ora) => Number.isFinite(salvata) && ora - salvata < FRESCA_MS;
 
 export const SERVER_OVERPASS = [
   'https://overpass-api.de/api/interpreter',

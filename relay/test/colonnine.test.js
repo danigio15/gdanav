@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { leggiRiquadro, richiestaOverpass, rispostaBuona } from '../src/colonnine.js';
+import { FRESCA_MS, fresca, leggiRiquadro, occupato, richiestaOverpass, rispostaBuona } from '../src/colonnine.js';
 
 test('il riquadro dal percorso', () => {
   assert.deepEqual(leggiRiquadro('GET', 'https://r.dev/v1/colonnine/90/18'), { riga: 90, colonna: 18 });
@@ -22,4 +22,12 @@ test('una risposta in tempo scaduto non è «nessuna colonnina»', () => {
   assert.ok(rispostaBuona('{"elements":[]}'));
   assert.ok(!rispostaBuona('{"remark":"runtime error: Query timed out","elements":[]}'));
   assert.ok(!rispostaBuona('<html>too many requests</html>'));
+});
+
+test('dopo una settimana si rinfresca, e «occupato» si riprova', () => {
+  assert.ok(fresca(1000, 1000 + FRESCA_MS - 1));
+  assert.ok(!fresca(1000, 1000 + FRESCA_MS));
+  assert.ok(!fresca(NaN, 1000));
+  assert.ok(occupato(504) && occupato(429) && occupato(503));
+  assert.ok(!occupato(400));
 });

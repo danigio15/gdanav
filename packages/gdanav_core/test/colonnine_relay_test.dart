@@ -41,19 +41,20 @@ void main() {
     expect(c.first.potenzaPer({TipoConnettore.ccs2}), 150);
   });
 
-  test('un riquadro che non arriva, dopo un secondo tentativo, è un errore', () async {
-    var volte = 0;
-    final client = MockClient((r) async {
-      if (r.url.path.endsWith('/22')) {
-        volte++;
-        return http.Response('{"errore":"colonnine: overpass"}', 502);
-      }
-      return http.Response(jsonEncode(riquadro(2, 44.5, 11.3)), 200);
-    });
-    await expectLater(
-      ClienteColonnineRelay(Uri.parse('https://gdanav.gdahome.org/'), client: client).lungo(percorso),
-      throwsA(predicate((e) => '$e'.contains('colonnine'))),
-    );
-    expect(volte, greaterThanOrEqualTo(2));
+  test('se manca qualche riquadro si va avanti con gli altri; se ne mancano tanti è un errore', () async {
+    // Un percorso lungo: una decina di riquadri.
+    final lungo = [for (var i = 0; i <= 40; i++) Punto(42 + i * 0.1, 12)];
+    Future<List<Colonnina>> con(bool Function(String percorso) rotto) => ClienteColonnineRelay(
+          Uri.parse('https://gdanav.gdahome.org/'),
+          client: MockClient((r) async => rotto(r.url.path)
+              ? http.Response('{"errore":"colonnine: overpass"}', 502)
+              : http.Response(jsonEncode(riquadro(r.url.path.hashCode, 44.5, 11.3)), 200)),
+        ).lungo(lungo);
+
+    final quanti = ClienteColonnineRelay.riquadri(lungo, 3).length;
+    expect(quanti, greaterThanOrEqualTo(8));
+    final uno = ClienteColonnineRelay.riquadri(lungo, 3).first;
+    expect(await con((p) => p.endsWith('/${uno.$1}/${uno.$2}')), hasLength(quanti - 1));
+    await expectLater(con((_) => true), throwsA(predicate((e) => '$e'.contains('non arrivati'))));
   });
 }

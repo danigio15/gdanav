@@ -46,7 +46,7 @@ class ClienteColonnineRelay implements FonteColonnine {
     Object? ultimo;
     for (var tentativo = 0; tentativo < 2; tentativo++) {
       try {
-        final r = await _http.get(_indirizzo(q)).timeout(const Duration(seconds: 45));
+        final r = await _http.get(_indirizzo(q)).timeout(const Duration(seconds: 35));
         if (r.statusCode == 200) {
           return ClienteOverpass.leggi(jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>);
         }
@@ -58,20 +58,33 @@ class ClienteColonnineRelay implements FonteColonnine {
     throw Exception('colonnine: riquadro ${q.$1}/${q.$2}: $ultimo');
   }
 
+  /// Quanti riquadri possono mancare: se Overpass non ne dà qualcuno, si
+  /// pianifica con gli altri (le soste si scelgono fra le colonnine che ci
+  /// sono) invece di non pianificare affatto.
+  static const mancantiAmmessi = 0.25;
+
   @override
   Future<List<Colonnina>> lungo(List<Punto> percorso, {double distanzaKm = 3}) async {
     final coda = riquadri(percorso, distanzaKm).toList();
     final trovate = <String, Colonnina>{};
+    final errori = <Object>[];
     var prossimo = 0;
     Future<void> lavora() async {
       while (prossimo < coda.length) {
-        for (final c in await _riquadro(coda[prossimo++])) {
-          trovate[c.id] = c;
+        try {
+          for (final c in await _riquadro(coda[prossimo++])) {
+            trovate[c.id] = c;
+          }
+        } catch (e) {
+          errori.add(e);
         }
       }
     }
 
     await Future.wait([for (var i = 0; i < math.min(insieme, coda.length); i++) lavora()]);
+    if (errori.isNotEmpty && errori.length > coda.length * mancantiAmmessi) {
+      throw Exception('colonnine: ${errori.length} riquadri su ${coda.length} non arrivati (${errori.first})');
+    }
     return trovate.values.toList();
   }
 }

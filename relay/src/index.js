@@ -1,6 +1,14 @@
 import { DurableObject } from 'cloudflare:workers';
 
-import { DURATA_CACHE_S, SERVER_OVERPASS, leggiRiquadro, richiestaOverpass, rispostaBuona } from './colonnine.js';
+import {
+  DURATA_CACHE_S,
+  SERVER_OVERPASS,
+  fresca,
+  leggiRiquadro,
+  occupato,
+  richiestaOverpass,
+  rispostaBuona,
+} from './colonnine.js';
 import { DURATA_CODICE_MS, bustaValida, codiceVivo, leggiIndirizzoCodice } from './codici.js';
 import { MASSIMO_BYTE, destinatari, impronta, leggiRichiesta, presenza, puoEntrare } from './regole.js';
 import {
@@ -187,6 +195,69 @@ async function codici(richiesta, env) {
   if (!bustaValida(busta)) return json({ errore: 'busta non valida' }, 400);
   await codice.lascia(busta);
   return json({ scade_tra_s: DURATA_CODICE_MS / 1000 }, 201);
+}
+
+export class Codice extends DurableObject {
+  async lascia(busta) {
+    const scade = Date.now() + DURATA_CODICE_MS;
+    await this.ctx.storage.put('codice', { busta, scade });
+    await this.ctx.storage.setAlarm(scade);
+  }
+
+  async prendi() {
+    const salvato = await this.ctx.storage.get('codice');
+    await this.ctx.storage.deleteAll();
+    return codiceVivo(salvato, Date.now()) ? salvato.busta : null;
+  }
+
+  async alarm() {
+    await this.ctx.storage.deleteAll();
+  }
+}
+
+/** Un riquadro di colonnine: dalla cache, o da Overpass e poi in cache. */
+async function colonnine(richiesta, ctx) {
+  const r = leggiRiquadro(richiesta.method, richiesta.url);
+  if (r.errore) return json({ errore: r.errore }, r.stato);
+  const chiave = new Request(`https://cache.gdanav/colonnine/v1/${r.riga}/${r.colonna}`);
+  const inCache = await caches.default.match(chiave);
+  if (inCache && fresca(Number(inCache.headers.get('x-gdanav-salvata')), Date.now())) return inCache;
+
+  const corpo = new URLSearchParams({ data: richiestaOverpass(r.riga, r.colonna) });
+  let ultimo = 'nessun server';
+  for (const server of SERVER_OVERPASS) {
+    for (let tentativo = 0; tentativo < 2; tentativo++) {
+      try {
+        const risposta = await fetch(server, {
+          method: 'POST',
+          body: corpo,
+          headers: { 'user-agent': 'gdanav relay (github.com/danigio15/gdanav)' },
+          signal: AbortSignal.timeout(25000),
+        });
+        const testo = await risposta.text();
+        if (risposta.ok && rispostaBuona(testo)) {
+          const buona = new Response(testo, {
+            headers: {
+              'content-type': 'application/json',
+              'cache-control': `public, max-age=${DURATA_CACHE_S}`,
+              'x-gdanav-salvata': String(Date.now()),
+            },
+          });
+          ctx.waitUntil(caches.default.put(chiave, buona.clone()));
+          return buona;
+        }
+        ultimo = `${new URL(server).host}: ${risposta.status}`;
+        if (!occupato(risposta.status)) break;
+        await new Promise((fatto) => setTimeout(fatto, 2000));
+      } catch (e) {
+        ultimo = `${new URL(server).host}: ${e}`;
+        break;
+      }
+    }
+  }
+  // Overpass non risponde: meglio la copia di qualche settimana fa che niente.
+  if (inCache) return inCache;
+  return json({ errore: `colonnine: ${ultimo}` }, 502);
 }
 
 export class Codice extends DurableObject {
