@@ -164,6 +164,31 @@ jobs:
         env:
           GDANAV_RETE: "1"
 
+  # Le foto vere delle auto, da Wikimedia Commons: solo quando il commit lo
+  # chiede con «[foto-auto]». Il JSON va nella release «anteprima», da
+  # controllare e mettere in app/assets.
+  foto-auto:
+    if: contains(github.event.head_commit.message, '[foto-auto]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: packages/gdanav_core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.13.4
+      - run: dart pub get
+      - run: dart run tool/foto_auto.dart foto_auto.json | tee foto_auto.tsv
+      - name: Nella release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
+          gh release upload anteprima foto_auto.json foto_auto.tsv --clobber
+
   # L'APK da provare: a ogni push su main finisce nella release «anteprima»,
   # da scaricare dal telefono.
   apk:
