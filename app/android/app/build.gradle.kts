@@ -6,7 +6,9 @@ plugins {
 
 android {
     namespace = "it.gdanav.gdanav"
-    compileSdk = flutter.compileSdkVersion
+    // Almeno 37: la libreria Bluetooth del dongle OBD lo chiede. È solo per
+    // compilare: i telefoni supportati li decidono minSdk e targetSdk.
+    compileSdk = maxOf(flutter.compileSdkVersion, 37)
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
