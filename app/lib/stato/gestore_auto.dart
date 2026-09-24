@@ -121,6 +121,24 @@ class GestoreAuto extends ChangeNotifier {
     await _accendiObd();
   }
 
+  /// Il giro di sola lettura per conoscere l'auto: si ferma la lettura
+  /// normale, si esplora, si riaccende.
+  Future<String> esploraObd({void Function(String riga)? onRiga}) async {
+    final d = dongle;
+    if (d == null) throw const ErroreObd('nessun dongle scelto');
+    await _spegni(TipoSorgente.obd);
+    Elm327? elm;
+    try {
+      elm = Elm327(await _apriObd(d.id));
+      final auto = '# ${veicolo.nome} · dongle ${d.nome}';
+      onRiga?.call(auto);
+      return '$auto\n${await EsploraObd(elm, onRiga: onRiga).esegui()}';
+    } finally {
+      await elm?.chiudi().catchError((Object _) {});
+      await _accendiObd();
+    }
+  }
+
   Future<void> togliDongle() async {
     await _spegni(TipoSorgente.obd);
     dongle = null;

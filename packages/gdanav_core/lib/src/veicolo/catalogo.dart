@@ -218,7 +218,7 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('lancia-ypsilon-hf', 'Lancia', 'Ypsilon HF', kwh: 51, kg: 1620, cda: 0.66, dc: 100),
   // Leapmotor
   _auto('leapmotor-b10-56', 'Leapmotor', 'B10 56 kWh', kwh: 56.2, kg: 1750, cda: 0.70, dc: 140),
-  _auto('leapmotor-b10-67', 'Leapmotor', 'B10 67 kWh', kwh: 67.1, kg: 1800, cda: 0.70, dc: 168),
+  _auto('leapmotor-b10-67', 'Leapmotor', 'B10 67,1 kWh (Design, Pro Max)', kwh: 67.1, kg: 1800, cda: 0.70, dc: 168),
   _auto('leapmotor-c10', 'Leapmotor', 'C10', kwh: 67, kg: 1980, cda: 0.80, dc: 84),
   _auto('leapmotor-t03', 'Leapmotor', 'T03', kwh: 36.3, kg: 1250, cda: 0.68, dc: 48, ac: 6.6),
   // Lexus

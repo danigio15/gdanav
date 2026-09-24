@@ -3,6 +3,7 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import '../stato/gestore_auto.dart';
 import '../componenti/indicatore_batteria.dart';
+import 'esplora_auto.dart';
 import 'scegli_dongle.dart';
 
 /// Lo switch «Fonte dati auto»: Automatica, oppure una sorgente fissa.
@@ -129,8 +130,13 @@ class _Dongle extends StatelessWidget {
       title: Text(d.nome.isEmpty ? 'Dongle OBD' : d.nome),
       subtitle: Text(dati ? 'Dà i dati dell\'auto' : (gestore.erroreObd ?? 'In attesa dell\'auto accesa')),
       trailing: PopupMenuButton<String>(
-        onSelected: (v) => v == 'cambia' ? scegli() : gestore.togliDongle(),
+        onSelected: (v) => switch (v) {
+          'esplora' => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => EsploraAuto(auto: gestore))),
+          'cambia' => scegli(),
+          _ => gestore.togliDongle(),
+        },
         itemBuilder: (_) => const [
+          PopupMenuItem(value: 'esplora', child: Text("Esplora l'auto")),
           PopupMenuItem(value: 'cambia', child: Text('Cambia dongle')),
           PopupMenuItem(value: 'togli', child: Text('Togli')),
         ],

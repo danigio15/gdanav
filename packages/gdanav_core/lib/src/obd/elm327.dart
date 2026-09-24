@@ -83,14 +83,19 @@ class Elm327 {
   /// [intestazione] come «7E4» se non va alla centralina motore.
   /// Restituisce i byte dei dati, dopo il servizio e il PID; `null` se
   /// l'auto non risponde a quella richiesta.
-  Future<List<int>?> richiesta(String pid, {String? intestazione}) async {
+  Future<List<int>?> richiesta(String pid, {String? intestazione}) async =>
+      (await richiestaGrezza(pid, intestazione: intestazione)).dati;
+
+  /// Come [richiesta], ma con anche il testo com'è arrivato: per esplorare.
+  Future<({String testo, List<int>? dati})> richiestaGrezza(String pid, {String? intestazione}) async {
     final h = intestazione ?? '7DF';
     if (h != _intestazione) {
       final r = await comando('ATSH$h');
       if (!r.contains('OK')) throw ErroreObd('intestazione $h rifiutata: $r');
       _intestazione = h;
     }
-    return leggiRisposta(await comando(pid), pid);
+    final testo = await comando(pid);
+    return (testo: testo, dati: leggiRisposta(testo, pid));
   }
 
   Future<void> chiudi() async {

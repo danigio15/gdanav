@@ -70,6 +70,23 @@ void main() {
     expect(await Archivio().dongleObd(), isNull);
     auto.dispose();
   });
+
+  test("«Esplora l'auto» fa il giro di lettura e poi riaccende il dongle", () async {
+    preparaPiattaforma();
+    final dongle = _DongleFinto({'0100': '7E8064100983B8011', '015B': '7E803415BA3'});
+    final auto = GestoreAuto(archivio: Archivio(), apriObd: (_) async => dongle);
+    await auto.avvia();
+    await auto.scegliVeicolo(catalogoVeicoli.firstWhere((v) => v.id == 'leapmotor-b10-67'));
+    await auto.usaDongle('AA:BB', 'Vgate iCar Pro');
+    final righe = <String>[];
+    final r = await auto.esploraObd(onRiga: righe.add);
+    expect(r, startsWith('# Leapmotor B10 67,1 kWh (Design, Pro Max) · dongle Vgate iCar Pro'));
+    expect(r, contains('PID 01 supportati: 01 04 05'));
+    expect(righe.last, '# fine');
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(auto.stato!.sorgente, TipoSorgente.obd);
+    auto.dispose();
+  });
 }
 
 class _DongleFinto implements CanaleObd {

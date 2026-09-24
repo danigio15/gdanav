@@ -12,6 +12,7 @@ export 'src/motore/consumo_imparato.dart';
 export 'src/motore/modello_consumo.dart';
 export 'src/motore/pianificatore_soste.dart';
 export 'src/obd/elm327.dart';
+export 'src/obd/esplora_obd.dart';
 export 'src/obd/profili_obd.dart';
 export 'src/obd/sorgente_obd.dart';
 export 'src/percorso/valhalla.dart';
