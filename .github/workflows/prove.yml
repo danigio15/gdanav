@@ -60,6 +60,49 @@ jobs:
       - run: npm ci
       - run: npm test
 
+  # Il relay su Cloudflare, a ogni push su main: sul dominio dato dalla
+  # variabile GDANAV_DOMINIO (relay.<dominio>), con i segreti
+  # CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID. Senza segreti si salta.
+  pubblica-relay:
+    needs: [relay]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: relay
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Pubblica su Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DOMINIO: ${{ vars.GDANAV_DOMINIO }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::notice::Relay non pubblicato: mancano i segreti CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID."
+            exit 0
+          fi
+          if [ -n "$DOMINIO" ]; then
+            # In cima al file: dopo le tabelle [[...]] finirebbe dentro l'ultima.
+            sed -i "/^compatibility_date/a routes = [{ pattern = \"relay.$DOMINIO\", custom_domain = true }]" wrangler.toml
+          fi
+          npx wrangler deploy
+      - name: Il relay risponde
+        if: vars.GDANAV_DOMINIO != ''
+        env:
+          DOMINIO: ${{ vars.GDANAV_DOMINIO }}
+        run: |
+          [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] && exit 0
+          for i in 1 2 3 4 5 6; do
+            if curl -sf "https://relay.$DOMINIO/v1/segnalazioni?lat=45&lon=9" > /dev/null; then echo "ok"; exit 0; fi
+            sleep 10
+          done
+          echo "::error::https://relay.$DOMINIO non risponde"; exit 1
+
   # Tutti i pezzi veri insieme: relay acceso, Home Assistant e app che si
   # parlano, e un Valhalla vero (mappa di prova di Utrecht) per i percorsi.
   insieme:
@@ -126,7 +169,10 @@ jobs:
           flutter-version: 3.47.5
           channel: stable
       - run: flutter pub get
-      - run: flutter build apk --release
+      # Con il dominio, le segnalazioni puntano al relay pubblicato.
+      - run: flutter build apk --release ${DOMINIO:+--dart-define=GDANAV_SEGNALAZIONI=https://relay.$DOMINIO/}
+        env:
+          DOMINIO: ${{ vars.GDANAV_DOMINIO }}
       - run: cp build/app/outputs/flutter-apk/app-release.apk gdanav.apk
       - uses: actions/upload-artifact@v4
         with:
