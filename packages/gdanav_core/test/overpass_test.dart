@@ -66,11 +66,45 @@ void main() {
     expect(c[1].potenzaPer({TipoConnettore.tipo2}), 22);
   });
 
-  test('la richiesta segue il percorso, anche lungo, con pochi punti', () {
+  test('la richiesta: riquadri da una cinquantina di chilometri, solo colonnine rapide', () {
     final lungo = [for (var i = 0; i <= 800; i++) Punto(40.8 + i * 0.009, 14.2)]; // ~800 km
     final q = ClienteOverpass.richiesta(lungo, 3);
-    expect(q, contains('nwr["amenity"="charging_station"](around:3000,'));
-    expect(RegExp(r'\d+\.\d+,\d+\.\d+').allMatches(q).length, lessThanOrEqualTo(350));
+    expect(q, startsWith('[out:json][timeout:60];('));
+    expect(q, contains('socket:(type2_combo|chademo'));
+    expect(q, contains('["operator"~"Ionity|Tesla'));
+    expect(q, isNot(contains('around')));
+    // 800 km a riquadri da 50: 16 riquadri più quello dell'arrivo, tre filtri ciascuno.
+    expect('nwr['.allMatches(q).length, 17 * 3);
+    // Il primo riquadro copre la partenza, con il margine.
+    expect(q, contains('(40.7630,'));
+  });
+
+  test('in tempo scaduto non si dice «nessuna colonnina»: si prova l\'altro server', () async {
+    final client = MockClient((r) async => r.url.host == 'uno.esempio'
+        ? http.Response('{"elements":[],"remark":"runtime error: Query timed out in \\"query\\""}', 200)
+        : http.Response(jsonEncode(risposta), 200));
+    final o = ClienteOverpass(
+      client: client,
+      server: [Uri.parse('https://uno.esempio/api'), Uri.parse('https://due.esempio/api')],
+    );
+    expect(await o.lungo(const [Punto(44.5, 11.3), Punto(44.8, 11.6)]), hasLength(2));
+    final solo = ClienteOverpass(client: client, server: [Uri.parse('https://uno.esempio/api')]);
+    expect(solo.lungo(const [Punto(44.5, 11.3)]), throwsA(predicate((e) => '$e'.contains('timed out'))));
+  });
+
+  test('una rete rapida senza prese scritte vale come CCS rapida', () {
+    final c = ClienteOverpass.leggi({
+      'elements': [
+        {
+          'type': 'node',
+          'id': 9,
+          'lat': 45.0,
+          'lon': 9.0,
+          'tags': {'amenity': 'charging_station', 'operator': 'Free To X'},
+        },
+      ],
+    });
+    expect(c.single.potenzaPer({TipoConnettore.ccs2}), 150);
   });
 
   test('se il primo server è giù si prova il secondo', () async {

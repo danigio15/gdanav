@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
 
@@ -22,22 +23,42 @@ class ClienteOverpass implements FonteColonnine {
   final List<Uri> server;
   final http.Client _http;
 
-  /// Quanti punti al massimo nella richiesta: oltre, Overpass rallenta.
-  static const _massimoPunti = 350;
+  /// Le reti di ricarica rapida: le loro colonnine valgono anche se i
+  /// mappatori non hanno scritto le prese.
+  static const retiRapide =
+      'Ionity|Tesla|Free To X|Electra|Fastned|Ewiva|Atlante|Allego|Plenitude|Be Charge|Enel X|A2A|Neogy|Zunder|Powerdot|Duferco';
 
-  /// La richiesta: tutto quello che è una colonnina entro [distanzaKm] dalla
-  /// linea del percorso, coi punti al centro per le aree.
+  /// La richiesta: il percorso a riquadri di una cinquantina di chilometri
+  /// (Overpass li cerca in un attimo; la linea intera lo manda in tempo
+  /// scaduto), solo le colonnine rapide. La distanza vera dalla strada la
+  /// misura poi colonnineSulPercorso.
   static String richiesta(List<Punto> percorso, double distanzaKm) {
-    var passo = 1000.0;
-    var punti = semplifica(percorso, passo);
-    while (punti.length > _massimoPunti) {
-      passo *= 1.5;
-      punti = semplifica(percorso, passo);
+    final margine = distanzaKm / 111.0 + 0.01;
+    final riquadri = <String>[];
+    final pezzi = semplifica(percorso, 1000);
+    const passo = 50; // punti a 1 km: riquadri da ~50 km
+    for (var i = 0; i < pezzi.length; i += passo) {
+      final tratto = pezzi.sublist(i, math.min(i + passo + 1, pezzi.length));
+      final lat = tratto.map((p) => p.lat), lon = tratto.map((p) => p.lon);
+      final coseno = math.cos(tratto.first.lat * math.pi / 180).abs().clamp(0.2, 1.0);
+      riquadri.add([
+        (lat.reduce(math.min) - margine).toStringAsFixed(4),
+        (lon.reduce(math.min) - margine / coseno).toStringAsFixed(4),
+        (lat.reduce(math.max) + margine).toStringAsFixed(4),
+        (lon.reduce(math.max) + margine / coseno).toStringAsFixed(4),
+      ].join(','));
     }
-    final coordinate = punti.map((p) => '${p.lat.toStringAsFixed(5)},${p.lon.toStringAsFixed(5)}').join(',');
-    return '[out:json][timeout:90];'
-        'nwr["amenity"="charging_station"](around:${(distanzaKm * 1000).round()},$coordinate);'
-        'out center tags;';
+    const rapide = '[~"^socket:(type2_combo|chademo|tesla_supercharger.*)\$"~"."]';
+    final filtri = [
+      '["amenity"="charging_station"]$rapide',
+      '["amenity"="charging_station"]["operator"~"$retiRapide",i]',
+      '["amenity"="charging_station"]["brand"~"$retiRapide",i]',
+    ];
+    final corpo = [
+      for (final r in riquadri)
+        for (final f in filtri) 'nwr$f($r);',
+    ].join();
+    return '[out:json][timeout:60];($corpo);out center tags;';
   }
 
   @override
@@ -46,9 +67,22 @@ class ClienteOverpass implements FonteColonnine {
     Object? ultimo;
     for (final s in server) {
       try {
-        final r = await _http.post(s, body: corpo, headers: {'user-agent': 'gdanav (github.com/danigio15/gdanav)'});
-        if (r.statusCode == 200) return leggi(jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>);
-        ultimo = 'Overpass: ${r.statusCode}';
+        final r = await _http.post(s,
+            body: corpo,
+            headers: {'user-agent': 'gdanav (github.com/danigio15/gdanav)'}).timeout(const Duration(seconds: 75));
+        if (r.statusCode != 200) {
+          ultimo = 'Overpass: ${r.statusCode}';
+          continue;
+        }
+        final json = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>;
+        // In tempo scaduto Overpass risponde 200 con un avviso e niente dati:
+        // non è «non ci sono colonnine».
+        final avviso = json['remark'];
+        if (avviso is String && avviso.contains('error')) {
+          ultimo = 'Overpass: $avviso';
+          continue;
+        }
+        return leggi(json);
       } catch (e) {
         ultimo = e;
       }
@@ -77,11 +111,18 @@ class ClienteOverpass implements FonteColonnine {
       ..._prese(tag, 'type2_cable', TipoConnettore.tipo2, 22),
       ..._prese(tag, 'tesla_supercharger_ccs', TipoConnettore.ccs2, 150),
     ];
-    // Senza prese scritte: una Tipo 2, la più comune, con la potenza se c'è.
-    if (connettori.isEmpty) {
-      connettori.add(Connettore(tipo: TipoConnettore.tipo2, potenzaKw: _kw(tag['charging_station:output']) ?? 22));
-    }
     final operatore = (tag['operator'] ?? tag['brand'] ?? tag['network']) as String?;
+    // Senza prese scritte: una rapida CCS se è di una rete rapida, altrimenti
+    // una Tipo 2, la più comune; con la potenza se c'è.
+    if (connettori.isEmpty) {
+      final rapida = RegExp(retiRapide, caseSensitive: false).hasMatch('${tag['operator']} ${tag['brand']}');
+      connettori.add(
+        Connettore(
+          tipo: rapida ? TipoConnettore.ccs2 : TipoConnettore.tipo2,
+          potenzaKw: _kw(tag['charging_station:output']) ?? (rapida ? 150 : 22),
+        ),
+      );
+    }
     return Colonnina(
       id: 'osm-${e['type']}-${e['id']}',
       nome: (tag['name'] as String?) ?? operatore ?? 'Colonnina',

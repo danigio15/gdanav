@@ -1,3 +1,5 @@
+import 'dart:isolate';
+
 import '../colonnine/colonnina.dart';
 import '../colonnine/lungo_percorso.dart';
 import '../geo/geo.dart';
@@ -127,18 +129,22 @@ class PianificatoreViaggio {
       if (senzaSoste == null) rethrow;
       trovate = const [];
     }
-    final vicine = colonnineSulPercorso(
-      Linea(percorso.punti),
-      trovate,
-      compatibili: profilo.connettori,
-      potenzaMinimaKw: p.potenzaMinimaKw,
-      obbligate: obbligate,
-    );
-    return Viaggio(
-      percorso: percorso,
-      colonnine: vicine,
-      piano: senzaSoste ??
-          pianificatore.pianifica(percorso: percorso.tratti, batteriaPartenza: batteria, colonnine: vicine),
-    );
+    // Proiettare migliaia di colonnine e cercare le soste è lavoro pesante:
+    // si fa su un altro filo, così l'interfaccia non si blocca.
+    final prese = profilo.connettori;
+    final (vicine, piano) = await Isolate.run(() {
+      final vicine = colonnineSulPercorso(
+        Linea(percorso.punti),
+        trovate,
+        compatibili: prese,
+        potenzaMinimaKw: p.potenzaMinimaKw,
+        obbligate: obbligate,
+      );
+      return (
+        vicine,
+        senzaSoste ?? pianificatore.pianifica(percorso: percorso.tratti, batteriaPartenza: batteria, colonnine: vicine),
+      );
+    });
+    return Viaggio(percorso: percorso, colonnine: vicine, piano: piano);
   }
 }

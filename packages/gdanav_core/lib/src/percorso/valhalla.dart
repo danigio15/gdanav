@@ -158,11 +158,14 @@ class ClienteValhalla {
       'language': lingua,
       'elevation_interval': 30,
     };
-    final r = await _http.post(
-      indirizzo.resolve('route'),
-      headers: {'content-type': 'application/json', if (chiave != null) 'x-gdanav-chiave': chiave!},
-      body: jsonEncode(corpo),
-    );
+    final r = await _http
+        .post(
+          indirizzo.resolve('route'),
+          headers: {'content-type': 'application/json', if (chiave != null) 'x-gdanav-chiave': chiave!},
+          body: jsonEncode(corpo),
+        )
+        .timeout(const Duration(seconds: 60),
+            onTimeout: () => throw const ErroreValhalla('il server dei percorsi non risponde'));
     final testo = utf8.decode(r.bodyBytes);
     if (r.statusCode != 200) {
       // Valhalla risponde in JSON; Caddy davanti (chiave sbagliata) no.

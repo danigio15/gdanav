@@ -127,8 +127,7 @@ class PianificatoreSoste {
     required List<ColonninaSulPercorso> colonnine,
   }) {
     final prog = _Progressivo(percorso, profilo, condizioni);
-    final ordinate = colonnine.where((c) => c.distanzaM >= 0 && c.distanzaM <= prog.lunghezza).toList()
-      ..sort((a, b) => a.distanzaM.compareTo(b.distanzaM));
+    final ordinate = candidate(colonnine.where((c) => c.distanzaM >= 0 && c.distanzaM <= prog.lunghezza).toList());
     final n = ordinate.length;
     final cap = profilo.capacitaUtileKwh;
     // Da ogni punto non si può andare oltre la prossima sosta obbligata.
@@ -136,14 +135,27 @@ class PianificatoreSoste {
     for (var i = n - 1; i >= 0; i--) {
       limite[i] = ordinate[i].obbligata ? i : limite[i + 1];
     }
+    // Energia e tempo alle colonnine e all'arrivo, calcolati una volta sola.
+    final posM = [for (final c in ordinate) c.distanzaM, prog.lunghezza];
+    final eKwh = [for (final m in posM) prog.energiaKwh(0, m)];
+    final eSec = [for (final m in posM) prog.secondi(0, m)];
+    final devKwh = [for (final c in ordinate) _deviazioneKwh(c.deviazioneM), 0.0];
+    final devSec = [for (final c in ordinate) _deviazioneSecondi(c.deviazioneM), 0.0];
+    final ricariche = <(int, int, int), double>{};
+    double ricarica(int da, int a, double kw) =>
+        ricariche.putIfAbsent((da, a, kw.round()), () => _secondiRicarica(da.toDouble(), a.toDouble(), kw));
 
     // Nodi: 0..n-1 le colonnine, n la destinazione. La partenza è a parte.
     final costo = <(int, int), double>{};
     final da = <(int, int), (int, int, int)?>{}; // nodo -> (nodo precedente, partenza%)
     final coda = PriorityQueue<(double, int, int)>((a, b) => a.$1.compareTo(b.$1));
+    // Per ogni colonnina, la batteria migliore con cui ci si è già arrivati:
+    // arrivarci dopo con meno batteria non serve a niente.
+    final migliore = List<int>.filled(n + 1, -1);
 
     void rilassa(int verso, int arrivo, double secondi, (int, int, int)? precedente) {
       final chiave = (verso, arrivo);
+      if (arrivo <= migliore[verso]) return;
       if (secondi < (costo[chiave] ?? double.infinity)) {
         costo[chiave] = secondi;
         da[chiave] = precedente;
@@ -152,33 +164,34 @@ class PianificatoreSoste {
     }
 
     void guida(
-        {required double dalM,
-        required double deviazioneDaM,
+        {required int? daIndice,
         required double batteria,
         required double secondi,
         required int indiceDa,
         required (int, int, int)? precedente}) {
+      final e0 = daIndice == null ? 0.0 : eKwh[daIndice] - devKwh[daIndice];
+      final s0 = daIndice == null ? 0.0 : eSec[daIndice] - devSec[daIndice];
       for (var j = indiceDa; j <= limite[indiceDa]; j++) {
         final destinazione = j == n;
-        final alM = destinazione ? prog.lunghezza : ordinate[j].distanzaM;
-        final deviazioneA = destinazione ? 0.0 : ordinate[j].deviazioneM;
-        final kWh = prog.energiaKwh(dalM, alM) + _deviazioneKwh(deviazioneDaM) + _deviazioneKwh(deviazioneA);
+        final kWh = eKwh[j] - e0 + devKwh[j];
         final arrivo = batteria - kWh / cap * 100;
-        // L'energia cresce con la distanza: se non si arriva qui, più in là
-        // nemmeno, salvo discese lunghe. Si prova comunque tutto, n è piccolo.
+        // L'energia cresce con la distanza: ben sotto zero qui, più in là
+        // non si arriva comunque (il margine è per le discese lunghe).
+        if (arrivo < -30) break;
         if (arrivo < (destinazione ? minimoArrivo : minimoSosta)) continue;
-        final t =
-            secondi + prog.secondi(dalM, alM) + _deviazioneSecondi(deviazioneDaM) + _deviazioneSecondi(deviazioneA);
-        rilassa(j, arrivo.floor(), t, precedente);
+        rilassa(j, arrivo.floor(), secondi + eSec[j] - s0 + devSec[j], precedente);
       }
     }
 
-    guida(dalM: 0, deviazioneDaM: 0, batteria: batteriaPartenza, secondi: 0, indiceDa: 0, precedente: null);
+    guida(daIndice: null, batteria: batteriaPartenza, secondi: 0, indiceDa: 0, precedente: null);
 
     while (coda.isNotEmpty) {
       final (secondi, i, arrivo) = coda.removeFirst();
       if (secondi > (costo[(i, arrivo)] ?? double.infinity)) continue;
       if (i == n) return _ricostruisci(ordinate, da, (i, arrivo), secondi, prog, batteriaPartenza);
+      // Già passati di qui prima e con più batteria: questo ramo è peggiore.
+      if (arrivo <= migliore[i]) continue;
+      migliore[i] = arrivo;
 
       final c = ordinate[i];
       // A una colonnina tutta guasta non si ricarica.
@@ -189,18 +202,41 @@ class PianificatoreSoste {
       final ultimo = c.obbligata ? math.max(massimoRicarica.toInt(), math.min(primo, 100)) : massimoRicarica;
       final attesa = c.disponibilita.piena ? attesaSeOccupata.inSeconds : 0;
       for (var partenza = primo; partenza <= ultimo; partenza += passoRicarica) {
-        final ricarica = _secondiRicarica(arrivo.toDouble(), partenza.toDouble(), c.potenzaKw);
         guida(
-          dalM: c.distanzaM,
-          deviazioneDaM: c.deviazioneM,
+          daIndice: i,
           batteria: partenza.toDouble(),
-          secondi: secondi + ricarica + attesa + tempoFissoSosta.inSeconds,
+          secondi: secondi + ricarica(arrivo, partenza, c.potenzaKw) + attesa + tempoFissoSosta.inSeconds,
           indiceDa: i + 1,
           precedente: (i, arrivo, partenza),
         );
       }
     }
     return null;
+  }
+
+  /// Le colonnine fra cui scegliere le soste: di quelle a meno di un
+  /// chilometro l'una dall'altra lungo la strada (spesso la stessa area di
+  /// servizio, o lo stesso posto contato due volte) si tiene la migliore.
+  /// Le soste scelte dall'utente restano sempre.
+  static List<ColonninaSulPercorso> candidate(List<ColonninaSulPercorso> tutte, {double raggioM = 1000}) {
+    final ordinate = [...tutte]..sort((a, b) => a.distanzaM.compareTo(b.distanzaM));
+    final tenute = <ColonninaSulPercorso>[];
+    for (final c in ordinate) {
+      final ultima = tenute.isEmpty ? null : tenute.last;
+      if (c.obbligata || ultima == null || ultima.obbligata || c.distanzaM - ultima.distanzaM > raggioM) {
+        tenute.add(c);
+      } else if (_meglio(c, ultima)) {
+        tenute[tenute.length - 1] = c;
+      }
+    }
+    return tenute;
+  }
+
+  static bool _meglio(ColonninaSulPercorso a, ColonninaSulPercorso b) {
+    int punti(ColonninaSulPercorso c) => c.disponibilita.guasta ? 0 : (c.disponibilita.piena ? 1 : 2);
+    if (punti(a) != punti(b)) return punti(a) > punti(b);
+    if (a.potenzaKw != b.potenzaKw) return a.potenzaKw > b.potenzaKw;
+    return a.deviazioneM < b.deviazioneM;
   }
 
   PianoViaggio _ricostruisci(
