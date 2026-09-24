@@ -1,5 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 
+import { DURATA_CACHE_S, SERVER_OVERPASS, leggiRiquadro, richiestaOverpass, rispostaBuona } from './colonnine.js';
+import { DURATA_CODICE_MS, bustaValida, codiceVivo, leggiIndirizzoCodice } from './codici.js';
 import { MASSIMO_BYTE, destinatari, impronta, leggiRichiesta, presenza, puoEntrare } from './regole.js';
 import {
   FINESTRA_MS,
@@ -18,8 +20,11 @@ const json = (dati, stato = 200) =>
   new Response(JSON.stringify(dati), { status: stato, headers: { 'content-type': 'application/json' } });
 
 export default {
-  async fetch(richiesta, env) {
-    if (new URL(richiesta.url).pathname.startsWith('/v1/segnalazioni')) return segnalazioni(richiesta, env);
+  async fetch(richiesta, env, ctx) {
+    const percorso = new URL(richiesta.url).pathname;
+    if (percorso.startsWith('/v1/segnalazioni')) return segnalazioni(richiesta, env);
+    if (percorso.startsWith('/v1/codici/')) return codici(richiesta, env);
+    if (percorso.startsWith('/v1/colonnine/')) return colonnine(richiesta, ctx);
     if (richiesta.headers.get('Upgrade') !== 'websocket') {
       return new Response('gdanav relay\n', { status: 426 });
     }
@@ -165,4 +170,73 @@ export class Zona extends DurableObject {
     await this.ctx.storage.put(`s:${id}`, n);
     return pubblica(n);
   }
+}
+
+/** I codici di abbinamento: uno per oggetto, dieci minuti, una lettura. */
+async function codici(richiesta, env) {
+  const r = leggiIndirizzoCodice(richiesta.method, richiesta.url);
+  if (r.errore) return json({ errore: r.errore }, r.stato);
+  const codice = env.CODICI.get(env.CODICI.idFromName(r.id));
+  if (r.azione === 'prendi') {
+    const busta = await codice.prendi();
+    return busta
+      ? new Response(busta, { status: 200, headers: { 'content-type': 'application/json' } })
+      : json({ errore: 'codice sbagliato o scaduto' }, 404);
+  }
+  const busta = await richiesta.text();
+  if (!bustaValida(busta)) return json({ errore: 'busta non valida' }, 400);
+  await codice.lascia(busta);
+  return json({ scade_tra_s: DURATA_CODICE_MS / 1000 }, 201);
+}
+
+export class Codice extends DurableObject {
+  async lascia(busta) {
+    const scade = Date.now() + DURATA_CODICE_MS;
+    await this.ctx.storage.put('codice', { busta, scade });
+    await this.ctx.storage.setAlarm(scade);
+  }
+
+  async prendi() {
+    const salvato = await this.ctx.storage.get('codice');
+    await this.ctx.storage.deleteAll();
+    return codiceVivo(salvato, Date.now()) ? salvato.busta : null;
+  }
+
+  async alarm() {
+    await this.ctx.storage.deleteAll();
+  }
+}
+
+/** Un riquadro di colonnine: dalla cache, o da Overpass e poi in cache. */
+async function colonnine(richiesta, ctx) {
+  const r = leggiRiquadro(richiesta.method, richiesta.url);
+  if (r.errore) return json({ errore: r.errore }, r.stato);
+  const chiave = new Request(`https://cache.gdanav/colonnine/v1/${r.riga}/${r.colonna}`);
+  const inCache = await caches.default.match(chiave);
+  if (inCache) return inCache;
+  const corpo = new URLSearchParams({ data: richiestaOverpass(r.riga, r.colonna) });
+  let ultimo = 'nessun server';
+  for (const server of SERVER_OVERPASS) {
+    try {
+      const risposta = await fetch(server, {
+        method: 'POST',
+        body: corpo,
+        headers: { 'user-agent': 'gdanav relay (github.com/danigio15/gdanav)' },
+        signal: AbortSignal.timeout(30000),
+      });
+      const testo = await risposta.text();
+      if (!risposta.ok || !rispostaBuona(testo)) {
+        ultimo = `${new URL(server).host}: ${risposta.status}`;
+        continue;
+      }
+      const buona = new Response(testo, {
+        headers: { 'content-type': 'application/json', 'cache-control': `public, max-age=${DURATA_CACHE_S}` },
+      });
+      ctx.waitUntil(caches.default.put(chiave, buona.clone()));
+      return buona;
+    } catch (e) {
+      ultimo = `${new URL(server).host}: ${e}`;
+    }
+  }
+  return json({ errore: `colonnine: ${ultimo}` }, 502);
 }

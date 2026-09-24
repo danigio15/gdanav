@@ -149,3 +149,43 @@ class Busta:
         if abs((ora or datetime.now(UTC)) - m.ts) > TOLLERANZA:
             raise ErroreProtocollo("Messaggio fuori tempo")
         return m
+
+
+# Il codice da scrivere a mano al posto del QR: lo specchio di
+# ``lib/src/protocollo/codice.dart``.
+ALFABETO_CODICE = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+LUNGHEZZA_CODICE = 10
+ITERAZIONI_CODICE = 20000
+DURATA_CODICE = timedelta(minutes=10)
+_AAD_CODICE = b"gdanav/codice/v1"
+
+
+def nuovo_codice() -> str:
+    return "".join(secrets.choice(ALFABETO_CODICE) for _ in range(LUNGHEZZA_CODICE))
+
+
+def mostra_codice(codice: str) -> str:
+    return f"{codice[:5]}-{codice[5:]}"
+
+
+def deriva_codice(codice: str) -> tuple[bytes, str]:
+    """La chiave della busta e il nome sul relay."""
+    b = hashlib.pbkdf2_hmac("sha256", codice.encode(), _AAD_CODICE, ITERAZIONI_CODICE, 64)
+    return b[:32], b64(hashlib.sha256(b[32:]).digest())[:22]
+
+
+def chiudi_codice(abbinamento: Abbinamento, codice: str, nonce: bytes | None = None) -> str:
+    chiave, _ = deriva_codice(codice)
+    nonce = nonce or secrets.token_bytes(12)
+    cifrato = AESGCM(chiave).encrypt(nonce, abbinamento.uri.encode(), _AAD_CODICE)
+    return json.dumps({"v": 1, "n": b64(nonce), "c": b64(cifrato)})
+
+
+def indirizzo_codice(relay: str, id_: str) -> str:
+    """L'indirizzo http del relay, da quello del WebSocket."""
+    if relay.startswith("wss://"):
+        relay = "https://" + relay[len("wss://") :]
+    elif relay.startswith("ws://"):
+        relay = "http://" + relay[len("ws://") :]
+    base = relay if relay.endswith("/") else relay + "/"
+    return f"{base}v1/codici/{id_}"

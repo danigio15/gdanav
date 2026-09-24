@@ -6,5 +6,9 @@
   "busta_casa": "{\"v\": 1, \"n\": \"AAECAwQFBgcICQoL\", \"c\": \"PCCicrWK4CGvMuPqxYYnDPai6BbcWTYYGl3HtSxbM4Y0JpnElqBw-xDBGc-kpVxLzGNCv2rklfcPrgcrK7fE3soM9kDj4QhRLGTwTMOtaolM4-tYDUExCYmJ-74RkZu3_Mp304hjoXTBf1_AIRZAXYABA8eQoFjnEUIHU2VFbWenYcaVQSL74w\"}",
   "ts": "2026-09-23T10:00:00.000Z",
   "uri_dart": "gdanav://abbina?v=1&k=AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8&r=wss%3A%2F%2Frelay.esempio.dev&n=Auto+di+prova",
-  "busta_app_dart": "{\"v\":1,\"n\":\"DAsKCQgHBgUEAwIB\",\"c\":\"Z7OXMV4n8kfZaDqRstnQmOkzfi4SBvaimgrvfycUdnlvLPjgMaG3FNOeyLRif7Zv-2BGFmdbBmABKVbcD6_pGvHQCrkbjXgGpRIHl54e1YUwB2mfFRCVDKgwbyDKM2msis8uiFV4agl5T475bpxkZTsaYugV3Ww_M3EQD4xGwqK0GXCiWdMti77c\"}"
+  "busta_app_dart": "{\"v\":1,\"n\":\"DAsKCQgHBgUEAwIB\",\"c\":\"Z7OXMV4n8kfZaDqRstnQmOkzfi4SBvaimgrvfycUdnlvLPjgMaG3FNOeyLRif7Zv-2BGFmdbBmABKVbcD6_pGvHQCrkbjXgGpRIHl54e1YUwB2mfFRCVDKgwbyDKM2msis8uiFV4agl5T475bpxkZTsaYugV3Ww_M3EQD4xGwqK0GXCiWdMti77c\"}",
+  "codice": "7KQ2M9XAPD",
+  "codice_id": "Aokg8cEJWWLnEZN4Bfqk3Q",
+  "codice_chiave": "GOWqSzWd4zdJNHqLFSYJsgZwNX926sTKpqRnxmBHVIY",
+  "codice_busta": "{\"v\": 1, \"n\": \"AAECAwQFBgcICQoL\", \"c\": \"DaUeEb5u8MoGYKxJNV1jcWnK_HZ6ebDfJLXOAoFgp8mm2jqEPn4rmeFLwYbInFtJOiaieikE_xsJs8UjS0PKd_5XCjWENqiOGykF853aPI6oZn2A1mjEqP-kdVHVrSq_wHiv79hkmDgpyB4N0WNiJ0VhpmW91C0hJ1QhkBXDKQ-2\"}"
 }

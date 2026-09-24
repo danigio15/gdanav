@@ -79,3 +79,31 @@ def test_altra_chiave() -> None:
 def test_buste_rotte(testo: str) -> None:
     with pytest.raises(p.ErroreProtocollo):
         p.Busta(A).apri(testo, p.MITTENTE_CASA, ora=ORA)
+
+
+def test_codice_derivazioni() -> None:
+    chiave, id_ = p.deriva_codice(VETTORE["codice"])
+    assert id_ == VETTORE["codice_id"]
+    assert p.b64(chiave) == VETTORE["codice_chiave"]
+
+
+def test_codice_busta_uguale_al_vettore() -> None:
+    assert p.chiudi_codice(A, VETTORE["codice"], bytes(range(12))) == VETTORE["codice_busta"]
+
+
+def test_codice_nuovo() -> None:
+    c = p.nuovo_codice()
+    assert len(c) == p.LUNGHEZZA_CODICE
+    assert all(x in p.ALFABETO_CODICE for x in c)
+    assert p.mostra_codice("7KQ2M9XAPD") == "7KQ2M-9XAPD"
+
+
+@pytest.mark.parametrize(
+    ("relay", "atteso"),
+    [
+        ("wss://relay.esempio.dev", "https://relay.esempio.dev/v1/codici/x"),
+        ("ws://127.0.0.1:8799/", "http://127.0.0.1:8799/v1/codici/x"),
+    ],
+)
+def test_indirizzo_codice(relay: str, atteso: str) -> None:
+    assert p.indirizzo_codice(relay, "x") == atteso

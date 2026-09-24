@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
+import '../servizi.dart';
 import 'archivio.dart';
 import 'gestore_auto.dart';
 import 'gestore_consumo.dart';
@@ -58,9 +59,11 @@ PianificatoreViaggio pianificatoreVero(Impostazioni i, ProfiloVeicolo profilo, P
   return PianificatoreViaggio(
     percorsi: valhalla.calcola,
     // Open Charge Map se c'è la chiave (ha anche lo stato delle prese), e
-    // comunque OpenStreetMap, che non ne chiede.
+    // comunque OpenStreetMap, che non ne chiede: dalla cache del relay di
+    // gdanav, e se il relay non risponde direttamente da Overpass.
     colonnine: FonteColonnineConRiserva([
       if (i.chiaveOcm.isNotEmpty) ClienteOpenChargeMap(chiave: i.chiaveOcm),
+      ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni)),
       ClienteOverpass(),
     ]),
     profilo: profilo,

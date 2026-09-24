@@ -22,3 +22,12 @@ class_name = "Zona"
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["Zona"]
+
+# I codici di abbinamento da scrivere a mano: dieci minuti, una lettura.
+[[durable_objects.bindings]]
+name = "CODICI"
+class_name = "Codice"
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["Codice"]

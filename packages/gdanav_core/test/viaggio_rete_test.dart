@@ -29,10 +29,23 @@ void main() {
       }
     }
 
+    // Dal relay: la prima volta i riquadri si chiedono a Overpass, la
+    // seconda arrivano dalla cache di Cloudflare.
+    for (final volta in ['prima', 'seconda']) {
+      orologio.reset();
+      try {
+        final c = await ClienteColonnineRelay(Uri.parse('https://gdanav.gdahome.org/')).lungo(percorso.punti);
+        avviso('Relay, $volta volta', '${orologio.elapsedMilliseconds} ms, ${c.length} colonnine');
+      } catch (e) {
+        avviso('Relay, $volta volta', 'errore dopo ${orologio.elapsedMilliseconds} ms: $e');
+      }
+    }
+
     orologio.reset();
     final v = await PianificatoreViaggio(
       percorsi: valhalla.calcola,
-      colonnine: FonteColonnineConRiserva([ClienteOverpass()]),
+      colonnine: FonteColonnineConRiserva(
+          [ClienteColonnineRelay(Uri.parse('https://gdanav.gdahome.org/')), ClienteOverpass()]),
       profilo: veicoloPerId('leapmotor-b10-67')!,
     ).pianifica(partenza: napoli, arrivo: milano, batteria: 64);
     avviso(

@@ -149,6 +149,7 @@ jobs:
   # Il viaggio vero, coi server pubblici: quanto ci mette ogni pezzo. Non
   # blocca niente: i server degli altri possono essere lenti.
   rete:
+    needs: [pubblica-relay]
     runs-on: ubuntu-latest
     continue-on-error: true
     defaults:
