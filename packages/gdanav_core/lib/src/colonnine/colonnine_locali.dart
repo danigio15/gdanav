@@ -43,16 +43,20 @@ class ColonnineLocali implements FonteColonnine {
 
 /// Le colonnine divise per riquadri di mezzo grado.
 class ArchivioColonnine {
-  ArchivioColonnine(Iterable<Colonnina> colonnine, {this.generato}) {
+  ArchivioColonnine(Iterable<Colonnina> colonnine, {this.generato, Set<(int, int)>? coperti}) {
     for (final c in colonnine) {
       (_perRiquadro[_riquadro(c.posizione)] ??= []).add(c);
     }
-    // Coperti: i riquadri con colonnine e quelli intorno (una valle alpina
-    // senza colonnine è coperta, il mare aperto fuori dall'area no).
-    for (final (r, c) in _perRiquadro.keys.toList()) {
-      for (var dr = -1; dr <= 1; dr++) {
-        for (var dc = -1; dc <= 1; dc++) {
-          _coperti.add((r + dr, c + dc));
+    if (coperti != null) {
+      // Quelli cercati davvero, anche se senza colonnine.
+      _coperti.addAll(coperti);
+    } else {
+      // Se non si sa: i riquadri con colonnine e quelli intorno.
+      for (final (r, c) in _perRiquadro.keys.toList()) {
+        for (var dr = -1; dr <= 1; dr++) {
+          for (var dc = -1; dc <= 1; dc++) {
+            _coperti.add((r + dr, c + dc));
+          }
         }
       }
     }
@@ -74,12 +78,14 @@ class ArchivioColonnine {
 
   // --- il formato compatto ------------------------------------------------
   //
-  // {"v":1,"generato":"…","c":[[lat,lon,"osm-node-1","nome","operatore",[[tipo,kw,quante],…]],…]}
+  // {"v":1,"generato":"…","q":[[riga,colonna],…],
+  //  "c":[[lat,lon,"osm-node-1","nome","operatore",[[tipo,kw,quante],…]],…]}
+  // q: i riquadri di mezzo grado cercati (anche vuoti).
   // tipo: 0 CCS2, 1 CHAdeMO, 2 Tipo 2, 3 Tesla.
 
   static const _tipi = [TipoConnettore.ccs2, TipoConnettore.chademo, TipoConnettore.tipo2, TipoConnettore.tesla];
 
-  static String scrivi(List<Colonnina> colonnine, {DateTime? generato}) {
+  static String scrivi(List<Colonnina> colonnine, {DateTime? generato, Set<(int, int)>? coperti}) {
     final righe = [
       for (final c in colonnine)
         [
@@ -91,7 +97,15 @@ class ArchivioColonnine {
           _prese(c.connettori),
         ],
     ];
-    return jsonEncode({'v': 1, 'generato': (generato ?? DateTime.now().toUtc()).toIso8601String(), 'c': righe});
+    return jsonEncode({
+      'v': 1,
+      'generato': (generato ?? DateTime.now().toUtc()).toIso8601String(),
+      if (coperti != null)
+        'q': [
+          for (final (r, c) in coperti) [r, c]
+        ],
+      'c': righe,
+    });
   }
 
   static List<List<num>> _prese(List<Connettore> connettori) {
@@ -126,6 +140,11 @@ class ArchivioColonnine {
         ),
       );
     }
-    return ArchivioColonnine(colonnine, generato: DateTime.tryParse('${j['generato']}'));
+    final q = j['q'] as List?;
+    return ArchivioColonnine(
+      colonnine,
+      generato: DateTime.tryParse('${j['generato']}'),
+      coperti: q == null ? null : {for (final x in q.cast<List>()) ((x[0] as num).toInt(), (x[1] as num).toInt())},
+    );
   }
 }

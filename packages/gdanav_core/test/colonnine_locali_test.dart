@@ -31,7 +31,15 @@ void main() {
     expect(a.generato, isNotNull);
   });
 
-  test('coperti: i riquadri con colonnine e quelli intorno', () {
+  test('coperti: quelli scritti nell\'archivio, anche vuoti', () {
+    final testo = ArchivioColonnine.scrivi([colonnina('a', 44.5, 11.3)], coperti: {(89, 22), (70, 30)});
+    final a = ArchivioColonnine.leggi(testo);
+    expect(a.copre((70, 30)), isTrue);
+    expect(a.copre((89, 22)), isTrue);
+    expect(a.copre((90, 23)), isFalse);
+  });
+
+  test('coperti, se l\'archivio non lo dice: i riquadri con colonnine e quelli intorno', () {
     final a = ArchivioColonnine([colonnina('a', 44.5, 11.3)]);
     expect(a.copre((89, 22)), isTrue);
     expect(a.copre((90, 23)), isTrue);
