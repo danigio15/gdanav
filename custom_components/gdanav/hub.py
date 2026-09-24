@@ -15,6 +15,7 @@ import logging
 from typing import Any
 
 import aiohttp
+from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State, callback
@@ -22,6 +23,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
+from homeassistant.util import dt as dt_util
 
 from . import protocollo as p
 from .const import (
@@ -120,6 +122,10 @@ class Hub:
         self._ws: aiohttp.ClientWebSocketResponse | None = None
         self._attivo = False
         self._annulla_invio: Any = None
+        # Il codice da scrivere nell'app al posto del QR, finché vale.
+        self.codice: str | None = None
+        self.codice_scade: datetime | None = None
+        self._annulla_codice: Any = None
 
     # --- ciclo di vita ---------------------------------------------------
 
@@ -140,6 +146,7 @@ class Hub:
 
     async def async_ferma(self) -> None:
         self._attivo = False
+        self._togli_codice()
         if self._annulla_invio:
             self._annulla_invio()
         if self._ws is not None:
@@ -296,8 +303,66 @@ class Hub:
                     esito["ok"] = True
         await self.async_manda(p.ESITO_COMANDO, esito)
 
+    # --- il codice al posto del QR ---------------------------------------
+
+    @property
+    def _id_notifica(self) -> str:
+        return f"gdanav_codice_{self.entry.entry_id}"
+
+    async def async_nuovo_codice(self) -> str:
+        """Un codice nuovo: l'abbinamento cifrato va sul relay per dieci minuti."""
+        codice = p.nuovo_codice()
+        # PBKDF2: qualche decina di millisecondi, fuori dal ciclo degli eventi.
+        (_, id_), busta = await self.hass.async_add_executor_job(
+            lambda: (p.deriva_codice(codice), p.chiudi_codice(self.abbinamento, codice))
+        )
+        sessione = async_get_clientsession(self.hass)
+        try:
+            async with sessione.put(
+                p.indirizzo_codice(self.abbinamento.relay, id_),
+                data=busta,
+                headers={"content-type": "application/json"},
+                timeout=aiohttp.ClientTimeout(total=20),
+            ) as r:
+                if r.status != 201:
+                    raise HomeAssistantError(f"Il relay di gdanav ha risposto {r.status}")
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise HomeAssistantError(f"Il relay di gdanav non risponde: {err}") from err
+        self._togli_codice()
+        self.codice = codice
+        self.codice_scade = dt_util.utcnow() + p.DURATA_CODICE
+        self._annulla_codice = async_call_later(self.hass, p.DURATA_CODICE, self._codice_scaduto)
+        persistent_notification.async_create(
+            self.hass,
+            f"Nell'app gdanav: menu → Home Assistant → «Scrivi il codice», e scrivi\n\n"
+            f"**{p.mostra_codice(codice)}**\n\nVale dieci minuti, una volta sola.",
+            title=f"Codice per collegare {self.entry.title}",
+            notification_id=self._id_notifica,
+        )
+        self._aggiorna()
+        return codice
+
+    def _togli_codice(self) -> None:
+        if self._annulla_codice:
+            self._annulla_codice()
+            self._annulla_codice = None
+        if self.codice is not None:
+            persistent_notification.async_dismiss(self.hass, self._id_notifica)
+        self.codice = None
+        self.codice_scade = None
+
+    @callback
+    def _codice_scaduto(self, _now: Any) -> None:
+        self._annulla_codice = None
+        self._togli_codice()
+        self._aggiorna()
+
     @callback
     def _imposta_app(self, presente: bool) -> None:
+        # L'app si è collegata: il codice è servito.
+        if presente and self.codice is not None:
+            self._togli_codice()
+            self._aggiorna()
         if self.viaggio.app_collegata != presente:
             self.viaggio.app_collegata = presente
             self._aggiorna()

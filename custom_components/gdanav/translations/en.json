@@ -10,7 +10,7 @@
       },
       "entita": {
         "title": "The car's entities",
-        "description": "Entities recognised: {trovate}. Check, fix if needed and confirm. Only the battery is required. Then open the gdanav device and scan the QR code with the app.",
+        "description": "Entities recognised: {trovate}. Check, fix if needed and confirm. Only the battery is required. Then open the gdanav device: scan the QR code with the app, or press «New pairing code» and type the code in the app.",
         "data": {
           "nome_auto": "Car name",
           "entita_batteria": "Battery (%)",
@@ -64,6 +64,9 @@
       },
       "soc_necessario": {
         "name": "Battery needed"
+      },
+      "codice": {
+        "name": "Pairing code"
       }
     },
     "binary_sensor": {
@@ -81,6 +84,11 @@
     "image": {
       "abbinamento": {
         "name": "Pairing QR code"
+      }
+    },
+    "button": {
+      "nuovo_codice": {
+        "name": "New pairing code"
       }
     }
   },

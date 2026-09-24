@@ -10,7 +10,7 @@ from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import GdanavConfigEntry
+from . import GdanavConfigEntry, protocollo as p
 from .entita import EntitaGdanav
 
 
@@ -25,12 +25,14 @@ async def async_setup_entry(
             SocArrivo(hub, "soc_arrivo"),
             ProssimaSosta(hub, "prossima_sosta"),
             SocNecessario(hub, "soc_necessario"),
+            Codice(hub, "codice"),
         ]
     )
 
 
 NESSUN_VIAGGIO = "Nessun viaggio"
 NESSUNA_SOSTA = "Nessuna sosta"
+NESSUN_CODICE = "Nessun codice"
 
 
 class SensoreGdanav(EntitaGdanav):
@@ -90,3 +92,17 @@ class SocNecessario(SensoreGdanav, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any] | None:
         per = self.hub.viaggio.soc_necessario_per
         return {"destinazione": per} if per else None
+
+
+class Codice(SensoreGdanav, SensorEntity):
+    """Il codice da scrivere nell'app al posto del QR, finché vale."""
+
+    _attr_icon = "mdi:form-textbox-password"
+
+    @property
+    def native_value(self) -> str:
+        return p.mostra_codice(self.hub.codice) if self.hub.codice else NESSUN_CODICE
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        return {"scade": self.hub.codice_scade.isoformat()} if self.hub.codice_scade else None

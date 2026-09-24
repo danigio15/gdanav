@@ -164,9 +164,12 @@ async def test_entita_create(hass: HomeAssistant, senza_relay: None) -> None:
         "binary_sensor.gdanav_in_viaggio",
         "binary_sensor.gdanav_app_collegata",
         "image.gdanav_abbinamento",
+        "button.gdanav_nuovo_codice",
+        "sensor.gdanav_codice",
     ):
         assert hass.states.get(entity_id) is not None, entity_id
     assert hass.states.get("binary_sensor.gdanav_in_viaggio").state == "off"
+    assert hass.states.get("sensor.gdanav_codice").state == "Nessun codice"
 
 
 async def test_dati_per_il_consumo_con_le_unita_giuste(hass: HomeAssistant, senza_relay: None) -> None:
@@ -354,3 +357,83 @@ async def test_scarica(hass: HomeAssistant, senza_relay: None) -> None:
     assert await hass.config_entries.async_unload(voce.entry_id)
     await hass.async_block_till_done()
     assert voce.state is config_entries.ConfigEntryState.NOT_LOADED
+
+
+class FintaSessione:
+    """Al posto di aiohttp verso il relay: tiene le buste lasciate."""
+
+    def __init__(self, stato: int = 201) -> None:
+        self.stato = stato
+        self.lasciate: list[tuple[str, str]] = []
+
+    def put(self, url: str, data: str, **_: Any) -> Any:
+        self.lasciate.append((url, data))
+        stato = self.stato
+
+        class Risposta:
+            status = stato
+
+            async def __aenter__(self) -> Any:
+                return self
+
+            async def __aexit__(self, *_: object) -> None:
+                return None
+
+        return Risposta()
+
+
+async def test_codice_al_posto_del_qr(hass: HomeAssistant, senza_relay: None, freezer) -> None:
+    from datetime import timedelta
+    import json
+    from unittest.mock import patch
+
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+    _, hub = await _installa(hass)
+    sessione = FintaSessione()
+    with patch("custom_components.gdanav.hub.async_get_clientsession", return_value=sessione):
+        await hass.services.async_call("button", "press", {"entity_id": "button.gdanav_nuovo_codice"}, blocking=True)
+    await hass.async_block_till_done()
+
+    codice = hub.codice
+    assert codice is not None
+    stato = hass.states.get("sensor.gdanav_codice")
+    assert stato.state == p.mostra_codice(codice)
+    assert "scade" in stato.attributes
+    # Sul relay la busta sta sotto il nome ricavato dal codice; il codice
+    # non ci arriva, e col codice la busta si apre.
+    ((url, busta),) = sessione.lasciate
+    chiave, id_ = p.deriva_codice(codice)
+    assert url == f"https://relay.esempio.dev/v1/codici/{id_}"
+    assert codice not in url
+    assert codice not in busta
+    b = json.loads(busta)
+    chiaro = AESGCM(chiave).decrypt(p.da_b64(b["n"]), p.da_b64(b["c"]), b"gdanav/codice/v1")
+    assert p.Abbinamento.da_uri(chiaro.decode()) == hub.abbinamento
+
+    # Dopo dieci minuti non vale più.
+    freezer.tick(timedelta(minutes=10, seconds=1))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.gdanav_codice").state == "Nessun codice"
+
+
+async def test_codice_usato_quando_l_app_arriva(hass: HomeAssistant, senza_relay: None) -> None:
+    _, hub = await _installa(hass)
+    hub.codice = "7KQ2M9XAPD"
+    hub._ws = FintoWs()
+    await hub.async_ricevi('{"relay":"presente","ruolo":"app"}')
+    assert hub.codice is None
+
+
+async def test_codice_relay_giu(hass: HomeAssistant, senza_relay: None) -> None:
+    from unittest.mock import patch
+
+    _, hub = await _installa(hass)
+    with (
+        patch("custom_components.gdanav.hub.async_get_clientsession", return_value=FintaSessione(503)),
+        pytest.raises(HomeAssistantError, match="503"),
+    ):
+        await hub.async_nuovo_codice()
+    assert hub.codice is None

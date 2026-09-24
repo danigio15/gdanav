@@ -52,9 +52,90 @@ String _semplice(String s) => s
     .replaceAll(RegExp(r'\s+'), ' ')
     .trim();
 
+/// Dove il nome porta all'auto sbagliata (la Capri del 1969, l'Explorer
+/// americano a benzina): le sole pagine da provare.
+const _pagineGiuste = {
+  'Ford Capri': ['Ford Capri (2024)', 'Ford Capri EV', 'Ford Capri (electric)'],
+  'Ford Explorer': ['Ford Explorer EV', 'Ford Explorer (electric)'],
+  'Ford E-Tourneo Custom': ['Ford Transit Custom'],
+  'MG MG4': ['MG4 EV', 'MG 4 EV', 'MG4'],
+  'MG MG4 XPOWER': ['MG4 EV', 'MG 4 EV', 'MG4'],
+  'MG MG5 Electric': ['MG5 EV', 'MG 5 EV'],
+  'MG MGS5': ['MG S5 EV', 'MG S5'],
+  'MG IM5': ['IM L6', 'IM Motors L6'],
+  'MG IM6': ['IM LS6', 'IM Motors LS6'],
+  'Lancia Ypsilon HF': ['Lancia Ypsilon (2024)', 'Lancia Ypsilon'],
+  'Alpine A290': ['Alpine A290'],
+  'Abarth 600e': ['Abarth 600e', 'Fiat 600 (2023)'],
+  'Fiat E-Ulysse': ['Fiat Ulysse', 'Fiat Scudo'],
+  'Mercedes-Benz AMG EQE 53 +': ['Mercedes-Benz EQE'],
+  'Mercedes-Benz EQV 300': ['Mercedes-Benz V-Class'],
+  'Mercedes-Benz EQT': ['Mercedes-Benz T-Class'],
+  'Nissan Townstar EV': ['Nissan Townstar'],
+  'Toyota Proace Verso Electric': ['Toyota ProAce'],
+  'Toyota Proace City Verso Electric': ['Toyota ProAce City'],
+  'Subaru Solterra': ['Subaru Solterra'],
+  'Peugeot iOn': ['Peugeot iOn', 'Mitsubishi i-MiEV'],
+  'Škoda Citigo e iV': ['Škoda Citigo'],
+  'GWM ORA 03': ['Ora 03', 'Ora Good Cat', 'Great Wall Ora Good Cat'],
+};
+
+/// Le foto buone: niente loghi né disegni.
+bool _foto(String? f) =>
+    f != null && !f.toLowerCase().contains('logo') && RegExp(r'\.(jpe?g|png|webp)$', caseSensitive: false).hasMatch(f);
+
+/// «ë-C4 X» → «c4x», «e-2008» → «2008», «ID.3» → «id3»: per dire se la
+/// pagina trovata parla davvero di quel modello.
+String _chiaveModello(String termine, String marca) {
+  final m = _semplice(termine.substring(marca.length)).split(' ')
+    ..removeWhere((w) => const {'electric', 'elettrica', 'e tech', 'tech', 'con', 'tecnologia', 'eq'}.contains(w));
+  if (m.isNotEmpty && m.first == 'e' && m.length > 1) m.removeAt(0);
+  return m.take(2).join();
+}
+
+/// Le pagine da provare per nome esatto: il termine intero, poi togliendo
+/// una parola alla volta dalla fine («Škoda Elroq 50» → «Škoda Elroq»).
+List<String> _candidate(String t, String marca) {
+  if (_pagineGiuste[t] case final giuste?) return giuste;
+  final parole = t.split(' ');
+  final n = marca.split(' ').length;
+  return [for (var i = parole.length; i > n; i--) parole.sublist(0, i).join(' ')];
+}
+
 /// La pagina di Wikipedia dell'auto e la sua foto principale (solo libera).
 Future<(String, String)?> pagina(ProfiloVeicolo v) async {
   final t = termine(v);
+  final candidate = _candidate(t, v.marca);
+  final esatte = await _chiedi('en.wikipedia.org', {
+    'action': 'query',
+    'titles': candidate.join('|'),
+    'redirects': '1',
+    'prop': 'pageimages',
+    'piprop': 'name',
+    'pilicense': 'free',
+  });
+  final q = (esatte['query'] as Map?) ?? const {};
+  String segui(String titolo, String chiave) {
+    for (final r in ((q[chiave] as List?) ?? const []).cast<Map>()) {
+      if (r['from'] == titolo) return r['to'] as String;
+    }
+    return titolo;
+  }
+
+  final perTitolo = {for (final p in ((q['pages'] as List?) ?? const []).cast<Map>()) p['title']: p};
+  final marca = _semplice(v.marca).split(' ');
+  bool diMarca(String titolo) => marca.any(_semplice(titolo).split(' ').contains);
+  for (final (i, c) in candidate.indexed) {
+    final titolo = segui(segui(c, 'normalized'), 'redirects');
+    final p = perTitolo[titolo];
+    if (p == null || p['missing'] == true || !_foto(p['pageimage'] as String?)) continue;
+    // Il nome intero può portare altrove (Opel Ampera-e → Chevrolet Bolt: è
+    // la stessa auto); accorciato, deve restare della stessa marca.
+    if (i == 0 || _pagineGiuste.containsKey(t) || diMarca(titolo)) return (titolo, p['pageimage'] as String);
+  }
+  if (_pagineGiuste.containsKey(t)) return null;
+
+  // Se no, la ricerca; ma la pagina deve nominare marca e modello.
   final j = await _chiedi('en.wikipedia.org', {
     'action': 'query',
     'generator': 'search',
@@ -67,13 +148,12 @@ Future<(String, String)?> pagina(ProfiloVeicolo v) async {
   });
   final pagine = [...((j['query'] as Map?)?['pages'] as List? ?? const [])]
     ..sort((a, b) => (a['index'] as int).compareTo(b['index'] as int));
-  final marca = _semplice(v.marca).split(' ');
-  final primo = _semplice(t).split(' ').skip(marca.length).firstOrNull;
-  bool diMarca(Map p) => marca.any(_semplice(p['title'] as String).split(' ').contains);
-  bool delModello(Map p) => primo == null || _semplice(p['title'] as String).split(' ').contains(primo);
-  for (final ok in [(Map p) => diMarca(p) && delModello(p), diMarca]) {
-    for (final p in pagine.cast<Map>()) {
-      if (ok(p) && p['pageimage'] is String) return (p['title'] as String, p['pageimage'] as String);
+  final chiave = _chiaveModello(t, v.marca);
+  for (final p in pagine.cast<Map>()) {
+    final titolo = p['title'] as String;
+    final compatto = _semplice(titolo).replaceAll(' ', '');
+    if (diMarca(titolo) && chiave.isNotEmpty && compatto.contains(chiave) && _foto(p['pageimage'] as String?)) {
+      return (titolo, p['pageimage'] as String);
     }
   }
   return null;

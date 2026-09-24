@@ -10,7 +10,7 @@
       },
       "entita": {
         "title": "Le entità dell'auto",
-        "description": "Entità riconosciute: {trovate}. Controlla, correggi se serve e conferma. Serve solo la batteria. Poi apri il dispositivo gdanav e inquadra il QR con l'app.",
+        "description": "Entità riconosciute: {trovate}. Controlla, correggi se serve e conferma. Serve solo la batteria. Poi apri il dispositivo gdanav: inquadra il QR con l'app, oppure premi «Nuovo codice di abbinamento» e scrivi il codice nell'app.",
         "data": {
           "nome_auto": "Nome dell'auto",
           "entita_batteria": "Batteria (%)",
@@ -64,6 +64,9 @@
       },
       "soc_necessario": {
         "name": "Batteria necessaria"
+      },
+      "codice": {
+        "name": "Codice di abbinamento"
       }
     },
     "binary_sensor": {
@@ -81,6 +84,11 @@
     "image": {
       "abbinamento": {
         "name": "QR di abbinamento"
+      }
+    },
+    "button": {
+      "nuovo_codice": {
+        "name": "Nuovo codice di abbinamento"
       }
     }
   },

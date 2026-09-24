@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:gdanav_core/gdanav_core.dart';
+import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -54,4 +55,23 @@ void main() {
     await sorgente.ferma();
     await casa.sink.close();
   }, skip: relay == null ? 'serve GDANAV_RELAY con un relay acceso' : false);
+
+  test('il codice scritto a mano: la casa lo lascia, l\'app lo prende una volta sola', () async {
+    final a = Abbinamento.nuovo(relay: Uri.parse(relay!), nomeAuto: 'Prova');
+    final codice = CodiceAbbinamento.nuovo();
+    final (_, id) = await CodiceAbbinamento.deriva(codice);
+    final r = await http.put(
+      CodiceAbbinamento.indirizzo(a.relay, id),
+      headers: {'content-type': 'application/json'},
+      body: await CodiceAbbinamento.chiudi(a, codice),
+    );
+    expect(r.statusCode, 201);
+
+    final letto = await CodiceAbbinamento.recupera(a.relay, CodiceAbbinamento.mostra(codice).toLowerCase());
+    expect(letto.uri, a.uri);
+    await expectLater(
+      CodiceAbbinamento.recupera(a.relay, codice),
+      throwsA(predicate((e) => '$e'.contains('scaduto'))),
+    );
+  }, skip: relay == null ? 'serve GDANAV_RELAY' : false);
 }

@@ -14,7 +14,7 @@ from . import protocollo as p
 from .const import DOMAIN, SERVIZIO_PIANIFICA
 from .hub import Hub
 
-PIATTAFORME = [Platform.BINARY_SENSOR, Platform.IMAGE, Platform.SENSOR]
+PIATTAFORME = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.IMAGE, Platform.SENSOR]
 
 type GdanavConfigEntry = ConfigEntry[Hub]
 

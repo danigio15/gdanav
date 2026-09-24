@@ -11,6 +11,7 @@ import '../mappa/controllo_mappa.dart';
 import '../mappa/mappa_viaggio.dart';
 import '../stato/archivio.dart';
 import '../stato/gestore_auto.dart';
+import '../stato/foto_auto.dart';
 import '../stato/gestore_consumo.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_luoghi.dart';
@@ -46,6 +47,7 @@ class SchermataPrincipale extends StatefulWidget {
     this.luoghi,
     this.segnalazioni,
     this.consumo,
+    this.fotoAuto,
     this.mappeOffline,
   });
 
@@ -63,6 +65,7 @@ class SchermataPrincipale extends StatefulWidget {
 
   /// Il consumo imparato, da mostrare in «La tua auto».
   final GestoreConsumo? consumo;
+  final GestoreFotoAuto? fotoAuto;
 
   /// Le mappe scaricate; se manca, quelle vere di MapLibre.
   final GestoreMappeOffline? mappeOffline;
@@ -461,6 +464,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                                 ),
                                 onFonte: () => mostraFonteDatiAuto(context, widget.auto),
                                 onFoto: _foto,
+                                fotoCatalogo: widget.fotoAuto,
                               ),
                             ),
                           )

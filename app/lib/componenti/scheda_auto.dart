@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../mappa/segnaposto.dart';
+import '../stato/foto_auto.dart';
 import '../stato/gestore_auto.dart';
 import '../tema.dart';
 import 'indicatore_batteria.dart' show eta, nomeSorgente;
@@ -18,6 +19,7 @@ class SchedaAuto extends StatelessWidget {
     required this.onApriAuto,
     required this.onFonte,
     required this.onFoto,
+    this.fotoCatalogo,
   });
 
   final GestoreAuto auto;
@@ -28,13 +30,16 @@ class SchedaAuto extends StatelessWidget {
   final VoidCallback onFonte;
   final VoidCallback onFoto;
 
+  /// Le foto vere dei modelli; senza, l'auto disegnata.
+  final GestoreFotoAuto? fotoCatalogo;
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final s = Theme.of(context).colorScheme;
     final c = ColoriGdanav.di(context);
     return ListenableBuilder(
-      listenable: auto,
+      listenable: Listenable.merge([auto, ?fotoCatalogo]),
       builder: (context, _) {
         final v = auto.veicolo;
         final st = auto.stato;
@@ -123,22 +128,12 @@ class SchedaAuto extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Tooltip(
-                      message: 'Foto della tua auto',
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: onFoto,
-                        child: SizedBox(
-                          width: 124,
-                          height: 80,
-                          child: auto.foto != null && File(auto.foto!).existsSync()
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(16),
-                                  child: Image.file(File(auto.foto!), fit: BoxFit.cover),
-                                )
-                              : CustomPaint(painter: AutoDisegnata(coloreAuto(segnaposto))),
-                        ),
-                      ),
+                    _Foto(
+                      propria: auto.foto != null && File(auto.foto!).existsSync() ? File(auto.foto!) : null,
+                      catalogo: v.id == ProfiloVeicolo.esempio.id ? null : fotoCatalogo?.file(v.id),
+                      credito: fotoCatalogo?.info(v.id)?.credito,
+                      colore: coloreAuto(segnaposto),
+                      onFoto: onFoto,
                     ),
                   ],
                 ),
@@ -180,6 +175,71 @@ class SchedaAuto extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// La foto nella scheda: la tua se l'hai scelta, se no quella vera del
+/// modello (con autore e licenza sotto), se no l'auto disegnata.
+class _Foto extends StatelessWidget {
+  const _Foto({
+    required this.propria,
+    required this.catalogo,
+    this.credito,
+    required this.colore,
+    required this.onFoto,
+  });
+
+  final File? propria;
+  final File? catalogo;
+  final String? credito;
+  final Color colore;
+  final VoidCallback onFoto;
+
+  @override
+  Widget build(BuildContext context) {
+    final file = propria ?? catalogo;
+    return Tooltip(
+      message: 'Foto della tua auto',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onFoto,
+        child: SizedBox(
+          width: 124,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 80,
+                width: 124,
+                child: file != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Image.file(
+                          file,
+                          key: Key(propria != null ? 'foto-propria' : 'foto-modello'),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => CustomPaint(painter: AutoDisegnata(colore)),
+                        ),
+                      )
+                    : CustomPaint(painter: AutoDisegnata(colore)),
+              ),
+              if (propria == null && catalogo != null && credito != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: Text(
+                    credito!,
+                    key: const Key('credito-foto'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall
+                        ?.copyWith(fontSize: 9, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
