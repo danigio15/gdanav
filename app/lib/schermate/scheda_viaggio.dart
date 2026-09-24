@@ -20,10 +20,17 @@ String orario(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.to
 /// Il riquadro in basso: sta calcolando, il viaggio con le sue soste, o
 /// cosa non va.
 class SchedaViaggio extends StatelessWidget {
-  const SchedaViaggio({super.key, required this.gestore, required this.apriImpostazioni, this.soglia = 15});
+  const SchedaViaggio({
+    super.key,
+    required this.gestore,
+    required this.apriImpostazioni,
+    required this.onAvvia,
+    this.soglia = 15,
+  });
 
   final GestoreViaggio gestore;
   final VoidCallback apriImpostazioni;
+  final VoidCallback onAvvia;
   final double soglia;
 
   @override
@@ -76,7 +83,7 @@ class SchedaViaggio extends StatelessWidget {
             ),
           ],
         ),
-        final ViaggioPronto pronto => _Pronta(pronto: pronto, gestore: gestore, soglia: soglia),
+        final ViaggioPronto pronto => _Pronta(pronto: pronto, gestore: gestore, soglia: soglia, onAvvia: onAvvia),
       },
     );
   }
@@ -129,11 +136,12 @@ class _Piccola extends StatelessWidget {
 }
 
 class _Pronta extends StatelessWidget {
-  const _Pronta({required this.pronto, required this.gestore, required this.soglia});
+  const _Pronta({required this.pronto, required this.gestore, required this.soglia, required this.onAvvia});
 
   final ViaggioPronto pronto;
   final GestoreViaggio gestore;
   final double soglia;
+  final VoidCallback onAvvia;
 
   @override
   Widget build(BuildContext context) {
@@ -210,6 +218,15 @@ class _Pronta extends StatelessWidget {
                 ),
               ),
               Text('${durata(piano.durata)} · ${km.round()} km', style: t.titleMedium?.copyWith(color: muto)),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: onAvvia,
+                  icon: const Icon(Icons.navigation),
+                  label: const Text('Avvia'),
+                ),
+              ),
               const SizedBox(height: 16),
               Row(
                 children: [

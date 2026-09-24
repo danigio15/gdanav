@@ -84,7 +84,7 @@ class Impostazioni {
   const Impostazioni({this.valhalla = '', this.chiaveValhalla = '', this.chiaveOcm = ''});
 
   factory Impostazioni.predefinite() => const Impostazioni(
-    valhalla: String.fromEnvironment('GDANAV_VALHALLA'),
+    valhalla: String.fromEnvironment('GDANAV_VALHALLA', defaultValue: valhallaDiProva),
     chiaveValhalla: String.fromEnvironment('GDANAV_VALHALLA_CHIAVE'),
     chiaveOcm: String.fromEnvironment('GDANAV_OCM_CHIAVE'),
   );
@@ -95,6 +95,10 @@ class Impostazioni {
     chiaveOcm: j['chiave_ocm'] as String? ?? '',
   );
 
+  /// Il server pubblico di FOSSGIS: va bene per provare l'app, non per
+  /// distribuirla a tanti (chiede un uso moderato). Poi si mette il proprio.
+  static const valhallaDiProva = 'https://valhalla1.openstreetmap.de/';
+
   final String valhalla;
   final String chiaveValhalla;
   final String chiaveOcm;
@@ -102,7 +106,8 @@ class Impostazioni {
   /// Cosa manca per pianificare un viaggio, in parole. `null` se c'è tutto.
   String? get mancante {
     if (valhalla.isEmpty) return "Manca l'indirizzo del server dei percorsi: scrivilo nelle impostazioni.";
-    if (chiaveOcm.isEmpty) return 'Manca la chiave di Open Charge Map: scrivila nelle impostazioni.';
+    // La chiave di Open Charge Map non blocca: senza, le colonnine si provano
+    // a chiedere lo stesso.
     return null;
   }
 

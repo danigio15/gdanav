@@ -97,9 +97,14 @@ List<Punto> semplifica(List<Punto> punti, double passoM) {
 /// Dove cade un punto rispetto a una linea: quanto lungo la linea (dalla
 /// partenza) e quanto lontano da essa.
 class Proiezione {
-  const Proiezione({required this.lungoM, required this.lontanoM});
+  const Proiezione({required this.lungoM, required this.lontanoM, this.segmento = 0, this.t = 0});
   final double lungoM;
   final double lontanoM;
+
+  /// Il segmento più vicino (dal punto `segmento` al successivo) e dove ci
+  /// si trova, da 0 a 1.
+  final int segmento;
+  final double t;
 }
 
 /// Una linea con le distanze cumulate già calcolate, per proiettarci sopra
@@ -122,11 +127,15 @@ class Linea {
 
   /// Proiezione su ogni segmento, in un piano locale attorno al punto:
   /// alle distanze di qualche chilometro l'errore è trascurabile.
-  Proiezione proietta(Punto q) {
+  Proiezione proietta(Punto q) => proiettaTra(q, 0, punti.length - 1);
+
+  /// Come [proietta], ma solo sui segmenti da [da] ad [a] (esclusi i punti
+  /// oltre): chi guida non salta dall'altra parte di un anello.
+  Proiezione proiettaTra(Punto q, int da, int a) {
     final kx = math.cos(_rad(q.lat)) * _raggioTerraM * math.pi / 180;
     const ky = _raggioTerraM * math.pi / 180;
     var migliore = const Proiezione(lungoM: 0, lontanoM: double.infinity);
-    for (var i = 1; i < punti.length; i++) {
+    for (var i = math.max(1, da + 1); i <= math.min(a, punti.length - 1); i++) {
       final a = punti[i - 1], b = punti[i];
       final ax = (a.lon - q.lon) * kx, ay = (a.lat - q.lat) * ky;
       final bx = (b.lon - q.lon) * kx, by = (b.lat - q.lat) * ky;
@@ -136,7 +145,12 @@ class Linea {
       final px = ax + t * dx, py = ay + t * dy;
       final d = math.sqrt(px * px + py * py);
       if (d < migliore.lontanoM) {
-        migliore = Proiezione(lungoM: cumulate[i - 1] + t * (cumulate[i] - cumulate[i - 1]), lontanoM: d);
+        migliore = Proiezione(
+          lungoM: cumulate[i - 1] + t * (cumulate[i] - cumulate[i - 1]),
+          lontanoM: d,
+          segmento: i - 1,
+          t: t,
+        );
       }
     }
     return migliore;

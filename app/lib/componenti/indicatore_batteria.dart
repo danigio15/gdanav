@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../stato/gestore_auto.dart';
-import '../tema.dart';
+import 'vetro.dart';
 import 'anello_batteria.dart';
 
 String nomeSorgente(TipoSorgente t) => switch (t) {
@@ -33,53 +33,48 @@ class IndicatoreBatteria extends StatelessWidget {
     final t = Theme.of(context).textTheme;
     final s = auto.stato;
     final km = auto.autonomiaKm();
+    final muto = Theme.of(context).colorScheme.onSurfaceVariant;
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 330),
-      child: Material(
-        color: ColoriGdanav.di(context).vetro,
-        elevation: 3,
-        shadowColor: Colors.black26,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnelloBatteria(
-                  batteria: s?.batteria,
-                  child: Text(
-                    s == null ? '?' : '${s.batteria.round()}',
-                    style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-                  ),
+      child: Vetro(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnelloBatteria(
+                batteria: s?.batteria,
+                child: Text(
+                  s == null ? '?' : '${s.batteria.round()}',
+                  style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(width: 10),
-                Flexible(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        s == null ? 'Batteria sconosciuta' : '${s.batteria.round()}% · ≈ ${km!.round()} km',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      Text(
-                        s == null
-                            ? 'Tocca per scriverla'
-                            : '${auto.veicolo.modello} · ${nomeSorgente(s.sorgente)} · ${eta(DateTime.now().difference(s.letto))}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: t.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
+              ),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      s == null ? 'Batteria sconosciuta' : '${s.batteria.round()}% · ≈ ${km!.round()} km',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      s == null
+                          ? 'Tocca per scriverla'
+                          : '${auto.veicolo.modello} · ${nomeSorgente(s.sorgente)} · '
+                                '${eta(DateTime.now().difference(s.letto))}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: t.bodySmall?.copyWith(color: muto),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

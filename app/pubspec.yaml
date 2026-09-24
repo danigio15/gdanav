@@ -40,6 +40,7 @@ dependencies:
   gdanav_core:
     path: ../packages/gdanav_core
   geolocator: ^14.0.3
+  flutter_tts: ^4.2.5
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -42,7 +42,7 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
   Future<void> _salva() async {
     await widget.archivio.salvaImpostazioni(
       Impostazioni(
-        valhalla: _valhalla.text.trim(),
+        valhalla: _valhalla.text.trim().isEmpty ? Impostazioni.valhallaDiProva : _valhalla.text.trim(),
         chiaveValhalla: _chiaveValhalla.text.trim(),
         chiaveOcm: _chiaveOcm.text.trim(),
       ),
@@ -55,7 +55,7 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Impostazioni')),
+      appBar: AppBar(title: const Text('Servizi')),
       body: !_pronta
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -68,7 +68,7 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
                   decoration: const InputDecoration(
                     labelText: 'Server dei percorsi',
                     hintText: 'https://1-2-3-4.sslip.io/',
-                    helperText: 'Il tuo Valhalla (vedi valhalla/README.md)',
+                    helperText: 'Vuoto: il server di prova di FOSSGIS. Poi il tuo (valhalla/README.md)',
                   ),
                 ),
                 const SizedBox(height: 16),

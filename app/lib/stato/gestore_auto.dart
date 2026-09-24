@@ -29,6 +29,13 @@ class GestoreAuto extends ChangeNotifier {
 
   ModalitaFonte get modalita => arbitro.modalita;
 
+  /// Il filo con Home Assistant, se l'auto è abbinata: la guida ci manda
+  /// viaggio ed eventi.
+  ClienteRelay? get relay => switch (_sorgenti[TipoSorgente.homeAssistant]) {
+    final SorgenteHomeAssistant s => s.relay,
+    _ => null,
+  };
+
   /// Le sorgenti che questo telefono può usare adesso, per lo switch.
   Iterable<TipoSorgente> get disponibili => _sorgenti.keys;
 

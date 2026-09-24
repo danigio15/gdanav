@@ -7,9 +7,27 @@ import '../motore/modello_consumo.dart';
 
 /// Un'istruzione di guida, come la dà Valhalla.
 class Manovra {
-  const Manovra({required this.istruzione, required this.lunghezzaM, required this.secondi, required this.inizio});
+  const Manovra({
+    required this.istruzione,
+    required this.lunghezzaM,
+    required this.secondi,
+    required this.inizio,
+    this.tipo = 0,
+    this.voce = '',
+    this.strada = '',
+  });
 
   final String istruzione;
+
+  /// Il tipo di Valhalla (10 destra, 15 sinistra, 26 rotonda…): decide
+  /// l'icona.
+  final int tipo;
+
+  /// La frase da dire prima della manovra.
+  final String voce;
+
+  /// Il nome della strada in cui si entra, se c'è.
+  final String strada;
   final double lunghezzaM;
   final double secondi;
 
@@ -60,6 +78,9 @@ class PercorsoCalcolato {
           lunghezzaM: lunghezza,
           secondi: secondi,
           inizio: base + da,
+          tipo: m['type'] as int? ?? 0,
+          voce: m['verbal_pre_transition_instruction'] as String? ?? m['instruction'] as String? ?? '',
+          strada: ((m['street_names'] as List?) ?? const []).cast<String>().join(', '),
         ));
         if (a <= da || lunghezza <= 0 || secondi <= 0) continue;
         final kmh = lunghezza / secondi * 3.6;

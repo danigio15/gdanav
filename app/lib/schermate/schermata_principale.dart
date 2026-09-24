@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../componenti/indicatore_batteria.dart';
+import '../componenti/vetro.dart';
 import '../mappa/controllo_mappa.dart';
 import '../mappa/mappa_viaggio.dart';
 import '../stato/archivio.dart';
 import '../stato/gestore_auto.dart';
+import '../stato/gestore_guida.dart';
 import '../stato/gestore_viaggio.dart';
-import '../tema.dart';
 import 'abbina_home_assistant.dart';
 import 'cerca_destinazione.dart';
 import 'dettaglio_colonnina.dart';
@@ -16,15 +17,28 @@ import 'impostazioni.dart';
 import 'la_tua_auto.dart';
 import 'ricarica.dart';
 import 'scheda_viaggio.dart';
+import 'schermata_guida.dart';
 
 typedef CostruisciMappa = Widget Function(BuildContext context, ControlloMappa controllo);
 
 class SchermataPrincipale extends StatefulWidget {
-  const SchermataPrincipale({super.key, required this.auto, required this.viaggio, required this.archivio, this.mappa});
+  const SchermataPrincipale({
+    super.key,
+    required this.auto,
+    required this.viaggio,
+    required this.archivio,
+    required this.guida,
+    this.mappa,
+    this.chiediPosizione,
+  });
 
   final GestoreAuto auto;
   final GestoreViaggio viaggio;
   final Archivio archivio;
+  final GestoreGuida guida;
+
+  /// Chiede il permesso della posizione; nelle prove non c'è.
+  final Future<bool> Function()? chiediPosizione;
 
   /// Nelle prove e nelle anteprime si passa un'altra mappa: quella vera vuole
   /// il codice nativo.
@@ -37,6 +51,7 @@ class SchermataPrincipale extends StatefulWidget {
 class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   final controllo = ControlloMappa();
   PreferenzeRicarica _preferenze = const PreferenzeRicarica();
+  var _posizione = false;
 
   GestoreViaggio get viaggio => widget.viaggio;
 
@@ -44,7 +59,14 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   void initState() {
     super.initState();
     _ricaricaPreferenze();
+    widget.chiediPosizione?.call().then((ok) => mounted ? setState(() => _posizione = ok) : null);
   }
+
+  void _avvia() => Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => SchermataGuida(guida: widget.guida, mappa: widget.mappa),
+    ),
+  );
 
   @override
   void dispose() {
@@ -132,7 +154,6 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
 
   @override
   Widget build(BuildContext context) {
-    final vetro = ColoriGdanav.di(context).vetro;
     return Scaffold(
       body: Stack(
         children: [
@@ -142,6 +163,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                 MappaViaggio(
                   gestore: viaggio,
                   controllo: controllo,
+                  posizioneConcessa: _posizione,
                   onPuntoScelto: (p) => viaggio.vaiA(
                     Luogo(
                       nome: 'Punto sulla mappa',
@@ -158,11 +180,8 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Material(
-                    color: vetro,
-                    elevation: 4,
-                    shadowColor: Colors.black26,
-                    borderRadius: BorderRadius.circular(28),
+                  Vetro(
+                    raggio: 28,
                     child: Row(
                       children: [
                         Expanded(
@@ -230,7 +249,12 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
             ),
           ),
           Positioned.fill(
-            child: SchedaViaggio(gestore: viaggio, apriImpostazioni: _impostazioni, soglia: _preferenze.minimoArrivo),
+            child: SchedaViaggio(
+              gestore: viaggio,
+              apriImpostazioni: _impostazioni,
+              onAvvia: _avvia,
+              soglia: _preferenze.minimoArrivo,
+            ),
           ),
         ],
       ),
@@ -248,16 +272,10 @@ class _BottoneMappa extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Tooltip(
     message: tooltip,
-    child: Material(
-      color: ColoriGdanav.di(context).vetro,
-      elevation: 4,
-      shadowColor: Colors.black26,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onPressed,
-        child: SizedBox.square(dimension: 48, child: Center(child: child)),
-      ),
+    child: Vetro(
+      forma: BoxShape.circle,
+      onTap: onPressed,
+      child: SizedBox.square(dimension: 48, child: Center(child: child)),
     ),
   );
 }

@@ -143,7 +143,11 @@ class GestoreViaggio extends ChangeNotifier {
       if (identical(stato, calcolo)) _imposta(ErroreViaggio(_spiega(e), destinazione: destinazione));
     } catch (e) {
       if (identical(stato, calcolo)) {
-        _imposta(ErroreViaggio('Il viaggio non si è potuto calcolare: $e', destinazione: destinazione));
+        final messaggio = impostazioni.chiaveOcm.isEmpty
+            ? 'Per questo viaggio servono soste, ma le colonnine non sono arrivate: aggiungi la chiave gratuita '
+                  'di Open Charge Map nelle impostazioni.'
+            : 'Il viaggio non si è potuto calcolare: $e';
+        _imposta(ErroreViaggio(messaggio, destinazione: destinazione));
       }
     }
   }

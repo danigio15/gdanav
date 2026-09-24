@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'schermate/schermata_principale.dart';
 import 'stato/archivio.dart';
 import 'stato/gestore_auto.dart';
+import 'stato/gestore_guida.dart';
 import 'stato/gestore_viaggio.dart';
 import 'stato/posizione.dart';
+import 'stato/voce.dart';
 import 'tema.dart';
 
 Future<void> main() async {
@@ -13,15 +15,26 @@ Future<void> main() async {
   final auto = GestoreAuto(archivio: archivio);
   await auto.avvia();
   final viaggio = GestoreViaggio(archivio: archivio, auto: auto, posizione: posizioneAttuale);
-  runApp(GdanavApp(archivio: archivio, auto: auto, viaggio: viaggio));
+  final guida = GestoreGuida(viaggio: viaggio, auto: auto, posizioni: posizioniGuida, voce: VoceTelefono());
+  runApp(GdanavApp(archivio: archivio, auto: auto, viaggio: viaggio, guida: guida, chiediPosizione: chiediPosizione));
 }
 
 class GdanavApp extends StatelessWidget {
-  const GdanavApp({super.key, required this.archivio, required this.auto, required this.viaggio, this.mappa});
+  const GdanavApp({
+    super.key,
+    required this.archivio,
+    required this.auto,
+    required this.viaggio,
+    required this.guida,
+    this.mappa,
+    this.chiediPosizione,
+  });
 
   final Archivio archivio;
   final GestoreAuto auto;
   final GestoreViaggio viaggio;
+  final GestoreGuida guida;
+  final Future<bool> Function()? chiediPosizione;
 
   /// Nelle prove e nelle anteprime si passa un'altra mappa: quella vera vuole
   /// il codice nativo.
@@ -34,7 +47,14 @@ class GdanavApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: temaGdanav(Brightness.light),
       darkTheme: temaGdanav(Brightness.dark),
-      home: SchermataPrincipale(auto: auto, viaggio: viaggio, archivio: archivio, mappa: mappa),
+      home: SchermataPrincipale(
+        auto: auto,
+        viaggio: viaggio,
+        archivio: archivio,
+        guida: guida,
+        mappa: mappa,
+        chiediPosizione: chiediPosizione,
+      ),
     );
   }
 }

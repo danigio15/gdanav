@@ -39,7 +39,7 @@ class ClienteOpenChargeMap implements FonteColonnine {
       'distance': '$distanzaKm',
       'distanceunit': 'KM',
     });
-    final r = await _http.get(uri, headers: {'X-API-Key': chiave});
+    final r = await _http.get(uri, headers: {if (chiave.isNotEmpty) 'X-API-Key': chiave});
     if (r.statusCode != 200) throw Exception('Open Charge Map: ${r.statusCode}');
     return leggi(jsonDecode(utf8.decode(r.bodyBytes)) as List);
   }

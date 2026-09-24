@@ -55,32 +55,32 @@ void main() {
     expect(find.text('Ci arrivi senza fermarti.'), findsOneWidget);
   });
 
-  testWidgets('senza server dice di aprire le impostazioni, e le salva', (tester) async {
+  testWidgets('senza impostazioni si usa il server di prova, e i servizi si salvano', (tester) async {
     preparaPiattaforma();
     final a = await ambiente(tester);
     await tester.pumpWidget(a.app());
     a.auto.manuale.imposta(80);
     await tester.pump();
     await cercaBologna(tester);
+    expect(a.viaggio.stato, isA<ViaggioPronto>());
+    final predefinite = await tester.runAsync(() => Archivio().impostazioni());
+    expect(predefinite!.valhalla, Impostazioni.valhallaDiProva);
 
-    expect(find.textContaining('Manca l\'indirizzo del server dei percorsi'), findsOneWidget);
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Impostazioni'));
+    await tester.tap(find.byTooltip('Chiudi'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Servizi'));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 80)));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('valhalla')), 'https://1-2-3-4.sslip.io/');
     await tester.enterText(find.byKey(const Key('chiave_ocm')), 'ocm-123');
     await tester.tap(find.text('Salva'));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 80)));
     await tester.pumpAndSettle();
-
     final salvate = await tester.runAsync(() => Archivio().impostazioni());
     expect(salvate!.valhalla, 'https://1-2-3-4.sslip.io/');
     expect(salvate.chiaveOcm, 'ocm-123');
-    expect(salvate.mancante, isNull);
-
-    await tester.tap(find.text('Riprova'));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
-    await tester.pumpAndSettle();
-    expect(a.viaggio.stato, isA<ViaggioPronto>());
   });
 
   testWidgets('senza batteria chiede di scriverla', (tester) async {

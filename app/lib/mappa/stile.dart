@@ -39,6 +39,7 @@ class _Tavolozza {
     required this.luogo,
     required this.percorso,
     required this.percorsoBordo,
+    required this.contorno,
     required this.libera,
     required this.piena,
     required this.guasta,
@@ -49,7 +50,8 @@ class _Tavolozza {
   final String sfondo, abitato, prato, bosco, acqua, edificio, edificioLato, edificioBordo;
   final String autostrada, autostradaBordo, principale, principaleBordo, strada, stradaBordo, sentiero, ferrovia;
   final String etichetta, etichettaAlone, luogo;
-  final String percorso, percorsoBordo, libera, piena, guasta, ignota, arrivo;
+  final String percorso, percorsoBordo, contorno;
+  final String libera, piena, guasta, ignota, arrivo;
 }
 
 const _chiaro = _Tavolozza(
@@ -72,8 +74,9 @@ const _chiaro = _Tavolozza(
   etichetta: '#475467',
   etichettaAlone: '#FFFFFF',
   luogo: '#1F2937',
-  percorso: '#2563EB',
-  percorsoBordo: '#FFFFFF',
+  percorso: '#2F6BFF',
+  percorsoBordo: '#1638A8',
+  contorno: '#FFFFFF',
   libera: '#16A34A',
   piena: '#D97706',
   guasta: '#DC2626',
@@ -101,8 +104,9 @@ const _scuro = _Tavolozza(
   etichetta: '#B8C4D6',
   etichettaAlone: '#0E1520',
   luogo: '#E5ECF5',
-  percorso: '#60A5FA',
-  percorsoBordo: '#0B1220',
+  percorso: '#4C8DFF',
+  percorsoBordo: '#0B2A73',
+  contorno: '#0B1220',
   libera: '#4ADE80',
   piena: '#FBBF24',
   guasta: '#F87171',
@@ -342,19 +346,54 @@ Map<String, Object> stileMappa({required bool scuro}) {
         },
         'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 1.5},
       },
+      // Il percorso: un alone morbido, il bordo blu scuro, la linea blu e le
+      // frecce della direzione. Sempre blu: nessuna strada ha quel colore.
+      {
+        'id': 'percorso-alone',
+        'type': 'line',
+        'source': sorgentePercorso,
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {'line-color': t.percorso, 'line-width': _largo(16, 40), 'line-blur': 10, 'line-opacity': 0.22},
+      },
       {
         'id': 'percorso-bordo',
         'type': 'line',
         'source': sorgentePercorso,
         'layout': {'line-cap': 'round', 'line-join': 'round'},
-        'paint': {'line-color': t.percorsoBordo, 'line-width': _largo(7, 22)},
+        'paint': {'line-color': t.percorsoBordo, 'line-width': _largo(8.5, 24)},
       },
       {
         'id': 'percorso',
         'type': 'line',
         'source': sorgentePercorso,
         'layout': {'line-cap': 'round', 'line-join': 'round'},
-        'paint': {'line-color': t.percorso, 'line-width': _largo(4.5, 16)},
+        'paint': {'line-color': t.percorso, 'line-width': _largo(5.5, 18)},
+      },
+      {
+        'id': 'percorso-frecce',
+        'type': 'symbol',
+        'source': sorgentePercorso,
+        'minzoom': 13,
+        'layout': {
+          'symbol-placement': 'line',
+          'symbol-spacing': 110,
+          'text-field': '›',
+          'text-font': ['Noto Sans Bold'],
+          'text-size': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            10,
+            14,
+            18,
+            26,
+          ],
+          'text-keep-upright': false,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+          'text-offset': [0, -0.1],
+        },
+        'paint': {'text-color': '#FFFFFF', 'text-opacity': 0.9},
       },
       {
         'id': 'gdanav-colonnine',
@@ -367,7 +406,7 @@ Map<String, Object> stileMappa({required bool scuro}) {
         'paint': {
           'circle-radius': 6.5,
           'circle-color': statoColore,
-          'circle-stroke-color': t.percorsoBordo,
+          'circle-stroke-color': t.contorno,
           'circle-stroke-width': 2,
         },
       },
@@ -379,7 +418,7 @@ Map<String, Object> stileMappa({required bool scuro}) {
         'paint': {
           'circle-radius': 14,
           'circle-color': statoColore,
-          'circle-stroke-color': t.percorsoBordo,
+          'circle-stroke-color': t.contorno,
           'circle-stroke-width': 3,
         },
       },
@@ -406,7 +445,7 @@ Map<String, Object> stileMappa({required bool scuro}) {
         'paint': {
           'circle-radius': 11,
           'circle-color': t.arrivo,
-          'circle-stroke-color': t.percorsoBordo,
+          'circle-stroke-color': t.contorno,
           'circle-stroke-width': 3.5,
         },
       },

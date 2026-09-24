@@ -22,10 +22,11 @@ Map<String, Map<String, Object?>> datiViaggio(Viaggio? v) {
   final linea = Linea(v.percorso.punti);
   return {
     sorgentePercorso: _collezione([
-      _elemento({
-        'type': 'LineString',
-        'coordinates': [for (final p in v.percorso.punti) _xy(p)],
-      }, const {}),
+      if (v.percorso.punti.length > 1)
+        _elemento({
+          'type': 'LineString',
+          'coordinates': [for (final p in v.percorso.punti) _xy(p)],
+        }, const {}),
     ]),
     sorgenteColonnine: _collezione([
       // Prima le colonnine comuni, poi le soste: così le soste stanno sopra.

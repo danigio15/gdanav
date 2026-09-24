@@ -18,6 +18,8 @@ class MappaViaggio extends StatefulWidget {
     required this.controllo,
     required this.onPuntoScelto,
     required this.onColonnina,
+    this.guida = false,
+    this.posizioneConcessa = true,
   });
 
   final GestoreViaggio gestore;
@@ -28,6 +30,12 @@ class MappaViaggio extends StatefulWidget {
 
   /// Tocco su una colonnina o una sosta.
   final ValueChanged<String> onColonnina;
+
+  /// In guida la mappa segue la posizione, inclinata e girata come l'auto.
+  final bool guida;
+
+  /// Senza permesso MapLibre non deve cercare la posizione.
+  final bool posizioneConcessa;
 
   @override
   State<MappaViaggio> createState() => _MappaViaggioState();
@@ -91,7 +99,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     for (final MapEntry(key: id, value: dati) in datiViaggio(viaggio).entries) {
       await m.setGeoJsonSource(id, dati.cast<String, dynamic>());
     }
-    if (viaggio == null) return;
+    if (viaggio == null || widget.guida) return;
     final (so, ne) = confini(viaggio)!;
     await m.animateCamera(
       CameraUpdate.newLatLngBounds(
@@ -110,8 +118,9 @@ class _MappaViaggioState extends State<MappaViaggio> {
     if (m == null) return;
     final trovati = await m.queryRenderedFeatures(punto, stratiToccabili, null);
     for (final f in trovati) {
-      final id = (f as Map)['properties']?['id'];
-      if (id is String) return widget.onColonnina(id);
+      // A seconda della piattaforma arriva già decodificata o come JSON.
+      final mappa = f is String ? jsonDecode(f) : f;
+      if (mappa case {'properties': {'id': final String id}}) return widget.onColonnina(id);
     }
   }
 
@@ -122,9 +131,14 @@ class _MappaViaggioState extends State<MappaViaggio> {
       // Cambia stile col tema: la chiave rifà la mappa.
       key: ValueKey(scuro),
       styleString: jsonEncode(stileMappa(scuro: scuro)),
-      initialCameraPosition: const CameraPosition(target: LatLng(41.9, 12.5), zoom: 5),
-      myLocationEnabled: true,
-      myLocationTrackingMode: MyLocationTrackingMode.tracking,
+      initialCameraPosition: widget.guida
+          ? const CameraPosition(target: LatLng(41.9, 12.5), zoom: 17, tilt: _inclinazione)
+          : const CameraPosition(target: LatLng(41.9, 12.5), zoom: 5),
+      myLocationEnabled: widget.posizioneConcessa,
+      myLocationTrackingMode: !widget.posizioneConcessa
+          ? MyLocationTrackingMode.none
+          : (widget.guida ? MyLocationTrackingMode.trackingGps : MyLocationTrackingMode.tracking),
+      myLocationRenderMode: widget.guida ? MyLocationRenderMode.gps : MyLocationRenderMode.normal,
       compassEnabled: true,
       attributionButtonPosition: AttributionButtonPosition.topLeft,
       attributionButtonMargins: const Point(12, 200),
@@ -132,7 +146,11 @@ class _MappaViaggioState extends State<MappaViaggio> {
       onStyleLoadedCallback: () {
         _stileCaricato = true;
         _disegnato = null;
-        if (_mappa case final m?) _edifici(m);
+        if (_mappa case final m?) {
+          _inclinata = widget.controllo.inclinata;
+          _edifici(m);
+          if (widget.guida) m.animateCamera(CameraUpdate.tiltTo(_inclinazione));
+        }
         _ridisegna();
       },
       onMapClick: (p, _) => _tocco(p),
