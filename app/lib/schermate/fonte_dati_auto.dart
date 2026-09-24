@@ -3,6 +3,7 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import '../stato/gestore_auto.dart';
 import '../componenti/indicatore_batteria.dart';
+import 'scegli_dongle.dart';
 
 /// Lo switch «Fonte dati auto»: Automatica, oppure una sorgente fissa.
 Future<void> mostraFonteDatiAuto(BuildContext context, GestoreAuto gestore) {
@@ -54,6 +55,8 @@ class FonteDatiAuto extends StatelessWidget {
                     subtitle: gestore.disponibili.contains(t) ? null : const Text('Non collegata'),
                   ),
                 const Divider(),
+                _Dongle(gestore: gestore),
+                const Divider(),
                 _BatteriaManuale(gestore: gestore),
               ],
             ),
@@ -95,6 +98,41 @@ class _BatteriaManualeState extends State<_BatteriaManuale> {
             onPressed: () => widget.gestore.manuale.imposta(_valore),
             child: Text('Batteria ${_valore.round()}%'),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Il dongle OBD: quale, se dà dati, e come cambiarlo.
+class _Dongle extends StatelessWidget {
+  const _Dongle({required this.gestore});
+
+  final GestoreAuto gestore;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = gestore.dongle;
+    void scegli() => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ScegliDongle(auto: gestore)));
+    if (d == null) {
+      return ListTile(
+        leading: const Icon(Icons.cable),
+        title: const Text('Dongle OBD Bluetooth'),
+        subtitle: const Text('Batteria, velocità e temperatura dalla presa OBD, come ABRP'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: scegli,
+      );
+    }
+    final dati = gestore.stato?.sorgente == TipoSorgente.obd;
+    return ListTile(
+      leading: const Icon(Icons.cable),
+      title: Text(d.nome.isEmpty ? 'Dongle OBD' : d.nome),
+      subtitle: Text(dati ? 'Dà i dati dell\'auto' : (gestore.erroreObd ?? 'In attesa dell\'auto accesa')),
+      trailing: PopupMenuButton<String>(
+        onSelected: (v) => v == 'cambia' ? scegli() : gestore.togliDongle(),
+        itemBuilder: (_) => const [
+          PopupMenuItem(value: 'cambia', child: Text('Cambia dongle')),
+          PopupMenuItem(value: 'togli', child: Text('Togli')),
         ],
       ),
     );

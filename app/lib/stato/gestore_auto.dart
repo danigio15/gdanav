@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
+import '../sorgenti/canale_ble.dart';
 import '../sorgenti/sorgente_android_auto.dart';
 import '../sorgenti/sorgente_manuale.dart';
 import 'archivio.dart';
@@ -10,8 +11,20 @@ import 'archivio.dart';
 /// Tiene accese le sorgenti dei dati dell'auto e dice all'interfaccia
 /// quale stato vale adesso, secondo lo switch «Fonte dati auto».
 class GestoreAuto extends ChangeNotifier {
-  GestoreAuto({required this.archivio})
-    : arbitro = ArbitroSorgenti(capacitaUtileKwh: ProfiloVeicolo.esempio.capacitaUtileKwh);
+  GestoreAuto({required this.archivio, Future<CanaleObd> Function(String id)? apriObd})
+    : arbitro = ArbitroSorgenti(capacitaUtileKwh: ProfiloVeicolo.esempio.capacitaUtileKwh),
+      _apriObd = apriObd ?? CanaleBle.apri;
+
+  final Future<CanaleObd> Function(String id) _apriObd;
+
+  /// Il dongle OBD scelto, se c'è.
+  ({String id, String nome})? dongle;
+
+  /// Perché il dongle non dà dati, in parole; `null` se va.
+  String? get erroreObd => switch (_sorgenti[TipoSorgente.obd]) {
+    final SorgenteObd s => s.ultimoErrore,
+    _ => null,
+  };
 
   final Archivio archivio;
   final ArbitroSorgenti arbitro;
@@ -47,6 +60,8 @@ class GestoreAuto extends ChangeNotifier {
     await _accendi(manuale);
     await _accendi(SorgenteAndroidAuto(onVelocita: _velocita));
     if (abbinamento != null) await _accendi(SorgenteHomeAssistant(ClienteRelay(abbinamento!)));
+    dongle = await archivio.dongleObd();
+    if (dongle != null) unawaited(_accendiObd());
     // Anche senza letture nuove l'età del dato cambia: si ricalcola ogni tanto.
     _orologio = Timer.periodic(const Duration(seconds: 5), (_) => _aggiorna());
   }
@@ -86,6 +101,30 @@ class GestoreAuto extends ChangeNotifier {
     await _spegni(TipoSorgente.homeAssistant);
     abbinamento = null;
     await archivio.salvaAbbinamento(null);
+    notifyListeners();
+  }
+
+  /// Il dongle col profilo della marca dell'auto (quello standard se non
+  /// c'è ancora uno specifico).
+  Future<void> _accendiObd() async {
+    final d = dongle;
+    if (d == null) return;
+    await _accendi(SorgenteObd(apri: () => _apriObd(d.id), profilo: profiloPerMarca(veicolo.marca)));
+    notifyListeners();
+  }
+
+  Future<void> usaDongle(String id, String nome) async {
+    await _spegni(TipoSorgente.obd);
+    dongle = (id: id, nome: nome);
+    await archivio.salvaDongleObd(dongle);
+    notifyListeners();
+    await _accendiObd();
+  }
+
+  Future<void> togliDongle() async {
+    await _spegni(TipoSorgente.obd);
+    dongle = null;
+    await archivio.salvaDongleObd(null);
     notifyListeners();
   }
 

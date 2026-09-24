@@ -1,7 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav/sorgenti/sorgente_android_auto.dart';
+import 'package:gdanav/stato/archivio.dart';
+import 'package:gdanav/stato/gestore_auto.dart';
 import 'package:gdanav_core/gdanav_core.dart';
+
+import 'aiuti.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -48,4 +54,39 @@ void main() {
     expect(letture.single.batteria, 60);
     await sorgente.ferma();
   });
+
+  test('un dongle OBD scelto dà i dati dell\'auto e resta salvato', () async {
+    preparaPiattaforma();
+    final dongle = _DongleFinto({'015B': '7E803415BA3', '010D': '7E803410D3C'});
+    final auto = GestoreAuto(archivio: Archivio(), apriObd: (_) async => dongle);
+    await auto.avvia();
+    await auto.usaDongle('AA:BB', 'Vgate iCar Pro');
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(auto.stato!.sorgente, TipoSorgente.obd);
+    expect(auto.stato!.batteria, closeTo(64, 0.1));
+    expect(auto.velocitaAuto(), 60);
+    expect((await Archivio().dongleObd())!.nome, 'Vgate iCar Pro');
+    await auto.togliDongle();
+    expect(await Archivio().dongleObd(), isNull);
+    auto.dispose();
+  });
+}
+
+class _DongleFinto implements CanaleObd {
+  _DongleFinto(this.risposte);
+  final Map<String, String> risposte;
+  final _in = StreamController<String>.broadcast();
+
+  @override
+  Stream<String> get ricevuti => _in.stream;
+
+  @override
+  Future<void> scrivi(String testo) async {
+    final c = testo.trim();
+    final r = risposte[c] ?? (c.startsWith('AT') ? 'OK' : 'NO DATA');
+    Future<void>.delayed(Duration.zero, () => _in.add('$r\r>'));
+  }
+
+  @override
+  Future<void> chiudi() async {}
 }

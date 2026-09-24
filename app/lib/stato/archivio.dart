@@ -83,6 +83,22 @@ class Archivio {
 
   Future<void> salvaLuoghi(Map<String, Object?> j) => _p.write(key: _luoghi, value: jsonEncode(j));
 
+  /// Il dongle OBD Bluetooth scelto: indirizzo e nome.
+  Future<({String id, String nome})?> dongleObd() async {
+    final testo = await _p.read(key: 'dongle_obd');
+    if (testo == null) return null;
+    try {
+      final j = jsonDecode(testo) as Map<String, Object?>;
+      return (id: j['id']! as String, nome: j['nome'] as String? ?? '');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> salvaDongleObd(({String id, String nome})? d) => d == null
+      ? _p.delete(key: 'dongle_obd')
+      : _p.write(key: 'dongle_obd', value: jsonEncode({'id': d.id, 'nome': d.nome}));
+
   /// Il consumo imparato di un modello.
   Future<ConsumoImparato> consumo(String veicolo) async {
     final testo = await _p.read(key: 'consumo_$veicolo');
