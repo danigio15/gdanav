@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav/componenti/tachimetro.dart';
+import 'package:gdanav/schermate/diagnosi_auto.dart';
+import 'package:gdanav/tema.dart';
 import 'package:gdanav/schermate/cerca_destinazione.dart';
 import 'package:gdanav/stato/archivio.dart';
 import 'package:gdanav/stato/gestore_posizione.dart';
@@ -239,5 +241,29 @@ void main() {
     expect(int.parse(testo('batteria-arrivo').replaceAll('%', '')), inInclusiveRange(arrivo - 5, arrivo - 3));
     await tester.tap(find.text('Fine'));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('la diagnosi di Android Auto dice cosa vede il telefono', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: temaGdanav(Brightness.light),
+        home: const Scaffold(
+          body: DiagnosiAuto(
+            dati: {
+              'servizio': true,
+              'navigazione': true,
+              'descrittore': true,
+              'androidAuto': '15.2.1',
+              'installatore': null,
+              'android': '15',
+              'telefono': 'samsung SM-S921B',
+            },
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Registrato come app di navigazione'), findsOneWidget);
+    expect(find.text('Versione 15.2.1'), findsOneWidget);
+    expect(find.text('file APK (fuori dal Play Store)'), findsOneWidget);
   });
 }

@@ -12,3 +12,6 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# La chiave degli APK d’anteprima sì: serve alla CI per firmare sempre uguale.
+!app/anteprima.jks

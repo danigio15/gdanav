@@ -30,11 +30,24 @@ android {
         versionName = flutter.versionName
     }
 
+    // Una chiave fissa per gli APK d'anteprima: con la chiave di debug che la
+    // CI rigenera a ogni build, Android rifiuta l'aggiornamento («App non
+    // installata»). Per il Play Store ci sarà la chiave vera, fuori dalla repo.
+    signingConfigs {
+        create("anteprima") {
+            storeFile = file("anteprima.jks")
+            storePassword = "gdanav-anteprima"
+            keyAlias = "gdanav"
+            keyPassword = "gdanav-anteprima"
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("anteprima")
+        }
+        debug {
+            signingConfig = signingConfigs.getByName("anteprima")
         }
     }
 }

@@ -3,6 +3,7 @@ package it.gdanav.gdanav
 import android.content.Context
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import it.gdanav.gdanav.auto.Diagnosi
 import it.gdanav.gdanav.auto.MotoreFlutter
 import it.gdanav.gdanav.auto.PonteAuto
 
@@ -17,5 +18,6 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         // Il filo fra l'app sul telefono e lo schermo dell'auto.
         PonteAuto.collega(flutterEngine.dartExecutor.binaryMessenger)
+        Diagnosi.collega(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
     }
 }

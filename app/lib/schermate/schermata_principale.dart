@@ -15,6 +15,7 @@ import '../stato/gestore_viaggio.dart';
 import 'abbina_home_assistant.dart';
 import 'cerca_destinazione.dart';
 import 'dettaglio_colonnina.dart';
+import 'diagnosi_auto.dart';
 import 'fonte_dati_auto.dart';
 import 'la_tua_auto.dart';
 import 'pannello_partenza.dart';
@@ -260,6 +261,15 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                 titolo: 'Home Assistant',
                 sotto: ha == null ? 'Non collegata' : 'Collegata${ha.nomeAuto.isEmpty ? '' : ' a ${ha.nomeAuto}'}',
                 onTap: () => vai(AbbinaHomeAssistant(gestore: widget.auto)),
+              ),
+              _VoceMenu(
+                icona: Icons.directions_car_filled_outlined,
+                titolo: 'Android Auto',
+                sotto: 'Controlla perché non compare sull\'auto',
+                onTap: () {
+                  Navigator.of(contesto).pop();
+                  mostraDiagnosiAuto(context);
+                },
               ),
               const SizedBox(height: 8),
             ],
