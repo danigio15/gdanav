@@ -65,12 +65,9 @@ const _pagineGiuste = {
   'MG IM5': ['IM L6', 'IM Motors L6'],
   'MG IM6': ['IM LS6', 'IM Motors LS6'],
   'Lancia Ypsilon HF': ['Lancia Ypsilon (2024)', 'Lancia Ypsilon'],
-  'Alpine A290': ['Alpine A290'],
   'Abarth 600e': ['Abarth 600e', 'Fiat 600 (2023)'],
-  'Fiat E-Ulysse': ['Fiat Ulysse', 'Fiat Scudo'],
   'Mercedes-Benz AMG EQE 53 +': ['Mercedes-Benz EQE'],
   'Mercedes-Benz EQV 300': ['Mercedes-Benz V-Class'],
-  'Mercedes-Benz EQT': ['Mercedes-Benz T-Class'],
   'Nissan Townstar EV': ['Nissan Townstar'],
   'Toyota Proace Verso Electric': ['Toyota ProAce'],
   'Toyota Proace City Verso Electric': ['Toyota ProAce City'],
@@ -78,6 +75,16 @@ const _pagineGiuste = {
   'Peugeot iOn': ['Peugeot iOn', 'Mitsubishi i-MiEV'],
   'Škoda Citigo e iV': ['Škoda Citigo'],
   'GWM ORA 03': ['Ora 03', 'Ora Good Cat', 'Great Wall Ora Good Cat'],
+  // La i3 di prima, non la berlina del 2026.
+  'BMW i3 94 Ah': ['BMW i3 (hatchback)'],
+  'BMW i3 120 Ah': ['BMW i3 (hatchback)'],
+  'BMW i3s 120 Ah': ['BMW i3 (hatchback)'],
+  'Audi SQ8 e-tron': ['Audi Q8 e-tron'],
+  // Senza una foto giusta: meglio l'auto disegnata.
+  'Alpine A290': [],
+  'Fiat E-Ulysse': [],
+  'Mercedes-Benz EQT': [],
+  'Jeep Compass Elettrica': [],
 };
 
 /// Le foto buone: niente loghi né disegni.
@@ -107,6 +114,7 @@ List<String> _candidate(String t, String marca) {
 Future<(String, String)?> pagina(ProfiloVeicolo v) async {
   final t = termine(v);
   final candidate = _candidate(t, v.marca);
+  if (candidate.isEmpty) return null;
   final esatte = await _chiedi('en.wikipedia.org', {
     'action': 'query',
     'titles': candidate.join('|'),
