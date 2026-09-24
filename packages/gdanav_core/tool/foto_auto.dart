@@ -97,7 +97,8 @@ String _chiaveModello(String termine, String marca) {
 /// una parola alla volta dalla fine («Škoda Elroq 50» → «Škoda Elroq»).
 List<String> _candidate(String t, String marca) {
   if (_pagineGiuste[t] case final giuste?) return giuste;
-  final parole = t.split(' ');
+  // «#», «|», le parentesi: nei titoli di Wikipedia non ci possono stare.
+  final parole = t.replaceAll(RegExp(r'[#<>\[\]{}|+]'), ' ').trim().split(RegExp(r'\s+'));
   final n = marca.split(' ').length;
   return [for (var i = parole.length; i > n; i--) parole.sublist(0, i).join(' ')];
 }
@@ -168,12 +169,28 @@ String _testo(Object? html) => '${html ?? ''}'
     .trim();
 
 Future<void> main(List<String> argomenti) async {
+  try {
+    await _main(argomenti);
+  } catch (e, st) {
+    stdout.writeln('::error title=Foto delle auto::${'$e'.split('\n').first} ${'$st'.split('\n').take(3).join(' | ')}');
+    exitCode = 1;
+  }
+  _http.close();
+}
+
+Future<void> _main(List<String> argomenti) async {
   final uscita = File(argomenti.isEmpty ? 'foto_auto.json' : argomenti.first);
   final trovate = <String, (String, String)>{};
   final perTermine = <String, (String, String)?>{};
   for (final v in catalogoVeicoli) {
     final t = termine(v);
-    final p = perTermine.containsKey(t) ? perTermine[t] : (perTermine[t] = await pagina(v));
+    (String, String)? p;
+    try {
+      p = perTermine.containsKey(t) ? perTermine[t] : (perTermine[t] = await pagina(v));
+    } catch (e) {
+      final riga = '$e'.split('\n').first;
+      stdout.writeln('::warning title=Foto ${v.id}::$riga');
+    }
     if (p != null) trovate[v.id] = p;
     stdout.writeln('${v.id}\t$t\t${p?.$1 ?? '-'}\t${p?.$2 ?? ''}');
   }
@@ -217,5 +234,4 @@ Future<void> main(List<String> argomenti) async {
   }
   await uscita.writeAsString(const JsonEncoder.withIndent('  ').convert(risultato));
   stdout.writeln('::notice title=Foto delle auto::${risultato.length} di ${catalogoVeicoli.length}');
-  _http.close();
 }
