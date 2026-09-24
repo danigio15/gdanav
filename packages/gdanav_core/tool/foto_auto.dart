@@ -54,7 +54,7 @@ String _semplice(String s) => s
 
 /// Dove il nome porta all'auto sbagliata (la Capri del 1969, l'Explorer
 /// americano a benzina): le sole pagine da provare.
-const _pagineGiuste = {
+const _pagineGiuste = <String, List<String>>{
   'Ford Capri': ['Ford Capri (2024)', 'Ford Capri EV', 'Ford Capri (electric)'],
   'Ford Explorer': ['Ford Explorer EV', 'Ford Explorer (electric)'],
   'Ford E-Tourneo Custom': ['Ford Transit Custom'],
