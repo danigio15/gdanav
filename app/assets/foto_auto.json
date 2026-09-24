@@ -1,1 +1,2858 @@
-{}
+{
+  "abarth-500e": {
+    "pagina": "Fiat 500e",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8a/Fiat-500-vorne2.jpg/500px-Fiat-500-vorne2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Fiat-500-vorne2.jpg",
+    "autore": "Daniel Przygoda",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "abarth-600e": {
+    "pagina": "Fiat 600 (2023)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7f/Fiat_600_Hybrid_1.2_T3_Pop_%28III%29_%E2%80%93_f_24032026.jpg/500px-Fiat_600_Hybrid_1.2_T3_Pop_%28III%29_%E2%80%93_f_24032026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Fiat_600_Hybrid_1.2_T3_Pop_(III)_%E2%80%93_f_24032026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "aiways-u5": {
+    "pagina": "Aiways U5",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/89/Aiways_U5_IMG_4448.jpg/500px-Aiways_U5_IMG_4448.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Aiways_U5_IMG_4448.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "aiways-u6": {
+    "pagina": "Aiways U6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/04/Aiways_U6_Auto_Zuerich_2023_1X7A1153.jpg/500px-Aiways_U6_Auto_Zuerich_2023_1X7A1153.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Aiways_U6_Auto_Zuerich_2023_1X7A1153.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "alfa-romeo-junior-elettrica": {
+    "pagina": "Alfa Romeo Junior (2024)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c9/Alfa_Romeo_Junior_Ibrida_DSC_7219.jpg/500px-Alfa_Romeo_Junior_Ibrida_DSC_7219.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Alfa_Romeo_Junior_Ibrida_DSC_7219.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "alpine-a390": {
+    "pagina": "Alpine A390",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/95/Alpine_A390_GT_%E2%80%93_f_11042026.jpg/500px-Alpine_A390_GT_%E2%80%93_f_11042026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Alpine_A390_GT_%E2%80%93_f_11042026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "audi-a6-e-tron-83": {
+    "pagina": "Audi A6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/eb/Audi_A6_C9_IAA_2025_DSC_1920.jpg/500px-Audi_A6_C9_IAA_2025_DSC_1920.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Audi_A6_C9_IAA_2025_DSC_1920.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-a6-sportback-e-tron": {
+    "pagina": "Audi A6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/eb/Audi_A6_C9_IAA_2025_DSC_1920.jpg/500px-Audi_A6_C9_IAA_2025_DSC_1920.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Audi_A6_C9_IAA_2025_DSC_1920.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-a6-avant-e-tron": {
+    "pagina": "Audi A6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/eb/Audi_A6_C9_IAA_2025_DSC_1920.jpg/500px-Audi_A6_C9_IAA_2025_DSC_1920.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Audi_A6_C9_IAA_2025_DSC_1920.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-e-tron-50": {
+    "pagina": "Audi e-tron",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/2020_Audi_e-Tron_Sport_50_Quattro.jpg/500px-2020_Audi_e-Tron_Sport_50_Quattro.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Audi_e-Tron_Sport_50_Quattro.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-e-tron-55": {
+    "pagina": "Audi e-tron",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/2020_Audi_e-Tron_Sport_50_Quattro.jpg/500px-2020_Audi_e-Tron_Sport_50_Quattro.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Audi_e-Tron_Sport_50_Quattro.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-e-tron-sportback-50": {
+    "pagina": "Audi Q8 e-tron",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/2020_Audi_e-Tron_Sport_50_Quattro.jpg/500px-2020_Audi_e-Tron_Sport_50_Quattro.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Audi_e-Tron_Sport_50_Quattro.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-e-tron-sportback-55": {
+    "pagina": "Audi Q8 e-tron",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/2020_Audi_e-Tron_Sport_50_Quattro.jpg/500px-2020_Audi_e-Tron_Sport_50_Quattro.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Audi_e-Tron_Sport_50_Quattro.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-e-tron-gt": {
+    "pagina": "Audi e-tron GT",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/Audi_e-tron_GT_IMG_5689.jpg/500px-Audi_e-tron_GT_IMG_5689.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Audi_e-tron_GT_IMG_5689.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-rs-e-tron-gt": {
+    "pagina": "Audi e-tron GT",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/Audi_e-tron_GT_IMG_5689.jpg/500px-Audi_e-tron_GT_IMG_5689.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Audi_e-tron_GT_IMG_5689.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-s-e-tron-gt-2025": {
+    "pagina": "Audi S and RS models",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/RS_S_AA.png/500px-RS_S_AA.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:RS_S_AA.png",
+    "autore": "Anton V.",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-q4-e-tron-35": {
+    "pagina": "Audi Q4 e-tron",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/05/2021_Audi_Q4_e-tron_Sport_35.jpg/500px-2021_Audi_Q4_e-tron_Sport_35.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_Audi_Q4_e-tron_Sport_35.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-q4-e-tron-40": {
+    "pagina": "Audi Q4 e-tron",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/05/2021_Audi_Q4_e-tron_Sport_35.jpg/500px-2021_Audi_Q4_e-tron_Sport_35.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_Audi_Q4_e-tron_Sport_35.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-q4-e-tron-45": {
+    "pagina": "Audi Q4 e-tron",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/05/2021_Audi_Q4_e-tron_Sport_35.jpg/500px-2021_Audi_Q4_e-tron_Sport_35.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_Audi_Q4_e-tron_Sport_35.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-q4-e-tron-50": {
+    "pagina": "Audi Q4 e-tron",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/05/2021_Audi_Q4_e-tron_Sport_35.jpg/500px-2021_Audi_Q4_e-tron_Sport_35.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_Audi_Q4_e-tron_Sport_35.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-q4-sportback-e-tron-45": {
+    "pagina": "Audi Q4 e-tron",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/05/2021_Audi_Q4_e-tron_Sport_35.jpg/500px-2021_Audi_Q4_e-tron_Sport_35.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_Audi_Q4_e-tron_Sport_35.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-q6-e-tron-83": {
+    "pagina": "Audi Q6 e-tron",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a7/Audi_Q6_e-tron_DSC_7829.jpg/500px-Audi_Q6_e-tron_DSC_7829.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Audi_Q6_e-tron_DSC_7829.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-q6-e-tron-performance": {
+    "pagina": "Audi Q6 e-tron",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a7/Audi_Q6_e-tron_DSC_7829.jpg/500px-Audi_Q6_e-tron_DSC_7829.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Audi_Q6_e-tron_DSC_7829.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-q6-e-tron-quattro": {
+    "pagina": "Audi Q6 e-tron",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a7/Audi_Q6_e-tron_DSC_7829.jpg/500px-Audi_Q6_e-tron_DSC_7829.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Audi_Q6_e-tron_DSC_7829.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-q6-sportback-e-tron": {
+    "pagina": "Audi Q6 e-tron",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a7/Audi_Q6_e-tron_DSC_7829.jpg/500px-Audi_Q6_e-tron_DSC_7829.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Audi_Q6_e-tron_DSC_7829.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-q8-e-tron-50": {
+    "pagina": "Audi Q8 e-tron",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/2020_Audi_e-Tron_Sport_50_Quattro.jpg/500px-2020_Audi_e-Tron_Sport_50_Quattro.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Audi_e-Tron_Sport_50_Quattro.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-q8-e-tron-55": {
+    "pagina": "Audi Q8 e-tron",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/2020_Audi_e-Tron_Sport_50_Quattro.jpg/500px-2020_Audi_e-Tron_Sport_50_Quattro.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Audi_e-Tron_Sport_50_Quattro.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-q8-sportback-e-tron-55": {
+    "pagina": "Audi Q8",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3f/2018_Audi_Q8_S_Line_50_TDi_Quattro_3.0_Front.jpg/500px-2018_Audi_Q8_S_Line_50_TDi_Quattro_3.0_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2018_Audi_Q8_S_Line_50_TDi_Quattro_3.0_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "audi-sq8-e-tron": {
+    "pagina": "Audi Q8 e-tron",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/2020_Audi_e-Tron_Sport_50_Quattro.jpg/500px-2020_Audi_e-Tron_Sport_50_Quattro.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Audi_e-Tron_Sport_50_Quattro.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-i3-94ah": {
+    "pagina": "BMW i3 (hatchback)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/98/2018_BMW_i3_facelift_%281%29.jpg/500px-2018_BMW_i3_facelift_%281%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2018_BMW_i3_facelift_(1).jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-i3-120ah": {
+    "pagina": "BMW i3 (hatchback)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/98/2018_BMW_i3_facelift_%281%29.jpg/500px-2018_BMW_i3_facelift_%281%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2018_BMW_i3_facelift_(1).jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-i3s-120ah": {
+    "pagina": "BMW i3 (hatchback)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/98/2018_BMW_i3_facelift_%281%29.jpg/500px-2018_BMW_i3_facelift_%281%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2018_BMW_i3_facelift_(1).jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-i4-edrive35": {
+    "pagina": "BMW i4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ad/BMW_i4_IMG_6695.jpg/500px-BMW_i4_IMG_6695.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_i4_IMG_6695.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-i4-40": {
+    "pagina": "BMW i4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ad/BMW_i4_IMG_6695.jpg/500px-BMW_i4_IMG_6695.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_i4_IMG_6695.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-i4-m50": {
+    "pagina": "BMW i4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ad/BMW_i4_IMG_6695.jpg/500px-BMW_i4_IMG_6695.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_i4_IMG_6695.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-i5-edrive40": {
+    "pagina": "BMW 5 Series (G60)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/86/BMW_G60_520i_1X7A2443.jpg/500px-BMW_G60_520i_1X7A2443.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_G60_520i_1X7A2443.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-i5-m60": {
+    "pagina": "BMW 5 Series (G60)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/86/BMW_G60_520i_1X7A2443.jpg/500px-BMW_G60_520i_1X7A2443.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_G60_520i_1X7A2443.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-i5-touring-edrive40": {
+    "pagina": "BMW 5 Series (G60)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/86/BMW_G60_520i_1X7A2443.jpg/500px-BMW_G60_520i_1X7A2443.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_G60_520i_1X7A2443.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-i7-edrive50": {
+    "pagina": "BMW 7 Series (G70)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a4/BMW_7-Series_%28G70%29_750e_IMG_9358.jpg/500px-BMW_7-Series_%28G70%29_750e_IMG_9358.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_7-Series_(G70)_750e_IMG_9358.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-i7-xdrive60": {
+    "pagina": "BMW 7 Series (G70)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a4/BMW_7-Series_%28G70%29_750e_IMG_9358.jpg/500px-BMW_7-Series_%28G70%29_750e_IMG_9358.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_7-Series_(G70)_750e_IMG_9358.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-ix-xdrive40": {
+    "pagina": "BMW iX",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/BMW_iX_IAA_2021_1X7A0204.jpg/500px-BMW_iX_IAA_2021_1X7A0204.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_iX_IAA_2021_1X7A0204.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-ix-xdrive45": {
+    "pagina": "BMW iX",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/BMW_iX_IAA_2021_1X7A0204.jpg/500px-BMW_iX_IAA_2021_1X7A0204.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_iX_IAA_2021_1X7A0204.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-ix-xdrive50": {
+    "pagina": "BMW iX",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/BMW_iX_IAA_2021_1X7A0204.jpg/500px-BMW_iX_IAA_2021_1X7A0204.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_iX_IAA_2021_1X7A0204.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-ix-xdrive60": {
+    "pagina": "BMW iX",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/BMW_iX_IAA_2021_1X7A0204.jpg/500px-BMW_iX_IAA_2021_1X7A0204.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_iX_IAA_2021_1X7A0204.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-ix-m60": {
+    "pagina": "BMW iX",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/BMW_iX_IAA_2021_1X7A0204.jpg/500px-BMW_iX_IAA_2021_1X7A0204.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_iX_IAA_2021_1X7A0204.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-ix1-edrive20": {
+    "pagina": "BMW X1 (U11)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/65/2022_BMW_X1_sDrive18d_M_Sport_MHEV_Automatic_2.0.jpg/500px-2022_BMW_X1_sDrive18d_M_Sport_MHEV_Automatic_2.0.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2022_BMW_X1_sDrive18d_M_Sport_MHEV_Automatic_2.0.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-ix1-xdrive30": {
+    "pagina": "BMW X1 (U11)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/65/2022_BMW_X1_sDrive18d_M_Sport_MHEV_Automatic_2.0.jpg/500px-2022_BMW_X1_sDrive18d_M_Sport_MHEV_Automatic_2.0.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2022_BMW_X1_sDrive18d_M_Sport_MHEV_Automatic_2.0.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-ix2-edrive20": {
+    "pagina": "BMW X2",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e9/BMW_U10_1X7A2456.jpg/500px-BMW_U10_1X7A2456.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_U10_1X7A2456.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-ix2-xdrive30": {
+    "pagina": "BMW X2",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e9/BMW_U10_1X7A2456.jpg/500px-BMW_U10_1X7A2456.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_U10_1X7A2456.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "bmw-ix3-2021": {
+    "pagina": "BMW iX3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a6/BMW_iX3_50_xDrive_M_Sportpaket_Pro_%28NA5%29_%E2%80%93_f_17052026.jpg/500px-BMW_iX3_50_xDrive_M_Sportpaket_Pro_%28NA5%29_%E2%80%93_f_17052026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_iX3_50_xDrive_M_Sportpaket_Pro_(NA5)_%E2%80%93_f_17052026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "bmw-ix3-50-xdrive": {
+    "pagina": "BMW iX3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a6/BMW_iX3_50_xDrive_M_Sportpaket_Pro_%28NA5%29_%E2%80%93_f_17052026.jpg/500px-BMW_iX3_50_xDrive_M_Sportpaket_Pro_%28NA5%29_%E2%80%93_f_17052026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BMW_iX3_50_xDrive_M_Sportpaket_Pro_(NA5)_%E2%80%93_f_17052026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "byd-atto2-45": {
+    "pagina": "BYD Atto 2",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/21/BYD_Atto_2_IAA_2025_DSC_2131.jpg/500px-BYD_Atto_2_IAA_2025_DSC_2131.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BYD_Atto_2_IAA_2025_DSC_2131.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "byd-atto2-64": {
+    "pagina": "BYD Atto 2",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/21/BYD_Atto_2_IAA_2025_DSC_2131.jpg/500px-BYD_Atto_2_IAA_2025_DSC_2131.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BYD_Atto_2_IAA_2025_DSC_2131.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "byd-atto3": {
+    "pagina": "BYD Atto 3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3e/BYD_Atto_3_1X7A6491.jpg/500px-BYD_Atto_3_1X7A6491.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BYD_Atto_3_1X7A6491.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "byd-dolphin-44": {
+    "pagina": "BYD Dolphin",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/60/2021_BYD_Dolphin_EV_%28front%29.jpg/500px-2021_BYD_Dolphin_EV_%28front%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_BYD_Dolphin_EV_(front).jpg",
+    "autore": "User3204",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "byd-dolphin-60": {
+    "pagina": "BYD Dolphin",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/60/2021_BYD_Dolphin_EV_%28front%29.jpg/500px-2021_BYD_Dolphin_EV_%28front%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_BYD_Dolphin_EV_(front).jpg",
+    "autore": "User3204",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "byd-dolphin-surf-30": {
+    "pagina": "BYD Seagull",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/09/2023_%D0%92YD_Seagull_%28front%29.jpg/500px-2023_%D0%92YD_Seagull_%28front%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2023_%D0%92YD_Seagull_(front).jpg",
+    "autore": "User3204",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "byd-dolphin-surf-43": {
+    "pagina": "BYD Seagull",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/09/2023_%D0%92YD_Seagull_%28front%29.jpg/500px-2023_%D0%92YD_Seagull_%28front%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2023_%D0%92YD_Seagull_(front).jpg",
+    "autore": "User3204",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "byd-han": {
+    "pagina": "BYD Han",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/2023_BYD_Han_DM-i_%28facelift%29%2C_front_8.17.23.jpg/500px-2023_BYD_Han_DM-i_%28facelift%29%2C_front_8.17.23.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2023_BYD_Han_DM-i_(facelift),_front_8.17.23.jpg",
+    "autore": "Kevauto",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "byd-seal-82": {
+    "pagina": "BYD Seal",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/60/2022_BYD_Seal.jpg/500px-2022_BYD_Seal.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2022_BYD_Seal.jpg",
+    "autore": "User3204",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "byd-seal-awd": {
+    "pagina": "BYD Seal",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/60/2022_BYD_Seal.jpg/500px-2022_BYD_Seal.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2022_BYD_Seal.jpg",
+    "autore": "User3204",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "byd-seal-u-71": {
+    "pagina": "BYD Song Plus",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/2023_BYD_Song_Plus_DM-i_%28front%29.jpg/500px-2023_BYD_Song_Plus_DM-i_%28front%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2023_BYD_Song_Plus_DM-i_(front).jpg",
+    "autore": "User3204",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "byd-seal-u-87": {
+    "pagina": "BYD Song Plus",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/2023_BYD_Song_Plus_DM-i_%28front%29.jpg/500px-2023_BYD_Song_Plus_DM-i_%28front%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2023_BYD_Song_Plus_DM-i_(front).jpg",
+    "autore": "User3204",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "byd-sealion-7-82": {
+    "pagina": "BYD Sealion 7",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/65/2025_BYD_Sealion_7_Performance_front.jpg/500px-2025_BYD_Sealion_7_Performance_front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2025_BYD_Sealion_7_Performance_front.jpg",
+    "autore": "LuvsMG481",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "byd-sealion-7-91": {
+    "pagina": "BYD Sealion 7",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/65/2025_BYD_Sealion_7_Performance_front.jpg/500px-2025_BYD_Sealion_7_Performance_front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2025_BYD_Sealion_7_Performance_front.jpg",
+    "autore": "LuvsMG481",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "byd-tang": {
+    "pagina": "BYD Tang",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bb/BYD_Tang_DM-p_front_quarter_trimmed_2.jpg/500px-BYD_Tang_DM-p_front_quarter_trimmed_2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:BYD_Tang_DM-p_front_quarter_trimmed_2.jpg",
+    "autore": "BYD Tang DM-p front quarter.jpg: Taylormilan3216 derivative work: Mariordo (Mar…",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "citroen-c-zero": {
+    "pagina": "Citroën C-Zero",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bd/Citroen_C-Zero.JPG/500px-Citroen_C-Zero.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Citroen_C-Zero.JPG",
+    "autore": "Thomas doerfer",
+    "licenza": "CC BY 3.0"
+  },
+  "citroen-e-c3": {
+    "pagina": "Citroën C3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/55/Citro%C3%ABn_C3_Hybrid_110_%C3%AB-DSC6_Max_%28IV%29_%E2%80%93_f_05042026.jpg/500px-Citro%C3%ABn_C3_Hybrid_110_%C3%AB-DSC6_Max_%28IV%29_%E2%80%93_f_05042026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Citro%C3%ABn_C3_Hybrid_110_%C3%AB-DSC6_Max_(IV)_%E2%80%93_f_05042026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "citroen-e-c3-aircross": {
+    "pagina": "Citroën C3 Aircross",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/be/Citro%C3%ABn_%C3%AB-C3_Aircross_IMG_3525.jpg/500px-Citro%C3%ABn_%C3%AB-C3_Aircross_IMG_3525.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Citro%C3%ABn_%C3%AB-C3_Aircross_IMG_3525.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "citroen-e-c3-aircross-lr": {
+    "pagina": "Citroën C3 Aircross",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/be/Citro%C3%ABn_%C3%AB-C3_Aircross_IMG_3525.jpg/500px-Citro%C3%ABn_%C3%AB-C3_Aircross_IMG_3525.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Citro%C3%ABn_%C3%AB-C3_Aircross_IMG_3525.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "citroen-e-c4-50": {
+    "pagina": "Citroën C4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/Citroen_C4_%282020%29_1X7A5851.jpg/500px-Citroen_C4_%282020%29_1X7A5851.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Citroen_C4_(2020)_1X7A5851.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "citroen-e-c4-54": {
+    "pagina": "Citroën C4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/Citroen_C4_%282020%29_1X7A5851.jpg/500px-Citroen_C4_%282020%29_1X7A5851.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Citroen_C4_(2020)_1X7A5851.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "citroen-e-c4-x": {
+    "pagina": "Citroën C4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/Citroen_C4_%282020%29_1X7A5851.jpg/500px-Citroen_C4_%282020%29_1X7A5851.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Citroen_C4_(2020)_1X7A5851.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "citroen-e-c5-aircross-73": {
+    "pagina": "Citroën C5 Aircross",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0a/2022_Citro%C3%ABn_C5_Aircross_Automesse_Ludwigsburg_2024_IMG_1342.jpg/500px-2022_Citro%C3%ABn_C5_Aircross_Automesse_Ludwigsburg_2024_IMG_1342.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2022_Citro%C3%ABn_C5_Aircross_Automesse_Ludwigsburg_2024_IMG_1342.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "citroen-e-c5-aircross-97": {
+    "pagina": "Citroën C5 Aircross",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0a/2022_Citro%C3%ABn_C5_Aircross_Automesse_Ludwigsburg_2024_IMG_1342.jpg/500px-2022_Citro%C3%ABn_C5_Aircross_Automesse_Ludwigsburg_2024_IMG_1342.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2022_Citro%C3%ABn_C5_Aircross_Automesse_Ludwigsburg_2024_IMG_1342.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "cupra-born-45": {
+    "pagina": "Cupra Born",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fa/Cupra_Born_%E2%80%93_f_03042026.jpg/500px-Cupra_Born_%E2%80%93_f_03042026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Cupra_Born_%E2%80%93_f_03042026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "cupra-born-58": {
+    "pagina": "Cupra Born",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fa/Cupra_Born_%E2%80%93_f_03042026.jpg/500px-Cupra_Born_%E2%80%93_f_03042026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Cupra_Born_%E2%80%93_f_03042026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "cupra-born-77": {
+    "pagina": "Cupra Born",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fa/Cupra_Born_%E2%80%93_f_03042026.jpg/500px-Cupra_Born_%E2%80%93_f_03042026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Cupra_Born_%E2%80%93_f_03042026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "cupra-born-vz": {
+    "pagina": "Cupra Born",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fa/Cupra_Born_%E2%80%93_f_03042026.jpg/500px-Cupra_Born_%E2%80%93_f_03042026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Cupra_Born_%E2%80%93_f_03042026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "cupra-raval-37": {
+    "pagina": "Cupra Raval",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6f/Cupra_Raval_VZ_IMG_6967_%28cropped%29.jpg/500px-Cupra_Raval_VZ_IMG_6967_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Cupra_Raval_VZ_IMG_6967_(cropped).jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "cupra-raval-52": {
+    "pagina": "Cupra Raval",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6f/Cupra_Raval_VZ_IMG_6967_%28cropped%29.jpg/500px-Cupra_Raval_VZ_IMG_6967_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Cupra_Raval_VZ_IMG_6967_(cropped).jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "cupra-tavascan-endurance": {
+    "pagina": "Cupra Tavascan",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/43/Cupra_Tavascan_Endurance_%E2%80%93_f_18042026.jpg/500px-Cupra_Tavascan_Endurance_%E2%80%93_f_18042026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Cupra_Tavascan_Endurance_%E2%80%93_f_18042026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "cupra-tavascan-vz": {
+    "pagina": "Cupra Tavascan",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/43/Cupra_Tavascan_Endurance_%E2%80%93_f_18042026.jpg/500px-Cupra_Tavascan_Endurance_%E2%80%93_f_18042026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Cupra_Tavascan_Endurance_%E2%80%93_f_18042026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "dacia-spring": {
+    "pagina": "Dacia Spring",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Dacia_Spring_IAA_2021_1X7A0215.jpg/500px-Dacia_Spring_IAA_2021_1X7A0215.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Dacia_Spring_IAA_2021_1X7A0215.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "ds-3-e-tense-50": {
+    "pagina": "DS 3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3d/DS_3_Crossback_PureTech_155_EAT8_So_Chic_%E2%80%93_f_25072020.jpg/500px-DS_3_Crossback_PureTech_155_EAT8_So_Chic_%E2%80%93_f_25072020.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:DS_3_Crossback_PureTech_155_EAT8_So_Chic_%E2%80%93_f_25072020.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "ds-3-e-tense-54": {
+    "pagina": "DS 3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3d/DS_3_Crossback_PureTech_155_EAT8_So_Chic_%E2%80%93_f_25072020.jpg/500px-DS_3_Crossback_PureTech_155_EAT8_So_Chic_%E2%80%93_f_25072020.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:DS_3_Crossback_PureTech_155_EAT8_So_Chic_%E2%80%93_f_25072020.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "ds-n4-e-tense": {
+    "pagina": "DS No. 4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/11/DS_4_E-Tense_%282021%29_Auto_Zuerich_2021_IMG_0542.jpg/500px-DS_4_E-Tense_%282021%29_Auto_Zuerich_2021_IMG_0542.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:DS_4_E-Tense_(2021)_Auto_Zuerich_2021_IMG_0542.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "ds-n8-73": {
+    "pagina": "DS No. 8",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/af/DS_Automobiles_N%C2%B08_AWD_Long_Range_Jules_Verne_%E2%80%93_f_19072025.jpg/500px-DS_Automobiles_N%C2%B08_AWD_Long_Range_Jules_Verne_%E2%80%93_f_19072025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:DS_Automobiles_N%C2%B08_AWD_Long_Range_Jules_Verne_%E2%80%93_f_19072025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "ds-n8-97": {
+    "pagina": "DS No. 8",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/af/DS_Automobiles_N%C2%B08_AWD_Long_Range_Jules_Verne_%E2%80%93_f_19072025.jpg/500px-DS_Automobiles_N%C2%B08_AWD_Long_Range_Jules_Verne_%E2%80%93_f_19072025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:DS_Automobiles_N%C2%B08_AWD_Long_Range_Jules_Verne_%E2%80%93_f_19072025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "fiat-500e-24": {
+    "pagina": "Fiat 500e",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8a/Fiat-500-vorne2.jpg/500px-Fiat-500-vorne2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Fiat-500-vorne2.jpg",
+    "autore": "Daniel Przygoda",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "fiat-500e-42": {
+    "pagina": "Fiat 500e",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8a/Fiat-500-vorne2.jpg/500px-Fiat-500-vorne2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Fiat-500-vorne2.jpg",
+    "autore": "Daniel Przygoda",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "fiat-500e-3plus1": {
+    "pagina": "Fiat 500e",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8a/Fiat-500-vorne2.jpg/500px-Fiat-500-vorne2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Fiat-500-vorne2.jpg",
+    "autore": "Daniel Przygoda",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "fiat-500e-cabrio": {
+    "pagina": "Fiat 500e",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8a/Fiat-500-vorne2.jpg/500px-Fiat-500-vorne2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Fiat-500-vorne2.jpg",
+    "autore": "Daniel Przygoda",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "fiat-600e": {
+    "pagina": "Fiat 600 (2023)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7f/Fiat_600_Hybrid_1.2_T3_Pop_%28III%29_%E2%80%93_f_24032026.jpg/500px-Fiat_600_Hybrid_1.2_T3_Pop_%28III%29_%E2%80%93_f_24032026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Fiat_600_Hybrid_1.2_T3_Pop_(III)_%E2%80%93_f_24032026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "fiat-e-doblo": {
+    "pagina": "Citroën e-Berlingo",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/Citroen_e-Berlingo_Auto_Zuerich_2021_IMG_0097.jpg/500px-Citroen_e-Berlingo_Auto_Zuerich_2021_IMG_0097.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Citroen_e-Berlingo_Auto_Zuerich_2021_IMG_0097.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "fiat-grande-panda": {
+    "pagina": "Fiat Grande Panda",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/90/Fiat_Grande_Panda_Elektro_La_Prima_%E2%80%93_f_01062025.jpg/500px-Fiat_Grande_Panda_Elektro_La_Prima_%E2%80%93_f_01062025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Fiat_Grande_Panda_Elektro_La_Prima_%E2%80%93_f_01062025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "ford-capri-sr": {
+    "pagina": "Ford Capri EV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/Ford_Capri_%282024%29_Autofr%C3%BChling_Ulm_2025_DSC_8721.jpg/500px-Ford_Capri_%282024%29_Autofr%C3%BChling_Ulm_2025_DSC_8721.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Ford_Capri_(2024)_Autofr%C3%BChling_Ulm_2025_DSC_8721.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "ford-capri-er-rwd": {
+    "pagina": "Ford Capri EV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/Ford_Capri_%282024%29_Autofr%C3%BChling_Ulm_2025_DSC_8721.jpg/500px-Ford_Capri_%282024%29_Autofr%C3%BChling_Ulm_2025_DSC_8721.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Ford_Capri_(2024)_Autofr%C3%BChling_Ulm_2025_DSC_8721.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "ford-capri-awd": {
+    "pagina": "Ford Capri EV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/Ford_Capri_%282024%29_Autofr%C3%BChling_Ulm_2025_DSC_8721.jpg/500px-Ford_Capri_%282024%29_Autofr%C3%BChling_Ulm_2025_DSC_8721.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Ford_Capri_(2024)_Autofr%C3%BChling_Ulm_2025_DSC_8721.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "ford-e-tourneo-custom": {
+    "pagina": "Ford Transit Custom",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/89/2024_Ford_Transit_Custom_Limited_TDCi_-_1996cc_2.0_%28136PS%29_Diesel_-_Artisan_Red_-_08-2024%2C_Front.jpg/500px-2024_Ford_Transit_Custom_Limited_TDCi_-_1996cc_2.0_%28136PS%29_Diesel_-_Artisan_Red_-_08-2024%2C_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2024_Ford_Transit_Custom_Limited_TDCi_-_1996cc_2.0_(136PS)_Diesel_-_Artisan_Red_-_08-2024,_Front.jpg",
+    "autore": "Harvey Bold",
+    "licenza": "CC0"
+  },
+  "ford-e-transit-custom": {
+    "pagina": "Ford Transit Custom",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/89/2024_Ford_Transit_Custom_Limited_TDCi_-_1996cc_2.0_%28136PS%29_Diesel_-_Artisan_Red_-_08-2024%2C_Front.jpg/500px-2024_Ford_Transit_Custom_Limited_TDCi_-_1996cc_2.0_%28136PS%29_Diesel_-_Artisan_Red_-_08-2024%2C_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2024_Ford_Transit_Custom_Limited_TDCi_-_1996cc_2.0_(136PS)_Diesel_-_Artisan_Red_-_08-2024,_Front.jpg",
+    "autore": "Harvey Bold",
+    "licenza": "CC0"
+  },
+  "ford-explorer-ev-sr": {
+    "pagina": "Ford Explorer EV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/93/Ford_Explorer_EV_IMG_2120.jpg/500px-Ford_Explorer_EV_IMG_2120.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Ford_Explorer_EV_IMG_2120.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "ford-explorer-ev-er-rwd": {
+    "pagina": "Ford Explorer EV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/93/Ford_Explorer_EV_IMG_2120.jpg/500px-Ford_Explorer_EV_IMG_2120.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Ford_Explorer_EV_IMG_2120.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "ford-explorer-ev-awd": {
+    "pagina": "Ford Explorer EV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/93/Ford_Explorer_EV_IMG_2120.jpg/500px-Ford_Explorer_EV_IMG_2120.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Ford_Explorer_EV_IMG_2120.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "ford-mustang-mach-e-sr-rwd": {
+    "pagina": "Ford Mustang Mach-E",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/49/2021_Ford_Mustang_Mach-E_Standard_Range_Front.jpg/500px-2021_Ford_Mustang_Mach-E_Standard_Range_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_Ford_Mustang_Mach-E_Standard_Range_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "ford-mustang-mach-e-er-rwd": {
+    "pagina": "Ford Mustang Mach-E",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/49/2021_Ford_Mustang_Mach-E_Standard_Range_Front.jpg/500px-2021_Ford_Mustang_Mach-E_Standard_Range_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_Ford_Mustang_Mach-E_Standard_Range_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "ford-mustang-mach-e-er-awd": {
+    "pagina": "Ford Mustang Mach-E",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/49/2021_Ford_Mustang_Mach-E_Standard_Range_Front.jpg/500px-2021_Ford_Mustang_Mach-E_Standard_Range_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_Ford_Mustang_Mach-E_Standard_Range_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "ford-mustang-mach-e-gt": {
+    "pagina": "Ford Mustang Mach-E",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/49/2021_Ford_Mustang_Mach-E_Standard_Range_Front.jpg/500px-2021_Ford_Mustang_Mach-E_Standard_Range_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_Ford_Mustang_Mach-E_Standard_Range_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "ford-puma-gen-e": {
+    "pagina": "Ford Puma (crossover)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a4/2020_Ford_Puma_Titanium_EcoBoost_Hybrid_1.0_Front.jpg/500px-2020_Ford_Puma_Titanium_EcoBoost_Hybrid_1.0_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Ford_Puma_Titanium_EcoBoost_Hybrid_1.0_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "genesis-g80-electrified": {
+    "pagina": "Genesis G80",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/Genesis_G80_IAA_2021_1X7A0229.jpg/500px-Genesis_G80_IAA_2021_1X7A0229.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Genesis_G80_IAA_2021_1X7A0229.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "genesis-gv60-standard": {
+    "pagina": "Genesis GV60",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/98/Genesis_GV60_1X7A5760.jpg/500px-Genesis_GV60_1X7A5760.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Genesis_GV60_1X7A5760.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "genesis-gv60-performance": {
+    "pagina": "Genesis GV60",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/98/Genesis_GV60_1X7A5760.jpg/500px-Genesis_GV60_1X7A5760.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Genesis_GV60_1X7A5760.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "genesis-gv70-electrified": {
+    "pagina": "Genesis GV70",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2e/Genesis_GV70_IAA_2021_1X7A0228.jpg/500px-Genesis_GV70_IAA_2021_1X7A0228.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Genesis_GV70_IAA_2021_1X7A0228.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "gwm-ora-03-48": {
+    "pagina": "Ora Good Cat",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1c/GWM_Ora_03_%E2%80%93_f_12102025.jpg/500px-GWM_Ora_03_%E2%80%93_f_12102025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:GWM_Ora_03_%E2%80%93_f_12102025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "gwm-ora-03-63": {
+    "pagina": "Ora Good Cat",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1c/GWM_Ora_03_%E2%80%93_f_12102025.jpg/500px-GWM_Ora_03_%E2%80%93_f_12102025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:GWM_Ora_03_%E2%80%93_f_12102025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "honda-e": {
+    "pagina": "Honda e",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/16/Honda_e_Advance_%E2%80%93_f_18102020.jpg/500px-Honda_e_Advance_%E2%80%93_f_18102020.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Honda_e_Advance_%E2%80%93_f_18102020.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "honda-e-ny1": {
+    "pagina": "Honda HR-V (third generation)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/64/Honda_HR-V_eHEV_Advance_%28III%29_%E2%80%93_f_31122023.jpg/500px-Honda_HR-V_eHEV_Advance_%28III%29_%E2%80%93_f_31122023.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Honda_HR-V_eHEV_Advance_(III)_%E2%80%93_f_31122023.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "hyundai-inster-42": {
+    "pagina": "Hyundai Inster",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/Hyundai_Inster_Prime_%E2%80%93_f_14022026.jpg/500px-Hyundai_Inster_Prime_%E2%80%93_f_14022026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Hyundai_Inster_Prime_%E2%80%93_f_14022026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "hyundai-inster-49": {
+    "pagina": "Hyundai Inster",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/Hyundai_Inster_Prime_%E2%80%93_f_14022026.jpg/500px-Hyundai_Inster_Prime_%E2%80%93_f_14022026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Hyundai_Inster_Prime_%E2%80%93_f_14022026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "hyundai-ioniq-28": {
+    "pagina": "Hyundai Ioniq",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1a/Hyundai_IONIQ_electric_Premium_%E2%80%93_Frontansicht%2C_7._Mai_2017%2C_D%C3%BCsseldorf.jpg/500px-Hyundai_IONIQ_electric_Premium_%E2%80%93_Frontansicht%2C_7._Mai_2017%2C_D%C3%BCsseldorf.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Hyundai_IONIQ_electric_Premium_%E2%80%93_Frontansicht,_7._Mai_2017,_D%C3%BCsseldorf.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "hyundai-ioniq-38": {
+    "pagina": "Hyundai Ioniq",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1a/Hyundai_IONIQ_electric_Premium_%E2%80%93_Frontansicht%2C_7._Mai_2017%2C_D%C3%BCsseldorf.jpg/500px-Hyundai_IONIQ_electric_Premium_%E2%80%93_Frontansicht%2C_7._Mai_2017%2C_D%C3%BCsseldorf.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Hyundai_IONIQ_electric_Premium_%E2%80%93_Frontansicht,_7._Mai_2017,_D%C3%BCsseldorf.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "hyundai-ioniq5-58": {
+    "pagina": "Hyundai Ioniq 5",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg/500px-Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "hyundai-ioniq5-63": {
+    "pagina": "Hyundai Ioniq 5",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg/500px-Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "hyundai-ioniq5-77": {
+    "pagina": "Hyundai Ioniq 5",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg/500px-Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "hyundai-ioniq5-84": {
+    "pagina": "Hyundai Ioniq 5",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg/500px-Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "hyundai-ioniq5-84-awd": {
+    "pagina": "Hyundai Ioniq 5",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg/500px-Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "hyundai-ioniq5-n": {
+    "pagina": "Hyundai Ioniq 5",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg/500px-Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Hyundai_Ioniq_5_AWD_Techniq-Paket_%E2%80%93_f_31122024.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "hyundai-ioniq6-53": {
+    "pagina": "Hyundai Ioniq 6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/96/2023_Hyundai_Ioniq_6_Limited%2C_front_4.27.23.jpg/500px-2023_Hyundai_Ioniq_6_Limited%2C_front_4.27.23.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2023_Hyundai_Ioniq_6_Limited,_front_4.27.23.jpg",
+    "autore": "Kevauto",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "hyundai-ioniq6-77": {
+    "pagina": "Hyundai Ioniq 6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/96/2023_Hyundai_Ioniq_6_Limited%2C_front_4.27.23.jpg/500px-2023_Hyundai_Ioniq_6_Limited%2C_front_4.27.23.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2023_Hyundai_Ioniq_6_Limited,_front_4.27.23.jpg",
+    "autore": "Kevauto",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "hyundai-ioniq6-84-awd": {
+    "pagina": "Hyundai Ioniq 6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/96/2023_Hyundai_Ioniq_6_Limited%2C_front_4.27.23.jpg/500px-2023_Hyundai_Ioniq_6_Limited%2C_front_4.27.23.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2023_Hyundai_Ioniq_6_Limited,_front_4.27.23.jpg",
+    "autore": "Kevauto",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "hyundai-ioniq9": {
+    "pagina": "Hyundai Ioniq 9",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/90/Hyundai_Ioniq_9_IMG_5950.jpg/500px-Hyundai_Ioniq_9_IMG_5950.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Hyundai_Ioniq_9_IMG_5950.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "hyundai-ioniq9-awd": {
+    "pagina": "Hyundai Ioniq 9",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/90/Hyundai_Ioniq_9_IMG_5950.jpg/500px-Hyundai_Ioniq_9_IMG_5950.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Hyundai_Ioniq_9_IMG_5950.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "hyundai-kona-39": {
+    "pagina": "Hyundai Kona",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ac/Hyundai_Kona_N_Line_%28SX2%29_DSC_8250.jpg/500px-Hyundai_Kona_N_Line_%28SX2%29_DSC_8250.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Hyundai_Kona_N_Line_(SX2)_DSC_8250.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "hyundai-kona-64-2018": {
+    "pagina": "Hyundai Kona",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ac/Hyundai_Kona_N_Line_%28SX2%29_DSC_8250.jpg/500px-Hyundai_Kona_N_Line_%28SX2%29_DSC_8250.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Hyundai_Kona_N_Line_(SX2)_DSC_8250.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "hyundai-kona-48": {
+    "pagina": "Hyundai Kona",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ac/Hyundai_Kona_N_Line_%28SX2%29_DSC_8250.jpg/500px-Hyundai_Kona_N_Line_%28SX2%29_DSC_8250.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Hyundai_Kona_N_Line_(SX2)_DSC_8250.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "hyundai-kona-65": {
+    "pagina": "Hyundai Kona",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ac/Hyundai_Kona_N_Line_%28SX2%29_DSC_8250.jpg/500px-Hyundai_Kona_N_Line_%28SX2%29_DSC_8250.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Hyundai_Kona_N_Line_(SX2)_DSC_8250.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "jaguar-i-pace": {
+    "pagina": "Jaguar I-Pace",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/37/2018_Jaguar_I-Pace_EV400_AWD_Front.jpg/500px-2018_Jaguar_I-Pace_EV400_AWD_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2018_Jaguar_I-Pace_EV400_AWD_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "jeep-avenger": {
+    "pagina": "Jeep Avenger",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a4/Jeep_Avenger_Elektro_Summit_%E2%80%93_f_18052025.jpg/500px-Jeep_Avenger_Elektro_Summit_%E2%80%93_f_18052025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Jeep_Avenger_Elektro_Summit_%E2%80%93_f_18052025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "kgm-torres-evx": {
+    "pagina": "KGM Torres",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c9/KGM_Torres_Hybrid_Automesse_Ludwigsburg_2025_DSC_2567.jpg/500px-KGM_Torres_Hybrid_Automesse_Ludwigsburg_2025_DSC_2567.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:KGM_Torres_Hybrid_Automesse_Ludwigsburg_2025_DSC_2567.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-e-niro-39": {
+    "pagina": "Kia Niro",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d6/Kia_Niro_%28SG2%29_PHEV_Leonberg_2022_1X7A0474.jpg/500px-Kia_Niro_%28SG2%29_PHEV_Leonberg_2022_1X7A0474.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Kia_Niro_(SG2)_PHEV_Leonberg_2022_1X7A0474.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-e-niro-64": {
+    "pagina": "Kia Niro",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d6/Kia_Niro_%28SG2%29_PHEV_Leonberg_2022_1X7A0474.jpg/500px-Kia_Niro_%28SG2%29_PHEV_Leonberg_2022_1X7A0474.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Kia_Niro_(SG2)_PHEV_Leonberg_2022_1X7A0474.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-e-soul-39": {
+    "pagina": "Kia Soul EV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6d/2020_Kia_Soul_First_Edition_EV_Front.jpg/500px-2020_Kia_Soul_First_Edition_EV_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Kia_Soul_First_Edition_EV_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-e-soul-64": {
+    "pagina": "Kia Soul EV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6d/2020_Kia_Soul_First_Edition_EV_Front.jpg/500px-2020_Kia_Soul_First_Edition_EV_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Kia_Soul_First_Edition_EV_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-ev3-58": {
+    "pagina": "Kia EV3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a8/Kia_EV3_GT-Line_Automesse_Ludwigsburg_2025_DSC_2635_%28cropped%29.jpg/500px-Kia_EV3_GT-Line_Automesse_Ludwigsburg_2025_DSC_2635_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Kia_EV3_GT-Line_Automesse_Ludwigsburg_2025_DSC_2635_(cropped).jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-ev3-81": {
+    "pagina": "Kia EV3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a8/Kia_EV3_GT-Line_Automesse_Ludwigsburg_2025_DSC_2635_%28cropped%29.jpg/500px-Kia_EV3_GT-Line_Automesse_Ludwigsburg_2025_DSC_2635_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Kia_EV3_GT-Line_Automesse_Ludwigsburg_2025_DSC_2635_(cropped).jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-ev4-58": {
+    "pagina": "Kia EV4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/04/Kia_EV4_GT-Line_Automesse_Ludwigsburg_2025_DSC_2535.jpg/500px-Kia_EV4_GT-Line_Automesse_Ludwigsburg_2025_DSC_2535.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Kia_EV4_GT-Line_Automesse_Ludwigsburg_2025_DSC_2535.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-ev4-81": {
+    "pagina": "Kia EV4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/04/Kia_EV4_GT-Line_Automesse_Ludwigsburg_2025_DSC_2535.jpg/500px-Kia_EV4_GT-Line_Automesse_Ludwigsburg_2025_DSC_2535.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Kia_EV4_GT-Line_Automesse_Ludwigsburg_2025_DSC_2535.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-ev5": {
+    "pagina": "Kia EV5",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c5/2024_Kia_EV5_Earth_Exclusive_AWD_%28Thailand%29_front_view.png/500px-2024_Kia_EV5_Earth_Exclusive_AWD_%28Thailand%29_front_view.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2024_Kia_EV5_Earth_Exclusive_AWD_(Thailand)_front_view.png",
+    "autore": "iMoD Official",
+    "licenza": "CC BY 3.0"
+  },
+  "kia-ev6-58": {
+    "pagina": "Kia EV6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d9/2021_Kia_EV6_GT-Line_S.jpg/500px-2021_Kia_EV6_GT-Line_S.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_Kia_EV6_GT-Line_S.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-ev6-77": {
+    "pagina": "Kia EV6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d9/2021_Kia_EV6_GT-Line_S.jpg/500px-2021_Kia_EV6_GT-Line_S.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_Kia_EV6_GT-Line_S.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-ev6-84": {
+    "pagina": "Kia EV6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d9/2021_Kia_EV6_GT-Line_S.jpg/500px-2021_Kia_EV6_GT-Line_S.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_Kia_EV6_GT-Line_S.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-ev6-84-awd": {
+    "pagina": "Kia EV6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d9/2021_Kia_EV6_GT-Line_S.jpg/500px-2021_Kia_EV6_GT-Line_S.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_Kia_EV6_GT-Line_S.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-ev6-gt": {
+    "pagina": "Kia EV6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d9/2021_Kia_EV6_GT-Line_S.jpg/500px-2021_Kia_EV6_GT-Line_S.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_Kia_EV6_GT-Line_S.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-ev9": {
+    "pagina": "Kia EV9",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e0/Kia_EV9_1X7A2472.jpg/500px-Kia_EV9_1X7A2472.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Kia_EV9_1X7A2472.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-ev9-awd": {
+    "pagina": "Kia EV9",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e0/Kia_EV9_1X7A2472.jpg/500px-Kia_EV9_1X7A2472.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Kia_EV9_1X7A2472.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-niro-ev": {
+    "pagina": "Kia Niro",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d6/Kia_Niro_%28SG2%29_PHEV_Leonberg_2022_1X7A0474.jpg/500px-Kia_Niro_%28SG2%29_PHEV_Leonberg_2022_1X7A0474.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Kia_Niro_(SG2)_PHEV_Leonberg_2022_1X7A0474.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-pv5-passenger": {
+    "pagina": "Kia PV5",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8a/Kia_PV5_%28SW1%29_Cargo_%E2%80%93_Seoul_Mobility_Show_2025_%2807%29.jpg/500px-Kia_PV5_%28SW1%29_Cargo_%E2%80%93_Seoul_Mobility_Show_2025_%2807%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Kia_PV5_(SW1)_Cargo_%E2%80%93_Seoul_Mobility_Show_2025_(07).jpg",
+    "autore": "Treeinkr",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "kia-soul-ev-30": {
+    "pagina": "Kia Soul EV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6d/2020_Kia_Soul_First_Edition_EV_Front.jpg/500px-2020_Kia_Soul_First_Edition_EV_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Kia_Soul_First_Edition_EV_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "lancia-ypsilon-elettrica": {
+    "pagina": "Lancia Ypsilon",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Lancia_Ypsilon_%282024%29_Front_1_%28cropped%29_%28cropped%29.jpg/500px-Lancia_Ypsilon_%282024%29_Front_1_%28cropped%29_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Lancia_Ypsilon_(2024)_Front_1_(cropped)_(cropped).jpg",
+    "autore": "Mihnea Lazăr",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "lancia-ypsilon-hf": {
+    "pagina": "Lancia Ypsilon",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Lancia_Ypsilon_%282024%29_Front_1_%28cropped%29_%28cropped%29.jpg/500px-Lancia_Ypsilon_%282024%29_Front_1_%28cropped%29_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Lancia_Ypsilon_(2024)_Front_1_(cropped)_(cropped).jpg",
+    "autore": "Mihnea Lazăr",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "leapmotor-b10-56": {
+    "pagina": "Leapmotor B10",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/88/Leapmotor_B10_Design_Pro_Max_%E2%80%93_f_25012026.jpg/500px-Leapmotor_B10_Design_Pro_Max_%E2%80%93_f_25012026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Leapmotor_B10_Design_Pro_Max_%E2%80%93_f_25012026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "leapmotor-b10-67": {
+    "pagina": "Leapmotor B10",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/88/Leapmotor_B10_Design_Pro_Max_%E2%80%93_f_25012026.jpg/500px-Leapmotor_B10_Design_Pro_Max_%E2%80%93_f_25012026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Leapmotor_B10_Design_Pro_Max_%E2%80%93_f_25012026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "leapmotor-c10": {
+    "pagina": "Leapmotor C10",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/94/Leapmotor_C10_EREV_Classic-Gala_2025_DSC_0779.jpg/500px-Leapmotor_C10_EREV_Classic-Gala_2025_DSC_0779.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Leapmotor_C10_EREV_Classic-Gala_2025_DSC_0779.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "leapmotor-t03": {
+    "pagina": "Leapmotor T03",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/93/2020_Leapmotor_T03_%28front%29.jpg/500px-2020_Leapmotor_T03_%28front%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Leapmotor_T03_(front).jpg",
+    "autore": "User3204",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "lexus-rz-350e": {
+    "pagina": "Lexus RZ",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/81/Lexus_RZ_300e_%28XEBM10%29_IMG_6622.jpg/500px-Lexus_RZ_300e_%28XEBM10%29_IMG_6622.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Lexus_RZ_300e_(XEBM10)_IMG_6622.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "lexus-rz-450e": {
+    "pagina": "Lexus RZ",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/81/Lexus_RZ_300e_%28XEBM10%29_IMG_6622.jpg/500px-Lexus_RZ_300e_%28XEBM10%29_IMG_6622.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Lexus_RZ_300e_(XEBM10)_IMG_6622.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "lexus-rz-500e": {
+    "pagina": "Lexus RZ",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/81/Lexus_RZ_300e_%28XEBM10%29_IMG_6622.jpg/500px-Lexus_RZ_300e_%28XEBM10%29_IMG_6622.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Lexus_RZ_300e_(XEBM10)_IMG_6622.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "lexus-ux-300e-54": {
+    "pagina": "Lexus UX",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9b/Lexus_UX_250h_IMG_2810.jpg/500px-Lexus_UX_250h_IMG_2810.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Lexus_UX_250h_IMG_2810.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "lexus-ux-300e-72": {
+    "pagina": "Lexus UX",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9b/Lexus_UX_250h_IMG_2810.jpg/500px-Lexus_UX_250h_IMG_2810.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Lexus_UX_250h_IMG_2810.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "lotus-eletre": {
+    "pagina": "Lotus Eletre",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/39/Lotus_Eletre_Automesse_Ludwigsburg_2025_DSC_2658.jpg/500px-Lotus_Eletre_Automesse_Ludwigsburg_2025_DSC_2658.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Lotus_Eletre_Automesse_Ludwigsburg_2025_DSC_2658.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "lotus-eletre-r": {
+    "pagina": "Lotus Eletre",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/39/Lotus_Eletre_Automesse_Ludwigsburg_2025_DSC_2658.jpg/500px-Lotus_Eletre_Automesse_Ludwigsburg_2025_DSC_2658.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Lotus_Eletre_Automesse_Ludwigsburg_2025_DSC_2658.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "lotus-emeya": {
+    "pagina": "Lotus Emeya",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Lotus_Emeya_IMG_4142.jpg/500px-Lotus_Emeya_IMG_4142.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Lotus_Emeya_IMG_4142.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "lotus-emeya-r": {
+    "pagina": "Lotus Emeya",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Lotus_Emeya_IMG_4142.jpg/500px-Lotus_Emeya_IMG_4142.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Lotus_Emeya_IMG_4142.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "lucid-air-touring": {
+    "pagina": "Lucid Air",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/26/2022_Lucid_Air_Grand_Touring_in_Zenith_Red%2C_front_left.jpg/500px-2022_Lucid_Air_Grand_Touring_in_Zenith_Red%2C_front_left.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2022_Lucid_Air_Grand_Touring_in_Zenith_Red,_front_left.jpg",
+    "autore": "Mr.choppers",
+    "licenza": "CC BY-SA 3.0"
+  },
+  "lucid-air-grand-touring": {
+    "pagina": "Lucid Air",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/26/2022_Lucid_Air_Grand_Touring_in_Zenith_Red%2C_front_left.jpg/500px-2022_Lucid_Air_Grand_Touring_in_Zenith_Red%2C_front_left.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2022_Lucid_Air_Grand_Touring_in_Zenith_Red,_front_left.jpg",
+    "autore": "Mr.choppers",
+    "licenza": "CC BY-SA 3.0"
+  },
+  "lucid-gravity": {
+    "pagina": "Lucid Gravity",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fa/Lucid_Gravity_Grand_Touring_GIMS_2024_1X7A2334.jpg/500px-Lucid_Gravity_Grand_Touring_GIMS_2024_1X7A2334.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Lucid_Gravity_Grand_Touring_GIMS_2024_1X7A2334.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "lynk-co-02": {
+    "pagina": "Lynk & Co 02",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dc/Lynk_%26_Co_02.jpg/500px-Lynk_%26_Co_02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Lynk_%26_Co_02.jpg",
+    "autore": "Jengtingchen",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "maserati-grancabrio-folgore": {
+    "pagina": "Maserati GranTurismo",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/00/Maserati_GranTurismo_Trofeo_1X7A0828.jpg/500px-Maserati_GranTurismo_Trofeo_1X7A0828.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Maserati_GranTurismo_Trofeo_1X7A0828.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "maserati-granturismo-folgore": {
+    "pagina": "Maserati GranTurismo",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/00/Maserati_GranTurismo_Trofeo_1X7A0828.jpg/500px-Maserati_GranTurismo_Trofeo_1X7A0828.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Maserati_GranTurismo_Trofeo_1X7A0828.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "maserati-grecale-folgore": {
+    "pagina": "Maserati Grecale",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/57/Maserati_Grecale_GT_1X7A6371.jpg/500px-Maserati_Grecale_GT_1X7A6371.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Maserati_Grecale_GT_1X7A6371.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mazda-6e-68": {
+    "pagina": "Mazda 6e",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b9/Mazda6e_IMG_6681.jpg/500px-Mazda6e_IMG_6681.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mazda6e_IMG_6681.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mazda-6e-80": {
+    "pagina": "Mazda 6e",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b9/Mazda6e_IMG_6681.jpg/500px-Mazda6e_IMG_6681.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mazda6e_IMG_6681.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mazda-cx-6e": {
+    "pagina": "Mazda CX-6e",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d0/Mazda_EZ-60_001.jpg/500px-Mazda_EZ-60_001.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mazda_EZ-60_001.jpg",
+    "autore": "JustAnotherCarDesigner",
+    "licenza": "CC0"
+  },
+  "mazda-mx-30": {
+    "pagina": "Mazda MX-30",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fb/2021_Mazda_MX-30_Front.jpg/500px-2021_Mazda_MX-30_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_Mazda_MX-30_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-amg-eqe-53": {
+    "pagina": "Mercedes-Benz EQE",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Mercedes-Benz_V295_350%2B_Classic-Days_2022_DSC_0018.jpg/500px-Mercedes-Benz_V295_350%2B_Classic-Days_2022_DSC_0018.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_V295_350%2B_Classic-Days_2022_DSC_0018.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-cla-200": {
+    "pagina": "Mercedes-Benz CLA",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/71/Mercedes-Benz_C118_IMG_2673.jpg/500px-Mercedes-Benz_C118_IMG_2673.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_C118_IMG_2673.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-cla-250-plus": {
+    "pagina": "Mercedes-Benz CLA",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/71/Mercedes-Benz_C118_IMG_2673.jpg/500px-Mercedes-Benz_C118_IMG_2673.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_C118_IMG_2673.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-cla-350-4matic": {
+    "pagina": "Mercedes-Benz CLA",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/71/Mercedes-Benz_C118_IMG_2673.jpg/500px-Mercedes-Benz_C118_IMG_2673.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_C118_IMG_2673.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-cla-shooting-brake": {
+    "pagina": "Mercedes-Benz CLA",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/71/Mercedes-Benz_C118_IMG_2673.jpg/500px-Mercedes-Benz_C118_IMG_2673.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_C118_IMG_2673.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqa-250": {
+    "pagina": "Mercedes-Benz EQA",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/Mercedes-Benz_H243_IMG_5876.jpg/500px-Mercedes-Benz_H243_IMG_5876.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_H243_IMG_5876.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqa-300-4matic": {
+    "pagina": "Mercedes-Benz EQA",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/Mercedes-Benz_H243_IMG_5876.jpg/500px-Mercedes-Benz_H243_IMG_5876.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_H243_IMG_5876.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqa-350-4matic": {
+    "pagina": "Mercedes-Benz EQA",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/Mercedes-Benz_H243_IMG_5876.jpg/500px-Mercedes-Benz_H243_IMG_5876.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_H243_IMG_5876.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqb-250": {
+    "pagina": "Mercedes-Benz EQB",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/Mercedes-Benz_X243_300_1X7A0422.jpg/500px-Mercedes-Benz_X243_300_1X7A0422.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_X243_300_1X7A0422.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqb-300-4matic": {
+    "pagina": "Mercedes-Benz EQB",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/Mercedes-Benz_X243_300_1X7A0422.jpg/500px-Mercedes-Benz_X243_300_1X7A0422.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_X243_300_1X7A0422.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqb-350-4matic": {
+    "pagina": "Mercedes-Benz EQB",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/Mercedes-Benz_X243_300_1X7A0422.jpg/500px-Mercedes-Benz_X243_300_1X7A0422.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_X243_300_1X7A0422.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqc-400": {
+    "pagina": "Mercedes-Benz EQC",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/44/Mercedes-Benz_EQC_400_4MATIC_AMG_Line_%28N_293%29_%E2%80%93_f_02042021.jpg/500px-Mercedes-Benz_EQC_400_4MATIC_AMG_Line_%28N_293%29_%E2%80%93_f_02042021.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_EQC_400_4MATIC_AMG_Line_(N_293)_%E2%80%93_f_02042021.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "mercedes-eqe-300": {
+    "pagina": "Mercedes-Benz EQE",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Mercedes-Benz_V295_350%2B_Classic-Days_2022_DSC_0018.jpg/500px-Mercedes-Benz_V295_350%2B_Classic-Days_2022_DSC_0018.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_V295_350%2B_Classic-Days_2022_DSC_0018.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqe-350": {
+    "pagina": "Mercedes-Benz EQE",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Mercedes-Benz_V295_350%2B_Classic-Days_2022_DSC_0018.jpg/500px-Mercedes-Benz_V295_350%2B_Classic-Days_2022_DSC_0018.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_V295_350%2B_Classic-Days_2022_DSC_0018.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqe-500-4matic": {
+    "pagina": "Mercedes-Benz EQE",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Mercedes-Benz_V295_350%2B_Classic-Days_2022_DSC_0018.jpg/500px-Mercedes-Benz_V295_350%2B_Classic-Days_2022_DSC_0018.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_V295_350%2B_Classic-Days_2022_DSC_0018.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqe-suv-300": {
+    "pagina": "Mercedes-Benz EQE SUV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/41/Mercedes-Benz_X294_IMG_8682.jpg/500px-Mercedes-Benz_X294_IMG_8682.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_X294_IMG_8682.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqe-suv-350-4matic": {
+    "pagina": "Mercedes-Benz EQE SUV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/41/Mercedes-Benz_X294_IMG_8682.jpg/500px-Mercedes-Benz_X294_IMG_8682.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_X294_IMG_8682.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqe-suv-500-4matic": {
+    "pagina": "Mercedes-Benz EQE SUV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/41/Mercedes-Benz_X294_IMG_8682.jpg/500px-Mercedes-Benz_X294_IMG_8682.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_X294_IMG_8682.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqs-450": {
+    "pagina": "Mercedes-Benz EQS",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ef/Mercedes-Benz_V297_Classic-Days_2022_DSC_0016.jpg/500px-Mercedes-Benz_V297_Classic-Days_2022_DSC_0016.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_V297_Classic-Days_2022_DSC_0016.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqs-580": {
+    "pagina": "Mercedes-Benz EQS",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ef/Mercedes-Benz_V297_Classic-Days_2022_DSC_0016.jpg/500px-Mercedes-Benz_V297_Classic-Days_2022_DSC_0016.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_V297_Classic-Days_2022_DSC_0016.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqs-suv-450": {
+    "pagina": "Mercedes-Benz EQS SUV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/72/Mercedes-Benz_X296_1X7A1725.jpg/500px-Mercedes-Benz_X296_1X7A1725.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_X296_1X7A1725.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqs-suv-580": {
+    "pagina": "Mercedes-Benz EQS SUV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/72/Mercedes-Benz_X296_1X7A1725.jpg/500px-Mercedes-Benz_X296_1X7A1725.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_X296_1X7A1725.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-eqv-300": {
+    "pagina": "Mercedes-Benz Vito",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/54/Mercedes-Benz_V_250_d_Exclusive_AMG_Line_Lang_%28V_447%29_%E2%80%93_Frontansicht%2C_29._Juni_2016%2C_D%C3%BCsseldorf.jpg/500px-Mercedes-Benz_V_250_d_Exclusive_AMG_Line_Lang_%28V_447%29_%E2%80%93_Frontansicht%2C_29._Juni_2016%2C_D%C3%BCsseldorf.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_V_250_d_Exclusive_AMG_Line_Lang_(V_447)_%E2%80%93_Frontansicht,_29._Juni_2016,_D%C3%BCsseldorf.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "mercedes-evito-tourer": {
+    "pagina": "Mercedes-Benz Vito",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/54/Mercedes-Benz_V_250_d_Exclusive_AMG_Line_Lang_%28V_447%29_%E2%80%93_Frontansicht%2C_29._Juni_2016%2C_D%C3%BCsseldorf.jpg/500px-Mercedes-Benz_V_250_d_Exclusive_AMG_Line_Lang_%28V_447%29_%E2%80%93_Frontansicht%2C_29._Juni_2016%2C_D%C3%BCsseldorf.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_V_250_d_Exclusive_AMG_Line_Lang_(V_447)_%E2%80%93_Frontansicht,_29._Juni_2016,_D%C3%BCsseldorf.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "mercedes-glc-400-4matic": {
+    "pagina": "Mercedes-Benz GLC",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Mercedes-Benz_X254_1X7A6343.jpg/500px-Mercedes-Benz_X254_1X7A6343.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_X254_1X7A6343.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mercedes-maybach-eqs-680": {
+    "pagina": "Mercedes-Benz EQS SUV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/72/Mercedes-Benz_X296_1X7A1725.jpg/500px-Mercedes-Benz_X296_1X7A1725.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mercedes-Benz_X296_1X7A1725.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mg-cyberster": {
+    "pagina": "MG Cyberster",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/11/2024_MG_Cyberster.jpg/500px-2024_MG_Cyberster.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2024_MG_Cyberster.jpg",
+    "autore": "MrWalkr",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mg-im5": {
+    "pagina": "IM L6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/43/IM_L6_GIMS_2024_1X7A2393.jpg/500px-IM_L6_GIMS_2024_1X7A2393.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:IM_L6_GIMS_2024_1X7A2393.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mg-im6": {
+    "pagina": "IM LS6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/IM_LS6_008.jpg/500px-IM_LS6_008.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:IM_LS6_008.jpg",
+    "autore": "Quzhouliulian",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mg-marvel-r": {
+    "pagina": "Roewe Marvel X",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/62/Roewe_Marvel_X_IMG002_%28cropped%29.jpg/500px-Roewe_Marvel_X_IMG002_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Roewe_Marvel_X_IMG002_(cropped).jpg",
+    "autore": "Zotyefan",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mg4-51": {
+    "pagina": "MG4 EV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/12/MG4_Electric_%E2%80%93_f_21042025.jpg/500px-MG4_Electric_%E2%80%93_f_21042025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:MG4_Electric_%E2%80%93_f_21042025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "mg4-64": {
+    "pagina": "MG4 EV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/12/MG4_Electric_%E2%80%93_f_21042025.jpg/500px-MG4_Electric_%E2%80%93_f_21042025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:MG4_Electric_%E2%80%93_f_21042025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "mg4-77": {
+    "pagina": "MG4 EV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/12/MG4_Electric_%E2%80%93_f_21042025.jpg/500px-MG4_Electric_%E2%80%93_f_21042025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:MG4_Electric_%E2%80%93_f_21042025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "mg4-xpower": {
+    "pagina": "MG4 EV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/12/MG4_Electric_%E2%80%93_f_21042025.jpg/500px-MG4_Electric_%E2%80%93_f_21042025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:MG4_Electric_%E2%80%93_f_21042025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "mg5": {
+    "pagina": "Roewe i5",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6f/2021_SAIC_Roewe_i5_%28facelift%29.jpg/500px-2021_SAIC_Roewe_i5_%28facelift%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_SAIC_Roewe_i5_(facelift).jpg",
+    "autore": "User3204",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mg-s5-49": {
+    "pagina": "MGS5 EV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/MGS5_EV_Automesse_Ludwigsburg_2025_DSC_2557.jpg/500px-MGS5_EV_Automesse_Ludwigsburg_2025_DSC_2557.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:MGS5_EV_Automesse_Ludwigsburg_2025_DSC_2557.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mg-s5-64": {
+    "pagina": "MGS5 EV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/MGS5_EV_Automesse_Ludwigsburg_2025_DSC_2557.jpg/500px-MGS5_EV_Automesse_Ludwigsburg_2025_DSC_2557.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:MGS5_EV_Automesse_Ludwigsburg_2025_DSC_2557.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mg-zs-ev-44": {
+    "pagina": "MG ZS (crossover)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cf/MG_ZS_%28crossover%2C_second_generation%29_DSC_8542.jpg/500px-MG_ZS_%28crossover%2C_second_generation%29_DSC_8542.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:MG_ZS_(crossover,_second_generation)_DSC_8542.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mg-zs-ev-51": {
+    "pagina": "MG ZS (crossover)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cf/MG_ZS_%28crossover%2C_second_generation%29_DSC_8542.jpg/500px-MG_ZS_%28crossover%2C_second_generation%29_DSC_8542.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:MG_ZS_(crossover,_second_generation)_DSC_8542.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mg-zs-ev-72": {
+    "pagina": "MG ZS (crossover)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cf/MG_ZS_%28crossover%2C_second_generation%29_DSC_8542.jpg/500px-MG_ZS_%28crossover%2C_second_generation%29_DSC_8542.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:MG_ZS_(crossover,_second_generation)_DSC_8542.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mini-aceman-e": {
+    "pagina": "Mini Aceman",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/23/Mini_Aceman_DSC_7114.jpg/500px-Mini_Aceman_DSC_7114.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mini_Aceman_DSC_7114.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mini-aceman-se": {
+    "pagina": "Mini Aceman",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/23/Mini_Aceman_DSC_7114.jpg/500px-Mini_Aceman_DSC_7114.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mini_Aceman_DSC_7114.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mini-cooper-se-2020": {
+    "pagina": "Mini Electric",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/29/Mini_Hatch_%28F56%29_Electric_IMG_2679.jpg/500px-Mini_Hatch_%28F56%29_Electric_IMG_2679.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mini_Hatch_(F56)_Electric_IMG_2679.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mini-cooper-e": {
+    "pagina": "Mini Cooper",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e0/Mini_One_%28R50%29_%E2%80%93_Frontansicht%2C_12._Juni_2011%2C_D%C3%BCsseldorf.jpg/500px-Mini_One_%28R50%29_%E2%80%93_Frontansicht%2C_12._Juni_2011%2C_D%C3%BCsseldorf.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mini_One_(R50)_%E2%80%93_Frontansicht,_12._Juni_2011,_D%C3%BCsseldorf.jpg",
+    "autore": "M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "mini-cooper-se": {
+    "pagina": "Mini Electric",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/29/Mini_Hatch_%28F56%29_Electric_IMG_2679.jpg/500px-Mini_Hatch_%28F56%29_Electric_IMG_2679.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mini_Hatch_(F56)_Electric_IMG_2679.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mini-countryman-e": {
+    "pagina": "Mini Countryman",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bc/2018_Mini_Countryman_Cooper_S_2.0_Front.jpg/500px-2018_Mini_Countryman_Cooper_S_2.0_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2018_Mini_Countryman_Cooper_S_2.0_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mini-countryman-se-all4": {
+    "pagina": "Mini Countryman",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bc/2018_Mini_Countryman_Cooper_S_2.0_Front.jpg/500px-2018_Mini_Countryman_Cooper_S_2.0_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2018_Mini_Countryman_Cooper_S_2.0_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mini-jcw-electric": {
+    "pagina": "Mini Hatch",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c4/Mini_Hatch_%28J01%29_Ditzingen_Mobil_IMG_9772_%28cropped%29.jpg/500px-Mini_Hatch_%28J01%29_Ditzingen_Mobil_IMG_9772_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Mini_Hatch_(J01)_Ditzingen_Mobil_IMG_9772_(cropped).jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "mitsubishi-i-miev": {
+    "pagina": "Mitsubishi i-MiEV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/93/2010_Mitsubishi_i-MiEV_%28GA_MY10%29_hatchback_%282015-11-11%29_01.jpg/500px-2010_Mitsubishi_i-MiEV_%28GA_MY10%29_hatchback_%282015-11-11%29_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2010_Mitsubishi_i-MiEV_(GA_MY10)_hatchback_(2015-11-11)_01.jpg",
+    "autore": "OSX",
+    "licenza": "Public domain"
+  },
+  "nio-et5-75": {
+    "pagina": "Nio ET5",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7b/NIO_ET5_IMG_8291.jpg/500px-NIO_ET5_IMG_8291.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:NIO_ET5_IMG_8291.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "nio-et5-100": {
+    "pagina": "Nio ET5",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7b/NIO_ET5_IMG_8291.jpg/500px-NIO_ET5_IMG_8291.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:NIO_ET5_IMG_8291.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "nio-et5-touring": {
+    "pagina": "Nio ET5",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7b/NIO_ET5_IMG_8291.jpg/500px-NIO_ET5_IMG_8291.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:NIO_ET5_IMG_8291.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "nio-et7": {
+    "pagina": "Nio ET7",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/70/NIO_ET7_1X7A6679_%28cropped%29.jpg/500px-NIO_ET7_1X7A6679_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:NIO_ET7_1X7A6679_(cropped).jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "nissan-ariya-63": {
+    "pagina": "Nissan Ariya",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/64/2023_Nissan_Ariya_Advance_Front.jpg/500px-2023_Nissan_Ariya_Advance_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2023_Nissan_Ariya_Advance_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "nissan-ariya-87": {
+    "pagina": "Nissan Ariya",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/64/2023_Nissan_Ariya_Advance_Front.jpg/500px-2023_Nissan_Ariya_Advance_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2023_Nissan_Ariya_Advance_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "nissan-ariya-e-4orce": {
+    "pagina": "Nissan Ariya",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/64/2023_Nissan_Ariya_Advance_Front.jpg/500px-2023_Nissan_Ariya_Advance_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2023_Nissan_Ariya_Advance_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "nissan-e-nv200": {
+    "pagina": "Nissan NV200",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f1/2021_Nissan_NV200_Vanette.jpg/500px-2021_Nissan_NV200_Vanette.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2021_Nissan_NV200_Vanette.jpg",
+    "autore": "TTTNIS",
+    "licenza": "CC0"
+  },
+  "nissan-leaf-40": {
+    "pagina": "Nissan Leaf",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/73/Nissan_Leaf_%28ZE2%29_autoMOBIL_T%C3%BCbingen_2025_DSC_2752.jpg/500px-Nissan_Leaf_%28ZE2%29_autoMOBIL_T%C3%BCbingen_2025_DSC_2752.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Nissan_Leaf_(ZE2)_autoMOBIL_T%C3%BCbingen_2025_DSC_2752.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "nissan-leaf-e-plus": {
+    "pagina": "Nissan Leaf",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/73/Nissan_Leaf_%28ZE2%29_autoMOBIL_T%C3%BCbingen_2025_DSC_2752.jpg/500px-Nissan_Leaf_%28ZE2%29_autoMOBIL_T%C3%BCbingen_2025_DSC_2752.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Nissan_Leaf_(ZE2)_autoMOBIL_T%C3%BCbingen_2025_DSC_2752.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "nissan-leaf-2026-52": {
+    "pagina": "Nissan Leaf",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/73/Nissan_Leaf_%28ZE2%29_autoMOBIL_T%C3%BCbingen_2025_DSC_2752.jpg/500px-Nissan_Leaf_%28ZE2%29_autoMOBIL_T%C3%BCbingen_2025_DSC_2752.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Nissan_Leaf_(ZE2)_autoMOBIL_T%C3%BCbingen_2025_DSC_2752.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "nissan-leaf-2026-75": {
+    "pagina": "Nissan Leaf",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/73/Nissan_Leaf_%28ZE2%29_autoMOBIL_T%C3%BCbingen_2025_DSC_2752.jpg/500px-Nissan_Leaf_%28ZE2%29_autoMOBIL_T%C3%BCbingen_2025_DSC_2752.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Nissan_Leaf_(ZE2)_autoMOBIL_T%C3%BCbingen_2025_DSC_2752.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "nissan-micra-40": {
+    "pagina": "Nissan Micra",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0d/2015_Nissan_Micra_SR_in_Brilliant_Silver%2C_front_right%2C_2024-10-11.jpg/500px-2015_Nissan_Micra_SR_in_Brilliant_Silver%2C_front_right%2C_2024-10-11.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2015_Nissan_Micra_SR_in_Brilliant_Silver,_front_right,_2024-10-11.jpg",
+    "autore": "Elise240SX",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "nissan-micra-52": {
+    "pagina": "Nissan Micra",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0d/2015_Nissan_Micra_SR_in_Brilliant_Silver%2C_front_right%2C_2024-10-11.jpg/500px-2015_Nissan_Micra_SR_in_Brilliant_Silver%2C_front_right%2C_2024-10-11.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2015_Nissan_Micra_SR_in_Brilliant_Silver,_front_right,_2024-10-11.jpg",
+    "autore": "Elise240SX",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "nissan-townstar-ev": {
+    "pagina": "Renault Kangoo",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/2024_Renault_Kangoo_in_Mineral_White%2C_front_left%2C_06-12-2025.jpg/500px-2024_Renault_Kangoo_in_Mineral_White%2C_front_left%2C_06-12-2025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2024_Renault_Kangoo_in_Mineral_White,_front_left,_06-12-2025.jpg",
+    "autore": "Cutlass",
+    "licenza": "CC0"
+  },
+  "omoda-e5": {
+    "pagina": "Omoda C5",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/43/2023_Omoda_C5_front_view.png/500px-2023_Omoda_C5_front_view.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2023_Omoda_C5_front_view.png",
+    "autore": "Autosdeprimera",
+    "licenza": "CC BY 3.0"
+  },
+  "opel-ampera-e": {
+    "pagina": "Chevrolet Bolt",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dd/2022_Chevrolet_Bolt_EV_2LT%2C_NYC_official_fleet_1.2.23.jpg/500px-2022_Chevrolet_Bolt_EV_2LT%2C_NYC_official_fleet_1.2.23.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2022_Chevrolet_Bolt_EV_2LT,_NYC_official_fleet_1.2.23.jpg",
+    "autore": "Kevauto",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "opel-astra-electric": {
+    "pagina": "Opel Astra",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4c/Opel_Astra_1.2_Turbo_Ultimate_%28L%29_%E2%80%93_f_13122024.jpg/500px-Opel_Astra_1.2_Turbo_Ultimate_%28L%29_%E2%80%93_f_13122024.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Opel_Astra_1.2_Turbo_Ultimate_(L)_%E2%80%93_f_13122024.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "opel-astra-st-electric": {
+    "pagina": "Opel Astra",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4c/Opel_Astra_1.2_Turbo_Ultimate_%28L%29_%E2%80%93_f_13122024.jpg/500px-Opel_Astra_1.2_Turbo_Ultimate_%28L%29_%E2%80%93_f_13122024.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Opel_Astra_1.2_Turbo_Ultimate_(L)_%E2%80%93_f_13122024.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "opel-corsa-e-50": {
+    "pagina": "Opel Corsa",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e9/Opel_Corsa-e_at_IAA_2019_IMG_0738.jpg/500px-Opel_Corsa-e_at_IAA_2019_IMG_0738.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Opel_Corsa-e_at_IAA_2019_IMG_0738.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "opel-corsa-electric-51": {
+    "pagina": "Opel Corsa",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e9/Opel_Corsa-e_at_IAA_2019_IMG_0738.jpg/500px-Opel_Corsa-e_at_IAA_2019_IMG_0738.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Opel_Corsa-e_at_IAA_2019_IMG_0738.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "opel-frontera-electric": {
+    "pagina": "Opel Frontera",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6e/Opel_Frontera_front_20080118.jpg/500px-Opel_Frontera_front_20080118.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Opel_Frontera_front_20080118.jpg",
+    "autore": "Rudolf Stricker",
+    "licenza": "CC BY-SA 3.0"
+  },
+  "opel-frontera-electric-lr": {
+    "pagina": "Opel Frontera",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6e/Opel_Frontera_front_20080118.jpg/500px-Opel_Frontera_front_20080118.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Opel_Frontera_front_20080118.jpg",
+    "autore": "Rudolf Stricker",
+    "licenza": "CC BY-SA 3.0"
+  },
+  "opel-grandland-electric-73": {
+    "pagina": "Opel Grandland",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cf/Opel_Grandland_Hybrid4_Automesse_Ludwigsburg_2022_1X7A5911.jpg/500px-Opel_Grandland_Hybrid4_Automesse_Ludwigsburg_2022_1X7A5911.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Opel_Grandland_Hybrid4_Automesse_Ludwigsburg_2022_1X7A5911.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "opel-grandland-electric-97": {
+    "pagina": "Opel Grandland",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cf/Opel_Grandland_Hybrid4_Automesse_Ludwigsburg_2022_1X7A5911.jpg/500px-Opel_Grandland_Hybrid4_Automesse_Ludwigsburg_2022_1X7A5911.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Opel_Grandland_Hybrid4_Automesse_Ludwigsburg_2022_1X7A5911.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "opel-mokka-e-50": {
+    "pagina": "Opel Mokka",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c2/Opel_Mokka-e_IMG_6111.jpg/500px-Opel_Mokka-e_IMG_6111.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Opel_Mokka-e_IMG_6111.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "opel-mokka-electric-54": {
+    "pagina": "Opel Mokka",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c2/Opel_Mokka-e_IMG_6111.jpg/500px-Opel_Mokka-e_IMG_6111.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Opel_Mokka-e_IMG_6111.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "peugeot-e208-50": {
+    "pagina": "Peugeot e-208",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/45/Peugeot_e-208_facelift_1X7A2502.jpg/500px-Peugeot_e-208_facelift_1X7A2502.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Peugeot_e-208_facelift_1X7A2502.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "peugeot-e208-51": {
+    "pagina": "Peugeot e-208",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/45/Peugeot_e-208_facelift_1X7A2502.jpg/500px-Peugeot_e-208_facelift_1X7A2502.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Peugeot_e-208_facelift_1X7A2502.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "peugeot-e2008-50": {
+    "pagina": "Peugeot 2008",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/2023_Peugeot_2008_in_Vertigo_Blue%2C_front_left%2C_06-08-2025.jpg/500px-2023_Peugeot_2008_in_Vertigo_Blue%2C_front_left%2C_06-08-2025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2023_Peugeot_2008_in_Vertigo_Blue,_front_left,_06-08-2025.jpg",
+    "autore": "Cutlass",
+    "licenza": "CC0"
+  },
+  "peugeot-e2008-54": {
+    "pagina": "Peugeot 2008",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/2023_Peugeot_2008_in_Vertigo_Blue%2C_front_left%2C_06-08-2025.jpg/500px-2023_Peugeot_2008_in_Vertigo_Blue%2C_front_left%2C_06-08-2025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2023_Peugeot_2008_in_Vertigo_Blue,_front_left,_06-08-2025.jpg",
+    "autore": "Cutlass",
+    "licenza": "CC0"
+  },
+  "peugeot-e308-54": {
+    "pagina": "Peugeot 308",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9e/2022_-_Peugeot_308_III_%28C%29_-_121.jpg/500px-2022_-_Peugeot_308_III_%28C%29_-_121.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2022_-_Peugeot_308_III_(C)_-_121.jpg",
+    "autore": "A.BourgeoisP",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "peugeot-e308-58": {
+    "pagina": "Peugeot 308",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9e/2022_-_Peugeot_308_III_%28C%29_-_121.jpg/500px-2022_-_Peugeot_308_III_%28C%29_-_121.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2022_-_Peugeot_308_III_(C)_-_121.jpg",
+    "autore": "A.BourgeoisP",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "peugeot-e3008-73": {
+    "pagina": "Peugeot 3008",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ed/Peugeot_e-3008_Automesse_Ludwigsburg_2024_IMG_1537.jpg/500px-Peugeot_e-3008_Automesse_Ludwigsburg_2024_IMG_1537.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Peugeot_e-3008_Automesse_Ludwigsburg_2024_IMG_1537.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "peugeot-e3008-97": {
+    "pagina": "Peugeot 3008",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ed/Peugeot_e-3008_Automesse_Ludwigsburg_2024_IMG_1537.jpg/500px-Peugeot_e-3008_Automesse_Ludwigsburg_2024_IMG_1537.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Peugeot_e-3008_Automesse_Ludwigsburg_2024_IMG_1537.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "peugeot-e3008-dual": {
+    "pagina": "Peugeot 3008",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ed/Peugeot_e-3008_Automesse_Ludwigsburg_2024_IMG_1537.jpg/500px-Peugeot_e-3008_Automesse_Ludwigsburg_2024_IMG_1537.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Peugeot_e-3008_Automesse_Ludwigsburg_2024_IMG_1537.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "peugeot-e408": {
+    "pagina": "Peugeot 408 (crossover)",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/04/Peugeot_408_Hybrid_136_e-DSC6_Allure_%E2%80%93_f_09022025.jpg/500px-Peugeot_408_Hybrid_136_e-DSC6_Allure_%E2%80%93_f_09022025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Peugeot_408_Hybrid_136_e-DSC6_Allure_%E2%80%93_f_09022025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "peugeot-e5008-73": {
+    "pagina": "Peugeot 5008",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e3/Peugeot_5008_C_DSC_2949.jpg/500px-Peugeot_5008_C_DSC_2949.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Peugeot_5008_C_DSC_2949.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "peugeot-e5008-97": {
+    "pagina": "Peugeot 5008",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e3/Peugeot_5008_C_DSC_2949.jpg/500px-Peugeot_5008_C_DSC_2949.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Peugeot_5008_C_DSC_2949.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "peugeot-ion": {
+    "pagina": "Mitsubishi i-MiEV",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/93/2010_Mitsubishi_i-MiEV_%28GA_MY10%29_hatchback_%282015-11-11%29_01.jpg/500px-2010_Mitsubishi_i-MiEV_%28GA_MY10%29_hatchback_%282015-11-11%29_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2010_Mitsubishi_i-MiEV_(GA_MY10)_hatchback_(2015-11-11)_01.jpg",
+    "autore": "OSX",
+    "licenza": "Public domain"
+  },
+  "polestar-2-launch": {
+    "pagina": "Polestar 2",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/ca/Polestar_2_%E2%80%93_f_02042021.jpg/500px-Polestar_2_%E2%80%93_f_02042021.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Polestar_2_%E2%80%93_f_02042021.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "polestar-2-sr": {
+    "pagina": "Polestar 2",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/ca/Polestar_2_%E2%80%93_f_02042021.jpg/500px-Polestar_2_%E2%80%93_f_02042021.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Polestar_2_%E2%80%93_f_02042021.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "polestar-2-lr": {
+    "pagina": "Polestar 2",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/ca/Polestar_2_%E2%80%93_f_02042021.jpg/500px-Polestar_2_%E2%80%93_f_02042021.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Polestar_2_%E2%80%93_f_02042021.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "polestar-2-lr-dual": {
+    "pagina": "Polestar 2",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/ca/Polestar_2_%E2%80%93_f_02042021.jpg/500px-Polestar_2_%E2%80%93_f_02042021.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Polestar_2_%E2%80%93_f_02042021.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "polestar-3-single": {
+    "pagina": "Polestar 3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/14/Polestar_3_Auto_Zuerich_2023_1X7A1307.jpg/500px-Polestar_3_Auto_Zuerich_2023_1X7A1307.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Polestar_3_Auto_Zuerich_2023_1X7A1307.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "polestar-3-dual": {
+    "pagina": "Polestar 3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/14/Polestar_3_Auto_Zuerich_2023_1X7A1307.jpg/500px-Polestar_3_Auto_Zuerich_2023_1X7A1307.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Polestar_3_Auto_Zuerich_2023_1X7A1307.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "polestar-4-single": {
+    "pagina": "Polestar 4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1e/Polestar_4_DSC_8232_%28cropped_2%29.jpg/500px-Polestar_4_DSC_8232_%28cropped_2%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Polestar_4_DSC_8232_(cropped_2).jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "polestar-4-dual": {
+    "pagina": "Polestar 4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1e/Polestar_4_DSC_8232_%28cropped_2%29.jpg/500px-Polestar_4_DSC_8232_%28cropped_2%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Polestar_4_DSC_8232_(cropped_2).jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "porsche-cayenne-electric": {
+    "pagina": "Porsche Cayenne",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fb/Porsche_Cayenne_%28III%2C_Facelift%29_%E2%80%93_f_01012025.jpg/500px-Porsche_Cayenne_%28III%2C_Facelift%29_%E2%80%93_f_01012025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Porsche_Cayenne_(III,_Facelift)_%E2%80%93_f_01012025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "porsche-macan-electric": {
+    "pagina": "Porsche Macan",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3a/Porsche_Macan_4_IMG_2153.jpg/500px-Porsche_Macan_4_IMG_2153.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Porsche_Macan_4_IMG_2153.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "porsche-macan-4": {
+    "pagina": "Porsche Macan",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3a/Porsche_Macan_4_IMG_2153.jpg/500px-Porsche_Macan_4_IMG_2153.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Porsche_Macan_4_IMG_2153.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "porsche-macan-turbo": {
+    "pagina": "Porsche Macan",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3a/Porsche_Macan_4_IMG_2153.jpg/500px-Porsche_Macan_4_IMG_2153.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Porsche_Macan_4_IMG_2153.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "porsche-taycan-79": {
+    "pagina": "Porsche Taycan",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dc/2020_Porsche_Taycan_4S_79kWh_Front.jpg/500px-2020_Porsche_Taycan_4S_79kWh_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Porsche_Taycan_4S_79kWh_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "porsche-taycan-93": {
+    "pagina": "Porsche Taycan",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dc/2020_Porsche_Taycan_4S_79kWh_Front.jpg/500px-2020_Porsche_Taycan_4S_79kWh_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Porsche_Taycan_4S_79kWh_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "porsche-taycan-turbo-2020": {
+    "pagina": "Porsche Taycan",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dc/2020_Porsche_Taycan_4S_79kWh_Front.jpg/500px-2020_Porsche_Taycan_4S_79kWh_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Porsche_Taycan_4S_79kWh_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "porsche-taycan-cross-turismo": {
+    "pagina": "Porsche Taycan",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dc/2020_Porsche_Taycan_4S_79kWh_Front.jpg/500px-2020_Porsche_Taycan_4S_79kWh_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Porsche_Taycan_4S_79kWh_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "porsche-taycan-2024-82": {
+    "pagina": "Porsche Taycan",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dc/2020_Porsche_Taycan_4S_79kWh_Front.jpg/500px-2020_Porsche_Taycan_4S_79kWh_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Porsche_Taycan_4S_79kWh_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "porsche-taycan-2024-97": {
+    "pagina": "Porsche Taycan",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dc/2020_Porsche_Taycan_4S_79kWh_Front.jpg/500px-2020_Porsche_Taycan_4S_79kWh_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Porsche_Taycan_4S_79kWh_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "porsche-taycan-sport-turismo-2024": {
+    "pagina": "Porsche Taycan",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dc/2020_Porsche_Taycan_4S_79kWh_Front.jpg/500px-2020_Porsche_Taycan_4S_79kWh_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Porsche_Taycan_4S_79kWh_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "renault-4-40": {
+    "pagina": "Renault 4 E-Tech",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Renault_4_E-Tech_150_Comfort_Range_Techno_%E2%80%93_f_22062025.jpg/500px-Renault_4_E-Tech_150_Comfort_Range_Techno_%E2%80%93_f_22062025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Renault_4_E-Tech_150_Comfort_Range_Techno_%E2%80%93_f_22062025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "renault-4-52": {
+    "pagina": "Renault 4 E-Tech",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Renault_4_E-Tech_150_Comfort_Range_Techno_%E2%80%93_f_22062025.jpg/500px-Renault_4_E-Tech_150_Comfort_Range_Techno_%E2%80%93_f_22062025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Renault_4_E-Tech_150_Comfort_Range_Techno_%E2%80%93_f_22062025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "renault-5-40": {
+    "pagina": "Renault 5 E-Tech",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e4/Renault_5_E-Tech_Electric_DSC_7279.jpg/500px-Renault_5_E-Tech_Electric_DSC_7279.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Renault_5_E-Tech_Electric_DSC_7279.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "renault-5-52": {
+    "pagina": "Renault 5 E-Tech",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e4/Renault_5_E-Tech_Electric_DSC_7279.jpg/500px-Renault_5_E-Tech_Electric_DSC_7279.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Renault_5_E-Tech_Electric_DSC_7279.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "renault-kangoo-e-tech": {
+    "pagina": "Renault Kangoo",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/2024_Renault_Kangoo_in_Mineral_White%2C_front_left%2C_06-12-2025.jpg/500px-2024_Renault_Kangoo_in_Mineral_White%2C_front_left%2C_06-12-2025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2024_Renault_Kangoo_in_Mineral_White,_front_left,_06-12-2025.jpg",
+    "autore": "Cutlass",
+    "licenza": "CC0"
+  },
+  "renault-megane-40": {
+    "pagina": "Renault Megane E-Tech Electric",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/42/Renault_M%C3%A9gane_E-Tech_IMG_4064.jpg/500px-Renault_M%C3%A9gane_E-Tech_IMG_4064.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Renault_M%C3%A9gane_E-Tech_IMG_4064.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "renault-megane-60": {
+    "pagina": "Renault Megane E-Tech Electric",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/42/Renault_M%C3%A9gane_E-Tech_IMG_4064.jpg/500px-Renault_M%C3%A9gane_E-Tech_IMG_4064.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Renault_M%C3%A9gane_E-Tech_IMG_4064.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "renault-scenic-60": {
+    "pagina": "Renault Scénic",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2e/2019_Renault_Grand_Scenic_Iconic_TCE_1.3.jpg/500px-2019_Renault_Grand_Scenic_Iconic_TCE_1.3.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2019_Renault_Grand_Scenic_Iconic_TCE_1.3.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "renault-scenic-87": {
+    "pagina": "Renault Scénic",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2e/2019_Renault_Grand_Scenic_Iconic_TCE_1.3.jpg/500px-2019_Renault_Grand_Scenic_Iconic_TCE_1.3.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2019_Renault_Grand_Scenic_Iconic_TCE_1.3.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "renault-twingo-2026": {
+    "pagina": "Renault Twingo E-Tech",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b9/Renault_Twingo_E-Tech_IMG_6605.jpg/500px-Renault_Twingo_E-Tech_IMG_6605.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Renault_Twingo_E-Tech_IMG_6605.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "renault-zoe-r110": {
+    "pagina": "Renault Zoe",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/83/Renault_Zoe_R110_Z.E._50_Experience_%28Facelift%29_%E2%80%93_f_22112020.jpg/500px-Renault_Zoe_R110_Z.E._50_Experience_%28Facelift%29_%E2%80%93_f_22112020.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Renault_Zoe_R110_Z.E._50_Experience_(Facelift)_%E2%80%93_f_22112020.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "renault-zoe-r135": {
+    "pagina": "Renault Zoe",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/83/Renault_Zoe_R110_Z.E._50_Experience_%28Facelift%29_%E2%80%93_f_22112020.jpg/500px-Renault_Zoe_R110_Z.E._50_Experience_%28Facelift%29_%E2%80%93_f_22112020.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Renault_Zoe_R110_Z.E._50_Experience_(Facelift)_%E2%80%93_f_22112020.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "rolls-royce-spectre": {
+    "pagina": "Rolls-Royce Spectre",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f2/2024_Rolls-Royce_Spectre_in_Midnight_Sapphire_over_Silver%2C_front_left.jpg/500px-2024_Rolls-Royce_Spectre_in_Midnight_Sapphire_over_Silver%2C_front_left.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2024_Rolls-Royce_Spectre_in_Midnight_Sapphire_over_Silver,_front_left.jpg",
+    "autore": "Mr.choppers",
+    "licenza": "CC BY-SA 3.0"
+  },
+  "skoda-citigo-e-iv": {
+    "pagina": "Volkswagen Up",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d1/2013_Volkswagen_Take_UP%21_1.0.jpg/500px-2013_Volkswagen_Take_UP%21_1.0.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2013_Volkswagen_Take_UP!_1.0.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "skoda-elroq-50": {
+    "pagina": "Škoda Elroq",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/96/%C5%A0koda_Elroq_DSC_9260.jpg/500px-%C5%A0koda_Elroq_DSC_9260.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:%C5%A0koda_Elroq_DSC_9260.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "skoda-elroq-60": {
+    "pagina": "Škoda Elroq",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/96/%C5%A0koda_Elroq_DSC_9260.jpg/500px-%C5%A0koda_Elroq_DSC_9260.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:%C5%A0koda_Elroq_DSC_9260.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "skoda-elroq-85": {
+    "pagina": "Škoda Elroq",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/96/%C5%A0koda_Elroq_DSC_9260.jpg/500px-%C5%A0koda_Elroq_DSC_9260.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:%C5%A0koda_Elroq_DSC_9260.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "skoda-elroq-rs": {
+    "pagina": "Škoda Elroq",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/96/%C5%A0koda_Elroq_DSC_9260.jpg/500px-%C5%A0koda_Elroq_DSC_9260.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:%C5%A0koda_Elroq_DSC_9260.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "skoda-enyaq-60": {
+    "pagina": "Škoda Enyaq",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/%C5%A0koda_Enyaq_IMG_1190.jpg/500px-%C5%A0koda_Enyaq_IMG_1190.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:%C5%A0koda_Enyaq_IMG_1190.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "skoda-enyaq-80": {
+    "pagina": "Škoda Enyaq",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/%C5%A0koda_Enyaq_IMG_1190.jpg/500px-%C5%A0koda_Enyaq_IMG_1190.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:%C5%A0koda_Enyaq_IMG_1190.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "skoda-enyaq-85": {
+    "pagina": "Škoda Enyaq",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/%C5%A0koda_Enyaq_IMG_1190.jpg/500px-%C5%A0koda_Enyaq_IMG_1190.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:%C5%A0koda_Enyaq_IMG_1190.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "skoda-enyaq-85x": {
+    "pagina": "Škoda Enyaq",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/%C5%A0koda_Enyaq_IMG_1190.jpg/500px-%C5%A0koda_Enyaq_IMG_1190.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:%C5%A0koda_Enyaq_IMG_1190.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "skoda-enyaq-coupe-85": {
+    "pagina": "Škoda Enyaq",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/%C5%A0koda_Enyaq_IMG_1190.jpg/500px-%C5%A0koda_Enyaq_IMG_1190.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:%C5%A0koda_Enyaq_IMG_1190.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "skoda-enyaq-rs": {
+    "pagina": "Škoda Enyaq",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/%C5%A0koda_Enyaq_IMG_1190.jpg/500px-%C5%A0koda_Enyaq_IMG_1190.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:%C5%A0koda_Enyaq_IMG_1190.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "skoda-epiq-38": {
+    "pagina": "Škoda Epiq",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5a/%C5%A0koda_Epiq_Showcar_IAA_2025_DSC_1378_%28cropped%29.jpg/500px-%C5%A0koda_Epiq_Showcar_IAA_2025_DSC_1378_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:%C5%A0koda_Epiq_Showcar_IAA_2025_DSC_1378_(cropped).jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "skoda-epiq-55": {
+    "pagina": "Škoda Epiq",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5a/%C5%A0koda_Epiq_Showcar_IAA_2025_DSC_1378_%28cropped%29.jpg/500px-%C5%A0koda_Epiq_Showcar_IAA_2025_DSC_1378_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:%C5%A0koda_Epiq_Showcar_IAA_2025_DSC_1378_(cropped).jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "smart-1-pro": {
+    "pagina": "Smart 1",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/Smart_%E2%99%AF1_Pro_%E2%80%93_f_11102025.jpg/500px-Smart_%E2%99%AF1_Pro_%E2%80%93_f_11102025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Smart_%E2%99%AF1_Pro_%E2%80%93_f_11102025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "smart-1": {
+    "pagina": "Smart 1",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/Smart_%E2%99%AF1_Pro_%E2%80%93_f_11102025.jpg/500px-Smart_%E2%99%AF1_Pro_%E2%80%93_f_11102025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Smart_%E2%99%AF1_Pro_%E2%80%93_f_11102025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "smart-1-brabus": {
+    "pagina": "Smart 1",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/Smart_%E2%99%AF1_Pro_%E2%80%93_f_11102025.jpg/500px-Smart_%E2%99%AF1_Pro_%E2%80%93_f_11102025.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Smart_%E2%99%AF1_Pro_%E2%80%93_f_11102025.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "smart-3": {
+    "pagina": "Smart 3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/45/Smart_Hashtag_3_DSC_7992.jpg/500px-Smart_Hashtag_3_DSC_7992.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Smart_Hashtag_3_DSC_7992.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "smart-3-brabus": {
+    "pagina": "Smart 3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/45/Smart_Hashtag_3_DSC_7992.jpg/500px-Smart_Hashtag_3_DSC_7992.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Smart_Hashtag_3_DSC_7992.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "smart-5": {
+    "pagina": "Smart 5",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/69/Smart_Hashtag_5_Premium_autoMOBIL_T%C3%BCbingen_2025_DSC_2755_%28cropped%29.jpg/500px-Smart_Hashtag_5_Premium_autoMOBIL_T%C3%BCbingen_2025_DSC_2755_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Smart_Hashtag_5_Premium_autoMOBIL_T%C3%BCbingen_2025_DSC_2755_(cropped).jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "subaru-solterra": {
+    "pagina": "Toyota bZ4X",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ea/Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg/500px-Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "subaru-solterra-2025": {
+    "pagina": "Toyota bZ4X",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ea/Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg/500px-Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "suzuki-e-vitara-49": {
+    "pagina": "Suzuki e Vitara",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1c/Suzuki_e_Vitara_in_Hamamatsu_Sta_front.jpg/500px-Suzuki_e_Vitara_in_Hamamatsu_Sta_front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Suzuki_e_Vitara_in_Hamamatsu_Sta_front.jpg",
+    "autore": "IXTA9839",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "suzuki-e-vitara-61": {
+    "pagina": "Suzuki e Vitara",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1c/Suzuki_e_Vitara_in_Hamamatsu_Sta_front.jpg/500px-Suzuki_e_Vitara_in_Hamamatsu_Sta_front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Suzuki_e_Vitara_in_Hamamatsu_Sta_front.jpg",
+    "autore": "IXTA9839",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "tesla-model-3-sr-plus": {
+    "pagina": "Tesla Model 3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Tesla_Model_3_%282023%29_Autofr%C3%BChling_Ulm_IMG_9282.jpg/500px-Tesla_Model_3_%282023%29_Autofr%C3%BChling_Ulm_IMG_9282.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Tesla_Model_3_(2023)_Autofr%C3%BChling_Ulm_IMG_9282.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "tesla-model-3-rwd": {
+    "pagina": "Tesla Model 3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Tesla_Model_3_%282023%29_Autofr%C3%BChling_Ulm_IMG_9282.jpg/500px-Tesla_Model_3_%282023%29_Autofr%C3%BChling_Ulm_IMG_9282.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Tesla_Model_3_(2023)_Autofr%C3%BChling_Ulm_IMG_9282.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "tesla-model-3-lr": {
+    "pagina": "Tesla Model 3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Tesla_Model_3_%282023%29_Autofr%C3%BChling_Ulm_IMG_9282.jpg/500px-Tesla_Model_3_%282023%29_Autofr%C3%BChling_Ulm_IMG_9282.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Tesla_Model_3_(2023)_Autofr%C3%BChling_Ulm_IMG_9282.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "tesla-model-3-lr-rwd": {
+    "pagina": "Tesla Model 3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Tesla_Model_3_%282023%29_Autofr%C3%BChling_Ulm_IMG_9282.jpg/500px-Tesla_Model_3_%282023%29_Autofr%C3%BChling_Ulm_IMG_9282.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Tesla_Model_3_(2023)_Autofr%C3%BChling_Ulm_IMG_9282.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "tesla-model-3-performance": {
+    "pagina": "Tesla Model 3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Tesla_Model_3_%282023%29_Autofr%C3%BChling_Ulm_IMG_9282.jpg/500px-Tesla_Model_3_%282023%29_Autofr%C3%BChling_Ulm_IMG_9282.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Tesla_Model_3_(2023)_Autofr%C3%BChling_Ulm_IMG_9282.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "tesla-model-3-performance-2024": {
+    "pagina": "Tesla Model 3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Tesla_Model_3_%282023%29_Autofr%C3%BChling_Ulm_IMG_9282.jpg/500px-Tesla_Model_3_%282023%29_Autofr%C3%BChling_Ulm_IMG_9282.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Tesla_Model_3_(2023)_Autofr%C3%BChling_Ulm_IMG_9282.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "tesla-model-s-75d": {
+    "pagina": "Tesla Model S",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9e/Tesla_Model_S_%28Facelift_ab_04-2016%29_%28cropped%29.jpg/500px-Tesla_Model_S_%28Facelift_ab_04-2016%29_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Tesla_Model_S_(Facelift_ab_04-2016)_(cropped).jpg",
+    "autore": "Peteratkins",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "tesla-model-s-100d": {
+    "pagina": "Tesla Model S",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9e/Tesla_Model_S_%28Facelift_ab_04-2016%29_%28cropped%29.jpg/500px-Tesla_Model_S_%28Facelift_ab_04-2016%29_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Tesla_Model_S_(Facelift_ab_04-2016)_(cropped).jpg",
+    "autore": "Peteratkins",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "tesla-model-s-lr": {
+    "pagina": "Tesla Model S",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9e/Tesla_Model_S_%28Facelift_ab_04-2016%29_%28cropped%29.jpg/500px-Tesla_Model_S_%28Facelift_ab_04-2016%29_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Tesla_Model_S_(Facelift_ab_04-2016)_(cropped).jpg",
+    "autore": "Peteratkins",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "tesla-model-s-plaid": {
+    "pagina": "Tesla Model S",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9e/Tesla_Model_S_%28Facelift_ab_04-2016%29_%28cropped%29.jpg/500px-Tesla_Model_S_%28Facelift_ab_04-2016%29_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Tesla_Model_S_(Facelift_ab_04-2016)_(cropped).jpg",
+    "autore": "Peteratkins",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "tesla-model-x-75d": {
+    "pagina": "Tesla Model X",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/92/2017_Tesla_Model_X_100D_Front.jpg/500px-2017_Tesla_Model_X_100D_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2017_Tesla_Model_X_100D_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "tesla-model-x-100d": {
+    "pagina": "Tesla Model X",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/92/2017_Tesla_Model_X_100D_Front.jpg/500px-2017_Tesla_Model_X_100D_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2017_Tesla_Model_X_100D_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "tesla-model-x-lr": {
+    "pagina": "Tesla Model X",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/92/2017_Tesla_Model_X_100D_Front.jpg/500px-2017_Tesla_Model_X_100D_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2017_Tesla_Model_X_100D_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "tesla-model-x-plaid": {
+    "pagina": "Tesla Model X",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/92/2017_Tesla_Model_X_100D_Front.jpg/500px-2017_Tesla_Model_X_100D_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2017_Tesla_Model_X_100D_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "tesla-model-y-standard": {
+    "pagina": "Tesla Model Y",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e7/Tesla_Model_Y_Premium_%28Facelift%29_%E2%80%93_f_05052026.jpg/500px-Tesla_Model_Y_Premium_%28Facelift%29_%E2%80%93_f_05052026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Tesla_Model_Y_Premium_(Facelift)_%E2%80%93_f_05052026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "tesla-model-y-rwd": {
+    "pagina": "Tesla Model Y",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e7/Tesla_Model_Y_Premium_%28Facelift%29_%E2%80%93_f_05052026.jpg/500px-Tesla_Model_Y_Premium_%28Facelift%29_%E2%80%93_f_05052026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Tesla_Model_Y_Premium_(Facelift)_%E2%80%93_f_05052026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "tesla-model-y-lr": {
+    "pagina": "Tesla Model Y",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e7/Tesla_Model_Y_Premium_%28Facelift%29_%E2%80%93_f_05052026.jpg/500px-Tesla_Model_Y_Premium_%28Facelift%29_%E2%80%93_f_05052026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Tesla_Model_Y_Premium_(Facelift)_%E2%80%93_f_05052026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "tesla-model-y-lr-rwd": {
+    "pagina": "Tesla Model Y",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e7/Tesla_Model_Y_Premium_%28Facelift%29_%E2%80%93_f_05052026.jpg/500px-Tesla_Model_Y_Premium_%28Facelift%29_%E2%80%93_f_05052026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Tesla_Model_Y_Premium_(Facelift)_%E2%80%93_f_05052026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "tesla-model-y-performance": {
+    "pagina": "Tesla Model Y",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e7/Tesla_Model_Y_Premium_%28Facelift%29_%E2%80%93_f_05052026.jpg/500px-Tesla_Model_Y_Premium_%28Facelift%29_%E2%80%93_f_05052026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Tesla_Model_Y_Premium_(Facelift)_%E2%80%93_f_05052026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "toyota-bz4x-fwd": {
+    "pagina": "Toyota bZ4X",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ea/Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg/500px-Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "toyota-bz4x-awd": {
+    "pagina": "Toyota bZ4X",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ea/Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg/500px-Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "toyota-bz4x-2025-57": {
+    "pagina": "Toyota bZ4X",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ea/Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg/500px-Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "toyota-bz4x-2025-74": {
+    "pagina": "Toyota bZ4X",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ea/Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg/500px-Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Toyota_bZ4X_Automesse_Ludwigsburg_2022_1X7A5895.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "toyota-c-hr-plus-57": {
+    "pagina": "Toyota C-HR",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a8/Toyota_C-HR_Hybrid_%28AX20%29_DSC_7239.jpg/500px-Toyota_C-HR_Hybrid_%28AX20%29_DSC_7239.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Toyota_C-HR_Hybrid_(AX20)_DSC_7239.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "toyota-c-hr-plus-77": {
+    "pagina": "Toyota C-HR",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a8/Toyota_C-HR_Hybrid_%28AX20%29_DSC_7239.jpg/500px-Toyota_C-HR_Hybrid_%28AX20%29_DSC_7239.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Toyota_C-HR_Hybrid_(AX20)_DSC_7239.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "toyota-proace-city-verso": {
+    "pagina": "Citroën Berlingo",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2a/Citro%C3%ABn_Berlingo_XL_BlueHDi_130_EAT8_Shine_XTR_%28III%29_%E2%80%93_f_02012021.jpg/500px-Citro%C3%ABn_Berlingo_XL_BlueHDi_130_EAT8_Shine_XTR_%28III%29_%E2%80%93_f_02012021.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Citro%C3%ABn_Berlingo_XL_BlueHDi_130_EAT8_Shine_XTR_(III)_%E2%80%93_f_02012021.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "toyota-proace-verso": {
+    "pagina": "Citroën Jumpy",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/2016_Citroen_Dispatch_1000_BlueHDi_X_S_1.6_Front.jpg/500px-2016_Citroen_Dispatch_1000_BlueHDi_X_S_1.6_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2016_Citroen_Dispatch_1000_BlueHDi_X_S_1.6_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "toyota-urban-cruiser-49": {
+    "pagina": "Toyota Urban Cruiser",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5b/Toyota_Urban_Cruiser.jpg/500px-Toyota_Urban_Cruiser.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Toyota_Urban_Cruiser.jpg",
+    "autore": "Thomas doerfer",
+    "licenza": "CC BY-SA 3.0"
+  },
+  "toyota-urban-cruiser-61": {
+    "pagina": "Toyota Urban Cruiser",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5b/Toyota_Urban_Cruiser.jpg/500px-Toyota_Urban_Cruiser.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Toyota_Urban_Cruiser.jpg",
+    "autore": "Thomas doerfer",
+    "licenza": "CC BY-SA 3.0"
+  },
+  "vinfast-vf8": {
+    "pagina": "VinFast VF 8",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/61/VinFast_VF_8_DSC_8568.jpg/500px-VinFast_VF_8_DSC_8568.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:VinFast_VF_8_DSC_8568.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-e-golf": {
+    "pagina": "Volkswagen Golf Mk7",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/59/2013_Volkswagen_Golf_SE_BlueMotion_Technology_1.4_Front.jpg/500px-2013_Volkswagen_Golf_SE_BlueMotion_Technology_1.4_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2013_Volkswagen_Golf_SE_BlueMotion_Technology_1.4_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-e-up": {
+    "pagina": "Volkswagen Up",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d1/2013_Volkswagen_Take_UP%21_1.0.jpg/500px-2013_Volkswagen_Take_UP%21_1.0.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2013_Volkswagen_Take_UP!_1.0.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id-buzz-pro": {
+    "pagina": "Volkswagen ID. Buzz",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4f/Volkswagen_ID._Buzz_1X7A6263.jpg/500px-Volkswagen_ID._Buzz_1X7A6263.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volkswagen_ID._Buzz_1X7A6263.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id-buzz-lwb": {
+    "pagina": "Volkswagen ID. Buzz",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4f/Volkswagen_ID._Buzz_1X7A6263.jpg/500px-Volkswagen_ID._Buzz_1X7A6263.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volkswagen_ID._Buzz_1X7A6263.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id-buzz-gtx": {
+    "pagina": "Volkswagen ID. Buzz",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4f/Volkswagen_ID._Buzz_1X7A6263.jpg/500px-Volkswagen_ID._Buzz_1X7A6263.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volkswagen_ID._Buzz_1X7A6263.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id-polo-37": {
+    "pagina": "Volkswagen ID. Polo",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Volkswagen_ID.Polo_IMG_8361.jpg/500px-Volkswagen_ID.Polo_IMG_8361.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volkswagen_ID.Polo_IMG_8361.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id-polo-52": {
+    "pagina": "Volkswagen ID. Polo",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Volkswagen_ID.Polo_IMG_8361.jpg/500px-Volkswagen_ID.Polo_IMG_8361.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volkswagen_ID.Polo_IMG_8361.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id3-45": {
+    "pagina": "Volkswagen ID.3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/22/2020_Volkswagen_ID.3_1st_Front.jpg/500px-2020_Volkswagen_ID.3_1st_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Volkswagen_ID.3_1st_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id3-52": {
+    "pagina": "Volkswagen ID.3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/22/2020_Volkswagen_ID.3_1st_Front.jpg/500px-2020_Volkswagen_ID.3_1st_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Volkswagen_ID.3_1st_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id3-58": {
+    "pagina": "Volkswagen ID.3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/22/2020_Volkswagen_ID.3_1st_Front.jpg/500px-2020_Volkswagen_ID.3_1st_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Volkswagen_ID.3_1st_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id3-77": {
+    "pagina": "Volkswagen ID.3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/22/2020_Volkswagen_ID.3_1st_Front.jpg/500px-2020_Volkswagen_ID.3_1st_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Volkswagen_ID.3_1st_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id3-gtx": {
+    "pagina": "Volkswagen ID.3",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/22/2020_Volkswagen_ID.3_1st_Front.jpg/500px-2020_Volkswagen_ID.3_1st_Front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2020_Volkswagen_ID.3_1st_Front.jpg",
+    "autore": "Vauxford",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id4-52": {
+    "pagina": "Volkswagen ID.4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/55/2025_Volkswagen_ID4_Pro_Redspot_front.jpg/500px-2025_Volkswagen_ID4_Pro_Redspot_front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2025_Volkswagen_ID4_Pro_Redspot_front.jpg",
+    "autore": "LuvsMG481",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id4-77": {
+    "pagina": "Volkswagen ID.4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/55/2025_Volkswagen_ID4_Pro_Redspot_front.jpg/500px-2025_Volkswagen_ID4_Pro_Redspot_front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2025_Volkswagen_ID4_Pro_Redspot_front.jpg",
+    "autore": "LuvsMG481",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id4-4motion": {
+    "pagina": "Volkswagen ID.4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/55/2025_Volkswagen_ID4_Pro_Redspot_front.jpg/500px-2025_Volkswagen_ID4_Pro_Redspot_front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2025_Volkswagen_ID4_Pro_Redspot_front.jpg",
+    "autore": "LuvsMG481",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id4-gtx": {
+    "pagina": "Volkswagen ID.4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/55/2025_Volkswagen_ID4_Pro_Redspot_front.jpg/500px-2025_Volkswagen_ID4_Pro_Redspot_front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2025_Volkswagen_ID4_Pro_Redspot_front.jpg",
+    "autore": "LuvsMG481",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id5-pro": {
+    "pagina": "Volkswagen ID.4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/55/2025_Volkswagen_ID4_Pro_Redspot_front.jpg/500px-2025_Volkswagen_ID4_Pro_Redspot_front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2025_Volkswagen_ID4_Pro_Redspot_front.jpg",
+    "autore": "LuvsMG481",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id5-gtx": {
+    "pagina": "Volkswagen ID.4",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/55/2025_Volkswagen_ID4_Pro_Redspot_front.jpg/500px-2025_Volkswagen_ID4_Pro_Redspot_front.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2025_Volkswagen_ID4_Pro_Redspot_front.jpg",
+    "autore": "LuvsMG481",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id7-pro": {
+    "pagina": "Volkswagen ID.7",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/86/Volkswagen_ID.7_DSC_7879_%28cropped%29.jpg/500px-Volkswagen_ID.7_DSC_7879_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volkswagen_ID.7_DSC_7879_(cropped).jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id7-pro-s": {
+    "pagina": "Volkswagen ID.7",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/86/Volkswagen_ID.7_DSC_7879_%28cropped%29.jpg/500px-Volkswagen_ID.7_DSC_7879_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volkswagen_ID.7_DSC_7879_(cropped).jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id7-gtx": {
+    "pagina": "Volkswagen ID.7",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/86/Volkswagen_ID.7_DSC_7879_%28cropped%29.jpg/500px-Volkswagen_ID.7_DSC_7879_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volkswagen_ID.7_DSC_7879_(cropped).jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id7-tourer-pro": {
+    "pagina": "Volkswagen ID.7",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/86/Volkswagen_ID.7_DSC_7879_%28cropped%29.jpg/500px-Volkswagen_ID.7_DSC_7879_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volkswagen_ID.7_DSC_7879_(cropped).jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volkswagen-id7-tourer-pro-s": {
+    "pagina": "Volkswagen ID.7",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/86/Volkswagen_ID.7_DSC_7879_%28cropped%29.jpg/500px-Volkswagen_ID.7_DSC_7879_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volkswagen_ID.7_DSC_7879_(cropped).jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volvo-c40-recharge": {
+    "pagina": "Volvo XC40",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/27/2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg/500px-2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic,_front_left,_2025-09-22.jpg",
+    "autore": "Elise240SX",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volvo-ec40-69": {
+    "pagina": "Volvo XC40",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/27/2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg/500px-2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic,_front_left,_2025-09-22.jpg",
+    "autore": "Elise240SX",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volvo-ec40-82": {
+    "pagina": "Volvo XC40",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/27/2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg/500px-2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic,_front_left,_2025-09-22.jpg",
+    "autore": "Elise240SX",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volvo-ec40-twin": {
+    "pagina": "Volvo XC40",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/27/2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg/500px-2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic,_front_left,_2025-09-22.jpg",
+    "autore": "Elise240SX",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volvo-es90": {
+    "pagina": "Volvo ES90",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0e/Volvo_ES90_Ultra_%E2%80%93_f_29032026.jpg/500px-Volvo_ES90_Ultra_%E2%80%93_f_29032026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volvo_ES90_Ultra_%E2%80%93_f_29032026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "volvo-es90-twin": {
+    "pagina": "Volvo ES90",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0e/Volvo_ES90_Ultra_%E2%80%93_f_29032026.jpg/500px-Volvo_ES90_Ultra_%E2%80%93_f_29032026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volvo_ES90_Ultra_%E2%80%93_f_29032026.jpg",
+    "autore": "© M 93",
+    "licenza": "CC BY-SA 3.0 de"
+  },
+  "volvo-ex30-51": {
+    "pagina": "Volvo EX30",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/eb/Volvo_EX30_IMG_8923.jpg/500px-Volvo_EX30_IMG_8923.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volvo_EX30_IMG_8923.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volvo-ex30-69": {
+    "pagina": "Volvo EX30",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/eb/Volvo_EX30_IMG_8923.jpg/500px-Volvo_EX30_IMG_8923.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volvo_EX30_IMG_8923.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volvo-ex30-twin": {
+    "pagina": "Volvo EX30",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/eb/Volvo_EX30_IMG_8923.jpg/500px-Volvo_EX30_IMG_8923.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volvo_EX30_IMG_8923.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volvo-ex30-cross-country": {
+    "pagina": "Volvo EX30",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/eb/Volvo_EX30_IMG_8923.jpg/500px-Volvo_EX30_IMG_8923.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volvo_EX30_IMG_8923.jpg",
+    "autore": "Alexander-93",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volvo-ex40-69": {
+    "pagina": "Volvo XC40",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/27/2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg/500px-2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic,_front_left,_2025-09-22.jpg",
+    "autore": "Elise240SX",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volvo-ex40-82": {
+    "pagina": "Volvo XC40",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/27/2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg/500px-2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic,_front_left,_2025-09-22.jpg",
+    "autore": "Elise240SX",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volvo-ex40-twin": {
+    "pagina": "Volvo XC40",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/27/2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg/500px-2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic,_front_left,_2025-09-22.jpg",
+    "autore": "Elise240SX",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volvo-ex90": {
+    "pagina": "Volvo EX90",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/31/Volvo_EX90_autoMOBIL_T%C3%BCbingen_2025_DSC_2740.jpg/500px-Volvo_EX90_autoMOBIL_T%C3%BCbingen_2025_DSC_2740.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Volvo_EX90_autoMOBIL_T%C3%BCbingen_2025_DSC_2740.jpg",
+    "autore": "Alexander Migl",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "volvo-xc40-recharge-p8": {
+    "pagina": "Volvo XC40",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/27/2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg/500px-2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic%2C_front_left%2C_2025-09-22.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2019_Volvo_XC40_T5_Momentum_in_Bright_Silver_Metallic,_front_left,_2025-09-22.jpg",
+    "autore": "Elise240SX",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "xpeng-g6-sr": {
+    "pagina": "XPeng G6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a5/XPeng_G6_018_%28cropped%29.jpg/500px-XPeng_G6_018_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:XPeng_G6_018_(cropped).jpg",
+    "autore": "JustAnotherCarDesigner",
+    "licenza": "CC0"
+  },
+  "xpeng-g6-lr": {
+    "pagina": "XPeng G6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a5/XPeng_G6_018_%28cropped%29.jpg/500px-XPeng_G6_018_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:XPeng_G6_018_(cropped).jpg",
+    "autore": "JustAnotherCarDesigner",
+    "licenza": "CC0"
+  },
+  "xpeng-g6-awd": {
+    "pagina": "XPeng G6",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a5/XPeng_G6_018_%28cropped%29.jpg/500px-XPeng_G6_018_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:XPeng_G6_018_(cropped).jpg",
+    "autore": "JustAnotherCarDesigner",
+    "licenza": "CC0"
+  },
+  "xpeng-g9-sr": {
+    "pagina": "XPeng G9",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7f/2022_XPeng_G9_%28front%29.jpg/500px-2022_XPeng_G9_%28front%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2022_XPeng_G9_(front).jpg",
+    "autore": "User3204",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "xpeng-g9-lr": {
+    "pagina": "XPeng G9",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7f/2022_XPeng_G9_%28front%29.jpg/500px-2022_XPeng_G9_%28front%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2022_XPeng_G9_(front).jpg",
+    "autore": "User3204",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "xpeng-g9-awd": {
+    "pagina": "XPeng G9",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7f/2022_XPeng_G9_%28front%29.jpg/500px-2022_XPeng_G9_%28front%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2022_XPeng_G9_(front).jpg",
+    "autore": "User3204",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "xpeng-p7": {
+    "pagina": "XPeng P7",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/06/XPeng_P7_II_MY2025_IMG03.jpg/500px-XPeng_P7_II_MY2025_IMG03.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:XPeng_P7_II_MY2025_IMG03.jpg",
+    "autore": "Poprace",
+    "licenza": "CC0"
+  },
+  "zeekr-001": {
+    "pagina": "Zeekr 001",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0a/2022_Zeekr_001_%28front%29.jpg/500px-2022_Zeekr_001_%28front%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2022_Zeekr_001_(front).jpg",
+    "autore": "User3204",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "zeekr-7x-75": {
+    "pagina": "Zeekr 7X",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1d/Zeekr_7X_005_%28cropped%29.jpg/500px-Zeekr_7X_005_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Zeekr_7X_005_(cropped).jpg",
+    "autore": "JustAnotherCarDesigner",
+    "licenza": "CC0"
+  },
+  "zeekr-7x-100": {
+    "pagina": "Zeekr 7X",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1d/Zeekr_7X_005_%28cropped%29.jpg/500px-Zeekr_7X_005_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:Zeekr_7X_005_(cropped).jpg",
+    "autore": "JustAnotherCarDesigner",
+    "licenza": "CC0"
+  },
+  "zeekr-x-rwd": {
+    "pagina": "Zeekr X",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/34/2023_Zeekr_X_%28front%29.jpg/500px-2023_Zeekr_X_%28front%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2023_Zeekr_X_(front).jpg",
+    "autore": "User3204",
+    "licenza": "CC BY-SA 4.0"
+  },
+  "zeekr-x-awd": {
+    "pagina": "Zeekr X",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/34/2023_Zeekr_X_%28front%29.jpg/500px-2023_Zeekr_X_%28front%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "fonte": "https://commons.wikimedia.org/wiki/File:2023_Zeekr_X_(front).jpg",
+    "autore": "User3204",
+    "licenza": "CC BY-SA 4.0"
+  }
+}
