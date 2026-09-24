@@ -132,7 +132,12 @@ class Ambiente {
   );
 }
 
-Future<Ambiente> ambiente(WidgetTester tester, {int km = 500, Punto? posizione = const Punto(42, 12)}) async {
+Future<Ambiente> ambiente(
+  WidgetTester tester, {
+  int km = 500,
+  Punto? posizione = const Punto(42, 12),
+  ArchivioAutovelox? autovelox,
+}) async {
   // Uno schermo da telefono, non gli 800×600 delle prove.
   tester.view.physicalSize = const Size(1170, 2532);
   tester.view.devicePixelRatio = 3;
@@ -171,6 +176,7 @@ Future<Ambiente> ambiente(WidgetTester tester, {int km = 500, Punto? posizione =
   final segnalazioni = GestoreSegnalazioni(
     posizione: segnaposto,
     cliente: ClienteSegnalazioni(Uri.parse('https://relay.esempio.dev/'), client: MockClient(relay.risponde)),
+    autovelox: autovelox == null ? null : Future.value(autovelox),
   );
   addTearDown(segnalazioni.dispose);
   return Ambiente(archivio, auto, viaggio, guida, posizioni, voce, segnaposto, gps, segnalazioni, relay);

@@ -37,7 +37,7 @@ Future<void> main() async {
   );
   final posizione = GestorePosizione(archivio: archivio, letture: lettureGps);
   await posizione.carica();
-  final segnalazioni = GestoreSegnalazioni(posizione: posizione);
+  final segnalazioni = GestoreSegnalazioni(posizione: posizione, autovelox: archivioAutovelox());
   final luoghi = GestoreLuoghi(archivio);
   await luoghi.carica();
   // Le colonnine dentro l'app: si leggono mentre si guarda la mappa.

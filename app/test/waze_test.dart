@@ -193,6 +193,45 @@ void main() {
     expect(find.text("Incidente: c'è ancora?"), findsNothing);
   });
 
+  testWidgets('autovelox fisso: avviso col limite, solo nella nostra direzione, senza «c\'è ancora?»', (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    // La strada di prova va dritta verso nord: il primo guarda chi sale, il
+    // secondo chi scende (l'altra carreggiata).
+    final strada = dritta(20).punti;
+    final autovelox = ArchivioAutovelox.leggi(
+      ArchivioAutovelox.scrivi([
+        (strada[5].lat, strada[5].lon + 0.0001, 90, 0),
+        (strada[8].lat, strada[8].lon + 0.0001, 70, 180),
+      ]),
+    );
+    final a = await ambiente(tester, km: 20, autovelox: autovelox);
+    await tester.pumpWidget(a.app());
+    a.auto.manuale.imposta(90);
+    await tester.pump();
+    await tester.runAsync(() => a.viaggio.vaiA(const Luogo(nome: 'Nord', posizione: Punto(42.18, 12))));
+    await tester.pumpAndSettle();
+    final punti = (a.viaggio.stato as ViaggioPronto).viaggio.percorso.punti;
+    a.posizione.avvia();
+    a.gps.add(Lettura(punti[0]));
+    await aspetta(tester, 60);
+    expect(a.segnalazioni.vicine.where((s) => s.fissa), hasLength(2));
+
+    await tester.tap(find.text('Avvia'));
+    await tester.pumpAndSettle();
+    a.posizioni.add(Punto(punti[4].lat + 0.003, punti[4].lon)); // ~700 m prima del primo
+    await aspetta(tester);
+    expect(find.text('Autovelox fisso'), findsOneWidget);
+    expect(a.voce.frasi.where((f) => f.startsWith('Autovelox, limite 90 tra')), hasLength(1));
+
+    a.posizioni.add(Punto(punti[5].lat + 0.0005, punti[5].lon)); // passato
+    await aspetta(tester);
+    expect(find.textContaining("c'è ancora?"), findsNothing);
+
+    a.posizioni.add(Punto(punti[7].lat + 0.003, punti[7].lon)); // prima del secondo, che guarda dall'altra parte
+    await aspetta(tester);
+    expect(a.voce.frasi.where((f) => f.contains('limite 70')), isEmpty);
+  });
+
   test('senza velocità dal GPS la si ricava dagli spostamenti, e da fermi torna a zero', () {
     var adesso = DateTime(2026, 9, 24, 8);
     final gps = StreamController<Lettura>(sync: true);

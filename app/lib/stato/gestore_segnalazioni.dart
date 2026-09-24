@@ -1,4 +1,7 @@
+import 'dart:isolate';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../servizi.dart';
@@ -13,6 +16,7 @@ class GestoreSegnalazioni extends ChangeNotifier {
     ClienteSegnalazioni? cliente,
     bool? cablato,
     DateTime Function()? orologio,
+    this.autovelox,
   }) : _ora = orologio ?? DateTime.now,
        cliente =
            cliente ??
@@ -23,13 +27,20 @@ class GestoreSegnalazioni extends ChangeNotifier {
   /// `null` finché il servizio non è pubblicato.
   final ClienteSegnalazioni? cliente;
 
+  /// Gli autovelox fissi dentro l'app: ci sono anche senza rete.
+  final Future<ArchivioAutovelox>? autovelox;
+
   final DateTime Function() _ora;
-  var vicine = <Segnalazione>[];
+
+  /// Quelle della comunità e gli autovelox fissi, intorno a te.
+  List<Segnalazione> get vicine => [..._comunita, ..._fisse];
+  var _comunita = <Segnalazione>[];
+  var _fisse = <Segnalazione>[];
   var _avviato = false;
   Punto? _ultimaRichiesta;
   DateTime _ultimaVolta = DateTime(0);
 
-  bool get attivo => cliente != null;
+  bool get attivo => cliente != null || autovelox != null;
 
   void avvia() {
     if (!attivo || _avviato) return;
@@ -49,11 +60,16 @@ class GestoreSegnalazioni extends ChangeNotifier {
 
   Future<void> aggiorna() async {
     final c = cliente, qui = posizione.qui;
-    if (c == null || qui == null) return;
+    if (qui == null) return;
     _ultimaRichiesta = qui;
     _ultimaVolta = _ora();
+    if (autovelox case final a?) {
+      _fisse = (await a).vicini(qui, 30000);
+      notifyListeners();
+    }
+    if (c == null) return;
     try {
-      vicine = await c.vicine(qui);
+      _comunita = await c.vicine(qui);
       notifyListeners();
     } catch (_) {
       // Senza rete si tengono quelle che si hanno.
@@ -67,7 +83,7 @@ class GestoreSegnalazioni extends ChangeNotifier {
     if (qui == null) return 'Non so dove sei: attiva la posizione.';
     try {
       final s = await c.invia(tipo, qui);
-      vicine = [...vicine, s];
+      _comunita = [..._comunita, s];
       notifyListeners();
       return 'Grazie! ${tipo.nome} segnalato a chi arriva dopo di te.';
     } catch (e) {
@@ -77,11 +93,11 @@ class GestoreSegnalazioni extends ChangeNotifier {
 
   Future<void> vota(Segnalazione s, {required bool ancora}) async {
     final c = cliente;
-    if (c == null) return;
+    if (c == null || s.fissa) return;
     try {
       final n = await c.vota(s, ancora: ancora);
-      vicine = [
-        for (final v in vicine)
+      _comunita = [
+        for (final v in _comunita)
           if (v.id != s.id) v else ?n,
       ];
       notifyListeners();
@@ -93,5 +109,19 @@ class GestoreSegnalazioni extends ChangeNotifier {
     posizione.removeListener(_forse);
     cliente?.chiudi();
     super.dispose();
+  }
+}
+
+/// Gli autovelox fissi dentro l'app: si leggono una volta, su un altro filo.
+Future<ArchivioAutovelox> archivioAutovelox() => _autovelox ??= _leggiAutovelox();
+Future<ArchivioAutovelox>? _autovelox;
+
+Future<ArchivioAutovelox> _leggiAutovelox() async {
+  try {
+    final testo = await rootBundle.loadString('assets/autovelox.json');
+    return await Isolate.run(() => ArchivioAutovelox.leggi(testo));
+  } catch (e) {
+    debugPrint('archivio autovelox: $e');
+    return ArchivioAutovelox.vuoto;
   }
 }

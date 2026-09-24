@@ -76,15 +76,22 @@ class _SchermataGuidaState extends State<SchermataGuida> {
     }
     (Segnalazione, double)? davanti;
     Segnalazione? passata;
+    final linea = _linea!;
     for (final s in tutte) {
-      final p = _linea!.proietta(s.punto);
-      if (p.lontanoM > 40) continue;
+      final p = linea.proietta(s.punto);
+      // Un autovelox fisso sta sul bordo della strada: più vicino, e solo
+      // se guarda chi va nella nostra direzione (non l'altra carreggiata).
+      if (p.lontanoM > (s.fissa ? 30 : 40)) continue;
+      if (s.fissa) {
+        final i = p.segmento.clamp(0, linea.punti.length - 2);
+        if (!s.riguarda(rottaGradi(linea.punti[i], linea.punti[i + 1]))) continue;
+      }
       final avanti = p.lungoM - a.percorsiM;
       if (avanti > 0 && avanti <= _avvisoM && (davanti == null || avanti < davanti.$2)) davanti = (s, avanti);
-      if (avanti <= 0 && avanti > -250 && !_chieste.contains(s.id)) passata = s;
+      if (!s.fissa && avanti <= 0 && avanti > -250 && !_chieste.contains(s.id)) passata = s;
     }
     if (davanti case (final s, final m) when _annunciate.add(s.id)) {
-      g.annuncia('${s.tipo.avviso} tra ${distanzaParlata(m)}.');
+      g.annuncia('${s.avviso} tra ${distanzaParlata(m)}.');
     }
     if (davanti?.$1.id != _davanti?.$1.id || davanti?.$2 != _davanti?.$2 || passata?.id != _passata?.id) {
       setState(() {
@@ -186,7 +193,10 @@ class _AvvisoSegnalazione extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(segnalazione.tipo.avviso, style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    Text(
+                      segnalazione.fissa ? 'Autovelox fisso' : segnalazione.tipo.avviso,
+                      style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                    ),
                     Text(
                       'tra ${distanzaBreve(metri)}'
                       '${segnalazione.conferme > 0 ? ' · confermata da ${segnalazione.conferme}' : ''}',
@@ -195,6 +205,7 @@ class _AvvisoSegnalazione extends StatelessWidget {
                   ],
                 ),
               ),
+              if (segnalazione.limiteKmh case final l?) CartelloLimite(limiteKmh: l, lato: 44),
             ],
           ),
         ),

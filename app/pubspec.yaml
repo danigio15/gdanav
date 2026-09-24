@@ -64,6 +64,7 @@ flutter:
     - assets/segnaposto/
     - assets/foto_auto.json
     - assets/colonnine.json
+    - assets/autovelox.json
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
