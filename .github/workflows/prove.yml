@@ -192,26 +192,41 @@ jobs:
           gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
           gh release upload anteprima foto_auto.json foto_auto.tsv --clobber
 
-  # Le colonnine rapide di mezza Europa per l'archivio dentro l'app: solo
-  # quando il commit lo chiede con «[colonnine]». Il JSON va nella release
-  # «anteprima», da mettere in app/assets.
+  # Le colonnine rapide per l'archivio dentro l'app, dagli estratti completi
+  # di OpenStreetMap (Geofabrik) filtrati con osmium: niente Overpass, che è
+  # spesso sovraccarico. Solo quando il commit lo chiede con «[colonnine]»;
+  # il JSON va nella release «anteprima», da mettere in app/assets.
   colonnine-dati:
     if: contains(github.event.head_commit.message, '[colonnine]')
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
     permissions:
       contents: write
-    defaults:
-      run:
-        working-directory: packages/gdanav_core
     steps:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: 3.13.4
+      - run: sudo apt-get update && sudo apt-get install -y osmium-tool
+      - name: Estratti e colonnine
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -e
+          for zona in europe/italy europe/switzerland europe/austria europe/slovenia europe/croatia \
+                      europe/monaco europe/liechtenstein europe/france/provence-alpes-cote-d-azur; do
+            nome=$(basename $zona)
+            curl -sSfL --retry 5 -o $nome.osm.pbf https://download.geofabrik.de/$zona-latest.osm.pbf
+            osmium tags-filter $nome.osm.pbf nwr/amenity=charging_station -o $nome-cs.osm.pbf
+            osmium export $nome-cs.osm.pbf -f geojsonseq --add-unique-id=type_id -o $nome.geojsonseq
+            echo "$nome: $(wc -l < $nome.geojsonseq)"
+            rm $nome.osm.pbf
+          done
       - run: dart pub get
-      - run: dart run tool/colonnine_europa.dart colonnine.json
+        working-directory: packages/gdanav_core
+      - run: dart run tool/colonnine_osm.dart colonnine.json ${{ runner.temp }}/*.geojsonseq
+        working-directory: packages/gdanav_core
       - name: Nella release
+        working-directory: packages/gdanav_core
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
