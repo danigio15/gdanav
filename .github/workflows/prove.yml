@@ -146,6 +146,24 @@ jobs:
         env:
           GDANAV_VALHALLA: http://127.0.0.1:8002/
 
+  # Il viaggio vero, coi server pubblici: quanto ci mette ogni pezzo. Non
+  # blocca niente: i server degli altri possono essere lenti.
+  rete:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: packages/gdanav_core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.13.4
+      - run: dart pub get
+      - run: dart test test/viaggio_rete_test.dart --reporter expanded
+        env:
+          GDANAV_RETE: "1"
+
   # L'APK da provare: a ogni push su main finisce nella release «anteprima»,
   # da scaricare dal telefono.
   apk:
