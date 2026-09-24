@@ -10,6 +10,7 @@ import '../stato/gestore_auto.dart';
 import '../stato/gestore_consumo.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_luoghi.dart';
+import '../stato/gestore_mappe_offline.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_viaggio.dart';
@@ -19,6 +20,7 @@ import 'dettaglio_colonnina.dart';
 import 'diagnosi_auto.dart';
 import 'fonte_dati_auto.dart';
 import 'la_tua_auto.dart';
+import 'mappe_offline.dart';
 import 'pannello_partenza.dart';
 import 'ricarica.dart';
 import 'scheda_viaggio.dart';
@@ -40,6 +42,7 @@ class SchermataPrincipale extends StatefulWidget {
     this.luoghi,
     this.segnalazioni,
     this.consumo,
+    this.mappeOffline,
   });
 
   final GestoreAuto auto;
@@ -56,6 +59,9 @@ class SchermataPrincipale extends StatefulWidget {
 
   /// Il consumo imparato, da mostrare in «La tua auto».
   final GestoreConsumo? consumo;
+
+  /// Le mappe scaricate; se manca, quelle vere di MapLibre.
+  final GestoreMappeOffline? mappeOffline;
 
   /// Chiede il permesso della posizione; nelle prove non c'è.
   final Future<bool> Function()? chiediPosizione;
@@ -276,6 +282,17 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                   titolo: 'Home Assistant',
                   sotto: ha == null ? 'Non collegata' : 'Collegata${ha.nomeAuto.isEmpty ? '' : ' a ${ha.nomeAuto}'}',
                   onTap: () => vai(AbbinaHomeAssistant(gestore: widget.auto)),
+                ),
+                _VoceMenu(
+                  icona: Icons.offline_pin_outlined,
+                  titolo: 'Mappe offline',
+                  sotto: 'Scarica le regioni per quando non c\'è rete',
+                  onTap: () => vai(
+                    MappeOffline(
+                      gestore: widget.mappeOffline ?? GestoreMappeOffline(ArchivioMapLibre()),
+                      qui: widget.posizione.qui,
+                    ),
+                  ),
                 ),
                 _VoceMenu(
                   icona: Icons.directions_car_filled_outlined,

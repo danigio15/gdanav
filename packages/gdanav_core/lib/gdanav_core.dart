@@ -9,6 +9,7 @@ export 'src/colonnine/overpass.dart';
 export 'src/geo/geo.dart';
 export 'src/guida/guida.dart';
 export 'src/luoghi/luoghi.dart';
+export 'src/mappe/zone.dart';
 export 'src/motore/consumo_imparato.dart';
 export 'src/motore/modello_consumo.dart';
 export 'src/motore/pianificatore_soste.dart';

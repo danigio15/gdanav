@@ -278,7 +278,14 @@ void main() {
     await tester.pumpWidget(a.app());
     await tester.tap(find.byTooltip('Menu'));
     await tester.pumpAndSettle();
-    for (final voce in ['La tua auto', 'Ricarica', 'Fonte dati auto', 'Home Assistant', 'Android Auto']) {
+    for (final voce in [
+      'La tua auto',
+      'Ricarica',
+      'Fonte dati auto',
+      'Home Assistant',
+      'Mappe offline',
+      'Android Auto',
+    ]) {
       await tester.scrollUntilVisible(find.text(voce), 60, scrollable: find.byType(Scrollable).last);
       final r = tester.getRect(find.text(voce));
       // Sopra la barra di navigazione, dentro lo schermo.
