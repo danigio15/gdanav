@@ -59,6 +59,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
   var _stileCaricato = false;
   StatoViaggio? _disegnato;
   var _inclinata = false;
+  var _libera = false;
   var _centrate = 0;
 
   static const _inclinazione = 58.0;
@@ -91,6 +92,14 @@ class _MappaViaggioState extends State<MappaViaggio> {
       await _edifici(m);
       await m.animateCamera(CameraUpdate.tiltTo(_inclinata ? _inclinazione : 0));
     }
+    // In guida, tornati a seguire l'auto: subito, senza aspettare il GPS.
+    if (widget.controllo.libera != _libera) {
+      _libera = widget.controllo.libera;
+      if (!_libera) {
+        _ultimaCamera = DateTime(0);
+        await _io();
+      }
+    }
     if (widget.controllo.richiesteCentra != _centrate) {
       _centrate = widget.controllo.richiesteCentra;
       final qui = widget.posizione.qui;
@@ -118,13 +127,20 @@ class _MappaViaggioState extends State<MappaViaggio> {
     await m.setGeoJsonSource(sorgenteIo, datiIo(qui, rotta, widget.posizione.segnaposto).cast<String, dynamic>());
     if (qui == null) return;
     if (widget.guida != null) {
+      // Mappa libera: la si lascia dove l'ha messa chi guida.
+      if (widget.controllo.libera) return;
       // La telecamera segue l'auto; al massimo un movimento al secondo.
       final ora = DateTime.now();
       if (ora.difference(_ultimaCamera) < const Duration(milliseconds: 900)) return;
       _ultimaCamera = ora;
       await m.animateCamera(
         CameraUpdate.newCameraPosition(
-          CameraPosition(target: LatLng(qui.lat, qui.lon), zoom: 17, tilt: _inclinazione, bearing: rotta),
+          CameraPosition(
+            target: LatLng(qui.lat, qui.lon),
+            zoom: _inclinata ? 17 : 16,
+            tilt: _inclinata ? _inclinazione : 0,
+            bearing: rotta,
+          ),
         ),
         duration: const Duration(milliseconds: 900),
       );
@@ -194,7 +210,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
   @override
   Widget build(BuildContext context) {
     final scuro = Theme.of(context).brightness == Brightness.dark;
-    return MapLibreMap(
+    final mappa = MapLibreMap(
       // Cambia stile col tema: la chiave rifà la mappa.
       key: ValueKey(scuro),
       styleString: jsonEncode(stileMappa(scuro: scuro, chiaveTraffico: Servizi.chiaveTomTom)),
@@ -223,5 +239,8 @@ class _MappaViaggioState extends State<MappaViaggio> {
       onMapClick: (p, _) => _tocco(p),
       onMapLongClick: (_, p) => widget.onPuntoScelto(p),
     );
+    // In guida un dito che muove la mappa la rende libera (zoom, spostamenti).
+    if (widget.guida == null) return mappa;
+    return Listener(onPointerMove: (_) => widget.controllo.toccata(), child: mappa);
   }
 }

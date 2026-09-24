@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav/main.dart';
+import 'package:gdanav/mappa/controllo_mappa.dart';
 import 'package:gdanav/stato/archivio.dart';
 import 'package:gdanav/stato/gestore_auto.dart';
 import 'package:gdanav/stato/gestore_consumo.dart';
@@ -121,6 +122,9 @@ class Ambiente {
   final GestoreSegnalazioni segnalazioni;
   final RelayFinto relay;
 
+  /// L'ultimo controllo passato alla mappa finta (in guida, quello della guida).
+  ControlloMappa? controllo;
+
   Widget app() => GdanavApp(
     posizione: posizione,
     archivio: archivio,
@@ -128,7 +132,10 @@ class Ambiente {
     viaggio: viaggio,
     guida: guida,
     segnalazioni: segnalazioni,
-    mappa: (_, _) => const ColoredBox(color: Colors.grey),
+    mappa: (_, c) {
+      controllo = c;
+      return const ColoredBox(color: Colors.grey);
+    },
   );
 }
 

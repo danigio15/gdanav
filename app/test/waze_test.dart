@@ -232,6 +232,41 @@ void main() {
     expect(a.voce.frasi.where((f) => f.contains('limite 70')), isEmpty);
   });
 
+  testWidgets('in guida: 2D/3D al volo, mappa libera con «Riprendi», e dopo 20 s torna da sola', (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final a = await ambiente(tester, km: 20);
+    await tester.pumpWidget(a.app());
+    a.auto.manuale.imposta(90);
+    await tester.pump();
+    await tester.runAsync(() => a.viaggio.vaiA(const Luogo(nome: 'Nord', posizione: Punto(42.18, 12))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Avvia'));
+    await tester.pumpAndSettle();
+    final c = a.controllo!;
+    expect(c.inclinata, isTrue);
+
+    await tester.tap(find.byKey(const Key('2d-3d')));
+    await tester.pump();
+    expect(c.inclinata, isFalse);
+    expect(find.text('3D'), findsOneWidget);
+
+    // Un dito sposta la mappa: resta lì, e compare «Riprendi».
+    c.toccata();
+    await tester.pump();
+    expect(find.byKey(const Key('riprendi')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('riprendi')));
+    await tester.pump();
+    expect(c.libera, isFalse);
+    expect(find.byKey(const Key('riprendi')), findsNothing);
+
+    // Toccata e lasciata: dopo 20 secondi segue di nuovo l'auto.
+    c.toccata();
+    await tester.pump(const Duration(seconds: 10));
+    expect(c.libera, isTrue);
+    await tester.pump(const Duration(seconds: 11));
+    expect(c.libera, isFalse);
+  });
+
   test('senza velocità dal GPS la si ricava dagli spostamenti, e da fermi torna a zero', () {
     var adesso = DateTime(2026, 9, 24, 8);
     final gps = StreamController<Lettura>(sync: true);

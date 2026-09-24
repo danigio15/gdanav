@@ -148,14 +148,47 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                   const Spacer(),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Tachimetro(velocitaKmh: widget.posizione.velocitaKmh, limiteKmh: g.avanzamento?.limiteKmh),
-                        const Spacer(),
-                        if (widget.segnalazioni case final seg?)
-                          BottoneSegnala(onTap: () => mostraSegnala(context, seg)),
-                      ],
+                    child: ListenableBuilder(
+                      listenable: controllo,
+                      builder: (context, _) => Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Tachimetro(velocitaKmh: widget.posizione.velocitaKmh, limiteKmh: g.avanzamento?.limiteKmh),
+                          const Spacer(),
+                          // Mappa spostata o allontanata: si torna sull'auto.
+                          if (controllo.libera)
+                            FilledButton.icon(
+                              key: const Key('riprendi'),
+                              onPressed: controllo.segui,
+                              icon: const Icon(Icons.navigation),
+                              label: const Text('Riprendi'),
+                            ),
+                          const Spacer(),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Vetro(
+                                raggio: 28,
+                                child: SizedBox.square(
+                                  dimension: 56,
+                                  child: TextButton(
+                                    key: const Key('2d-3d'),
+                                    onPressed: controllo.alternaInclinazione,
+                                    style: TextButton.styleFrom(shape: const CircleBorder()),
+                                    child: Text(
+                                      controllo.inclinata ? '2D' : '3D',
+                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              if (widget.segnalazioni case final seg?)
+                                BottoneSegnala(onTap: () => mostraSegnala(context, seg)),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   _Fondo(guida: g, onFine: _fine),
