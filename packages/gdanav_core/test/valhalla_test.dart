@@ -76,6 +76,25 @@ void main() {
       expect(p.manovre, hasLength(14));
     });
 
+    test('le opzioni: risparmio, senza pedaggi, senza traghetti', () async {
+      final chiesti = <Map<String, Object?>>[];
+      final client = MockClient((r) async {
+        if (r.url.path == '/trace_attributes') return http.Response('{"edges":[]}', 200);
+        chiesti.add(jsonDecode(r.body) as Map<String, Object?>);
+        return http.Response(jsonEncode(utrecht()), 200);
+      });
+      final v = ClienteValhalla(Uri.parse('https://valhalla.esempio.dev/'), client: client);
+      await v.calcola(const [Punto(52.0907, 5.1214), Punto(52.064, 5.19)]);
+      const o = OpzioniPercorso(modo: ModoGuida.risparmio, evitaPedaggi: true, evitaTraghetti: true);
+      await v.calcola(const [Punto(52.0907, 5.1214), Punto(52.064, 5.19)], opzioni: o);
+      expect(chiesti.first.containsKey('costing_options'), isFalse);
+      expect(chiesti.last['costing_options'], {
+        'auto': {'top_speed': 100, 'use_tolls': 0.0, 'use_ferry': 0.0},
+      });
+      expect(o.riassunto, 'Risparmio · senza pedaggi · senza traghetti');
+      expect(OpzioniPercorso.daJson(o.toJson()).toJson(), o.toJson());
+    });
+
     test('i limiti di velocità arrivano da trace_attributes, lungo le stesse strade', () async {
       late Map<String, Object?> traccia;
       final client = MockClient((r) async {

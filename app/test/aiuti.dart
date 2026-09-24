@@ -73,7 +73,7 @@ PercorsoCalcolato dritta(int km) {
 }
 
 CostruisciPianificatore pianificatoreFinto(int km) =>
-    (_, profilo, preferenze) => PianificatoreViaggio(
+    (_, profilo, preferenze, _) => PianificatoreViaggio(
       percorsi: (_) async => dritta(km),
       colonnine: ColonnineFinte(),
       profilo: profilo,

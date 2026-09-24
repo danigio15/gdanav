@@ -27,6 +27,7 @@ Future<void> main() async {
   await consumo.carica(auto.veicolo.id);
   auto.addListener(() => consumo.carica(auto.veicolo.id));
   final viaggio = GestoreViaggio(archivio: archivio, auto: auto, posizione: posizioneAttuale, consumo: consumo);
+  viaggio.opzioni = await archivio.opzioniPercorso();
   final guida = GestoreGuida(
     viaggio: viaggio,
     auto: auto,

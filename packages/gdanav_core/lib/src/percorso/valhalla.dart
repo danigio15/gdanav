@@ -138,6 +138,76 @@ class ErroreValhalla implements Exception {
   String toString() => 'Valhalla: $messaggio';
 }
 
+/// Come guidare: più veloce, o più piano per consumare meno. Come la
+/// «velocità di riferimento» di ABRP: Valhalla sceglie strade e tempi con
+/// quel massimo, e il consumo si stima su quelle velocità.
+enum ModoGuida {
+  veloce('Più veloce', null),
+  equilibrato('Equilibrato', 120),
+  risparmio('Risparmio', 100);
+
+  const ModoGuida(this.nome, this.velocitaMassima);
+
+  final String nome;
+
+  /// km/h; `null`: quelle della strada.
+  final int? velocitaMassima;
+}
+
+/// Le scelte del percorso, come in ogni navigatore.
+class OpzioniPercorso {
+  const OpzioniPercorso({
+    this.modo = ModoGuida.veloce,
+    this.evitaPedaggi = false,
+    this.evitaAutostrade = false,
+    this.evitaTraghetti = false,
+  });
+
+  factory OpzioniPercorso.daJson(Map<String, Object?> j) => OpzioniPercorso(
+        modo: ModoGuida.values.where((m) => m.name == j['modo']).firstOrNull ?? ModoGuida.veloce,
+        evitaPedaggi: j['evita_pedaggi'] as bool? ?? false,
+        evitaAutostrade: j['evita_autostrade'] as bool? ?? false,
+        evitaTraghetti: j['evita_traghetti'] as bool? ?? false,
+      );
+
+  final ModoGuida modo;
+  final bool evitaPedaggi;
+  final bool evitaAutostrade;
+  final bool evitaTraghetti;
+
+  OpzioniPercorso copia({ModoGuida? modo, bool? evitaPedaggi, bool? evitaAutostrade, bool? evitaTraghetti}) =>
+      OpzioniPercorso(
+        modo: modo ?? this.modo,
+        evitaPedaggi: evitaPedaggi ?? this.evitaPedaggi,
+        evitaAutostrade: evitaAutostrade ?? this.evitaAutostrade,
+        evitaTraghetti: evitaTraghetti ?? this.evitaTraghetti,
+      );
+
+  Map<String, Object?> toJson() => {
+        'modo': modo.name,
+        'evita_pedaggi': evitaPedaggi,
+        'evita_autostrade': evitaAutostrade,
+        'evita_traghetti': evitaTraghetti,
+      };
+
+  /// I `costing_options.auto` di Valhalla: 0 vuol dire «solo se non c'è
+  /// altro modo».
+  Map<String, Object> get valhalla => {
+        if (modo.velocitaMassima case final v?) 'top_speed': v,
+        if (evitaPedaggi) 'use_tolls': 0.0,
+        if (evitaAutostrade) 'use_highways': 0.0,
+        if (evitaTraghetti) 'use_ferry': 0.0,
+      };
+
+  /// «Risparmio · senza pedaggi»: per dire in breve com'è calcolato.
+  String get riassunto => [
+        modo.nome,
+        if (evitaPedaggi) 'senza pedaggi',
+        if (evitaAutostrade) 'senza autostrade',
+        if (evitaTraghetti) 'senza traghetti',
+      ].join(' · ');
+}
+
 /// Il client di Valhalla, sul server gratuito (vedi `valhalla/`).
 class ClienteValhalla {
   ClienteValhalla(this.indirizzo, {http.Client? client, this.chiave}) : _http = client ?? http.Client();
@@ -148,12 +218,18 @@ class ClienteValhalla {
   final String? chiave;
   final http.Client _http;
 
-  Future<PercorsoCalcolato> calcola(List<Punto> tappe, {String lingua = 'it-IT'}) async {
+  Future<PercorsoCalcolato> calcola(
+    List<Punto> tappe, {
+    String lingua = 'it-IT',
+    OpzioniPercorso opzioni = const OpzioniPercorso(),
+  }) async {
+    final costi = opzioni.valhalla;
     final corpo = {
       'locations': [
         for (final p in tappe) {'lat': p.lat, 'lon': p.lon},
       ],
       'costing': 'auto',
+      if (costi.isNotEmpty) 'costing_options': {'auto': costi},
       'units': 'kilometers',
       'language': lingua,
       'elevation_interval': 30,

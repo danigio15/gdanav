@@ -28,7 +28,7 @@ void main() {
       archivio: archivio,
       auto: auto,
       posizione: () async => const Punto(42, 12),
-      costruisci: (_, profilo, preferenze) => PianificatoreViaggio(
+      costruisci: (_, profilo, preferenze, _) => PianificatoreViaggio(
         percorsi: (_) async => dritta(500),
         colonnine: ColonnineMute(),
         profilo: profilo,

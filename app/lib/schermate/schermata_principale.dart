@@ -26,6 +26,7 @@ import 'diagnosi_auto.dart';
 import 'fonte_dati_auto.dart';
 import 'la_tua_auto.dart';
 import 'mappe_offline.dart';
+import 'opzioni_percorso.dart';
 import 'pannello_partenza.dart';
 import 'ricarica.dart';
 import 'scheda_viaggio.dart';
@@ -314,6 +315,14 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                   titolo: 'La tua auto',
                   sotto: widget.auto.veicolo.nome,
                   onTap: () => vai(LaTuaAuto(auto: widget.auto, posizione: widget.posizione, consumo: widget.consumo)),
+                ),
+                _VoceMenu(
+                  icona: Icons.alt_route,
+                  titolo: 'Percorso',
+                  sotto: widget.viaggio.opzioni.riassunto,
+                  onTap: () => vai(
+                    OpzioniPercorsoSchermata(iniziali: widget.viaggio.opzioni, onCambia: widget.viaggio.cambiaOpzioni),
+                  ),
                 ),
                 _VoceMenu(
                   icona: Icons.ev_station,

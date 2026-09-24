@@ -8,6 +8,7 @@ import '../mappa/dati_viaggio.dart';
 import '../stato/gestore_viaggio.dart';
 import '../tema.dart';
 import 'dettaglio_colonnina.dart';
+import 'opzioni_percorso.dart';
 
 String durata(Duration d) {
   final ore = d.inHours, minuti = d.inMinutes % 60;
@@ -193,7 +194,17 @@ class _Pronta extends StatelessWidget {
                 IconButton.filledTonal(onPressed: gestore.annulla, icon: const Icon(Icons.close), tooltip: 'Chiudi'),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ActionChip(
+                key: const Key('opzioni-percorso'),
+                avatar: const Icon(Icons.tune, size: 18),
+                label: Text(gestore.opzioni.riassunto),
+                onPressed: () => mostraOpzioniPercorso(context, gestore.opzioni, gestore.cambiaOpzioni),
+              ),
+            ),
+            const SizedBox(height: 10),
             if (piano == null) ...[
               Text('${km.round()} km', style: t.headlineSmall),
               const SizedBox(height: 6),

@@ -51,6 +51,7 @@ typedef CostruisciPianificatore = PianificatoreViaggio Function(
   Impostazioni impostazioni,
   ProfiloVeicolo profilo,
   PreferenzeRicarica preferenze,
+  OpzioniPercorso opzioni,
 );
 
 /// L'archivio delle colonnine dentro l'app: si legge una volta, su un altro
@@ -68,13 +69,18 @@ Future<ArchivioColonnine> _leggiArchivio() async {
   }
 }
 
-PianificatoreViaggio pianificatoreVero(Impostazioni i, ProfiloVeicolo profilo, PreferenzeRicarica preferenze) {
+PianificatoreViaggio pianificatoreVero(
+  Impostazioni i,
+  ProfiloVeicolo profilo,
+  PreferenzeRicarica preferenze,
+  OpzioniPercorso opzioni,
+) {
   final valhalla = ClienteValhalla(
     Uri.parse(i.valhalla.endsWith('/') ? i.valhalla : '${i.valhalla}/'),
     chiave: i.chiaveValhalla.isEmpty ? null : i.chiaveValhalla,
   );
   return PianificatoreViaggio(
-    percorsi: valhalla.calcola,
+    percorsi: (tappe) => valhalla.calcola(tappe, opzioni: opzioni),
     // Open Charge Map se c'è la chiave (ha anche lo stato delle prese), e
     // comunque OpenStreetMap: dall'archivio dentro l'app, fuori archivio dal
     // relay di gdanav, e se tutto manca direttamente da Overpass.
@@ -121,6 +127,17 @@ class GestoreViaggio extends ChangeNotifier {
 
   /// Oltre questo si smette di aspettare e lo si dice.
   static const tempoMassimo = Duration(minutes: 2);
+
+  /// Come si calcola il percorso: veloce o risparmio, cosa evitare.
+  OpzioniPercorso opzioni = const OpzioniPercorso();
+
+  /// Cambiate le opzioni si salvano e, se c'è un viaggio, si ricalcola.
+  Future<void> cambiaOpzioni(OpzioniPercorso o) async {
+    opzioni = o;
+    notifyListeners();
+    await archivio.salvaOpzioniPercorso(o);
+    if (destinazione case final d?) await pianifica(d);
+  }
 
   /// Le colonnine dove l'utente ha deciso di fermarsi, per questo viaggio.
   final obbligate = <String>{};
@@ -170,10 +187,11 @@ class GestoreViaggio extends ChangeNotifier {
     }
     ultimaPosizione = partenza;
     final preferenze = await archivio.preferenze();
+    opzioni = await archivio.opzioniPercorso();
     final calcolo = Calcolo(destinazione);
     _imposta(calcolo);
     try {
-      final viaggio = await costruisci(impostazioni, auto.veicolo, preferenze)
+      final viaggio = await costruisci(impostazioni, auto.veicolo, preferenze, opzioni)
           .pianifica(
             partenza: partenza,
             arrivo: destinazione.posizione,

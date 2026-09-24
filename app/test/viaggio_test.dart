@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav/servizi.dart';
+import 'package:gdanav_core/gdanav_core.dart';
 import 'package:gdanav/stato/archivio.dart';
 import 'package:gdanav/stato/gestore_viaggio.dart';
 
@@ -43,6 +44,34 @@ void main() {
     await tester.tap(find.byTooltip('Chiudi'));
     await tester.pumpAndSettle();
     expect(a.viaggio.stato, isA<NessunViaggio>());
+  });
+
+  testWidgets('dalla scheda del viaggio: risparmio e senza pedaggi, e si ricalcola', (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final a = await ambiente(tester);
+    await tester.pumpWidget(a.app());
+    a.auto.manuale.imposta(80);
+    await tester.pump();
+    await cercaBologna(tester);
+    expect(find.text('Più veloce'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('opzioni-percorso')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Risparmio'));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pedaggi'));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pumpAndSettle();
+    expect(a.viaggio.opzioni.modo, ModoGuida.risparmio);
+    expect(a.viaggio.opzioni.evitaPedaggi, isTrue);
+    expect(a.viaggio.stato, isA<ViaggioPronto>());
+    final salvate = await tester.runAsync(() => Archivio().opzioniPercorso());
+    expect(salvate!.riassunto, 'Risparmio · senza pedaggi');
+
+    await tester.tapAt(const Offset(20, 40)); // chiude il foglio
+    await tester.pumpAndSettle();
+    expect(find.text('Risparmio · senza pedaggi'), findsOneWidget);
   });
 
   testWidgets('un viaggio corto non ha soste', (tester) async {

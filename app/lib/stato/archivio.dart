@@ -17,6 +17,7 @@ class Archivio {
   static const _fonte = 'fonte_dati_auto';
   static const _veicolo = 'veicolo';
   static const _preferenze = 'preferenze_ricarica';
+  static const _opzioniPercorso = 'opzioni_percorso';
   static const _segnaposto = 'segnaposto';
   static const _luoghi = 'luoghi';
 
@@ -67,6 +68,20 @@ class Archivio {
   }
 
   Future<void> salvaPreferenze(PreferenzeRicarica p) => _p.write(key: _preferenze, value: jsonEncode(p.toJson()));
+
+  /// Veloce o risparmio, pedaggi, autostrade, traghetti.
+  Future<OpzioniPercorso> opzioniPercorso() async {
+    final testo = await _p.read(key: _opzioniPercorso);
+    if (testo == null) return const OpzioniPercorso();
+    try {
+      return OpzioniPercorso.daJson(jsonDecode(testo) as Map<String, Object?>);
+    } catch (_) {
+      return const OpzioniPercorso();
+    }
+  }
+
+  Future<void> salvaOpzioniPercorso(OpzioniPercorso o) =>
+      _p.write(key: _opzioniPercorso, value: jsonEncode(o.toJson()));
 
   Future<Segnaposto> segnaposto() async => Segnaposto.perNome(await _p.read(key: _segnaposto));
 
