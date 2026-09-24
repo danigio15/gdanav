@@ -14,6 +14,7 @@ class PannelloPartenza extends StatelessWidget {
     required this.onPreferito,
     required this.onNuovo,
     required this.onModificaPreferito,
+    this.schedaAuto,
   });
 
   final GestoreLuoghi luoghi;
@@ -25,16 +26,19 @@ class PannelloPartenza extends StatelessWidget {
   final VoidCallback onNuovo;
   final ValueChanged<Preferito> onModificaPreferito;
 
+  /// La tua auto: batteria, foto, collegamento.
+  final Widget? schedaAuto;
+
   @override
   Widget build(BuildContext context) {
     final s = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
     return DraggableScrollableSheet(
-      initialChildSize: 0.36,
+      initialChildSize: 0.5,
       minChildSize: 0.2,
       maxChildSize: 0.9,
       snap: true,
-      snapSizes: const [0.36],
+      snapSizes: const [0.5],
       builder: (context, scorri) => Material(
         color: s.surface,
         elevation: 12,
@@ -112,6 +116,7 @@ class PannelloPartenza extends StatelessWidget {
                   ],
                 ),
               ),
+              if (schedaAuto case final scheda?) ...[const SizedBox(height: 16), scheda],
               if (luoghi.recenti.isNotEmpty) ...[
                 const SizedBox(height: 22),
                 Text('Recenti', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w500)),

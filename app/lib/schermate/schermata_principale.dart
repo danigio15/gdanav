@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
-import '../componenti/indicatore_batteria.dart';
+import '../componenti/scheda_auto.dart';
 import '../componenti/vetro.dart';
 import '../mappa/controllo_mappa.dart';
 import '../mappa/mappa_viaggio.dart';
@@ -148,6 +152,52 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   Future<void> _vai(Luogo luogo) async {
     await luoghi.usato(luogo);
     await viaggio.vaiA(luogo);
+  }
+
+  /// La foto della propria auto: dalla galleria o scattata, copiata fra i
+  /// file dell'app.
+  Future<void> _foto() async {
+    final da = await showModalBottomSheet<Object>(
+      context: context,
+      builder: (c) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Scegli dalla galleria'),
+              onTap: () => Navigator.of(c).pop(ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Scatta una foto'),
+              onTap: () => Navigator.of(c).pop(ImageSource.camera),
+            ),
+            if (widget.auto.foto != null)
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Togli la foto'),
+                onTap: () => Navigator.of(c).pop('togli'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (da == 'togli') return widget.auto.impostaFoto(null);
+    if (da is! ImageSource) return;
+    try {
+      final scelta = await ImagePicker().pickImage(source: da, maxWidth: 1200, imageQuality: 85);
+      if (scelta == null) return;
+      final cartella = await getApplicationDocumentsDirectory();
+      // Un nome nuovo ogni volta: così l'immagine vecchia non resta in memoria.
+      final destinazione = '${cartella.path}/auto_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await File(scelta.path).copy(destinazione);
+      final vecchia = widget.auto.foto;
+      await widget.auto.impostaFoto(destinazione);
+      if (vecchia != null) await File(vecchia).delete().catchError((Object _) => File(vecchia));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Foto non caricata: $e')));
+    }
   }
 
   Future<void> _preferito(TipoPreferito tipo) async {
@@ -352,20 +402,12 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                     child: const SizedBox.square(dimension: 60, child: Icon(Icons.menu_rounded, size: 32)),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: ListenableBuilder(
-                    listenable: widget.auto,
-                    builder: (context, _) =>
-                        IndicatoreBatteria(auto: widget.auto, onTap: () => mostraFonteDatiAuto(context, widget.auto)),
-                  ),
-                ),
               ],
             ),
           ),
           Positioned(
             right: 16,
-            top: alto + 86,
+            top: alto + 10,
             child: ListenableBuilder(
               listenable: controllo,
               builder: (context, _) => Column(
@@ -397,7 +439,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                   if (libero)
                     Positioned(
                       right: 16,
-                      bottom: schermo * 0.36 + 14,
+                      bottom: schermo * 0.5 + 14,
                       child: BottoneSegnala(onTap: () => mostraSegnala(context, segnalazioni)),
                     ),
                   Positioned.fill(
@@ -409,6 +451,18 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                             onPreferito: _preferito,
                             onNuovo: () => _imposta(TipoPreferito.altro),
                             onModificaPreferito: _modificaPreferito,
+                            schedaAuto: ListenableBuilder(
+                              listenable: widget.posizione,
+                              builder: (context, _) => SchedaAuto(
+                                auto: widget.auto,
+                                segnaposto: widget.posizione.segnaposto,
+                                onApriAuto: () => _apri(
+                                  LaTuaAuto(auto: widget.auto, posizione: widget.posizione, consumo: widget.consumo),
+                                ),
+                                onFonte: () => mostraFonteDatiAuto(context, widget.auto),
+                                onFoto: _foto,
+                              ),
+                            ),
                           )
                         : SchedaViaggio(gestore: viaggio, onAvvia: _avvia, soglia: _preferenze.minimoArrivo),
                   ),

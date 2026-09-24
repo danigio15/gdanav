@@ -99,6 +99,12 @@ class Archivio {
       ? _p.delete(key: 'dongle_obd')
       : _p.write(key: 'dongle_obd', value: jsonEncode({'id': d.id, 'nome': d.nome}));
 
+  /// La foto della propria auto, come percorso di un file dell'app.
+  Future<String?> fotoAuto() => _p.read(key: 'foto_auto');
+
+  Future<void> salvaFotoAuto(String? percorso) =>
+      percorso == null ? _p.delete(key: 'foto_auto') : _p.write(key: 'foto_auto', value: percorso);
+
   /// Il consumo imparato di un modello.
   Future<ConsumoImparato> consumo(String veicolo) async {
     final testo = await _p.read(key: 'consumo_$veicolo');

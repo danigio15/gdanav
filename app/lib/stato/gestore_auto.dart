@@ -17,6 +17,15 @@ class GestoreAuto extends ChangeNotifier {
 
   final Future<CanaleObd> Function(String id) _apriObd;
 
+  /// La foto della propria auto, se l'utente l'ha messa.
+  String? foto;
+
+  Future<void> impostaFoto(String? percorso) async {
+    foto = percorso;
+    await archivio.salvaFotoAuto(percorso);
+    notifyListeners();
+  }
+
   /// Il dongle OBD scelto, se c'è.
   ({String id, String nome})? dongle;
 
@@ -60,6 +69,7 @@ class GestoreAuto extends ChangeNotifier {
     await _accendi(manuale);
     await _accendi(SorgenteAndroidAuto(onVelocita: _velocita));
     if (abbinamento != null) await _accendi(SorgenteHomeAssistant(ClienteRelay(abbinamento!)));
+    foto = await archivio.fotoAuto();
     dongle = await archivio.dongleObd();
     if (dongle != null) unawaited(_accendiObd());
     // Anche senza letture nuove l'età del dato cambia: si ricalcola ogni tanto.

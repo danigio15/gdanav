@@ -35,7 +35,8 @@ void main() {
     await aspetta(tester);
 
     expect(a.auto.veicolo.id, 'tesla-model-3-lr');
-    expect(find.textContaining('Model 3 Long Range · Manuale'), findsOneWidget);
+    // La scheda dell'auto nel pannello mostra quella scelta.
+    expect(find.text('Tesla Model 3 Long Range'), findsOneWidget);
     final ricordata = await tester.runAsync(() => Archivio().veicolo());
     expect(ricordata!.id, 'tesla-model-3-lr');
   });

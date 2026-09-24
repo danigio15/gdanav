@@ -86,6 +86,12 @@ void main() {
     // Chiuso il viaggio, Bologna è fra i recenti.
     await tester.tap(find.byTooltip('Chiudi'));
     await tester.pumpAndSettle();
+    // Sotto la scheda dell'auto.
+    await tester.scrollUntilVisible(
+      find.text('Emilia-Romagna'),
+      100,
+      scrollable: find.ancestor(of: find.text('Dove andiamo?'), matching: find.byType(Scrollable)).first,
+    );
     expect(find.text('Recenti'), findsOneWidget);
     expect(find.text('Emilia-Romagna'), findsOneWidget);
   });
