@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import '../veicolo/profilo_veicolo.dart';
+import 'consumo_imparato.dart';
 
 const _g = 9.81;
 
@@ -20,11 +21,22 @@ class Tratto {
 
 /// Quello che il meteo e l'abitacolo aggiungono.
 class Condizioni {
-  const Condizioni({this.temperaturaC = 20, this.ventoControMs = 0, this.climaW = 0, this.fattoreConsumo = 1});
+  const Condizioni({
+    this.temperaturaC = 20,
+    this.ventoControMs = 0,
+    this.climaW = 0,
+    this.fattoreConsumo = 1,
+    this.fattoriStrada = const {},
+  });
 
   /// Il clima stimato dalla temperatura esterna: niente fra 18 e 26 gradi,
   /// poi riscaldamento o raffrescamento proporzionali, con un tetto.
-  factory Condizioni.daMeteo({required double temperaturaC, double ventoControMs = 0, double fattoreConsumo = 1}) {
+  factory Condizioni.daMeteo({
+    required double temperaturaC,
+    double ventoControMs = 0,
+    double fattoreConsumo = 1,
+    Map<TipoStrada, double> fattoriStrada = const {},
+  }) {
     final caldo = math.min(3000.0, math.max(0.0, 18 - temperaturaC) * 150);
     final freddo = math.min(1500.0, math.max(0.0, temperaturaC - 26) * 100);
     return Condizioni(
@@ -32,6 +44,7 @@ class Condizioni {
       ventoControMs: ventoControMs,
       climaW: caldo + freddo,
       fattoreConsumo: fattoreConsumo,
+      fattoriStrada: fattoriStrada,
     );
   }
 
@@ -45,6 +58,11 @@ class Condizioni {
   /// Quanto la tua auto consuma rispetto al modello: lo impara
   /// [ConsumoImparato] guidando (1,1 = il 10% in più).
   final double fattoreConsumo;
+
+  /// Il correttivo per tipo di strada, dove misurato; altrove [fattoreConsumo].
+  final Map<TipoStrada, double> fattoriStrada;
+
+  double fattorePer(double kmh) => fattoriStrada[TipoStrada.daVelocita(kmh)] ?? fattoreConsumo;
 
   /// Densità dell'aria alla temperatura data, al livello del mare.
   double get densitaAria => 101325 / (287.05 * (temperaturaC + 273.15));
@@ -65,7 +83,7 @@ double energiaTrattoWh(Tratto tratto, ProfiloVeicolo p, [Condizioni c = const Co
   final fissi = (p.consumoFissoW + c.climaW) * tratto.secondi;
   final wh = (batteria + fissi) / 3600;
   // Il correttivo vale per quello che si spende, non per il recupero.
-  return wh > 0 ? wh * c.fattoreConsumo : wh;
+  return wh > 0 ? wh * c.fattorePer(tratto.velocitaKmh) : wh;
 }
 
 /// Consumo medio in Wh/km, il numero che si mostra all'utente.

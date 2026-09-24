@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:gdanav_core/gdanav_core.dart';
 import 'package:test/test.dart';
 
@@ -75,5 +77,68 @@ void main() {
     expect(s.velocitaKmh, 88);
     expect(s.potenzaKw, 17.2);
     expect(s.odometroKm, 23456.7);
+  });
+
+  test('le strade dalla velocità: urbane, extraurbane, autostrade', () {
+    expect(TipoStrada.daVelocita(45), TipoStrada.urbana);
+    expect(TipoStrada.daVelocita(60), TipoStrada.extraurbana);
+    expect(TipoStrada.daVelocita(100), TipoStrada.extraurbana);
+    expect(TipoStrada.daVelocita(125), TipoStrada.autostrada);
+  });
+
+  test('per tipo di strada: km, consumo previsto e vero, precisione, correttivo suo', () {
+    var c = const ConsumoImparato();
+    // In autostrada la macchina consuma il 20% più del modello; in città come dice.
+    for (var i = 0; i < 6; i++) {
+      c = c.con(previstoWh: 2000, realeWh: 2400, km: 10, tipo: TipoStrada.autostrada);
+      c = c.con(previstoWh: 1200, realeWh: 1200, km: 10, tipo: TipoStrada.urbana);
+    }
+    final a = c.strade[TipoStrada.autostrada]!;
+    expect(a.km, 60);
+    expect(a.affidabile, isTrue);
+    expect(a.fattore, closeTo(1.2, 0.03));
+    expect(a.realeKwh100, closeTo(24, 0.01));
+    // All'inizio il calcolo sbagliava, poi ha imparato: la precisione cresce.
+    expect(a.precisionePercento, greaterThan(85));
+    expect(a.precisionePercento, lessThan(100));
+    final u = c.strade[TipoStrada.urbana]!;
+    expect(u.fattore, lessThan(1.1));
+    expect(c.fattorePer(TipoStrada.autostrada), closeTo(1.2, 0.03));
+    expect(c.fattorePer(TipoStrada.urbana), lessThan(1.1));
+    // Mai misurate: il correttivo generale.
+    expect(c.fattorePer(TipoStrada.extraurbana), c.fattore);
+    // Va e torna.
+    final letto = ConsumoImparato.daJson(jsonDecode(jsonEncode(c.toJson())) as Map<String, Object?>);
+    expect(letto.strade[TipoStrada.autostrada]!.km, 60);
+    expect(letto.fattorePer(TipoStrada.autostrada), c.fattorePer(TipoStrada.autostrada));
+  });
+
+  test('il correttivo per strada si applica solo a quelle strade', () {
+    const auto = Tratto(lunghezzaM: 1000, velocitaKmh: 120);
+    const citta = Tratto(lunghezzaM: 1000, velocitaKmh: 40);
+    final p = ProfiloVeicolo.esempio;
+    const c = Condizioni(fattoriStrada: {TipoStrada.autostrada: 1.2});
+    expect(energiaTrattoWh(auto, p, c), closeTo(energiaTrattoWh(auto, p) * 1.2, 0.001));
+    expect(energiaTrattoWh(citta, p, c), closeTo(energiaTrattoWh(citta, p), 0.001));
+  });
+
+  test('ogni misura sa su che strade è stata presa', () {
+    final punti = [for (var i = 0; i <= 20; i++) Punto(45 + i * 0.009, 9)];
+    final linea = Linea(punti);
+    final percorso = PercorsoCalcolato(
+      punti: punti,
+      tratti: [
+        for (var i = 1; i < punti.length; i++)
+          Tratto(lunghezzaM: linea.cumulate[i] - linea.cumulate[i - 1], velocitaKmh: i <= 10 ? 50 : 130),
+      ],
+      manovre: const [],
+    );
+    final m = MisuratoreConsumo(percorso: percorso, capacitaKwh: 60, profilo: (t) => t.lunghezzaM * 0.15);
+    m.registra(batteria: 80, metri: 0);
+    final citta = m.registra(batteria: 78, metri: 9000)!;
+    expect(citta.tipo, TipoStrada.urbana);
+    expect(citta.velocitaKmh, closeTo(50, 1));
+    final autostrada = m.registra(batteria: 75, metri: 20000)!;
+    expect(autostrada.tipo, TipoStrada.autostrada);
   });
 }

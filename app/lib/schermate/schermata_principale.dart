@@ -336,7 +336,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                   sotto: 'Da dove arriva la batteria',
                   onTap: () {
                     Navigator.of(contesto).pop();
-                    mostraFonteDatiAuto(context, widget.auto);
+                    mostraFonteDatiAuto(context, widget.auto, consumo: widget.consumo);
                   },
                 ),
                 _VoceMenu(
@@ -471,7 +471,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                                 onApriAuto: () => _apri(
                                   LaTuaAuto(auto: widget.auto, posizione: widget.posizione, consumo: widget.consumo),
                                 ),
-                                onFonte: () => mostraFonteDatiAuto(context, widget.auto),
+                                onFonte: () => mostraFonteDatiAuto(context, widget.auto, consumo: widget.consumo),
                                 onFoto: _foto,
                                 fotoCatalogo: widget.fotoAuto,
                               ),

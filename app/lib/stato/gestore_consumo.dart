@@ -21,7 +21,7 @@ class GestoreConsumo extends ChangeNotifier {
   }
 
   Future<void> registra(MisuraConsumo m) async {
-    imparato = imparato.con(previstoWh: m.previstoWh, realeWh: m.realeWh, km: m.km);
+    imparato = imparato.con(previstoWh: m.previstoWh, realeWh: m.realeWh, km: m.km, tipo: m.tipo);
     notifyListeners();
     if (_veicolo case final v?) await archivio.salvaConsumo(v, imparato);
   }
@@ -36,7 +36,16 @@ class GestoreConsumo extends ChangeNotifier {
   /// la dice, la temperatura esterna (col clima che ne segue).
   Condizioni condizioni(StatoAuto? s, {bool conFattore = true}) {
     final f = conFattore ? imparato.fattore : 1.0;
+    // Dove si è misurato abbastanza, il correttivo di quel tipo di strada.
+    final strade = conFattore
+        ? {
+            for (final MapEntry(:key, :value) in imparato.strade.entries)
+              if (value.affidabile) key: value.fattore,
+          }
+        : const <TipoStrada, double>{};
     final t = s?.temperaturaEsternaC;
-    return t == null ? Condizioni(fattoreConsumo: f) : Condizioni.daMeteo(temperaturaC: t, fattoreConsumo: f);
+    return t == null
+        ? Condizioni(fattoreConsumo: f, fattoriStrada: strade)
+        : Condizioni.daMeteo(temperaturaC: t, fattoreConsumo: f, fattoriStrada: strade);
   }
 }
