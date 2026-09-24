@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:collection/collection.dart';
 
+import '../colonnine/colonnina.dart';
 import '../veicolo/profilo_veicolo.dart';
 import 'modello_consumo.dart';
 
@@ -13,6 +14,9 @@ class ColonninaSulPercorso {
     required this.distanzaM,
     required this.potenzaKw,
     this.deviazioneM = 0,
+    this.disponibilita = Disponibilita.sconosciuta,
+    this.obbligata = false,
+    this.dettaglio,
   });
 
   final String id;
@@ -25,6 +29,15 @@ class ColonninaSulPercorso {
 
   /// Dall'uscita alla colonnina, solo andata.
   final double deviazioneM;
+
+  /// Le prese adatte all'auto, libere o no adesso.
+  final Disponibilita disponibilita;
+
+  /// L'ha scelta l'utente: ci si ferma per forza.
+  final bool obbligata;
+
+  /// La colonnina intera, per la mappa e la scheda.
+  final Colonnina? dettaglio;
 }
 
 class Sosta {
@@ -37,14 +50,35 @@ class Sosta {
   final Duration ricarica;
 }
 
+/// Un punto del grafico della batteria lungo il viaggio.
+class PuntoBatteria {
+  const PuntoBatteria(this.km, this.batteria);
+  final double km;
+  final double batteria;
+}
+
 class PianoViaggio {
-  const PianoViaggio({required this.soste, required this.batteriaArrivo, required this.durata});
+  const PianoViaggio({
+    required this.soste,
+    required this.batteriaArrivo,
+    required this.durata,
+    this.profiloBatteria = const [],
+    this.energiaKwh = 0,
+  });
 
   final List<Sosta> soste;
   final double batteriaArrivo;
 
   /// Guida più ricariche più il tempo fisso di ogni sosta.
   final Duration durata;
+
+  /// La batteria lungo la strada: scende guidando, sale alle soste.
+  final List<PuntoBatteria> profiloBatteria;
+
+  /// L'energia presa dalla batteria per tutto il viaggio.
+  final double energiaKwh;
+
+  Duration get ricarica => soste.fold(Duration.zero, (t, s) => t + s.ricarica);
 }
 
 /// Trova le soste che portano a destinazione nel minor tempo, senza mai
@@ -63,6 +97,7 @@ class PianificatoreSoste {
     this.passoRicarica = 5,
     this.tempoFissoSosta = const Duration(minutes: 4),
     this.velocitaDeviazioneKmh = 40,
+    this.attesaSeOccupata = const Duration(minutes: 15),
   });
 
   final ProfiloVeicolo profilo;
@@ -81,6 +116,10 @@ class PianificatoreSoste {
   final Duration tempoFissoSosta;
   final double velocitaDeviazioneKmh;
 
+  /// Quanto si conta di aspettare a una colonnina tutta occupata adesso.
+  /// Zero per non tenerne conto.
+  final Duration attesaSeOccupata;
+
   /// `null` se non c'è modo di arrivare.
   PianoViaggio? pianifica({
     required List<Tratto> percorso,
@@ -92,6 +131,11 @@ class PianificatoreSoste {
       ..sort((a, b) => a.distanzaM.compareTo(b.distanzaM));
     final n = ordinate.length;
     final cap = profilo.capacitaUtileKwh;
+    // Da ogni punto non si può andare oltre la prossima sosta obbligata.
+    final limite = List<int>.filled(n + 1, n);
+    for (var i = n - 1; i >= 0; i--) {
+      limite[i] = ordinate[i].obbligata ? i : limite[i + 1];
+    }
 
     // Nodi: 0..n-1 le colonnine, n la destinazione. La partenza è a parte.
     final costo = <(int, int), double>{};
@@ -114,7 +158,7 @@ class PianificatoreSoste {
         required double secondi,
         required int indiceDa,
         required (int, int, int)? precedente}) {
-      for (var j = indiceDa; j <= n; j++) {
+      for (var j = indiceDa; j <= limite[indiceDa]; j++) {
         final destinazione = j == n;
         final alM = destinazione ? prog.lunghezza : ordinate[j].distanzaM;
         final deviazioneA = destinazione ? 0.0 : ordinate[j].deviazioneM;
@@ -134,17 +178,21 @@ class PianificatoreSoste {
     while (coda.isNotEmpty) {
       final (secondi, i, arrivo) = coda.removeFirst();
       if (secondi > (costo[(i, arrivo)] ?? double.infinity)) continue;
-      if (i == n) return _ricostruisci(ordinate, da, (i, arrivo), secondi);
+      if (i == n) return _ricostruisci(ordinate, da, (i, arrivo), secondi, prog, batteriaPartenza);
 
       final c = ordinate[i];
       final primo = ((arrivo ~/ passoRicarica) + 1) * passoRicarica;
-      for (var partenza = primo; partenza <= massimoRicarica; partenza += passoRicarica) {
+      // A una sosta scelta dall'utente ci si ferma comunque, anche se la
+      // batteria è già sopra il massimo abituale.
+      final ultimo = c.obbligata ? math.max(massimoRicarica.toInt(), math.min(primo, 100)) : massimoRicarica;
+      final attesa = c.disponibilita.piena ? attesaSeOccupata.inSeconds : 0;
+      for (var partenza = primo; partenza <= ultimo; partenza += passoRicarica) {
         final ricarica = _secondiRicarica(arrivo.toDouble(), partenza.toDouble(), c.potenzaKw);
         guida(
           dalM: c.distanzaM,
           deviazioneDaM: c.deviazioneM,
           batteria: partenza.toDouble(),
-          secondi: secondi + ricarica + tempoFissoSosta.inSeconds,
+          secondi: secondi + ricarica + attesa + tempoFissoSosta.inSeconds,
           indiceDa: i + 1,
           precedente: (i, arrivo, partenza),
         );
@@ -154,7 +202,13 @@ class PianificatoreSoste {
   }
 
   PianoViaggio _ricostruisci(
-      List<ColonninaSulPercorso> ordinate, Map<(int, int), (int, int, int)?> da, (int, int) fine, double secondi) {
+    List<ColonninaSulPercorso> ordinate,
+    Map<(int, int), (int, int, int)?> da,
+    (int, int) fine,
+    double secondi,
+    _Progressivo prog,
+    double batteriaPartenza,
+  ) {
     final soste = <Sosta>[];
     var passo = da[fine];
     while (passo != null) {
@@ -168,11 +222,38 @@ class PianificatoreSoste {
       ));
       passo = da[(i, arrivo)];
     }
+    final ordinateSoste = soste.reversed.toList();
     return PianoViaggio(
-      soste: soste.reversed.toList(),
+      soste: ordinateSoste,
       batteriaArrivo: fine.$2.toDouble(),
       durata: Duration(seconds: secondi.round()),
+      profiloBatteria: _profilo(ordinateSoste, prog, batteriaPartenza, fine.$2.toDouble()),
+      energiaKwh: prog.energiaKwh(0, prog.lunghezza),
     );
+  }
+
+  /// Il grafico: a ogni tratto fra due soste la batteria scende come dice il
+  /// modello; alla sosta sale di colpo.
+  List<PuntoBatteria> _profilo(List<Sosta> soste, _Progressivo prog, double partenza, double arrivo) {
+    final cap = profilo.capacitaUtileKwh;
+    final passo = math.max(500.0, prog.lunghezza / 150);
+    final punti = <PuntoBatteria>[];
+    var daM = 0.0, batteria = partenza;
+    void tratto(double aM, double fine) {
+      for (var m = daM; m < aM; m += passo) {
+        punti.add(PuntoBatteria(m / 1000, batteria - prog.energiaKwh(daM, m) / cap * 100));
+      }
+      punti.add(PuntoBatteria(aM / 1000, fine));
+    }
+
+    for (final s in soste) {
+      tratto(s.colonnina.distanzaM, s.batteriaArrivo);
+      punti.add(PuntoBatteria(s.colonnina.distanzaM / 1000, s.batteriaPartenza));
+      daM = s.colonnina.distanzaM;
+      batteria = s.batteriaPartenza;
+    }
+    tratto(prog.lunghezza, arrivo);
+    return punti;
   }
 
   /// Si integra la curva a passi di mezzo punto: la potenza è il minimo fra

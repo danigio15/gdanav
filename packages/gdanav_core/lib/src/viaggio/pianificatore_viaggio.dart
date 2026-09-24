@@ -19,47 +19,126 @@ class Viaggio {
   final PianoViaggio? piano;
 }
 
+/// Come si preferisce ricaricare. Si sceglie nelle impostazioni.
+class PreferenzeRicarica {
+  const PreferenzeRicarica({
+    this.minimoArrivo = 15,
+    this.minimoSosta = 10,
+    this.massimoRicarica = 80,
+    this.potenzaMinimaKw = 50,
+    this.evitaOccupate = true,
+  });
+
+  factory PreferenzeRicarica.daJson(Map<String, Object?> j) {
+    const d = PreferenzeRicarica();
+    double n(String k, double v) => (j[k] as num?)?.toDouble() ?? v;
+    return PreferenzeRicarica(
+      minimoArrivo: n('minimo_arrivo', d.minimoArrivo),
+      minimoSosta: n('minimo_sosta', d.minimoSosta),
+      massimoRicarica: n('massimo_ricarica', d.massimoRicarica),
+      potenzaMinimaKw: n('potenza_minima_kw', d.potenzaMinimaKw),
+      evitaOccupate: j['evita_occupate'] as bool? ?? d.evitaOccupate,
+    );
+  }
+
+  /// Batteria con cui arrivare a destinazione.
+  final double minimoArrivo;
+
+  /// Batteria con cui arrivare a una colonnina.
+  final double minimoSosta;
+
+  /// Fin dove ricaricare alle soste: oltre, la ricarica rapida rallenta.
+  final double massimoRicarica;
+
+  /// Le colonnine più lente non si propongono come soste.
+  final double potenzaMinimaKw;
+
+  /// Mette in conto un'attesa alle colonnine tutte occupate adesso, così si
+  /// preferiscono quelle libere.
+  final bool evitaOccupate;
+
+  PreferenzeRicarica copia({
+    double? minimoArrivo,
+    double? minimoSosta,
+    double? massimoRicarica,
+    double? potenzaMinimaKw,
+    bool? evitaOccupate,
+  }) =>
+      PreferenzeRicarica(
+        minimoArrivo: minimoArrivo ?? this.minimoArrivo,
+        minimoSosta: minimoSosta ?? this.minimoSosta,
+        massimoRicarica: massimoRicarica ?? this.massimoRicarica,
+        potenzaMinimaKw: potenzaMinimaKw ?? this.potenzaMinimaKw,
+        evitaOccupate: evitaOccupate ?? this.evitaOccupate,
+      );
+
+  Map<String, Object?> toJson() => {
+        'minimo_arrivo': minimoArrivo,
+        'minimo_sosta': minimoSosta,
+        'massimo_ricarica': massimoRicarica,
+        'potenza_minima_kw': potenzaMinimaKw,
+        'evita_occupate': evitaOccupate,
+      };
+}
+
 /// Mette insieme Valhalla, le colonnine e il pianificatore delle soste.
 class PianificatoreViaggio {
   PianificatoreViaggio({
     required this.percorsi,
     required this.colonnine,
     required this.profilo,
-    this.potenzaMinimaKw = 40,
+    this.preferenze = const PreferenzeRicarica(),
   });
 
   final Future<PercorsoCalcolato> Function(List<Punto> tappe) percorsi;
   final FonteColonnine colonnine;
   final ProfiloVeicolo profilo;
+  final PreferenzeRicarica preferenze;
 
-  /// Sotto questa potenza una colonnina non vale la sosta in viaggio.
-  final double potenzaMinimaKw;
-
+  /// [obbligate]: gli id delle colonnine dove l'utente vuole fermarsi.
   Future<Viaggio> pianifica({
     required Punto partenza,
     required Punto arrivo,
     required double batteria,
     Condizioni condizioni = const Condizioni(),
+    Set<String> obbligate = const {},
   }) async {
     final percorso = await percorsi([partenza, arrivo]);
-    final pianificatore = PianificatoreSoste(profilo: profilo, condizioni: condizioni);
+    final p = preferenze;
+    final pianificatore = PianificatoreSoste(
+      profilo: profilo,
+      condizioni: condizioni,
+      minimoArrivo: p.minimoArrivo,
+      minimoSosta: p.minimoSosta,
+      massimoRicarica: p.massimoRicarica,
+      attesaSeOccupata: p.evitaOccupate ? const Duration(minutes: 15) : Duration.zero,
+    );
+    final senzaSoste = obbligate.isEmpty
+        ? pianificatore.pianifica(percorso: percorso.tratti, batteriaPartenza: batteria, colonnine: const [])
+        : null;
 
-    // Se si arriva senza fermarsi, le colonnine non servono: una richiesta
-    // in meno, e il piano è pronto prima.
-    final senzaSoste =
-        pianificatore.pianifica(percorso: percorso.tratti, batteriaPartenza: batteria, colonnine: const []);
-    if (senzaSoste != null) return Viaggio(percorso: percorso, colonnine: const [], piano: senzaSoste);
-
+    // Le colonnine si chiedono sempre, anche quando non servono: sulla mappa
+    // si vedono lungo la strada, e se ne può scegliere una. Ma se il servizio
+    // non risponde e la batteria basta, il viaggio si fa lo stesso.
+    List<Colonnina> trovate;
+    try {
+      trovate = await colonnine.lungo(percorso.punti);
+    } catch (_) {
+      if (senzaSoste == null) rethrow;
+      trovate = const [];
+    }
     final vicine = colonnineSulPercorso(
       Linea(percorso.punti),
-      await colonnine.lungo(percorso.punti),
+      trovate,
       compatibili: profilo.connettori,
-      potenzaMinimaKw: potenzaMinimaKw,
+      potenzaMinimaKw: p.potenzaMinimaKw,
+      obbligate: obbligate,
     );
     return Viaggio(
       percorso: percorso,
       colonnine: vicine,
-      piano: pianificatore.pianifica(percorso: percorso.tratti, batteriaPartenza: batteria, colonnine: vicine),
+      piano: senzaSoste ??
+          pianificatore.pianifica(percorso: percorso.tratti, batteriaPartenza: batteria, colonnine: vicine),
     );
   }
 }

@@ -12,6 +12,10 @@ class PuntoCurva {
 /// consumi e i tempi di ricarica.
 class ProfiloVeicolo {
   const ProfiloVeicolo({
+    this.id = '',
+    this.marca = '',
+    this.modello = '',
+    this.potenzaAcKw = 11,
     required this.nome,
     required this.massaKg,
     required this.cdA,
@@ -23,6 +27,14 @@ class ProfiloVeicolo {
     this.rendimentoRecupero = 0.65,
     this.consumoFissoW = 300,
   });
+
+  /// Stabile, per ricordare la scelta: `tesla-model-3-lr`.
+  final String id;
+  final String marca;
+  final String modello;
+
+  /// La ricarica in alternata di bordo: 11 kW quasi per tutte.
+  final double potenzaAcKw;
 
   final String nome;
 
@@ -69,9 +81,27 @@ class ProfiloVeicolo {
     return c.last.potenzaKw;
   }
 
+  /// La potenza massima in continua, il numero delle schede tecniche.
+  double get piccoDcKw => curvaRicarica.map((p) => p.potenzaKw).reduce((a, b) => a > b ? a : b);
+
+  /// Una curva di ricarica con la forma tipica delle batterie a 400 V:
+  /// sale fino al picco verso il 10%, lo tiene fino al 40% e poi cala.
+  static List<PuntoCurva> curvaTipica(double piccoKw) => [
+        PuntoCurva(0, piccoKw * 0.8),
+        PuntoCurva(10, piccoKw),
+        PuntoCurva(40, piccoKw),
+        PuntoCurva(60, piccoKw * 0.75),
+        PuntoCurva(80, piccoKw * 0.45),
+        PuntoCurva(90, piccoKw * 0.25),
+        PuntoCurva(100, piccoKw * 0.08),
+      ];
+
   /// Un'auto media di segmento C, per le prove e per chi non ha ancora
   /// scelto il suo modello.
   static const esempio = ProfiloVeicolo(
+    id: 'esempio',
+    marca: 'Esempio',
+    modello: 'Segmento C 60 kWh',
     nome: 'Esempio segmento C (60 kWh)',
     massaKg: 1900,
     cdA: 0.62,

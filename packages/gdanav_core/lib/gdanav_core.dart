@@ -15,6 +15,7 @@ export 'src/protocollo/busta.dart';
 export 'src/protocollo/cliente_relay.dart';
 export 'src/protocollo/messaggio.dart';
 export 'src/veicolo/arbitro_sorgenti.dart';
+export 'src/veicolo/catalogo.dart';
 export 'src/veicolo/profilo_veicolo.dart';
 export 'src/veicolo/sorgente_home_assistant.dart';
 export 'src/veicolo/sorgente_dati_auto.dart';

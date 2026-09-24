@@ -37,13 +37,14 @@ void main() {
         connettori: [Connettore(tipo: TipoConnettore.ccs2, potenzaKw: kw)],
       );
 
-  test('un viaggio corto non chiede nemmeno le colonnine', () async {
+  test('un viaggio corto non ha soste, ma mostra le colonnine lungo la strada', () async {
     final fonti = FontiFinte([colonnina(50)]);
     final p =
         PianificatoreViaggio(percorsi: (_) async => dritta(80), colonnine: fonti, profilo: ProfiloVeicolo.esempio);
     final v = await p.pianifica(partenza: const Punto(42, 12), arrivo: const Punto(43, 12), batteria: 90);
-    expect(fonti.chiamate, 0);
+    expect(fonti.chiamate, 1);
     expect(v.piano!.soste, isEmpty);
+    expect(v.colonnine.single.id, 'c50');
   });
 
   test('un viaggio lungo si ferma alle colonnine lungo la strada', () async {
@@ -89,14 +90,12 @@ void main() {
 
     final comodo = await p.pianifica(partenza: partenza, arrivo: arrivo, batteria: 60);
     expect(comodo.piano!.soste, isEmpty);
-    expect(fonti.chiamate, 0);
 
     // Si parte con la soglia di arrivo (15%) più metà del consumo del
     // viaggio: si arriverebbe sotto, serve la colonnina a metà strada.
     final kWh = percorso.tratti.fold(0.0, (s, t) => s + energiaTrattoWh(t, ProfiloVeicolo.esempio)) / 1000;
     final percento = kWh / ProfiloVeicolo.esempio.capacitaUtileKwh * 100;
     final tirato = await p.pianifica(partenza: partenza, arrivo: arrivo, batteria: 15 + percento / 2);
-    expect(fonti.chiamate, 1);
     expect(tirato.colonnine.single.id, 'utrecht');
     expect(tirato.piano!.soste.single.colonnina.id, 'utrecht');
   }, skip: vero == null ? 'serve GDANAV_VALHALLA' : false);

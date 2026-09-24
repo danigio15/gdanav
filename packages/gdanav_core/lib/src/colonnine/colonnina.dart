@@ -14,6 +14,26 @@ class Connettore {
   Connettore conStato(StatoPresa s) => Connettore(tipo: tipo, potenzaKw: potenzaKw, stato: s);
 }
 
+/// Quante prese adatte a un'auto sono libere adesso.
+class Disponibilita {
+  const Disponibilita({this.libere = 0, this.occupate = 0, this.guaste = 0, this.totali = 0});
+
+  final int libere;
+  final int occupate;
+  final int guaste;
+
+  /// Le prese compatibili, comprese quelle di cui non si sa lo stato.
+  final int totali;
+
+  /// `true` se almeno una presa dice come sta.
+  bool get nota => libere + occupate + guaste > 0;
+
+  /// Tutte le prese funzionanti sono occupate: si rischia di aspettare.
+  bool get piena => libere == 0 && occupate > 0;
+
+  static const sconosciuta = Disponibilita();
+}
+
 /// Un punto di ricarica, da qualunque fonte arrivi.
 class Colonnina {
   const Colonnina({
@@ -44,6 +64,24 @@ class Colonnina {
       }
     }
     return massima;
+  }
+
+  Disponibilita disponibilitaPer(Set<TipoConnettore> compatibili) {
+    var libere = 0, occupate = 0, guaste = 0, totali = 0;
+    for (final c in connettori.where((c) => compatibili.contains(c.tipo))) {
+      totali++;
+      switch (c.stato) {
+        case StatoPresa.disponibile:
+          libere++;
+        case StatoPresa.occupata:
+          occupate++;
+        case StatoPresa.fuoriServizio:
+          guaste++;
+        case StatoPresa.sconosciuto:
+          break;
+      }
+    }
+    return Disponibilita(libere: libere, occupate: occupate, guaste: guaste, totali: totali);
   }
 
   /// `true` se tutte le prese compatibili sono occupate adesso.
