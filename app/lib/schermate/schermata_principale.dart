@@ -8,6 +8,7 @@ import '../mappa/mappa_viaggio.dart';
 import '../stato/archivio.dart';
 import '../stato/gestore_auto.dart';
 import '../stato/gestore_guida.dart';
+import '../stato/gestore_posizione.dart';
 import '../stato/gestore_viaggio.dart';
 import 'abbina_home_assistant.dart';
 import 'cerca_destinazione.dart';
@@ -28,6 +29,7 @@ class SchermataPrincipale extends StatefulWidget {
     required this.viaggio,
     required this.archivio,
     required this.guida,
+    required this.posizione,
     this.mappa,
     this.chiediPosizione,
   });
@@ -36,6 +38,7 @@ class SchermataPrincipale extends StatefulWidget {
   final GestoreViaggio viaggio;
   final Archivio archivio;
   final GestoreGuida guida;
+  final GestorePosizione posizione;
 
   /// Chiede il permesso della posizione; nelle prove non c'è.
   final Future<bool> Function()? chiediPosizione;
@@ -51,7 +54,6 @@ class SchermataPrincipale extends StatefulWidget {
 class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   final controllo = ControlloMappa();
   PreferenzeRicarica _preferenze = const PreferenzeRicarica();
-  var _posizione = false;
 
   GestoreViaggio get viaggio => widget.viaggio;
 
@@ -59,12 +61,14 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   void initState() {
     super.initState();
     _ricaricaPreferenze();
-    widget.chiediPosizione?.call().then((ok) => mounted ? setState(() => _posizione = ok) : null);
+    widget.chiediPosizione?.call().then((ok) {
+      if (ok) widget.posizione.avvia();
+    });
   }
 
   void _avvia() => Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) => SchermataGuida(guida: widget.guida, mappa: widget.mappa),
+      builder: (_) => SchermataGuida(guida: widget.guida, posizione: widget.posizione, mappa: widget.mappa),
     ),
   );
 
@@ -115,7 +119,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                 icona: Icons.electric_car,
                 titolo: 'La tua auto',
                 sotto: widget.auto.veicolo.nome,
-                onTap: () => vai(LaTuaAuto(auto: widget.auto)),
+                onTap: () => vai(LaTuaAuto(auto: widget.auto, posizione: widget.posizione)),
               ),
               _VoceMenu(
                 icona: Icons.ev_station,
@@ -163,7 +167,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                 MappaViaggio(
                   gestore: viaggio,
                   controllo: controllo,
-                  posizioneConcessa: _posizione,
+                  posizione: widget.posizione,
                   onPuntoScelto: (p) => viaggio.vaiA(
                     Luogo(
                       nome: 'Punto sulla mappa',

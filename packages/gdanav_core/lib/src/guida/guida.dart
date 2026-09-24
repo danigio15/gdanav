@@ -16,6 +16,7 @@ class Avanzamento {
     required this.fuoriPercorso,
     required this.arrivato,
     required this.posizioneSulPercorso,
+    required this.rotta,
     this.daDire,
   });
 
@@ -39,6 +40,10 @@ class Avanzamento {
 
   /// Il punto del percorso più vicino, per agganciarci la freccia.
   final Punto posizioneSulPercorso;
+
+  /// La direzione della strada in quel punto, in gradi da nord in senso
+  /// orario: per girare l'auto e la mappa.
+  final double rotta;
 
   /// Una frase nuova da dire ad alta voce, se è il momento.
   final String? daDire;
@@ -100,6 +105,7 @@ class Guida {
       fuoriPercorso: _fuori >= lettureFuori,
       arrivato: arrivato,
       posizioneSulPercorso: _punto(i, p.t),
+      rotta: _rotta(i),
       daDire: arrivato ? _una('arrivo', 'Sei arrivato.') : _annuncio(prossima, alla),
     );
   }
@@ -120,6 +126,16 @@ class Guida {
   Punto _punto(int i, double t) {
     final a = _linea.punti[i], b = _linea.punti[math.min(i + 1, _linea.punti.length - 1)];
     return Punto(a.lat + t * (b.lat - a.lat), a.lon + t * (b.lon - a.lon));
+  }
+
+  /// La direzione del segmento [i]; se è cortissimo, quella dei successivi.
+  double _rotta(int i) {
+    final n = _linea.punti.length;
+    var j = math.min(i + 1, n - 1);
+    while (j < n - 1 && distanzaM(_linea.punti[i], _linea.punti[j]) < 8) {
+      j++;
+    }
+    return rottaGradi(_linea.punti[math.min(i, n - 1)], _linea.punti[j]);
   }
 
   /// Il tempo cumulato a ogni punto, con la velocità della manovra a cui il

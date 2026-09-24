@@ -46,6 +46,8 @@ void main() {
     expect(a.dopo, same(percorso.manovre[2]));
     expect(a.allaProssimaM, closeTo(percorso.manovre.first.lunghezzaM, 5));
     expect(a.restante.inSeconds, closeTo(percorso.durata.inSeconds, 3));
+    // Si parte da Domplein verso nord.
+    expect(a.rotta, anyOf(lessThan(45), greaterThan(315)));
   });
 
   test('uscendo di strada, dopo tre letture chiede di ricalcolare', () {

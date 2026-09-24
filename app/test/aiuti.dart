@@ -8,6 +8,7 @@ import 'package:gdanav/main.dart';
 import 'package:gdanav/stato/archivio.dart';
 import 'package:gdanav/stato/gestore_auto.dart';
 import 'package:gdanav/stato/gestore_guida.dart';
+import 'package:gdanav/stato/gestore_posizione.dart';
 import 'package:gdanav/stato/gestore_viaggio.dart';
 import 'package:gdanav/stato/voce.dart';
 import 'package:gdanav_core/gdanav_core.dart';
@@ -84,7 +85,7 @@ class VoceFinta implements Voce {
 }
 
 class Ambiente {
-  Ambiente(this.archivio, this.auto, this.viaggio, this.guida, this.posizioni, this.voce);
+  Ambiente(this.archivio, this.auto, this.viaggio, this.guida, this.posizioni, this.voce, this.posizione, this.gps);
   final Archivio archivio;
   final GestoreAuto auto;
   final GestoreViaggio viaggio;
@@ -93,8 +94,13 @@ class Ambiente {
   /// Il GPS finto della guida: le prove ci mettono le posizioni.
   final StreamController<Punto> posizioni;
   final VoceFinta voce;
+  final GestorePosizione posizione;
+
+  /// Il GPS finto del segnaposto.
+  final StreamController<Lettura> gps;
 
   Widget app() => GdanavApp(
+    posizione: posizione,
     archivio: archivio,
     auto: auto,
     viaggio: viaggio,
@@ -124,7 +130,12 @@ Future<Ambiente> ambiente(WidgetTester tester, {int km = 500, Punto? posizione =
   final voce = VoceFinta();
   final guida = GestoreGuida(viaggio: viaggio, auto: auto, posizioni: () => posizioni.stream, voce: voce);
   addTearDown(guida.dispose);
-  return Ambiente(archivio, auto, viaggio, guida, posizioni, voce);
+  final gps = StreamController<Lettura>.broadcast();
+  addTearDown(gps.close);
+  final segnaposto = GestorePosizione(archivio: archivio, letture: () => gps.stream);
+  await tester.runAsync(segnaposto.carica);
+  addTearDown(segnaposto.dispose);
+  return Ambiente(archivio, auto, viaggio, guida, posizioni, voce, segnaposto, gps);
 }
 
 const impostazioniComplete = {

@@ -10,8 +10,8 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     defaultConfig {
@@ -41,10 +41,19 @@ android {
 
 kotlin {
     compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
     }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Android Auto: la libreria delle app per l'auto, e i dati dell'auto
+    // (batteria, autonomia) quando il telefono è collegato.
+    implementation("androidx.car.app:app:1.4.0")
+    implementation("androidx.car.app:app-projected:1.4.0")
+    // La stessa MapLibre del plugin maplibre_gl, per la mappa sullo schermo dell'auto.
+    implementation("org.maplibre.gl:android-sdk-opengl:13.5.0")
 }

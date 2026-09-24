@@ -30,6 +30,14 @@ double distanzaM(Punto a, Punto b) {
   return 2 * _raggioTerraM * math.asin(math.min(1, math.sqrt(h)));
 }
 
+/// La direzione da [a] a [b], in gradi da nord in senso orario (0–360).
+double rottaGradi(Punto a, Punto b) {
+  final f1 = _rad(a.lat), f2 = _rad(b.lat), dl = _rad(b.lon - a.lon);
+  final y = math.sin(dl) * math.cos(f2);
+  final x = math.cos(f1) * math.sin(f2) - math.sin(f1) * math.cos(f2) * math.cos(dl);
+  return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
+}
+
 /// Decodifica una polyline codificata: precisione 6 per Valhalla, 5 per
 /// Google e Open Charge Map.
 List<Punto> decodificaPolyline(String codificata, {int precisione = 6}) {

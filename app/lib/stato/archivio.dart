@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
+import '../mappa/segnaposto.dart';
+
 /// Quello che l'app ricorda: l'abbinamento con Home Assistant (contiene la
 /// chiave, quindi sta nel portachiavi del telefono) e come è messo lo switch.
 class Archivio {
@@ -15,6 +17,7 @@ class Archivio {
   static const _impostazioni = 'impostazioni';
   static const _veicolo = 'veicolo';
   static const _preferenze = 'preferenze_ricarica';
+  static const _segnaposto = 'segnaposto';
 
   Future<Abbinamento?> abbinamento() async {
     final uri = await _p.read(key: _abbinamento);
@@ -70,6 +73,10 @@ class Archivio {
   }
 
   Future<void> salvaPreferenze(PreferenzeRicarica p) => _p.write(key: _preferenze, value: jsonEncode(p.toJson()));
+
+  Future<Segnaposto> segnaposto() async => Segnaposto.perNome(await _p.read(key: _segnaposto));
+
+  Future<void> salvaSegnaposto(Segnaposto s) => _p.write(key: _segnaposto, value: s.name);
 
   Future<void> salvaImpostazioni(Impostazioni i) => _p.write(key: _impostazioni, value: jsonEncode(i.toJson()));
 }

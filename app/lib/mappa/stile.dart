@@ -9,6 +9,7 @@ library;
 const sorgentePercorso = 'gdanav-percorso';
 const sorgenteColonnine = 'gdanav-colonnine';
 const sorgenteArrivo = 'gdanav-arrivo';
+const sorgenteIo = 'gdanav-io';
 const stratiToccabili = ['gdanav-soste', 'gdanav-colonnine'];
 
 /// Dall'alto gli edifici sono piatti e puliti; inclinando la mappa si
@@ -210,6 +211,7 @@ Map<String, Object> stileMappa({required bool scuro}) {
       sorgentePercorso: {'type': 'geojson', 'data': _vuota},
       sorgenteColonnine: {'type': 'geojson', 'data': _vuota},
       sorgenteArrivo: {'type': 'geojson', 'data': _vuota},
+      sorgenteIo: {'type': 'geojson', 'data': _vuota},
     },
     'layers': [
       {
@@ -447,6 +449,32 @@ Map<String, Object> stileMappa({required bool scuro}) {
           'circle-color': t.arrivo,
           'circle-stroke-color': t.contorno,
           'circle-stroke-width': 3.5,
+        },
+      },
+      {
+        // Dove sei: la freccia o l'auto scelta, girata come vai, distesa sulla
+        // mappa anche quando è inclinata.
+        'id': 'io',
+        'type': 'symbol',
+        'source': sorgenteIo,
+        'layout': {
+          'icon-image': ['get', 'icona'],
+          'icon-rotate': ['get', 'rotta'],
+          'icon-rotation-alignment': 'map',
+          'icon-pitch-alignment': 'map',
+          'icon-size': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            10,
+            0.38,
+            16,
+            0.6,
+            19,
+            0.85,
+          ],
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
         },
       },
       {

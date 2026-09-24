@@ -37,4 +37,12 @@ void main() {
     expect(s.last, punti.last);
     expect(s.length, lessThan(15));
   });
+
+  test('rotta: nord, est, sud, ovest', () {
+    const o = Punto(45, 9);
+    expect(rottaGradi(o, const Punto(45.01, 9)), closeTo(0, 0.01));
+    expect(rottaGradi(o, const Punto(45, 9.01)), closeTo(90, 0.1));
+    expect(rottaGradi(o, const Punto(44.99, 9)), closeTo(180, 0.01));
+    expect(rottaGradi(o, const Punto(45, 8.99)), closeTo(270, 0.1));
+  });
 }

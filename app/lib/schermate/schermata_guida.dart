@@ -6,6 +6,7 @@ import '../componenti/vetro.dart';
 import '../mappa/controllo_mappa.dart';
 import '../mappa/mappa_viaggio.dart';
 import '../stato/gestore_guida.dart';
+import '../stato/gestore_posizione.dart';
 import '../tema.dart';
 import 'scheda_viaggio.dart' show durata, orario;
 import 'schermata_principale.dart' show CostruisciMappa;
@@ -13,9 +14,10 @@ import 'schermata_principale.dart' show CostruisciMappa;
 /// La guida: la mappa ti segue inclinata, in alto la prossima manovra, in
 /// basso arrivo, chilometri e la prossima sosta.
 class SchermataGuida extends StatefulWidget {
-  const SchermataGuida({super.key, required this.guida, this.mappa});
+  const SchermataGuida({super.key, required this.guida, required this.posizione, this.mappa});
 
   final GestoreGuida guida;
+  final GestorePosizione posizione;
   final CostruisciMappa? mappa;
 
   @override
@@ -58,7 +60,8 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                   MappaViaggio(
                     gestore: g.viaggio,
                     controllo: controllo,
-                    guida: true,
+                    posizione: widget.posizione,
+                    guida: g,
                     onPuntoScelto: (_) {},
                     onColonnina: (_) {},
                   ),

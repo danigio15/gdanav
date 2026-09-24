@@ -2,11 +2,15 @@ import 'dart:convert';
 import 'dart:math' show Point;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
+import '../stato/gestore_guida.dart';
+import '../stato/gestore_posizione.dart';
 import '../stato/gestore_viaggio.dart';
 import 'controllo_mappa.dart';
 import 'dati_viaggio.dart';
+import 'segnaposto.dart';
 import 'stile.dart';
 
 /// La mappa vera: MapLibre con lo stile di gdanav (chiaro o scuro come il
@@ -18,8 +22,8 @@ class MappaViaggio extends StatefulWidget {
     required this.controllo,
     required this.onPuntoScelto,
     required this.onColonnina,
-    this.guida = false,
-    this.posizioneConcessa = true,
+    required this.posizione,
+    this.guida,
   });
 
   final GestoreViaggio gestore;
@@ -31,11 +35,12 @@ class MappaViaggio extends StatefulWidget {
   /// Tocco su una colonnina o una sosta.
   final ValueChanged<String> onColonnina;
 
-  /// In guida la mappa segue la posizione, inclinata e girata come l'auto.
-  final bool guida;
+  /// Dove sei e con quale segnaposto: lo disegna la mappa, non MapLibre.
+  final GestorePosizione posizione;
 
-  /// Senza permesso MapLibre non deve cercare la posizione.
-  final bool posizioneConcessa;
+  /// In guida la mappa segue l'auto agganciata al percorso, inclinata e
+  /// girata come la strada.
+  final GestoreGuida? guida;
 
   @override
   State<MappaViaggio> createState() => _MappaViaggioState();
@@ -55,12 +60,16 @@ class _MappaViaggioState extends State<MappaViaggio> {
     super.initState();
     widget.gestore.addListener(_ridisegna);
     widget.controllo.addListener(_comandi);
+    widget.posizione.addListener(_io);
+    widget.guida?.addListener(_io);
   }
 
   @override
   void dispose() {
     widget.gestore.removeListener(_ridisegna);
     widget.controllo.removeListener(_comandi);
+    widget.posizione.removeListener(_io);
+    widget.guida?.removeListener(_io);
     super.dispose();
   }
 
@@ -74,12 +83,51 @@ class _MappaViaggioState extends State<MappaViaggio> {
     }
     if (widget.controllo.richiesteCentra != _centrate) {
       _centrate = widget.controllo.richiesteCentra;
-      final qui = await m.requestMyLocationLatLng();
+      final qui = widget.posizione.qui;
       if (qui != null) {
         await m.animateCamera(
-          CameraUpdate.newCameraPosition(CameraPosition(target: qui, zoom: 16, tilt: _inclinata ? _inclinazione : 0)),
+          CameraUpdate.newCameraPosition(
+            CameraPosition(target: LatLng(qui.lat, qui.lon), zoom: 16, tilt: _inclinata ? _inclinazione : 0),
+          ),
         );
       }
+    }
+  }
+
+  var _primaPosizione = true;
+  DateTime _ultimaCamera = DateTime(0);
+
+  /// Il segnaposto: in guida agganciato al percorso e girato come la
+  /// strada, altrimenti dove dice il GPS.
+  Future<void> _io() async {
+    final m = _mappa;
+    if (m == null || !_stileCaricato) return;
+    final a = widget.guida?.avanzamento;
+    final qui = a?.posizioneSulPercorso ?? widget.posizione.qui;
+    final rotta = a?.rotta ?? widget.posizione.rotta;
+    await m.setGeoJsonSource(sorgenteIo, datiIo(qui, rotta, widget.posizione.segnaposto).cast<String, dynamic>());
+    if (qui == null) return;
+    if (widget.guida != null) {
+      // La telecamera segue l'auto; al massimo un movimento al secondo.
+      final ora = DateTime.now();
+      if (ora.difference(_ultimaCamera) < const Duration(milliseconds: 900)) return;
+      _ultimaCamera = ora;
+      await m.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: LatLng(qui.lat, qui.lon), zoom: 17, tilt: _inclinazione, bearing: rotta),
+        ),
+        duration: const Duration(milliseconds: 900),
+      );
+    } else if (_primaPosizione && widget.gestore.stato is! ViaggioPronto) {
+      _primaPosizione = false;
+      await m.animateCamera(CameraUpdate.newLatLngZoom(LatLng(qui.lat, qui.lon), 15));
+    }
+  }
+
+  Future<void> _immagini(MapLibreMapController m) async {
+    for (final s in Segnaposto.values) {
+      final byte = await rootBundle.load(s.asset);
+      await m.addImage(s.immagine, byte.buffer.asUint8List());
     }
   }
 
@@ -99,7 +147,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     for (final MapEntry(key: id, value: dati) in datiViaggio(viaggio).entries) {
       await m.setGeoJsonSource(id, dati.cast<String, dynamic>());
     }
-    if (viaggio == null || widget.guida) return;
+    if (viaggio == null || widget.guida != null) return;
     final (so, ne) = confini(viaggio)!;
     await m.animateCamera(
       CameraUpdate.newLatLngBounds(
@@ -131,14 +179,11 @@ class _MappaViaggioState extends State<MappaViaggio> {
       // Cambia stile col tema: la chiave rifà la mappa.
       key: ValueKey(scuro),
       styleString: jsonEncode(stileMappa(scuro: scuro)),
-      initialCameraPosition: widget.guida
+      initialCameraPosition: widget.guida != null
           ? const CameraPosition(target: LatLng(41.9, 12.5), zoom: 17, tilt: _inclinazione)
           : const CameraPosition(target: LatLng(41.9, 12.5), zoom: 5),
-      myLocationEnabled: widget.posizioneConcessa,
-      myLocationTrackingMode: !widget.posizioneConcessa
-          ? MyLocationTrackingMode.none
-          : (widget.guida ? MyLocationTrackingMode.trackingGps : MyLocationTrackingMode.tracking),
-      myLocationRenderMode: widget.guida ? MyLocationRenderMode.gps : MyLocationRenderMode.normal,
+      // Il puntino di MapLibre no: il segnaposto lo disegna lo stile.
+      myLocationEnabled: false,
       compassEnabled: true,
       attributionButtonPosition: AttributionButtonPosition.topLeft,
       attributionButtonMargins: const Point(12, 200),
@@ -149,7 +194,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
         if (_mappa case final m?) {
           _inclinata = widget.controllo.inclinata;
           _edifici(m);
-          if (widget.guida) m.animateCamera(CameraUpdate.tiltTo(_inclinazione));
+          _immagini(m).then((_) => _io());
         }
         _ridisegna();
       },
