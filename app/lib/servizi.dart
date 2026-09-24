@@ -18,11 +18,11 @@ abstract final class Servizi {
   static const chiaveTomTom = String.fromEnvironment('GDANAV_TOMTOM_CHIAVE', defaultValue: _chiaveTomTom);
 
   /// Le segnalazioni della comunità (incidenti, polizia, pericoli): il relay
-  /// di gdanav su Cloudflare. Vuoto finché non è pubblicato.
+  /// di gdanav su Cloudflare.
   static const segnalazioni = String.fromEnvironment('GDANAV_SEGNALAZIONI', defaultValue: _segnalazioni);
 }
 
 // Le chiavi di gdanav.
 const _chiaveOcm = '';
 const _chiaveTomTom = '';
-const _segnalazioni = '';
+const _segnalazioni = 'https://gdanav.gdahome.org/';

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 DOMAIN = "gdanav"
 
-RELAY_PREDEFINITO = "wss://relay.gdanav.workers.dev"
+# Il relay di gdanav su Cloudflare (vedi relay/ e la CI che lo pubblica).
+RELAY_PREDEFINITO = "wss://gdanav.gdahome.org"
 
 CONF_CHIAVE = "chiave"
 CONF_RELAY = "relay"
