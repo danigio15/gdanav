@@ -50,6 +50,10 @@ class GestoreGuida extends ChangeNotifier {
   var attiva = false;
   var ricalcolando = false;
   var muto = false;
+
+  /// Con il ricalcolo automatico spento: perché converrebbe ricalcolare. Si
+  /// mostra una scheda con «Ricalcola» e «No».
+  String? proposta;
   DateTime? _ultimoRacconto;
   var _vicinoDetto = false;
 
@@ -226,10 +230,34 @@ class GestoreGuida extends ChangeNotifier {
     if (_ora().difference(_ultimoRicalcolo) < intervalloRicalcolo) return;
     final scarto = (ora.valore - _prevista(p, metri / 1000)).abs();
     final fattoreCambiato = ((consumo?.imparato.fattore ?? 1) - _fattorePiano).abs() > 0.05;
-    if (scarto >= scartoPerRicalcolo || fattoreCambiato) unawaited(_ricalcola(perConsumo: true));
+    if (scarto < scartoPerRicalcolo && !fattoreCambiato) return;
+    if (viaggio.opzioni.ricalcoloAutomatico) {
+      unawaited(_ricalcola(perConsumo: true));
+    } else if (proposta == null) {
+      // Si chiede una volta; se si dice di no, se ne riparla fra due minuti.
+      _ultimoRicalcolo = _ora();
+      proposta = ora.valore < _prevista(p, metri / 1000)
+          ? 'Consumi più del previsto: ricalcolo le soste?'
+          : 'Consumi meno del previsto: ricalcolo le soste?';
+      notifyListeners();
+    }
   }
 
-  Future<void> _ricalcola({bool perConsumo = false}) async {
+  /// «Ricalcola», dal bottone o dalla scheda: da dove si è, con la batteria
+  /// di adesso.
+  Future<void> ricalcolaOra() async {
+    proposta = null;
+    if (!muto) unawaited(voce.parla('Ricalcolo il viaggio.'));
+    await _ricalcola(perConsumo: true, detto: true);
+  }
+
+  /// «No» alla proposta.
+  void lasciaCosi() {
+    proposta = null;
+    notifyListeners();
+  }
+
+  Future<void> _ricalcola({bool perConsumo = false, bool detto = false}) async {
     final d = viaggio.destinazione;
     if (d == null) return;
     ricalcolando = true;
@@ -248,7 +276,7 @@ class GestoreGuida extends ChangeNotifier {
       _guida = Guida(p.viaggio.percorso);
       _nuovoPiano(p);
       final dopo = p.viaggio.piano?.soste.map((s) => s.colonnina.id).toList();
-      if (perConsumo && !listEquals(prima, dopo) && !muto) {
+      if (perConsumo && !detto && !listEquals(prima, dopo) && !muto) {
         unawaited(voce.parla('Ho aggiornato le soste in base al consumo reale.'));
       }
     }

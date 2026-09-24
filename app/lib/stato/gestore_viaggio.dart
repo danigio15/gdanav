@@ -133,10 +133,11 @@ class GestoreViaggio extends ChangeNotifier {
 
   /// Cambiate le opzioni si salvano e, se c'è un viaggio, si ricalcola.
   Future<void> cambiaOpzioni(OpzioniPercorso o) async {
+    final strade = !mapEquals(o.valhalla, opzioni.valhalla);
     opzioni = o;
     notifyListeners();
     await archivio.salvaOpzioniPercorso(o);
-    if (destinazione case final d?) await pianifica(d);
+    if (strade && destinazione != null) await pianifica(destinazione!);
   }
 
   /// Le colonnine dove l'utente ha deciso di fermarsi, per questo viaggio.

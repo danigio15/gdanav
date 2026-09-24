@@ -145,6 +145,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                   if (_davanti case (final s, final m)) _AvvisoSegnalazione(segnalazione: s, metri: m),
                   if (_passata case final s?)
                     _Ancora(segnalazione: s, onSi: () => _rispondi(s, true), onNo: () => _rispondi(s, false)),
+                  if (g.proposta case final testo?) _Proposta(testo: testo, onSi: g.ricalcolaOra, onNo: g.lasciaCosi),
                   const Spacer(),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
@@ -400,6 +401,15 @@ class _Fondo extends StatelessWidget {
                       ),
                     ),
                     IconButton.filledTonal(
+                      key: const Key('ricalcola'),
+                      tooltip: 'Ricalcola il viaggio',
+                      onPressed: guida.ricalcolando ? null : guida.ricalcolaOra,
+                      icon: guida.ricalcolando
+                          ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.refresh),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton.filledTonal(
                       tooltip: guida.muto ? 'Riattiva la voce' : 'Silenzia la voce',
                       onPressed: guida.alternaVoce,
                       icon: Icon(guida.muto ? Icons.volume_off : Icons.volume_up),
@@ -499,6 +509,41 @@ class _Batteria extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Con il ricalcolo automatico spento: la domanda, e la risposta.
+class _Proposta extends StatelessWidget {
+  const _Proposta({required this.testo, required this.onSi, required this.onNo});
+
+  final String testo;
+  final VoidCallback onSi;
+  final VoidCallback onNo;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Vetro(
+        raggio: 20,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+          child: Row(
+            children: [
+              const Icon(Icons.battery_alert_outlined),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(testo, style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+              ),
+              FilledButton(onPressed: onSi, child: const Text('Ricalcola')),
+              const SizedBox(width: 6),
+              OutlinedButton(onPressed: onNo, child: const Text('No')),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

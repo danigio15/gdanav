@@ -423,4 +423,53 @@ void main() {
     await tester.tap(find.text('Fine'));
     await tester.pumpAndSettle();
   });
+
+  testWidgets('con il ricalcolo automatico spento, lo chiede; e «Ricalcola» si può premere sempre', (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final a = await ambiente(tester, km: 20);
+    await tester.pumpWidget(a.app());
+    a.auto.manuale.imposta(90);
+    await tester.pump();
+    await tester.runAsync(() => a.viaggio.cambiaOpzioni(const OpzioniPercorso(ricalcoloAutomatico: false)));
+    await tester.runAsync(() => a.viaggio.vaiA(const Luogo(nome: 'Nord', posizione: Punto(42.18, 12))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Avvia'));
+    await tester.pumpAndSettle();
+    final primo = (a.viaggio.stato as ViaggioPronto).viaggio;
+    final punti = primo.percorso.punti;
+
+    Future<void> letturaVera(int i, double batteria) async {
+      a.posizioni.add(punti[i]);
+      await aspetta(tester);
+      a.auto.arbitro.registra(
+        StatoAuto(sorgente: TipoSorgente.homeAssistant, letto: DateTime.now(), batteria: batteria),
+      );
+      await tester.runAsync(() => a.auto.cambiaModalita(a.auto.modalita));
+      await aspetta(tester, 80);
+      await tester.pumpAndSettle();
+    }
+
+    await letturaVera(3, a.guida.batteriaOra!.valore.roundToDouble());
+    await letturaVera(8, (a.guida.batteriaOra!.valore - 6).roundToDouble());
+    // Non ricalcola da solo: chiede.
+    expect(identical((a.viaggio.stato as ViaggioPronto).viaggio, primo), isTrue);
+    expect(find.text('Consumi più del previsto: ricalcolo le soste?'), findsOneWidget);
+
+    await tester.tap(find.text('Ricalcola'));
+    await aspetta(tester, 80);
+    await tester.pumpAndSettle();
+    expect(identical((a.viaggio.stato as ViaggioPronto).viaggio, primo), isFalse);
+    expect(find.textContaining('ricalcolo le soste?'), findsNothing);
+    expect(a.voce.frasi, contains('Ricalcolo il viaggio.'));
+
+    // Il bottone in basso: sempre.
+    final secondo = (a.viaggio.stato as ViaggioPronto).viaggio;
+    await tester.tap(find.byKey(const Key('ricalcola')));
+    await aspetta(tester, 80);
+    await tester.pumpAndSettle();
+    expect(identical((a.viaggio.stato as ViaggioPronto).viaggio, secondo), isFalse);
+    expect(a.guida.attiva, isTrue);
+    await tester.tap(find.text('Fine'));
+    await tester.pumpAndSettle();
+  });
 }

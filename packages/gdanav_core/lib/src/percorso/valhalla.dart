@@ -161,6 +161,7 @@ class OpzioniPercorso {
     this.evitaPedaggi = false,
     this.evitaAutostrade = false,
     this.evitaTraghetti = false,
+    this.ricalcoloAutomatico = true,
   });
 
   factory OpzioniPercorso.daJson(Map<String, Object?> j) => OpzioniPercorso(
@@ -168,6 +169,7 @@ class OpzioniPercorso {
         evitaPedaggi: j['evita_pedaggi'] as bool? ?? false,
         evitaAutostrade: j['evita_autostrade'] as bool? ?? false,
         evitaTraghetti: j['evita_traghetti'] as bool? ?? false,
+        ricalcoloAutomatico: j['ricalcolo_automatico'] as bool? ?? true,
       );
 
   final ModoGuida modo;
@@ -175,12 +177,23 @@ class OpzioniPercorso {
   final bool evitaAutostrade;
   final bool evitaTraghetti;
 
-  OpzioniPercorso copia({ModoGuida? modo, bool? evitaPedaggi, bool? evitaAutostrade, bool? evitaTraghetti}) =>
+  /// In guida, se il consumo vero si allontana dal previsto: ricalcolare da
+  /// soli le soste, o chiederlo prima. Fuori percorso si ricalcola sempre.
+  final bool ricalcoloAutomatico;
+
+  OpzioniPercorso copia({
+    ModoGuida? modo,
+    bool? evitaPedaggi,
+    bool? evitaAutostrade,
+    bool? evitaTraghetti,
+    bool? ricalcoloAutomatico,
+  }) =>
       OpzioniPercorso(
         modo: modo ?? this.modo,
         evitaPedaggi: evitaPedaggi ?? this.evitaPedaggi,
         evitaAutostrade: evitaAutostrade ?? this.evitaAutostrade,
         evitaTraghetti: evitaTraghetti ?? this.evitaTraghetti,
+        ricalcoloAutomatico: ricalcoloAutomatico ?? this.ricalcoloAutomatico,
       );
 
   Map<String, Object?> toJson() => {
@@ -188,6 +201,7 @@ class OpzioniPercorso {
         'evita_pedaggi': evitaPedaggi,
         'evita_autostrade': evitaAutostrade,
         'evita_traghetti': evitaTraghetti,
+        'ricalcolo_automatico': ricalcoloAutomatico,
       };
 
   /// I `costing_options.auto` di Valhalla: 0 vuol dire «solo se non c'è

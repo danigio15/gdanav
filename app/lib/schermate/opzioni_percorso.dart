@@ -67,6 +67,19 @@ class PannelloOpzioniPercorso extends StatelessWidget {
           value: o.evitaTraghetti,
           onChanged: (v) => onCambia(o.copia(evitaTraghetti: v)),
         ),
+        const SizedBox(height: 16),
+        Text('In viaggio', style: t.titleSmall),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          secondary: const Icon(Icons.autorenew),
+          title: const Text('Ricalcolo automatico'),
+          subtitle: const Text(
+            'Se il consumo vero si allontana dal previsto, le soste si ricalcolano da sole. '
+            'Spento, te lo chiede. Se esci dal percorso si ricalcola sempre.',
+          ),
+          value: o.ricalcoloAutomatico,
+          onChanged: (v) => onCambia(o.copia(ricalcoloAutomatico: v)),
+        ),
       ],
     );
   }
