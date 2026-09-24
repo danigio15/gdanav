@@ -184,7 +184,10 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   void _modificaPreferito(Preferito p) {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       builder: (contesto) => SafeArea(
+        top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -224,6 +227,10 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   void _menu() {
     showModalBottomSheet<void>(
       context: context,
+      // Alto quanto le voci e, sui telefoni piccoli, scorrevole: niente di tagliato.
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
       builder: (contesto) {
         void vai(Widget w) {
           Navigator.of(contesto).pop();
@@ -232,47 +239,50 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
 
         final ha = widget.auto.abbinamento;
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _VoceMenu(
-                icona: Icons.electric_car,
-                titolo: 'La tua auto',
-                sotto: widget.auto.veicolo.nome,
-                onTap: () => vai(LaTuaAuto(auto: widget.auto, posizione: widget.posizione)),
-              ),
-              _VoceMenu(
-                icona: Icons.ev_station,
-                titolo: 'Ricarica',
-                sotto: riassuntoPreferenze(_preferenze),
-                onTap: () => vai(PreferenzeRicaricaSchermata(archivio: widget.archivio)),
-              ),
-              _VoceMenu(
-                icona: Icons.battery_charging_full,
-                titolo: 'Fonte dati auto',
-                sotto: 'Da dove arriva la batteria',
-                onTap: () {
-                  Navigator.of(contesto).pop();
-                  mostraFonteDatiAuto(context, widget.auto);
-                },
-              ),
-              _VoceMenu(
-                icona: Icons.home_outlined,
-                titolo: 'Home Assistant',
-                sotto: ha == null ? 'Non collegata' : 'Collegata${ha.nomeAuto.isEmpty ? '' : ' a ${ha.nomeAuto}'}',
-                onTap: () => vai(AbbinaHomeAssistant(gestore: widget.auto)),
-              ),
-              _VoceMenu(
-                icona: Icons.directions_car_filled_outlined,
-                titolo: 'Android Auto',
-                sotto: 'Controlla perché non compare sull\'auto',
-                onTap: () {
-                  Navigator.of(contesto).pop();
-                  mostraDiagnosiAuto(context);
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _VoceMenu(
+                  icona: Icons.electric_car,
+                  titolo: 'La tua auto',
+                  sotto: widget.auto.veicolo.nome,
+                  onTap: () => vai(LaTuaAuto(auto: widget.auto, posizione: widget.posizione)),
+                ),
+                _VoceMenu(
+                  icona: Icons.ev_station,
+                  titolo: 'Ricarica',
+                  sotto: riassuntoPreferenze(_preferenze),
+                  onTap: () => vai(PreferenzeRicaricaSchermata(archivio: widget.archivio)),
+                ),
+                _VoceMenu(
+                  icona: Icons.battery_charging_full,
+                  titolo: 'Fonte dati auto',
+                  sotto: 'Da dove arriva la batteria',
+                  onTap: () {
+                    Navigator.of(contesto).pop();
+                    mostraFonteDatiAuto(context, widget.auto);
+                  },
+                ),
+                _VoceMenu(
+                  icona: Icons.home_outlined,
+                  titolo: 'Home Assistant',
+                  sotto: ha == null ? 'Non collegata' : 'Collegata${ha.nomeAuto.isEmpty ? '' : ' a ${ha.nomeAuto}'}',
+                  onTap: () => vai(AbbinaHomeAssistant(gestore: widget.auto)),
+                ),
+                _VoceMenu(
+                  icona: Icons.directions_car_filled_outlined,
+                  titolo: 'Android Auto',
+                  sotto: 'Controlla perché non compare sull\'auto',
+                  onTap: () {
+                    Navigator.of(contesto).pop();
+                    mostraDiagnosiAuto(context);
+                  },
+                ),
+              ],
+            ),
           ),
         );
       },

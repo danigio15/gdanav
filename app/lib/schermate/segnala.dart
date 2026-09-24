@@ -44,8 +44,11 @@ Future<void> mostraSegnala(BuildContext context, GestoreSegnalazioni segnalazion
   final tipo = await showModalBottomSheet<TipoSegnalazione>(
     context: context,
     showDragHandle: true,
+    isScrollControlled: true,
+    useSafeArea: true,
     builder: (contesto) => SafeArea(
-      child: Padding(
+      top: false,
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,

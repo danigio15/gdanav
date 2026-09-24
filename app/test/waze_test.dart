@@ -266,4 +266,27 @@ void main() {
     expect(find.text('Versione 15.2.1'), findsOneWidget);
     expect(find.text('file APK (fuori dal Play Store)'), findsOneWidget);
   });
+
+  testWidgets('il menu non è tagliato: anche su un telefono piccolo si arriva all\'ultima voce', (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final a = await ambiente(tester);
+    // Un telefono piccolo, con la barra di navigazione in basso.
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 3;
+    tester.view.padding = const FakeViewPadding(top: 72, bottom: 144);
+    tester.view.viewPadding = const FakeViewPadding(top: 72, bottom: 144);
+    await tester.pumpWidget(a.app());
+    await tester.tap(find.byTooltip('Menu'));
+    await tester.pumpAndSettle();
+    for (final voce in ['La tua auto', 'Ricarica', 'Fonte dati auto', 'Home Assistant', 'Android Auto']) {
+      await tester.scrollUntilVisible(find.text(voce), 60, scrollable: find.byType(Scrollable).last);
+      final r = tester.getRect(find.text(voce));
+      // Sopra la barra di navigazione, dentro lo schermo.
+      expect(r.bottom, lessThanOrEqualTo(640 - 48), reason: voce);
+    }
+    await tester.tap(find.text('Android Auto'));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+    await tester.pumpAndSettle();
+    expect(find.text('Se gdanav non compare sull\'auto'), findsOneWidget);
+  });
 }
