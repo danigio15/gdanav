@@ -3,7 +3,14 @@
     "step": {
       "user": {
         "title": "Connect a car to gdanav",
-        "description": "Pick your car's entities among the ones you already have in Home Assistant. Only the battery is required. Then open the gdanav device and scan the QR code with the app.",
+        "description": "Pick your car's device in Home Assistant (for example the Leapmotor one): gdanav recognises battery, range, charging, temperatures, speed, power and odometer by itself. You can check and fix everything in the next step. If the car has no device, leave it empty and pick the entities by hand.",
+        "data": {
+          "dispositivo": "Car device"
+        }
+      },
+      "entita": {
+        "title": "The car's entities",
+        "description": "Entities recognised: {trovate}. Check, fix if needed and confirm. Only the battery is required. Then open the gdanav device and scan the QR code with the app.",
         "data": {
           "nome_auto": "Car name",
           "entita_batteria": "Battery (%)",

@@ -8,6 +8,7 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_capture_events, async_mock_service
 
@@ -17,6 +18,7 @@ from custom_components.gdanav.const import (
     CONF_BATTERIA,
     CONF_CHIAVE,
     CONF_COMANDI,
+    CONF_DISPOSITIVO,
     CONF_IN_CARICA,
     CONF_NOME_AUTO,
     CONF_ODOMETRO,
@@ -92,6 +94,10 @@ async def test_configurazione(hass: HomeAssistant, senza_relay: None) -> None:
     hass.states.async_set("sensor.auto_batteria", "50", {"device_class": "battery"})
     flusso = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
     assert flusso["type"] is FlowResultType.FORM
+    assert flusso["step_id"] == "user"
+    # Senza dispositivo: le entità si scelgono a mano.
+    flusso = await hass.config_entries.flow.async_configure(flusso["flow_id"], {})
+    assert flusso["step_id"] == "entita"
 
     sbagliato = await hass.config_entries.flow.async_configure(
         flusso["flow_id"], {CONF_NOME_AUTO: "Kona", CONF_BATTERIA: "sensor.auto_batteria", CONF_RELAY: "https://x"}
@@ -106,6 +112,45 @@ async def test_configurazione(hass: HomeAssistant, senza_relay: None) -> None:
     chiave = p.da_b64(fatto["data"][CONF_CHIAVE])
     assert len(chiave) == 32
     assert fatto["result"].unique_id == p.Abbinamento(chiave, RELAY).canale
+
+
+async def test_dal_dispositivo_le_entita_si_propongono_da_sole(hass: HomeAssistant, senza_relay: None) -> None:
+    voce_auto = MockConfigEntry(domain="leapmotor")
+    voce_auto.add_to_hass(hass)
+    dispositivo = dr.async_get(hass).async_get_or_create(
+        config_entry_id=voce_auto.entry_id, identifiers={("leapmotor", "b10")}, name="Leapmotor B10"
+    )
+    registro = er.async_get(hass)
+    for oggetto, nome, stato, attributi in [
+        ("battery", "Battery", "64", {"unit_of_measurement": "%", "device_class": "battery"}),
+        ("range", "Range", "280", {"unit_of_measurement": "km"}),
+        ("charging", "Charging", "off", {"device_class": "battery_charging"}),
+        ("battery_temperature", "Battery temperature", "22", {"unit_of_measurement": "°C"}),
+        ("outside_temperature", "Outside temperature", "15", {"unit_of_measurement": "°C"}),
+        ("odometer", "Odometer", "12345", {"unit_of_measurement": "km"}),
+        ("key_battery", "Key battery", "90", {"unit_of_measurement": "%", "device_class": "battery"}),
+    ]:
+        dominio = "binary_sensor" if oggetto == "charging" else "sensor"
+        e = registro.async_get_or_create(
+            dominio, "leapmotor", oggetto, device_id=dispositivo.id, original_name=nome, config_entry=voce_auto
+        )
+        hass.states.async_set(e.entity_id, stato, attributi)
+
+    flusso = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    flusso = await hass.config_entries.flow.async_configure(flusso["flow_id"], {CONF_DISPOSITIVO: dispositivo.id})
+    assert flusso["step_id"] == "entita"
+    assert flusso["description_placeholders"] == {"trovate": "6"}
+    proposti = {str(k): k.description["suggested_value"] for k in flusso["data_schema"].schema if k.description}
+    assert proposti[CONF_NOME_AUTO] == "Leapmotor B10"
+    assert proposti[CONF_BATTERIA] == "sensor.leapmotor_battery"
+    assert proposti[CONF_AUTONOMIA] == "sensor.leapmotor_range"
+    assert proposti[CONF_IN_CARICA] == "binary_sensor.leapmotor_charging"
+    assert proposti[CONF_ODOMETRO] == "sensor.leapmotor_odometer"
+    assert proposti[CONF_TEMPERATURA_ESTERNA] == "sensor.leapmotor_outside_temperature"
+
+    fatto = await hass.config_entries.flow.async_configure(flusso["flow_id"], {**proposti, CONF_RELAY: RELAY})
+    assert fatto["type"] is FlowResultType.CREATE_ENTRY
+    assert fatto["data"][CONF_BATTERIA] == "sensor.leapmotor_battery"
 
 
 async def test_entita_create(hass: HomeAssistant, senza_relay: None) -> None:

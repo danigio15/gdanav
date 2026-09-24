@@ -1,4 +1,4 @@
-"""La configurazione: nome dell'auto, le sue entità, e il QR per l'app."""
+"""La configurazione: l'auto (il suo dispositivo), le sue entità, e il QR per l'app."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.core import callback
-from homeassistant.helpers import selector
+from homeassistant.helpers import device_registry as dr, entity_registry as er, selector
 import voluptuous as vol
 
 from . import protocollo as p
@@ -15,6 +15,7 @@ from .const import (
     CONF_BATTERIA,
     CONF_CHIAVE,
     CONF_COMANDI,
+    CONF_DISPOSITIVO,
     CONF_IN_CARICA,
     CONF_NOME_AUTO,
     CONF_ODOMETRO,
@@ -28,6 +29,7 @@ from .const import (
     DOMAIN,
     RELAY_PREDEFINITO,
 )
+from .riconosci import Entita, proponi
 
 
 def _entita(*domini: str, device_class: str | None = None) -> selector.EntitySelector:
@@ -40,16 +42,17 @@ def _entita(*domini: str, device_class: str | None = None) -> selector.EntitySel
 SCHEMA = vol.Schema(
     {
         vol.Required(CONF_NOME_AUTO): selector.TextSelector(),
-        vol.Required(CONF_BATTERIA): _entita("sensor", device_class="battery"),
+        # Senza filtri sulla classe: non tutte le integrazioni la dichiarano.
+        vol.Required(CONF_BATTERIA): _entita("sensor"),
         vol.Optional(CONF_AUTONOMIA): _entita("sensor"),
         vol.Optional(CONF_IN_CARICA): _entita("binary_sensor", "switch", "sensor"),
-        vol.Optional(CONF_POTENZA_CARICA): _entita("sensor", device_class="power"),
-        vol.Optional(CONF_TEMPERATURA_BATTERIA): _entita("sensor", device_class="temperature"),
+        vol.Optional(CONF_POTENZA_CARICA): _entita("sensor"),
+        vol.Optional(CONF_TEMPERATURA_BATTERIA): _entita("sensor"),
         vol.Optional(CONF_POSIZIONE): _entita("device_tracker"),
-        vol.Optional(CONF_TEMPERATURA_ESTERNA): _entita("sensor", device_class="temperature"),
-        vol.Optional(CONF_VELOCITA): _entita("sensor", device_class="speed"),
-        vol.Optional(CONF_POTENZA): _entita("sensor", device_class="power"),
-        vol.Optional(CONF_ODOMETRO): _entita("sensor", device_class="distance"),
+        vol.Optional(CONF_TEMPERATURA_ESTERNA): _entita("sensor"),
+        vol.Optional(CONF_VELOCITA): _entita("sensor"),
+        vol.Optional(CONF_POTENZA): _entita("sensor"),
+        vol.Optional(CONF_ODOMETRO): _entita("sensor"),
         vol.Required(CONF_RELAY, default=RELAY_PREDEFINITO): selector.TextSelector(
             selector.TextSelectorConfig(type=selector.TextSelectorType.URL)
         ),
@@ -60,9 +63,46 @@ SCHEMA = vol.Schema(
 class GdanavConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
+    def __init__(self) -> None:
+        self._proposta: dict[str, Any] = {}
+
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        errori: dict[str, str] = {}
+        """Primo passo: il dispositivo dell'auto, se c'è. Le entità si propongono da sole."""
         if user_input is not None:
+            self._proposta = {}
+            if dispositivo := user_input.get(CONF_DISPOSITIVO):
+                self._proposta = self._dal_dispositivo(dispositivo)
+            return await self.async_step_entita()
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_DISPOSITIVO): selector.DeviceSelector(selector.DeviceSelectorConfig()),
+            }
+        )
+        return self.async_show_form(step_id="user", data_schema=schema)
+
+    def _dal_dispositivo(self, device_id: str) -> dict[str, Any]:
+        registro = er.async_get(self.hass)
+        entita = []
+        for voce in er.async_entries_for_device(registro, device_id):
+            stato = self.hass.states.get(voce.entity_id)
+            attributi = stato.attributes if stato else {}
+            entita.append(
+                Entita(
+                    voce.entity_id,
+                    nome=voce.name or voce.original_name or (stato.name if stato else ""),
+                    unita=attributi.get("unit_of_measurement") or voce.unit_of_measurement,
+                    classe=attributi.get("device_class") or voce.device_class or voce.original_device_class,
+                )
+            )
+        proposta: dict[str, Any] = dict(proponi(entita))
+        if (d := dr.async_get(self.hass).async_get(device_id)) is not None:
+            proposta[CONF_NOME_AUTO] = d.name_by_user or d.name or ""
+        return proposta
+
+    async def async_step_entita(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Secondo passo: le entità, già riempite se si è scelto il dispositivo."""
+        errori: dict[str, str] = {}
+        if user_input is not None and CONF_BATTERIA in user_input:
             relay = user_input[CONF_RELAY].strip()
             if not relay.startswith(("wss://", "ws://")):
                 errori[CONF_RELAY] = "relay_non_valido"
@@ -76,7 +116,10 @@ class GdanavConfigFlow(ConfigFlow, domain=DOMAIN):
                     data={**user_input, CONF_RELAY: relay, CONF_CHIAVE: p.b64(abbinamento.chiave)},
                 )
         return self.async_show_form(
-            step_id="user", data_schema=self.add_suggested_values_to_schema(SCHEMA, user_input), errors=errori
+            step_id="entita",
+            data_schema=self.add_suggested_values_to_schema(SCHEMA, user_input or self._proposta),
+            errors=errori,
+            description_placeholders={"trovate": str(len([k for k in self._proposta if k != CONF_NOME_AUTO]))},
         )
 
     @staticmethod

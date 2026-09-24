@@ -3,7 +3,14 @@
     "step": {
       "user": {
         "title": "Collega un'auto a gdanav",
-        "description": "Scegli le entità della tua auto fra quelle che hai già in Home Assistant. Serve solo la batteria: il resto aiuta. Dopo, apri il dispositivo gdanav e inquadra il QR con l'app.",
+        "description": "Scegli il dispositivo della tua auto in Home Assistant (per esempio quello della Leapmotor): gdanav riconosce da solo batteria, autonomia, ricarica, temperature, velocità, potenza e contachilometri. Nel passo dopo puoi controllare e correggere. Se l'auto non ha un dispositivo, lascia vuoto e scegli le entità a mano.",
+        "data": {
+          "dispositivo": "Dispositivo dell'auto"
+        }
+      },
+      "entita": {
+        "title": "Le entità dell'auto",
+        "description": "Entità riconosciute: {trovate}. Controlla, correggi se serve e conferma. Serve solo la batteria. Poi apri il dispositivo gdanav e inquadra il QR con l'app.",
         "data": {
           "nome_auto": "Nome dell'auto",
           "entita_batteria": "Batteria (%)",

@@ -9,6 +9,7 @@ RELAY_PREDEFINITO = "wss://relay.gdanav.workers.dev"
 CONF_CHIAVE = "chiave"
 CONF_RELAY = "relay"
 CONF_NOME_AUTO = "nome_auto"
+CONF_DISPOSITIVO = "dispositivo"
 
 # Le entità dell'auto, scelte dall'utente fra quelle che ha già.
 CONF_BATTERIA = "entita_batteria"
