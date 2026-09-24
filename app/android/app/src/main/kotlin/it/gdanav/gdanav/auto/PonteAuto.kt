@@ -37,6 +37,24 @@ object PonteAuto {
     @Volatile var rotta: Double = 0.0
     @Volatile var guida: Guida? = null
 
+    /** Un posto da scegliere in auto: Casa, Lavoro, un preferito, un recente o un risultato. */
+    data class Luogo(
+        val etichetta: String,
+        val nome: String,
+        val descrizione: String,
+        val lat: Double,
+        val lon: Double,
+        val tipo: String,
+    ) {
+        fun comeMappa(): Map<String, Any> =
+            mapOf("nome" to nome, "descrizione" to descrizione, "lat" to lat, "lon" to lon)
+    }
+
+    @Volatile var luoghi: List<Luogo> = emptyList()
+
+    /** Cosa dire quando non si guida: «Calcolo il percorso…», o cosa non va. */
+    @Volatile var messaggio: String? = null
+
     private val principale = Handler(Looper.getMainLooper())
     private val ascoltatori = CopyOnWriteArrayList<() -> Unit>()
     private var canale: MethodChannel? = null
@@ -83,6 +101,10 @@ object PonteAuto {
                 qui = if (lat != null && lon != null) doubleArrayOf(lat, lon) else null
                 rotta = call.argument<Double>("rotta") ?: 0.0
             }
+            "luoghi" -> {
+                luoghi = (call.argument<List<Map<String, Any?>>>("elenco") ?: emptyList()).mapNotNull(::luogo)
+            }
+            "messaggio" -> messaggio = call.argument<String>("testo")
             "guida" -> {
                 guida = if (call.argument<Boolean>("attiva") == true) {
                     Guida(
@@ -101,6 +123,42 @@ object PonteAuto {
             }
         }
         avvisa()
+    }
+
+    private fun luogo(m: Map<String, Any?>): Luogo? {
+        val lat = (m["lat"] as? Number)?.toDouble() ?: return null
+        val lon = (m["lon"] as? Number)?.toDouble() ?: return null
+        val nome = m["nome"] as? String ?: return null
+        return Luogo(
+            etichetta = m["etichetta"] as? String ?: nome,
+            nome = nome,
+            descrizione = m["descrizione"] as? String ?: "",
+            lat = lat,
+            lon = lon,
+            tipo = m["tipo"] as? String ?: "risultato",
+        )
+    }
+
+    /** La ricerca fatta sull'auto, con Photon come sul telefono. */
+    fun cerca(testo: String, risultati: (List<Luogo>) -> Unit) {
+        val c = canale ?: return risultati(emptyList())
+        c.invokeMethod("cerca", mapOf("testo" to testo), object : MethodChannel.Result {
+            override fun success(r: Any?) {
+                @Suppress("UNCHECKED_CAST")
+                risultati(((r as? List<Map<String, Any?>>) ?: emptyList()).mapNotNull(::luogo))
+            }
+
+            override fun error(codice: String, messaggio: String?, dettagli: Any?) = risultati(emptyList())
+
+            override fun notImplemented() = risultati(emptyList())
+        })
+    }
+
+    /** Una meta scelta sull'auto: il telefono calcola e parte la guida. */
+    fun vai(l: Luogo) {
+        messaggio = "Calcolo il percorso per ${l.etichetta}…"
+        avvisa()
+        principale.post { canale?.invokeMethod("vai", l.comeMappa()) }
     }
 
     private fun avvisa() = principale.post { ascoltatori.forEach { it() } }

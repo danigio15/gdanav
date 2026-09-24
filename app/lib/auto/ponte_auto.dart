@@ -7,11 +7,13 @@ import '../mappa/dati_viaggio.dart';
 import '../mappa/segnaposto.dart';
 import '../mappa/stile.dart';
 import '../stato/gestore_guida.dart';
+import '../stato/gestore_luoghi.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_viaggio.dart';
 
 /// Tiene aggiornato lo schermo di Android Auto: stile, percorso, colonnine,
-/// segnaposto e prossima manovra. Il lato nativo è in
+/// segnaposto e prossima manovra; dall'auto arrivano la ricerca, la meta
+/// scelta (che parte subito in guida) e «Fine». Il lato nativo è in
 /// `android/app/src/main/kotlin/it/gdanav/gdanav/auto`. Su iPhone e nelle
 /// prove il canale non c'è, e si tace.
 class PonteAuto {
@@ -19,6 +21,7 @@ class PonteAuto {
     required this.viaggio,
     required this.guida,
     required this.posizione,
+    this.luoghi,
     MethodChannel? canale,
     DateTime Function()? orologio,
   }) : _canale = canale ?? const MethodChannel('gdanav/schermo_auto'),
@@ -27,16 +30,16 @@ class PonteAuto {
   final GestoreViaggio viaggio;
   final GestoreGuida guida;
   final GestorePosizione posizione;
+
+  /// Casa, Lavoro e recenti, da scegliere sullo schermo dell'auto.
+  final GestoreLuoghi? luoghi;
   final MethodChannel _canale;
   final DateTime Function() _ora;
   var _attivo = true;
   DateTime _ultimaPosizione = DateTime(0);
 
   void avvia() {
-    _canale.setMethodCallHandler((call) async {
-      // «Fine» premuto sullo schermo dell'auto.
-      if (call.method == 'ferma' && guida.attiva) await guida.ferma();
-    });
+    _canale.setMethodCallHandler(_dallAuto);
     _manda('stili', {
       'chiaro': jsonEncode(stileMappa(scuro: false, chiaveTraffico: Servizi.chiaveTomTom)),
       'scuro': jsonEncode(stileMappa(scuro: true, chiaveTraffico: Servizi.chiaveTomTom)),
@@ -44,17 +47,61 @@ class PonteAuto {
     viaggio.addListener(_viaggio);
     guida.addListener(_guida);
     posizione.addListener(_posizione);
+    luoghi?.addListener(_luoghi);
     _viaggio();
+    _luoghi();
+  }
+
+  Future<Object?> _dallAuto(MethodCall call) async {
+    switch (call.method) {
+      // «Fine» premuto sullo schermo dell'auto.
+      case 'ferma':
+        if (guida.attiva) await guida.ferma();
+        viaggio.annulla();
+      case 'cerca':
+        final testo = (call.arguments as Map?)?['testo'] as String? ?? '';
+        final trovati = await viaggio.luoghi.cerca(testo, vicinoA: posizione.qui ?? viaggio.ultimaPosizione);
+        return [for (final l in trovati) luogoJson(l)];
+      // Una meta scelta in auto: si calcola e si parte, senza toccare il telefono.
+      case 'vai':
+        final l = luogoDaJson(call.arguments);
+        if (l == null) return null;
+        if (guida.attiva) await guida.ferma();
+        await luoghi?.usato(l);
+        await viaggio.vaiA(l);
+        if (viaggio.stato is ViaggioPronto) guida.avvia();
+    }
+    return null;
+  }
+
+  void _luoghi() {
+    final g = luoghi;
+    if (g == null) return;
+    _manda('luoghi', {
+      'elenco': [
+        for (final p in g.preferiti) {...luogoJson(p.luogo), 'tipo': p.tipo.name, 'etichetta': p.etichetta},
+        for (final l in g.recenti) {...luogoJson(l), 'tipo': 'recente', 'etichetta': l.nome},
+      ],
+    });
   }
 
   void ferma() {
     viaggio.removeListener(_viaggio);
     guida.removeListener(_guida);
     posizione.removeListener(_posizione);
+    luoghi?.removeListener(_luoghi);
   }
 
   void _viaggio() {
     final stato = viaggio.stato;
+    // Cosa dire sull'auto quando non si guida.
+    _manda('messaggio', {
+      'testo': switch (stato) {
+        Calcolo(:final destinazione) => 'Calcolo il percorso per ${destinazione.nome}…',
+        ErroreViaggio(:final messaggio) => messaggio,
+        _ => null,
+      },
+    });
     final dati = datiViaggio(stato is ViaggioPronto ? stato.viaggio : null);
     _manda('sorgenti', {
       'dati': {for (final MapEntry(:key, :value) in dati.entries) key: jsonEncode(value)},

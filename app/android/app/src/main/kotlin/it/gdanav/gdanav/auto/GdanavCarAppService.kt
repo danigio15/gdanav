@@ -28,6 +28,8 @@ class GdanavCarAppService : CarAppService() {
 
 class SessioneGdanav : Session() {
     override fun onCreateScreen(intent: Intent): Screen {
+        // Se l'app sul telefono non è aperta, la si accende qui.
+        MotoreFlutter.assicura(carContext)
         ascoltaEnergia()
         return SchermoNavigazione(carContext)
     }

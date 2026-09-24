@@ -14,6 +14,17 @@ Future<bool> chiediPosizione() async {
   }
 }
 
+/// Se il permesso c'è già, senza chiederlo: all'avvio da Android Auto non
+/// c'è una schermata a cui chiederlo.
+Future<bool> haPosizione() async {
+  try {
+    final p = await Geolocator.checkPermission();
+    return p == LocationPermission.always || p == LocationPermission.whileInUse;
+  } catch (_) {
+    return false;
+  }
+}
+
 /// Le posizioni mentre si guida: alta precisione, una ogni 5 metri.
 Stream<Punto> posizioniGuida() => Geolocator.getPositionStream(
   locationSettings: const LocationSettings(accuracy: LocationAccuracy.bestForNavigation, distanceFilter: 5),

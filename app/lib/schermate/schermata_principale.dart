@@ -78,21 +78,35 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
       if (ok) widget.posizione.avvia();
     });
     segnalazioni.avvia();
+    widget.guida.addListener(_guidaDaFuori);
   }
 
-  void _avvia() => Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (_) => SchermataGuida(
-        guida: widget.guida,
-        posizione: widget.posizione,
-        segnalazioni: segnalazioni,
-        mappa: widget.mappa,
+  var _inGuida = false;
+
+  Future<void> _avvia() async {
+    if (_inGuida) return;
+    _inGuida = true;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SchermataGuida(
+          guida: widget.guida,
+          posizione: widget.posizione,
+          segnalazioni: segnalazioni,
+          mappa: widget.mappa,
+        ),
       ),
-    ),
-  );
+    );
+    _inGuida = false;
+  }
+
+  /// La guida partita dall'auto: anche il telefono passa alla guida.
+  void _guidaDaFuori() {
+    if (widget.guida.attiva && !_inGuida && mounted) _avvia();
+  }
 
   @override
   void dispose() {
+    widget.guida.removeListener(_guidaDaFuori);
     controllo.dispose();
     if (widget.segnalazioni == null) segnalazioni.dispose();
     super.dispose();

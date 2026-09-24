@@ -73,10 +73,14 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
 
     override fun onGetTemplate(): Template {
         val guida = PonteAuto.guida
-        val azione = Action.Builder()
-            .setTitle(if (guida != null) "Fine" else "gdanav")
-            .setOnClickListener { if (PonteAuto.guida != null) PonteAuto.fermaDallAuto() }
-            .build()
+        val azione = if (guida != null) {
+            Action.Builder().setTitle("Fine").setOnClickListener { PonteAuto.fermaDallAuto() }.build()
+        } else {
+            Action.Builder()
+                .setTitle("Dove andiamo?")
+                .setOnClickListener { screenManager.push(SchermoDestinazioni(carContext)) }
+                .build()
+        }
         val modello = NavigationTemplate.Builder()
             .setActionStrip(ActionStrip.Builder().addAction(azione).build())
         if (guida != null) {
@@ -97,7 +101,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         } else {
             modello.setNavigationInfo(
                 MessageInfo.Builder("gdanav")
-                    .setText("Scegli la destinazione sul telefono e premi Avvia.")
+                    .setText(PonteAuto.messaggio ?: "Tocca «Dove andiamo?» per scegliere la meta.")
                     .build(),
             )
         }

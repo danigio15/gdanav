@@ -5,6 +5,7 @@ import 'schermate/schermata_principale.dart';
 import 'stato/archivio.dart';
 import 'stato/gestore_auto.dart';
 import 'stato/gestore_guida.dart';
+import 'stato/gestore_luoghi.dart';
 import 'stato/gestore_posizione.dart';
 import 'stato/gestore_segnalazioni.dart';
 import 'stato/gestore_viaggio.dart';
@@ -22,7 +23,12 @@ Future<void> main() async {
   final posizione = GestorePosizione(archivio: archivio, letture: lettureGps);
   await posizione.carica();
   final segnalazioni = GestoreSegnalazioni(posizione: posizione);
-  PonteAuto(viaggio: viaggio, guida: guida, posizione: posizione).avvia();
+  final luoghi = GestoreLuoghi(archivio);
+  await luoghi.carica();
+  // Aperta da Android Auto la schermata del telefono non c'è: la posizione
+  // parte subito, se il permesso è già stato dato.
+  if (await haPosizione()) posizione.avvia();
+  PonteAuto(viaggio: viaggio, guida: guida, posizione: posizione, luoghi: luoghi).avvia();
   runApp(
     GdanavApp(
       archivio: archivio,
@@ -31,6 +37,7 @@ Future<void> main() async {
       guida: guida,
       posizione: posizione,
       segnalazioni: segnalazioni,
+      luoghi: luoghi,
       chiediPosizione: chiediPosizione,
     ),
   );
@@ -47,6 +54,7 @@ class GdanavApp extends StatelessWidget {
     this.mappa,
     this.chiediPosizione,
     this.segnalazioni,
+    this.luoghi,
   });
 
   final Archivio archivio;
@@ -56,6 +64,7 @@ class GdanavApp extends StatelessWidget {
   final GestorePosizione posizione;
   final Future<bool> Function()? chiediPosizione;
   final GestoreSegnalazioni? segnalazioni;
+  final GestoreLuoghi? luoghi;
 
   /// Nelle prove e nelle anteprime si passa un'altra mappa: quella vera vuole
   /// il codice nativo.
@@ -77,6 +86,7 @@ class GdanavApp extends StatelessWidget {
         mappa: mappa,
         chiediPosizione: chiediPosizione,
         segnalazioni: segnalazioni,
+        luoghi: luoghi,
       ),
     );
   }
