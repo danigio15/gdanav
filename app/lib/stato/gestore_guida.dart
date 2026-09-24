@@ -50,6 +50,68 @@ class GestoreGuida extends ChangeNotifier {
     return _ora().add(a.restante + ricariche);
   }
 
+  DateTime? _partitoAlle;
+
+  /// La batteria quando si è partiti.
+  double? get batteriaPartenza => pronto?.batteriaPartenza;
+
+  /// La batteria adesso: quella vera se l'auto l'ha mandata dopo la
+  /// partenza (Home Assistant, Android Auto), altrimenti la stima del piano
+  /// al punto in cui si è.
+  ({double valore, bool misurata})? get batteriaOra {
+    final p = pronto;
+    if (p == null) return null;
+    final s = auto.stato, partito = _partitoAlle;
+    if (s != null &&
+        partito != null &&
+        !s.letto.isBefore(partito) &&
+        s.sorgente != TipoSorgente.manuale &&
+        s.sorgente != TipoSorgente.stima) {
+      return (valore: s.batteria, misurata: true);
+    }
+    return (valore: _prevista(p, (avanzamento?.percorsiM ?? 0) / 1000), misurata: false);
+  }
+
+  /// La batteria all'arrivo: quella del piano, spostata di quanto la vera
+  /// si discosta da quella prevista.
+  double? get batteriaArrivo {
+    final p = pronto, ora = batteriaOra, piano = p?.viaggio.piano;
+    if (p == null || piano == null || ora == null) return null;
+    if (!ora.misurata) return piano.batteriaArrivo;
+    final scarto = ora.valore - _prevista(p, (avanzamento?.percorsiM ?? 0) / 1000);
+    return (piano.batteriaArrivo + scarto).clamp(0, 100).toDouble();
+  }
+
+  /// Il consumo in kWh ogni 100 km: quello vero dopo qualche chilometro con i
+  /// dati dell'auto, altrimenti quello previsto per il viaggio.
+  double? get consumoKwh100 {
+    final p = pronto, ora = batteriaOra;
+    if (p == null) return null;
+    final km = (avanzamento?.percorsiM ?? 0) / 1000;
+    if (ora != null && ora.misurata && km > 3) {
+      final kwh = (p.batteriaPartenza - ora.valore) / 100 * auto.veicolo.capacitaUtileKwh;
+      if (kwh > 0) return kwh / km * 100;
+    }
+    final piano = p.viaggio.piano, totale = p.viaggio.percorso.lunghezzaM / 1000;
+    if (piano == null || totale <= 0 || piano.energiaKwh <= 0) return null;
+    return piano.energiaKwh / totale * 100;
+  }
+
+  /// Il profilo del piano al chilometro [km], fra i due punti vicini.
+  static double _prevista(ViaggioPronto p, double km) {
+    final profilo = p.viaggio.piano?.profiloBatteria ?? const <PuntoBatteria>[];
+    if (profilo.isEmpty) return p.batteriaPartenza;
+    if (km <= profilo.first.km) return profilo.first.batteria;
+    for (var i = 1; i < profilo.length; i++) {
+      final a = profilo[i - 1], b = profilo[i];
+      if (km <= b.km) {
+        final t = b.km == a.km ? 1.0 : (km - a.km) / (b.km - a.km);
+        return a.batteria + t * (b.batteria - a.batteria);
+      }
+    }
+    return profilo.last.batteria;
+  }
+
   /// La prossima sosta ancora davanti, e quanto manca.
   (Sosta, double)? get prossimaSosta {
     final a = avanzamento, p = pronto;
@@ -65,6 +127,7 @@ class GestoreGuida extends ChangeNotifier {
     final p = pronto;
     if (p == null || attiva) return;
     attiva = true;
+    _partitoAlle = _ora();
     _vicinoDetto = false;
     _guida = Guida(p.viaggio.percorso);
     _iscrizione = posizioni().listen(_posizione);

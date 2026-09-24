@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -43,15 +45,22 @@ class _SchermataGuidaState extends State<SchermataGuida> {
 
   static const _avvisoM = 800.0;
 
+  /// Ridisegna il tachimetro ogni secondo: da fermi il GPS può tacere.
+  Timer? _battito;
+
   @override
   void initState() {
     super.initState();
+    _battito = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
     widget.guida.avvia();
     widget.guida.addListener(_lungoLaStrada);
   }
 
   @override
   void dispose() {
+    _battito?.cancel();
     widget.guida.removeListener(_lungoLaStrada);
     controllo.dispose();
     super.dispose();
@@ -362,6 +371,8 @@ class _Fondo extends StatelessWidget {
                     ),
                   ],
                 ),
+                const Divider(height: 20),
+                _Batteria(guida: guida),
                 if (sosta != null) ...[
                   const Divider(height: 20),
                   Row(
@@ -384,6 +395,66 @@ class _Fondo extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Sempre in vista: batteria alla partenza, adesso, all'arrivo, e consumo.
+class _Batteria extends StatelessWidget {
+  const _Batteria({required this.guida});
+  final GestoreGuida guida;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final muto = Theme.of(context).colorScheme.onSurfaceVariant;
+    final ora = guida.batteriaOra;
+    final consumo = guida.consumoKwh100;
+    String pc(double? v) => v == null ? '–' : '${v.round()}%';
+    Color colore(double? v) => switch (v) {
+      null => muto,
+      < 15 => ColoriGdanav.di(context).guasta,
+      < 30 => ColoriGdanav.di(context).piena,
+      _ => ColoriGdanav.di(context).libera,
+    };
+    Widget voce(String etichetta, double? v, {Key? chiave}) => Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            pc(v),
+            key: chiave,
+            style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: colore(v)),
+          ),
+          Text(
+            etichetta,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: t.labelMedium?.copyWith(color: muto),
+          ),
+        ],
+      ),
+    );
+    return Row(
+      children: [
+        voce('partenza', guida.batteriaPartenza, chiave: const Key('batteria-partenza')),
+        voce(ora?.misurata == true ? 'ora (auto)' : 'ora (stima)', ora?.valore, chiave: const Key('batteria-ora')),
+        voce('all\'arrivo', guida.batteriaArrivo, chiave: const Key('batteria-arrivo')),
+        Expanded(
+          flex: 2,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                consumo == null ? '–' : consumo.toStringAsFixed(1).replaceAll('.', ','),
+                key: const Key('consumo'),
+                style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              Text('kWh/100 km', maxLines: 1, style: t.labelMedium?.copyWith(color: muto)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

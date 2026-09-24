@@ -17,7 +17,10 @@ class Lettura {
 /// Dove sei e verso dove guardi, per il segnaposto sulla mappa, e quale
 /// segnaposto hai scelto.
 class GestorePosizione extends ChangeNotifier {
-  GestorePosizione({required this.archivio, required this.letture});
+  GestorePosizione({required this.archivio, required this.letture, DateTime Function()? orologio})
+    : _ora = orologio ?? DateTime.now;
+
+  final DateTime Function() _ora;
 
   final Archivio archivio;
   final Stream<Lettura> Function() letture;
@@ -25,8 +28,20 @@ class GestorePosizione extends ChangeNotifier {
   Punto? qui;
   double rotta = 0;
 
-  /// Dal GPS, per il tachimetro.
+  /// Dal GPS, per il tachimetro. Vedi [velocitaAdesso].
   double velocitaKmh = 0;
+
+  /// Quando è arrivata l'ultima lettura.
+  DateTime? lettoAlle;
+
+  /// La velocità da mostrare: zero se il GPS tace da qualche secondo (da
+  /// fermi certi telefoni non mandano più niente).
+  double velocitaAdesso() {
+    final t = lettoAlle;
+    if (t == null || _ora().difference(t) > const Duration(seconds: 4)) return 0;
+    return velocitaKmh;
+  }
+
   Segnaposto segnaposto = Segnaposto.autoBlu;
   StreamSubscription<Lettura>? _iscrizione;
 
@@ -47,8 +62,18 @@ class GestorePosizione extends ChangeNotifier {
     } else if (prima != null && distanzaM(prima, l.punto) > 8) {
       rotta = rottaGradi(prima, l.punto);
     }
+    final ora = _ora();
+    final lettaPrima = lettoAlle;
+    // Molti telefoni non danno la velocità: la si ricava dallo spostamento.
+    var v = l.velocitaMs;
+    if (v <= 0.3 && prima != null && lettaPrima != null) {
+      final secondi = ora.difference(lettaPrima).inMilliseconds / 1000;
+      if (secondi >= 0.5 && secondi <= 10) v = distanzaM(prima, l.punto) / secondi;
+    }
     qui = l.punto;
-    velocitaKmh = l.velocitaMs * 3.6;
+    lettoAlle = ora;
+    // Sotto i 2 km/h è rumore del GPS: si è fermi.
+    velocitaKmh = v * 3.6 < 2 ? 0 : v * 3.6;
     notifyListeners();
   }
 

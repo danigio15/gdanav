@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -25,15 +26,27 @@ Future<bool> haPosizione() async {
   }
 }
 
-/// Le posizioni mentre si guida: alta precisione, una ogni 5 metri.
-Stream<Punto> posizioniGuida() => Geolocator.getPositionStream(
-  locationSettings: const LocationSettings(accuracy: LocationAccuracy.bestForNavigation, distanceFilter: 5),
-).map((p) => Punto(p.latitude, p.longitude));
+/// Un solo flusso del GPS per tutta l'app: una posizione al secondo, anche
+/// da fermi, così il tachimetro scende a zero.
+Stream<Position>? _gps;
+
+Stream<Position> _flusso() => _gps ??= Geolocator.getPositionStream(
+  locationSettings: defaultTargetPlatform == TargetPlatform.android
+      ? AndroidSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+          distanceFilter: 0,
+          intervalDuration: const Duration(seconds: 1),
+        )
+      : const LocationSettings(accuracy: LocationAccuracy.bestForNavigation, distanceFilter: 0),
+).asBroadcastStream();
+
+/// Le posizioni mentre si guida.
+Stream<Punto> posizioniGuida() => _flusso().map((p) => Punto(p.latitude, p.longitude));
 
 /// Le letture per il segnaposto: posizione, direzione e velocità.
-Stream<Lettura> lettureGps() => Geolocator.getPositionStream(
-  locationSettings: const LocationSettings(accuracy: LocationAccuracy.bestForNavigation, distanceFilter: 3),
-).map((p) => Lettura(Punto(p.latitude, p.longitude), rotta: p.heading >= 0 ? p.heading : null, velocitaMs: p.speed));
+Stream<Lettura> lettureGps() => _flusso().map(
+  (p) => Lettura(Punto(p.latitude, p.longitude), rotta: p.heading >= 0 ? p.heading : null, velocitaMs: p.speed),
+);
 
 /// Dove si è adesso, chiedendo il permesso la prima volta. `null` se la
 /// posizione è spenta o negata: chi chiama lo dice all'utente.

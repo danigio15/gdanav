@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav/componenti/tachimetro.dart';
 import 'package:gdanav/schermate/cerca_destinazione.dart';
+import 'package:gdanav/stato/archivio.dart';
 import 'package:gdanav/stato/gestore_posizione.dart';
 import 'package:gdanav/stato/gestore_viaggio.dart';
 import 'package:gdanav_core/gdanav_core.dart';
@@ -182,5 +183,61 @@ void main() {
     await aspetta(tester);
     expect(a.relay.voti, [('z~incidente1', false)]);
     expect(find.text("Incidente: c'è ancora?"), findsNothing);
+  });
+
+  test('senza velocità dal GPS la si ricava dagli spostamenti, e da fermi torna a zero', () {
+    var adesso = DateTime(2026, 9, 24, 8);
+    final gps = StreamController<Lettura>(sync: true);
+    addTearDown(gps.close);
+    final p = GestorePosizione(archivio: Archivio(), letture: () => gps.stream, orologio: () => adesso)..avvia();
+    gps.add(const Lettura(Punto(45, 9)));
+    adesso = adesso.add(const Duration(seconds: 1));
+    // 20 metri in un secondo: 72 km/h.
+    gps.add(Lettura(Punto(45 + 20 / 111195, 9)));
+    expect(p.velocitaAdesso(), closeTo(72, 1));
+    // Il GPS dà la velocità: vince la sua.
+    adesso = adesso.add(const Duration(seconds: 1));
+    gps.add(Lettura(Punto(45 + 40 / 111195, 9), velocitaMs: 25));
+    expect(p.velocitaAdesso(), closeTo(90, 0.1));
+    // Fermi e senza letture per cinque secondi: zero.
+    adesso = adesso.add(const Duration(seconds: 5));
+    expect(p.velocitaAdesso(), 0);
+    p.dispose();
+  });
+
+  testWidgets('in guida la batteria è sempre in vista: partenza, adesso, arrivo e consumo', (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final a = await ambiente(tester, km: 20);
+    await tester.pumpWidget(a.app());
+    a.auto.manuale.imposta(90);
+    await tester.pump();
+    await tester.runAsync(() => a.viaggio.vaiA(const Luogo(nome: 'Nord', posizione: Punto(42.18, 12))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Avvia'));
+    await tester.pumpAndSettle();
+    final punti = (a.viaggio.stato as ViaggioPronto).viaggio.percorso.punti;
+    a.posizioni.add(punti[10]);
+    await aspetta(tester);
+
+    String testo(String chiave) => tester.widget<Text>(find.byKey(Key(chiave))).data!;
+    expect(testo('batteria-partenza'), '90%');
+    final stimata = int.parse(testo('batteria-ora').replaceAll('%', ''));
+    final arrivo = int.parse(testo('batteria-arrivo').replaceAll('%', ''));
+    expect(stimata, inExclusiveRange(arrivo, 90));
+    expect(find.text('ora (stima)'), findsOneWidget);
+    expect(double.parse(testo('consumo').replaceAll(',', '.')), inInclusiveRange(8, 35));
+
+    // L'auto manda la batteria vera, più bassa del previsto: arrivo e consumo si adeguano.
+    a.auto.arbitro.registra(
+      StatoAuto(sorgente: TipoSorgente.homeAssistant, letto: DateTime.now(), batteria: stimata - 4.0),
+    );
+    await tester.runAsync(() => a.auto.cambiaModalita(a.auto.modalita));
+    a.posizioni.add(punti[11]);
+    await aspetta(tester);
+    expect(find.text('ora (auto)'), findsOneWidget);
+    expect(testo('batteria-ora'), '${stimata - 4}%');
+    expect(int.parse(testo('batteria-arrivo').replaceAll('%', '')), inInclusiveRange(arrivo - 5, arrivo - 3));
+    await tester.tap(find.text('Fine'));
+    await tester.pumpAndSettle();
   });
 }
