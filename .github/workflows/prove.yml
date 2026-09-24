@@ -98,7 +98,8 @@ jobs:
           [ -z "$CLOUDFLARE_API_TOKEN" ] && exit 0
           # Il primo certificato del dominio può metterci qualche minuto.
           for i in $(seq 1 30); do
-            if curl -sf "https://gdanav.gdahome.org/v1/segnalazioni?lat=45&lon=9" > /dev/null; then echo "ok"; exit 0; fi
+            if curl -sf "https://gdanav.gdahome.org/v1/segnalazioni?lat=45&lon=9" > /dev/null \
+              && curl -sf "https://gdanav.gdahome.org/privacy" | grep -q "Informativa"; then echo "ok"; exit 0; fi
             sleep 10
           done
           echo "::error::https://gdanav.gdahome.org non risponde"; exit 1
@@ -267,24 +268,38 @@ jobs:
       - run: flutter pub get
       # Le chiavi facoltative (TomTom: traffico e colonnine libere/occupate;
       # Open Charge Map) arrivano dai segreti del repository.
+      # Il numero di versione sale a ogni build: il Play Store non accetta due
+      # volte lo stesso.
       - run: >-
-          flutter build apk --release
+          flutter build apk --release --build-number=${{ github.run_number }}
           --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM"
           --dart-define=GDANAV_OCM_CHIAVE="$OCM"
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
       - run: cp build/app/outputs/flutter-apk/app-release.apk gdanav.apk
+      # Il pacchetto per il Play Store (test interno): da lì Android Auto
+      # mostra l'app senza «Origini sconosciute».
+      - run: >-
+          flutter build appbundle --release --build-number=${{ github.run_number }}
+          --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM"
+          --dart-define=GDANAV_OCM_CHIAVE="$OCM"
+        env:
+          TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
+          OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
+      - run: cp build/app/outputs/bundle/release/app-release.aab gdanav.aab
       - uses: actions/upload-artifact@v4
         with:
           name: gdanav-apk
-          path: app/gdanav.apk
+          path: |
+            app/gdanav.apk
+            app/gdanav.aab
       - name: Pubblica l'anteprima
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          note="Versione di prova di gdanav, dal commit ${GITHUB_SHA::7}. Si installa sul telefono Android aprendo gdanav.apk (va permesso di installare app da fonti sconosciute). Firmata con la chiave di prova: non è per il Play Store."
+          note="Versione di prova di gdanav, dal commit ${GITHUB_SHA::7} (versione ${GITHUB_RUN_NUMBER}). gdanav.apk si installa sul telefono aprendolo (va permesso di installare app da fonti sconosciute). gdanav.aab è il pacchetto da caricare nella Play Console, nel test interno."
           gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "$note"
-          gh release upload anteprima gdanav.apk --clobber
+          gh release upload anteprima gdanav.apk gdanav.aab --clobber
           gh release edit anteprima --notes "$note"

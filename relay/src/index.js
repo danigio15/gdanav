@@ -9,6 +9,7 @@ import {
   richiestaOverpass,
   rispostaBuona,
 } from './colonnine.js';
+import { PRIVACY } from './privacy.js';
 import { DURATA_CODICE_MS, bustaValida, codiceVivo, leggiIndirizzoCodice } from './codici.js';
 import { MASSIMO_BYTE, destinatari, impronta, leggiRichiesta, presenza, puoEntrare } from './regole.js';
 import {
@@ -30,6 +31,9 @@ const json = (dati, stato = 200) =>
 export default {
   async fetch(richiesta, env, ctx) {
     const percorso = new URL(richiesta.url).pathname;
+    if (percorso === '/privacy') {
+      return new Response(PRIVACY, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+    }
     if (percorso.startsWith('/v1/segnalazioni')) return segnalazioni(richiesta, env);
     if (percorso.startsWith('/v1/codici/')) return codici(richiesta, env);
     if (percorso.startsWith('/v1/colonnine/')) return colonnine(richiesta, ctx);
