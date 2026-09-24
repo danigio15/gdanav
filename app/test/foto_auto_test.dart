@@ -25,6 +25,14 @@ const elenco = {
   'senza-licenza': {'url': 'https://upload.wikimedia.org/y.jpg'},
 };
 
+/// Finché il file non c'è, fino a tre secondi.
+Future<File?> quando(GestoreFotoAuto g, String id) async {
+  for (var i = 0; i < 60 && g.file(id) == null; i++) {
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+  }
+  return g.file(id);
+}
+
 void main() {
   late Directory cartella;
   setUp(() => cartella = Directory.systemTemp.createTempSync('foto'));
@@ -47,16 +55,13 @@ void main() {
     expect(g.info('senza-licenza'), isNull);
     expect(g.file('leapmotor-b10-67'), isNull); // parte lo scaricamento
     expect(g.file('leapmotor-b10-67'), isNull); // non due volte
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-    expect(g.file('leapmotor-b10-67')!.readAsBytesSync(), [1, 2, 3]);
+    expect((await quando(g, 'leapmotor-b10-67'))!.readAsBytesSync(), [1, 2, 3]);
     expect(chiesti, hasLength(1));
 
     // Riaperta l'app, il file c'è già: nessuna richiesta.
     final dopo = gestore(chiesti);
     await dopo.carica();
-    dopo.file('leapmotor-b10-67');
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-    expect(dopo.file('leapmotor-b10-67'), isNotNull);
+    expect(await quando(dopo, 'leapmotor-b10-67'), isNotNull);
     expect(chiesti, hasLength(1));
   });
 
@@ -68,8 +73,7 @@ void main() {
     final g = gestore([]);
     await tester.runAsync(() async {
       await g.carica();
-      g.file('leapmotor-b10-67');
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await quando(g, 'leapmotor-b10-67');
     });
     await tester.pumpWidget(
       MaterialApp(
