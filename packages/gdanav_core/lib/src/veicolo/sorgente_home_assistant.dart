@@ -29,6 +29,17 @@ class SorgenteHomeAssistant implements SorgenteDatiAuto {
     await relay.avvia();
   }
 
+  /// Chiede a Home Assistant di rileggere l'auto e rimandare lo stato: in
+  /// viaggio, perché alcune integrazioni aggiornano la batteria solo ogni
+  /// tanto. Senza relay collegato non fa niente.
+  Future<void> chiediAggiornamento() async {
+    try {
+      await relay.manda(Messaggio(tipo: TipoMessaggio.richiediStato, dati: const {'aggiorna': true}));
+    } on StateError {
+      // Relay non collegato: si riconnette da solo e chiede lo stato allora.
+    }
+  }
+
   @override
   Future<void> ferma() async {
     await _iscrizione?.cancel();

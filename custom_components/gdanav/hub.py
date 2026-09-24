@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import logging
 from typing import Any
@@ -51,6 +51,7 @@ _LOGGER = logging.getLogger(__name__)
 
 ATTESE = (1, 2, 5, 10, 30, 60)
 RITARDO_INVIO = 2.0
+AGGIORNA_OGNI = timedelta(seconds=30)
 
 
 @dataclass
@@ -123,6 +124,7 @@ class Hub:
         self._attivo = False
         self._annulla_invio: Any = None
         # Il codice da scrivere nell'app al posto del QR, finché vale.
+        self._ultimo_aggiornamento: datetime | None = None
         self.codice: str | None = None
         self.codice_scade: datetime | None = None
         self._annulla_codice: Any = None
@@ -263,6 +265,8 @@ class Hub:
         d = m.dati
         if m.tipo == p.RICHIEDI_STATO:
             await self._manda_tutto()
+            if d.get("aggiorna"):
+                self._aggiorna_auto()
         elif m.tipo == p.VIAGGIO:
             v = self.viaggio
             v.in_viaggio = bool(d.get("in_viaggio"))
@@ -302,6 +306,31 @@ class Hub:
                 else:
                     esito["ok"] = True
         await self.async_manda(p.ESITO_COMANDO, esito)
+
+    # --- dati freschi in viaggio -----------------------------------------
+
+    @callback
+    def _aggiorna_auto(self) -> None:
+        """L'app in viaggio chiede dati freschi: si fanno rileggere le entità
+        dell'auto (come il pulsante «Aggiorna»), al massimo ogni 30 secondi, e
+        si rimanda lo stato anche se i valori non sono cambiati."""
+        ora = dt_util.utcnow()
+        if self._ultimo_aggiornamento and ora - self._ultimo_aggiornamento < AGGIORNA_OGNI:
+            return
+        self._ultimo_aggiornamento = ora
+        self.entry.async_create_background_task(self.hass, self._rileggi(), "gdanav aggiorna auto")
+
+    async def _rileggi(self) -> None:
+        entita = list(self.entita_auto.values())
+        if entita:
+            try:
+                async with asyncio.timeout(20):
+                    await self.hass.services.async_call(
+                        "homeassistant", "update_entity", {"entity_id": entita}, blocking=True
+                    )
+            except (HomeAssistantError, TimeoutError) as err:
+                _LOGGER.debug("Aggiornamento dell'auto non riuscito: %s", err)
+        await self.async_manda(p.STATO_AUTO, self.stato_auto())
 
     # --- il codice al posto del QR ---------------------------------------
 

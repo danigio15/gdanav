@@ -437,3 +437,33 @@ async def test_codice_relay_giu(hass: HomeAssistant, senza_relay: None) -> None:
     ):
         await hub.async_nuovo_codice()
     assert hub.codice is None
+
+
+async def test_in_viaggio_l_app_chiede_dati_freschi(hass: HomeAssistant, senza_relay: None, freezer) -> None:
+    from datetime import timedelta
+
+    _, hub = await _installa(hass)
+    aggiornate = async_mock_service(hass, "homeassistant", "update_entity")
+    ws = FintoWs()
+    hub._ws = ws
+    await hub.async_ricevi(_dall_app(p.RICHIEDI_STATO, {"aggiorna": True}))
+    await hass.async_block_till_done()
+    # Si fanno rileggere le entità dell'auto, e lo stato parte due volte:
+    # subito e dopo l'aggiornamento.
+    assert len(aggiornate) == 1
+    assert "sensor.auto_batteria" in aggiornate[0].data["entity_id"]
+    assert [m.tipo for m in ws.aperti()].count(p.STATO_AUTO) == 2
+
+    # Una seconda richiesta subito dopo: niente altro aggiornamento.
+    await hub.async_ricevi(_dall_app(p.RICHIEDI_STATO, {"aggiorna": True}))
+    await hass.async_block_till_done()
+    assert len(aggiornate) == 1
+    freezer.tick(timedelta(seconds=31))
+    await hub.async_ricevi(_dall_app(p.RICHIEDI_STATO, {"aggiorna": True}))
+    await hass.async_block_till_done()
+    assert len(aggiornate) == 2
+
+    # Senza «aggiorna» (all'avvio dell'app) si manda solo lo stato.
+    await hub.async_ricevi(_dall_app(p.RICHIEDI_STATO, {}))
+    await hass.async_block_till_done()
+    assert len(aggiornate) == 2

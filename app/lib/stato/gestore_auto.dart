@@ -61,6 +61,11 @@ class GestoreAuto extends ChangeNotifier {
   /// Le sorgenti che questo telefono può usare adesso, per lo switch.
   Iterable<TipoSorgente> get disponibili => _sorgenti.keys;
 
+  /// In viaggio: che Home Assistant rilegga l'auto e mandi i dati freschi.
+  Future<void> chiediAggiornamento() async {
+    if (_sorgenti[TipoSorgente.homeAssistant] case final SorgenteHomeAssistant h) await h.chiediAggiornamento();
+  }
+
   Future<void> avvia() async {
     veicolo = await archivio.veicolo();
     arbitro.capacitaUtileKwh = veicolo.capacitaUtileKwh;

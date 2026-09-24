@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../componenti/icona_manovra.dart';
+import '../componenti/indicatore_batteria.dart' show eta;
 import '../componenti/icone_segnalazioni.dart';
 import '../componenti/tachimetro.dart';
 import '../componenti/vetro.dart';
@@ -492,7 +493,15 @@ class _Batteria extends StatelessWidget {
     return Row(
       children: [
         voce('partenza', guida.batteriaPartenza, chiave: const Key('batteria-partenza')),
-        voce(ora?.misurata == true ? 'ora (auto)' : 'ora (stima)', ora?.valore, chiave: const Key('batteria-ora')),
+        voce(
+          switch ((ora?.misurata, guida.auto.stato)) {
+            // Quanto è fresco il dato dell'auto: «auto · adesso», «auto · 4 min fa».
+            (true, final s?) => 'auto · ${eta(DateTime.now().difference(s.letto))}',
+            _ => 'ora (stima)',
+          },
+          ora?.valore,
+          chiave: const Key('batteria-ora'),
+        ),
         voce('all\'arrivo', guida.batteriaArrivo, chiave: const Key('batteria-arrivo')),
         Expanded(
           flex: 2,
