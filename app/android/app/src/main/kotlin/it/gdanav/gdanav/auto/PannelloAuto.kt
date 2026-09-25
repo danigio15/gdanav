@@ -14,8 +14,9 @@ import kotlin.math.roundToInt
 
 /**
  * Sopra la mappa dell'auto, come sul telefono. In alto, avvicinandosi a
- * un'uscita, lo svincolo in grande col cartello verde (numero e direzioni);
- * sotto, grandi e in fila, batteria (adesso, autonomia, all'arrivo), prossima
+ * un'uscita, il cartello verde (numero e direzioni) dal lato dell'uscita
+ * (poi va sulla vista dello svincolo, nella scheda in alto a sinistra);
+ * grandi e in fila, batteria (adesso, autonomia, all'arrivo), prossima
  * sosta e meteo; poi l'avviso della segnalazione che si avvicina. In basso a
  * destra velocità e limite. Tutto dentro l'area lasciata libera da Android
  * Auto: la mappa continua sotto.
@@ -28,7 +29,10 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
             invalidate()
         }
 
-    private fun dp(v: Float) = v * densita
+    /** Più grande quando si disegna sull'immagine dello svincolo. */
+    private var scala = 1f
+
+    private fun dp(v: Float) = v * densita * scala
 
     private val testo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
@@ -47,7 +51,6 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         textAlign = Paint.Align.CENTER
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     }
-    private val immagine = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
     fun aggiorna() = postInvalidate()
 
@@ -60,20 +63,12 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val sinistra = a.left + margine
         val destra = a.right - margine
 
-        // 1. Lo svincolo in grande, in alto, col cartello; o, un po' prima,
-        // il cartello da solo.
+        // 1. Avvicinandosi a un'uscita, prima che la vista dello svincolo
+        // compaia nella scheda di Android Auto, il cartello da solo, dal
+        // lato dell'uscita; i dati sotto.
         val vista = g?.svincolo?.let { PonteAuto.svincoli[it] }
         val conCartello = g != null && (g.uscita.isNotEmpty() || g.verso.isNotEmpty()) && g.distanzaM <= 2500
-        if (g != null && vista != null) {
-            val box = svincolo(canvas, a, alto, vista, g)
-            if (conCartello) {
-                // Sul lato dell'uscita, piantato sulla strada coi suoi pali.
-                val m = dp(12f)
-                cartelloUscita(canvas, box.left + m, box.right - m, box.top + m, box.width() * 0.44f, g, pali = box.top + box.height() * 0.5f)
-            }
-            alto = box.bottom + dp(8f)
-        } else if (g != null && conCartello) {
-            // Il cartello sul lato dell'uscita; i dati sotto.
+        if (g != null && vista == null && conCartello) {
             val box = cartelloUscita(canvas, sinistra, destra, alto, (a.width() * 0.55f).coerceAtMost(dp(420f)), g)
             alto = (dati(canvas, sinistra, box.bottom + dp(8f), destra, c) ?: box.bottom) + dp(8f)
             avviso(canvas, a, alto)
@@ -91,42 +86,29 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         velocita(canvas, a, c)
     }
 
-    /** Lo svincolo disegnato dall'app, largo quanto l'area, con la distanza sotto. */
-    private fun svincolo(canvas: Canvas, a: Rect, alto: Float, vista: Bitmap, g: PonteAuto.Guida): RectF {
-        val margine = dp(10f)
-        var w = a.width() - margine * 2
-        var h = w * vista.height / vista.width
-        val massima = a.height() * 0.52f
-        if (h > massima) {
-            h = massima
-            w = h * vista.width / vista.height
+    /** L'ultima vista composta per la scheda: id, cartello, immagine. */
+    private var composta: Triple<Int, String, Bitmap>? = null
+
+    /**
+     * La vista dello svincolo per la scheda di Android Auto (in alto a
+     * sinistra), col cartello dell'uscita disegnato sopra dal lato giusto e
+     * piantato coi suoi pali.
+     */
+    fun svincoloConCartello(vista: Bitmap, id: Int, g: PonteAuto.Guida): Bitmap {
+        if (g.uscita.isEmpty() && g.verso.isEmpty()) return vista
+        val chiave = "${g.uscita}|${g.verso}|${g.tipo}|${g.strada}"
+        composta?.let { (i, k, b) -> if (i == id && k == chiave) return b }
+        val b = vista.copy(Bitmap.Config.ARGB_8888, true)
+        // Nella scheda l'immagine è larga circa 400 dp: il cartello in proporzione.
+        scala = b.width / (400f * densita)
+        try {
+            val m = dp(10f)
+            cartelloUscita(Canvas(b), m, b.width - m, m, b.width * 0.46f, g, pali = b.height * 0.5f)
+        } finally {
+            scala = 1f
         }
-        val cx = (a.left + a.right) / 2f
-        val box = RectF(cx - w / 2, alto, cx + w / 2, alto + h)
-        val raggio = dp(18f)
-        canvas.save()
-        val forma = android.graphics.Path().apply { addRoundRect(box, raggio, raggio, android.graphics.Path.Direction.CW) }
-        canvas.clipPath(forma)
-        canvas.drawBitmap(vista, null, box, immagine)
-        // La distanza che manca, in basso: barra che si accorcia e metri.
-        val striscia = RectF(box.left, box.bottom - dp(40f), box.right, box.bottom)
-        canvas.drawRect(striscia, sfondo)
-        val quanto = (g.distanzaM / 800.0).coerceIn(0.0, 1.0).toFloat()
-        pieno.color = Color.rgb(51, 153, 255)
-        canvas.drawRect(RectF(striscia.left, striscia.top, striscia.left + striscia.width() * quanto, striscia.top + dp(5f)), pieno)
-        val metri = distanza(g.distanzaM)
-        val grande = Paint(testo).apply { textSize = dp(24f) }
-        canvas.drawText(metri, striscia.left + dp(14f), striscia.bottom - dp(9f), grande)
-        val dopo = g.strada.ifEmpty { g.istruzione }
-        if (dopo.isNotEmpty()) {
-            val x = striscia.left + dp(28f) + grande.measureText(metri)
-            canvas.drawText(accorcia(dopo, 40), x, striscia.bottom - dp(11f), testoPiccolo)
-        }
-        canvas.restore()
-        bordo.color = Color.argb(90, 255, 255, 255)
-        bordo.strokeWidth = dp(1.5f)
-        canvas.drawRoundRect(box, raggio, raggio, bordo)
-        return box
+        composta = Triple(id, chiave, b)
+        return b
     }
 
     /**
