@@ -52,6 +52,18 @@ class _SchermataGuidaState extends State<SchermataGuida> {
     return (m, metri);
   }
 
+  /// Col popup dello svincolo aperto la mappa sposta giù l'auto: la strada
+  /// che arriva resta in vista sotto il popup.
+  void _copri(BuildContext context, GestoreGuida g) {
+    final alto = _svincolo(g) == null
+        ? 0.0
+        : MediaQuery.paddingOf(context).top + 8 + 72 + (MediaQuery.sizeOf(context).width - 24) * 9 / 16;
+    if ((alto - controllo.coperto).abs() < 1) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) controllo.copriAlto(alto);
+    });
+  }
+
   /// Ridisegna il tachimetro ogni secondo: da fermi il GPS può tacere.
   Timer? _battito;
 
@@ -104,79 +116,93 @@ class _SchermataGuidaState extends State<SchermataGuida> {
             ),
             ListenableBuilder(
               listenable: Listenable.merge([g, widget.posizione, ?_avvisi]),
-              builder: (context, _) => Column(
-                children: [
-                  SafeArea(
-                    bottom: false,
-                    child: _Banner(guida: g, conSvincolo: _svincolo(g) != null),
-                  ),
-                  // Avvicinandosi a un'uscita o a un bivio: lo svincolo in grande.
-                  if ((_svincolo(g), g.pronto) case ((final m, final metri), final p?))
-                    PopupSvincolo(
-                      viaggio: p.viaggio,
-                      manovra: m,
-                      metri: metri,
-                      // Nelle prove niente mappa vera (vuole il codice nativo).
-                      mappa: widget.mappa == null ? null : (_, _) => const ColoredBox(color: Color(0xFF9DB7A0)),
-                      onChiudi: () => setState(() => _svincoliChiusi.add(m.inizio)),
+              builder: (context, _) {
+                _copri(context, g);
+                return Column(
+                  children: [
+                    // In alto la manovra; avvicinandosi a un'uscita o a un
+                    // bivio, al suo posto il popup con lo svincolo in 3D.
+                    SafeArea(
+                      bottom: false,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 280),
+                        transitionBuilder: (figlio, animazione) => SizeTransition(
+                          sizeFactor: animazione,
+                          alignment: Alignment.topCenter,
+                          child: FadeTransition(opacity: animazione, child: figlio),
+                        ),
+                        child: switch ((_svincolo(g), g.pronto)) {
+                          ((final m, final metri), final p?) => PopupSvincolo(
+                            key: ValueKey(m.inizio),
+                            viaggio: p.viaggio,
+                            manovra: m,
+                            metri: metri,
+                            // Nelle prove niente scena vera.
+                            mappa: widget.mappa == null ? null : (_, _) => const ColoredBox(color: Color(0xFF9DB7A0)),
+                            onChiudi: () => setState(() => _svincoliChiusi.add(m.inizio)),
+                          ),
+                          _ => _Banner(key: const ValueKey('banner'), guida: g),
+                        },
+                      ),
                     ),
-                  if (_avvisi?.davanti case (final s, final m)) _AvvisoSegnalazione(segnalazione: s, metri: m),
-                  if (_avvisi?.passata case final s?)
-                    _Ancora(
-                      segnalazione: s,
-                      onSi: () => _avvisi!.rispondi(s, true),
-                      onNo: () => _avvisi!.rispondi(s, false),
-                    ),
-                  if (g.proposta case final testo?) _Proposta(testo: testo, onSi: g.ricalcolaOra, onNo: g.lasciaCosi),
-                  const Spacer(),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-                    child: ListenableBuilder(
-                      listenable: controllo,
-                      builder: (context, _) => Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Tachimetro(velocitaKmh: widget.posizione.velocitaKmh, limiteKmh: g.avanzamento?.limiteKmh),
-                          const Spacer(),
-                          // Mappa spostata o allontanata: si torna sull'auto.
-                          if (controllo.libera)
-                            FilledButton.icon(
-                              key: const Key('riprendi'),
-                              onPressed: controllo.segui,
-                              icon: const Icon(Icons.navigation),
-                              label: const Text('Riprendi'),
-                            ),
-                          const Spacer(),
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Vetro(
-                                raggio: 28,
-                                child: SizedBox.square(
-                                  dimension: 56,
-                                  child: TextButton(
-                                    key: const Key('2d-3d'),
-                                    onPressed: controllo.alternaInclinazione,
-                                    style: TextButton.styleFrom(shape: const CircleBorder()),
-                                    child: Text(
-                                      controllo.inclinata ? '2D' : '3D',
-                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                    if (_avvisi?.davanti case (final s, final m)) _AvvisoSegnalazione(segnalazione: s, metri: m),
+                    if (_avvisi?.passata case final s?)
+                      _Ancora(
+                        segnalazione: s,
+                        onSi: () => _avvisi!.rispondi(s, true),
+                        onNo: () => _avvisi!.rispondi(s, false),
+                      ),
+                    if (g.proposta case final testo?) _Proposta(testo: testo, onSi: g.ricalcolaOra, onNo: g.lasciaCosi),
+                    const Spacer(),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                      child: ListenableBuilder(
+                        listenable: controllo,
+                        builder: (context, _) => Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Tachimetro(velocitaKmh: widget.posizione.velocitaKmh, limiteKmh: g.avanzamento?.limiteKmh),
+                            const Spacer(),
+                            // Mappa spostata o allontanata: si torna sull'auto.
+                            if (controllo.libera)
+                              FilledButton.icon(
+                                key: const Key('riprendi'),
+                                onPressed: controllo.segui,
+                                icon: const Icon(Icons.navigation),
+                                label: const Text('Riprendi'),
+                              ),
+                            const Spacer(),
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Vetro(
+                                  raggio: 28,
+                                  child: SizedBox.square(
+                                    dimension: 56,
+                                    child: TextButton(
+                                      key: const Key('2d-3d'),
+                                      onPressed: controllo.alternaInclinazione,
+                                      style: TextButton.styleFrom(shape: const CircleBorder()),
+                                      child: Text(
+                                        controllo.inclinata ? '2D' : '3D',
+                                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 12),
-                              if (widget.segnalazioni case final seg?)
-                                BottoneSegnala(onTap: () => mostraSegnala(context, seg)),
-                            ],
-                          ),
-                        ],
+                                const SizedBox(height: 12),
+                                if (widget.segnalazioni case final seg?)
+                                  BottoneSegnala(onTap: () => mostraSegnala(context, seg)),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  _Fondo(guida: g, onFine: _fine),
-                ],
-              ),
+                    _Fondo(guida: g, onFine: _fine),
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -269,11 +295,8 @@ class _Ancora extends StatelessWidget {
 }
 
 class _Banner extends StatelessWidget {
-  const _Banner({required this.guida, this.conSvincolo = false});
+  const _Banner({super.key, required this.guida});
   final GestoreGuida guida;
-
-  /// Sotto c'è la vista dello svincolo: le corsie le mostra lei.
-  final bool conSvincolo;
 
   @override
   Widget build(BuildContext context) {
@@ -346,7 +369,7 @@ class _Banner extends StatelessWidget {
             ),
           ),
           // Le corsie, avvicinandosi allo svincolo: quale prendere.
-          if (m != null && m.corsieUtili && alla <= 2000 && !conSvincolo)
+          if (m != null && m.corsieUtili && alla <= 2000)
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: CorsieSvincolo(corsie: m.corsie),

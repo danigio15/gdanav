@@ -62,6 +62,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
   var _inclinata = false;
   var _libera = false;
   var _centrate = 0;
+  var _coperto = 0.0;
 
   static const _inclinazione = 58.0;
 
@@ -107,6 +108,11 @@ class _MappaViaggioState extends State<MappaViaggio> {
         await _io();
       }
     }
+    // Un popup copre la parte alta: il centro della mappa scende.
+    if (widget.controllo.coperto != _coperto) {
+      _coperto = widget.controllo.coperto;
+      await m.updateContentInsets(EdgeInsets.only(top: _coperto * 0.8), true);
+    }
     if (widget.controllo.richiesteCentra != _centrate) {
       _centrate = widget.controllo.richiesteCentra;
       final qui = widget.posizione.qui;
@@ -132,6 +138,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     final qui = a?.posizioneSulPercorso ?? widget.posizione.qui;
     final rotta = a?.rotta ?? widget.posizione.rotta;
     await m.setGeoJsonSource(sorgenteIo, datiIo(qui, rotta, widget.posizione.segnaposto).cast<String, dynamic>());
+    await _freccia(m);
     if (qui == null) return;
     if (widget.guida != null) {
       // Mappa libera: la si lascia dove l'ha messa chi guida.
@@ -155,6 +162,19 @@ class _MappaViaggioState extends State<MappaViaggio> {
       _primaPosizione = false;
       await m.animateCamera(CameraUpdate.newLatLngZoom(LatLng(qui.lat, qui.lon), 15));
     }
+  }
+
+  (int, int)? _frecciaDisegnata;
+
+  /// La freccia della prossima manovra sul percorso, avvicinandosi.
+  Future<void> _freccia(MapLibreMapController m) async {
+    final g = widget.guida;
+    final v = g?.pronto?.viaggio, a = g?.avanzamento;
+    final chiave = chiaveFreccia(v, a?.prossima, a?.allaProssimaM, ricalcolo: g?.ricalcolando ?? false);
+    if (chiave == _frecciaDisegnata) return;
+    _frecciaDisegnata = chiave;
+    final dati = chiave == null ? datiManovra(null, null) : datiManovra(v, a?.prossima);
+    await m.setGeoJsonSource(sorgenteManovra, dati.cast<String, dynamic>());
   }
 
   Future<void> _immagini(MapLibreMapController m) async {

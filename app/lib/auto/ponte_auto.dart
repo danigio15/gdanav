@@ -248,6 +248,12 @@ class PonteAuto {
     final p = guida.pronto;
     if (!guida.attiva || p == null) {
       _manda('guida', {'attiva': false});
+      if (_freccia != null) {
+        _freccia = null;
+        _manda('sorgenti', {
+          'dati': {sorgenteManovra: jsonEncode(datiManovra(null, null))},
+        });
+      }
       _cruscotto();
       return;
     }
@@ -272,6 +278,14 @@ class PonteAuto {
       if (m != null && _svincoloPronto == m.inizio && (a?.allaProssimaM ?? m.lunghezzaM) <= PopupSvincolo.daMetri)
         'svincolo': m.inizio,
     });
+    // La freccia della manovra sul percorso, avvicinandosi.
+    final chiave = chiaveFreccia(p.viaggio, a?.prossima, a?.allaProssimaM, ricalcolo: guida.ricalcolando);
+    if (chiave != _freccia) {
+      _freccia = chiave;
+      _manda('sorgenti', {
+        'dati': {sorgenteManovra: jsonEncode(datiManovra(chiave == null ? null : p.viaggio, a?.prossima))},
+      });
+    }
     // La vista dello svincolo si disegna una volta, poco prima.
     if (m != null &&
         haSvincolo(m) &&
@@ -284,6 +298,8 @@ class PonteAuto {
   }
 
   int? _svincoloChiesto;
+
+  (int, int)? _freccia;
 
   int? _svincoloPronto;
 

@@ -38,6 +38,16 @@ class ControlloMappa extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Quanto spazio in alto copre un popup (in punti): la mappa sposta giù
+  /// l'auto, così quello che arriva resta in vista sotto il popup.
+  double coperto = 0;
+
+  void copriAlto(double punti) {
+    if ((punti - coperto).abs() < 1) return;
+    coperto = punti;
+    notifyListeners();
+  }
+
   /// Si torna a seguire l'auto.
   void segui() {
     _ritorno?.cancel();

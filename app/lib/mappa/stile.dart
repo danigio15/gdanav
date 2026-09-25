@@ -11,6 +11,7 @@ const sorgenteColonnine = 'gdanav-colonnine';
 const sorgenteArrivo = 'gdanav-arrivo';
 const sorgenteIo = 'gdanav-io';
 const sorgenteSegnalazioni = 'gdanav-segnalazioni';
+const sorgenteManovra = 'gdanav-manovra';
 const stratoTraffico = 'traffico';
 const stratoTrafficoLocale = 'traffico-locale';
 const stratiToccabili = ['gdanav-soste', 'gdanav-colonnine'];
@@ -128,6 +129,17 @@ const _scuro = _Tavolozza(
   arrivo: '#F87171',
 );
 
+/// Una larghezza in metri (alle nostre latitudini): raddoppia a ogni zoom.
+List<Object> _metri(double metri) => [
+  'interpolate',
+  ['exponential', 2],
+  ['zoom'],
+  13,
+  metri / 7,
+  20,
+  metri / 7 * 128,
+];
+
 /// Larghezza che cresce con lo zoom, come fanno le strade vere.
 List<Object> _largo(double a12, double a18) => [
   'interpolate',
@@ -231,6 +243,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}
       sorgenteArrivo: {'type': 'geojson', 'data': _vuota},
       sorgenteIo: {'type': 'geojson', 'data': _vuota},
       sorgenteSegnalazioni: {'type': 'geojson', 'data': _vuota},
+      sorgenteManovra: {'type': 'geojson', 'data': _vuota},
       if (traffico.isNotEmpty)
         'traffico': {
           'type': 'vector',
@@ -482,6 +495,60 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}
           'text-offset': [0, -0.1],
         },
         'paint': {'text-color': '#FFFFFF', 'text-opacity': 0.9},
+      },
+      // La freccia della prossima manovra, sopra il percorso: bianca col
+      // bordo blu scuro, larga sempre uguale in metri (come la strada), così
+      // allo svincolo si vede esattamente la rampa da prendere.
+      {
+        'id': 'manovra-bordo',
+        'type': 'line',
+        'source': sorgenteManovra,
+        'minzoom': 13,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'LineString',
+        ],
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {'line-color': '#0B3C78', 'line-width': _metri(8.5)},
+      },
+      {
+        'id': 'manovra-punta-bordo',
+        'type': 'line',
+        'source': sorgenteManovra,
+        'minzoom': 13,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'Polygon',
+        ],
+        'layout': {'line-join': 'round'},
+        'paint': {'line-color': '#0B3C78', 'line-width': _metri(2.9)},
+      },
+      {
+        'id': 'manovra',
+        'type': 'line',
+        'source': sorgenteManovra,
+        'minzoom': 13,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'LineString',
+        ],
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {'line-color': '#FFFFFF', 'line-width': _metri(5.6)},
+      },
+      {
+        'id': 'manovra-punta',
+        'type': 'fill',
+        'source': sorgenteManovra,
+        'minzoom': 13,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'Polygon',
+        ],
+        'paint': {'fill-color': '#FFFFFF', 'fill-antialias': true},
       },
       {
         'id': 'gdanav-colonnine',

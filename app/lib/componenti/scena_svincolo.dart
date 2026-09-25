@@ -33,8 +33,8 @@ class ScenaSvincolo extends CustomPainter {
     // La camera sta sopra la linea che separa il ramo, un po' verso l'interno.
     final camX = k * _corsia - 0.4;
     final f = math.max(w, h * 1.2) * 0.78;
-    Offset p(Offset mondo) =>
-        Offset(w / 2 + f * (mondo.dx - camX) / mondo.dy, orizzonte + f * _altezzaCamera / mondo.dy);
+    Offset p(Offset mondo, [double quota = 0]) =>
+        Offset(w / 2 + f * (mondo.dx - camX) / mondo.dy, orizzonte + f * (_altezzaCamera - quota) / mondo.dy);
 
     // Il ramo: dritto fino alla separazione, poi curva sempre di più
     // (come una clotoide) fino a 70°. Si integra una volta sola, ogni metro.
@@ -195,16 +195,43 @@ class ScenaSvincolo extends CustomPainter {
       }
     }
 
+    // I guardrail ai lati: la fascia d'acciaio sui paletti.
+    final lamiera = Paint()..color = const Color(0xFFB9C0C8);
+    final lamieraScura = Paint()..color = const Color(0xFF8E959E);
+    void guardrail(Offset Function(double t) punto, double t0, double t1) {
+      final l = passi(math.max(t0, _vicino), t1);
+      for (var t = (t0 / 4).ceil() * 4.0; t < t1; t += 4) {
+        if (t < _vicino) continue;
+        final a = p(punto(t)), b = p(punto(t), 0.75);
+        canvas.drawLine(a, b, lamieraScura..strokeWidth = math.max(1.0, f * 0.12 / punto(t).dy));
+      }
+      final fascia = Path();
+      for (final (j, q) in l.indexed) {
+        final o = p(punto(q), 0.82);
+        j == 0 ? fascia.moveTo(o.dx, o.dy) : fascia.lineTo(o.dx, o.dy);
+      }
+      for (final q in l.reversed) {
+        final o = p(punto(q), 0.5);
+        fascia.lineTo(o.dx, o.dy);
+      }
+      canvas.drawPath(fascia..close(), lamiera);
+    }
+
+    guardrail((z) => principale(-0.4, z), _vicino, 900);
+    guardrail((t) => ramo(n + 0.4, t), _vicino, 300);
+
     // Le frecce dipinte sulle corsie giuste: ogni punto della freccia segue
-    // la corsia, così in curva piega con lei.
+    // la corsia, così in curva piega con lei. Prima della rampa, sulle
+    // corsie che escono, la freccia piega già verso l'uscita.
     final freccia = Paint()..color = Colors.white;
     for (var i = 0; i < n; i++) {
       if (!giuste.contains(i)) continue;
-      for (final t0 in [13.0, 34.0, 62.0, 98.0]) {
+      for (final t0 in [19.0, 40.0, 68.0, 104.0]) {
         Offset mondo(double u, double v) =>
             i >= k ? ramo(i + 0.5 + u / _corsia, t0 + v) : principale(i + 0.5 + u / _corsia, t0 + v);
+        final forma = i >= k && t0 < _separazione + 5 ? _formaPiegata : _forma;
         final path = Path();
-        for (final (j, q) in _forma.indexed) {
+        for (final (j, q) in forma.indexed) {
           final o = p(mondo(q.dx, q.dy));
           j == 0 ? path.moveTo(o.dx, o.dy) : path.lineTo(o.dx, o.dy);
         }
@@ -213,6 +240,30 @@ class ScenaSvincolo extends CustomPainter {
     }
     canvas.restore();
   }
+
+  /// La freccia che piega verso l'uscita: asta dritta, poi curva a destra
+  /// (a sinistra ci pensa lo specchio) e la punta nella nuova direzione.
+  static final _formaPiegata = () {
+    const asta = 0.24, punta = 0.9, lungaPunta = 3.6;
+    final centro = <Offset>[], rotte = <double>[];
+    // Parte un po' a sinistra: così la punta resta dentro la corsia.
+    var c = const Offset(-0.75, 0);
+    for (var s = 0.0; s <= 9.0; s += 0.2) {
+      final a = s < 4.0 ? 0.0 : math.min(0.42, (s - 4.0) / 5.0 * 0.42);
+      centro.add(c);
+      rotte.add(a);
+      c += Offset(math.sin(a), math.cos(a)) * 0.2;
+    }
+    Offset normale(double a) => Offset(math.cos(a), -math.sin(a));
+    final fine = centro.last, a = rotte.last;
+    return [
+      for (final (j, q) in centro.indexed) q - normale(rotte[j]) * asta,
+      fine - normale(a) * punta,
+      fine + Offset(math.sin(a), math.cos(a)) * lungaPunta,
+      fine + normale(a) * punta,
+      for (final (j, q) in centro.indexed.toList().reversed) q + normale(rotte[j]) * asta,
+    ];
+  }();
 
   /// La freccia come la dipingono sull'asfalto (metri: di lato, in avanti):
   /// asta lunga e stretta, punta larga.
