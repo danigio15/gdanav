@@ -76,7 +76,11 @@ class Distributore {
   Prezzo? prezzoDi(Carburante c) {
     Prezzo? migliore;
     for (final p in prezzi) {
-      if (p.carburante == c && (migliore == null || p.euro < migliore.euro)) migliore = p;
+      // Il più basso; a parità, il self.
+      if (p.carburante == c &&
+          (migliore == null || p.euro < migliore.euro || (p.euro == migliore.euro && p.self && !migliore.self))) {
+        migliore = p;
+      }
     }
     return migliore;
   }
@@ -239,6 +243,15 @@ class ClientePrezziMimit implements FonteDistributori {
     return null;
   }
 
+  static bool _senzaMarca(String marca) =>
+      const {'pompebianche', 'pompabianca', 'nomarca'}.contains(marca.toLowerCase().replaceAll(RegExp(r'[^a-z]'), ''));
+
+  /// «ROSSI CARBURANTI SRL» o «rossi srl» → «Rossi Carburanti Srl»; i nomi già scritti bene restano.
+  static String _leggibile(String nome) {
+    if (nome != nome.toUpperCase() && nome != nome.toLowerCase()) return nome;
+    return nome.toLowerCase().split(' ').map((p) => p.isEmpty ? p : p[0].toUpperCase() + p.substring(1)).join(' ');
+  }
+
   static Distributore? _distributore(Map<String, Object?> e) {
     final dove = (e['location'] as Map?)?.cast<String, Object?>();
     final lat = (dove?['lat'] as num?)?.toDouble(), lon = (dove?['lng'] as num?)?.toDouble();
@@ -256,8 +269,9 @@ class ClientePrezziMimit implements FonteDistributori {
     final nome = '${e['name'] ?? ''}'.trim();
     return Distributore(
       id: 'mimit-${e['id']}',
-      nome: marca.isNotEmpty && marca.toLowerCase() != 'pompe bianche' ? marca : (nome.isEmpty ? 'Distributore' : nome),
-      marca: marca.isEmpty ? null : marca,
+      // Le «pompe bianche» (senza marca) si chiamano col loro nome.
+      nome: marca.isNotEmpty && !_senzaMarca(marca) ? marca : (nome.isEmpty ? 'Distributore' : _leggibile(nome)),
+      marca: marca.isEmpty || _senzaMarca(marca) ? null : marca,
       posizione: Punto(lat, lon),
       carburanti: {for (final p in prezzi) p.carburante},
       prezzi: prezzi,

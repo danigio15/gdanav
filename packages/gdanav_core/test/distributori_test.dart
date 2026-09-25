@@ -105,14 +105,15 @@ void main() {
       },
       {
         'id': 777,
-        'name': 'Rossi Carburanti',
+        'name': 'ROSSI CARBURANTI',
         'fuels': [
+          {'id': 8, 'price': 1.759, 'name': 'Benzina', 'fuelId': 1, 'isSelf': false},
           {'id': 9, 'price': 1.759, 'name': 'Benzina', 'fuelId': 1, 'isSelf': true},
         ],
         'location': {'lat': 45.001, 'lng': 9.0},
         'insertDate': '2026-09-24T18:00:00Z',
         'address': 'Via Verdi 3',
-        'brand': 'Pompe Bianche',
+        'brand': 'PompeBianche',
       },
     ],
   };
@@ -131,8 +132,11 @@ void main() {
     // Il Blue Diesel è un gasolio, ma più caro: vince il normale.
     expect(eni.prezzoDi(Carburante.diesel)!.euro, 1.699);
     expect(eni.prezzoDi(Carburante.metano), isNull);
-    // Le «pompe bianche» si chiamano col loro nome.
+    // Le «pompe bianche» si chiamano col loro nome, scritto leggibile.
     expect(d.last.nome, 'Rossi Carburanti');
+    expect(d.last.marca, isNull);
+    // A parità di prezzo, il self.
+    expect(d.last.prezzoDi(Carburante.benzina)!.self, isTrue);
   });
 
   test('in Italia si chiedono i prezzi al Ministero; se non risponde, OpenStreetMap', () async {
