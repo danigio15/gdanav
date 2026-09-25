@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav/componenti/icona_manovra.dart';
+import 'package:gdanav/componenti/vista_svincolo.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 void main() {
@@ -46,5 +47,35 @@ void main() {
     expect(find.text('A12 · Arnhem'), findsOneWidget);
     final cartello = tester.widget<Container>(find.byKey(const Key('cartello')));
     expect((cartello.decoration! as BoxDecoration).color, const Color(0xFF0B7A3E));
+  });
+
+  testWidgets('allo svincolo il popup: il disegno, i metri che mancano, e si chiude', (tester) async {
+    const m = Manovra(
+      istruzione: 'Esci a destra',
+      lunghezzaM: 800,
+      secondi: 30,
+      inizio: 42,
+      tipo: 20,
+      uscita: '12',
+      verso: 'A1 · Roma',
+    );
+    var chiuso = false;
+    expect(haSvincolo(m), isTrue);
+    expect(haSvincolo(const Manovra(istruzione: 'Svolta', lunghezzaM: 1, secondi: 1, inizio: 0, tipo: 10)), isFalse);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PopupSvincolo(manovra: m, metri: 430, onChiudi: () => chiuso = true),
+        ),
+      ),
+    );
+    expect(find.byKey(const Key('popup-svincolo')), findsOneWidget);
+    expect(find.text('450 m'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('chiudi-svincolo')));
+    expect(chiuso, isTrue);
+    // Per Android Auto la stessa vista in PNG.
+    final png = await tester.runAsync(() => svincoloPng(m));
+    expect(png!.sublist(1, 4), 'PNG'.codeUnits);
   });
 }

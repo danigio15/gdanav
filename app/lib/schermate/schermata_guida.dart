@@ -7,6 +7,7 @@ import '../componenti/icona_manovra.dart';
 import '../componenti/indicatore_batteria.dart' show eta;
 import '../componenti/icone_segnalazioni.dart';
 import '../componenti/tachimetro.dart';
+import '../componenti/vista_svincolo.dart';
 import '../componenti/vetro.dart';
 import '../mappa/controllo_mappa.dart';
 import '../mappa/mappa_viaggio.dart';
@@ -38,6 +39,18 @@ class _SchermataGuidaState extends State<SchermataGuida> {
 
   /// Le segnalazioni lungo la strada, condivise con lo schermo dell'auto.
   AvvisiStrada? _avvisi;
+
+  /// Gli svincoli di cui si è chiuso il popup.
+  final _svincoliChiusi = <int>{};
+
+  /// Lo svincolo in arrivo, entro [PopupSvincolo.daMetri], se non chiuso.
+  (Manovra, double)? _svincolo(GestoreGuida g) {
+    final a = g.avanzamento, m = a?.prossima;
+    if (a == null || m == null || !haSvincolo(m) || g.ricalcolando) return null;
+    final metri = a.allaProssimaM;
+    if (metri <= 0 || metri > PopupSvincolo.daMetri || _svincoliChiusi.contains(m.inizio)) return null;
+    return (m, metri);
+  }
 
   /// Ridisegna il tachimetro ogni secondo: da fermi il GPS può tacere.
   Timer? _battito;
@@ -93,7 +106,17 @@ class _SchermataGuidaState extends State<SchermataGuida> {
               listenable: Listenable.merge([g, widget.posizione, ?_avvisi]),
               builder: (context, _) => Column(
                 children: [
-                  SafeArea(bottom: false, child: _Banner(guida: g)),
+                  SafeArea(
+                    bottom: false,
+                    child: _Banner(guida: g, conSvincolo: _svincolo(g) != null),
+                  ),
+                  // Avvicinandosi a un'uscita o a un bivio: lo svincolo in grande.
+                  if (_svincolo(g) case (final m, final metri))
+                    PopupSvincolo(
+                      manovra: m,
+                      metri: metri,
+                      onChiudi: () => setState(() => _svincoliChiusi.add(m.inizio)),
+                    ),
                   if (_avvisi?.davanti case (final s, final m)) _AvvisoSegnalazione(segnalazione: s, metri: m),
                   if (_avvisi?.passata case final s?)
                     _Ancora(
@@ -243,8 +266,11 @@ class _Ancora extends StatelessWidget {
 }
 
 class _Banner extends StatelessWidget {
-  const _Banner({required this.guida});
+  const _Banner({required this.guida, this.conSvincolo = false});
   final GestoreGuida guida;
+
+  /// Sotto c'è la vista dello svincolo: le corsie le mostra lei.
+  final bool conSvincolo;
 
   @override
   Widget build(BuildContext context) {
@@ -317,7 +343,7 @@ class _Banner extends StatelessWidget {
             ),
           ),
           // Le corsie, avvicinandosi allo svincolo: quale prendere.
-          if (m != null && m.corsieUtili && alla <= 2000)
+          if (m != null && m.corsieUtili && alla <= 2000 && !conSvincolo)
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: CorsieSvincolo(corsie: m.corsie),

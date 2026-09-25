@@ -34,6 +34,8 @@ object PonteAuto {
         val corsie: List<CorsiaAuto> = emptyList(),
         val dopoTipo: Int? = null,
         val dopoStrada: String = "",
+        /** La vista dello svincolo da mostrare, se pronta (vedi [svincoli]). */
+        val svincolo: Int? = null,
     )
 
     /** Una corsia prima dello svincolo: le frecce, se è giusta, quale seguire. */
@@ -101,6 +103,9 @@ object PonteAuto {
 
     /** Le opzioni del percorso e la voce, per il menu. */
     @Volatile var opzioni: Map<String, Any?> = emptyMap()
+
+    /** Le viste degli svincoli, disegnate dall'app: le ultime, per manovra. */
+    @Volatile var svincoli: Map<Int, Bitmap> = emptyMap()
 
     /** Le icone delle segnalazioni, disegnate dall'app. */
     @Volatile var immagini: Map<String, Bitmap> = emptyMap()
@@ -199,6 +204,14 @@ object PonteAuto {
                 ancoraTesto = call.argument<String>("ancora_testo"),
             )
             "opzioni" -> opzioni = (call.arguments as? Map<*, *>)?.entries?.associate { "${it.key}" to it.value } ?: emptyMap()
+            "svincolo" -> {
+                val id = numero(call, "id")?.toInt()
+                val png = call.argument<ByteArray>("png")
+                val bitmap = png?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+                if (id != null && bitmap != null) {
+                    svincoli = (svincoli.entries.toList().takeLast(2).associate { it.key to it.value }) + (id to bitmap)
+                }
+            }
             "immagini" -> {
                 val nuove = HashMap(immagini)
                 (call.argument<Map<String, ByteArray>>("png") ?: emptyMap()).forEach { (nome, byte) ->
@@ -230,6 +243,7 @@ object PonteAuto {
                         },
                         dopoTipo = numero(call, "dopo_tipo")?.toInt(),
                         dopoStrada = call.argument<String>("dopo_strada") ?: "",
+                        svincolo = numero(call, "svincolo")?.toInt(),
                     )
                 } else {
                     null

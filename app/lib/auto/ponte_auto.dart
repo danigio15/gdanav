@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
@@ -5,6 +6,7 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import '../componenti/icone_segnalazioni.dart';
 import '../componenti/stato_colonnina.dart' show testoDisponibilita;
+import '../componenti/vista_svincolo.dart';
 import '../mappa/dati_viaggio.dart';
 import '../mappa/segnaposto.dart';
 import '../mappa/stile.dart';
@@ -266,8 +268,32 @@ class PonteAuto {
       if (m != null && m.corsieUtili && (a?.allaProssimaM ?? m.lunghezzaM) <= 2000)
         'corsie': [for (final c in m.corsie) c.toJson()],
       if (a?.dopo case final d?) ...{'dopo_tipo': d.tipo, 'dopo_strada': d.strada.isNotEmpty ? d.strada : d.istruzione},
+      if (m != null && _svincoloPronto == m.inizio && (a?.allaProssimaM ?? m.lunghezzaM) <= PopupSvincolo.daMetri)
+        'svincolo': m.inizio,
     });
+    // La vista dello svincolo si disegna una volta, poco prima.
+    if (m != null &&
+        haSvincolo(m) &&
+        (a?.allaProssimaM ?? m.lunghezzaM) <= PopupSvincolo.daMetri + 400 &&
+        _svincoloChiesto != m.inizio) {
+      _svincoloChiesto = m.inizio;
+      unawaited(_disegnaSvincolo(m));
+    }
     _posizione();
+  }
+
+  int? _svincoloChiesto;
+  int? _svincoloPronto;
+
+  Future<void> _disegnaSvincolo(Manovra m) async {
+    if (!_attivo) return;
+    try {
+      _manda('svincolo', {'id': m.inizio, 'png': await svincoloPng(m)});
+      _svincoloPronto = m.inizio;
+      _guida();
+    } catch (_) {
+      // Senza immagine restano freccia e corsie.
+    }
   }
 
   /// Al massimo due volte al secondo: l'auto non ha bisogno di più.
