@@ -9,6 +9,7 @@ String nomeSorgente(TipoSorgente t) => switch (t) {
   TipoSorgente.automotive => 'Auto',
   TipoSorgente.androidAuto => 'Android Auto',
   TipoSorgente.obd => 'OBD',
+  TipoSorgente.gdahome => 'gdahome',
   TipoSorgente.homeAssistant => 'Home Assistant',
   TipoSorgente.manuale => 'Manuale',
   TipoSorgente.stima => 'Stima',

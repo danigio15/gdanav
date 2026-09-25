@@ -18,7 +18,14 @@ import 'stato/gestore_segnalazioni.dart';
 import 'stato/gestore_viaggio.dart';
 import 'stato/posizione.dart';
 import 'stato/voce.dart';
+import 'sorgenti/sorgente_gdahome.dart';
 import 'tema.dart';
+
+// Quello che serve a chi ospita gdanav per dargli l'auto: la fonte gdahome e
+// la lettura che le si manda.
+export 'package:gdanav_core/gdanav_core.dart' show StatoAuto, TipoSorgente;
+
+export 'sorgenti/sorgente_gdahome.dart';
 
 /// Accende tutto quello che gdanav tiene in piedi — l'auto, il viaggio, la
 /// guida, la posizione, le segnalazioni — e torna l'app pronta da disegnare.
@@ -26,14 +33,20 @@ import 'tema.dart';
 /// La chiama `main` nell'app gdanav, e la chiama gdahome la prima volta che si
 /// apre la sezione del navigatore: lì il portachiavi è un altro ([portachiavi],
 /// per non mescolare le chiavi della casa con quelle di gdanav) e Android Auto
-/// resta di gdahome ([conLAuto] spento).
-Future<GdanavApp> preparaGdanav({FlutterSecureStorage? portachiavi, bool conLAuto = true}) async {
+/// lo decide lei ([conLAuto]). Lì c'è anche [gdahome]: l'auto della
+/// sezione Auto della sua plancia, coi dati in tempo reale dalla casa, senza
+/// abbinamento.
+Future<GdanavApp> preparaGdanav({
+  FlutterSecureStorage? portachiavi,
+  bool conLAuto = true,
+  SorgenteGdahome? gdahome,
+}) async {
   final archivio = Archivio(portachiavi);
   // Premium (Android Auto e Home Assistant): si sa subito se è sbloccato,
   // il Play Store conferma dopo.
   final premium = GestorePremium(archivio: archivio, negozio: NegozioGooglePlay());
   await premium.carica();
-  final auto = GestoreAuto(archivio: archivio)..homeAssistantConsentito = premium.sbloccato;
+  final auto = GestoreAuto(archivio: archivio, gdahome: gdahome)..homeAssistantConsentito = premium.sbloccato;
   await auto.avvia();
   premium.addListener(() => auto.consentiHomeAssistant(premium.sbloccato));
   // Il consumo imparato del modello scelto; cambiando auto si cambia storia.

@@ -525,6 +525,59 @@ const _chademo = {TipoConnettore.chademo, TipoConnettore.tipo2};
 ProfiloVeicolo? veicoloPerId(String id) =>
     id == ProfiloVeicolo.esempio.id ? ProfiloVeicolo.esempio : catalogoVeicoli.where((v) => v.id == id).firstOrNull;
 
+/// L'auto del catalogo che corrisponde a una marca e un modello scritti da
+/// qualcun altro: la sezione Auto della plancia di gdahome, per esempio
+/// («Renault», «Zoe R135»), che non conosce i nostri id.
+///
+/// Vince quella con più parole del modello in comune; a parità, quella con la
+/// batteria più vicina a [kwh] (se si sa), poi quella col nome più corto (la
+/// versione base). Se del modello non torna nemmeno una parola, `null`: meglio
+/// l'auto d'esempio che una sbagliata.
+ProfiloVeicolo? veicoloPerNome(String marca, String modello, {double? kwh}) {
+  final laMarca = semplice(marca);
+  var parole = semplice(modello).split(' ').where((p) => p.isNotEmpty).toList();
+  // La marca scritta anche nel modello («Tesla Model 3») non è una parola del modello.
+  if (laMarca.isNotEmpty) parole = parole.where((p) => !laMarca.split(' ').contains(p)).toList();
+  if (parole.isEmpty) return null;
+  ProfiloVeicolo? migliore;
+  var punti = 0.0;
+  for (final v in catalogoVeicoli) {
+    if (laMarca.isNotEmpty && semplice(v.marca) != laMarca) continue;
+    final suo = semplice(v.modello);
+    final compatto = suo.replaceAll(' ', '');
+    final comuni = parole.where((p) => suo.split(' ').contains(p) || (p.length > 2 && compatto.contains(p))).length;
+    if (comuni == 0) continue;
+    // Le parole del catalogo che non sono state scritte pesano poco, ma pesano.
+    final inPiu = suo.split(' ').where((p) => !parole.contains(p)).length;
+    var p = comuni - inPiu * 0.1;
+    if (kwh != null) p -= (v.capacitaUtileKwh - kwh).abs() / 1000;
+    if (migliore == null || p > punti) {
+      migliore = v;
+      punti = p;
+    }
+  }
+  return migliore;
+}
+
+/// Minuscole, senza accenti né trattini: «Škoda Elroq» e «skoda elroq»,
+/// «ë-C4» ed «e-c4» sono la stessa cosa.
+String semplice(String s) {
+  const accenti = {
+    'à': 'a', 'á': 'a', 'â': 'a', 'ä': 'a', 'ã': 'a', 'å': 'a', //
+    'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e', //
+    'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i', //
+    'ò': 'o', 'ó': 'o', 'ô': 'o', 'ö': 'o', 'õ': 'o', 'ø': 'o', //
+    'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u', //
+    'š': 's', 'ž': 'z', 'č': 'c', 'ç': 'c', 'ñ': 'n', //
+  };
+  final b = StringBuffer();
+  for (final c in s.toLowerCase().split('')) {
+    final d = accenti[c] ?? c;
+    b.write(RegExp(r'[a-z0-9 ]').hasMatch(d) ? d : ' ');
+  }
+  return b.toString().replaceAll(RegExp(r' +'), ' ').trim();
+}
+
 ProfiloVeicolo _auto(
   String id,
   String marca,

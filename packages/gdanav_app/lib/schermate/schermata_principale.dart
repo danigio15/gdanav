@@ -26,6 +26,7 @@ import 'cerca_destinazione.dart';
 import 'dettaglio_colonnina.dart';
 import 'diagnosi_auto.dart';
 import 'fonte_dati_auto.dart';
+import 'fonte_gdahome.dart';
 import 'la_tua_auto.dart';
 import 'mappe_offline.dart';
 import 'opzioni_percorso.dart';
@@ -364,6 +365,17 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                         ? AbbinaHomeAssistant(gestore: widget.auto)
                         : SchermataPremium(premium: widget.premium!, perche: 'Home Assistant'),
                   ),
+                ),
+                // gdahome: l'auto della plancia di gdahome, da sola. Niente
+                // Premium e niente abbinamento: dentro gdahome la casa c'è già.
+                _VoceMenu(
+                  icona: Icons.cottage_outlined,
+                  titolo: 'gdahome',
+                  sotto: riassuntoGdahome(widget.auto),
+                  onTap: () {
+                    Navigator.of(contesto).pop();
+                    mostraFonteGdahome(context, widget.auto);
+                  },
                 ),
                 _VoceMenu(
                   icona: Icons.offline_pin_outlined,

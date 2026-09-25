@@ -229,24 +229,7 @@ class _Scelta extends StatelessWidget {
   }
 }
 
-/// Minuscole, senza accenti né trattini: «Škoda Elroq» e «skoda elroq»,
-/// «ë-C4» ed «e-c4» sono la stessa cosa.
-String semplice(String s) {
-  const accenti = {
-    'à': 'a', 'á': 'a', 'â': 'a', 'ä': 'a', 'ã': 'a', 'å': 'a', //
-    'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e', //
-    'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i', //
-    'ò': 'o', 'ó': 'o', 'ô': 'o', 'ö': 'o', 'õ': 'o', 'ø': 'o', //
-    'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u', //
-    'š': 's', 'ž': 'z', 'č': 'c', 'ç': 'c', 'ñ': 'n', //
-  };
-  final b = StringBuffer();
-  for (final c in s.toLowerCase().split('')) {
-    final d = accenti[c] ?? c;
-    b.write(RegExp(r'[a-z0-9 ]').hasMatch(d) ? d : ' ');
-  }
-  return b.toString().replaceAll(RegExp(r' +'), ' ').trim();
-}
+// `semplice` sta nel motore (gdanav_core), accanto al catalogo.
 
 /// Tutte le parole cercate devono esserci, anche attaccate: «id3», «id 3» e
 /// «ID.3» trovano la stessa auto.

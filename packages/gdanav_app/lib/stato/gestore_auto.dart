@@ -5,13 +5,14 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import '../sorgenti/canale_ble.dart';
 import '../sorgenti/sorgente_android_auto.dart';
+import '../sorgenti/sorgente_gdahome.dart';
 import '../sorgenti/sorgente_manuale.dart';
 import 'archivio.dart';
 
 /// Tiene accese le sorgenti dei dati dell'auto e dice all'interfaccia
 /// quale stato vale adesso, secondo lo switch «Fonte dati auto».
 class GestoreAuto extends ChangeNotifier {
-  GestoreAuto({required this.archivio, Future<CanaleObd> Function(String id)? apriObd})
+  GestoreAuto({required this.archivio, Future<CanaleObd> Function(String id)? apriObd, this.gdahome})
     : arbitro = ArbitroSorgenti(capacitaUtileKwh: ProfiloVeicolo.esempio.capacitaUtileKwh),
       _apriObd = apriObd ?? CanaleBle.apri;
 
@@ -38,6 +39,10 @@ class GestoreAuto extends ChangeNotifier {
   final Archivio archivio;
   final ArbitroSorgenti arbitro;
   final manuale = SorgenteManuale();
+
+  /// La fonte gdahome, quando gdanav gira dentro l'app gdahome: si accende da
+  /// sola, senza abbinamento, e non è Premium.
+  final SorgenteGdahome? gdahome;
 
   final _sorgenti = <TipoSorgente, SorgenteDatiAuto>{};
   final _iscrizioni = <StreamSubscription<StatoAuto>>[];
@@ -88,6 +93,11 @@ class GestoreAuto extends ChangeNotifier {
     abbinamento = await archivio.abbinamento();
     await _accendi(manuale);
     await _accendi(SorgenteAndroidAuto(onVelocita: _velocita));
+    if (gdahome case final g?) {
+      await _accendi(g);
+      g.addListener(_autoDaGdahome);
+      await _autoDaGdahome();
+    }
     if (abbinamento != null && homeAssistantConsentito) {
       await _accendi(SorgenteHomeAssistant(ClienteRelay(abbinamento!)));
     }
@@ -96,6 +106,16 @@ class GestoreAuto extends ChangeNotifier {
     if (dongle != null) unawaited(_accendiObd());
     // Anche senza letture nuove l'età del dato cambia: si ricalcola ogni tanto.
     _orologio = Timer.periodic(const Duration(seconds: 5), (_) => _aggiorna());
+  }
+
+  /// L'auto della plancia di gdahome diventa la tua auto, se non ne hai già
+  /// scelta una: marca e modello cercati nel catalogo. Una scelta fatta a mano
+  /// non si tocca.
+  Future<void> _autoDaGdahome() async {
+    final a = gdahome?.auto;
+    if (a == null || veicolo.id != ProfiloVeicolo.esempio.id) return;
+    final v = veicoloPerNome(a.marca, a.modello, kwh: a.kwh);
+    if (v != null) await scegliVeicolo(v);
   }
 
   Future<void> scegliVeicolo(ProfiloVeicolo v) async {
@@ -224,6 +244,7 @@ class GestoreAuto extends ChangeNotifier {
   @override
   void dispose() {
     _orologio?.cancel();
+    gdahome?.removeListener(_autoDaGdahome);
     for (final i in _iscrizioni) {
       i.cancel();
     }

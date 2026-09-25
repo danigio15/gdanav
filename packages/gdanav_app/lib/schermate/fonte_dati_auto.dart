@@ -28,7 +28,13 @@ class FonteDatiAuto extends StatelessWidget {
   /// Il consumo imparato: per dire quanto è preciso il calcolo.
   final GestoreConsumo? consumo;
 
-  static const _scelte = [TipoSorgente.androidAuto, TipoSorgente.obd, TipoSorgente.homeAssistant, TipoSorgente.manuale];
+  static const _scelte = [
+    TipoSorgente.androidAuto,
+    TipoSorgente.obd,
+    TipoSorgente.gdahome,
+    TipoSorgente.homeAssistant,
+    TipoSorgente.manuale,
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -50,17 +56,23 @@ class FonteDatiAuto extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                   child: Text('Fonte dati auto', style: Theme.of(context).textTheme.titleLarge),
                 ),
-                const RadioListTile<TipoSorgente?>(
+                RadioListTile<TipoSorgente?>(
                   value: null,
-                  title: Text('Automatica'),
-                  subtitle: Text('Auto, poi OBD, poi Home Assistant se recente, poi stima'),
+                  title: const Text('Automatica'),
+                  subtitle: Text(
+                    gestore.gdahome == null
+                        ? 'Auto, poi OBD, poi Home Assistant se recente, poi stima'
+                        : 'Auto, poi OBD, poi gdahome e Home Assistant se recenti, poi stima',
+                  ),
                 ),
                 for (final t in _scelte)
-                  RadioListTile<TipoSorgente?>(
-                    value: t,
-                    title: Text(nomeSorgente(t)),
-                    subtitle: gestore.disponibili.contains(t) ? null : const Text('Non collegata'),
-                  ),
+                  // gdahome c'è solo dentro l'app gdahome.
+                  if (t != TipoSorgente.gdahome || gestore.gdahome != null)
+                    RadioListTile<TipoSorgente?>(
+                      value: t,
+                      title: Text(nomeSorgente(t)),
+                      subtitle: gestore.disponibili.contains(t) ? null : const Text('Non collegata'),
+                    ),
                 const Divider(),
                 _Dongle(gestore: gestore),
                 const Divider(),
