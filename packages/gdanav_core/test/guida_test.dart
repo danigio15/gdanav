@@ -91,4 +91,33 @@ void main() {
     expect(distanzaBreve(1234), '1,2 km');
     expect(distanzaBreve(15600), '16 km');
   });
+
+  test('la mappa guarda avanti: su una rampa che curva la manovra resta in vista', () {
+    // 300 m verso nord, poi una curva stretta verso ovest dove c'è il bivio.
+    final punti = [
+      for (var i = 0; i <= 30; i++) Punto(45 + i * 0.00009, 9),
+      for (var i = 1; i <= 20; i++) Punto(45.0027, 9 - i * 0.000127),
+    ];
+    final g = Guida(
+      PercorsoCalcolato(
+        punti: punti,
+        tratti: const [],
+        manovre: const [
+          Manovra(istruzione: 'Parti', lunghezzaM: 300, secondi: 20, inizio: 0, tipo: 1),
+          Manovra(istruzione: 'Tieni la sinistra', lunghezzaM: 200, secondi: 20, inizio: 30, tipo: 24),
+        ],
+      ),
+    );
+    // Lontano dalla curva, sul dritto: guarda dritto.
+    final lontano = g.aggiorna(punti[5]);
+    expect((lontano.rotta + 540) % 360 - 180, closeTo(0, 1));
+    expect((lontano.rottaMappa + 540) % 360 - 180, closeTo(0, 1));
+    // A 100 m dal bivio la strada va ancora a nord, ma la mappa gira già
+    // verso la curva (a ovest), per mostrare dove si va.
+    final vicino = g.aggiorna(punti[20]);
+    expect((vicino.rotta + 540) % 360 - 180, closeTo(0, 1));
+    final gira = (vicino.rottaMappa + 540) % 360 - 180;
+    expect(gira, lessThan(-15));
+    expect(gira, greaterThan(-90));
+  });
 }

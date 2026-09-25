@@ -325,7 +325,8 @@ class PonteAuto {
     if (ora.difference(_ultimaPosizione) < const Duration(milliseconds: 500)) return;
     _ultimaPosizione = ora;
     final rotta = a?.rotta ?? posizione.rotta;
-    _manda('posizione', {'lat': qui.lat, 'lon': qui.lon, 'rotta': rotta});
+    // La mappa guarda un po' avanti; la freccia dell'auto segue la strada.
+    _manda('posizione', {'lat': qui.lat, 'lon': qui.lon, 'rotta': a?.rottaMappa ?? rotta});
     _manda('sorgenti', {
       'dati': {sorgenteIo: jsonEncode(datiIo(qui, rotta, posizione.segnaposto))},
     });

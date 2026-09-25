@@ -17,9 +17,10 @@ class Avanzamento {
     required this.arrivato,
     required this.posizioneSulPercorso,
     required this.rotta,
+    double? rottaMappa,
     this.limiteKmh,
     this.daDire,
-  });
+  }) : _rottaMappa = rottaMappa;
 
   final double percorsiM;
   final double restantiM;
@@ -45,6 +46,12 @@ class Avanzamento {
   /// La direzione della strada in quel punto, in gradi da nord in senso
   /// orario: per girare l'auto e la mappa.
   final double rotta;
+
+  /// Dove guarda la mappa: un po' più avanti lungo il percorso, così su una
+  /// rampa in curva la prossima manovra resta in vista invece di finire di
+  /// lato. Sul dritto è uguale a [rotta].
+  double get rottaMappa => _rottaMappa ?? rotta;
+  final double? _rottaMappa;
 
   /// Il limite di velocità dove si è, se si conosce.
   final int? limiteKmh;
@@ -110,6 +117,7 @@ class Guida {
       arrivato: arrivato,
       posizioneSulPercorso: _punto(i, p.t),
       rotta: _rotta(i),
+      rottaMappa: _rottaAvanti(_punto(i, p.t), percorsi, prossima == null ? null : alla),
       // In fondo a un segmento si è già all'inizio del prossimo.
       limiteKmh: percorso.limiteSul(p.t > 0.999 ? i + 1 : i),
       daDire: arrivato ? _una('arrivo', 'Sei arrivato.') : _annuncio(prossima, alla),
@@ -142,6 +150,23 @@ class Guida {
       j++;
     }
     return rottaGradi(_linea.punti[math.min(i, n - 1)], _linea.punti[j]);
+  }
+
+  /// La direzione verso un punto più avanti sul percorso: di solito 150 m;
+  /// vicino a una manovra, poco oltre la manovra, per vederne l'uscita.
+  double? _rottaAvanti(Punto qui, double percorsi, double? alla) {
+    final avanti = math.max(40.0, alla != null && alla < 150 ? alla + 40 : 150.0);
+    final meta = math.min(percorsi + avanti, _linea.lunghezzaM);
+    if (meta - percorsi < 20) return null;
+    final punti = _linea.punti, c = _linea.cumulate;
+    for (var j = 1; j < punti.length; j++) {
+      if (c[j] >= meta) {
+        final f = c[j] == c[j - 1] ? 0.0 : (meta - c[j - 1]) / (c[j] - c[j - 1]);
+        final a = punti[j - 1], b = punti[j];
+        return rottaGradi(qui, Punto(a.lat + f * (b.lat - a.lat), a.lon + f * (b.lon - a.lon)));
+      }
+    }
+    return null;
   }
 
   /// Il tempo cumulato a ogni punto, con la velocità della manovra a cui il

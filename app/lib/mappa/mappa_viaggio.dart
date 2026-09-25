@@ -153,7 +153,8 @@ class _MappaViaggioState extends State<MappaViaggio> {
             target: LatLng(qui.lat, qui.lon),
             zoom: _inclinata ? 17 : 16,
             tilt: _inclinata ? _inclinazione : 0,
-            bearing: rotta,
+            // Guarda un po' avanti: in curva la manovra resta in vista.
+            bearing: a?.rottaMappa ?? rotta,
           ),
         ),
         duration: const Duration(milliseconds: 900),
