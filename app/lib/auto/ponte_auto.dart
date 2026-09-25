@@ -12,7 +12,6 @@ import '../mappa/segnaposto.dart';
 import '../mappa/stile.dart';
 import '../servizi.dart';
 import '../stato/avvisi_strada.dart';
-import '../stato/foto_svincoli.dart';
 import '../stato/gestore_auto.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_luoghi.dart';
@@ -68,7 +67,6 @@ class PonteAuto {
     viaggio.addListener(_viaggio);
     viaggio.addListener(_opzioni);
     guida.addListener(_guida);
-    _foto = FotoSvincoli.di(guida)..addListener(_fotoArrivata);
     posizione.addListener(_posizione);
     luoghi?.addListener(_luoghi);
     auto?.addListener(_cruscotto);
@@ -195,7 +193,6 @@ class PonteAuto {
     viaggio.removeListener(_viaggio);
     viaggio.removeListener(_opzioni);
     guida.removeListener(_guida);
-    _foto?.removeListener(_fotoArrivata);
     posizione.removeListener(_posizione);
     luoghi?.removeListener(_luoghi);
     auto?.removeListener(_cruscotto);
@@ -286,21 +283,23 @@ class PonteAuto {
   }
 
   int? _svincoloChiesto;
-  FotoSvincoli? _foto;
-
-  /// Arrivata la foto vera dello svincolo in arrivo: si ridisegna con quella.
-  void _fotoArrivata() {
-    final m = guida.avanzamento?.prossima;
-    if (m != null && _svincoloChiesto == m.inizio && _foto?.perManovra(m) != null) unawaited(_disegnaSvincolo(m));
-  }
 
   int? _svincoloPronto;
 
+  /// Lo svincolo in 3D per l'auto: lo stile con la freccia e l'inquadratura;
+  /// l'immagine la fa MapLibre sul lato nativo.
   Future<void> _disegnaSvincolo(Manovra m) async {
-    if (!_attivo) return;
+    final p = guida.pronto;
+    if (!_attivo || p == null) return;
     try {
-      final foto = _foto?.perManovra(m);
-      _manda('svincolo', {'id': m.inizio, 'png': await svincoloPng(m, foto: foto?.$2, citazione: foto?.$1.citazione)});
+      final chiara = scenaSvincolo(p.viaggio, m, scuro: false), scura = scenaSvincolo(p.viaggio, m, scuro: true);
+      _manda('svincolo3d', {
+        'id': m.inizio,
+        'chiaro': jsonEncode(chiara.stile),
+        'scuro': jsonEncode(scura.stile),
+        ...chiara.inquadratura.toJson(),
+        'punta': await puntaPng(),
+      });
       _svincoloPronto = m.inizio;
       _guida();
     } catch (_) {

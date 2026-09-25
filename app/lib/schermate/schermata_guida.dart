@@ -12,7 +12,6 @@ import '../componenti/vetro.dart';
 import '../mappa/controllo_mappa.dart';
 import '../mappa/mappa_viaggio.dart';
 import '../stato/avvisi_strada.dart';
-import '../stato/foto_svincoli.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_segnalazioni.dart';
@@ -40,9 +39,6 @@ class _SchermataGuidaState extends State<SchermataGuida> {
 
   /// Le segnalazioni lungo la strada, condivise con lo schermo dell'auto.
   AvvisiStrada? _avvisi;
-
-  /// Le foto vere degli svincoli, condivise con lo schermo dell'auto.
-  late final _foto = FotoSvincoli.di(widget.guida);
 
   /// Gli svincoli di cui si è chiuso il popup.
   final _svincoliChiusi = <int>{};
@@ -107,7 +103,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                   ),
             ),
             ListenableBuilder(
-              listenable: Listenable.merge([g, widget.posizione, ?_avvisi, _foto]),
+              listenable: Listenable.merge([g, widget.posizione, ?_avvisi]),
               builder: (context, _) => Column(
                 children: [
                   SafeArea(
@@ -115,11 +111,13 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                     child: _Banner(guida: g, conSvincolo: _svincolo(g) != null),
                   ),
                   // Avvicinandosi a un'uscita o a un bivio: lo svincolo in grande.
-                  if (_svincolo(g) case (final m, final metri))
+                  if ((_svincolo(g), g.pronto) case ((final m, final metri), final p?))
                     PopupSvincolo(
+                      viaggio: p.viaggio,
                       manovra: m,
                       metri: metri,
-                      foto: _foto.perManovra(m),
+                      // Nelle prove niente mappa vera (vuole il codice nativo).
+                      mappa: widget.mappa == null ? null : (_, _) => const ColoredBox(color: Color(0xFF9DB7A0)),
                       onChiudi: () => setState(() => _svincoliChiusi.add(m.inizio)),
                     ),
                   if (_avvisi?.davanti case (final s, final m)) _AvvisoSegnalazione(segnalazione: s, metri: m),

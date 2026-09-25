@@ -49,71 +49,77 @@ void main() {
     expect((cartello.decoration! as BoxDecoration).color, const Color(0xFF0B7A3E));
   });
 
-  testWidgets('allo svincolo il popup: il disegno, i metri che mancano, e si chiude', (tester) async {
-    const m = Manovra(
-      istruzione: 'Esci a destra',
-      lunghezzaM: 800,
-      secondi: 30,
-      inizio: 42,
-      tipo: 20,
-      uscita: '12',
-      verso: 'A1 · Roma',
-    );
+  // Una strada verso est che a metà piega a destra (sud-est): lo svincolo.
+  final punti = [
+    for (var i = 0; i <= 30; i++) Punto(45.0, 9.0 + i * 0.0005),
+    for (var i = 1; i <= 20; i++) Punto(45.0 - i * 0.0004, 9.015 + i * 0.0004),
+  ];
+  final manovraSvincolo = const Manovra(
+    istruzione: 'Esci a destra',
+    lunghezzaM: 800,
+    secondi: 30,
+    inizio: 30,
+    tipo: 20,
+    uscita: '12',
+    verso: 'A1 · Roma',
+    corsie: [
+      Corsia([DirezioneCorsia.dritto]),
+      Corsia([DirezioneCorsia.leggeraDestra], giusta: true),
+    ],
+  );
+  final viaggio = Viaggio(
+    percorso: PercorsoCalcolato(punti: punti, tratti: const [], manovre: [manovraSvincolo]),
+    colonnine: const [],
+    piano: null,
+  );
+
+  test('lo svincolo in 3D: la mappa vera inclinata, la freccia sulla strada e sul ramo giusto', () {
+    final scena = scenaSvincolo(viaggio, manovraSvincolo, scuro: false);
+    final q = scena.inquadratura;
+    // Si guarda verso est (con un po' di sud-est), dall'alto e inclinati.
+    expect(q.rotta, inInclusiveRange(90, 125));
+    expect(q.inclinazione, greaterThan(50));
+    // Centrati poco oltre lo svincolo: si vedono l'arrivo e il ramo giusto.
+    expect(q.centro.lon, closeTo(9.015, 0.003));
+    final sorgenti = scena.stile['sources']! as Map;
+    final freccia = ((sorgenti['svincolo-freccia'] as Map)['data'] as Map)['geometry'] as Map;
+    final coordinate = (freccia['coordinates'] as List).cast<List>();
+    // Parte prima dello svincolo e finisce sul ramo che scende.
+    expect(coordinate.first[0] as double, lessThan(9.015));
+    expect(coordinate.last[1] as double, lessThan(45.0));
+    final strati = (scena.stile['layers']! as List).cast<Map>();
+    expect(strati.map((l) => l['id']), containsAll(['svincolo-freccia', 'svincolo-punta']));
+    expect(strati.firstWhere((l) => l['id'] == 'edifici-3d')['layout'], containsPair('visibility', 'visible'));
+    expect(strati.any((l) => l['id'] == 'io'), isFalse);
+    // Il percorso c'è, anche senza viaggio sulla mappa principale.
+    expect((((sorgenti['gdanav-percorso'] as Map)['data'] as Map)['features'] as List), hasLength(1));
+  });
+
+  testWidgets('allo svincolo il popup: la mappa 3D, cartello, corsie, metri; e si chiude', (tester) async {
     var chiuso = false;
-    expect(haSvincolo(m), isTrue);
+    expect(haSvincolo(manovraSvincolo), isTrue);
     expect(haSvincolo(const Manovra(istruzione: 'Svolta', lunghezzaM: 1, secondi: 1, inizio: 0, tipo: 10)), isFalse);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: PopupSvincolo(manovra: m, metri: 430, onChiudi: () => chiuso = true),
+          body: PopupSvincolo(
+            viaggio: viaggio,
+            manovra: manovraSvincolo,
+            metri: 430,
+            onChiudi: () => chiuso = true,
+            mappa: (_, _) => const ColoredBox(key: Key('mappa-svincolo'), color: Colors.grey),
+          ),
         ),
       ),
     );
-    expect(find.byKey(const Key('popup-svincolo')), findsOneWidget);
+    expect(find.byKey(const Key('mappa-svincolo')), findsOneWidget);
+    expect(find.text('Uscita 12'), findsOneWidget);
+    expect(find.byKey(const Key('corsie')), findsOneWidget);
     expect(find.text('450 m'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.tap(find.byKey(const Key('chiudi-svincolo')));
     expect(chiuso, isTrue);
-    // Per Android Auto la stessa vista in PNG.
-    final png = await tester.runAsync(() => svincoloPng(m));
-    expect(png!.sublist(1, 4), 'PNG'.codeUnits);
-  });
-
-  testWidgets('con la foto vera: la foto sotto, freccia e cartello sopra, e la citazione', (tester) async {
-    const m = Manovra(
-      istruzione: 'Esci a destra',
-      lunghezzaM: 800,
-      secondi: 30,
-      inizio: 7,
-      tipo: 20,
-      verso: 'A1 · Roma',
-      corsie: [
-        Corsia([DirezioneCorsia.dritto]),
-        Corsia([DirezioneCorsia.leggeraDestra], giusta: true),
-      ],
-    );
-    // Una «foto» qualsiasi: lo svincolo disegnato, in PNG.
-    final byte = (await tester.runAsync(() => svincoloPng(m)))!;
-    final foto = FotoStrada(
-      id: '1',
-      url: 'https://foto.esempio/1.jpg',
-      punto: const Punto(45, 9),
-      direzione: 90,
-      scattata: DateTime.utc(2024, 5),
-      autore: 'mario',
-    );
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: PopupSvincolo(manovra: m, metri: 600, foto: (foto, byte), onChiudi: () {}),
-        ),
-      ),
-    );
-    expect(find.byKey(const Key('foto-svincolo')), findsOneWidget);
-    expect(find.text('© mario, Mapillary · 2024 · CC BY-SA'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-    // Per l'auto: la foto con sopra la vista, sempre in PNG.
-    final png = await tester.runAsync(() => svincoloPng(m, foto: byte, citazione: foto.citazione));
-    expect(png!.sublist(1, 4), 'PNG'.codeUnits);
+    final punta = await tester.runAsync(puntaPng);
+    expect(punta!.sublist(1, 4), 'PNG'.codeUnits);
   });
 }

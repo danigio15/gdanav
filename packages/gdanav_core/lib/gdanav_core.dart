@@ -21,7 +21,6 @@ export 'src/obd/elm327.dart';
 export 'src/obd/esplora_obd.dart';
 export 'src/obd/profili_obd.dart';
 export 'src/obd/sorgente_obd.dart';
-export 'src/percorso/foto_svincolo.dart';
 export 'src/percorso/valhalla.dart';
 export 'src/protocollo/abbinamento.dart';
 export 'src/protocollo/busta.dart';
