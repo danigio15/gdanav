@@ -39,7 +39,7 @@ class NegozioFinto implements NegozioPremium {
   @override
   Future<List<PianoPremium>> piani() async => const [
     PianoPremium(id: pianoMensile, prezzo: '3,00 €', giorniProva: 14),
-    PianoPremium(id: pianoAnnuale, prezzo: '20,00 €', giorniProva: 14),
+    PianoPremium(id: pianoAnnuale, prezzo: '25,00 €', giorniProva: 14),
   ];
 
   @override
@@ -195,11 +195,11 @@ void main() {
     );
     expect(find.textContaining('Il traffico fa parte di Premium'), findsOneWidget);
     expect(find.text('Previsioni meteo'), findsOneWidget);
-    expect(find.text('20,00 €/anno'), findsOneWidget);
+    expect(find.text('25,00 €/anno'), findsOneWidget);
     expect(find.text('3,00 €/mese'), findsOneWidget);
-    expect(find.text('Risparmi il 44%'), findsOneWidget);
+    expect(find.text('Risparmi il 31%'), findsOneWidget);
     expect(find.text('Prova gratis per 14 giorni'), findsOneWidget);
-    expect(find.textContaining('Poi 20,00 €/anno, rinnovo automatico'), findsOneWidget);
+    expect(find.textContaining('Poi 25,00 €/anno, rinnovo automatico'), findsOneWidget);
 
     await tester.ensureVisible(find.byKey(const Key('piano-mensile')));
     await tester.pumpAndSettle();
