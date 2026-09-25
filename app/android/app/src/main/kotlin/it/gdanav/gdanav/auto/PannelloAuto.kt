@@ -17,9 +17,9 @@ import kotlin.math.roundToInt
  * basso a sinistra, dal lato di chi guida, una capsula con velocità, limite e
  * arrivo, e sopra una barra sottile coi dati dell'auto (batteria, km, alla
  * meta), il meteo e la prossima sosta; in alto solo l'avviso della
- * segnalazione che si avvicina, finché serve. Disegna anche il cartello
- * dell'uscita, piccolo, sulla vista dello svincolo per la scheda in alto a
- * sinistra.
+ * segnalazione che si avvicina, finché serve; avvicinandosi a un'uscita,
+ * accanto alla scheda della manovra, lo svincolo in un popup stretto col
+ * cartello dell'uscita.
  */
 class PannelloAuto(context: Context, private val densita: Float) : View(context) {
     /** L'area non coperta dalle schede di Android Auto. */
@@ -61,9 +61,16 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val sinistra = a.left + margine
         val destra = a.right - margine
 
-        // In alto niente, per vedere la strada davanti: solo l'avviso che si
-        // avvicina (autovelox, polizia, incidente…), finché serve.
-        avviso(canvas, sinistra, destra, alto)
+        // In alto a sinistra, accanto alla scheda della manovra, avvicinandosi
+        // a un'uscita: lo svincolo in un popup stretto, col cartello.
+        val g = PonteAuto.guida
+        val vista = g?.svincolo?.let { id -> PonteAuto.svincoli[id]?.let { svincoloConCartello(it, id, g) } }
+        val popup = vista?.let { svincolo(canvas, sinistra, alto, a, it) }
+
+        // Per il resto in alto niente, per vedere la strada davanti: solo
+        // l'avviso che si avvicina (autovelox, polizia, incidente…), finché
+        // serve, accanto al popup.
+        avviso(canvas, popup?.let { it.right + dp(8f) } ?: sinistra, destra, alto)
 
         // In basso a sinistra, dal lato di chi guida: la capsula con velocità,
         // limite e arrivo, e sopra una barra sottile coi dati dell'auto e il
@@ -72,22 +79,42 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         barra(canvas, a, tachimetro, c)
     }
 
+    private val immagine = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+
+    /**
+     * Il popup dello svincolo: stretto (al massimo 380 dp e metà dell'area
+     * libera), arrotondato, dall'angolo in alto a sinistra dell'area.
+     */
+    private fun svincolo(canvas: Canvas, x: Float, y: Float, a: Rect, vista: Bitmap): RectF {
+        val w = minOf(dp(380f), a.width() * 0.5f)
+        val h = w * vista.height / vista.width
+        val box = RectF(x, y, x + w, y + h)
+        val raggio = dp(16f)
+        canvas.save()
+        canvas.clipPath(android.graphics.Path().apply { addRoundRect(box, raggio, raggio, android.graphics.Path.Direction.CW) })
+        canvas.drawBitmap(vista, null, box, immagine)
+        canvas.restore()
+        bordo.color = Color.argb(200, 24, 28, 36)
+        bordo.strokeWidth = dp(3f)
+        canvas.drawRoundRect(box, raggio, raggio, bordo)
+        return box
+    }
+
     /** L'ultima vista composta per la scheda: id, cartello, immagine. */
     private var composta: Triple<Int, String, Bitmap>? = null
 
     /**
-     * La vista dello svincolo per la scheda di Android Auto (in alto a
-     * sinistra), col cartello dell'uscita disegnato sopra dal lato giusto e
+     * La vista dello svincolo per il popup, col cartello dell'uscita disegnato sopra dal lato giusto e
      * piantato coi suoi pali.
      */
-    fun svincoloConCartello(vista: Bitmap, id: Int, g: PonteAuto.Guida): Bitmap {
+    private fun svincoloConCartello(vista: Bitmap, id: Int, g: PonteAuto.Guida): Bitmap {
         if (g.uscita.isEmpty() && g.verso.isEmpty()) return vista
         val chiave = "${g.uscita}|${g.verso}|${g.tipo}|${g.strada}"
         composta?.let { (i, k, b) -> if (i == id && k == chiave) return b }
         val b = vista.copy(Bitmap.Config.ARGB_8888, true)
         // Il cartello piccolo, nel cielo dal lato dell'uscita: la scena deve
         // restare libera per vedere le corsie.
-        scala = b.width / (600f * densita)
+        scala = b.width / (500f * densita)
         try {
             val m = dp(10f)
             cartelloUscita(Canvas(b), m, b.width - m, m, b.width * 0.38f, g, pali = b.height * 0.52f, righe = 2)

@@ -156,12 +156,8 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         }
         if (guida != null) {
             val routing = RoutingInfo.Builder().setCurrentStep(passo(guida), distanza(guida.distanzaM))
-            // Avvicinandosi a un'uscita o a un bivio: lo svincolo nella scheda
-            // in alto a sinistra, col cartello dell'uscita, le corsie e la freccia.
-            guida.svincolo?.let { id -> PonteAuto.svincoli[id]?.let { id to it } }?.let { (id, vista) ->
-                val immagine = renderer.svincolo(vista, id, guida)
-                routing.setJunctionImage(CarIcon.Builder(IconCompat.createWithBitmap(immagine)).build())
-            }
+            // Lo svincolo non va nella scheda (larga quanto vuole Android Auto):
+            // lo disegna il pannello, stretto, accanto alla scheda.
             guida.dopoTipo?.let { tipo ->
                 val dopo = Step.Builder(guida.dopoStrada.ifEmpty { " " })
                     .setManeuver(Maneuver.Builder(IconeManovra.tipo(tipo)).setIcon(icona(IconeManovra.icona(tipo))).build())

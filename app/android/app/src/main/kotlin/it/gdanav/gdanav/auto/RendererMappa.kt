@@ -151,10 +151,6 @@ class RendererMappa(private val carContext: CarContext) : SurfaceCallback {
         }
     }
 
-    /** La vista dello svincolo col cartello dell'uscita, per la scheda. */
-    fun svincolo(vista: android.graphics.Bitmap, id: Int, g: PonteAuto.Guida) =
-        pannello?.svincoloConCartello(vista, id, g) ?: vista
-
     /** Un punto toccato sulla mappa: proprietà, latitudine, longitudine. */
     var alPunto: (Map<String, Any?>, Double, Double) -> Unit = { _, _, _ -> }
 
