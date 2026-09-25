@@ -162,13 +162,16 @@ void main() {
       ]..sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
       final stato = DisponibilitaTomTom(chiave);
       final elenco = await Future.wait([
-        for (final c in rapide.take(15)) stato.aggiorna(c).timeout(const Duration(seconds: 60)).catchError((Object _) => c),
+        for (final c in rapide.take(15))
+          stato.aggiorna(c).timeout(const Duration(seconds: 60)).catchError((Object _) => c),
       ]);
-      avviso('Colonnine Napoli', [
-        '${tutte.length} in tutto, ${rapide.length} rapide',
-        for (final c in elenco)
-          '${c.nome} (${c.operatore}): ${c.connettori.map((x) => '${x.tipo.name}=${x.stato.name}').join(' ')}',
-      ].join(' | '));
+      avviso(
+          'Colonnine Napoli',
+          [
+            '${tutte.length} in tutto, ${rapide.length} rapide',
+            for (final c in elenco)
+              '${c.nome} (${c.operatore}): ${c.connettori.map((x) => '${x.tipo.name}=${x.stato.name}').join(' ')}',
+          ].join(' | '));
     } catch (e) {
       avviso('Colonnine Napoli', 'errore: $e');
     }
