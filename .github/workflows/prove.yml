@@ -157,6 +157,8 @@ jobs:
     needs: [pubblica-relay]
     runs-on: ubuntu-latest
     continue-on-error: true
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: packages/gdanav_core
@@ -169,6 +171,17 @@ jobs:
       - run: dart test test/viaggio_rete_test.dart --reporter expanded
         env:
           GDANAV_RETE: "1"
+          GDANAV_PREZZI: ${{ github.workspace }}/prezzi_napoli.json
+      # I prezzi veri di Napoli nella release, per le anteprime dell'app.
+      - name: Prezzi di Napoli nella release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -s prezzi_napoli.json ] || exit 0
+          gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
+          gh release upload anteprima prezzi_napoli.json --clobber
       - name: Com'è fatto il traffico TomTom
         working-directory: .
         env:

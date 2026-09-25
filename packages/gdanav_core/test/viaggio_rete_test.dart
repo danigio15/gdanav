@@ -92,9 +92,10 @@ void main() {
         }),
       );
       final json = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>;
-      // Uno per avviso: GitHub li taglia a 4000 caratteri.
-      for (final (i, d) in (json['results'] as List).take(14).indexed) {
-        avviso('Prezzi MIMIT grezzi $i', jsonEncode(d));
+      final risultati = json['results'] as List;
+      avviso('Prezzi MIMIT grezzi', '${risultati.length} distributori');
+      if (Platform.environment['GDANAV_PREZZI'] case final file?) {
+        File(file).writeAsStringSync(jsonEncode({'results': risultati}));
       }
     } catch (e) {
       avviso('Prezzi MIMIT grezzi', 'errore: $e');
