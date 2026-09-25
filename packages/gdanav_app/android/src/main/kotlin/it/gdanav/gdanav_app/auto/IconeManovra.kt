@@ -1,7 +1,7 @@
-package it.gdanav.gdanav.auto
+package it.gdanav.gdanav_app.auto
 
 import androidx.car.app.navigation.model.Maneuver
-import it.gdanav.gdanav.R
+import it.gdanav.gdanav_app.R
 
 /**
  * Dal tipo di manovra di Valhalla al tipo e all'icona di Android Auto. Si

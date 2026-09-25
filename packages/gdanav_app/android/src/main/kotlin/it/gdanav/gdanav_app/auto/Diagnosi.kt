@@ -1,4 +1,4 @@
-package it.gdanav.gdanav.auto
+package it.gdanav.gdanav_app.auto
 
 import android.content.Context
 import android.content.Intent

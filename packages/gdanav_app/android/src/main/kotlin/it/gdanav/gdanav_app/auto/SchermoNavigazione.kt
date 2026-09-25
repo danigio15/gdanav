@@ -1,4 +1,4 @@
-package it.gdanav.gdanav.auto
+package it.gdanav.gdanav_app.auto
 
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
@@ -22,7 +22,7 @@ import androidx.car.app.navigation.model.TravelEstimate
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import it.gdanav.gdanav.R
+import it.gdanav.gdanav_app.R
 import java.util.TimeZone
 
 /**
@@ -87,7 +87,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     private fun tasto(id: Int, azione: () -> Unit) =
         Action.Builder().setIcon(icona(id)).setOnClickListener { azione() }.build()
 
-    /** In alto: Cerca, Menu e Fine; appena passata una segnalazione, «C'è ancora?» Sì / No. */
+    /** In alto: Cerca, la casa (dentro gdahome), Menu e Fine; appena passata una segnalazione, «C'è ancora?» Sì / No. */
     private fun azioni(): ActionStrip {
         val striscia = ActionStrip.Builder()
         val ancora = PonteAuto.avviso.ancoraId
@@ -99,6 +99,11 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             return striscia.build()
         }
         striscia.addAction(tasto(R.drawable.auto_cerca) { screenManager.push(SchermoCerca(carContext)) })
+        // La casa, se chi porta gdanav dentro ne ha una (gdahome): al massimo
+        // quattro tasti, e con Cerca, Menu e Fine ci sta.
+        GdanavInAuto.casa?.let { casa ->
+            striscia.addAction(tasto(R.drawable.auto_casa) { screenManager.push(casa(carContext)) })
+        }
         if (PonteAuto.guida != null) {
             striscia.addAction(tasto(R.drawable.auto_menu) { screenManager.push(SchermoMenu(carContext, renderer)) })
             striscia.addAction(Action.Builder().setTitle("Fine").setOnClickListener { PonteAuto.fermaDallAuto() }.build())

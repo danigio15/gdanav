@@ -20,7 +20,8 @@ if (!kotlinIncorporato) {
 
 android {
     namespace = "it.gdanav.gdanav_app"
-    compileSdk = 36
+    // Come l'app: la 37 la chiede la libreria Bluetooth del dongle.
+    compileSdk = 37
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -47,4 +48,11 @@ if (extensions.findByName("kotlin") != null) {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.17.0")
+    // Android Auto: la libreria delle app per l'auto, e i dati dell'auto
+    // (batteria, autonomia) quando il telefono è collegato. `api` perché
+    // l'app che porta gdanav dentro dichiara il servizio con queste classi.
+    api("androidx.car.app:app:1.4.0")
+    api("androidx.car.app:app-projected:1.4.0")
+    // La stessa MapLibre del plugin maplibre_gl, per la mappa sullo schermo dell'auto.
+    implementation("org.maplibre.gl:android-sdk-opengl:13.5.0")
 }

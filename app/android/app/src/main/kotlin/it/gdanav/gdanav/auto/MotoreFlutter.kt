@@ -4,6 +4,7 @@ import android.content.Context
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineCache
 import io.flutter.embedding.engine.dart.DartExecutor
+import it.gdanav.gdanav_app.auto.PonteAuto
 
 /**
  * Un solo motore Flutter per il telefono e per l'auto. Se gdanav si apre da

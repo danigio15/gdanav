@@ -1,4 +1,4 @@
-package it.gdanav.gdanav.auto
+package it.gdanav.gdanav_app.auto
 
 import androidx.car.app.CarContext
 import androidx.car.app.CarToast

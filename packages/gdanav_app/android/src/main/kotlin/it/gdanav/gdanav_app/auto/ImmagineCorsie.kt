@@ -1,4 +1,4 @@
-package it.gdanav.gdanav.auto
+package it.gdanav.gdanav_app.auto
 
 import android.graphics.Bitmap
 import android.graphics.Canvas

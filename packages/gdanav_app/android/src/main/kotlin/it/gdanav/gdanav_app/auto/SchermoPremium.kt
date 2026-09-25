@@ -1,4 +1,4 @@
-package it.gdanav.gdanav.auto
+package it.gdanav.gdanav_app.auto
 
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
@@ -33,9 +33,9 @@ class SchermoPremium(carContext: CarContext) : Screen(carContext), DefaultLifecy
         finish()
     }
 
-    override fun onGetTemplate(): Template =
-        MessageTemplate.Builder(
-            "Android Auto fa parte di gdanav Premium. Sbloccalo dall'app sul telefono: menu → Premium.",
+    override fun onGetTemplate(): Template {
+        val messaggio = MessageTemplate.Builder(
+            "La navigazione in auto fa parte di gdanav Premium. Sbloccalo dall'app sul telefono: menu → Premium.",
         )
             .setTitle("gdanav Premium")
             .setHeaderAction(Action.APP_ICON)
@@ -45,5 +45,12 @@ class SchermoPremium(carContext: CarContext) : Screen(carContext), DefaultLifecy
                     .setOnClickListener { if (PonteAuto.premium(carContext)) apriNavigazione() else invalidate() }
                     .build(),
             )
-            .build()
+        // Dentro gdahome la casa non è Premium: ci si arriva anche da qui.
+        GdanavInAuto.casa?.let { casa ->
+            messaggio.addAction(
+                Action.Builder().setTitle("Casa").setOnClickListener { screenManager.push(casa(carContext)) }.build(),
+            )
+        }
+        return messaggio.build()
+    }
 }
