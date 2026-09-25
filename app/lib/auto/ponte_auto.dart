@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
+import '../componenti/icone_punti.dart';
 import '../componenti/icone_segnalazioni.dart';
 import '../componenti/stato_colonnina.dart' show testoDisponibilita;
 import '../componenti/scena_svincolo.dart';
@@ -11,6 +12,7 @@ import '../componenti/vista_svincolo.dart';
 import '../mappa/dati_viaggio.dart';
 import '../mappa/segnaposto.dart';
 import '../mappa/stile.dart';
+import '../schermate/scheda_punto.dart';
 import '../servizi.dart';
 import '../stato/avvisi_strada.dart';
 import '../stato/distributori.dart';
@@ -22,6 +24,7 @@ import '../stato/gestore_posizione.dart';
 import '../stato/gestore_premium.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
+import '../stato/gestore_vicini.dart';
 
 /// Tiene aggiornato lo schermo di Android Auto: stile, percorso, colonnine,
 /// segnalazioni, segnaposto e prossima manovra, e il cruscotto (batteria,
@@ -39,6 +42,7 @@ class PonteAuto {
     this.auto,
     this.segnalazioni,
     this.meteo,
+    this.vicini,
     MethodChannel? canale,
     DateTime Function()? orologio,
   }) : _canale = canale ?? const MethodChannel('gdanav/schermo_auto'),
@@ -53,6 +57,9 @@ class PonteAuto {
   final GestoreAuto? auto;
   final GestoreSegnalazioni? segnalazioni;
   final GestoreMeteo? meteo;
+
+  /// Distributori o colonnine intorno, anche sulla mappa dell'auto.
+  final GestoreVicini? vicini;
   final MethodChannel _canale;
   final DateTime Function() _ora;
   var _attivo = true;
@@ -73,6 +80,7 @@ class PonteAuto {
     luoghi?.addListener(_luoghi);
     auto?.addListener(_cruscotto);
     meteo?.addListener(_cruscotto);
+    vicini?.addListener(_vicini);
     if (segnalazioni case final s?) {
       s.addListener(_segnalazioni);
       _avvisi = AvvisiStrada.di(guida, s)..addListener(_avviso);
@@ -81,6 +89,7 @@ class PonteAuto {
     _luoghi();
     _opzioni();
     _segnalazioni();
+    _vicini();
   }
 
   /// Le icone delle segnalazioni, disegnate come sul telefono.
@@ -88,7 +97,11 @@ class PonteAuto {
     if (!_attivo) return;
     try {
       _manda('immagini', {
-        'png': {for (final t in TipoSegnalazione.values) nomeIcona(t): await iconaSegnalazionePng(t)},
+        'png': {
+          for (final t in TipoSegnalazione.values) nomeIcona(t): await iconaSegnalazionePng(t),
+          // Le icone dei punti: categorie, distributori, colonnine.
+          ...await iconePunti(),
+        },
       });
     } catch (_) {
       // Senza icone le segnalazioni restano nel cruscotto.
@@ -163,12 +176,44 @@ class PonteAuto {
       case 'passa':
         final l = luogoDaJson(call.arguments);
         if (l == null) return null;
-        if (guida.attiva) {
+        // Con la termica ci si passa e si prosegue; con l'elettrica il
+        // punto diventa la meta (le soste le fa il piano).
+        if (guida.attiva && (guida.pronto?.termica ?? false)) {
           await guida.passaDa(l);
         } else {
+          if (guida.attiva) await guida.ferma();
           await viaggio.vaiA(l);
           if (viaggio.stato is ViaggioPronto) guida.avvia();
         }
+      // Un punto toccato sulla mappa dell'auto: cosa dirne.
+      case 'punto':
+        final p = PuntoToccato.daElemento({
+          'properties': a['proprieta'],
+          'geometry': {
+            'type': 'Point',
+            'coordinates': [a['lon'], a['lat']],
+          },
+        });
+        if (p == null) return null;
+        final qui = guida.avanzamento?.posizioneSulPercorso ?? posizione.qui;
+        final (:sopra, :righe) = righePunto(
+          p,
+          vicini: vicini,
+          qui: qui,
+          carburante: auto?.carburante ?? Carburante.benzina,
+        );
+        return {
+          'titolo': p.nome,
+          'sopra': sopra,
+          'righe': righe,
+          'vai': guida.attiva && (guida.pronto?.termica ?? false) ? 'Passa di qui' : 'Vai',
+          'luogo': {
+            'nome': p.nome,
+            'descrizione': righe.firstOrNull ?? sopra,
+            'lat': p.posizione.lat,
+            'lon': p.posizione.lon,
+          },
+        };
       case 'colonnine':
         final qui = posizione.qui ?? viaggio.ultimaPosizione;
         final v = auto?.veicolo;
@@ -225,6 +270,7 @@ class PonteAuto {
     luoghi?.removeListener(_luoghi);
     auto?.removeListener(_cruscotto);
     meteo?.removeListener(_cruscotto);
+    vicini?.removeListener(_vicini);
     segnalazioni?.removeListener(_segnalazioni);
     _avvisi?.removeListener(_avviso);
   }
@@ -244,6 +290,14 @@ class PonteAuto {
       'dati': {for (final MapEntry(:key, :value) in dati.entries) key: jsonEncode(value)},
     });
     _cruscotto();
+  }
+
+  void _vicini() {
+    final v = vicini;
+    if (v == null) return;
+    _manda('sorgenti', {
+      'dati': {for (final MapEntry(:key, :value) in v.dati().entries) key: jsonEncode(value)},
+    });
   }
 
   void _segnalazioni() {

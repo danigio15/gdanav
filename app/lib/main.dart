@@ -14,6 +14,7 @@ import 'stato/gestore_luoghi.dart';
 import 'stato/gestore_meteo.dart';
 import 'stato/gestore_posizione.dart';
 import 'stato/gestore_segnalazioni.dart';
+import 'stato/gestore_vicini.dart';
 import 'stato/gestore_viaggio.dart';
 import 'stato/posizione.dart';
 import 'stato/voce.dart';
@@ -48,6 +49,8 @@ Future<void> main() async {
   // Il meteo lungo la strada (Premium): nel consumo e sullo schermo.
   final meteo = GestoreMeteo(viaggio: viaggio, posizione: posizione);
   viaggio.stimaMeteo = meteo.stima;
+  // Distributori o colonnine intorno, sulla mappa del telefono e dell'auto.
+  final vicini = GestoreVicini(auto: auto, posizione: posizione);
   final luoghi = GestoreLuoghi(archivio);
   await luoghi.carica();
   // Le colonnine dentro l'app: si leggono mentre si guarda la mappa.
@@ -67,6 +70,7 @@ Future<void> main() async {
     auto: auto,
     segnalazioni: segnalazioni,
     meteo: meteo,
+    vicini: vicini,
   )..avvia();
   ponte.premium(premium.sbloccato);
   premium.addListener(() => ponte.premium(premium.sbloccato));
@@ -79,6 +83,7 @@ Future<void> main() async {
       posizione: posizione,
       segnalazioni: segnalazioni,
       meteo: meteo,
+      vicini: vicini,
       luoghi: luoghi,
       consumo: consumo,
       fotoAuto: fotoAuto,
@@ -100,6 +105,7 @@ class GdanavApp extends StatelessWidget {
     this.chiediPosizione,
     this.segnalazioni,
     this.meteo,
+    this.vicini,
     this.luoghi,
     this.consumo,
     this.fotoAuto,
@@ -114,6 +120,7 @@ class GdanavApp extends StatelessWidget {
   final Future<bool> Function()? chiediPosizione;
   final GestoreSegnalazioni? segnalazioni;
   final GestoreMeteo? meteo;
+  final GestoreVicini? vicini;
   final GestoreLuoghi? luoghi;
   final GestoreConsumo? consumo;
   final GestoreFotoAuto? fotoAuto;
@@ -142,6 +149,7 @@ class GdanavApp extends StatelessWidget {
         chiediPosizione: chiediPosizione,
         segnalazioni: segnalazioni,
         meteo: meteo,
+        vicini: vicini,
         luoghi: luoghi,
         consumo: consumo,
         fotoAuto: fotoAuto,

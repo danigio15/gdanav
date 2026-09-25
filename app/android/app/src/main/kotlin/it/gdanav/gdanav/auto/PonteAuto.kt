@@ -288,6 +288,16 @@ object PonteAuto {
     fun ancora(id: String, si: Boolean) = chiedi("ancora", mapOf("id" to id, "si" to si))
 
     /** Le colonnine rapide vicine, come luoghi da raggiungere. */
+    /** Un punto toccato sulla mappa: il telefono dice cosa è e cosa sapere. */
+    fun punto(proprieta: Map<String, Any?>, lat: Double, lon: Double, risposta: (Map<String, Any?>?) -> Unit) =
+        chiedi("punto", mapOf("proprieta" to proprieta, "lat" to lat, "lon" to lon)) { r ->
+            @Suppress("UNCHECKED_CAST")
+            risposta(r as? Map<String, Any?>)
+        }
+
+    /** La scheda del punto, per [SchermoPunto]. */
+    fun luogoDa(m: Map<String, Any?>): Luogo? = luogo(m)
+
     /** Auto termica: i distributori intorno. */
     fun distributori(risultati: (List<Luogo>) -> Unit) = chiedi("distributori", null) { r ->
         @Suppress("UNCHECKED_CAST")

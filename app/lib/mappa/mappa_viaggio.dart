@@ -6,13 +6,16 @@ import 'package:flutter/services.dart';
 import 'package:gdanav_core/gdanav_core.dart' show TipoSegnalazione;
 import 'package:maplibre_gl/maplibre_gl.dart';
 
+import '../componenti/icone_punti.dart';
 import '../componenti/icone_segnalazioni.dart';
+import '../schermate/scheda_punto.dart';
 import '../servizi.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_premium.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
+import '../stato/gestore_vicini.dart';
 import 'controllo_mappa.dart';
 import 'dati_viaggio.dart';
 import 'segnaposto.dart';
@@ -30,6 +33,8 @@ class MappaViaggio extends StatefulWidget {
     required this.posizione,
     this.guida,
     this.segnalazioni,
+    this.vicini,
+    this.onPunto,
   });
 
   final GestoreViaggio gestore;
@@ -50,6 +55,12 @@ class MappaViaggio extends StatefulWidget {
 
   /// Polizia, incidenti, traffico segnalati da chi guida.
   final GestoreSegnalazioni? segnalazioni;
+
+  /// Distributori o colonnine intorno, sulla mappa.
+  final GestoreVicini? vicini;
+
+  /// Tocco su un distributore, una colonnina vicina o un punto di interesse.
+  final ValueChanged<PuntoToccato>? onPunto;
 
   @override
   State<MappaViaggio> createState() => _MappaViaggioState();
@@ -74,6 +85,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.posizione.addListener(_io);
     widget.guida?.addListener(_io);
     widget.segnalazioni?.addListener(_segnalazioni);
+    widget.vicini?.addListener(_vicini);
     GestorePremium.attivo.addListener(_premium);
   }
 
@@ -88,6 +100,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.posizione.removeListener(_io);
     widget.guida?.removeListener(_io);
     widget.segnalazioni?.removeListener(_segnalazioni);
+    widget.vicini?.removeListener(_vicini);
     GestorePremium.attivo.removeListener(_premium);
     super.dispose();
   }
@@ -186,6 +199,17 @@ class _MappaViaggioState extends State<MappaViaggio> {
     for (final t in TipoSegnalazione.values) {
       await m.addImage(nomeIcona(t), await iconaSegnalazionePng(t));
     }
+    for (final MapEntry(:key, :value) in (await iconePunti()).entries) {
+      await m.addImage(key, value);
+    }
+  }
+
+  Future<void> _vicini() async {
+    final m = _mappa, v = widget.vicini;
+    if (m == null || !_stileCaricato || v == null) return;
+    for (final MapEntry(:key, :value) in v.dati().entries) {
+      await m.setGeoJsonSource(key, value.cast<String, dynamic>());
+    }
   }
 
   Future<void> _segnalazioni() async {
@@ -231,6 +255,10 @@ class _MappaViaggioState extends State<MappaViaggio> {
     for (final f in trovati) {
       // A seconda della piattaforma arriva già decodificata o come JSON.
       final mappa = f is String ? jsonDecode(f) : f;
+      if (mappa is! Map) continue;
+      // Prima i punti che sappiamo raccontare (distributori, colonnine
+      // vicine, ristoranti…), poi le colonnine del viaggio.
+      if (PuntoToccato.daElemento(mappa) case final p? when widget.onPunto != null) return widget.onPunto!(p);
       if (mappa case {'properties': {'id': final String id}}) return widget.onColonnina(id);
     }
   }
@@ -262,6 +290,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
           _immagini(m).then((_) {
             _io();
             _segnalazioni();
+            _vicini();
           });
         }
         _ridisegna();

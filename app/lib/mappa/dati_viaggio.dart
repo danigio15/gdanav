@@ -129,6 +129,38 @@ Punto _sposta(Punto p, double rotta, double metri) => Punto(
   p.lon + metri * math.sin(rotta) / (111320 * math.cos(p.lat * math.pi / 180)),
 );
 
+/// I distributori sulla mappa, col prezzo del [carburante] sotto l'icona.
+Map<String, Object?> datiDistributori(List<Distributore> elenco, Carburante carburante) => _collezione([
+  for (final d in elenco)
+    _elemento(
+      {'type': 'Point', 'coordinates': _xy(d.posizione)},
+      {
+        'id': d.id,
+        'tipo': 'distributore',
+        'nome': d.nome,
+        'etichetta': switch (d.prezzoDi(carburante)) {
+          final p? => p.euro.toStringAsFixed(3).replaceAll('.', ','),
+          null => d.nome,
+        },
+      },
+    ),
+]);
+
+/// Le colonnine rapide intorno, col colore dello stato e la potenza.
+Map<String, Object?> datiColonnineVicine(List<Colonnina> elenco, Set<TipoConnettore> connettori) => _collezione([
+  for (final c in elenco)
+    _elemento(
+      {'type': 'Point', 'coordinates': _xy(c.posizione)},
+      {
+        'id': c.id,
+        'tipo': 'colonnina',
+        'nome': c.nome,
+        'stato': statoDi(c.disponibilitaPer(connettori)).name,
+        'etichetta': '${c.potenzaNominalePer(connettori).round()} kW',
+      },
+    ),
+]);
+
 /// Il riquadro che contiene tutto il percorso: sud-ovest e nord-est.
 (Punto, Punto)? confini(Viaggio v) {
   final p = v.percorso.punti;

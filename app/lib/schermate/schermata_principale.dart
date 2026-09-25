@@ -21,6 +21,7 @@ import '../stato/gestore_meteo.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_viaggio.dart';
+import '../stato/gestore_vicini.dart';
 import 'abbina_home_assistant.dart';
 import 'cerca_destinazione.dart';
 import 'dettaglio_colonnina.dart';
@@ -34,6 +35,7 @@ import 'premium.dart';
 import 'ricarica.dart';
 import 'scheda_viaggio.dart';
 import 'distributori.dart';
+import 'scheda_punto.dart';
 import 'segnala.dart';
 import 'schermata_guida.dart';
 
@@ -52,6 +54,7 @@ class SchermataPrincipale extends StatefulWidget {
     this.luoghi,
     this.segnalazioni,
     this.meteo,
+    this.vicini,
     this.consumo,
     this.fotoAuto,
     this.premium,
@@ -72,6 +75,9 @@ class SchermataPrincipale extends StatefulWidget {
 
   /// Il meteo lungo la strada (Premium); `null` nelle prove.
   final GestoreMeteo? meteo;
+
+  /// Distributori o colonnine intorno, sulla mappa.
+  final GestoreVicini? vicini;
 
   /// Il consumo imparato, da mostrare in «La tua auto».
   final GestoreConsumo? consumo;
@@ -124,6 +130,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
           guida: widget.guida,
           posizione: widget.posizione,
           segnalazioni: segnalazioni,
+          vicini: widget.vicini,
           mappa: widget.mappa,
         ),
       ),
@@ -430,6 +437,15 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                     ),
                   ),
                   onColonnina: (id) => mostraColonnina(context, viaggio, id),
+                  vicini: widget.vicini,
+                  onPunto: (p) => mostraPunto(
+                    context,
+                    p,
+                    vicini: widget.vicini,
+                    qui: widget.posizione.qui,
+                    carburante: widget.auto.carburante,
+                    onVai: (l) => viaggio.vaiA(l),
+                  ),
                 ),
           ),
           // In alto: il menu quadrato di Waze e la batteria.

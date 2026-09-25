@@ -4,7 +4,9 @@ import android.app.Presentation
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.graphics.Point
+import android.graphics.PointF
 import android.graphics.Rect
+import android.graphics.RectF
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.os.Handler
@@ -138,6 +140,39 @@ class RendererMappa(private val carContext: CarContext) : SurfaceCallback {
             areaVisibile = Rect(area)
             pannello?.area = areaVisibile
         }
+    }
+
+    /** Un punto toccato sulla mappa: proprietà, latitudine, longitudine. */
+    var alPunto: (Map<String, Any?>, Double, Double) -> Unit = { _, _, _ -> }
+
+    /**
+     * Un tocco sulla mappa (Android Auto dalla versione 5 dell'auto): se sotto
+     * il dito c'è un distributore, una colonnina o un punto di interesse, la
+     * sua scheda.
+     */
+    override fun onClick(x: Float, y: Float) {
+        val m = mappa ?: return
+        val raggio = 28f
+        val trovati = m.queryRenderedFeatures(
+            RectF(x - raggio, y - raggio, x + raggio, y + raggio),
+            "gdanav-distributori",
+            "gdanav-vicine",
+            "nomi-poi",
+        )
+        // Il più vicino al dito.
+        val punto = trovati.mapNotNull { f ->
+            val g = f.geometry() as? org.maplibre.geojson.Point ?: return@mapNotNull null
+            val schermo = m.projection.toScreenLocation(LatLng(g.latitude(), g.longitude()))
+            Triple(f, g, (schermo.x - x) * (schermo.x - x) + (schermo.y - y) * (schermo.y - y))
+        }.minByOrNull { it.third } ?: return
+        val proprieta = HashMap<String, Any?>()
+        punto.first.properties()?.entrySet()?.forEach { (chiave, valore) ->
+            if (valore.isJsonPrimitive) {
+                val v = valore.asJsonPrimitive
+                proprieta[chiave] = if (v.isNumber) v.asDouble else v.asString
+            }
+        }
+        alPunto(proprieta, punto.second.latitude(), punto.second.longitude())
     }
 
     // --- col dito o con la manopola -------------------------------------

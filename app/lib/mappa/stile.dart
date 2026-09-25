@@ -6,15 +6,19 @@
 /// arrivo) con le loro sorgenti vuote: l'app ne cambia solo i dati.
 library;
 
+import 'categorie_poi.dart';
+
 const sorgentePercorso = 'gdanav-percorso';
 const sorgenteColonnine = 'gdanav-colonnine';
 const sorgenteArrivo = 'gdanav-arrivo';
 const sorgenteIo = 'gdanav-io';
 const sorgenteSegnalazioni = 'gdanav-segnalazioni';
 const sorgenteManovra = 'gdanav-manovra';
+const sorgenteDistributori = 'gdanav-distributori';
+const sorgenteVicine = 'gdanav-vicine';
 const stratoTraffico = 'traffico';
 const stratoTrafficoLocale = 'traffico-locale';
-const stratiToccabili = ['gdanav-soste', 'gdanav-colonnine'];
+const stratiToccabili = ['gdanav-soste', 'gdanav-colonnine', 'gdanav-distributori', 'gdanav-vicine', 'nomi-poi'];
 
 /// Dall'alto gli edifici sono piatti e puliti; inclinando la mappa si
 /// accendono quelli in 3D e si spengono i piatti.
@@ -244,6 +248,8 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}
       sorgenteIo: {'type': 'geojson', 'data': _vuota},
       sorgenteSegnalazioni: {'type': 'geojson', 'data': _vuota},
       sorgenteManovra: {'type': 'geojson', 'data': _vuota},
+      sorgenteDistributori: {'type': 'geojson', 'data': _vuota},
+      sorgenteVicine: {'type': 'geojson', 'data': _vuota},
       if (traffico.isNotEmpty)
         'traffico': {
           'type': 'vector',
@@ -421,14 +427,14 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}
         },
         'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 2},
       },
+      // I punti di interesse come in Google Maps: il bollino colorato della
+      // categoria col simbolo, e il nome dello stesso colore accanto.
       {
-        // I nomi dei posti (distributori, scuole, negozi): piccoli e grigi,
-        // come in Waze.
         'id': 'nomi-poi',
         'type': 'symbol',
         'source': 'openmaptiles',
         'source-layer': 'poi',
-        'minzoom': 15.5,
+        'minzoom': 14.5,
         'filter': [
           '<=',
           [
@@ -436,16 +442,37 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}
             ['get', 'rank'],
             99,
           ],
-          20,
+          [
+            'step',
+            ['zoom'],
+            6,
+            15.5,
+            14,
+            16.5,
+            30,
+            17.5,
+            99,
+          ],
         ],
         'layout': {
+          'icon-image': esprPoi((c) => c.immagine),
+          'icon-size': 0.62,
+          'icon-allow-overlap': false,
           'text-field': ['get', 'name'],
           'text-font': ['Noto Sans Regular'],
           'text-size': 11.5,
           'text-max-width': 8,
-          'text-padding': 4,
+          'text-variable-anchor': ['left', 'right', 'top', 'bottom'],
+          'text-radial-offset': 1.0,
+          'text-justify': 'auto',
+          'text-optional': true,
+          'text-padding': 3,
         },
-        'paint': {'text-color': t.poi, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 1.5},
+        'paint': {
+          'text-color': scuro ? t.poi : esprPoi((c) => c.colore),
+          'text-halo-color': t.etichettaAlone,
+          'text-halo-width': 1.5,
+        },
       },
       // Il percorso: un alone morbido, il bordo blu scuro, la linea blu e le
       // frecce della direzione. Sempre blu: nessuna strada ha quel colore.
@@ -549,6 +576,60 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}
           'Polygon',
         ],
         'paint': {'fill-color': '#FFFFFF', 'fill-antialias': true},
+      },
+      // Intorno a te: i distributori col prezzo (auto termica) o le
+      // colonnine rapide col colore dello stato (auto elettrica).
+      {
+        'id': 'gdanav-vicine',
+        'type': 'symbol',
+        'source': sorgenteVicine,
+        'minzoom': 10,
+        'layout': {
+          'icon-image': [
+            'concat',
+            'punto-colonnina-',
+            ['get', 'stato'],
+          ],
+          'icon-size': 0.8,
+          'icon-allow-overlap': true,
+          'text-field': [
+            'step',
+            ['zoom'],
+            '',
+            13,
+            ['get', 'etichetta'],
+          ],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 11,
+          'text-anchor': 'top',
+          'text-offset': [0, 1.1],
+          'text-optional': true,
+        },
+        'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 1.6},
+      },
+      {
+        'id': 'gdanav-distributori',
+        'type': 'symbol',
+        'source': sorgenteDistributori,
+        'minzoom': 10,
+        'layout': {
+          'icon-image': 'punto-distributore',
+          'icon-size': 0.8,
+          'icon-allow-overlap': true,
+          'text-field': [
+            'step',
+            ['zoom'],
+            '',
+            12.5,
+            ['get', 'etichetta'],
+          ],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 11.5,
+          'text-anchor': 'top',
+          'text-offset': [0, 1.1],
+          'text-optional': true,
+        },
+        'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 1.6},
       },
       {
         'id': 'gdanav-colonnine',
