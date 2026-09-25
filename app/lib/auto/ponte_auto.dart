@@ -78,6 +78,7 @@ class PonteAuto {
     posizione.addListener(_posizione);
     luoghi?.addListener(_luoghi);
     auto?.addListener(_cruscotto);
+    auto?.addListener(_opzioni);
     meteo?.addListener(_cruscotto);
     vicini?.addListener(_vicini);
     if (segnalazioni case final s?) {
@@ -87,6 +88,15 @@ class PonteAuto {
     _viaggio();
     _luoghi();
     _opzioni();
+    // La batteria all'arrivo, per il menu dell'auto.
+    if (viaggio.minimoArrivo == null) {
+      unawaited(
+        viaggio.archivio.preferenze().then((p) {
+          viaggio.minimoArrivo ??= p.minimoArrivo;
+          _opzioni();
+        }, onError: (Object _) {}),
+      );
+    }
     _segnalazioni();
     _vicini();
   }
@@ -143,6 +153,10 @@ class PonteAuto {
         if (a['autostrade'] case final bool v) o = o.copia(evitaAutostrade: v);
         if (a['traghetti'] case final bool v) o = o.copia(evitaTraghetti: v);
         if (a['ricalcolo'] case final bool v) o = o.copia(ricalcoloAutomatico: v);
+        if (a['arrivo'] case final num v) {
+          await viaggio.cambiaMinimoArrivo(v.toDouble());
+          return null;
+        }
         await viaggio.cambiaOpzioni(o);
       case 'voce':
         guida.alternaVoce();
@@ -262,6 +276,8 @@ class PonteAuto {
       'traghetti': o.evitaTraghetti,
       'ricalcolo': o.ricalcoloAutomatico,
       'muto': guida.muto,
+      'elettrica': auto?.elettrica ?? true,
+      'arrivo': ?viaggio.minimoArrivo,
     });
   }
 
@@ -272,6 +288,7 @@ class PonteAuto {
     posizione.removeListener(_posizione);
     luoghi?.removeListener(_luoghi);
     auto?.removeListener(_cruscotto);
+    auto?.removeListener(_opzioni);
     meteo?.removeListener(_cruscotto);
     vicini?.removeListener(_vicini);
     segnalazioni?.removeListener(_segnalazioni);
@@ -391,7 +408,7 @@ class PonteAuto {
   Future<void> _disegnaSvincolo(Manovra m) async {
     if (!_attivo) return;
     try {
-      _manda('svincolo', {'id': m.inizio, 'png': await scenaSvincoloPng(m)});
+      _manda('svincolo', {'id': m.inizio, 'png': await scenaSvincoloPng(m, larghezza: 1040, altezza: 540)});
       _svincoloPronto = m.inizio;
       _guida();
     } catch (_) {
@@ -399,20 +416,25 @@ class PonteAuto {
     }
   }
 
-  /// Al massimo due volte al secondo: l'auto non ha bisogno di più.
+  /// Al massimo tre volte al secondo: fra una e l'altra l'auto fa scorrere
+  /// da sé segnaposto e mappa.
   void _posizione() {
     final a = guida.attiva ? guida.avanzamento : null;
     final qui = a?.posizioneSulPercorso ?? posizione.qui;
     // Senza posizione non c'è niente da mostrare: non si consuma il turno.
     if (qui == null) return;
     final ora = _ora();
-    if (ora.difference(_ultimaPosizione) < const Duration(milliseconds: 500)) return;
+    if (ora.difference(_ultimaPosizione) < const Duration(milliseconds: 300)) return;
     _ultimaPosizione = ora;
     final rotta = a?.rotta ?? posizione.rotta;
     // La mappa guarda un po' avanti; la freccia dell'auto segue la strada.
-    _manda('posizione', {'lat': qui.lat, 'lon': qui.lon, 'rotta': a?.rottaMappa ?? rotta});
-    _manda('sorgenti', {
-      'dati': {sorgenteIo: jsonEncode(datiIo(qui, rotta, posizione.segnaposto))},
+    // Il segnaposto lo disegna l'auto, che lo fa scorrere fra due posizioni.
+    _manda('posizione', {
+      'lat': qui.lat,
+      'lon': qui.lon,
+      'rotta': a?.rottaMappa ?? rotta,
+      'rotta_io': rotta,
+      'icona': posizione.segnaposto.immagine,
     });
     _cruscotto();
   }

@@ -50,6 +50,10 @@ object PonteAuto {
     /** Dove sei: centro della mappa, e la rotta in gradi. */
     @Volatile var qui: DoubleArray? = null
     @Volatile var rotta: Double = 0.0
+
+    /** La rotta del segnaposto (la mappa guarda un po' avanti) e la sua immagine. */
+    @Volatile var rottaIo: Double = 0.0
+    @Volatile var icona: String = "freccia"
     @Volatile var guida: Guida? = null
 
     /** Un posto da scegliere in auto: Casa, Lavoro, un preferito, un recente o un risultato. */
@@ -178,6 +182,8 @@ object PonteAuto {
                 val lon = call.argument<Double>("lon")
                 qui = if (lat != null && lon != null) doubleArrayOf(lat, lon) else null
                 rotta = call.argument<Double>("rotta") ?: 0.0
+                rottaIo = call.argument<Double>("rotta_io") ?: rotta
+                call.argument<String>("icona")?.let { icona = it }
             }
             "luoghi" -> {
                 luoghi = (call.argument<List<Map<String, Any?>>>("elenco") ?: emptyList()).mapNotNull(::luogo)

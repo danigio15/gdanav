@@ -100,7 +100,7 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
                 riga("Segnala", "Polizia, incidente, traffico, pericolo…", sfoglia = true) {
                     screenManager.push(SchermoSegnala(carContext))
                 },
-                riga("Impostazioni", "Vista 2D/3D, voce, percorso, Casa e Lavoro", sfoglia = true) {
+                riga("Impostazioni", "Batteria all'arrivo, vista 3D, voce, percorso, Casa e Lavoro", sfoglia = true) {
                     screenManager.push(SchermoImpostazioni(carContext, renderer))
                 },
             ),
@@ -119,9 +119,20 @@ class SchermoImpostazioni(carContext: CarContext, private val renderer: Renderer
         val o = PonteAuto.opzioni
         val casa = PonteAuto.casa()
         val lavoro = PonteAuto.lavoro()
+        val elettrica = o["elettrica"] != false
+        val arrivo = (o["arrivo"] as? Number)?.toInt()
         return elenco(
             "Impostazioni",
-            listOf(
+            listOfNotNull(
+                if (elettrica) {
+                    riga(
+                        "Batteria all'arrivo: ${arrivo?.let { "$it%" } ?: "—"}",
+                        "Con quanta carica arrivare: le soste si ricalcolano",
+                        sfoglia = true,
+                    ) { screenManager.push(SchermoArrivo(carContext)) }
+                } else {
+                    null
+                },
                 interruttore("Vista 3D", renderer.tridimensionale, "Spenta: mappa dall'alto, nord in su") {
                     if (it != renderer.tridimensionale) renderer.alternaVista()
                     invalidate()
@@ -137,6 +148,24 @@ class SchermoImpostazioni(carContext: CarContext, private val renderer: Renderer
                     screenManager.push(SchermoCerca(carContext, "lavoro"))
                 },
             ),
+        )
+    }
+}
+
+/** Con quanta batteria arrivare alla meta (e alle soste): si ricalcola subito. */
+class SchermoArrivo(carContext: CarContext) : SchermoAggiornato(carContext) {
+    private val scelte = listOf(5, 10, 15, 20, 25, 30)
+
+    override fun onGetTemplate(): Template {
+        val ora = (PonteAuto.opzioni["arrivo"] as? Number)?.toInt()
+        return elenco(
+            "Batteria all'arrivo",
+            scelte.map { v ->
+                riga(if (v == ora) "✓  $v%" else "$v%", if (v == ora) "Scelta adesso" else null) {
+                    PonteAuto.cambiaOpzione("arrivo", v)
+                    screenManager.pop()
+                }
+            },
         )
     }
 }

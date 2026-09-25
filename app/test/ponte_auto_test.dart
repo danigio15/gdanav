@@ -49,10 +49,22 @@ void main() {
     expect(guida['restanti'] as double, lessThan(Linea(punti).lunghezzaM));
     final pos = chiamate.lastWhere((c) => c.method == 'posizione').arguments as Map;
     expect(pos['lat'], isNotNull);
-    final io = chiamate.lastWhere(
-      (c) => c.method == 'sorgenti' && ((c.arguments as Map)['dati'] as Map).containsKey('gdanav-io'),
+    // Il segnaposto lo fa scorrere l'auto: arrivano immagine e rotta.
+    expect(pos['icona'], 'auto_blu');
+    expect(pos['rotta_io'], isA<double>());
+
+    // Dall'auto si cambia la batteria all'arrivo: si salva e si ricalcola.
+    await tester.runAsync(
+      () => messaggero.handlePlatformMessage(
+        'gdanav/schermo_auto',
+        const StandardMethodCodec().encodeMethodCall(const MethodCall('opzioni', {'arrivo': 25})),
+        (_) {},
+      ),
     );
-    expect(((io.arguments as Map)['dati'] as Map)['gdanav-io'], contains('auto_blu'));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+    expect(a.viaggio.minimoArrivo, 25);
+    expect((await a.viaggio.archivio.preferenze()).minimoArrivo, 25);
+    expect((chiamate.lastWhere((c) => c.method == 'opzioni').arguments as Map)['arrivo'], 25);
 
     // L'auto preme «Fine».
     await tester.runAsync(

@@ -150,6 +150,20 @@ class GestoreViaggio extends ChangeNotifier {
   OpzioniPercorso opzioni = const OpzioniPercorso();
 
   /// Cambiate le opzioni si salvano e, se c'è un viaggio, si ricalcola.
+  /// Con quanta batteria arrivare (in %), come nelle preferenze di ricarica;
+  /// `null` finché non si è letto.
+  double? minimoArrivo;
+
+  /// Cambia la batteria all'arrivo (anche dall'auto): si salva e, se c'è una
+  /// meta, si ricalcolano le soste.
+  Future<void> cambiaMinimoArrivo(double percento) async {
+    final p = await archivio.preferenze();
+    await archivio.salvaPreferenze(p.copia(minimoArrivo: percento));
+    minimoArrivo = percento;
+    notifyListeners();
+    if (destinazione case final d?) await pianifica(d);
+  }
+
   Future<void> cambiaOpzioni(OpzioniPercorso o) async {
     final strade = !mapEquals(o.valhalla, opzioni.valhalla);
     opzioni = o;
@@ -214,6 +228,7 @@ class GestoreViaggio extends ChangeNotifier {
     }
     ultimaPosizione = partenza;
     final preferenze = await archivio.preferenze();
+    minimoArrivo = preferenze.minimoArrivo;
     opzioni = await archivio.opzioniPercorso();
     final calcolo = Calcolo(destinazione);
     _imposta(calcolo);

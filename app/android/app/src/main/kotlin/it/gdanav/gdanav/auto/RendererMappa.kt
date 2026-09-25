@@ -1,5 +1,6 @@
 package it.gdanav.gdanav.auto
 
+import android.animation.ValueAnimator
 import android.app.Presentation
 import android.content.Context
 import android.graphics.BitmapFactory
@@ -11,6 +12,8 @@ import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import androidx.car.app.CarContext
 import androidx.car.app.SurfaceCallback
@@ -25,6 +28,7 @@ import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.sources.GeoJsonSource
+import kotlin.math.abs
 import kotlin.math.ln
 
 /**
@@ -108,6 +112,11 @@ class RendererMappa(private val carContext: CarContext) : SurfaceCallback {
 
     override fun onSurfaceDestroyed(contenitore: SurfaceContainer) {
         principale.removeCallbacks(torna)
+        animazione?.cancel()
+        animazione = null
+        mostrata = null
+        obiettivo = null
+        sorgentiCaricate.clear()
         mappaView?.let {
             it.onPause()
             it.onStop()
@@ -257,6 +266,7 @@ class RendererMappa(private val carContext: CarContext) : SurfaceCallback {
             stile = null
             inclinataOra = null
             immaginiCaricate = 0
+            sorgentiCaricate.clear()
             m.setStyle(Style.Builder().fromJson(json)) { s ->
                 stile = s
                 caricaSegnaposto(s)
@@ -268,8 +278,12 @@ class RendererMappa(private val carContext: CarContext) : SurfaceCallback {
     }
 
     private fun aggiornaDati(m: MapLibreMap, s: Style) {
+        // Solo le sorgenti cambiate: rileggere il percorso a ogni novità del
+        // cruscotto fa perdere fotogrammi.
         for ((id, dati) in PonteAuto.sorgenti) {
+            if (sorgentiCaricate[id] === dati) continue
             s.getSourceAs<GeoJsonSource>(id)?.setGeoJson(dati)
+            sorgentiCaricate[id] = dati
         }
         val immagini = PonteAuto.immagini
         if (immagini.size != immaginiCaricate) {
@@ -283,25 +297,122 @@ class RendererMappa(private val carContext: CarContext) : SurfaceCallback {
             s.getLayer("edifici")?.setProperties(PropertyFactory.visibility(if (inclinata) Property.NONE else Property.VISIBLE))
             s.getLayer("edifici-3d")?.setProperties(PropertyFactory.visibility(if (inclinata) Property.VISIBLE else Property.NONE))
         }
-        if (libera) return
-        val qui = PonteAuto.qui ?: return
+        muovi(m, s)
+    }
+
+    // --- l'auto che scorre -----------------------------------------------
+
+    /**
+     * Quello che si vede adesso e dove si va: latitudine, longitudine, rotta
+     * della mappa, rotta del segnaposto, zoom, inclinazione e i quattro
+     * margini. Fra una posizione e l'altra (dal telefono ogni 300 ms circa)
+     * segnaposto e mappa scorrono a ogni fotogramma, invece di saltare.
+     */
+    private var mostrata: DoubleArray? = null
+    private var obiettivo: DoubleArray? = null
+    private var animazione: ValueAnimator? = null
+    private var ultimaPosizione = 0L
+    private var eraLibera = false
+    private val sorgentiCaricate = HashMap<String, String>()
+
+    private fun muovi(m: MapLibreMap, s: Style) {
+        val qui = PonteAuto.qui
+        if (qui == null) {
+            animazione?.cancel()
+            mostrata = null
+            obiettivo = null
+            s.getSourceAs<GeoJsonSource>("gdanav-io")?.setGeoJson(VUOTA)
+            return
+        }
+        val guida = PonteAuto.guida != null
+        val inclinata = guida && tridimensionale
         // L'auto al centro dell'area libera; in guida più in basso, per
         // vedere la strada davanti.
         val a = areaVisibile ?: Rect(0, 0, larghezza, altezza)
         val sopra = if (guida) (a.height() * 0.3) else 0.0
-        val posizione = CameraPosition.Builder()
-            .target(LatLng(qui[0], qui[1]))
-            .zoom(if (guida) zoomGuida else zoomFermo)
-            .tilt(if (inclinata) 55.0 else 0.0)
-            .bearing(if (guida && tridimensionale) PonteAuto.rotta else 0.0)
-            .padding(
-                a.left.toDouble(),
-                a.top.toDouble() + sopra,
-                (larghezza - a.right).toDouble().coerceAtLeast(0.0),
-                (altezza - a.bottom).toDouble().coerceAtLeast(0.0),
-            )
-            .build()
-        m.animateCamera(CameraUpdateFactory.newCameraPosition(posizione), 900)
+        val nuovo = doubleArrayOf(
+            qui[0], qui[1],
+            if (inclinata) PonteAuto.rotta else 0.0,
+            PonteAuto.rottaIo,
+            if (guida) zoomGuida else zoomFermo,
+            if (inclinata) 55.0 else 0.0,
+            a.left.toDouble(),
+            a.top.toDouble() + sopra,
+            (larghezza - a.right).toDouble().coerceAtLeast(0.0),
+            (altezza - a.bottom).toDouble().coerceAtLeast(0.0),
+        )
+        // Tornando a seguire l'auto dopo averla spostata col dito: un volo.
+        if (eraLibera && !libera) {
+            eraLibera = false
+            animazione?.cancel()
+            mostrata = nuovo
+            obiettivo = nuovo
+            disegna(m, s, nuovo, sposta = false)
+            m.animateCamera(CameraUpdateFactory.newCameraPosition(camera(nuovo)), 700)
+            return
+        }
+        eraLibera = libera
+        val prima = obiettivo
+        if (prima != null && prima.contentEquals(nuovo)) return
+        obiettivo = nuovo
+        val da = mostrata
+        val ora = SystemClock.uptimeMillis()
+        val spostata = prima == null || prima[0] != nuovo[0] || prima[1] != nuovo[1]
+        val passo = ora - ultimaPosizione
+        if (spostata) ultimaPosizione = ora
+        // Troppo lontano (prima volta, salto del GPS): subito lì.
+        if (da == null || abs(da[0] - nuovo[0]) > 0.01 || abs(da[1] - nuovo[1]) > 0.01) {
+            animazione?.cancel()
+            mostrata = nuovo
+            disegna(m, s, nuovo)
+            return
+        }
+        // Dura quanto l'intervallo fra due posizioni: si arriva quando arriva
+        // la prossima, e il moto resta continuo.
+        val durata = if (spostata) passo.coerceIn(250L, 1100L) else 450L
+        val partenza = da.copyOf()
+        animazione?.cancel()
+        animazione = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = durata
+            interpolator = LinearInterpolator()
+            addUpdateListener { va ->
+                val t = (va.animatedValue as Float).toDouble()
+                val v = DoubleArray(nuovo.size) { i ->
+                    if (i == 2 || i == 3) angolo(partenza[i], nuovo[i], t) else partenza[i] + (nuovo[i] - partenza[i]) * t
+                }
+                mostrata = v
+                val st = stile ?: return@addUpdateListener
+                val mm = mappa ?: return@addUpdateListener
+                disegna(mm, st, v)
+            }
+            start()
+        }
+    }
+
+    private fun camera(v: DoubleArray) = CameraPosition.Builder()
+        .target(LatLng(v[0], v[1]))
+        .bearing(v[2])
+        .zoom(v[4])
+        .tilt(v[5])
+        .padding(v[6], v[7], v[8], v[9])
+        .build()
+
+    private fun disegna(m: MapLibreMap, s: Style, v: DoubleArray, sposta: Boolean = true) {
+        val icona = PonteAuto.icona.replace("\"", "")
+        s.getSourceAs<GeoJsonSource>("gdanav-io")?.setGeoJson(
+            "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\"," +
+                "\"geometry\":{\"type\":\"Point\",\"coordinates\":[${v[1]},${v[0]}]}," +
+                "\"properties\":{\"icona\":\"$icona\",\"rotta\":${v[3]}}}]}",
+        )
+        if (sposta && !libera) m.moveCamera(CameraUpdateFactory.newCameraPosition(camera(v)))
+    }
+
+    /** Da un angolo all'altro per la via più corta. */
+    private fun angolo(da: Double, a: Double, t: Double): Double {
+        var d = (a - da) % 360.0
+        if (d > 180) d -= 360.0
+        if (d < -180) d += 360.0
+        return ((da + d * t) % 360.0 + 360.0) % 360.0
     }
 
     /** Le immagini del segnaposto, prese dagli asset dell'app Flutter. */
@@ -315,5 +426,9 @@ class RendererMappa(private val carContext: CarContext) : SurfaceCallback {
                 // Senza immagine il segnaposto non si vede; la guida resta.
             }
         }
+    }
+
+    private companion object {
+        const val VUOTA = "{\"type\":\"FeatureCollection\",\"features\":[]}"
     }
 }
