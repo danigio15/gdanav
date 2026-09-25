@@ -13,13 +13,12 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * Sopra la mappa dell'auto, come sul telefono. In alto, avvicinandosi a
- * un'uscita, il cartello verde (numero e direzioni) dal lato dell'uscita
- * (poi va sulla vista dello svincolo, nella scheda in alto a sinistra);
- * grandi e in fila, batteria (adesso, autonomia, all'arrivo), prossima
- * sosta e meteo; poi l'avviso della segnalazione che si avvicina. In basso a
+ * Sopra la mappa dell'auto, come sul telefono: in alto a destra una scheda
+ * sola coi dati dell'auto (batteria, km, all'arrivo), il meteo e la prossima
+ * sosta; accanto l'avviso della segnalazione che si avvicina; in basso a
  * destra velocità e limite. Tutto dentro l'area lasciata libera da Android
- * Auto: la mappa continua sotto.
+ * Auto: la mappa continua sotto. Disegna anche il cartello dell'uscita sulla
+ * vista dello svincolo, per la scheda in alto a sinistra.
  */
 class PannelloAuto(context: Context, private val densita: Float) : View(context) {
     /** L'area non coperta dalle schede di Android Auto. */
@@ -44,7 +43,6 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         typeface = Typeface.DEFAULT
         color = Color.argb(225, 255, 255, 255)
     }
-    private val sfondo = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(235, 32, 38, 51) }
     private val pieno = Paint(Paint.ANTI_ALIAS_FLAG)
     private val bordo = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val numero = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -58,31 +56,23 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val a = area ?: Rect(0, 0, width, height)
         val margine = dp(10f)
         val c = PonteAuto.cruscotto
-        val g = PonteAuto.guida
-        var alto = a.top + margine
+        val alto = a.top + margine
         val sinistra = a.left + margine
         val destra = a.right - margine
 
-        // 1. Avvicinandosi a un'uscita, prima che la vista dello svincolo
-        // compaia nella scheda di Android Auto, il cartello da solo, dal
-        // lato dell'uscita; i dati sotto.
-        val vista = g?.svincolo?.let { PonteAuto.svincoli[it] }
-        val conCartello = g != null && (g.uscita.isNotEmpty() || g.verso.isNotEmpty()) && g.distanzaM <= 2500
-        if (g != null && vista == null && conCartello) {
-            val box = cartelloUscita(canvas, sinistra, destra, alto, (a.width() * 0.55f).coerceAtMost(dp(420f)), g)
-            alto = (dati(canvas, sinistra, box.bottom + dp(8f), destra, c) ?: box.bottom) + dp(8f)
-            avviso(canvas, a, alto)
-            velocita(canvas, a, c)
-            return
+        // 1. I dati dell'auto e il meteo: una scheda sola, in alto a destra.
+        val scheda = cruscotto(canvas, destra, alto, c)
+
+        // 2. L'avviso (autovelox, polizia, incidente…): in alto, accanto alla
+        // scheda se ci sta, se no sotto.
+        val fine = scheda?.left?.minus(dp(8f)) ?: destra
+        if (!avviso(canvas, sinistra, fine, alto, prova = true)) {
+            avviso(canvas, sinistra, fine, alto)
+        } else {
+            avviso(canvas, sinistra, destra, (scheda?.bottom ?: alto) + dp(8f))
         }
 
-        // 2. I dati dell'auto, grandi, in fila in alto a destra.
-        dati(canvas, sinistra, alto, destra, c)?.let { alto = it + dp(8f) }
-
-        // 3. L'avviso: autovelox, polizia, incidente…
-        avviso(canvas, a, alto)
-
-        // 4. Velocità e limite in basso a destra.
+        // 3. Velocità e limite in basso a destra.
         velocita(canvas, a, c)
     }
 
@@ -217,128 +207,142 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         return box
     }
 
+    private val muto = Color.argb(185, 255, 255, 255)
+    private val sfondoScheda = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(238, 24, 28, 36) }
+
+    private fun font(sp: Float, grassetto: Boolean = true, colore: Int = Color.WHITE) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = dp(sp)
+        typeface = if (grassetto) Typeface.create(Typeface.DEFAULT, Typeface.BOLD) else Typeface.DEFAULT
+        color = colore
+    }
+
+    private fun taglia(p: Paint, t: String, spazio: Float): String {
+        var s = t
+        while (p.measureText(s) > spazio && s.length > 3) s = s.dropLast(2) + "…"
+        return s
+    }
+
     /**
-     * Batteria, sosta e meteo in fila, allineati a destra partendo da [alto];
-     * se non ci stanno, vanno a capo. Restituisce il fondo, o `null` se non
-     * c'è niente (o, con [prova], se non ci stanno fra [sinistra] e [destra]).
+     * La scheda del cruscotto, larga sempre uguale e allineata a destra da
+     * [alto]: in cima batteria (icona e percentuale grande) e meteo; sotto i
+     * km che restano (dall'auto o stimati); poi la batteria all'arrivo con la
+     * sua barra; sotto una riga, la prossima sosta. Con l'auto termica solo
+     * il meteo. Restituisce dove sta, o `null` se non c'è niente.
      */
-    private fun dati(canvas: Canvas, sinistra: Float, alto: Float, destra: Float, c: PonteAuto.Cruscotto, prova: Boolean = false): Float? {
-        val schede = mutableListOf<Pair<Float, (Float, Float) -> Float>>()
-        c.batteria?.let { b -> schede += larghezzaBatteria(b, c) to { x: Float, y: Float -> batteria(canvas, x, y, b, c) } }
-        if (c.sostaNome != null) {
-            val titolo = "⚡ ${accorcia(c.sostaNome, 22)}"
+    private fun cruscotto(canvas: Canvas, destra: Float, alto: Float, c: PonteAuto.Cruscotto): RectF? {
+        val b = c.batteria
+        val meteo = c.meteoTemperatura
+        if (b == null && meteo == null) return null
+        val p = dp(16f)
+        val grande = font(32f)
+        val medio = font(21f)
+        val piccolo = font(15f, grassetto = false, colore = muto)
+        val temperatura = meteo?.let { "${c.meteoEmoji ?: ""} ${it.roundToInt()}°".trim() }
+        val tempFont = font(if (b == null) 30f else 24f)
+        // Larga sempre uguale; con la termica, quanto il meteo.
+        val w = if (b != null || c.sostaNome != null) {
+            dp(290f)
+        } else {
+            tempFont.measureText(temperatura ?: "") + (c.meteoDove?.let { piccolo.measureText(it) + dp(14f) } ?: 0f) + p * 2
+        }
+        val x = destra - w
+
+        // Quanto è alta.
+        var h = p + dp(38f)
+        val autonomia = c.autonomiaKm?.let { "${it.roundToInt()} km" }
+        val arrivo = c.arrivoBatteria
+        if (b != null && autonomia != null) h += dp(30f)
+        if (b != null && arrivo != null) h += dp(36f)
+        val sosta = c.sostaNome
+        if (sosta != null) h += dp(17f) + dp(50f)
+        h += p - dp(4f)
+        val box = RectF(x, alto, destra, alto + h)
+        canvas.drawRoundRect(box, dp(20f), dp(20f), sfondoScheda)
+
+        var y = alto + p
+        if (b != null) {
+            // Riga 1: icona, percentuale; a destra il meteo.
+            val colore = when {
+                b < 20 -> Color.rgb(239, 83, 80)
+                b < 50 -> Color.rgb(255, 193, 7)
+                else -> Color.rgb(102, 187, 106)
+            }
+            val corpo = RectF(x + p, y + dp(8f), x + p + dp(44f), y + dp(32f))
+            bordo.color = Color.WHITE
+            bordo.strokeWidth = dp(2.5f)
+            canvas.drawRoundRect(corpo, dp(5f), dp(5f), bordo)
+            pieno.color = Color.WHITE
+            canvas.drawRoundRect(RectF(corpo.right + dp(1.5f), corpo.top + dp(7f), corpo.right + dp(5f), corpo.bottom - dp(7f)), dp(1.5f), dp(1.5f), pieno)
+            pieno.color = colore
+            val dentro = RectF(corpo.left + dp(4f), corpo.top + dp(4f), corpo.right - dp(4f), corpo.bottom - dp(4f))
+            val livello = (b / 100.0).coerceIn(0.04, 1.0).toFloat()
+            canvas.drawRoundRect(RectF(dentro.left, dentro.top, dentro.left + dentro.width() * livello, dentro.bottom), dp(2f), dp(2f), pieno)
+            canvas.drawText("${b.roundToInt()}%", corpo.right + dp(14f), y + dp(32f), grande)
+            temperatura?.let {
+                tempFont.textAlign = Paint.Align.RIGHT
+                canvas.drawText(it, destra - p, y + dp(28f), tempFont)
+            }
+            y += dp(38f)
+            // Riga 2: i km; a destra dove vale il meteo.
+            autonomia?.let {
+                canvas.drawText(it, x + p, y + dp(22f), medio)
+                val fonte = if (c.autonomiaAuto) "dall'auto" else "stimati"
+                canvas.drawText(fonte, x + p + medio.measureText(it) + dp(7f), y + dp(22f), piccolo)
+                y += dp(30f)
+            }
+            c.meteoDove?.let {
+                val d = Paint(piccolo).apply { textAlign = Paint.Align.RIGHT }
+                canvas.drawText(taglia(d, it, dp(100f)), destra - p, alto + p + dp(38f) + dp(22f), d)
+            }
+            // Riga 3: all'arrivo, con la barra.
+            arrivo?.let { v ->
+                val basso = v < 10
+                val coloreArrivo = if (basso) Color.rgb(239, 83, 80) else Color.rgb(102, 187, 106)
+                canvas.drawText("Alla meta", x + p, y + dp(20f), piccolo)
+                val valore = font(19f, colore = coloreArrivo).apply { textAlign = Paint.Align.RIGHT }
+                val testo = "${v.roundToInt()}%"
+                canvas.drawText(testo, destra - p, y + dp(21f), valore)
+                val bx = x + p + piccolo.measureText("Alla meta") + dp(12f)
+                val bFine = destra - p - valore.measureText(testo) - dp(10f)
+                val barra = RectF(bx, y + dp(10f), bFine, y + dp(18f))
+                pieno.color = Color.argb(60, 255, 255, 255)
+                canvas.drawRoundRect(barra, dp(4f), dp(4f), pieno)
+                pieno.color = coloreArrivo
+                val quanto = (v / 100.0).coerceIn(0.03, 1.0).toFloat()
+                canvas.drawRoundRect(RectF(barra.left, barra.top, barra.left + barra.width() * quanto, barra.bottom), dp(4f), dp(4f), pieno)
+                y += dp(36f)
+            }
+        } else if (temperatura != null) {
+            // Auto termica: solo il meteo, grande, e dove vale.
+            canvas.drawText(temperatura, x + p, y + dp(32f), tempFont)
+            c.meteoDove?.let {
+                val d = Paint(piccolo).apply { textAlign = Paint.Align.RIGHT }
+                canvas.drawText(it, destra - p, y + dp(30f), d)
+            }
+            y += dp(38f)
+        }
+        // La prossima sosta, sotto una riga.
+        if (sosta != null) {
+            y += dp(6f)
+            pieno.color = Color.argb(45, 255, 255, 255)
+            canvas.drawRect(RectF(x + p, y, destra - p, y + dp(1f)), pieno)
+            y += dp(11f)
+            val titolo = font(18f)
+            canvas.drawText(taglia(titolo, "⚡ $sosta", w - p * 2), x + p, y + dp(20f), titolo)
             val sotto = listOfNotNull(
                 c.sostaKm?.let { "tra ${it.roundToInt()} km" },
                 c.sostaBatteria?.let { "arrivi col ${it.roundToInt()}%" },
-            ).joinToString(" · ").ifEmpty { null }
-            schede += larghezzaScheda(titolo, sotto) to { x: Float, y: Float -> scheda(canvas, x, y, titolo, sotto) }
+            ).joinToString(" · ")
+            if (sotto.isNotEmpty()) canvas.drawText(taglia(piccolo, sotto, w - p * 2), x + p, y + dp(42f), piccolo)
         }
-        if (c.meteoTemperatura != null) {
-            val titolo = "${c.meteoEmoji ?: ""} ${c.meteoTemperatura.roundToInt()}°".trim()
-            val sotto = c.meteoDove?.let { accorcia(it, 22) }
-            schede += larghezzaScheda(titolo, sotto, grande = true) to { x: Float, y: Float -> scheda(canvas, x, y, titolo, sotto, grande = true) }
-        }
-        if (schede.isEmpty()) return null
-        val spazio = dp(8f)
-        if (prova) {
-            val tutta = schede.sumOf { it.first.toDouble() }.toFloat() + spazio * (schede.size - 1)
-            return if (tutta <= destra - sinistra) 0f else null
-        }
-        var x = destra
-        var y = alto
-        var fondo = alto
-        for ((w, disegna) in schede) {
-            if (x - w < sinistra && x < destra) {
-                x = destra
-                y = fondo + spazio
-            }
-            val basso = disegna(x - w, y)
-            fondo = max(fondo, basso)
-            x -= w + spazio
-        }
-        return fondo
-    }
-
-    private fun larghezzaScheda(titolo: String, sotto: String?, grande: Boolean = false): Float {
-        val t = if (grande) Paint(testo).apply { textSize = dp(28f) } else testo
-        return max(t.measureText(titolo), sotto?.let { testoPiccolo.measureText(it) } ?: 0f) + dp(28f)
-    }
-
-    /** Una scheda: titolo grande, sotto una riga. Restituisce il fondo. */
-    private fun scheda(canvas: Canvas, x: Float, y: Float, titolo: String, sotto: String?, grande: Boolean = false): Float {
-        val t = if (grande) Paint(testo).apply { textSize = dp(28f) } else testo
-        val w = larghezzaScheda(titolo, sotto, grande)
-        val h = dp(if (grande) 40f else 34f) + if (sotto != null) dp(24f) else 0f
-        val box = RectF(x, y, x + w, y + h)
-        canvas.drawRoundRect(box, dp(16f), dp(16f), sfondo)
-        canvas.drawText(titolo, box.left + dp(14f), box.top + dp(if (grande) 33f else 27f), t)
-        sotto?.let { canvas.drawText(it, box.left + dp(14f), box.bottom - dp(11f), testoPiccolo) }
-        return box.bottom
-    }
-
-    private fun larghezzaBatteria(b: Double, c: PonteAuto.Cruscotto): Float {
-        val grande = Paint(testo).apply { textSize = dp(30f) }
-        val autonomia = c.autonomiaKm?.let { "${it.roundToInt()} km" }
-        val fonte = if (c.autonomiaKm == null) null else if (c.autonomiaAuto) "dall'auto" else "stimati"
-        val arrivo = c.arrivoBatteria?.let { "${it.roundToInt()}% all'arrivo" }
-        return maxOf(
-            dp(50f) + dp(10f) + grande.measureText("${b.roundToInt()}%"),
-            (autonomia?.let { testo.measureText(it) + dp(6f) } ?: 0f) + (fonte?.let { testoPiccolo.measureText(it) } ?: 0f),
-            arrivo?.let { testo.measureText(it) } ?: 0f,
-        ) + dp(30f)
+        return box
     }
 
     /**
-     * La batteria come un'icona vera, piena quanto l'auto e colorata (verde,
-     * gialla, rossa), con la percentuale grande; sotto l'autonomia adesso
-     * (dall'auto o stimata sul consumo vero) e la batteria all'arrivo.
-     * Restituisce il fondo della scheda.
+     * L'avviso al centro fra [sinistra] e [destra], da [alto]. Con [prova] non
+     * disegna: dice solo se non ci sta (o se non c'è niente da dire).
      */
-    private fun batteria(canvas: Canvas, x0: Float, y0: Float, b: Double, c: PonteAuto.Cruscotto): Float {
-        val livello = (b / 100.0).coerceIn(0.0, 1.0).toFloat()
-        val colore = when {
-            b < 20 -> Color.rgb(229, 57, 53)
-            b < 50 -> Color.rgb(255, 179, 0)
-            else -> Color.rgb(67, 160, 71)
-        }
-        val grande = Paint(testo).apply { textSize = dp(30f) }
-        val percentuale = "${b.roundToInt()}%"
-        val autonomia = c.autonomiaKm?.let { "${it.roundToInt()} km" }
-        val fonte = if (c.autonomiaKm == null) null else if (c.autonomiaAuto) "dall'auto" else "stimati"
-        val arrivo = c.arrivoBatteria?.let { "${it.roundToInt()}% all'arrivo" }
-        val lIcona = dp(50f)
-        val larghezza = larghezzaBatteria(b, c)
-        val altezza = dp(52f) + (if (autonomia != null) dp(28f) else 0f) + (if (arrivo != null) dp(28f) else 0f)
-        val box = RectF(x0, y0, x0 + larghezza, y0 + altezza)
-        canvas.drawRoundRect(box, dp(16f), dp(16f), sfondo)
-        // L'icona: corpo, polo, riempimento.
-        val x = box.left + dp(15f)
-        val y = box.top + dp(14f)
-        val corpo = RectF(x, y, x + lIcona - dp(5f), y + dp(25f))
-        bordo.color = Color.WHITE
-        bordo.strokeWidth = dp(2.5f)
-        canvas.drawRoundRect(corpo, dp(5f), dp(5f), bordo)
-        pieno.color = Color.WHITE
-        canvas.drawRoundRect(RectF(corpo.right + dp(1f), y + dp(8f), corpo.right + dp(5f), y + dp(17f)), dp(1f), dp(1f), pieno)
-        pieno.color = colore
-        val dentro = RectF(corpo.left + dp(3.5f), corpo.top + dp(3.5f), corpo.right - dp(3.5f), corpo.bottom - dp(3.5f))
-        canvas.drawRoundRect(RectF(dentro.left, dentro.top, dentro.left + dentro.width() * max(livello, 0.04f), dentro.bottom), dp(2f), dp(2f), pieno)
-        canvas.drawText(percentuale, x + lIcona + dp(10f), y + dp(24f), grande)
-        var riga = box.top + dp(52f)
-        autonomia?.let {
-            canvas.drawText(it, box.left + dp(15f), riga + dp(20f), testo)
-            fonte?.let { f -> canvas.drawText(f, box.left + dp(21f) + testo.measureText(it), riga + dp(20f), testoPiccolo) }
-            riga += dp(28f)
-        }
-        arrivo?.let {
-            val colorato = Paint(testo).apply { color = if ((c.arrivoBatteria ?: 100.0) < 10) Color.rgb(255, 138, 128) else Color.rgb(165, 214, 167) }
-            canvas.drawText(it, box.left + dp(15f), riga + dp(20f), colorato)
-        }
-        return box.bottom
-    }
-
-    /** L'avviso a centro area, da [alto]: restituisce il fondo. */
-    private fun avviso(canvas: Canvas, a: Rect, alto: Float): Float {
+    private fun avviso(canvas: Canvas, sinistra: Float, destra: Float, alto: Float, prova: Boolean = false): Boolean {
         val av = PonteAuto.avviso
         val titoloAvviso = av.titolo
         val (riga1, riga2, colore) = when {
@@ -355,13 +359,14 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
             av.ancoraTesto != null -> Triple(av.ancoraTesto, "Rispondi coi tasti in alto", Color.argb(235, 32, 38, 51))
             else -> Triple(null, null, 0)
         }
-        if (riga1 == null) return alto
+        if (riga1 == null) return false
         val icona = av.tipo?.let { PonteAuto.immagini["segnala-$it"] }
         val spazioIcona = if (icona != null) dp(48f) else 0f
         val spazioLimite = if (av.limite != null) dp(52f) else 0f
         val larghezza = max(testo.measureText(riga1), riga2?.let { testoPiccolo.measureText(it) } ?: 0f) +
             dp(30f) + spazioIcona + spazioLimite
-        val cx = (a.left + a.right) / 2f
+        if (prova) return larghezza > destra - sinistra
+        val cx = (sinistra + destra) / 2f
         val box = RectF(cx - larghezza / 2, alto, cx + larghezza / 2, alto + dp(62f))
         pieno.color = colore
         canvas.drawRoundRect(box, dp(18f), dp(18f), pieno)
@@ -374,7 +379,7 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         canvas.drawText(riga1, x, box.top + dp(28f), testo)
         riga2?.let { canvas.drawText(it, x, box.top + dp(50f), testoPiccolo) }
         av.limite?.let { l -> cartello(canvas, box.right - dp(32f), box.centerY(), dp(23f), l) }
-        return box.bottom + dp(8f)
+        return false
     }
 
     /** Velocità e limite, in basso a destra. */
