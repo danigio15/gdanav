@@ -56,7 +56,18 @@ class SchermataPrincipale extends StatefulWidget {
     this.fotoAuto,
     this.premium,
     this.mappeOffline,
+    this.menuOspite,
+    this.apriIlMenu,
   });
+
+  /// Dentro un'altra app (gdahome): il tasto del menu in alto apre il menu di
+  /// quell'app, come i tre trattini della sua plancia. Il menu di gdanav si
+  /// apre allora da fuori, con [apriIlMenu].
+  final VoidCallback? menuOspite;
+
+  /// Messo a `true` da chi ospita gdanav: si apre il menu di gdanav (le sue
+  /// impostazioni), e torna `false`.
+  final ValueNotifier<bool>? apriIlMenu;
 
   final GestoreAuto auto;
   final GestoreViaggio viaggio;
@@ -111,6 +122,16 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
     });
     segnalazioni.avvia();
     widget.guida.addListener(_guidaDaFuori);
+    widget.apriIlMenu?.addListener(_menuDaFuori);
+    // Chiesto prima che la schermata ci fosse: si apre appena c'è.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _menuDaFuori());
+  }
+
+  void _menuDaFuori() {
+    final chiesto = widget.apriIlMenu;
+    if (chiesto == null || !chiesto.value || !mounted) return;
+    chiesto.value = false;
+    _menu();
   }
 
   var _inGuida = false;
@@ -139,6 +160,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   @override
   void dispose() {
     widget.guida.removeListener(_guidaDaFuori);
+    widget.apriIlMenu?.removeListener(_menuDaFuori);
     controllo.dispose();
     if (widget.segnalazioni == null) segnalazioni.dispose();
     super.dispose();
@@ -452,7 +474,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                   message: 'Menu',
                   child: Vetro(
                     raggio: 18,
-                    onTap: _menu,
+                    onTap: widget.menuOspite ?? _menu,
                     child: const SizedBox.square(dimension: 60, child: Icon(Icons.menu_rounded, size: 32)),
                   ),
                 ),

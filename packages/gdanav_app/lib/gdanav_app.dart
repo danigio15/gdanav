@@ -40,11 +40,15 @@ Future<GdanavApp> preparaGdanav({
   FlutterSecureStorage? portachiavi,
   bool conLAuto = true,
   SorgenteGdahome? gdahome,
+  bool senzaPremium = false,
 }) async {
   final archivio = Archivio(portachiavi);
   // Premium (Android Auto e Home Assistant): si sa subito se è sbloccato,
-  // il Play Store conferma dopo.
-  final premium = GestorePremium(archivio: archivio, negozio: NegozioGooglePlay());
+  // il Play Store conferma dopo. [senzaPremium]: tutto sbloccato e niente
+  // negozio né voce «Premium» (gdahome, finché i pagamenti non ci sono).
+  final premium = senzaPremium
+      ? GestorePremium(archivio: archivio, tuttoSbloccato: true)
+      : GestorePremium(archivio: archivio, negozio: NegozioGooglePlay());
   await premium.carica();
   final auto = GestoreAuto(archivio: archivio, gdahome: gdahome)..homeAssistantConsentito = premium.sbloccato;
   await auto.avvia();
@@ -104,7 +108,7 @@ Future<GdanavApp> preparaGdanav({
     luoghi: luoghi,
     consumo: consumo,
     fotoAuto: fotoAuto,
-    premium: premium,
+    premium: senzaPremium ? null : premium,
     chiediPosizione: chiediPosizione,
   );
 }
@@ -158,7 +162,9 @@ class GdanavApp extends StatelessWidget {
   }
 
   /// La prima schermata, senza l'app intorno: la usa [GdanavDentro].
-  Widget schermata() => SchermataPrincipale(
+  Widget schermata({VoidCallback? menuOspite, ValueNotifier<bool>? apriIlMenu}) => SchermataPrincipale(
+    menuOspite: menuOspite,
+    apriIlMenu: apriIlMenu,
     auto: auto,
     viaggio: viaggio,
     archivio: archivio,
@@ -182,10 +188,16 @@ class GdanavApp extends StatelessWidget {
 /// dell'app — la barra, il menu — resta dov'è. Il tasto Indietro lo decide chi
 /// ospita: con [navigatore] in mano chiude prima le schermate di gdanav.
 class GdanavDentro extends StatelessWidget {
-  const GdanavDentro({super.key, required this.app, this.navigatore});
+  const GdanavDentro({super.key, required this.app, this.navigatore, this.menuOspite, this.apriIlMenu});
 
   final GdanavApp app;
   final GlobalKey<NavigatorState>? navigatore;
+
+  /// Il menu di chi ospita: lo apre il tasto in alto a sinistra di gdanav.
+  final VoidCallback? menuOspite;
+
+  /// Per aprire da fuori il menu di gdanav (le sue impostazioni).
+  final ValueNotifier<bool>? apriIlMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -194,8 +206,10 @@ class GdanavDentro extends StatelessWidget {
       child: HeroControllerScope.none(
         child: Navigator(
           key: navigatore,
-          onGenerateRoute: (impostazioni) =>
-              MaterialPageRoute<void>(settings: impostazioni, builder: (_) => app.schermata()),
+          onGenerateRoute: (impostazioni) => MaterialPageRoute<void>(
+            settings: impostazioni,
+            builder: (_) => app.schermata(menuOspite: menuOspite, apriIlMenu: apriIlMenu),
+          ),
         ),
       ),
     );
