@@ -36,6 +36,8 @@ export const PRIVACY = `<!doctype html>
 <h2>Foto</h2>
 <p>La foto della tua auto, se la scegli, resta sul telefono. Le foto dei modelli si scaricano da Wikimedia Commons.</p>
 
+<h2>Abbonamento Premium</h2>
+<p>L'abbonamento si compra e si gestisce con Google Play: pagamento e dati della carta li tratta Google, secondo la sua informativa. gdanav riceve da Google Play solo se l'abbonamento è attivo, e lo ricorda sul telefono.</p>
 <h2>Cancellazione</h2>
 <p>Tutto quello che gdanav salva è sul telefono: disinstallando l'app si cancella. Scollegando Home Assistant la chiave di abbinamento sparisce.</p>
 
