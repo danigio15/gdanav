@@ -114,12 +114,14 @@ void main() {
       ]..sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
       final chiave = Platform.environment['GDANAV_TOMTOM'] ?? '';
       final stato = chiave.isEmpty ? null : DisponibilitaTomTom(chiave);
-      final elenco = <Colonnina>[];
-      for (final c in rapide.take(25)) {
-        elenco.add(stato == null
-            ? c
-            : await stato.aggiorna(c).timeout(const Duration(seconds: 8)).catchError((Object _) => c));
-      }
+      // Tutte insieme: una alla volta non si sta nel tempo.
+      final elenco = await Future.wait([
+        for (final c in rapide.take(25))
+          if (stato == null)
+            Future.value(c)
+          else
+            stato.aggiorna(c).timeout(const Duration(seconds: 10)).catchError((Object _) => c),
+      ]);
       avviso('Colonnine Utrecht', '${tutte.length} in tutto, ${rapide.length} rapide, stato TomTom: ${stato != null}');
       if (Platform.environment['GDANAV_COLONNINE'] case final file?) {
         File(file).writeAsStringSync(
@@ -141,5 +143,7 @@ void main() {
     } catch (e) {
       avviso('Colonnine Utrecht', 'errore: $e');
     }
-  }, skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+  },
+      timeout: const Timeout(Duration(minutes: 4)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 }
