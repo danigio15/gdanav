@@ -102,8 +102,9 @@ Map<String, Object?> datiAlternative(List<PercorsoCalcolato> scelte, int scelta)
   final elementi = <Map<String, Object?>>[];
   for (final (i, a) in scelte.indexed) {
     if (i == scelta || a.punti.length < 2) continue;
-    final diff = a.durata.inMinutes - base.durata.inMinutes;
-    final etichetta = diff == 0 ? 'Uguale' : '${diff > 0 ? '+' : '−'}${diff.abs()} min';
+    final diff = ((a.durata.inSeconds - base.durata.inSeconds) / 60).round();
+    // Il trattino normale: il segno meno non c'è in tutti i caratteri della mappa.
+    final etichetta = diff == 0 ? 'Uguale' : '${diff > 0 ? '+' : '-'}${diff.abs()} min';
     elementi.add(
       _elemento(
         {
@@ -126,7 +127,7 @@ Map<String, Object?> datiAlternative(List<PercorsoCalcolato> scelte, int scelta)
     elementi.add(
       _elemento(
         {'type': 'Point', 'coordinates': _xy(lontano)},
-        {'alternativa': i, 'etichetta': '$etichetta\n${durataBreve(a.durata)}'},
+        {'alternativa': i, 'etichetta': '${durataBreve(a.durata)}\n$etichetta'},
       ),
     );
   }

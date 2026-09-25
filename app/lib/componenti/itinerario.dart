@@ -80,8 +80,11 @@ class ScelteStrada extends StatelessWidget {
     final c = ColoriGdanav.di(context);
     final muto = tema.colorScheme.onSurfaceVariant;
     final attiva = i == scelta;
-    final piu = s.durata - migliore;
-    final via = s.stradaDistintiva([for (final (j, a) in scelte.indexed) if (j != i) a]);
+    final piu = Duration(minutes: ((s.durata.inSeconds - migliore.inSeconds) / 60).round());
+    final via = s.stradaDistintiva([
+      for (final (j, a) in scelte.indexed)
+        if (j != i) a,
+    ]);
     return Material(
       color: attiva ? tema.colorScheme.primaryContainer : tema.colorScheme.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
