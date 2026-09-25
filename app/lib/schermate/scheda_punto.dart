@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -64,6 +66,7 @@ Future<void> mostraPunto(
   Carburante carburante = Carburante.benzina,
   String vai = 'Vai',
 }) {
+  if (punto.tipo == 'colonnina' && punto.id != null) unawaited(vicini?.statoAdesso(punto.id!));
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -72,20 +75,32 @@ Future<void> mostraPunto(
     builder: (contesto) => SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-        child: _Scheda(
-          punto: punto,
-          vicini: vicini,
-          qui: qui,
-          carburante: carburante,
-          vai: vai,
-          onVai: (l) {
-            Navigator.of(contesto).pop();
-            onVai(l);
-          },
+        child: ListenableBuilder(
+          listenable: vicini ?? const _Fermo(),
+          builder: (_, _) => _Scheda(
+            punto: punto,
+            vicini: vicini,
+            qui: qui,
+            carburante: carburante,
+            vai: vai,
+            onVai: (l) {
+              Navigator.of(contesto).pop();
+              onVai(l);
+            },
+          ),
         ),
       ),
     ),
   );
+}
+
+/// Niente da ascoltare.
+class _Fermo implements Listenable {
+  const _Fermo();
+  @override
+  void addListener(VoidCallback listener) {}
+  @override
+  void removeListener(VoidCallback listener) {}
 }
 
 class _Scheda extends StatelessWidget {

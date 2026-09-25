@@ -58,7 +58,7 @@ void main() {
           }),
           200);
     });
-    final t = DisponibilitaTomTom('chiave', client: client);
+    final t = DisponibilitaTomTom('chiave', client: client, validita: Duration.zero);
     final c = await t.aggiorna(area);
     final d = c.disponibilitaPer({TipoConnettore.ccs2});
     expect((d.libere, d.occupate, d.guaste, d.totali), (1, 2, 1, 4));
@@ -70,6 +70,51 @@ void main() {
     chiesti.clear();
     await t.aggiorna(area);
     expect(chiesti, hasLength(1));
+  });
+
+  test('TomTom: fra le colonnine vicine si sceglie quella con le stesse prese; col 429 si riprova', () async {
+    var troppe = 1;
+    final t = DisponibilitaTomTom(
+      'chiave',
+      client: MockClient((r) async {
+        if (troppe-- > 0) return http.Response('', 429);
+        if (r.url.path.contains('nearbySearch')) {
+          Map<String, Object?> punto(String id, double lat, String presa) => {
+                'position': {'lat': lat, 'lon': 10.9},
+                'dataSources': {
+                  'chargingAvailability': {'id': id},
+                },
+                'chargingPark': {
+                  'connectors': [
+                    {'connectorType': presa, 'ratedPowerKW': 22},
+                  ],
+                },
+              };
+          return http.Response(
+            jsonEncode({
+              'results': [punto('lente', 44.6, 'Chademo'), punto('rapide', 44.6008, 'IEC62196Type2CCS')],
+            }),
+            200,
+          );
+        }
+        expect(r.url.queryParameters['chargingAvailability'], 'rapide');
+        return http.Response(
+          jsonEncode({
+            'connectors': [
+              {
+                'type': 'IEC62196Type2CCS',
+                'availability': {
+                  'current': {'available': 2, 'occupied': 0},
+                },
+              },
+            ],
+          }),
+          200,
+        );
+      }),
+    );
+    final c = await t.aggiorna(area);
+    expect(c.disponibilitaPer({TipoConnettore.ccs2}).libere, 2);
   });
 
   test('TomTom non la conosce: resta com\'era', () async {

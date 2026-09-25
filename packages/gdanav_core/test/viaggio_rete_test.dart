@@ -122,7 +122,8 @@ void main() {
           else
             stato.aggiorna(c).timeout(const Duration(seconds: 10)).catchError((Object _) => c),
       ]);
-      avviso('Colonnine Utrecht', '${tutte.length} in tutto, ${rapide.length} rapide, stato TomTom: ${stato != null}');
+      final note = elenco.where((c) => c.connettori.any((x) => x.stato != StatoPresa.sconosciuto)).length;
+      avviso('Colonnine Utrecht', '${tutte.length} in tutto, ${rapide.length} rapide, con stato TomTom: $note');
       if (Platform.environment['GDANAV_COLONNINE'] case final file?) {
         File(file).writeAsStringSync(
           jsonEncode([
@@ -142,6 +143,34 @@ void main() {
       }
     } catch (e) {
       avviso('Colonnine Utrecht', 'errore: $e');
+    }
+  },
+      timeout: const Timeout(Duration(minutes: 4)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  // In Italia: quante colonnine rapide intorno a Napoli hanno lo stato di
+  // adesso da TomTom.
+  test('stato delle colonnine intorno a Napoli', () async {
+    const qui = Punto(40.8518, 14.2681);
+    final chiave = Platform.environment['GDANAV_TOMTOM'] ?? '';
+    if (chiave.isEmpty) return;
+    try {
+      final tutte = await ClienteColonnineRelay(Uri.parse('https://gdanav.gdahome.org/')).lungo([qui], distanzaKm: 10);
+      final rapide = [
+        for (final c in tutte)
+          if (c.connettori.any((x) => x.potenzaKw >= 40)) c,
+      ]..sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
+      final stato = DisponibilitaTomTom(chiave);
+      final elenco = await Future.wait([
+        for (final c in rapide.take(15)) stato.aggiorna(c).timeout(const Duration(seconds: 60)).catchError((Object _) => c),
+      ]);
+      avviso('Colonnine Napoli', [
+        '${tutte.length} in tutto, ${rapide.length} rapide',
+        for (final c in elenco)
+          '${c.nome} (${c.operatore}): ${c.connettori.map((x) => '${x.tipo.name}=${x.stato.name}').join(' ')}',
+      ].join(' | '));
+    } catch (e) {
+      avviso('Colonnine Napoli', 'errore: $e');
     }
   },
       timeout: const Timeout(Duration(minutes: 4)),

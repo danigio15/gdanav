@@ -21,7 +21,6 @@ import '../stato/gestore_guida.dart';
 import '../stato/gestore_luoghi.dart';
 import '../stato/gestore_meteo.dart';
 import '../stato/gestore_posizione.dart';
-import '../stato/gestore_premium.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/gestore_vicini.dart';
@@ -195,6 +194,10 @@ class PonteAuto {
           },
         });
         if (p == null) return null;
+        // Libere e occupate di adesso, se arrivano in fretta.
+        if (p.tipo == 'colonnina' && p.id != null) {
+          await vicini?.statoAdesso(p.id!).timeout(const Duration(seconds: 5), onTimeout: () => null);
+        }
         final qui = guida.avanzamento?.posizioneSulPercorso ?? posizione.qui;
         final (:sopra, :righe) = righePunto(
           p,
@@ -226,7 +229,7 @@ class PonteAuto {
               'descrizione': [
                 '${(distanzaM(qui, c.posizione) / 1000).toStringAsFixed(1)} km',
                 '${c.potenzaNominalePer(v.connettori).round()} kW',
-                if (GestorePremium.attivo.value) testoDisponibilita(c.disponibilitaPer(v.connettori)),
+                testoDisponibilita(c.disponibilitaPer(v.connettori)),
                 if (c.operatore case final o? when o.isNotEmpty) o,
               ].join(' · '),
               'lat': c.posizione.lat,

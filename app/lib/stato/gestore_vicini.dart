@@ -18,7 +18,9 @@ class GestoreVicini extends ChangeNotifier {
     required this.posizione,
     Future<List<Distributore>> Function(Punto qui)? distributori,
     Future<List<Colonnina>> Function(Punto qui, ProfiloVeicolo v)? colonnine,
-  }) : _cercaDistributori = distributori ?? distributoriVicini,
+    Future<Colonnina> Function(Colonnina c)? statoAdesso,
+  }) : _statoAdesso = statoAdesso ?? statoColonninaAdesso,
+       _cercaDistributori = distributori ?? distributoriVicini,
        _cercaColonnine = colonnine ?? ((q, v) => colonnineVicine(q, v, km: 12, quante: 25)) {
     auto.addListener(_forse);
     posizione.addListener(_forse);
@@ -29,6 +31,7 @@ class GestoreVicini extends ChangeNotifier {
   final GestorePosizione posizione;
   final Future<List<Distributore>> Function(Punto qui) _cercaDistributori;
   final Future<List<Colonnina>> Function(Punto qui, ProfiloVeicolo v) _cercaColonnine;
+  final Future<Colonnina> Function(Colonnina c) _statoAdesso;
 
   List<Distributore> distributori = const [];
   List<Colonnina> colonnine = const [];
@@ -71,6 +74,22 @@ class GestoreVicini extends ChangeNotifier {
 
   Distributore? distributore(String id) => distributori.where((d) => d.id == id).firstOrNull;
   Colonnina? colonnina(String id) => colonnine.where((c) => c.id == id).firstOrNull;
+
+  /// Libere e occupate adesso per la colonnina toccata: quello della ricerca
+  /// può avere qualche minuto.
+  Future<Colonnina?> statoAdesso(String id) async {
+    final c = colonnina(id);
+    if (c == null) return null;
+    try {
+      final nuova = await _statoAdesso(c);
+      colonnine = [for (final x in colonnine) x.id == id ? nuova : x];
+      notifyListeners();
+      return nuova;
+    } catch (e) {
+      debugPrint('stato colonnina: $e');
+      return c;
+    }
+  }
 
   /// Le due sorgenti della mappa, in GeoJSON.
   Map<String, Map<String, Object?>> dati() => {

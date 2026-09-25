@@ -335,7 +335,13 @@ class GestoreViaggio extends ChangeNotifier {
 
 /// Le colonnine rapide intorno a [qui] adatte all'auto, dalla più vicina; con
 /// Premium anche libere e occupate adesso. Per «Colonnine vicine» sull'auto.
-Future<List<Colonnina>> colonnineVicine(Punto qui, ProfiloVeicolo veicolo, {double km = 15, int quante = 8}) async {
+Future<List<Colonnina>> colonnineVicine(
+  Punto qui,
+  ProfiloVeicolo veicolo, {
+  double km = 15,
+  int quante = 8,
+  int conStato = 10,
+}) async {
   final fonte = ColonnineLocali(archivioColonnine(), riserva: ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni)));
   final adatte = [
     for (final c in await fonte.lungo([qui], distanzaKm: km))
@@ -344,7 +350,17 @@ Future<List<Colonnina>> colonnineVicine(Punto qui, ProfiloVeicolo veicolo, {doub
   final prime = adatte.take(quante).toList();
   final d = GestorePremium.attivo.value ? _disponibilita : null;
   if (d == null) return prime;
+  // Lo stato solo per le più vicine (TomTom le serve una alla volta e ne
+  // regala poche al giorno); le altre quando si toccano.
   return Future.wait([
-    for (final c in prime) d.aggiorna(c).timeout(const Duration(seconds: 8)).catchError((Object _) => c),
+    for (final (i, c) in prime.indexed)
+      i < conStato ? d.aggiorna(c).timeout(const Duration(seconds: 30)).catchError((Object _) => c) : Future.value(c),
   ]);
+}
+
+/// Lo stato di adesso di una colonnina (con Premium); senza, com'era.
+Future<Colonnina> statoColonninaAdesso(Colonnina c) async {
+  final d = GestorePremium.attivo.value ? _disponibilita : null;
+  if (d == null) return c;
+  return d.aggiorna(c).timeout(const Duration(seconds: 10));
 }
