@@ -4,15 +4,20 @@ import androidx.car.app.CarContext
 import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
+import androidx.car.app.model.CarColor
+import androidx.car.app.model.CarIcon
 import androidx.car.app.model.ItemList
+import androidx.car.app.model.SectionedItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Pane
 import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.car.app.model.Toggle
+import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import it.gdanav.gdanav.R
 
 /** Uno schermo dell'auto che si rifà quando il telefono manda novità. */
 abstract class SchermoAggiornato(carContext: CarContext) : Screen(carContext), DefaultLifecycleObserver {
@@ -46,16 +51,50 @@ abstract class SchermoAggiornato(carContext: CarContext) : Screen(carContext), D
             .build()
     }
 
-    protected fun riga(titolo: String, testo: String? = null, sfoglia: Boolean = false, azione: () -> Unit): Row {
+    /** Un menu diviso in sezioni, ognuna col suo titolo. */
+    protected fun sezioni(titolo: String, gruppi: List<Pair<String, List<Row>>>): Template {
+        val t = ListTemplate.Builder().setTitle(titolo).setHeaderAction(Action.BACK)
+        for ((nome, righe) in gruppi) {
+            if (righe.isEmpty()) continue
+            val lista = ItemList.Builder()
+            righe.forEach { lista.addItem(it) }
+            t.addSectionedList(SectionedItemList.create(lista.build(), nome))
+        }
+        return t.build()
+    }
+
+    /** Un'icona dei menu, colorata. */
+    protected fun icona(id: Int, colore: CarColor = CarColor.DEFAULT): CarIcon =
+        CarIcon.Builder(IconCompat.createWithResource(carContext, id)).setTint(colore).build()
+
+    /** Un'icona disegnata dal telefono (segnalazioni, colonnine), coi suoi colori. */
+    protected fun immagine(nome: String): CarIcon? =
+        PonteAuto.immagini[nome]?.let { CarIcon.Builder(IconCompat.createWithBitmap(it)).build() }
+
+    protected fun riga(
+        titolo: String,
+        testo: String? = null,
+        sfoglia: Boolean = false,
+        icona: CarIcon? = null,
+        azione: () -> Unit,
+    ): Row {
         val r = Row.Builder().setTitle(titolo).setOnClickListener { azione() }
         if (!testo.isNullOrEmpty()) r.addText(testo)
         if (sfoglia) r.setBrowsable(true)
+        icona?.let { r.setImage(it, Row.IMAGE_TYPE_ICON) }
         return r.build()
     }
 
-    protected fun interruttore(titolo: String, acceso: Boolean, testo: String? = null, cambia: (Boolean) -> Unit): Row {
+    protected fun interruttore(
+        titolo: String,
+        acceso: Boolean,
+        testo: String? = null,
+        icona: CarIcon? = null,
+        cambia: (Boolean) -> Unit,
+    ): Row {
         val r = Row.Builder().setTitle(titolo).setToggle(Toggle.Builder { cambia(it) }.setChecked(acceso).build())
         if (!testo.isNullOrEmpty()) r.addText(testo)
+        icona?.let { r.setImage(it, Row.IMAGE_TYPE_ICON) }
         return r.build()
     }
 
@@ -71,38 +110,61 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
     override fun onGetTemplate(): Template {
         val casa = PonteAuto.casa()
         val lavoro = PonteAuto.lavoro()
-        return elenco(
+        val blu = CarColor.BLUE
+        return sezioni(
             "Menu",
-            listOfNotNull(
-                if (casa != null) {
-                    riga("Casa", casa.nome) { vai(casa) }
-                } else {
-                    riga("Casa", "Tocca per impostarla", sfoglia = true) { screenManager.push(SchermoCerca(carContext, "casa")) }
-                },
-                if (lavoro != null) {
-                    riga("Lavoro", lavoro.nome) { vai(lavoro) }
-                } else {
-                    riga("Lavoro", "Tocca per impostarlo", sfoglia = true) {
-                        screenManager.push(SchermoCerca(carContext, "lavoro"))
-                    }
-                },
-                riga("Preferiti e recenti", sfoglia = true) { screenManager.push(SchermoDestinazioni(carContext)) },
-                // Elettrica: le colonnine; termica: i distributori.
-                if (PonteAuto.cruscotto.elettrica) {
-                    riga("Colonnine vicine", "Le rapide intorno a te", sfoglia = true) {
-                        screenManager.push(SchermoColonnine(carContext))
-                    }
-                } else {
-                    riga("Distributori vicini", "Benzina, diesel, GPL, metano", sfoglia = true) {
-                        screenManager.push(SchermoDistributori(carContext))
-                    }
-                },
-                riga("Segnala", "Polizia, incidente, traffico, pericolo…", sfoglia = true) {
-                    screenManager.push(SchermoSegnala(carContext))
-                },
-                riga("Impostazioni", "Batteria all'arrivo, vista 3D, voce, percorso, Casa e Lavoro", sfoglia = true) {
-                    screenManager.push(SchermoImpostazioni(carContext, renderer))
-                },
+            listOf(
+                "Vai a" to listOf(
+                    if (casa != null) {
+                        riga("Casa", casa.nome, icona = icona(R.drawable.icona_casa, blu)) { vai(casa) }
+                    } else {
+                        riga("Casa", "Tocca per impostarla", sfoglia = true, icona = icona(R.drawable.icona_casa, blu)) {
+                            screenManager.push(SchermoCerca(carContext, "casa"))
+                        }
+                    },
+                    if (lavoro != null) {
+                        riga("Lavoro", lavoro.nome, icona = icona(R.drawable.icona_lavoro, blu)) { vai(lavoro) }
+                    } else {
+                        riga("Lavoro", "Tocca per impostarlo", sfoglia = true, icona = icona(R.drawable.icona_lavoro, blu)) {
+                            screenManager.push(SchermoCerca(carContext, "lavoro"))
+                        }
+                    },
+                    riga("Preferiti e recenti", sfoglia = true, icona = icona(R.drawable.icona_stella, CarColor.YELLOW)) {
+                        screenManager.push(SchermoDestinazioni(carContext))
+                    },
+                ),
+                "Intorno a te" to listOf(
+                    // Elettrica: le colonnine; termica: i distributori.
+                    if (PonteAuto.cruscotto.elettrica) {
+                        riga(
+                            "Colonnine vicine",
+                            "Le rapide intorno a te",
+                            sfoglia = true,
+                            icona = icona(R.drawable.icona_colonnina, CarColor.GREEN),
+                        ) { screenManager.push(SchermoColonnine(carContext)) }
+                    } else {
+                        riga(
+                            "Distributori vicini",
+                            "Coi prezzi di oggi",
+                            sfoglia = true,
+                            icona = icona(R.drawable.icona_distributore, CarColor.GREEN),
+                        ) { screenManager.push(SchermoDistributori(carContext)) }
+                    },
+                    riga(
+                        "Segnala",
+                        "Polizia, incidente, traffico, pericolo…",
+                        sfoglia = true,
+                        icona = icona(R.drawable.icona_segnala, CarColor.YELLOW),
+                    ) { screenManager.push(SchermoSegnala(carContext)) },
+                ),
+                "Impostazioni" to listOf(
+                    riga(
+                        "Impostazioni",
+                        "Batteria all'arrivo, vista 3D, voce, percorso",
+                        sfoglia = true,
+                        icona = icona(R.drawable.icona_impostazioni),
+                    ) { screenManager.push(SchermoImpostazioni(carContext, renderer)) },
+                ),
             ),
         )
     }
@@ -129,22 +191,43 @@ class SchermoImpostazioni(carContext: CarContext, private val renderer: Renderer
                         "Batteria all'arrivo: ${arrivo?.let { "$it%" } ?: "—"}",
                         "Con quanta carica arrivare: le soste si ricalcolano",
                         sfoglia = true,
+                        icona = icona(R.drawable.icona_batteria, CarColor.GREEN),
                     ) { screenManager.push(SchermoArrivo(carContext)) }
                 } else {
                     null
                 },
-                interruttore("Vista 3D", renderer.tridimensionale, "Spenta: mappa dall'alto, nord in su") {
+                interruttore(
+                    "Vista 3D",
+                    renderer.tridimensionale,
+                    "Spenta: mappa dall'alto, nord in su",
+                    icona = icona(R.drawable.icona_mappa, CarColor.BLUE),
+                ) {
                     if (it != renderer.tridimensionale) renderer.alternaVista()
                     invalidate()
                 },
-                interruttore("Voce", o["muto"] != true, "Le indicazioni e gli avvisi a voce") { PonteAuto.alternaVoce() },
-                riga("Percorso", "${o["modo_nome"] ?: "Veloce"} · pedaggi, autostrade, traghetti", sfoglia = true) {
+                interruttore(
+                    "Voce",
+                    o["muto"] != true,
+                    "Le indicazioni e gli avvisi a voce",
+                    icona = icona(R.drawable.icona_voce, CarColor.BLUE),
+                ) { PonteAuto.alternaVoce() },
+                riga(
+                    "Percorso",
+                    "${o["modo_nome"] ?: "Veloce"} · pedaggi, autostrade, traghetti",
+                    sfoglia = true,
+                    icona = icona(R.drawable.icona_percorso, CarColor.BLUE),
+                ) {
                     screenManager.push(SchermoOpzioni(carContext))
                 },
-                riga("Imposta Casa", casa?.nome ?: "Non ancora impostata", sfoglia = true) {
+                riga("Imposta Casa", casa?.nome ?: "Non ancora impostata", sfoglia = true, icona = icona(R.drawable.icona_casa)) {
                     screenManager.push(SchermoCerca(carContext, "casa"))
                 },
-                riga("Imposta Lavoro", lavoro?.nome ?: "Non ancora impostato", sfoglia = true) {
+                riga(
+                    "Imposta Lavoro",
+                    lavoro?.nome ?: "Non ancora impostato",
+                    sfoglia = true,
+                    icona = icona(R.drawable.icona_lavoro),
+                ) {
                     screenManager.push(SchermoCerca(carContext, "lavoro"))
                 },
             ),
@@ -213,7 +296,7 @@ class SchermoColonnine(carContext: CarContext) : SchermoAggiornato(carContext) {
         return elenco(
             "Colonnine vicine",
             trovate.take(righeMassime()).map { c ->
-                riga(c.nome, c.descrizione) {
+                riga(c.nome, c.descrizione, icona = icona(R.drawable.icona_colonnina, CarColor.GREEN)) {
                     PonteAuto.vai(c)
                     screenManager.popToRoot()
                 }
@@ -254,7 +337,7 @@ class SchermoDistributori(carContext: CarContext) : SchermoAggiornato(carContext
         return elenco(
             "Distributori vicini",
             trovati.take(limite).map { d ->
-                riga(d.nome, d.descrizione) {
+                riga(d.nome, d.descrizione, icona = icona(R.drawable.icona_distributore, CarColor.GREEN)) {
                     PonteAuto.passa(d)
                     screenManager.popToRoot()
                 }
@@ -278,7 +361,7 @@ class SchermoSegnala(carContext: CarContext) : SchermoAggiornato(carContext) {
     override fun onGetTemplate(): Template = elenco(
         "Segnala",
         tipi.map { (tipo, nome) ->
-            riga(nome) {
+            riga(nome, icona = immagine("segnala-$tipo") ?: icona(R.drawable.icona_segnala, CarColor.YELLOW)) {
                 PonteAuto.segnala(tipo) { frase -> avvisa(frase) }
                 screenManager.pop()
             }

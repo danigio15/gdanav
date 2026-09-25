@@ -168,7 +168,7 @@ void main() {
     final rifatto = await v.seguendo(scelto);
     // Stessa strada: stessa lunghezza, a meno di qualche metro.
     expect(rifatto.lunghezzaM, closeTo(scelto.lunghezzaM, scelto.lunghezzaM * 0.02));
-    expect(rifatto.limiti.whereType<int>(), isNotEmpty);
+    expect(rifatto.limiti.whereType<int>(), isNotEmpty, reason: v.ultimoErroreLimiti);
     // Senza tappe di mezzo nel viaggio: nessun «sei arrivato» a metà.
     expect(rifatto.manovre.where((m) => const {4, 5, 6}.contains(m.tipo)), hasLength(1));
   }, skip: vero == null ? 'serve GDANAV_VALHALLA' : false);

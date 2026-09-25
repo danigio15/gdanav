@@ -226,6 +226,42 @@ class GestoreViaggio extends ChangeNotifier {
     return pianifica(destinazione, conScelte: true);
   }
 
+  /// Il traffico di adesso sul percorso (Premium, con la chiave TomTom);
+  /// nelle prove se ne passa uno finto.
+  Future<PercorsoCalcolato> Function(PercorsoCalcolato percorso)? trafficoFinto;
+
+  Future<PercorsoCalcolato> Function(PercorsoCalcolato percorso)? get _trafficoAdesso =>
+      trafficoFinto ?? (GestorePremium.attivo.value ? _traffico?.applica : null);
+
+  /// Rilegge il traffico sul viaggio pronto (in guida, ogni tanto): stessa
+  /// strada, tempi e code nuovi. `null` se non si può o non è cambiato
+  /// niente.
+  Future<ViaggioPronto?> aggiornaTraffico() async {
+    final s = stato;
+    final t = _trafficoAdesso;
+    if (s is! ViaggioPronto || t == null) return null;
+    final PercorsoCalcolato p;
+    try {
+      p = await t(s.viaggio.percorso).timeout(const Duration(seconds: 25));
+    } catch (_) {
+      return null;
+    }
+    // Nel frattempo si è ricalcolato o annullato: il traffico vecchio non serve.
+    if (!identical(stato, s)) return null;
+    final nuovo = ViaggioPronto(
+      s.destinazione,
+      Viaggio(percorso: p, colonnine: s.viaggio.colonnine, piano: s.viaggio.piano),
+      s.batteriaPartenza,
+      calcolatoAlle: s.calcolatoAlle,
+      termica: s.termica,
+      scelte: s.scelte,
+      scelta: s.scelta,
+      tappe: s.tappe,
+    );
+    _imposta(nuovo);
+    return nuovo;
+  }
+
   /// Partiti, le strade proposte non servono più: i ricalcoli partono da
   /// dove si è.
   void dimenticaScelte() {

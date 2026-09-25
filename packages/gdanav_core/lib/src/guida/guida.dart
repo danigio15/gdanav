@@ -82,6 +82,16 @@ class Guida {
 
   double get lunghezzaM => _linea.lunghezzaM;
 
+  /// La stessa strada con tempi nuovi (il traffico aggiornato): si resta a
+  /// che punto si era, e le manovre già dette non si ripetono.
+  Guida conTempi(PercorsoCalcolato nuovo) {
+    final g = Guida(nuovo, sogliaFuoriM: sogliaFuoriM, lettureFuori: lettureFuori);
+    if (nuovo.punti.length != percorso.punti.length) return g;
+    g._segmento = _segmento;
+    g._annunciate.addAll(_annunciate);
+    return g;
+  }
+
   Avanzamento aggiorna(Punto qui) {
     // Si cerca poco indietro e un bel po' avanti: su una strada che torna su
     // se stessa si resta dalla parte giusta.
@@ -171,7 +181,34 @@ class Guida {
 
   /// Il tempo cumulato a ogni punto, con la velocità della manovra a cui il
   /// segmento appartiene.
+  /// I secondi dall'inizio a ogni punto: dai tempi dei tratti (che hanno
+  /// dentro il traffico), o, senza tratti, da quelli delle manovre.
   List<double> _secondiCumulati() {
+    final tratti = percorso.tratti;
+    final n = _linea.punti.length;
+    if (tratti.isNotEmpty && n > 1 && _linea.lunghezzaM > 0) {
+      final totale = tratti.fold(0.0, (s, t) => s + t.lunghezzaM);
+      final k = totale / _linea.lunghezzaM;
+      final s = <double>[0];
+      var j = 0;
+      var inizioM = 0.0, inizioS = 0.0;
+      for (var i = 1; i < n; i++) {
+        final m = _linea.cumulate[i] * k;
+        while (j < tratti.length - 1 && inizioM + tratti[j].lunghezzaM < m) {
+          inizioM += tratti[j].lunghezzaM;
+          inizioS += tratti[j].secondi;
+          j++;
+        }
+        final t = tratti[j];
+        final dentro = (m - inizioM).clamp(0.0, t.lunghezzaM);
+        s.add(math.max(s.last, inizioS + dentro / (t.velocitaKmh / 3.6)));
+      }
+      return s;
+    }
+    return _secondiDaManovre();
+  }
+
+  List<double> _secondiDaManovre() {
     final n = _linea.punti.length;
     final velocita = List<double>.filled(math.max(n - 1, 0), 13.9);
     final manovre = percorso.manovre;

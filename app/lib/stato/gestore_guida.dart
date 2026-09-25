@@ -32,6 +32,10 @@ class GestoreGuida extends ChangeNotifier {
 
   /// Ogni quanto, in viaggio, si chiedono dati freschi a Home Assistant.
   static const intervalloDatiAuto = Duration(minutes: 1);
+
+  /// Ogni quanto, in viaggio, si rilegge il traffico sul percorso.
+  static const intervalloTraffico = Duration(minutes: 5);
+  DateTime? _ultimoTraffico;
   DateTime _ultimaRichiestaDati = DateTime(0);
 
   /// Si chiede a ogni posizione, se è passato un minuto: niente timer.
@@ -245,6 +249,11 @@ class GestoreGuida extends ChangeNotifier {
       _evento('arrivo_vicino', {'minuti': a.restante.inMinutes});
     }
     if (a.fuoriPercorso && !ricalcolando) unawaited(_ricalcola());
+    final ultimo = _ultimoTraffico ??= _ora();
+    if (!ricalcolando && _ora().difference(ultimo) >= intervalloTraffico) {
+      _ultimoTraffico = _ora();
+      unawaited(aggiornaTraffico());
+    }
     if (_ultimoRacconto == null || _ora().difference(_ultimoRacconto!) > const Duration(minutes: 1)) _racconta();
     notifyListeners();
   }
@@ -317,6 +326,29 @@ class GestoreGuida extends ChangeNotifier {
     if (pronto case final p?) {
       _guida = Guida(p.viaggio.percorso);
       _nuovoPiano(p);
+    }
+    notifyListeners();
+  }
+
+  /// Il traffico di adesso sulla strada che si sta facendo: l'arrivo si
+  /// aggiorna, le code sulla mappa pure; se il ritardo cambia di parecchio
+  /// lo si dice.
+  Future<void> aggiornaTraffico() async {
+    final prima = pronto?.viaggio.percorso;
+    final nuovo = await viaggio.aggiornaTraffico();
+    final g = _guida;
+    if (nuovo == null || g == null || !attiva) return;
+    _guida = g.conTempi(nuovo.viaggio.percorso);
+    final ritardo = nuovo.viaggio.percorso.ritardoTraffico;
+    final differenza = ritardo - (prima?.ritardoTraffico ?? Duration.zero);
+    if (differenza.inMinutes.abs() >= 5 && !muto) {
+      unawaited(
+        voce.parla(
+          differenza.isNegative
+              ? 'Il traffico si è alleggerito: ${differenza.inMinutes.abs()} minuti in meno.'
+              : 'Traffico più avanti: ${differenza.inMinutes} minuti in più.',
+        ),
+      );
     }
     notifyListeners();
   }

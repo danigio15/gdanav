@@ -258,9 +258,12 @@ class PonteAuto {
     final g = luoghi;
     if (g == null) return;
     _manda('luoghi', {
+      // Casa e Lavoro, gli ultimi posti, poi gli altri salvati (importati da
+      // Google possono essere centinaia: l'auto ne mostra pochi).
       'elenco': [
-        for (final p in g.preferiti) {...luogoJson(p.luogo), 'tipo': p.tipo.name, 'etichetta': p.etichetta},
-        for (final l in g.recenti) {...luogoJson(l), 'tipo': 'recente', 'etichetta': l.nome},
+        for (final p in [?g.casa, ?g.lavoro]) {...luogoJson(p.luogo), 'tipo': p.tipo.name, 'etichetta': p.etichetta},
+        for (final l in g.recenti.take(5)) {...luogoJson(l), 'tipo': 'recente', 'etichetta': l.nome},
+        for (final p in g.altri.take(60)) {...luogoJson(p.luogo), 'tipo': p.tipo.name, 'etichetta': p.etichetta},
       ],
     });
   }

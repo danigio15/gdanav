@@ -27,6 +27,7 @@ import 'cerca_destinazione.dart';
 import 'dettaglio_colonnina.dart';
 import 'diagnosi_auto.dart';
 import 'fonte_dati_auto.dart';
+import 'importa_google.dart';
 import 'la_tua_auto.dart';
 import 'mappe_offline.dart';
 import 'opzioni_percorso.dart';
@@ -323,89 +324,123 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
 
         final ha = widget.auto.abbinamento;
         final sbloccato = widget.premium?.sbloccato ?? true;
+        final salvati = luoghi.altri.length;
         return SafeArea(
           top: false,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _VoceMenu(
-                  icona: widget.auto.elettrica ? Icons.electric_car : Icons.directions_car,
-                  titolo: 'La tua auto',
-                  sotto: widget.auto.elettrica ? widget.auto.veicolo.nome : 'Termica: navigatore senza soste',
+                _TestaMenu(
+                  auto: widget.auto,
                   onTap: () => vai(LaTuaAuto(auto: widget.auto, posizione: widget.posizione, consumo: widget.consumo)),
                 ),
-                _VoceMenu(
-                  icona: Icons.alt_route,
-                  titolo: 'Percorso',
-                  sotto: widget.viaggio.opzioni.riassunto,
-                  onTap: () => vai(
-                    OpzioniPercorsoSchermata(iniziali: widget.viaggio.opzioni, onCambia: widget.viaggio.cambiaOpzioni),
-                  ),
-                ),
-                // Ricarica e fonte della batteria servono solo all'elettrica.
-                if (widget.auto.elettrica)
-                  _VoceMenu(
-                    icona: Icons.ev_station,
-                    titolo: 'Ricarica',
-                    sotto: riassuntoPreferenze(_preferenze),
-                    onTap: () => vai(PreferenzeRicaricaSchermata(archivio: widget.archivio)),
-                  ),
-                if (widget.auto.elettrica)
-                  _VoceMenu(
-                    icona: Icons.battery_charging_full,
-                    titolo: 'Fonte dati auto',
-                    sotto: 'Da dove arriva la batteria',
-                    onTap: () {
-                      Navigator.of(contesto).pop();
-                      mostraFonteDatiAuto(context, widget.auto, consumo: widget.consumo);
-                    },
-                  ),
-                _VoceMenu(
-                  icona: Icons.home_outlined,
-                  titolo: 'Home Assistant',
-                  sotto: !sbloccato
-                      ? 'Premium'
-                      : ha == null
-                      ? 'Non collegata'
-                      : 'Collegata${ha.nomeAuto.isEmpty ? '' : ' a ${ha.nomeAuto}'}',
-                  onTap: () => vai(
-                    sbloccato
-                        ? AbbinaHomeAssistant(gestore: widget.auto)
-                        : SchermataPremium(premium: widget.premium!, perche: 'Home Assistant'),
-                  ),
-                ),
-                _VoceMenu(
-                  icona: Icons.offline_pin_outlined,
-                  titolo: 'Mappe offline',
-                  sotto: 'Scarica le regioni per quando non c\'è rete',
-                  onTap: () => vai(
-                    MappeOffline(
-                      gestore: widget.mappeOffline ?? GestoreMappeOffline(ArchivioMapLibre()),
-                      qui: widget.posizione.qui,
+                _GruppoMenu(
+                  titolo: 'Viaggio',
+                  voci: [
+                    _VoceMenu(
+                      icona: Icons.alt_route_rounded,
+                      colore: const Color(0xFF2563EB),
+                      titolo: 'Percorso',
+                      sotto: widget.viaggio.opzioni.riassunto,
+                      onTap: () => vai(
+                        OpzioniPercorsoSchermata(
+                          iniziali: widget.viaggio.opzioni,
+                          onCambia: widget.viaggio.cambiaOpzioni,
+                        ),
+                      ),
                     ),
-                  ),
+                    // Ricarica e fonte della batteria servono solo all'elettrica.
+                    if (widget.auto.elettrica)
+                      _VoceMenu(
+                        icona: Icons.ev_station_rounded,
+                        colore: const Color(0xFF16A34A),
+                        titolo: 'Ricarica',
+                        sotto: riassuntoPreferenze(_preferenze),
+                        onTap: () => vai(PreferenzeRicaricaSchermata(archivio: widget.archivio)),
+                      ),
+                    _VoceMenu(
+                      key: const Key('menu-importa-google'),
+                      icona: Icons.bookmarks_rounded,
+                      colore: const Color(0xFFEA4335),
+                      titolo: 'Importa da Google Maps',
+                      sotto: salvati == 0 ? 'I posti che hai salvato, qui come preferiti' : '$salvati posti salvati',
+                      onTap: () =>
+                          vai(ImportaGoogleMaps(luoghi: luoghi, fonte: viaggio.luoghi, vicinoA: widget.posizione.qui)),
+                    ),
+                  ],
                 ),
-                _VoceMenu(
-                  icona: Icons.directions_car_filled_outlined,
-                  titolo: 'Android Auto',
-                  sotto: sbloccato ? 'Controlla perché non compare sull\'auto' : 'Premium',
-                  onTap: () {
-                    if (!sbloccato) return vai(SchermataPremium(premium: widget.premium!, perche: 'Android Auto'));
-                    Navigator.of(contesto).pop();
-                    mostraDiagnosiAuto(context);
-                  },
+                _GruppoMenu(
+                  titolo: 'Auto e collegamenti',
+                  voci: [
+                    if (widget.auto.elettrica)
+                      _VoceMenu(
+                        icona: Icons.battery_charging_full_rounded,
+                        colore: const Color(0xFF0D9488),
+                        titolo: 'Fonte dati auto',
+                        sotto: 'Da dove arriva la batteria',
+                        onTap: () {
+                          Navigator.of(contesto).pop();
+                          mostraFonteDatiAuto(context, widget.auto, consumo: widget.consumo);
+                        },
+                      ),
+                    _VoceMenu(
+                      icona: Icons.home_rounded,
+                      colore: const Color(0xFF0EA5E9),
+                      titolo: 'Home Assistant',
+                      sotto: !sbloccato
+                          ? 'Premium'
+                          : ha == null
+                          ? 'Non collegata'
+                          : 'Collegata${ha.nomeAuto.isEmpty ? '' : ' a ${ha.nomeAuto}'}',
+                      onTap: () => vai(
+                        sbloccato
+                            ? AbbinaHomeAssistant(gestore: widget.auto)
+                            : SchermataPremium(premium: widget.premium!, perche: 'Home Assistant'),
+                      ),
+                    ),
+                    _VoceMenu(
+                      icona: Icons.directions_car_filled_rounded,
+                      colore: const Color(0xFF475569),
+                      titolo: 'Android Auto',
+                      sotto: sbloccato ? 'Controlla perché non compare sull\'auto' : 'Premium',
+                      onTap: () {
+                        if (!sbloccato) return vai(SchermataPremium(premium: widget.premium!, perche: 'Android Auto'));
+                        Navigator.of(contesto).pop();
+                        mostraDiagnosiAuto(context);
+                      },
+                    ),
+                  ],
                 ),
-                if (widget.premium case final p?)
-                  _VoceMenu(
-                    icona: Icons.workspace_premium,
-                    titolo: 'Premium',
-                    sotto: p.sbloccato
-                        ? 'Attivo: Android Auto e Home Assistant'
-                        : 'Sblocca Android Auto e Home Assistant',
-                    onTap: () => vai(SchermataPremium(premium: p)),
-                  ),
+                _GruppoMenu(
+                  titolo: 'Mappe e abbonamento',
+                  voci: [
+                    _VoceMenu(
+                      icona: Icons.download_for_offline_rounded,
+                      colore: const Color(0xFF7C3AED),
+                      titolo: 'Mappe offline',
+                      sotto: 'Scarica le regioni per quando non c\'è rete',
+                      onTap: () => vai(
+                        MappeOffline(
+                          gestore: widget.mappeOffline ?? GestoreMappeOffline(ArchivioMapLibre()),
+                          qui: widget.posizione.qui,
+                        ),
+                      ),
+                    ),
+                    if (widget.premium case final p?)
+                      _VoceMenu(
+                        icona: Icons.workspace_premium_rounded,
+                        colore: const Color(0xFFD97706),
+                        titolo: 'Premium',
+                        sotto: p.sbloccato
+                            ? 'Attivo: Android Auto e Home Assistant'
+                            : 'Sblocca Android Auto e Home Assistant',
+                        onTap: () => vai(SchermataPremium(premium: p)),
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -575,25 +610,146 @@ class _BottoneMappa extends StatelessWidget {
   );
 }
 
+/// In cima al menu: la tua auto, grande, da toccare per cambiarla.
+class _TestaMenu extends StatelessWidget {
+  const _TestaMenu({required this.auto, required this.onTap});
+
+  final GestoreAuto auto;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    final t = tema.textTheme;
+    final batteria = auto.elettrica ? auto.stato?.batteria : null;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        color: tema.colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(24),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(color: tema.colorScheme.primary, borderRadius: BorderRadius.circular(16)),
+                  child: Icon(
+                    auto.elettrica ? Icons.electric_car_rounded : Icons.directions_car_rounded,
+                    color: tema.colorScheme.onPrimary,
+                    size: 30,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('La tua auto', style: t.labelLarge?.copyWith(color: tema.colorScheme.onPrimaryContainer)),
+                      Text(
+                        auto.elettrica ? auto.veicolo.nome : 'Auto termica',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: t.titleLarge?.copyWith(
+                          color: tema.colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (batteria != null)
+                        Text(
+                          '${batteria.round()}% di batteria',
+                          style: t.bodyMedium?.copyWith(color: tema.colorScheme.onPrimaryContainer),
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: tema.colorScheme.onPrimaryContainer),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Un gruppo del menu: il titolo piccolo e le voci in una scheda sola.
+class _GruppoMenu extends StatelessWidget {
+  const _GruppoMenu({required this.titolo, required this.voci});
+
+  final String titolo;
+  final List<Widget> voci;
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
+          child: Text(
+            titolo.toUpperCase(),
+            style: tema.textTheme.labelMedium?.copyWith(
+              color: tema.colorScheme.onSurfaceVariant,
+              letterSpacing: 1.1,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Material(
+          color: tema.colorScheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(20),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              for (final (i, v) in voci.indexed) ...[
+                if (i > 0)
+                  Divider(height: 1, indent: 64, color: tema.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                v,
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _VoceMenu extends StatelessWidget {
-  const _VoceMenu({required this.icona, required this.titolo, required this.sotto, required this.onTap});
+  const _VoceMenu({
+    super.key,
+    required this.icona,
+    required this.colore,
+    required this.titolo,
+    required this.sotto,
+    required this.onTap,
+  });
 
   final IconData icona;
+  final Color colore;
   final String titolo;
   final String sotto;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final s = Theme.of(context).colorScheme;
+    final tema = Theme.of(context);
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: s.primaryContainer,
-        child: Icon(icona, color: s.onPrimaryContainer),
+      contentPadding: const EdgeInsets.fromLTRB(12, 4, 8, 4),
+      leading: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(color: colore, borderRadius: BorderRadius.circular(11)),
+        child: Icon(icona, color: Colors.white, size: 22),
       ),
-      title: Text(titolo, style: Theme.of(context).textTheme.titleMedium),
+      title: Text(titolo, style: tema.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
       subtitle: Text(sotto, maxLines: 1, overflow: TextOverflow.ellipsis),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: Icon(Icons.chevron_right_rounded, color: tema.colorScheme.onSurfaceVariant),
       onTap: onTap,
     );
   }

@@ -149,6 +149,7 @@ class PercorsoCalcolato {
     this.code = const [],
     this.ritardoTraffico = Duration.zero,
     this.trafficoVero = false,
+    this.senzaTraffico,
   });
 
   final List<Punto> punti;
@@ -174,6 +175,13 @@ class PercorsoCalcolato {
   /// delle strade).
   final bool trafficoVero;
 
+  /// Lo stesso percorso prima del traffico: per rimetterci sopra il traffico
+  /// aggiornato (le code sparite non devono restare).
+  final PercorsoCalcolato? senzaTraffico;
+
+  /// Il percorso da cui partire per applicare il traffico.
+  PercorsoCalcolato get base => senzaTraffico ?? this;
+
   /// Il limite sul segmento [i], se si conosce.
   int? limiteSul(int i) => i >= 0 && i < limiti.length ? limiti[i] : null;
 
@@ -184,6 +192,7 @@ class PercorsoCalcolato {
     List<Coda>? code,
     Duration? ritardoTraffico,
     bool? trafficoVero,
+    PercorsoCalcolato? senzaTraffico,
   }) =>
       PercorsoCalcolato(
         punti: punti,
@@ -196,6 +205,7 @@ class PercorsoCalcolato {
         code: code ?? this.code,
         ritardoTraffico: ritardoTraffico ?? this.ritardoTraffico,
         trafficoVero: trafficoVero ?? this.trafficoVero,
+        senzaTraffico: senzaTraffico ?? this.senzaTraffico,
       );
 
   PercorsoCalcolato conLimiti(List<int?> limiti) => _copia(limiti: limiti);
@@ -212,6 +222,8 @@ class PercorsoCalcolato {
   /// sa), così arrivo e consumi ne tengono conto. [code] con le distanze
   /// sui [punti] di questo percorso.
   PercorsoCalcolato conTraffico(List<Coda> code) {
+    // Sempre dal percorso senza traffico: le code di prima non si sommano.
+    if (senzaTraffico case final b?) return b.conTraffico(code);
     final nuovi = List<Tratto>.of(tratti);
     // Dove comincia ogni tratto, in metri.
     final inizio = <double>[];
@@ -243,7 +255,7 @@ class PercorsoCalcolato {
       }
       ritardo += c.ritardo;
     }
-    return _copia(tratti: nuovi, code: code, ritardoTraffico: ritardo, trafficoVero: true);
+    return _copia(tratti: nuovi, code: code, ritardoTraffico: ritardo, trafficoVero: true, senzaTraffico: this);
   }
 
   /// La strada fatta più a lungo («A1», «E45»): per chiamare il percorso.
@@ -620,29 +632,44 @@ class ClienteValhalla {
         limiti.addAll(await _limitiTratto(forma, n));
       }
       if (limiti.length == percorso.punti.length - 1) return percorso.conLimiti(limiti);
-    } catch (_) {}
+      ultimoErroreLimiti = 'limiti: ${limiti.length} invece di ${percorso.punti.length - 1}';
+    } catch (e) {
+      ultimoErroreLimiti ??= '$e';
+    }
     return percorso;
   }
 
   /// Chiede a `/trace_attributes` i limiti lungo il tracciato di una tappa:
   /// `edge_walk` segue esattamente le strade del percorso.
   Future<List<int?>> _limitiTratto(String forma, int punti) async {
-    final r = await _http.post(
-      indirizzo.resolve('trace_attributes'),
-      headers: _intestazioni,
-      body: jsonEncode({
-        'encoded_polyline': forma,
-        'shape_match': 'edge_walk',
-        'costing': 'auto',
-        'filters': {
-          'attributes': ['edge.speed_limit', 'edge.begin_shape_index', 'edge.end_shape_index'],
-          'action': 'include',
-        },
-      }),
-    );
-    if (r.statusCode != 200) throw ErroreValhalla('limiti: ${r.statusCode}', stato: r.statusCode);
-    return limitiDaTraccia(jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>, punti);
+    // `edge_walk` segue esattamente le strade; se non ci riesce (punti
+    // doppi dove si passa per un punto di mezzo), `map_snap` le ritrova.
+    Object? errore;
+    for (final modo in const ['edge_walk', 'map_snap']) {
+      final r = await _http.post(
+        indirizzo.resolve('trace_attributes'),
+        headers: _intestazioni,
+        body: jsonEncode({
+          'encoded_polyline': forma,
+          'shape_match': modo,
+          'costing': 'auto',
+          'filters': {
+            'attributes': ['edge.speed_limit', 'edge.begin_shape_index', 'edge.end_shape_index'],
+            'action': 'include',
+          },
+        }),
+      );
+      if (r.statusCode == 200) {
+        return limitiDaTraccia(jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>, punti);
+      }
+      errore = 'limiti ($modo): ${r.statusCode} ${utf8.decode(r.bodyBytes)}';
+    }
+    ultimoErroreLimiti = '$errore';
+    throw ErroreValhalla('$errore');
   }
+
+  /// Perché gli ultimi limiti non sono arrivati (per le prove).
+  String? ultimoErroreLimiti;
 
   /// Da `edges` di `/trace_attributes` a un limite per segmento.
   static List<int?> limitiDaTraccia(Map<String, Object?> json, int punti) {

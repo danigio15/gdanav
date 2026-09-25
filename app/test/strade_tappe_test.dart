@@ -14,19 +14,20 @@ void main() {
 
   // Due strade: la corta ha una coda di 20 minuti, e diventa la più lenta.
   final chiesti = <List<Punto>>[];
-  CostruisciPianificatore conAlternative() => (_, profilo, preferenze, _) => PianificatoreViaggio(
-    percorsi: (t) async {
-      chiesti.add(t);
-      return dritta(300);
-    },
-    alternative: (da, a) async => [dritta(250), dritta(300)],
-    traffico: (p) async => p.lunghezzaM < 260000
-        ? p.conTraffico([Coda(daM: 1000, aM: 30000, ritardo: const Duration(minutes: 40), livello: 3)])
-        : p.conTraffico(const []),
-    colonnine: ColonnineFinte(),
-    profilo: profilo,
-    preferenze: preferenze,
-  );
+  CostruisciPianificatore conAlternative() =>
+      (_, profilo, preferenze, _) => PianificatoreViaggio(
+        percorsi: (t) async {
+          chiesti.add(t);
+          return dritta(300);
+        },
+        alternative: (da, a) async => [dritta(250), dritta(300)],
+        traffico: (p) async => p.lunghezzaM < 260000
+            ? p.conTraffico([Coda(daM: 1000, aM: 30000, ritardo: const Duration(minutes: 40), livello: 3)])
+            : p.conTraffico(const []),
+        colonnine: ColonnineFinte(),
+        profilo: profilo,
+        preferenze: preferenze,
+      );
 
   testWidgets('le strade: col traffico la più veloce prima, e se ne sceglie un\'altra', (tester) async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
@@ -88,5 +89,36 @@ void main() {
     // In guida, raggiunta la tappa, si va verso la meta.
     a.viaggio.tappeFatte(const Punto(44.4901, 11.3401));
     expect(a.viaggio.tappe, isEmpty);
+  });
+
+  testWidgets('in guida il traffico si rilegge: arrivo e code nuove, e se cambia tanto lo si dice', (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final a = await ambiente(tester, km: 100);
+    await tester.pumpWidget(a.app());
+    a.auto.manuale.imposta(80);
+    await tester.pump();
+    await tester.runAsync(() => a.viaggio.vaiA(bologna));
+    await tester.pumpAndSettle();
+    a.guida.avvia();
+    a.posizioni.add(const Punto(42.1, 12));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    final prima = a.guida.arrivoAlle!;
+
+    a.viaggio.trafficoFinto = (p) async =>
+        p.conTraffico([Coda(daM: 60000, aM: 80000, ritardo: const Duration(minutes: 25), livello: 3)]);
+    await tester.runAsync(a.guida.aggiornaTraffico);
+    a.posizioni.add(const Punto(42.101, 12));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    final pronto = a.viaggio.stato as ViaggioPronto;
+    expect(pronto.viaggio.percorso.code, hasLength(1));
+    expect(a.guida.arrivoAlle!.difference(prima).inMinutes, greaterThanOrEqualTo(14));
+    expect(a.voce.frasi.last, contains('25 minuti in più'));
+
+    // La coda sparisce: il ritardo torna a zero, non si somma.
+    a.viaggio.trafficoFinto = (p) async => p.conTraffico(const []);
+    await tester.runAsync(a.guida.aggiornaTraffico);
+    expect((a.viaggio.stato as ViaggioPronto).viaggio.percorso.ritardoTraffico, Duration.zero);
+    expect(a.voce.frasi.last, contains('alleggerito'));
+    await tester.runAsync(a.guida.ferma);
   });
 }

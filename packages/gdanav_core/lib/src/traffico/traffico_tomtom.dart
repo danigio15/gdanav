@@ -22,7 +22,8 @@ class TrafficoTomTom {
 
   /// Il percorso coi tempi del traffico di adesso e le sue code; se TomTom
   /// non risponde, eccezione (chi chiama tiene il percorso com'era).
-  Future<PercorsoCalcolato> applica(PercorsoCalcolato p) async {
+  Future<PercorsoCalcolato> applica(PercorsoCalcolato percorso) async {
+    final p = percorso.base;
     if (p.punti.length < 2) return p;
     final punti = _dirada(p.punti);
     final da = punti.first, a = punti.last;
