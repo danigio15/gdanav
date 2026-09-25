@@ -25,6 +25,7 @@ import 'tema.dart';
 // la lettura che le si manda.
 export 'package:gdanav_core/gdanav_core.dart' show StatoAuto, TipoSorgente;
 
+export 'schermate/schermata_principale.dart' show VoceOspite;
 export 'sorgenti/sorgente_gdahome.dart';
 
 /// Accende tutto quello che gdanav tiene in piedi — l'auto, il viaggio, la
@@ -162,9 +163,14 @@ class GdanavApp extends StatelessWidget {
   }
 
   /// La prima schermata, senza l'app intorno: la usa [GdanavDentro].
-  Widget schermata({VoidCallback? menuOspite, ValueNotifier<bool>? apriIlMenu}) => SchermataPrincipale(
+  Widget schermata({
+    VoidCallback? menuOspite,
+    ValueNotifier<bool>? apriIlMenu,
+    List<VoceOspite> vociOspite = const [],
+  }) => SchermataPrincipale(
     menuOspite: menuOspite,
     apriIlMenu: apriIlMenu,
+    vociOspite: vociOspite,
     auto: auto,
     viaggio: viaggio,
     archivio: archivio,
@@ -188,7 +194,17 @@ class GdanavApp extends StatelessWidget {
 /// dell'app — la barra, il menu — resta dov'è. Il tasto Indietro lo decide chi
 /// ospita: con [navigatore] in mano chiude prima le schermate di gdanav.
 class GdanavDentro extends StatelessWidget {
-  const GdanavDentro({super.key, required this.app, this.navigatore, this.menuOspite, this.apriIlMenu});
+  const GdanavDentro({
+    super.key,
+    required this.app,
+    this.navigatore,
+    this.menuOspite,
+    this.apriIlMenu,
+    this.vociOspite = const [],
+  });
+
+  /// Le voci che chi ospita aggiunge al menu di gdanav.
+  final List<VoceOspite> vociOspite;
 
   final GdanavApp app;
   final GlobalKey<NavigatorState>? navigatore;
@@ -208,7 +224,7 @@ class GdanavDentro extends StatelessWidget {
           key: navigatore,
           onGenerateRoute: (impostazioni) => MaterialPageRoute<void>(
             settings: impostazioni,
-            builder: (_) => app.schermata(menuOspite: menuOspite, apriIlMenu: apriIlMenu),
+            builder: (_) => app.schermata(menuOspite: menuOspite, apriIlMenu: apriIlMenu, vociOspite: vociOspite),
           ),
         ),
       ),

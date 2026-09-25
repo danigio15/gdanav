@@ -48,4 +48,34 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('La tua auto'), findsOneWidget);
   });
+
+  testWidgets('le voci di chi ospita stanno nel menu di gdanav', (tester) async {
+    final a = await ambiente(tester);
+    var aperta = 0;
+    final apriIlMenu = ValueNotifier(true);
+    addTearDown(apriIlMenu.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: GdanavDentro(
+            app: a.app() as GdanavApp,
+            menuOspite: () {},
+            apriIlMenu: apriIlMenu,
+            vociOspite: [
+              VoceOspite(
+                icona: Icons.bolt,
+                titolo: 'Comandi rapidi in auto',
+                sotto: 'Cancello, garage',
+                apri: () => aperta++,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Comandi rapidi in auto'));
+    await tester.pumpAndSettle();
+    expect(aperta, 1);
+  });
 }

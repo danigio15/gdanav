@@ -58,7 +58,12 @@ class SchermataPrincipale extends StatefulWidget {
     this.mappeOffline,
     this.menuOspite,
     this.apriIlMenu,
+    this.vociOspite = const [],
   });
+
+  /// Le voci che chi ospita gdanav aggiunge al suo menu (gdahome: i comandi
+  /// rapidi in auto). Stanno sotto «gdahome».
+  final List<VoceOspite> vociOspite;
 
   /// Dentro un'altra app (gdahome): il tasto del menu in alto apre il menu di
   /// quell'app, come i tre trattini della sua plancia. Il menu di gdanav si
@@ -388,6 +393,16 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                         : SchermataPremium(premium: widget.premium!, perche: 'Home Assistant'),
                   ),
                 ),
+                for (final v in widget.vociOspite)
+                  _VoceMenu(
+                    icona: v.icona,
+                    titolo: v.titolo,
+                    sotto: v.sotto,
+                    onTap: () {
+                      Navigator.of(contesto).pop();
+                      v.apri();
+                    },
+                  ),
                 // gdahome: l'auto della plancia di gdahome, da sola. Niente
                 // Premium e niente abbinamento: dentro gdahome la casa c'è già.
                 _VoceMenu(
@@ -598,4 +613,16 @@ class _VoceMenu extends StatelessWidget {
       onTap: onTap,
     );
   }
+}
+
+/// Una voce del menu di gdanav che mette chi lo ospita.
+class VoceOspite {
+  const VoceOspite({required this.icona, required this.titolo, required this.sotto, required this.apri});
+
+  final IconData icona;
+  final String titolo;
+  final String sotto;
+
+  /// Cosa fa: chi ospita apre la sua schermata, col suo vestito.
+  final VoidCallback apri;
 }
