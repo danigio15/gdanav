@@ -21,6 +21,7 @@ class Archivio {
   static const _premium = 'premium';
   static const _segnaposto = 'segnaposto';
   static const _luoghi = 'luoghi';
+  static const _autoGdahome = 'auto_gdahome';
 
   Future<Abbinamento?> abbinamento() async {
     final uri = await _p.read(key: _abbinamento);
@@ -57,6 +58,12 @@ class Archivio {
   Future<ProfiloVeicolo> veicolo() async => veicoloPerId(await _p.read(key: _veicolo) ?? '') ?? ProfiloVeicolo.esempio;
 
   Future<void> salvaVeicolo(ProfiloVeicolo v) => _p.write(key: _veicolo, value: v.id);
+
+  /// L'ultima auto vista nella plancia di gdahome (marca, modello, kWh):
+  /// quando cambia, cambia anche la tua auto.
+  Future<String?> autoGdahome() => _p.read(key: _autoGdahome);
+
+  Future<void> salvaAutoGdahome(String chiave) => _p.write(key: _autoGdahome, value: chiave);
 
   Future<PreferenzeRicarica> preferenze() async {
     final testo = await _p.read(key: _preferenze);

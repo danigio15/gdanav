@@ -108,15 +108,26 @@ class GestoreAuto extends ChangeNotifier {
     _orologio = Timer.periodic(const Duration(seconds: 5), (_) => _aggiorna());
   }
 
-  /// L'auto della plancia di gdahome diventa la tua auto, se non ne hai già
-  /// scelta una: marca e modello cercati nel catalogo. Una scelta fatta a mano
-  /// non si tocca.
+  /// L'auto della plancia di gdahome diventa la tua auto: marca e modello
+  /// cercati nel catalogo.
+  ///
+  /// Quando nella plancia si cambia auto, cambia anche qui, subito. Finché
+  /// l'auto della plancia resta la stessa, invece, una scelta fatta a mano in
+  /// «La tua auto» non si tocca: gdahome può aver scritto un modello che il
+  /// catalogo non ha, o una versione vicina.
   Future<void> _autoDaGdahome() async {
     final a = gdahome?.auto;
-    if (a == null || veicolo.id != ProfiloVeicolo.esempio.id) return;
+    if (a == null) return;
+    final chiave = '${a.marca}|${a.modello}|${a.kwh ?? ''}';
+    final prima = _autoGdahomeVista ??= await archivio.autoGdahome() ?? '';
+    if (chiave == prima && veicolo.id != ProfiloVeicolo.esempio.id) return;
+    _autoGdahomeVista = chiave;
+    await archivio.salvaAutoGdahome(chiave);
     final v = veicoloPerNome(a.marca, a.modello, kwh: a.kwh);
-    if (v != null) await scegliVeicolo(v);
+    if (v != null && v.id != veicolo.id) await scegliVeicolo(v);
   }
+
+  String? _autoGdahomeVista;
 
   Future<void> scegliVeicolo(ProfiloVeicolo v) async {
     veicolo = v;

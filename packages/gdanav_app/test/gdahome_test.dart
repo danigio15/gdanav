@@ -34,13 +34,31 @@ void main() {
     auto.dispose();
   });
 
-  test('un\'auto scelta a mano non si tocca', () async {
-    preparaPiattaforma(portachiavi: {'veicolo': 'tesla-model-3-lr'});
+  test('una scelta a mano resta finché l\'auto della plancia è la stessa', () async {
     final g = SorgenteGdahome()..descrivi(const AutoDiGdahome(marca: 'Renault', modello: 'Zoe R135'));
     final auto = GestoreAuto(archivio: Archivio(), gdahome: g);
     await auto.avvia();
-    expect(auto.veicolo.id, 'tesla-model-3-lr');
+    await pumpEventQueue();
+    expect(auto.veicolo.id, 'renault-zoe-r135');
+
+    // Scelta a mano: la stessa auto della plancia non la cambia più.
+    await auto.scegliVeicolo(veicoloPerId('renault-zoe-r110')!);
+    g.descrivi(const AutoDiGdahome(nome: 'Rinominata', marca: 'Renault', modello: 'Zoe R135'));
+    await pumpEventQueue();
+    expect(auto.veicolo.id, 'renault-zoe-r110');
     auto.dispose();
+
+    // Anche riaprendo l'app.
+    final dopo = GestoreAuto(archivio: Archivio(), gdahome: g);
+    await dopo.avvia();
+    await pumpEventQueue();
+    expect(dopo.veicolo.id, 'renault-zoe-r110');
+
+    // Cambiata l'auto nella plancia, cambia subito anche qui.
+    g.descrivi(const AutoDiGdahome(marca: 'Tesla', modello: 'Model 3 Long Range'));
+    await pumpEventQueue();
+    expect(dopo.veicolo.id, 'tesla-model-3-lr');
+    dopo.dispose();
   });
 
   testWidgets('nell\'app gdanav da sola la voce dice come si accende', (tester) async {
