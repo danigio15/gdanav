@@ -92,8 +92,10 @@ void main() {
         }),
       );
       final json = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>;
-      final risultati = (json['results'] as List).take(14).toList();
-      avviso('Prezzi MIMIT grezzi', jsonEncode({'results': risultati}));
+      // Uno per avviso: GitHub li taglia a 4000 caratteri.
+      for (final (i, d) in (json['results'] as List).take(14).indexed) {
+        avviso('Prezzi MIMIT grezzi $i', jsonEncode(d));
+      }
     } catch (e) {
       avviso('Prezzi MIMIT grezzi', 'errore: $e');
     }
