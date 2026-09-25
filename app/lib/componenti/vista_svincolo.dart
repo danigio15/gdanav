@@ -339,16 +339,24 @@ class DisegnoSvincolo extends CustomPainter {
     )..layout(maxWidth: larghezza - h * 0.14);
     final altezza = testo.height + h * 0.05;
     final r = RRect.fromRectAndRadius(Rect.fromLTWH(x, y, larghezza, altezza), Radius.circular(h * 0.02));
-    // I pali del portale.
-    final palo = Paint()..color = const Color(0xFF8A9099);
-    canvas.drawRect(
-      Rect.fromLTWH(x + larghezza * 0.2, y + altezza, w * 0.008, orizzonte - y - altezza + h * 0.02),
-      palo,
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(x + larghezza * 0.8, y + altezza, w * 0.008, orizzonte - y - altezza + h * 0.02),
-      palo,
-    );
+    // I pali del portale, solo nel disegno: sulla foto sembrerebbero sospesi.
+    if (!sopraFoto) {
+      final palo = Paint()..color = const Color(0xFF8A9099);
+      for (final dx in [0.2, 0.8]) {
+        canvas.drawRect(
+          Rect.fromLTWH(x + larghezza * dx, y + altezza, w * 0.008, orizzonte - y - altezza + h * 0.02),
+          palo,
+        );
+      }
+    } else {
+      // Sulla foto un'ombra sotto il cartello, perché stacchi dal cielo.
+      canvas.drawRRect(
+        r.shift(Offset(0, h * 0.008)),
+        Paint()
+          ..color = Colors.black.withValues(alpha: 0.35)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, h * 0.012),
+      );
+    }
     canvas.drawRRect(r, Paint()..color = autostrada ? const Color(0xFF0B7A3E) : const Color(0xFF1558B0));
     canvas.drawRRect(
       r.deflate(h * 0.008),
