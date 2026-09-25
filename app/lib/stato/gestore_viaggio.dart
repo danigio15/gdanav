@@ -35,10 +35,21 @@ class ViaggioPronto extends StatoViaggio {
     this.batteriaPartenza, {
     required this.calcolatoAlle,
     this.termica = false,
+    this.scelte = const [],
+    this.scelta = 0,
+    this.tappe = const [],
   });
   final Luogo destinazione;
   final Viaggio viaggio;
   final double batteriaPartenza;
+
+  /// I percorsi fra cui scegliere (col traffico, se c'è), e quale si sta
+  /// usando. Vuota con le tappe o se il server ne dà uno solo.
+  final List<PercorsoCalcolato> scelte;
+  final int scelta;
+
+  /// Dove si passa prima della meta, in ordine.
+  final List<Luogo> tappe;
 
   /// Auto termica: solo il percorso, senza batteria né soste.
   final bool termica;
@@ -93,8 +104,14 @@ PianificatoreViaggio pianificatoreVero(
     Uri.parse(i.valhalla.endsWith('/') ? i.valhalla : '${i.valhalla}/'),
     chiave: i.chiaveValhalla.isEmpty ? null : i.chiaveValhalla,
   );
+  final traffico = GestorePremium.attivo.value ? _traffico : null;
   return PianificatoreViaggio(
     percorsi: (tappe) => valhalla.calcola(tappe, opzioni: opzioni),
+    alternative: (da, a) => valhalla.alternative(da, a, opzioni: opzioni),
+    seguendo: (p) => valhalla.seguendo(p, opzioni: opzioni),
+    // Il traffico di adesso sul percorso (Premium): arrivo e soste lo
+    // mettono in conto.
+    traffico: traffico?.applica,
     // Open Charge Map se c'è la chiave (ha anche lo stato delle prese), e
     // comunque OpenStreetMap: dall'archivio dentro l'app, fuori archivio dal
     // relay di gdanav, e se tutto manca direttamente da Overpass.
@@ -111,6 +128,7 @@ PianificatoreViaggio pianificatoreVero(
 }
 
 final _disponibilita = Servizi.chiaveTomTom.isEmpty ? null : DisponibilitaTomTom(Servizi.chiaveTomTom);
+final _traffico = Servizi.chiaveTomTom.isEmpty ? null : TrafficoTomTom(Servizi.chiaveTomTom);
 
 class GestoreViaggio extends ChangeNotifier {
   GestoreViaggio({
@@ -169,7 +187,7 @@ class GestoreViaggio extends ChangeNotifier {
     opzioni = o;
     notifyListeners();
     await archivio.salvaOpzioniPercorso(o);
-    if (strade && destinazione != null) await pianifica(destinazione!);
+    if (strade && destinazione != null) await pianifica(destinazione!, conScelte: true);
   }
 
   /// Con cosa si è calcolato l'ultimo viaggio: temperatura, vento, correttivi.
@@ -190,11 +208,87 @@ class GestoreViaggio extends ChangeNotifier {
   /// Auto termica: un distributore dove passare prima della meta.
   Luogo? tappa;
 
+  /// Le tappe del viaggio, prima della meta, in ordine.
+  final tappe = <Luogo>[];
+
+  /// Tutte quelle da cui passare: il distributore (se c'è), poi le tappe.
+  List<Luogo> get _daPassare => [?tappa, ...tappe];
+
+  /// I percorsi fra cui scegliere per questa meta, e quello scelto.
+  List<PercorsoCalcolato> _scelte = const [];
+  int _scelta = 0;
+
   /// Una meta nuova: le soste scelte per la vecchia non valgono più.
   Future<void> vaiA(Luogo destinazione) {
     obbligate.clear();
     tappa = null;
-    return pianifica(destinazione);
+    tappe.clear();
+    return pianifica(destinazione, conScelte: true);
+  }
+
+  /// Partiti, le strade proposte non servono più: i ricalcoli partono da
+  /// dove si è.
+  void dimenticaScelte() {
+    _scelte = const [];
+    _scelta = 0;
+  }
+
+  /// Un'altra delle strade proposte: si rifanno le soste su quella.
+  Future<void> scegli(int i) async {
+    final d = destinazione;
+    if (d == null || i < 0 || i >= _scelte.length || i == _scelta) return;
+    _scelta = i;
+    obbligate.clear();
+    await pianifica(d);
+  }
+
+  /// Una tappa in più, prima della meta (in fondo, o in [posizione]).
+  Future<void> aggiungiTappa(Luogo l, {int? posizione}) async {
+    tappe.insert((posizione ?? tappe.length).clamp(0, tappe.length), l);
+    _scelte = const [];
+    final d = destinazione;
+    if (d != null) await pianifica(d);
+  }
+
+  Future<void> togliTappa(int i) async {
+    if (i < 0 || i >= tappe.length) return;
+    tappe.removeAt(i);
+    _scelte = const [];
+    final d = destinazione;
+    if (d != null) await pianifica(d, conScelte: tappe.isEmpty);
+  }
+
+  /// Cambia l'ordine: la tappa [da] va in [a].
+  Future<void> spostaTappa(int da, int a) async {
+    if (da < 0 || da >= tappe.length) return;
+    final t = tappe.removeAt(da);
+    tappe.insert(a.clamp(0, tappe.length), t);
+    final d = destinazione;
+    if (d != null) await pianifica(d);
+  }
+
+  /// La meta diventa una tappa e [nuova] la meta: «aggiungi una
+  /// destinazione dopo».
+  Future<void> proseguiVerso(Luogo nuova) async {
+    final d = destinazione;
+    if (d == null) return vaiA(nuova);
+    tappe.add(d);
+    _scelte = const [];
+    await pianifica(nuova);
+  }
+
+  /// Le tappe raggiunte o già passate (entro [fattiM] del percorso) si
+  /// tolgono: da qui si va verso la prossima.
+  void tappeFatte(Punto qui, {double? fattiM}) {
+    final p = stato is ViaggioPronto ? (stato as ViaggioPronto).viaggio.percorso : null;
+    final linea = p == null ? null : Linea(p.punti);
+    bool fatta(Luogo t) =>
+        distanzaM(qui, t.posizione) < 60 ||
+        (fattiM != null && linea != null && linea.proietta(t.posizione).lungoM <= fattiM);
+    if (tappa case final t? when fatta(t)) tappa = null;
+    while (tappe.isNotEmpty && fatta(tappe.first)) {
+      tappe.removeAt(0);
+    }
   }
 
   /// «Fermati qui»: la colonnina diventa una sosta, e si ricalcola.
@@ -212,10 +306,16 @@ class GestoreViaggio extends ChangeNotifier {
     await pianifica(d);
   }
 
-  Future<void> pianifica(Luogo destinazione) async {
+  /// [conScelte]: si cercano anche le strade alternative (una meta nuova,
+  /// opzioni cambiate); in guida no, si ricalcola e basta.
+  Future<void> pianifica(Luogo destinazione, {bool conScelte = false}) async {
     final impostazioni = await archivio.impostazioni();
     if (impostazioni.mancante case final m?) return _imposta(ErroreViaggio(m, destinazione: destinazione));
-    if (!auto.elettrica) return _percorsoSolo(destinazione, impostazioni);
+    if (conScelte) {
+      _scelte = const [];
+      _scelta = 0;
+    }
+    if (!auto.elettrica) return _percorsoSolo(destinazione, impostazioni, conScelte: conScelte);
     final batteria = auto.stato?.batteria;
     if (batteria == null) {
       return _imposta(
@@ -243,10 +343,14 @@ class GestoreViaggio extends ChangeNotifier {
         );
       }
       this.condizioni = condizioni;
-      final viaggio = await costruisci(impostazioni, auto.veicolo, preferenze, opzioni)
+      final pianificatore = costruisci(impostazioni, auto.veicolo, preferenze, opzioni);
+      final scelto = await _scegli(pianificatore, partenza, destinazione, conScelte);
+      final viaggio = await pianificatore
           .pianifica(
             partenza: partenza,
             arrivo: destinazione.posizione,
+            tappe: [for (final t in _daPassare) t.posizione],
+            scelto: scelto,
             batteria: batteria,
             condizioni: condizioni,
             obbligate: Set.of(obbligate),
@@ -259,7 +363,17 @@ class GestoreViaggio extends ChangeNotifier {
           .timeout(tempoMassimo);
       // Nel frattempo l'utente può aver annullato o scelto un'altra meta.
       if (identical(stato, calcolo)) {
-        _imposta(ViaggioPronto(destinazione, viaggio, batteria, calcolatoAlle: _ora()));
+        _imposta(
+          ViaggioPronto(
+            destinazione,
+            viaggio,
+            batteria,
+            calcolatoAlle: _ora(),
+            scelte: _scelte,
+            scelta: _scelta,
+            tappe: List.of(tappe),
+          ),
+        );
       }
     } on TimeoutException {
       if (identical(stato, calcolo)) {
@@ -283,7 +397,7 @@ class GestoreViaggio extends ChangeNotifier {
   }
 
   /// Auto termica: il percorso e basta, come un navigatore normale.
-  Future<void> _percorsoSolo(Luogo destinazione, Impostazioni impostazioni) async {
+  Future<void> _percorsoSolo(Luogo destinazione, Impostazioni impostazioni, {bool conScelte = false}) async {
     final partenza = await posizione();
     if (partenza == null) {
       return _imposta(ErroreViaggio('Non so dove sei: attiva la posizione per gdanav.', destinazione: destinazione));
@@ -294,12 +408,16 @@ class GestoreViaggio extends ChangeNotifier {
     _imposta(calcolo);
     condizioni = null;
     try {
-      final percorso = await costruisci(
-        impostazioni,
-        auto.veicolo,
-        await archivio.preferenze(),
-        opzioni,
-      ).percorsi([partenza, ?tappa?.posizione, destinazione.posizione]).timeout(tempoMassimo);
+      final pianificatore = costruisci(impostazioni, auto.veicolo, await archivio.preferenze(), opzioni);
+      final scelto = await _scegli(pianificatore, partenza, destinazione, conScelte);
+      final percorso = await pianificatore
+          .percorso(
+            partenza: partenza,
+            arrivo: destinazione.posizione,
+            tappe: [for (final t in _daPassare) t.posizione],
+            scelto: scelto,
+          )
+          .timeout(tempoMassimo);
       if (identical(stato, calcolo)) {
         _imposta(
           ViaggioPronto(
@@ -308,6 +426,9 @@ class GestoreViaggio extends ChangeNotifier {
             0,
             calcolatoAlle: _ora(),
             termica: true,
+            scelte: _scelte,
+            scelta: _scelta,
+            tappe: List.of(tappe),
           ),
         );
       }
@@ -329,9 +450,42 @@ class GestoreViaggio extends ChangeNotifier {
     }
   }
 
+  /// Il percorso da usare fra quelli proposti: senza tappe, con
+  /// [conScelte] si chiedono le alternative (col traffico, la più veloce
+  /// prima); poi si usa quella scelta. `null`: si calcola il percorso
+  /// normale.
+  Future<PercorsoCalcolato?> _scegli(
+    PianificatoreViaggio pianificatore,
+    Punto partenza,
+    Luogo destinazione,
+    bool conScelte,
+  ) async {
+    if (_daPassare.isNotEmpty) {
+      _scelte = const [];
+      return null;
+    }
+    if (conScelte && pianificatore.alternative != null) {
+      try {
+        _scelte = await pianificatore
+            .scelte(partenza: partenza, arrivo: destinazione.posizione)
+            .timeout(const Duration(seconds: 60));
+      } catch (_) {
+        _scelte = const [];
+      }
+      _scelta = 0;
+    }
+    if (_scelte.length < 2) {
+      _scelte = const [];
+      return null;
+    }
+    return _scelte[_scelta.clamp(0, _scelte.length - 1)];
+  }
+
   void annulla() {
     obbligate.clear();
     tappa = null;
+    tappe.clear();
+    _scelte = const [];
     _imposta(const NessunViaggio());
   }
 

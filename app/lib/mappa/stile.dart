@@ -16,9 +16,20 @@ const sorgenteSegnalazioni = 'gdanav-segnalazioni';
 const sorgenteManovra = 'gdanav-manovra';
 const sorgenteDistributori = 'gdanav-distributori';
 const sorgenteVicine = 'gdanav-vicine';
+const sorgenteCode = 'gdanav-code';
+const sorgenteAlternative = 'gdanav-alternative';
+const sorgenteTappe = 'gdanav-tappe';
 const stratoTraffico = 'traffico';
 const stratoTrafficoLocale = 'traffico-locale';
-const stratiToccabili = ['gdanav-soste', 'gdanav-colonnine', 'gdanav-distributori', 'gdanav-vicine', 'nomi-poi'];
+const stratiToccabili = [
+  'alternative-etichetta',
+  'alternative',
+  'gdanav-soste',
+  'gdanav-colonnine',
+  'gdanav-distributori',
+  'gdanav-vicine',
+  'nomi-poi',
+];
 
 /// Dall'alto gli edifici sono piatti e puliti; inclinando la mappa si
 /// accendono quelli in 3D e si spengono i piatti.
@@ -50,6 +61,8 @@ class _Tavolozza {
     required this.poi,
     required this.percorso,
     required this.percorsoBordo,
+    required this.alternativa,
+    required this.alternativaBordo,
     required this.contorno,
     required this.libera,
     required this.piena,
@@ -62,6 +75,9 @@ class _Tavolozza {
   final String autostrada, autostradaBordo, principale, principaleBordo, strada, stradaBordo, sentiero, ferrovia;
   final String etichetta, etichettaAlone, luogo, poi;
   final String percorso, percorsoBordo, contorno;
+
+  /// Le strade alternative: grigio-azzurre, dietro al percorso.
+  final String alternativa, alternativaBordo;
   final String libera, piena, guasta, ignota, arrivo;
 }
 
@@ -92,6 +108,8 @@ const _chiaro = _Tavolozza(
   poi: '#8A919A',
   percorso: '#27A2F8',
   percorsoBordo: '#0A6CC2',
+  alternativa: '#A9C7E3',
+  alternativaBordo: '#6F93B8',
   contorno: '#FFFFFF',
   libera: '#16A34A',
   piena: '#D97706',
@@ -125,6 +143,8 @@ const _scuro = _Tavolozza(
   poi: '#7D8797',
   percorso: '#3AB0FF',
   percorsoBordo: '#0B5AA6',
+  alternativa: '#4E6A86',
+  alternativaBordo: '#2E4459',
   contorno: '#0F1420',
   libera: '#4ADE80',
   piena: '#FBBF24',
@@ -243,6 +263,9 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
     'sources': {
       'openmaptiles': {'type': 'vector', 'url': 'https://tiles.openfreemap.org/planet'},
       sorgentePercorso: {'type': 'geojson', 'data': _vuota},
+      sorgenteCode: {'type': 'geojson', 'data': _vuota},
+      sorgenteAlternative: {'type': 'geojson', 'data': _vuota},
+      sorgenteTappe: {'type': 'geojson', 'data': _vuota},
       sorgenteColonnine: {'type': 'geojson', 'data': _vuota},
       sorgenteArrivo: {'type': 'geojson', 'data': _vuota},
       sorgenteIo: {'type': 'geojson', 'data': _vuota},
@@ -487,6 +510,32 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'text-halo-width': 1.5,
         },
       },
+      // Le strade alternative, sotto il percorso: grigio-azzurre, toccandole
+      // si sceglie quella.
+      {
+        'id': 'alternative-bordo',
+        'type': 'line',
+        'source': sorgenteAlternative,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'LineString',
+        ],
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {'line-color': t.alternativaBordo, 'line-width': _largo(7.5, 20)},
+      },
+      {
+        'id': 'alternative',
+        'type': 'line',
+        'source': sorgenteAlternative,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'LineString',
+        ],
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {'line-color': t.alternativa, 'line-width': _largo(5, 15)},
+      },
       // Il percorso: un alone morbido, il bordo blu scuro, la linea blu e le
       // frecce della direzione. Sempre blu: nessuna strada ha quel colore.
       {
@@ -509,6 +558,28 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         'source': sorgentePercorso,
         'layout': {'line-cap': 'round', 'line-join': 'round'},
         'paint': {'line-color': t.percorso, 'line-width': _largo(5.5, 18)},
+      },
+      // Le code di adesso sopra il percorso: dal giallo (rallenta) al rosso
+      // (fermo), bordeaux se è chiusa.
+      {
+        'id': 'code',
+        'type': 'line',
+        'source': sorgenteCode,
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {
+          'line-color': [
+            'match',
+            ['get', 'livello'],
+            1,
+            '#F9A825',
+            2,
+            '#EF6C00',
+            3,
+            '#D32F2F',
+            '#7B1F1F',
+          ],
+          'line-width': _largo(5.5, 18),
+        },
       },
       {
         'id': 'percorso-frecce',
@@ -686,6 +757,55 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'text-allow-overlap': true,
         },
         'paint': {'text-color': '#FFFFFF'},
+      },
+      // Le tappe: un cerchio bianco col numero, bordo blu.
+      {
+        'id': 'tappe',
+        'type': 'circle',
+        'source': sorgenteTappe,
+        'paint': {
+          'circle-radius': 12,
+          'circle-color': '#FFFFFF',
+          'circle-stroke-color': t.percorsoBordo,
+          'circle-stroke-width': 3.5,
+        },
+      },
+      {
+        'id': 'tappe-numeri',
+        'type': 'symbol',
+        'source': sorgenteTappe,
+        'layout': {
+          'text-field': [
+            'to-string',
+            ['get', 'numero'],
+          ],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 13,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        'paint': {'text-color': t.percorsoBordo},
+      },
+      // Quanto fa guadagnare o perdere ogni alternativa: il fumetto sulla
+      // strada, da toccare per sceglierla.
+      {
+        'id': 'alternative-etichetta',
+        'type': 'symbol',
+        'source': sorgenteAlternative,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'Point',
+        ],
+        'layout': {
+          'text-field': ['get', 'etichetta'],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 13,
+          'text-line-height': 1.15,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        'paint': {'text-color': '#FFFFFF', 'text-halo-color': t.alternativaBordo, 'text-halo-width': 6},
       },
       {
         'id': 'arrivo',

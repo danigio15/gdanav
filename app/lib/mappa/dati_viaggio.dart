@@ -15,10 +15,24 @@ StatoColonnina statoDi(Disponibilita d) {
 }
 
 /// I dati delle sorgenti del viaggio, in GeoJSON: vuote se non c'è un
-/// viaggio.
-Map<String, Map<String, Object?>> datiViaggio(Viaggio? v) {
+/// viaggio. Con le [scelte] anche le strade alternative (tranne la
+/// [scelta]), con quanto fanno guadagnare o perdere; con le [tappe] i loro
+/// numeri.
+Map<String, Map<String, Object?>> datiViaggio(
+  Viaggio? v, {
+  List<PercorsoCalcolato> scelte = const [],
+  int scelta = 0,
+  List<Luogo> tappe = const [],
+}) {
   if (v == null) {
-    return {sorgentePercorso: _collezione([]), sorgenteColonnine: _collezione([]), sorgenteArrivo: _collezione([])};
+    return {
+      sorgentePercorso: _collezione([]),
+      sorgenteColonnine: _collezione([]),
+      sorgenteArrivo: _collezione([]),
+      sorgenteCode: _collezione([]),
+      sorgenteAlternative: _collezione([]),
+      sorgenteTappe: _collezione([]),
+    };
   }
   final soste = {for (final (i, s) in (v.piano?.soste ?? const <Sosta>[]).indexed) s.colonnina.id: i + 1};
   final linea = Linea(v.percorso.punti);
@@ -52,7 +66,100 @@ Map<String, Map<String, Object?>> datiViaggio(Viaggio? v) {
       if (v.percorso.punti.isNotEmpty)
         _elemento({'type': 'Point', 'coordinates': _xy(v.percorso.punti.last)}, const {}),
     ]),
+    sorgenteCode: datiCode(v.percorso),
+    sorgenteAlternative: datiAlternative(scelte, scelta),
+    sorgenteTappe: _collezione([
+      for (final (i, t) in tappe.indexed)
+        _elemento({'type': 'Point', 'coordinates': _xy(t.posizione)}, {'numero': i + 1, 'nome': t.nome}),
+    ]),
   };
+}
+
+/// Le code sul percorso, per colorarlo: gialle i rallentamenti, arancioni
+/// le code, rosse le code ferme, bordeaux le strade chiuse.
+Map<String, Object?> datiCode(PercorsoCalcolato p) {
+  if (p.code.isEmpty || p.punti.length < 2) return _collezione([]);
+  final linea = Linea(p.punti);
+  return _collezione([
+    for (final c in p.code)
+      if (_tratto(linea, c.daM, c.aM) case final pezzo when pezzo.length > 1)
+        _elemento(
+          {
+            'type': 'LineString',
+            'coordinates': [for (final q in pezzo) _xy(q)],
+          },
+          {'livello': c.livello},
+        ),
+  ]);
+}
+
+/// Le strade alternative (tutte tranne la [scelta]), ognuna con un'etichetta
+/// dove si separa di più: «+6 min», «−3 min», «uguale».
+Map<String, Object?> datiAlternative(List<PercorsoCalcolato> scelte, int scelta) {
+  if (scelte.length < 2) return _collezione([]);
+  final base = scelte[scelta.clamp(0, scelte.length - 1)];
+  final lineaBase = Linea(base.punti);
+  final elementi = <Map<String, Object?>>[];
+  for (final (i, a) in scelte.indexed) {
+    if (i == scelta || a.punti.length < 2) continue;
+    final diff = a.durata.inMinutes - base.durata.inMinutes;
+    final etichetta = diff == 0 ? 'Uguale' : '${diff > 0 ? '+' : '−'}${diff.abs()} min';
+    elementi.add(
+      _elemento(
+        {
+          'type': 'LineString',
+          'coordinates': [for (final q in a.punti) _xy(q)],
+        },
+        {'alternativa': i},
+      ),
+    );
+    // L'etichetta dove l'alternativa è più lontana dal percorso scelto.
+    var lontano = a.punti[a.punti.length ~/ 2];
+    var massimo = -1.0;
+    for (var k = 0; k < a.punti.length; k += math.max(1, a.punti.length ~/ 60)) {
+      final d = lineaBase.proietta(a.punti[k]).lontanoM;
+      if (d > massimo) {
+        massimo = d;
+        lontano = a.punti[k];
+      }
+    }
+    elementi.add(
+      _elemento(
+        {'type': 'Point', 'coordinates': _xy(lontano)},
+        {'alternativa': i, 'etichetta': '$etichetta\n${durataBreve(a.durata)}'},
+      ),
+    );
+  }
+  return _collezione(elementi);
+}
+
+/// «1 h 05», «45 min».
+String durataBreve(Duration d) {
+  final ore = d.inHours, minuti = d.inMinutes % 60;
+  return ore == 0 ? '$minuti min' : '$ore h ${minuti.toString().padLeft(2, '0')}';
+}
+
+/// I punti della [l] fra [da] e [a] metri, con gli estremi interpolati.
+List<Punto> _tratto(Linea l, double da, double a) {
+  if (a <= da) return const [];
+  Punto a0(double m) {
+    for (var i = 1; i < l.punti.length; i++) {
+      if (l.cumulate[i] >= m) {
+        final seg = l.cumulate[i] - l.cumulate[i - 1];
+        final t = seg <= 0 ? 0.0 : (m - l.cumulate[i - 1]) / seg;
+        final p = l.punti[i - 1], q = l.punti[i];
+        return Punto(p.lat + (q.lat - p.lat) * t, p.lon + (q.lon - p.lon) * t);
+      }
+    }
+    return l.punti.last;
+  }
+
+  return [
+    a0(da),
+    for (var i = 0; i < l.punti.length; i++)
+      if (l.cumulate[i] > da && l.cumulate[i] < a) l.punti[i],
+    a0(a),
+  ];
 }
 
 /// La freccia sul percorso compare a questa distanza dalla manovra.
@@ -162,8 +269,8 @@ Map<String, Object?> datiColonnineVicine(List<Colonnina> elenco, Set<TipoConnett
 ]);
 
 /// Il riquadro che contiene tutto il percorso: sud-ovest e nord-est.
-(Punto, Punto)? confini(Viaggio v) {
-  final p = v.percorso.punti;
+(Punto, Punto)? confini(Viaggio v, {List<PercorsoCalcolato> anche = const []}) {
+  final p = [...v.percorso.punti, for (final a in anche) ...a.punti];
   if (p.isEmpty) return null;
   var s = p.first.lat, n = s, o = p.first.lon, e = o;
   for (final q in p) {

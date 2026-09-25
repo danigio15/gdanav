@@ -231,11 +231,14 @@ class _MappaViaggioState extends State<MappaViaggio> {
     _disegnato = stato;
     final basso = MediaQuery.sizeOf(context).height * 0.45;
     final viaggio = stato is ViaggioPronto ? stato.viaggio : null;
-    for (final MapEntry(key: id, value: dati) in datiViaggio(viaggio).entries) {
+    final dati = stato is ViaggioPronto && widget.guida == null
+        ? datiViaggio(viaggio, scelte: stato.scelte, scelta: stato.scelta, tappe: stato.tappe)
+        : datiViaggio(viaggio, tappe: stato is ViaggioPronto ? stato.tappe : const []);
+    for (final MapEntry(key: id, value: dati) in dati.entries) {
       await m.setGeoJsonSource(id, dati.cast<String, dynamic>());
     }
     if (viaggio == null || widget.guida != null) return;
-    final (so, ne) = confini(viaggio)!;
+    final (so, ne) = confini(viaggio, anche: stato is ViaggioPronto ? stato.scelte : const [])!;
     await m.animateCamera(
       CameraUpdate.newLatLngBounds(
         LatLngBounds(southwest: LatLng(so.lat, so.lon), northeast: LatLng(ne.lat, ne.lon)),
@@ -258,6 +261,8 @@ class _MappaViaggioState extends State<MappaViaggio> {
       if (mappa is! Map) continue;
       // Prima i punti che sappiamo raccontare (distributori, colonnine
       // vicine, ristoranti…), poi le colonnine del viaggio.
+      // Una strada alternativa: si sceglie quella.
+      if (mappa case {'properties': {'alternativa': final num i}}) return widget.gestore.scegli(i.toInt());
       if (PuntoToccato.daElemento(mappa) case final p? when widget.onPunto != null) return widget.onPunto!(p);
       if (mappa case {'properties': {'id': final String id}}) return widget.onColonnina(id);
     }

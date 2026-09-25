@@ -183,6 +183,8 @@ class GestoreGuida extends ChangeNotifier {
     _partitoAlle = _ora();
     _vicinoDetto = false;
     _guida = Guida(p.viaggio.percorso);
+    // Partiti: i ricalcoli partono da dove si è, non dalle strade proposte.
+    viaggio.dimenticaScelte();
     _batteriaInizio = p.batteriaPartenza;
     _kmMisurati = 0;
     _whMisurati = 0;
@@ -218,14 +220,19 @@ class GestoreGuida extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// L'ultima posizione vista in guida.
+  Punto? _ultimaPosizione;
+
   Future<void> _posizione(Punto qui) async {
+    _ultimaPosizione = qui;
     _forseChiediDati();
     final g = _guida;
     if (g == null || !attiva) return;
     final a = g.aggiorna(qui);
     avanzamento = a;
     // Arrivati al distributore: da qui si prosegue verso la meta.
-    if (viaggio.tappa case final t? when distanzaM(qui, t.posizione) < 60) viaggio.tappa = null;
+    // Arrivati a una tappa (o al distributore): da qui si prosegue.
+    viaggio.tappeFatte(qui);
     if (a.daDire case final frase? when !muto) unawaited(voce.parla(frase));
     if (a.arrivato) {
       _evento('arrivo');
@@ -331,10 +338,8 @@ class GestoreGuida extends ChangeNotifier {
     for (final c in pronto?.viaggio.colonnine ?? const <ColonninaSulPercorso>[]) {
       if (c.distanzaM <= fatti) viaggio.obbligate.remove(c.id);
     }
-    // Il distributore già passato non si ripete.
-    if ((viaggio.tappa, pronto) case (final t?, final p?)) {
-      if (Linea(p.viaggio.percorso.punti).proietta(t.posizione).lungoM <= fatti) viaggio.tappa = null;
-    }
+    // Le tappe e il distributore già passati non si ripetono.
+    if (_ultimaPosizione case final q?) viaggio.tappeFatte(q, fattiM: fatti);
     notifyListeners();
     if (!perConsumo && !muto) unawaited(voce.parla('Ricalcolo il percorso.'));
     await viaggio.pianifica(d);

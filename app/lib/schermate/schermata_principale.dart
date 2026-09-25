@@ -544,6 +544,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                             onAvvia: _avvia,
                             soglia: _preferenze.minimoArrivo,
                             meteo: widget.meteo,
+                            onCercaTappa: () => _scegli(titolo: 'Aggiungi una tappa'),
                           ),
                   ),
                 ],
