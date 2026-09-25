@@ -1,0 +1,52 @@
+name: gdanav_app
+description: "gdanav, lo schermo: la mappa, la guida e le schermate. Lo usano l'app gdanav e gdahome, che la porta dentro come sezione."
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.13.4
+  flutter: ">=3.47.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  gdanav_core:
+    path: ../gdanav_core
+  maplibre_gl: ^0.27.1
+  mobile_scanner: ^7.4.2
+  # Da 9 in su: gdahome è ancora sulla 9 e il suo portachiavi non si tocca
+  # (dalla 10 Android cambia il modo di cifrare). Le chiamate che usa gdanav ci
+  # sono in tutte e tre.
+  flutter_secure_storage: ">=9.2.0 <12.0.0"
+  geolocator: ^14.0.3
+  flutter_tts: ^4.2.5
+  flutter_reactive_ble: ^5.6.0
+  image_picker: ^1.1.2
+  path_provider: ^2.1.6
+  http: ^1.2.0
+  in_app_purchase: ^3.3.1
+  in_app_purchase_android: ^0.5.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Il pezzo nativo che serve anche dentro un'altra app: i permessi Bluetooth
+  # per il dongle OBD. Android Auto invece resta nell'app gdanav.
+  plugin:
+    platforms:
+      android:
+        package: it.gdanav.gdanav_app
+        pluginClass: GdanavAppPlugin
+
+  # Dentro il pacchetto si leggono come `packages/gdanav_app/assets/…`: vedi
+  # `risorse.dart`.
+  assets:
+    - assets/segnaposto/
+    - assets/foto_auto.json
+    - assets/colonnine.json
+    - assets/autovelox.json

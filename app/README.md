@@ -1,17 +1,21 @@
 # L'app
 
 Flutter, Android e iOS. Il motore sta in
-[`../packages/gdanav_core`](../packages/gdanav_core): qui c'è solo quello che
-tocca lo schermo e il telefono.
+[`../packages/gdanav_core`](../packages/gdanav_core); lo schermo — mappa,
+guida, schermate — in [`../packages/gdanav_app`](../packages/gdanav_app), che
+porta gdanav anche dentro gdahome come sezione. Qui resta l'app: l'icona,
+Android Auto, iOS.
 
     flutter pub get
     flutter analyze
-    flutter test
     flutter run
+
+    # Le prove dello schermo
+    cd ../packages/gdanav_app && flutter test
 
 ## Cosa c'è
 
-- **Mappa**: MapLibre con lo stile di gdanav (`lib/mappa/stile.dart`), chiaro o
+- **Mappa**: MapLibre con lo stile di gdanav (`../packages/gdanav_app/lib/mappa/stile.dart`), chiaro o
   scuro come il telefono, sui dati gratuiti di OpenFreeMap. Il bottone **3D**
   inclina la mappa e gli edifici si alzano; **Dove sono** la riporta su di te.
   Il rilievo del terreno in 3D MapLibre per telefoni ancora non lo fa.

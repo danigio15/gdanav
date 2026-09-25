@@ -1,5 +1,5 @@
 /// Gli autovelox fissi di OpenStreetMap per l'archivio dentro l'app
-/// (`app/assets/autovelox.json`):
+/// (`packages/gdanav_app/assets/autovelox.json`):
 ///
 ///     osmium tags-filter italy.osm.pbf n/highway=speed_camera -o av.osm.pbf
 ///     osmium export av.osm.pbf -f geojsonseq -o av.geojsonseq

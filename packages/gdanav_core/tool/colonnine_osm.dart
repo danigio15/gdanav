@@ -1,4 +1,4 @@
-/// L'archivio delle colonnine dentro l'app (`app/assets/colonnine.json`),
+/// L'archivio delle colonnine dentro l'app (`packages/gdanav_app/assets/colonnine.json`),
 /// dagli estratti completi di OpenStreetMap (Geofabrik) filtrati con osmium:
 ///
 ///     osmium tags-filter italy.osm.pbf nwr/amenity=charging_station -o cs.osm.pbf

@@ -1,6 +1,6 @@
 /// Trova una foto vera per ogni auto del catalogo, su Wikipedia e Wikimedia
 /// Commons: solo foto con licenza libera, con autore e licenza da citare.
-/// Scrive il JSON che l'app porta con sé (`app/assets/foto_auto.json`).
+/// Scrive il JSON che l'app porta con sé (`packages/gdanav_app/assets/foto_auto.json`).
 ///
 ///     dart run tool/foto_auto.dart uscita.json
 ///

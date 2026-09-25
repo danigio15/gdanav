@@ -24,18 +24,24 @@ jobs:
 
   app:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: app
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.47.5
           channel: stable
+      # Lo schermo di gdanav sta nel pacchetto (lo porta dentro anche gdahome):
+      # le prove sono lì. L'app è l'involucro, e basta che compili.
       - run: flutter pub get
+        working-directory: packages/gdanav_app
       - run: flutter analyze
+        working-directory: packages/gdanav_app
       - run: flutter test
+        working-directory: packages/gdanav_app
+      - run: flutter pub get
+        working-directory: app
+      - run: flutter analyze
+        working-directory: app
 
   integrazione:
     runs-on: ubuntu-latest
@@ -179,7 +185,7 @@ jobs:
 
   # Le foto vere delle auto, da Wikimedia Commons: solo quando il commit lo
   # chiede con «[foto-auto]». Il JSON va nella release «anteprima», da
-  # controllare e mettere in app/assets.
+  # controllare e mettere in packages/gdanav_app/assets.
   foto-auto:
     if: contains(github.event.head_commit.message, '[foto-auto]')
     runs-on: ubuntu-latest
@@ -205,7 +211,7 @@ jobs:
   # Le colonnine rapide per l'archivio dentro l'app, dagli estratti completi
   # di OpenStreetMap (Geofabrik) filtrati con osmium: niente Overpass, che è
   # spesso sovraccarico. Solo quando il commit lo chiede con «[colonnine]»;
-  # il JSON va nella release «anteprima», da mettere in app/assets.
+  # il JSON va nella release «anteprima», da mettere in packages/gdanav_app/assets.
   colonnine-dati:
     if: contains(github.event.head_commit.message, '[colonnine]')
     runs-on: ubuntu-latest
