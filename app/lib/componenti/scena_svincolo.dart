@@ -16,29 +16,45 @@ class ScenaSvincolo extends CustomPainter {
   final Manovra manovra;
 
   static const _corsia = 3.6;
-  static const _altezzaCamera = 5.2;
-  static const _separazione = 38.0;
-  static const _vicino = 3.0;
+  static const _altezzaCamera = 8.5;
+  static const _separazione = 20.0;
+  static const _vicino = 4.0;
 
   bool get _destra => const {18, 20, 23}.contains(manovra.tipo);
 
   @override
   void paint(Canvas canvas, Size s) {
     final w = s.width, h = s.height;
-    final orizzonte = h * 0.42;
+    final orizzonte = h * 0.36;
     _cielo(canvas, w, orizzonte);
     _terreno(canvas, w, h, orizzonte);
 
-    final (n, k, giuste, consigliate) = _corsie();
-    // La camera sta sopra la corsia accanto al ramo, un po' verso l'interno.
-    final camX = (k - 0.2) * _corsia;
-    final f = w * 0.95;
-    Offset p(double x, double z) => Offset(w / 2 + f * (x - camX) / z, orizzonte + f * _altezzaCamera / z);
-    // Il ramo si allontana di lato, sempre di più.
-    double scarto(double z) => z <= _separazione ? 0 : 0.0075 * math.pow(z - _separazione, 2).toDouble();
-    double pendenza(double z) => z <= _separazione ? 0 : 0.015 * (z - _separazione);
-    double xMain(double i, double z) => i * _corsia;
-    double xRamo(double i, double z) => i * _corsia + scarto(z);
+    final (n, k, giuste, _) = _corsie();
+    // La camera sta sopra la linea che separa il ramo, un po' verso l'interno.
+    final camX = k * _corsia - 0.4;
+    final f = math.max(w, h * 1.2) * 0.78;
+    Offset p(Offset mondo) =>
+        Offset(w / 2 + f * (mondo.dx - camX) / mondo.dy, orizzonte + f * _altezzaCamera / mondo.dy);
+
+    // Il ramo: dritto fino alla separazione, poi curva sempre di più
+    // (come una clotoide) fino a 70°. Si integra una volta sola, ogni metro.
+    final base = <Offset>[const Offset(0, 0)], rotte = <double>[0];
+    for (var t = 1; t <= 600; t++) {
+      final d = math.max(0.0, t - _separazione);
+      final rotta = math.min(1.1, 0.5 * 2.6e-4 * d * d);
+      rotte.add(rotta);
+      base.add(base.last + Offset(math.sin(rotta), math.cos(rotta)));
+    }
+    Offset ramo(double j, double t) {
+      final i = t.clamp(0.0, 599.0), i0 = i.floor(), fr = i - i0;
+      final b = Offset.lerp(base[i0], base[i0 + 1], fr)!;
+      final r = rotte[i0] + (rotte[i0 + 1] - rotte[i0]) * fr;
+      // Di lato, perpendicolare alla direzione: le corsie restano larghe 3,6 m.
+      final lato = (j - k) * _corsia;
+      return Offset(k * _corsia + b.dx + lato * math.cos(r), b.dy - lato * math.sin(r));
+    }
+
+    Offset principale(double j, double z) => Offset(j * _corsia, z);
 
     canvas.save();
     if (!_destra) {
@@ -46,137 +62,169 @@ class ScenaSvincolo extends CustomPainter {
       canvas.scale(-1, 1);
     }
 
-    // Uno spessore di terra lontano, dove il ramo sparisce oltre l'orizzonte.
-    Path fascia(double Function(double z) sx, double Function(double z) dx, double z0, double z1) {
-      final passi = <double>[];
-      for (var z = z0; z < z1; z *= 1.06) {
-        passi.add(z);
+    /// I parametri lungo una strada: fitti vicino, più radi lontano.
+    List<double> passi(double t0, double t1) {
+      final l = <double>[];
+      for (var t = t0; t < t1; t += math.max(0.5, t * 0.04)) {
+        l.add(t);
       }
-      passi.add(z1);
-      final path = Path()..moveTo(p(sx(passi.first), passi.first).dx, p(sx(passi.first), passi.first).dy);
-      for (final z in passi) {
-        path.lineTo(p(sx(z), z).dx, p(sx(z), z).dy);
+      return l..add(t1);
+    }
+
+    Path fascia(Offset Function(double t) sx, Offset Function(double t) dx, double t0, double t1) {
+      final l = passi(t0, t1).where((t) => sx(t).dy > 0.5 && dx(t).dy > 0.5).toList();
+      final path = Path()..moveTo(p(sx(l.first)).dx, p(sx(l.first)).dy);
+      for (final t in l) {
+        path.lineTo(p(sx(t)).dx, p(sx(t)).dy);
       }
-      for (final z in passi.reversed) {
-        path.lineTo(p(dx(z), z).dx, p(dx(z), z).dy);
+      for (final t in l.reversed) {
+        path.lineTo(p(dx(t)).dx, p(dx(t)).dy);
       }
       return path..close();
     }
 
     // Banchine chiare, poi l'asfalto.
-    final banchina = Paint()..color = const Color(0xFFC9CCC4);
-    canvas.drawPath(fascia((z) => -1.4, (z) => k * _corsia + 0.3, _vicino, 3000), banchina);
+    final banchina = Paint()..color = const Color(0xFFCDD0C8);
     canvas.drawPath(
-      fascia((z) => xRamo(k.toDouble(), z) - 0.3, (z) => xRamo(n.toDouble(), z) + 1.4, _vicino, 900),
+      fascia((z) => const Offset(-1.6, 0) + Offset(0, z), (z) => principale(k.toDouble(), z), _vicino, 3000),
       banchina,
     );
+    canvas.drawPath(fascia((t) => ramo(k.toDouble(), t), (t) => ramo(n + 0.45, t), _vicino, 600), banchina);
     final asfalto = Paint()
       ..shader = ui.Gradient.linear(Offset(0, h), Offset(0, orizzonte), [
-        const Color(0xFF3A3E45),
-        const Color(0xFF5A5F67),
+        const Color(0xFF383C43),
+        const Color(0xFF5C6169),
       ]);
-    canvas.drawPath(fascia((z) => 0, (z) => xMain(k.toDouble(), z), _vicino, 3000), asfalto);
-    canvas.drawPath(fascia((z) => xRamo(k.toDouble(), z), (z) => xRamo(n.toDouble(), z), _vicino, 900), asfalto);
+    canvas.drawPath(fascia((z) => principale(0, z), (z) => principale(k.toDouble(), z), _vicino, 3000), asfalto);
+    canvas.drawPath(fascia((t) => ramo(k.toDouble(), t), (t) => ramo(n.toDouble(), t), _vicino, 600), asfalto);
 
-    // Le corsie giuste, blu fino in fondo.
+    // Le corsie giuste, blu da riga a riga (le righe ci vanno sopra).
     final blu = Paint()
       ..shader = ui.Gradient.linear(Offset(0, h), Offset(0, orizzonte), [
-        const Color(0xFF1E6FE8),
-        const Color(0xFF4F95F5),
+        const Color(0xE01C6FF0),
+        const Color(0xB35A9CF6),
       ]);
     for (var i = 0; i < n; i++) {
       if (!giuste.contains(i)) continue;
-      final a = i + 0.06, b = i + 0.94;
+      final a = i.toDouble(), b = i + 1.0;
       if (i >= k) {
-        canvas.drawPath(fascia((z) => xRamo(a, z), (z) => xRamo(b, z), _vicino, 900), blu);
+        canvas.drawPath(fascia((t) => ramo(a, t), (t) => ramo(b, t), _vicino, 600), blu);
       } else {
-        canvas.drawPath(fascia((z) => xMain(a, z), (z) => xMain(b, z), _vicino, 3000), blu);
+        canvas.drawPath(fascia((z) => principale(a, z), (z) => principale(b, z), _vicino, 3000), blu);
       }
     }
 
-    // Le righe: bordi pieni, fra le corsie tratteggiate (4,5 m pieni e 7,5 vuoti).
-    final bianco = Paint()..color = const Color(0xFFF4F6F8);
-    void riga(double Function(double z) x, double z0, double z1, {bool tratteggio = false, double larga = 0.18}) {
-      var z = z0;
-      while (z < z1) {
-        final lung = tratteggio ? 4.5 : math.max(2.0, z * 0.08);
-        final fine = math.min(z + lung, z1);
-        final a1 = p(x(z) - larga / 2, z), a2 = p(x(z) + larga / 2, z);
-        final b1 = p(x(fine) - larga / 2, fine), b2 = p(x(fine) + larga / 2, fine);
-        canvas.drawPath(
-          Path()
-            ..moveTo(a1.dx, a1.dy)
-            ..lineTo(a2.dx, a2.dy)
-            ..lineTo(b2.dx, b2.dy)
-            ..lineTo(b1.dx, b1.dy)
-            ..close(),
-          bianco,
-        );
-        z = fine + (tratteggio ? 7.5 : 0);
+    // Fra le carreggiate, dove si separano, la cuspide: asfalto con le
+    // strisce bianche oblique, finché lo spazio non diventa prato.
+    const cuspide = 58.0;
+    canvas.drawPath(
+      fascia((t) => principale(k.toDouble(), t), (t) => ramo(k.toDouble(), t), _separazione, _separazione + cuspide),
+      asfalto,
+    );
+    final zebra = Paint()..color = const Color(0xF2F4F6F8);
+    for (var t = _separazione + 7; t < _separazione + cuspide - 2; t += 4.5) {
+      final a = principale(k.toDouble(), t), b = ramo(k.toDouble(), t + 3.5);
+      if ((b.dx - a.dx) < 0.9) continue;
+      final a2 = principale(k.toDouble(), t + 1.1), b2 = ramo(k.toDouble(), t + 4.6);
+      canvas.drawPath(
+        Path()
+          ..moveTo(p(a).dx, p(a).dy)
+          ..lineTo(p(b).dx, p(b).dy)
+          ..lineTo(p(b2).dx, p(b2).dy)
+          ..lineTo(p(a2).dx, p(a2).dy)
+          ..close(),
+        zebra,
+      );
+    }
+    // Chiude la cuspide un cordolo chiaro, poi comincia il prato.
+    canvas.drawPath(
+      fascia(
+        (t) => principale(k.toDouble(), _separazione + cuspide + t),
+        (t) => ramo(k.toDouble(), _separazione + cuspide + t),
+        0,
+        1.2,
+      ),
+      banchina,
+    );
+
+    // Le righe: bordi pieni, fra le corsie tratteggiate (6 m pieni e 9
+    // vuoti), larghe 15 cm come sulle strade vere.
+    final bianco = Paint()..color = const Color(0xFFF6F8FA);
+    void riga(Offset Function(double t) punto, double t0, double t1, {bool tratteggio = false, double larga = 0.15}) {
+      Offset lato(double t, double s) {
+        final a = punto(t), b = punto(t + 0.5);
+        final d = b - a;
+        final l = d.distance == 0 ? 1.0 : d.distance;
+        return a + Offset(d.dy / l, -d.dx / l) * s;
+      }
+
+      var t = t0;
+      while (t < t1) {
+        final fine = math.min(t + (tratteggio ? 6.0 : math.max(1.0, t * 0.04)), t1);
+        if (fine <= _vicino) {
+          t = fine + (tratteggio ? 9.0 : 0);
+          continue;
+        }
+        final l = passi(math.max(t, _vicino), fine);
+        final path = Path();
+        for (final (j, q) in l.indexed) {
+          final o = p(lato(q, -larga / 2));
+          j == 0 ? path.moveTo(o.dx, o.dy) : path.lineTo(o.dx, o.dy);
+        }
+        for (final q in l.reversed) {
+          final o = p(lato(q, larga / 2));
+          path.lineTo(o.dx, o.dy);
+        }
+        canvas.drawPath(path..close(), bianco);
+        t = fine + (tratteggio ? 9.0 : 0);
       }
     }
 
-    riga((z) => 0.15, _vicino, 3000, larga: 0.25);
-    riga((z) => xMain(k.toDouble(), z) - 0.15, _separazione, 3000, larga: 0.25);
-    riga((z) => xRamo(k.toDouble(), z) + 0.15, _separazione, 900, larga: 0.25);
-    riga((z) => xRamo(n.toDouble(), z) - 0.15, _vicino, 900, larga: 0.25);
+    riga((z) => principale(0.07, z), _vicino, 3000, larga: 0.25);
+    riga((z) => principale(k - 0.07, z), _separazione, 3000, larga: 0.25);
+    riga((t) => ramo(k + 0.07, t), _separazione, 600, larga: 0.25);
+    riga((t) => ramo(n - 0.07, t), _vicino, 600, larga: 0.25);
     for (var i = 1; i < n; i++) {
       if (i == k) {
-        riga((z) => xMain(k.toDouble(), z), _vicino, _separazione, tratteggio: true, larga: 0.3);
+        // Il tratteggio che separa il ramo finisce giusto dove si divide.
+        riga((z) => principale(k.toDouble(), z), _separazione - 6 - 15 * 3, _separazione, tratteggio: true, larga: 0.4);
       } else if (i < k) {
-        riga((z) => xMain(i.toDouble(), z), _vicino, 3000, tratteggio: true);
+        riga((z) => principale(i.toDouble(), z), _vicino, 3000, tratteggio: true, larga: 0.2);
       } else {
-        riga((z) => xRamo(i.toDouble(), z), _vicino, 900, tratteggio: true);
+        riga((t) => ramo(i.toDouble(), t), _vicino, 600, tratteggio: true, larga: 0.2);
       }
     }
 
-    // Le frecce dipinte sulle corsie giuste, girate come la corsia.
-    final freccia = Paint()..color = Colors.white.withValues(alpha: 0.96);
+    // Le frecce dipinte sulle corsie giuste: ogni punto della freccia segue
+    // la corsia, così in curva piega con lei.
+    final freccia = Paint()..color = Colors.white;
     for (var i = 0; i < n; i++) {
       if (!giuste.contains(i)) continue;
-      final ramo = i >= k;
-      for (final z0 in [13.0, 30.0, 52.0, 80.0]) {
-        final centro = (ramo ? xRamo(i + 0.5, z0) : xMain(i + 0.5, z0));
-        final angolo = ramo ? math.atan(pendenza(z0 + 3)) : 0.0;
-        final curva = ramo && consigliate[i] != DirezioneCorsia.dritto && z0 > 20;
-        _frecciaDipinta(canvas, p, centro, z0, angolo, freccia, piega: curva ? 1 : 0);
+      for (final t0 in [13.0, 34.0, 62.0, 98.0]) {
+        Offset mondo(double u, double v) =>
+            i >= k ? ramo(i + 0.5 + u / _corsia, t0 + v) : principale(i + 0.5 + u / _corsia, t0 + v);
+        final path = Path();
+        for (final (j, q) in _forma.indexed) {
+          final o = p(mondo(q.dx, q.dy));
+          j == 0 ? path.moveTo(o.dx, o.dy) : path.lineTo(o.dx, o.dy);
+        }
+        canvas.drawPath(path..close(), freccia);
       }
     }
     canvas.restore();
   }
 
-  /// Una freccia dipinta per terra, lunga 7 m, nel piano della strada.
-  void _frecciaDipinta(
-    Canvas canvas,
-    Offset Function(double x, double z) p,
-    double cx,
-    double cz,
-    double angolo,
-    Paint colore, {
-    int piega = 0,
-  }) {
-    // Nel sistema della corsia: u di lato, v in avanti (metri).
-    const forma = [
-      Offset(-0.22, 0),
-      Offset(0.22, 0),
-      Offset(0.22, 4.6),
-      Offset(0.62, 4.6),
-      Offset(0, 7),
-      Offset(-0.62, 4.6),
-      Offset(-0.22, 4.6),
-    ];
-    final c = math.cos(angolo), sn = math.sin(angolo);
-    final path = Path();
-    for (final (j, q) in forma.indexed) {
-      // Piegata verso l'uscita: la punta si sposta di lato.
-      final u = q.dx + (piega != 0 ? q.dy * q.dy * 0.035 : 0);
-      final x = cx + u * c + q.dy * sn;
-      final z = cz + q.dy * c - u * sn;
-      final o = p(x, z);
-      j == 0 ? path.moveTo(o.dx, o.dy) : path.lineTo(o.dx, o.dy);
-    }
-    canvas.drawPath(path..close(), colore);
-  }
+  /// La freccia come la dipingono sull'asfalto (metri: di lato, in avanti):
+  /// asta lunga e stretta, punta larga.
+  static const _forma = [
+    Offset(-0.22, 0),
+    Offset(0.22, 0),
+    Offset(0.22, 5.0),
+    Offset(0.8, 4.6),
+    Offset(0, 8.5),
+    Offset(-0.8, 4.6),
+    Offset(-0.22, 5.0),
+  ];
 
   /// Il cielo, azzurro in alto e chiaro all'orizzonte, con le nuvole.
   void _cielo(Canvas canvas, double w, double orizzonte) {
