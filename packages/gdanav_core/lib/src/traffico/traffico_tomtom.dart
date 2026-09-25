@@ -78,21 +78,41 @@ class TrafficoTomTom {
       if (aM <= daM) continue;
       final categoria = '${s['simpleCategory'] ?? ''}';
       final grandezza = (s['magnitudeOfDelay'] as num?)?.toInt() ?? 0;
+      final ritardo = ((s['delayInSeconds'] as num?) ?? 0).round();
+      final velocita = (s['effectiveSpeedInKmh'] as num?)?.toDouble();
+      // Dove non si perde tempo e si va spediti (lavori di notte su un'altra
+      // corsia, chiusure dall'altra parte) non c'è niente da colorare.
+      if (ritardo < 30 && (velocita == null || velocita >= 50)) continue;
+      // «Chiusa» solo se lì non si passa davvero.
+      final chiusa = categoria == 'ROAD_CLOSURE' && (velocita == null || velocita < 10);
+      final livello = chiusa
+          ? 4
+          : math.max(
+              1,
+              math.min(3, grandezza > 0 && grandezza < 4 ? grandezza : _livelloDaVelocita(velocita, ritardo, aM - daM)),
+            );
       code.add(Coda(
         daM: daM,
         aM: aM,
-        ritardo: Duration(seconds: ((s['delayInSeconds'] as num?) ?? 0).round()),
-        velocitaKmh: (s['effectiveSpeedInKmh'] as num?)?.toDouble(),
-        livello: categoria == 'ROAD_CLOSURE' ? 4 : math.max(1, math.min(3, grandezza)),
+        ritardo: Duration(seconds: ritardo),
+        velocitaKmh: velocita,
+        livello: livello,
         tipo: switch (categoria) {
           'ROAD_WORK' => 'Lavori',
-          'ROAD_CLOSURE' => 'Strada chiusa',
-          'JAM' => null,
+          'ROAD_CLOSURE' => chiusa ? 'Strada chiusa' : 'Lavori',
           _ => null,
         },
       ));
     }
     return code;
+  }
+
+  /// Quanto è grave una coda di cui TomTom non dice la grandezza: dalla
+  /// velocità, o dai secondi persi per chilometro.
+  static int _livelloDaVelocita(double? kmh, int ritardo, double metri) {
+    if (kmh != null) return kmh < 15 ? 3 : (kmh < 35 ? 2 : 1);
+    final alKm = metri > 0 ? ritardo / (metri / 1000) : 0;
+    return alKm > 120 ? 3 : (alKm > 40 ? 2 : 1);
   }
 
   /// Un punto ogni tanto, al più [massimoPunti], sempre il primo e l'ultimo.

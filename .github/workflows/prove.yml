@@ -177,6 +177,7 @@ jobs:
           GDANAV_PREZZI: ${{ github.workspace }}/prezzi_napoli.json
           GDANAV_COLONNINE: ${{ github.workspace }}/colonnine_utrecht.json
           GDANAV_TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
+          GDANAV_ANTEPRIME: ${{ github.workspace }}
       # Prezzi veri di Napoli e colonnine vere di Utrecht nella release, per
       # le anteprime dell'app.
       - name: Dati veri per le anteprime nella release
@@ -188,6 +189,19 @@ jobs:
           gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
           for f in prezzi_napoli.json colonnine_utrecht.json; do
             [ -s "$f" ] && gh release upload anteprima "$f" --clobber
+          done
+          true
+      # Sui rami di lavoro: i viaggi veri per le anteprime in una release a
+      # parte («lavoro»), senza toccare quella dell'app.
+      - name: Dati veri per le anteprime (rami di lavoro)
+        if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "gdanav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app è nella release «anteprima»."
+          for f in anteprima.json anteprima_tappa.json; do
+            [ -s "$f" ] && gh release upload lavoro "$f" --clobber
           done
           true
       - name: Com'è fatto il traffico TomTom

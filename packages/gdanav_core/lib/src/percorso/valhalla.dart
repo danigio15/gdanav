@@ -258,16 +258,32 @@ class PercorsoCalcolato {
     return _copia(tratti: nuovi, code: code, ritardoTraffico: ritardo, trafficoVero: true, senzaTraffico: this);
   }
 
-  /// La strada fatta più a lungo («A1», «E45»): per chiamare il percorso.
-  String get stradaPrincipale {
+  /// I metri fatti su ogni strada.
+  Map<String, double> get _metriPerStrada {
     final metri = <String, double>{};
     for (final m in manovre) {
       final nome = m.strada.split(', ').first.trim();
       if (nome.isEmpty) continue;
       metri[nome] = (metri[nome] ?? 0) + m.lunghezzaM;
     }
+    return metri;
+  }
+
+  /// La strada fatta più a lungo («A1», «E45»): per chiamare il percorso.
+  String get stradaPrincipale {
+    final metri = _metriPerStrada;
     if (metri.isEmpty) return '';
     return (metri.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).first.key;
+  }
+
+  /// Per distinguerlo dagli [altri] percorsi: la strada più lunga che gli
+  /// altri non fanno (se tutti fanno la stessa autostrada, «via A27» non
+  /// dice niente).
+  String stradaDistintiva(Iterable<PercorsoCalcolato> altri) {
+    final loro = {for (final a in altri) ...a._metriPerStrada.keys};
+    final mie = _metriPerStrada.entries.where((e) => !loro.contains(e.key) && e.value >= 500).toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return mie.isEmpty ? stradaPrincipale : mie.first.key;
   }
 
   /// Dalle `steps` del formato OSRM di Valhalla: per ogni manovra le corsie

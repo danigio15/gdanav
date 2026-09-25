@@ -56,6 +56,17 @@ void main() {
           ],
           'sections': [
             {'sectionType': 'TRAVEL_MODE', 'startPointIndex': 0, 'endPointIndex': 100},
+            // Chiusa per TomTom, ma ci si passa a 86 km/h senza perdere tempo:
+            // non si colora.
+            {
+              'sectionType': 'TRAFFIC',
+              'startPointIndex': 40,
+              'endPointIndex': 45,
+              'simpleCategory': 'ROAD_CLOSURE',
+              'magnitudeOfDelay': 4,
+              'delayInSeconds': 0,
+              'effectiveSpeedInKmh': 86,
+            },
             {
               'sectionType': 'TRAFFIC',
               'startPointIndex': 20,
@@ -73,17 +84,28 @@ void main() {
               'magnitudeOfDelay': 1,
               'delayInSeconds': 60,
             },
+            {
+              'sectionType': 'TRAFFIC',
+              'startPointIndex': 80,
+              'endPointIndex': 84,
+              'simpleCategory': 'ROAD_CLOSURE',
+              'magnitudeOfDelay': 4,
+              'delayInSeconds': 900,
+              'effectiveSpeedInKmh': 0,
+            },
           ],
         },
       ],
     };
     final code = TrafficoTomTom.codeDa(json, p.punti);
-    expect(code, hasLength(2));
+    expect(code, hasLength(3));
     expect(code.first.daM, closeTo(10000, 200));
     expect(code.first.aM, closeTo(15000, 200));
     expect(code.first.livello, 3);
     expect(code.first.ritardo, const Duration(minutes: 7));
-    expect(code.last.tipo, 'Lavori');
+    expect(code[1].tipo, 'Lavori');
+    expect(code.last.tipo, 'Strada chiusa');
+    expect(code.last.livello, 4);
   });
 
   test('TomTom riceve i punti del percorso e il ritardo entra nel viaggio', () async {
@@ -173,6 +195,9 @@ void main() {
       expect(scelte.first.conPedaggi, isFalse);
       expect(scelte.last.conPedaggi, isTrue);
       expect(scelte.first.stradaPrincipale, isNotEmpty);
+      // Ognuna col nome della strada che la distingue.
+      expect(scelte.first.stradaDistintiva([scelte.last]), 'A5');
+      expect(scelte.last.stradaDistintiva([scelte.first]), 'A6');
     });
 
     test('lo scelto si rifà passando dai suoi punti, ognuno con la sua direzione', () async {
