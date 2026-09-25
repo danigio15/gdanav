@@ -238,6 +238,17 @@ void main() {
         });
       }
       stdout.writeln('ANTEPRIMA:${jsonEncode(fuori)}');
+      // Lo stesso viaggio passando da Utrecht Centraal.
+      final conTappa =
+          await valhalla.calcola(const [Punto(52.1150, 5.0700), Punto(52.0894, 5.1100), Punto(52.0560, 5.1500)]);
+      stdout.writeln(
+        'ANTEPRIMA_TAPPA:${jsonEncode({
+              'forma': codificaPolyline(conTappa.punti, precisione: 6),
+              'm': conTappa.lunghezzaM,
+              's': conTappa.durata.inSeconds,
+              'via': conTappa.stradaPrincipale
+            })}',
+      );
       avviso(
           'Anteprima Utrecht', '${fuori.length} strade, code: ${[for (final f in fuori) (f['code'] as List).length]}');
     } catch (e) {
