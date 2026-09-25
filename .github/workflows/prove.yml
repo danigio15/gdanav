@@ -3,6 +3,8 @@ name: Le prove
 on:
   push:
   pull_request:
+  # Da GitHub, «Run workflow»: per esempio per rifare le foto degli svincoli.
+  workflow_dispatch:
 
 jobs:
   motore:
@@ -200,6 +202,36 @@ jobs:
           gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
           gh release upload anteprima foto_auto.json foto_auto.tsv --clobber
 
+  # Le foto vere degli svincoli (Mapillary) con la vista di gdanav sopra, su
+  # percorsi veri: con «[svincolo]» nel commit o lanciando a mano. Le
+  # immagini vanno nella release «anteprima».
+  svincolo-foto:
+    if: contains(github.event.head_commit.message, '[svincolo]') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+      - run: flutter pub get
+      - run: flutter test test/rete/svincolo_rete_test.dart --reporter expanded
+        env:
+          MAPILLARY: ${{ secrets.GDANAV_MAPILLARY_TOKEN }}
+          USCITA: ${{ github.workspace }}/svincoli
+      - name: Nella release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: .
+        run: |
+          gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
+          gh release upload anteprima svincoli/*.png --clobber
+
   # Le colonnine rapide per l'archivio dentro l'app, dagli estratti completi
   # di OpenStreetMap (Geofabrik) filtrati con osmium: niente Overpass, che è
   # spesso sovraccarico. Solo quando il commit lo chiede con «[colonnine]»;
@@ -275,9 +307,11 @@ jobs:
           --dart-define=GDANAV_TUTTO_SBLOCCATO=true
           --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM"
           --dart-define=GDANAV_OCM_CHIAVE="$OCM"
+          --dart-define=GDANAV_MAPILLARY_TOKEN="$MAPILLARY"
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
+          MAPILLARY: ${{ secrets.GDANAV_MAPILLARY_TOKEN }}
       - run: cp build/app/outputs/flutter-apk/app-release.apk gdanav.apk
       # Il pacchetto per il Play Store (test interno): da lì Android Auto
       # mostra l'app senza «Origini sconosciute». Qui Premium si compra;
@@ -286,9 +320,11 @@ jobs:
           flutter build appbundle --release --build-number=${{ github.run_number }}
           --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM"
           --dart-define=GDANAV_OCM_CHIAVE="$OCM"
+          --dart-define=GDANAV_MAPILLARY_TOKEN="$MAPILLARY"
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
+          MAPILLARY: ${{ secrets.GDANAV_MAPILLARY_TOKEN }}
       - run: cp build/app/outputs/bundle/release/app-release.aab gdanav.aab
       - uses: actions/upload-artifact@v4
         with:

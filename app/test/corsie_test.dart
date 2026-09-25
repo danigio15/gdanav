@@ -78,4 +78,42 @@ void main() {
     final png = await tester.runAsync(() => svincoloPng(m));
     expect(png!.sublist(1, 4), 'PNG'.codeUnits);
   });
+
+  testWidgets('con la foto vera: la foto sotto, freccia e cartello sopra, e la citazione', (tester) async {
+    const m = Manovra(
+      istruzione: 'Esci a destra',
+      lunghezzaM: 800,
+      secondi: 30,
+      inizio: 7,
+      tipo: 20,
+      verso: 'A1 · Roma',
+      corsie: [
+        Corsia([DirezioneCorsia.dritto]),
+        Corsia([DirezioneCorsia.leggeraDestra], giusta: true),
+      ],
+    );
+    // Una «foto» qualsiasi: lo svincolo disegnato, in PNG.
+    final byte = (await tester.runAsync(() => svincoloPng(m)))!;
+    final foto = FotoStrada(
+      id: '1',
+      url: 'https://foto.esempio/1.jpg',
+      punto: const Punto(45, 9),
+      direzione: 90,
+      scattata: DateTime.utc(2024, 5),
+      autore: 'mario',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PopupSvincolo(manovra: m, metri: 600, foto: (foto, byte), onChiudi: () {}),
+        ),
+      ),
+    );
+    expect(find.byKey(const Key('foto-svincolo')), findsOneWidget);
+    expect(find.text('© mario, Mapillary · 2024 · CC BY-SA'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    // Per l'auto: la foto con sopra la vista, sempre in PNG.
+    final png = await tester.runAsync(() => svincoloPng(m, foto: byte, citazione: foto.citazione));
+    expect(png!.sublist(1, 4), 'PNG'.codeUnits);
+  });
 }

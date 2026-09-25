@@ -17,6 +17,10 @@ abstract final class Servizi {
   /// giorno). Senza chiave la mappa resta senza traffico.
   static const chiaveTomTom = String.fromEnvironment('GDANAV_TOMTOM_CHIAVE', defaultValue: _chiaveTomTom);
 
+  /// Le foto vere degli svincoli: Mapillary (gratuito, con la citazione).
+  /// Senza chiave si vede lo svincolo disegnato.
+  static const chiaveMapillary = String.fromEnvironment('GDANAV_MAPILLARY_TOKEN');
+
   /// Le segnalazioni della comunità (incidenti, polizia, pericoli): il relay
   /// di gdanav su Cloudflare.
   static const segnalazioni = String.fromEnvironment('GDANAV_SEGNALAZIONI', defaultValue: _segnalazioni);

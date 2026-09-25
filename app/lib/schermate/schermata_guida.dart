@@ -12,6 +12,7 @@ import '../componenti/vetro.dart';
 import '../mappa/controllo_mappa.dart';
 import '../mappa/mappa_viaggio.dart';
 import '../stato/avvisi_strada.dart';
+import '../stato/foto_svincoli.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_segnalazioni.dart';
@@ -39,6 +40,9 @@ class _SchermataGuidaState extends State<SchermataGuida> {
 
   /// Le segnalazioni lungo la strada, condivise con lo schermo dell'auto.
   AvvisiStrada? _avvisi;
+
+  /// Le foto vere degli svincoli, condivise con lo schermo dell'auto.
+  late final _foto = FotoSvincoli.di(widget.guida);
 
   /// Gli svincoli di cui si è chiuso il popup.
   final _svincoliChiusi = <int>{};
@@ -103,7 +107,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                   ),
             ),
             ListenableBuilder(
-              listenable: Listenable.merge([g, widget.posizione, ?_avvisi]),
+              listenable: Listenable.merge([g, widget.posizione, ?_avvisi, _foto]),
               builder: (context, _) => Column(
                 children: [
                   SafeArea(
@@ -115,6 +119,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                     PopupSvincolo(
                       manovra: m,
                       metri: metri,
+                      foto: _foto.perManovra(m),
                       onChiudi: () => setState(() => _svincoliChiusi.add(m.inizio)),
                     ),
                   if (_avvisi?.davanti case (final s, final m)) _AvvisoSegnalazione(segnalazione: s, metri: m),

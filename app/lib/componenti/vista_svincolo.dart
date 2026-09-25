@@ -5,6 +5,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
+import 'icona_manovra.dart';
+
 /// Le manovre che meritano la vista dello svincolo: uscite, rampe e bivi.
 const tipiSvincolo = {18, 19, 20, 21, 23, 24};
 
@@ -16,9 +18,13 @@ bool haSvincolo(Manovra m) => tipiSvincolo.contains(m.tipo);
 /// porta in autostrada, blu altrimenti). Disegnato dalla manovra: quante
 /// corsie, quali giuste, da che parte si esce.
 class DisegnoSvincolo extends CustomPainter {
-  DisegnoSvincolo(this.manovra);
+  DisegnoSvincolo(this.manovra, {this.sopraFoto = false});
 
   final Manovra manovra;
+
+  /// Sopra la foto vera dello svincolo: niente strada disegnata, solo la
+  /// freccia, le corsie e il cartello.
+  final bool sopraFoto;
 
   bool get _destra => const {18, 20, 23}.contains(manovra.tipo);
 
@@ -26,6 +32,11 @@ class DisegnoSvincolo extends CustomPainter {
   void paint(Canvas canvas, Size s) {
     final w = s.width, h = s.height;
     final orizzonte = h * 0.30;
+    if (sopraFoto) {
+      _sopraFoto(canvas, w, h);
+      _cartello(canvas, w, h, orizzonte);
+      return;
+    }
 
     // Cielo e prato.
     canvas.drawRect(
@@ -202,6 +213,100 @@ class DisegnoSvincolo extends CustomPainter {
     canvas.drawPath(punta, Paint()..color = Colors.white);
   }
 
+  /// Sulla foto: la freccia grande che curva verso il ramo, e in basso le
+  /// corsie con quelle giuste in blu.
+  void _sopraFoto(Canvas canvas, double w, double h) {
+    // In basso un'ombra, perché freccia e corsie si leggano su ogni foto.
+    canvas.drawRect(
+      Rect.fromLTWH(0, h * 0.55, w, h * 0.45),
+      Paint()
+        ..shader = ui.Gradient.linear(Offset(0, h * 0.55), Offset(0, h), [
+          Colors.black.withValues(alpha: 0),
+          Colors.black.withValues(alpha: 0.45),
+        ]),
+    );
+    canvas.save();
+    if (!_destra) {
+      canvas.translate(w, 0);
+      canvas.scale(-1, 1);
+    }
+    // La freccia: dal basso sale sulla corsia e piega verso l'uscita.
+    final percorso = Path()
+      ..moveTo(w * 0.56, h * 0.97)
+      ..lineTo(w * 0.60, h * 0.74)
+      ..quadraticBezierTo(w * 0.64, h * 0.56, w * 0.82, h * 0.50);
+    final metriche = percorso.computeMetrics().first;
+    final fine = metriche.getTangentForOffset(metriche.length)!;
+    final corpo = metriche.extractPath(0, metriche.length - w * 0.02);
+    for (final (colore, spessore) in [
+      (const Color(0xCC123E91), w * 0.075),
+      (Colors.white.withValues(alpha: 0.95), w * 0.05),
+    ]) {
+      canvas.drawPath(
+        corpo,
+        Paint()
+          ..color = colore
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = spessore
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      );
+    }
+    final a = fine.angle, p = fine.position, l = w * 0.065;
+    final punta = Path()
+      ..moveTo(p.dx + math.cos(-a) * l, p.dy + math.sin(-a) * l)
+      ..lineTo(p.dx + math.cos(-a + 2.3) * l * 0.85, p.dy + math.sin(-a + 2.3) * l * 0.85)
+      ..lineTo(p.dx + math.cos(-a - 2.3) * l * 0.85, p.dy + math.sin(-a - 2.3) * l * 0.85)
+      ..close();
+    canvas.drawPath(
+      punta,
+      Paint()
+        ..color = const Color(0xCC123E91)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = w * 0.013
+        ..strokeJoin = StrokeJoin.round,
+    );
+    canvas.drawPath(punta, Paint()..color = Colors.white.withValues(alpha: 0.95));
+    canvas.restore();
+
+    // Le corsie, in basso a sinistra: le giuste accese su blu.
+    final corsie = manovra.corsieUtili ? manovra.corsie : const <Corsia>[];
+    if (corsie.isEmpty) return;
+    final lato = h * 0.12, pad = h * 0.018;
+    final larghezza = corsie.length * (lato + pad) + pad;
+    final riquadro = RRect.fromRectAndRadius(
+      Rect.fromLTWH(w * 0.03, h * 0.97 - lato - pad * 2, larghezza, lato + pad * 2),
+      Radius.circular(h * 0.03),
+    );
+    canvas.drawRRect(riquadro, Paint()..color = const Color(0xE61B2130));
+    for (final (i, c) in corsie.indexed) {
+      final x = riquadro.left + pad + i * (lato + pad), y = riquadro.top + pad;
+      if (c.giusta) {
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(Rect.fromLTWH(x, y, lato, lato), Radius.circular(h * 0.02)),
+          Paint()..color = const Color(0xFF2F6FE4),
+        );
+      }
+      for (final d in c.direzioni.isEmpty ? const [DirezioneCorsia.dritto] : c.direzioni) {
+        final icona = iconaCorsia(d);
+        final accesa = c.giusta && (c.consigliata == null || c.consigliata == d);
+        final t = TextPainter(
+          text: TextSpan(
+            text: String.fromCharCode(icona.codePoint),
+            style: TextStyle(
+              fontFamily: icona.fontFamily,
+              package: icona.fontPackage,
+              fontSize: lato * 0.85,
+              color: accesa ? Colors.white : Colors.white.withValues(alpha: c.giusta ? 0.4 : 0.3),
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        t.paint(canvas, Offset(x + (lato - t.width) / 2, y + (lato - t.height) / 2));
+      }
+    }
+  }
+
   /// Il cartello sopra il ramo: uscita e direzione, come in autostrada.
   void _cartello(Canvas canvas, double w, double h, double orizzonte) {
     final verso = manovra.verso.isNotEmpty
@@ -275,13 +380,48 @@ class DisegnoSvincolo extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(DisegnoSvincolo old) => old.manovra != manovra;
+  bool shouldRepaint(DisegnoSvincolo old) => old.manovra != manovra || old.sopraFoto != sopraFoto;
 }
 
-/// La vista dello svincolo in PNG, per lo schermo di Android Auto.
-Future<Uint8List> svincoloPng(Manovra m, {double larghezza = 800, double altezza = 480}) async {
+/// La vista dello svincolo in PNG, per lo schermo di Android Auto: sulla foto
+/// vera se c'è ([foto], JPEG di Mapillary, con [citazione]), altrimenti
+/// disegnata.
+Future<Uint8List> svincoloPng(
+  Manovra m, {
+  Uint8List? foto,
+  String? citazione,
+  double larghezza = 800,
+  double altezza = 480,
+}) async {
   final registro = ui.PictureRecorder();
-  DisegnoSvincolo(m).paint(Canvas(registro), Size(larghezza, altezza));
+  final canvas = Canvas(registro);
+  final dimensione = Size(larghezza, altezza);
+  ui.Image? scatto;
+  if (foto != null) {
+    try {
+      scatto = (await (await ui.instantiateImageCodec(foto)).getNextFrame()).image;
+    } catch (_) {}
+  }
+  if (scatto != null) {
+    // La foto a riempire, tagliata al centro.
+    final originale = Size(scatto.width.toDouble(), scatto.height.toDouble());
+    final sorgente = applyBoxFit(BoxFit.cover, originale, dimensione).source;
+    final da = Alignment.center.inscribe(sorgente, Offset.zero & originale);
+    canvas.drawImageRect(scatto, da, Offset.zero & dimensione, Paint()..filterQuality = FilterQuality.medium);
+    DisegnoSvincolo(m, sopraFoto: true).paint(canvas, dimensione);
+    if (citazione != null) {
+      final t = TextPainter(
+        text: TextSpan(
+          text: citazione,
+          style: TextStyle(fontFamily: 'Roboto', color: Colors.white70, fontSize: altezza * 0.03),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: larghezza * 0.6);
+      t.paint(canvas, Offset(larghezza - t.width - altezza * 0.02, altezza - t.height - altezza * 0.015));
+    }
+  } else {
+    DisegnoSvincolo(m).paint(canvas, dimensione);
+  }
   final immagine = await registro.endRecording().toImage(larghezza.round(), altezza.round());
   final dati = await immagine.toByteData(format: ui.ImageByteFormat.png);
   return dati!.buffer.asUint8List();
@@ -290,9 +430,12 @@ Future<Uint8List> svincoloPng(Manovra m, {double larghezza = 800, double altezza
 /// Il popup sul telefono: la vista, i metri che mancano con la barra che si
 /// accorcia, e la X per chiuderlo.
 class PopupSvincolo extends StatelessWidget {
-  const PopupSvincolo({super.key, required this.manovra, required this.metri, required this.onChiudi});
+  const PopupSvincolo({super.key, required this.manovra, required this.metri, required this.onChiudi, this.foto});
 
   final Manovra manovra;
+
+  /// La foto vera dello svincolo, se Mapillary ce l'ha.
+  final (FotoStrada, Uint8List)? foto;
   final double metri;
   final VoidCallback onChiudi;
 
@@ -310,7 +453,24 @@ class PopupSvincolo extends StatelessWidget {
           children: [
             AspectRatio(
               aspectRatio: 5 / 3,
-              child: CustomPaint(painter: DisegnoSvincolo(manovra)),
+              child: switch (foto) {
+                (final f, final byte) => Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.memory(byte, key: const Key('foto-svincolo'), fit: BoxFit.cover, gaplessPlayback: true),
+                    CustomPaint(painter: DisegnoSvincolo(manovra, sopraFoto: true)),
+                    Positioned(
+                      right: 8,
+                      top: 4,
+                      child: Text(
+                        f.citazione,
+                        style: const TextStyle(color: Colors.white70, fontSize: 10, shadows: [Shadow(blurRadius: 3)]),
+                      ),
+                    ),
+                  ],
+                ),
+                null => CustomPaint(painter: DisegnoSvincolo(manovra)),
+              },
             ),
             Positioned(
               left: 10,
