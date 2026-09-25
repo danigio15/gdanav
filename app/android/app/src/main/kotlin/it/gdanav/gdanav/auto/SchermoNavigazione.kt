@@ -93,7 +93,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     private fun tasto(id: Int, azione: () -> Unit) =
         Action.Builder().setIcon(icona(id)).setOnClickListener { azione() }.build()
 
-    /** In alto: Cerca, Menu e Fine; appena passata una segnalazione, «C'è ancora?» Sì / No. */
+    /** In alto: Cerca e Menu (in guida anche Fine); appena passata una segnalazione, «C'è ancora?» Sì / No. */
     private fun azioni(): ActionStrip {
         val striscia = ActionStrip.Builder()
         val ancora = PonteAuto.avviso.ancoraId
@@ -104,11 +104,20 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             striscia.addAction(tasto(R.drawable.auto_no) { PonteAuto.ancora(ancora, false) })
             return striscia.build()
         }
-        striscia.addAction(tasto(R.drawable.auto_cerca) { screenManager.push(SchermoCerca(carContext)) })
         if (PonteAuto.guida != null) {
+            // In guida c'è poco spazio: solo la lente.
+            striscia.addAction(tasto(R.drawable.auto_cerca) { screenManager.push(SchermoCerca(carContext)) })
             striscia.addAction(tasto(R.drawable.auto_menu) { screenManager.push(SchermoMenu(carContext, renderer)) })
             striscia.addAction(Action.Builder().setTitle("Fine").setOnClickListener { PonteAuto.fermaDallAuto() }.build())
         } else {
+            // Da fermi, come Google Maps: «Cerca» e «Menu» ben leggibili.
+            striscia.addAction(
+                Action.Builder()
+                    .setTitle("Cerca")
+                    .setIcon(icona(R.drawable.auto_cerca))
+                    .setOnClickListener { screenManager.push(SchermoCerca(carContext)) }
+                    .build(),
+            )
             striscia.addAction(
                 Action.Builder()
                     .setTitle("Menu")
@@ -168,17 +177,11 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
                 ).setRemainingTimeSeconds(guida.restantiS).build(),
             )
         } else {
-            modello.setNavigationInfo(
-                MessageInfo.Builder("GDA NAV")
-                    .setText(
-                        PonteAuto.messaggio ?: if (PonteAuto.cruscotto.elettrica) {
-                            "Tocca la lente per cercare, o Menu per Casa, Lavoro e colonnine."
-                        } else {
-                            "Tocca la lente per cercare, o Menu per Casa, Lavoro e distributori."
-                        },
-                    )
-                    .build(),
-            )
+            // Da fermi la mappa resta pulita; il riquadro solo se c'è qualcosa
+            // da dire («Calcolo il percorso…», un errore).
+            PonteAuto.messaggio?.let { testo ->
+                modello.setNavigationInfo(MessageInfo.Builder(testo).build())
+            }
         }
         return modello.build()
     }

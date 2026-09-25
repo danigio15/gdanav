@@ -101,4 +101,45 @@ void main() {
       avviso('Prezzi MIMIT grezzi', 'errore: $e');
     }
   }, skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  // Le colonnine vere intorno a Utrecht, con lo stato TomTom se c'è la
+  // chiave: per le anteprime dell'app.
+  test('colonnine vere intorno a Utrecht', () async {
+    const qui = Punto(52.0907, 5.1214);
+    try {
+      final tutte = await ClienteColonnineRelay(Uri.parse('https://gdanav.gdahome.org/')).lungo([qui], distanzaKm: 8);
+      final rapide = [
+        for (final c in tutte)
+          if (c.connettori.any((x) => x.potenzaKw >= 50)) c,
+      ]..sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
+      final chiave = Platform.environment['GDANAV_TOMTOM'] ?? '';
+      final stato = chiave.isEmpty ? null : DisponibilitaTomTom(chiave);
+      final elenco = <Colonnina>[];
+      for (final c in rapide.take(25)) {
+        elenco.add(stato == null
+            ? c
+            : await stato.aggiorna(c).timeout(const Duration(seconds: 8)).catchError((Object _) => c));
+      }
+      avviso('Colonnine Utrecht', '${tutte.length} in tutto, ${rapide.length} rapide, stato TomTom: ${stato != null}');
+      if (Platform.environment['GDANAV_COLONNINE'] case final file?) {
+        File(file).writeAsStringSync(
+          jsonEncode([
+            for (final c in elenco)
+              {
+                'id': c.id,
+                'nome': c.nome,
+                'operatore': c.operatore,
+                'lat': c.posizione.lat,
+                'lon': c.posizione.lon,
+                'connettori': [
+                  for (final x in c.connettori) {'tipo': x.tipo.name, 'kw': x.potenzaKw, 'stato': x.stato.name},
+                ],
+              },
+          ]),
+        );
+      }
+    } catch (e) {
+      avviso('Colonnine Utrecht', 'errore: $e');
+    }
+  }, skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 }
