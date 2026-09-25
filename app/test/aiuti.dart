@@ -221,3 +221,26 @@ class RelayFinto {
     return http.Response(jsonEncode(s), 201);
   }
 }
+
+/// Il meteo finto: sempre [temperatura] gradi, pioggia, vento da nord.
+class MeteoFinto implements FonteMeteo {
+  MeteoFinto(this.temperatura);
+  final double temperatura;
+  var richieste = 0;
+
+  @override
+  Future<List<Previsione>> previsioni(Punto p) async {
+    richieste++;
+    final ora = DateTime.now();
+    return [
+      for (var h = -1; h < 48; h++)
+        Previsione(
+          ora: ora.add(Duration(hours: h)),
+          temperaturaC: temperatura,
+          ventoMs: 4,
+          simbolo: 'rain',
+          pioggiaMm: 1,
+        ),
+    ];
+  }
+}

@@ -126,6 +126,10 @@ class GestoreViaggio extends ChangeNotifier {
 
   StatoViaggio stato = const NessunViaggio();
 
+  /// Il meteo previsto lungo la strada (Premium), per il consumo: freddo,
+  /// caldo e vento contro. `null`, o risposta `null`: si pianifica senza.
+  Future<({double temperaturaC, double ventoControMs})?> Function(Punto da, Punto a)? stimaMeteo;
+
   /// Oltre questo si smette di aspettare e lo si dice.
   static const tempoMassimo = Duration(minutes: 2);
 
@@ -140,6 +144,9 @@ class GestoreViaggio extends ChangeNotifier {
     await archivio.salvaOpzioniPercorso(o);
     if (strade && destinazione != null) await pianifica(destinazione!);
   }
+
+  /// Con cosa si è calcolato l'ultimo viaggio: temperatura, vento, correttivi.
+  Condizioni? condizioni;
 
   /// Le colonnine dove l'utente ha deciso di fermarsi, per questo viaggio.
   final obbligate = <String>{};
@@ -193,12 +200,22 @@ class GestoreViaggio extends ChangeNotifier {
     final calcolo = Calcolo(destinazione);
     _imposta(calcolo);
     try {
+      var condizioni = consumo?.condizioni(auto.stato) ?? const Condizioni();
+      if (await stimaMeteo?.call(partenza, destinazione.posizione) case final m?) {
+        condizioni = Condizioni.daMeteo(
+          temperaturaC: m.temperaturaC,
+          ventoControMs: m.ventoControMs,
+          fattoreConsumo: condizioni.fattoreConsumo,
+          fattoriStrada: condizioni.fattoriStrada,
+        );
+      }
+      this.condizioni = condizioni;
       final viaggio = await costruisci(impostazioni, auto.veicolo, preferenze, opzioni)
           .pianifica(
             partenza: partenza,
             arrivo: destinazione.posizione,
             batteria: batteria,
-            condizioni: consumo?.condizioni(auto.stato) ?? const Condizioni(),
+            condizioni: condizioni,
             obbligate: Set.of(obbligate),
             avanzamento: (f) {
               if (!identical(stato, calcolo)) return;
@@ -248,4 +265,20 @@ class GestoreViaggio extends ChangeNotifier {
     stato = s;
     notifyListeners();
   }
+}
+
+/// Le colonnine rapide intorno a [qui] adatte all'auto, dalla più vicina; con
+/// Premium anche libere e occupate adesso. Per «Colonnine vicine» sull'auto.
+Future<List<Colonnina>> colonnineVicine(Punto qui, ProfiloVeicolo veicolo, {double km = 15, int quante = 8}) async {
+  final fonte = ColonnineLocali(archivioColonnine(), riserva: ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni)));
+  final adatte = [
+    for (final c in await fonte.lungo([qui], distanzaKm: km))
+      if (c.potenzaNominalePer(veicolo.connettori) > 0 && distanzaM(qui, c.posizione) <= km * 1000) c,
+  ]..sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
+  final prime = adatte.take(quante).toList();
+  final d = GestorePremium.attivo.value ? _disponibilita : null;
+  if (d == null) return prime;
+  return Future.wait([
+    for (final c in prime) d.aggiorna(c).timeout(const Duration(seconds: 8)).catchError((Object _) => c),
+  ]);
 }

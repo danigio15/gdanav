@@ -2,6 +2,8 @@ package it.gdanav.gdanav.auto
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Handler
 import android.os.Looper
 import io.flutter.plugin.common.BinaryMessenger
@@ -54,6 +56,44 @@ object PonteAuto {
 
     @Volatile var luoghi: List<Luogo> = emptyList()
 
+    fun casa(): Luogo? = luoghi.firstOrNull { it.tipo == "casa" }
+    fun lavoro(): Luogo? = luoghi.firstOrNull { it.tipo == "lavoro" }
+
+    /** Sopra la mappa: batteria, velocità e limite, arrivo, sosta, meteo. */
+    data class Cruscotto(
+        val batteria: Double? = null,
+        val autonomiaKm: Double? = null,
+        val velocita: Double? = null,
+        val limite: Int? = null,
+        val arrivoBatteria: Double? = null,
+        val sostaNome: String? = null,
+        val sostaKm: Double? = null,
+        val sostaBatteria: Double? = null,
+        val meteoTemperatura: Double? = null,
+        val meteoEmoji: String? = null,
+        val meteoDove: String? = null,
+    )
+
+    @Volatile var cruscotto = Cruscotto()
+
+    /** La segnalazione che si avvicina, e quella appena passata. */
+    data class Avviso(
+        val titolo: String? = null,
+        val tipo: String? = null,
+        val metri: Double? = null,
+        val limite: Int? = null,
+        val ancoraId: String? = null,
+        val ancoraTesto: String? = null,
+    )
+
+    @Volatile var avviso = Avviso()
+
+    /** Le opzioni del percorso e la voce, per il menu. */
+    @Volatile var opzioni: Map<String, Any?> = emptyMap()
+
+    /** Le icone delle segnalazioni, disegnate dall'app. */
+    @Volatile var immagini: Map<String, Bitmap> = emptyMap()
+
     /** Cosa dire quando non si guida: «Calcolo il percorso…», o cosa non va. */
     @Volatile var messaggio: String? = null
 
@@ -93,7 +133,18 @@ object PonteAuto {
         })
     }
 
+    /**
+     * Cresce quando cambia qualcosa dei modelli di Android Auto (manovra,
+     * messaggi, luoghi, opzioni): il resto (posizione, cruscotto) ridisegna
+     * solo la mappa, senza consumare gli aggiornamenti concessi dall'auto.
+     */
+    @Volatile var versioneModello = 0
+        private set
+
+    private val soloMappa = setOf("posizione", "sorgenti", "cruscotto", "immagini", "stili")
+
     private fun gestisci(call: MethodCall) {
+        val prima = avviso.ancoraId
         when (call.method) {
             "stili" -> {
                 stileChiaro = call.argument("chiaro")
@@ -114,6 +165,35 @@ object PonteAuto {
                 luoghi = (call.argument<List<Map<String, Any?>>>("elenco") ?: emptyList()).mapNotNull(::luogo)
             }
             "messaggio" -> messaggio = call.argument<String>("testo")
+            "cruscotto" -> cruscotto = Cruscotto(
+                batteria = numero(call, "batteria"),
+                autonomiaKm = numero(call, "autonomia_km"),
+                velocita = numero(call, "velocita"),
+                limite = numero(call, "limite")?.toInt(),
+                arrivoBatteria = numero(call, "arrivo_batteria"),
+                sostaNome = call.argument<String>("sosta_nome"),
+                sostaKm = numero(call, "sosta_km"),
+                sostaBatteria = numero(call, "sosta_batteria"),
+                meteoTemperatura = numero(call, "meteo_temperatura"),
+                meteoEmoji = call.argument<String>("meteo_emoji"),
+                meteoDove = call.argument<String>("meteo_dove"),
+            )
+            "avviso" -> avviso = Avviso(
+                titolo = call.argument<String>("titolo"),
+                tipo = call.argument<String>("tipo"),
+                metri = numero(call, "metri"),
+                limite = numero(call, "limite")?.toInt(),
+                ancoraId = call.argument<String>("ancora_id"),
+                ancoraTesto = call.argument<String>("ancora_testo"),
+            )
+            "opzioni" -> opzioni = (call.arguments as? Map<*, *>)?.entries?.associate { "${it.key}" to it.value } ?: emptyMap()
+            "immagini" -> {
+                val nuove = HashMap(immagini)
+                (call.argument<Map<String, ByteArray>>("png") ?: emptyMap()).forEach { (nome, byte) ->
+                    BitmapFactory.decodeByteArray(byte, 0, byte.size)?.let { nuove[nome] = it }
+                }
+                immagini = nuove
+            }
             "premium" -> preferenze?.edit()?.putBoolean("premium", call.argument<Boolean>("sbloccato") == true)?.apply()
             "guida" -> {
                 guida = if (call.argument<Boolean>("attiva") == true) {
@@ -132,7 +212,44 @@ object PonteAuto {
                 }
             }
         }
+        if (call.method !in soloMappa && (call.method != "avviso" || avviso.ancoraId != prima)) versioneModello++
         avvisa()
+    }
+
+    private fun numero(call: MethodCall, chiave: String): Double? = (call.argument<Any?>(chiave) as? Number)?.toDouble()
+
+    /** Una domanda all'app, con la risposta sul filo principale. */
+    fun chiedi(metodo: String, argomenti: Any?, risposta: (Any?) -> Unit = {}) {
+        val c = canale ?: return risposta(null)
+        principale.post {
+            c.invokeMethod(metodo, argomenti, object : MethodChannel.Result {
+                override fun success(r: Any?) = risposta(r)
+
+                override fun error(codice: String, messaggio: String?, dettagli: Any?) = risposta(null)
+
+                override fun notImplemented() = risposta(null)
+            })
+        }
+    }
+
+    /** Casa o Lavoro scelti dalla ricerca sull'auto. */
+    fun imposta(tipo: String, l: Luogo, fatto: (Boolean) -> Unit) =
+        chiedi("imposta", mapOf("tipo" to tipo, "luogo" to l.comeMappa())) { fatto(it == true) }
+
+    fun cambiaOpzione(chiave: String, valore: Any) = chiedi("opzioni", mapOf(chiave to valore))
+
+    fun alternaVoce() = chiedi("voce", null)
+
+    /** Segnala dove sei; la risposta è la frase da mostrare. */
+    fun segnala(tipo: String, risposta: (String) -> Unit) =
+        chiedi("segnala", mapOf("tipo" to tipo)) { risposta(it as? String ?: "Non è partita.") }
+
+    fun ancora(id: String, si: Boolean) = chiedi("ancora", mapOf("id" to id, "si" to si))
+
+    /** Le colonnine rapide vicine, come luoghi da raggiungere. */
+    fun colonnine(risultati: (List<Luogo>) -> Unit) = chiedi("colonnine", null) { r ->
+        @Suppress("UNCHECKED_CAST")
+        risultati(((r as? List<Map<String, Any?>>) ?: emptyList()).mapNotNull { luogo(it + ("tipo" to "colonnina")) })
     }
 
     private fun luogo(m: Map<String, Any?>): Luogo? {
@@ -167,6 +284,7 @@ object PonteAuto {
     /** Una meta scelta sull'auto: il telefono calcola e parte la guida. */
     fun vai(l: Luogo) {
         messaggio = "Calcolo il percorso per ${l.etichetta}…"
+        versioneModello++
         avvisa()
         principale.post { canale?.invokeMethod("vai", l.comeMappa()) }
     }

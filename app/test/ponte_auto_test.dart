@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav/auto/ponte_auto.dart';
 import 'package:gdanav/stato/gestore_luoghi.dart';
+import 'package:gdanav/stato/gestore_meteo.dart';
 import 'package:gdanav/stato/gestore_viaggio.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -120,6 +121,88 @@ void main() {
     await dallAuto('ferma', null);
     expect(a.guida.attiva, isFalse);
     expect(a.viaggio.stato, isA<NessunViaggio>());
+  });
+
+  testWidgets("sull'auto: cruscotto e meteo; Casa, opzioni e voce si cambiano dall'auto", (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final chiamate = <MethodCall>[];
+    final messaggero = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messaggero.setMockMethodCallHandler(canale, (c) async {
+      chiamate.add(c);
+      return null;
+    });
+    addTearDown(() => messaggero.setMockMethodCallHandler(canale, null));
+
+    final a = await ambiente(tester, km: 20);
+    final luoghi = GestoreLuoghi(a.archivio);
+    await tester.runAsync(luoghi.carica);
+    final meteo = GestoreMeteo(viaggio: a.viaggio, fonte: MeteoFinto(7));
+    addTearDown(meteo.dispose);
+    final ponte = PonteAuto(
+      viaggio: a.viaggio,
+      guida: a.guida,
+      posizione: a.posizione,
+      luoghi: luoghi,
+      auto: a.auto,
+      meteo: meteo,
+      canale: canale,
+    )..avvia();
+    addTearDown(ponte.ferma);
+    await tester.pump();
+
+    Future<Object?> dallAuto(String metodo, Object? argomenti) async {
+      Object? risposta;
+      await tester.runAsync(
+        () => messaggero.handlePlatformMessage(
+          'gdanav/schermo_auto',
+          const StandardMethodCodec().encodeMethodCall(MethodCall(metodo, argomenti)),
+          (dati) => risposta = dati == null ? null : const StandardMethodCodec().decodeEnvelope(dati),
+        ),
+      );
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump();
+      return risposta;
+    }
+
+    Map<Object?, Object?> ultima(String metodo) => chiamate.lastWhere((c) => c.method == metodo).arguments as Map;
+
+    // Batteria e autonomia anche da fermi.
+    a.auto.manuale.imposta(80);
+    await tester.pump();
+    expect(ultima('cruscotto')['batteria'], 80);
+    expect(ultima('cruscotto')['autonomia_km'], isNotNull);
+
+    // In viaggio: la batteria all'arrivo e il meteo all'arrivo.
+    await tester.runAsync(() => a.viaggio.vaiA(const Luogo(nome: 'Nord', posizione: Punto(42.18, 12))));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+    a.guida.avvia();
+    a.posizioni.add((a.viaggio.stato as ViaggioPronto).viaggio.percorso.punti[3]);
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+    await tester.pump();
+    final c = ultima('cruscotto');
+    expect(c['arrivo_batteria'], isNotNull);
+    expect(c['meteo_temperatura'], 7);
+    expect(c['meteo_dove'], "all'arrivo");
+
+    // Lavoro salvato dall'auto.
+    expect(
+      await dallAuto('imposta', {
+        'tipo': 'lavoro',
+        'luogo': {'nome': 'Ufficio', 'descrizione': 'Via Milano 3', 'lat': 42.2, 'lon': 12.1},
+      }),
+      isTrue,
+    );
+    expect(luoghi.lavoro!.luogo.nome, 'Ufficio');
+    expect((ultima('luoghi')['elenco'] as List).first, containsPair('tipo', 'lavoro'));
+
+    // Opzioni e voce dall'auto.
+    await dallAuto('opzioni', {'pedaggi': true, 'modo': 'risparmio'});
+    expect(a.viaggio.opzioni.evitaPedaggi, isTrue);
+    expect(a.viaggio.opzioni.modo, ModoGuida.risparmio);
+    expect(ultima('opzioni'), containsPair('pedaggi', true));
+    await dallAuto('voce', null);
+    expect(a.guida.muto, isTrue);
+    expect(ultima('opzioni'), containsPair('muto', true));
   });
 
   testWidgets('senza Android Auto si tace', (tester) async {

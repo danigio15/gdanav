@@ -17,6 +17,7 @@ import '../stato/gestore_premium.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_luoghi.dart';
 import '../stato/gestore_mappe_offline.dart';
+import '../stato/gestore_meteo.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_viaggio.dart';
@@ -49,6 +50,7 @@ class SchermataPrincipale extends StatefulWidget {
     this.chiediPosizione,
     this.luoghi,
     this.segnalazioni,
+    this.meteo,
     this.consumo,
     this.fotoAuto,
     this.premium,
@@ -66,6 +68,9 @@ class SchermataPrincipale extends StatefulWidget {
 
   /// Le segnalazioni della comunità; se manca se ne crea uno sui servizi cablati.
   final GestoreSegnalazioni? segnalazioni;
+
+  /// Il meteo lungo la strada (Premium); `null` nelle prove.
+  final GestoreMeteo? meteo;
 
   /// Il consumo imparato, da mostrare in «La tua auto».
   final GestoreConsumo? consumo;
@@ -502,7 +507,12 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                               ),
                             ),
                           )
-                        : SchedaViaggio(gestore: viaggio, onAvvia: _avvia, soglia: _preferenze.minimoArrivo),
+                        : SchedaViaggio(
+                            gestore: viaggio,
+                            onAvvia: _avvia,
+                            soglia: _preferenze.minimoArrivo,
+                            meteo: widget.meteo,
+                          ),
                   ),
                 ],
               );

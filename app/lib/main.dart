@@ -11,6 +11,7 @@ import 'stato/gestore_consumo.dart';
 import 'stato/gestore_premium.dart';
 import 'stato/gestore_guida.dart';
 import 'stato/gestore_luoghi.dart';
+import 'stato/gestore_meteo.dart';
 import 'stato/gestore_posizione.dart';
 import 'stato/gestore_segnalazioni.dart';
 import 'stato/gestore_viaggio.dart';
@@ -44,6 +45,9 @@ Future<void> main() async {
   final posizione = GestorePosizione(archivio: archivio, letture: lettureGps);
   await posizione.carica();
   final segnalazioni = GestoreSegnalazioni(posizione: posizione, autovelox: archivioAutovelox());
+  // Il meteo lungo la strada (Premium): nel consumo e sullo schermo.
+  final meteo = GestoreMeteo(viaggio: viaggio, posizione: posizione);
+  viaggio.stimaMeteo = meteo.stima;
   final luoghi = GestoreLuoghi(archivio);
   await luoghi.carica();
   // Le colonnine dentro l'app: si leggono mentre si guarda la mappa.
@@ -53,7 +57,17 @@ Future<void> main() async {
   // Aperta da Android Auto la schermata del telefono non c'è: la posizione
   // parte subito, se il permesso è già stato dato.
   if (await haPosizione()) posizione.avvia();
-  final ponte = PonteAuto(viaggio: viaggio, guida: guida, posizione: posizione, luoghi: luoghi)..avvia();
+  // Le segnalazioni servono anche con l'app aperta solo sull'auto.
+  segnalazioni.avvia();
+  final ponte = PonteAuto(
+    viaggio: viaggio,
+    guida: guida,
+    posizione: posizione,
+    luoghi: luoghi,
+    auto: auto,
+    segnalazioni: segnalazioni,
+    meteo: meteo,
+  )..avvia();
   ponte.premium(premium.sbloccato);
   premium.addListener(() => ponte.premium(premium.sbloccato));
   runApp(
@@ -64,6 +78,7 @@ Future<void> main() async {
       guida: guida,
       posizione: posizione,
       segnalazioni: segnalazioni,
+      meteo: meteo,
       luoghi: luoghi,
       consumo: consumo,
       fotoAuto: fotoAuto,
@@ -84,6 +99,7 @@ class GdanavApp extends StatelessWidget {
     this.mappa,
     this.chiediPosizione,
     this.segnalazioni,
+    this.meteo,
     this.luoghi,
     this.consumo,
     this.fotoAuto,
@@ -97,6 +113,7 @@ class GdanavApp extends StatelessWidget {
   final GestorePosizione posizione;
   final Future<bool> Function()? chiediPosizione;
   final GestoreSegnalazioni? segnalazioni;
+  final GestoreMeteo? meteo;
   final GestoreLuoghi? luoghi;
   final GestoreConsumo? consumo;
   final GestoreFotoAuto? fotoAuto;
@@ -124,6 +141,7 @@ class GdanavApp extends StatelessWidget {
         mappa: mappa,
         chiediPosizione: chiediPosizione,
         segnalazioni: segnalazioni,
+        meteo: meteo,
         luoghi: luoghi,
         consumo: consumo,
         fotoAuto: fotoAuto,

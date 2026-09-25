@@ -1,27 +1,40 @@
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
+import 'package:gdanav_core/gdanav_core.dart';
 
-import '../servizi.dart';
+import '../componenti/icone_segnalazioni.dart';
+import '../componenti/stato_colonnina.dart' show testoDisponibilita;
 import '../mappa/dati_viaggio.dart';
 import '../mappa/segnaposto.dart';
 import '../mappa/stile.dart';
+import '../servizi.dart';
+import '../stato/avvisi_strada.dart';
+import '../stato/gestore_auto.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_luoghi.dart';
+import '../stato/gestore_meteo.dart';
 import '../stato/gestore_posizione.dart';
+import '../stato/gestore_premium.dart';
+import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 
 /// Tiene aggiornato lo schermo di Android Auto: stile, percorso, colonnine,
-/// segnaposto e prossima manovra; dall'auto arrivano la ricerca, la meta
-/// scelta (che parte subito in guida) e «Fine». Il lato nativo è in
-/// `android/app/src/main/kotlin/it/gdanav/gdanav/auto`. Su iPhone e nelle
-/// prove il canale non c'è, e si tace.
+/// segnalazioni, segnaposto e prossima manovra, e il cruscotto (batteria,
+/// velocità e limite, arrivo, prossima sosta, meteo, avvisi). Dall'auto
+/// arrivano la ricerca, la meta scelta (che parte subito in guida), Casa e
+/// Lavoro da salvare, le opzioni del percorso, le segnalazioni e «Fine». Il
+/// lato nativo è in `android/app/src/main/kotlin/it/gdanav/gdanav/auto`. Su
+/// iPhone e nelle prove il canale non c'è, e si tace.
 class PonteAuto {
   PonteAuto({
     required this.viaggio,
     required this.guida,
     required this.posizione,
     this.luoghi,
+    this.auto,
+    this.segnalazioni,
+    this.meteo,
     MethodChannel? canale,
     DateTime Function()? orologio,
   }) : _canale = canale ?? const MethodChannel('gdanav/schermo_auto'),
@@ -33,10 +46,14 @@ class PonteAuto {
 
   /// Casa, Lavoro e recenti, da scegliere sullo schermo dell'auto.
   final GestoreLuoghi? luoghi;
+  final GestoreAuto? auto;
+  final GestoreSegnalazioni? segnalazioni;
+  final GestoreMeteo? meteo;
   final MethodChannel _canale;
   final DateTime Function() _ora;
   var _attivo = true;
   DateTime _ultimaPosizione = DateTime(0);
+  AvvisiStrada? _avvisi;
 
   void avvia() {
     _canale.setMethodCallHandler(_dallAuto);
@@ -44,22 +61,45 @@ class PonteAuto {
       'chiaro': jsonEncode(stileMappa(scuro: false, chiaveTraffico: Servizi.chiaveTomTom)),
       'scuro': jsonEncode(stileMappa(scuro: true, chiaveTraffico: Servizi.chiaveTomTom)),
     });
+    _immagini();
     viaggio.addListener(_viaggio);
+    viaggio.addListener(_opzioni);
     guida.addListener(_guida);
     posizione.addListener(_posizione);
     luoghi?.addListener(_luoghi);
+    auto?.addListener(_cruscotto);
+    meteo?.addListener(_cruscotto);
+    if (segnalazioni case final s?) {
+      s.addListener(_segnalazioni);
+      _avvisi = AvvisiStrada.di(guida, s)..addListener(_avviso);
+    }
     _viaggio();
     _luoghi();
+    _opzioni();
+    _segnalazioni();
+  }
+
+  /// Le icone delle segnalazioni, disegnate come sul telefono.
+  Future<void> _immagini() async {
+    if (!_attivo) return;
+    try {
+      _manda('immagini', {
+        'png': {for (final t in TipoSegnalazione.values) nomeIcona(t): await iconaSegnalazionePng(t)},
+      });
+    } catch (_) {
+      // Senza icone le segnalazioni restano nel cruscotto.
+    }
   }
 
   Future<Object?> _dallAuto(MethodCall call) async {
+    final a = (call.arguments as Map?) ?? const {};
     switch (call.method) {
       // «Fine» premuto sullo schermo dell'auto.
       case 'ferma':
         if (guida.attiva) await guida.ferma();
         viaggio.annulla();
       case 'cerca':
-        final testo = (call.arguments as Map?)?['testo'] as String? ?? '';
+        final testo = a['testo'] as String? ?? '';
         final trovati = await viaggio.luoghi.cerca(testo, vicinoA: posizione.qui ?? viaggio.ultimaPosizione);
         return [for (final l in trovati) luogoJson(l)];
       // Una meta scelta in auto: si calcola e si parte, senza toccare il telefono.
@@ -70,6 +110,54 @@ class PonteAuto {
         await luoghi?.usato(l);
         await viaggio.vaiA(l);
         if (viaggio.stato is ViaggioPronto) guida.avvia();
+      // «Imposta Casa» (o Lavoro) scelto dalla ricerca sull'auto.
+      case 'imposta':
+        final l = luogoDaJson(a['luogo']);
+        final tipo = TipoPreferito.values.where((t) => t.name == a['tipo']).firstOrNull;
+        final g = luoghi;
+        if (l == null || tipo == null || g == null) return false;
+        await g.salva(Preferito(tipo, l));
+        return true;
+      case 'opzioni':
+        var o = viaggio.opzioni;
+        if (a['modo'] case final String m) {
+          o = o.copia(modo: ModoGuida.values.where((x) => x.name == m).firstOrNull ?? o.modo);
+        }
+        if (a['pedaggi'] case final bool v) o = o.copia(evitaPedaggi: v);
+        if (a['autostrade'] case final bool v) o = o.copia(evitaAutostrade: v);
+        if (a['traghetti'] case final bool v) o = o.copia(evitaTraghetti: v);
+        if (a['ricalcolo'] case final bool v) o = o.copia(ricalcoloAutomatico: v);
+        await viaggio.cambiaOpzioni(o);
+      case 'voce':
+        guida.alternaVoce();
+        _opzioni();
+      case 'segnala':
+        final tipo = TipoSegnalazione.values.where((t) => t.name == a['tipo']).firstOrNull;
+        final s = segnalazioni;
+        if (tipo == null || s == null) return 'Le segnalazioni non sono disponibili.';
+        return s.segnala(tipo);
+      case 'ancora':
+        final s = _avvisi?.passata;
+        if (s != null && s.id == a['id']) _avvisi!.rispondi(s, a['si'] == true);
+      case 'colonnine':
+        final qui = posizione.qui ?? viaggio.ultimaPosizione;
+        final v = auto?.veicolo;
+        if (qui == null || v == null) return const <Object>[];
+        final trovate = await colonnineVicine(qui, v);
+        return [
+          for (final c in trovate)
+            {
+              'nome': c.nome,
+              'descrizione': [
+                '${(distanzaM(qui, c.posizione) / 1000).toStringAsFixed(1)} km',
+                '${c.potenzaNominalePer(v.connettori).round()} kW',
+                if (GestorePremium.attivo.value) testoDisponibilita(c.disponibilitaPer(v.connettori)),
+                if (c.operatore case final o? when o.isNotEmpty) o,
+              ].join(' · '),
+              'lat': c.posizione.lat,
+              'lon': c.posizione.lon,
+            },
+        ];
     }
     return null;
   }
@@ -85,11 +173,30 @@ class PonteAuto {
     });
   }
 
+  /// Le opzioni del percorso e la voce, per il menu dell'auto.
+  void _opzioni() {
+    final o = viaggio.opzioni;
+    _manda('opzioni', {
+      'modo': o.modo.name,
+      'modo_nome': o.modo.nome,
+      'pedaggi': o.evitaPedaggi,
+      'autostrade': o.evitaAutostrade,
+      'traghetti': o.evitaTraghetti,
+      'ricalcolo': o.ricalcoloAutomatico,
+      'muto': guida.muto,
+    });
+  }
+
   void ferma() {
     viaggio.removeListener(_viaggio);
+    viaggio.removeListener(_opzioni);
     guida.removeListener(_guida);
     posizione.removeListener(_posizione);
     luoghi?.removeListener(_luoghi);
+    auto?.removeListener(_cruscotto);
+    meteo?.removeListener(_cruscotto);
+    segnalazioni?.removeListener(_segnalazioni);
+    _avvisi?.removeListener(_avviso);
   }
 
   void _viaggio() {
@@ -106,6 +213,31 @@ class PonteAuto {
     _manda('sorgenti', {
       'dati': {for (final MapEntry(:key, :value) in dati.entries) key: jsonEncode(value)},
     });
+    _cruscotto();
+  }
+
+  void _segnalazioni() {
+    final s = segnalazioni;
+    if (s == null) return;
+    _manda('sorgenti', {
+      'dati': {sorgenteSegnalazioni: jsonEncode(datiSegnalazioni(s.vicine))},
+    });
+  }
+
+  /// La segnalazione che si avvicina, o quella appena passata.
+  void _avviso() {
+    final a = _avvisi;
+    if (a == null) return;
+    final passata = a.passata;
+    _manda('avviso', {
+      if (a.davanti case (final s, final m)) ...{
+        'titolo': s.fissa ? 'Autovelox fisso' : s.tipo.avviso,
+        'tipo': s.tipo.name,
+        'metri': m,
+        'limite': s.limiteKmh,
+      },
+      if (passata != null) ...{'ancora_id': passata.id, 'ancora_testo': '${passata.tipo.nome}: c\'è ancora?'},
+    });
   }
 
   void _guida() {
@@ -113,6 +245,7 @@ class PonteAuto {
     final p = guida.pronto;
     if (!guida.attiva || p == null) {
       _manda('guida', {'attiva': false});
+      _cruscotto();
       return;
     }
     final m = a?.prossima ?? p.viaggio.percorso.manovre.firstOrNull;
@@ -143,6 +276,41 @@ class PonteAuto {
     _manda('posizione', {'lat': qui.lat, 'lon': qui.lon, 'rotta': rotta});
     _manda('sorgenti', {
       'dati': {sorgenteIo: jsonEncode(datiIo(qui, rotta, posizione.segnaposto))},
+    });
+    _cruscotto();
+  }
+
+  /// Quello che sta sopra la mappa dell'auto.
+  void _cruscotto() {
+    final s = auto?.stato;
+    final p = guida.attiva ? guida.pronto : null;
+    final a = guida.avanzamento;
+    final ora = p == null ? null : guida.batteriaOra;
+    // La prossima sosta davanti.
+    final sosta = p == null
+        ? null
+        : (p.viaggio.piano?.soste ?? const <Sosta>[])
+              .where((x) => x.colonnina.distanzaM > (a?.percorsiM ?? 0))
+              .firstOrNull;
+    final m = meteo;
+    final arrivoMeteo = p == null ? null : m?.delViaggio?.arrivo;
+    final previsione = arrivoMeteo?.previsione ?? m?.qui;
+    _manda('cruscotto', {
+      'batteria': ora?.valore ?? s?.batteria,
+      'autonomia_km': p == null ? auto?.autonomiaKm() : null,
+      'velocita': posizione.velocitaKmh,
+      'limite': guida.attiva ? a?.limiteKmh : null,
+      'arrivo_batteria': p == null ? null : guida.batteriaArrivo,
+      if (sosta != null) ...{
+        'sosta_nome': sosta.colonnina.nome,
+        'sosta_km': (sosta.colonnina.distanzaM - (a?.percorsiM ?? 0)) / 1000,
+        'sosta_batteria': sosta.batteriaArrivo,
+      },
+      if (previsione != null) ...{
+        'meteo_temperatura': previsione.temperaturaC,
+        'meteo_emoji': previsione.cielo.emoji,
+        'meteo_dove': arrivoMeteo != null ? 'all\'arrivo' : 'qui',
+      },
     });
   }
 

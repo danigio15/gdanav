@@ -23,6 +23,7 @@ export const PRIVACY = `<!doctype html>
   <li><b>Percorsi</b>: partenza, tappe e arrivo al server Valhalla di FOSSGIS (OpenStreetMap Germania).</li>
   <li><b>Ricerca dei luoghi</b>: il testo cercato e la zona a Photon (Komoot).</li>
   <li><b>Traffico e colonnine libere/occupate</b>: la zona della mappa e le colonnine delle soste a TomTom.</li>
+  <li><b>Meteo</b> (Premium): alcuni punti del percorso e la zona in cui sei, arrotondati a circa un chilometro, a MET Norway (api.met.no) per le previsioni.</li>
   <li><b>Colonnine fuori dall'archivio dell'app</b>: la zona del percorso al relay di gdanav, che le chiede a OpenStreetMap.</li>
 </ul>
 

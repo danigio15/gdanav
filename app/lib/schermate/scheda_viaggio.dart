@@ -3,8 +3,10 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import '../componenti/anello_batteria.dart';
 import '../componenti/grafico_batteria.dart';
+import '../componenti/meteo_viaggio.dart';
 import '../componenti/stato_colonnina.dart';
 import '../mappa/dati_viaggio.dart';
+import '../stato/gestore_meteo.dart';
 import '../stato/gestore_viaggio.dart';
 import '../tema.dart';
 import 'dettaglio_colonnina.dart';
@@ -21,9 +23,12 @@ String orario(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.to
 /// Il riquadro in basso: sta calcolando, il viaggio con le sue soste, o
 /// cosa non va.
 class SchedaViaggio extends StatelessWidget {
-  const SchedaViaggio({super.key, required this.gestore, required this.onAvvia, this.soglia = 15});
+  const SchedaViaggio({super.key, required this.gestore, required this.onAvvia, this.soglia = 15, this.meteo});
 
   final GestoreViaggio gestore;
+
+  /// Il meteo lungo la strada (Premium); `null` nelle prove.
+  final GestoreMeteo? meteo;
   final VoidCallback onAvvia;
   final double soglia;
 
@@ -80,7 +85,13 @@ class SchedaViaggio extends StatelessWidget {
             ),
           ],
         ),
-        final ViaggioPronto pronto => _Pronta(pronto: pronto, gestore: gestore, soglia: soglia, onAvvia: onAvvia),
+        final ViaggioPronto pronto => _Pronta(
+          pronto: pronto,
+          gestore: gestore,
+          soglia: soglia,
+          onAvvia: onAvvia,
+          meteo: meteo,
+        ),
       },
     );
   }
@@ -133,8 +144,9 @@ class _Piccola extends StatelessWidget {
 }
 
 class _Pronta extends StatelessWidget {
-  const _Pronta({required this.pronto, required this.gestore, required this.soglia, required this.onAvvia});
+  const _Pronta({required this.pronto, required this.gestore, required this.soglia, required this.onAvvia, this.meteo});
 
+  final GestoreMeteo? meteo;
   final ViaggioPronto pronto;
   final GestoreViaggio gestore;
   final double soglia;
@@ -270,6 +282,7 @@ class _Pronta extends StatelessWidget {
               Text('Batteria lungo il viaggio', style: t.titleSmall),
               const SizedBox(height: 8),
               GraficoBatteria(piano: piano, soglia: soglia),
+              if (meteo case final m?) MeteoLungoLaStrada(meteo: m, condizioni: gestore.condizioni),
               const SizedBox(height: 20),
               Text(soste.isEmpty ? 'Soste' : 'Le soste', style: t.titleSmall),
               const SizedBox(height: 8),

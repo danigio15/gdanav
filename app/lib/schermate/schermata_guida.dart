@@ -10,6 +10,7 @@ import '../componenti/tachimetro.dart';
 import '../componenti/vetro.dart';
 import '../mappa/controllo_mappa.dart';
 import '../mappa/mappa_viaggio.dart';
+import '../stato/avvisi_strada.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_segnalazioni.dart';
@@ -35,16 +36,8 @@ class SchermataGuida extends StatefulWidget {
 class _SchermataGuidaState extends State<SchermataGuida> {
   final controllo = ControlloMappa()..inclinata = true;
 
-  /// Le segnalazioni lungo la strada: quella che si avvicina, e quella
-  /// appena passata a cui chiedere «c'è ancora?».
-  Linea? _linea;
-  List<Punto>? _puntiLinea;
-  (Segnalazione, double)? _davanti;
-  Segnalazione? _passata;
-  final _annunciate = <String>{};
-  final _chieste = <String>{};
-
-  static const _avvisoM = 800.0;
+  /// Le segnalazioni lungo la strada, condivise con lo schermo dell'auto.
+  AvvisiStrada? _avvisi;
 
   /// Ridisegna il tachimetro ogni secondo: da fermi il GPS può tacere.
   Timer? _battito;
@@ -56,56 +49,14 @@ class _SchermataGuidaState extends State<SchermataGuida> {
       if (mounted) setState(() {});
     });
     widget.guida.avvia();
-    widget.guida.addListener(_lungoLaStrada);
+    if (widget.segnalazioni case final seg?) _avvisi = AvvisiStrada.di(widget.guida, seg);
   }
 
   @override
   void dispose() {
     _battito?.cancel();
-    widget.guida.removeListener(_lungoLaStrada);
     controllo.dispose();
     super.dispose();
-  }
-
-  void _lungoLaStrada() {
-    final g = widget.guida, a = g.avanzamento, punti = g.pronto?.viaggio.percorso.punti;
-    final tutte = widget.segnalazioni?.vicine ?? const <Segnalazione>[];
-    if (a == null || punti == null || tutte.isEmpty) return;
-    if (!identical(punti, _puntiLinea)) {
-      _puntiLinea = punti;
-      _linea = Linea(punti);
-    }
-    (Segnalazione, double)? davanti;
-    Segnalazione? passata;
-    final linea = _linea!;
-    for (final s in tutte) {
-      final p = linea.proietta(s.punto);
-      // Un autovelox fisso sta sul bordo della strada: più vicino, e solo
-      // se guarda chi va nella nostra direzione (non l'altra carreggiata).
-      if (p.lontanoM > (s.fissa ? 30 : 40)) continue;
-      if (s.fissa) {
-        final i = p.segmento.clamp(0, linea.punti.length - 2);
-        if (!s.riguarda(rottaGradi(linea.punti[i], linea.punti[i + 1]))) continue;
-      }
-      final avanti = p.lungoM - a.percorsiM;
-      if (avanti > 0 && avanti <= _avvisoM && (davanti == null || avanti < davanti.$2)) davanti = (s, avanti);
-      if (!s.fissa && avanti <= 0 && avanti > -250 && !_chieste.contains(s.id)) passata = s;
-    }
-    if (davanti case (final s, final m) when _annunciate.add(s.id)) {
-      g.annuncia('${s.avviso} tra ${distanzaParlata(m)}.');
-    }
-    if (davanti?.$1.id != _davanti?.$1.id || davanti?.$2 != _davanti?.$2 || passata?.id != _passata?.id) {
-      setState(() {
-        _davanti = davanti;
-        _passata = passata;
-      });
-    }
-  }
-
-  void _rispondi(Segnalazione s, bool ancora) {
-    _chieste.add(s.id);
-    widget.segnalazioni?.vota(s, ancora: ancora);
-    setState(() => _passata = null);
   }
 
   /// «Fine», come in Waze: si torna alla mappa senza viaggio.
@@ -139,13 +90,17 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                   ),
             ),
             ListenableBuilder(
-              listenable: Listenable.merge([g, widget.posizione]),
+              listenable: Listenable.merge([g, widget.posizione, ?_avvisi]),
               builder: (context, _) => Column(
                 children: [
                   SafeArea(bottom: false, child: _Banner(guida: g)),
-                  if (_davanti case (final s, final m)) _AvvisoSegnalazione(segnalazione: s, metri: m),
-                  if (_passata case final s?)
-                    _Ancora(segnalazione: s, onSi: () => _rispondi(s, true), onNo: () => _rispondi(s, false)),
+                  if (_avvisi?.davanti case (final s, final m)) _AvvisoSegnalazione(segnalazione: s, metri: m),
+                  if (_avvisi?.passata case final s?)
+                    _Ancora(
+                      segnalazione: s,
+                      onSi: () => _avvisi!.rispondi(s, true),
+                      onNo: () => _avvisi!.rispondi(s, false),
+                    ),
                   if (g.proposta case final testo?) _Proposta(testo: testo, onSi: g.ricalcolaOra, onNo: g.lasciaCosi),
                   const Spacer(),
                   Padding(
