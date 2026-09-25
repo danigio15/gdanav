@@ -283,7 +283,7 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         }
         // Larga quanto la riga; la sosta, se è più lunga, si accorcia.
         val w = (if (pezzi.isEmpty()) dp(220f) else larghezzaRiga) + p * 2
-        val hRiga = dp(44f)
+        val hRiga = dp(54f)
         val hSosta = if (sosta != null) dp(24f) else 0f
         val h = hRiga + hSosta
 
@@ -291,7 +291,7 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val destra = a.right - margine
         val limiteSinistro = a.left + margine
         val (x, basso) = if (tachimetro != null && tachimetro.left - dp(10f) - w >= limiteSinistro) {
-            (tachimetro.left - dp(10f) - w) to (tachimetro.centerY() + hRiga / 2)
+            (tachimetro.left - dp(10f) - w) to tachimetro.bottom
         } else if (tachimetro != null) {
             (destra - w) to (tachimetro.top - dp(8f))
         } else {
@@ -360,30 +360,55 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         return false
     }
 
-    /** Velocità e limite, in basso a destra. */
+    /**
+     * In basso a destra, in una capsula sola: arrivo, tempo e km che restano
+     * (in guida), il limite e la velocità. Restituisce dove sta.
+     */
     private fun velocita(canvas: Canvas, a: Rect, c: PonteAuto.Cruscotto): RectF? {
-        val v = c.velocita ?: return null
+        val v = c.velocita
+        val g = PonteAuto.guida
+        if (v == null && g == null) return null
         val margine = dp(10f)
-        val r = dp(30f)
-        val cx = a.right - margine - r
-        val cy = a.bottom - margine - r
-        val oltre = c.limite != null && v > c.limite + 3
-        pieno.color = if (oltre) Color.rgb(229, 57, 53) else Color.WHITE
-        canvas.drawCircle(cx, cy, r, pieno)
-        bordo.color = Color.argb(60, 0, 0, 0)
-        bordo.strokeWidth = dp(1.5f)
-        canvas.drawCircle(cx, cy, r, bordo)
-        numero.color = if (oltre) Color.WHITE else Color.rgb(32, 38, 51)
-        numero.textSize = dp(23f)
-        canvas.drawText("${v.roundToInt()}", cx, cy + dp(5f), numero)
-        numero.textSize = dp(10f)
-        canvas.drawText("km/h", cx, cy + dp(18f), numero)
-        val sinistraLimite = c.limite?.let { l ->
-            val lx = cx - r * 2 - dp(6f)
-            cartello(canvas, lx, cy, r * 0.9f, l)
-            lx - r * 0.9f
-        } ?: (cx - r)
-        return RectF(sinistraLimite, cy - r, cx + r, cy + r)
+        val h = dp(54f)
+        val destra = a.right - margine
+        val basso = a.bottom - margine
+        val cy = basso - h / 2
+        val r = dp(22f)
+
+        // Da destra: velocità, limite, poi arrivo e tempo.
+        var x = destra - dp(5f)
+        val cxVelocita = v?.let { x - r }
+        if (v != null) x -= r * 2 + dp(6f)
+        val cxLimite = c.limite?.takeIf { v != null }?.let { x - r * 0.9f }
+        if (cxLimite != null) x -= r * 1.8f + dp(8f)
+        val ora = g?.let { java.text.SimpleDateFormat("HH:mm", java.util.Locale.ITALY).format(java.util.Date(it.arrivoMs)) }
+        val sotto = g?.let { "${tempo(it.restantiS)} · ${distanza(it.restantiM)}" }
+        val forte = font(21f)
+        val piccolo = font(13f, grassetto = false, colore = muto)
+        val larghezzaTesti = if (g != null) max(forte.measureText(ora!!), piccolo.measureText(sotto!!)) + dp(18f) + dp(8f) else dp(5f)
+        val box = RectF(x - larghezzaTesti, basso - h, destra, basso)
+        canvas.drawRoundRect(box, h / 2, h / 2, sfondoScheda)
+        if (g != null) {
+            canvas.drawText(ora!!, box.left + dp(18f), cy - dp(1f), forte)
+            canvas.drawText(sotto!!, box.left + dp(18f), cy + dp(17f), piccolo)
+        }
+        cxLimite?.let { cartello(canvas, it, cy, r * 0.9f, c.limite!!) }
+        if (v != null && cxVelocita != null) {
+            val oltre = c.limite != null && v > c.limite + 3
+            pieno.color = if (oltre) Color.rgb(229, 57, 53) else Color.WHITE
+            canvas.drawCircle(cxVelocita, cy, r, pieno)
+            numero.color = if (oltre) Color.WHITE else Color.rgb(32, 38, 51)
+            numero.textSize = dp(19f)
+            canvas.drawText("${v.roundToInt()}", cxVelocita, cy + dp(4f), numero)
+            numero.textSize = dp(8.5f)
+            canvas.drawText("km/h", cxVelocita, cy + dp(15f), numero)
+        }
+        return box
+    }
+
+    private fun tempo(secondi: Long): String {
+        val minuti = ((secondi + 30) / 60).coerceAtLeast(1)
+        return if (minuti < 60) "$minuti min" else "${minuti / 60} h ${"%02d".format(minuti % 60)}"
     }
 
     /** Da che parte va la manovra: 1 destra, -1 sinistra, 0 dritto. */

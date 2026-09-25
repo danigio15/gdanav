@@ -6,7 +6,6 @@ import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.CarIcon
-import androidx.car.app.model.DateTimeWithZone
 import androidx.car.app.model.Distance
 import androidx.car.app.model.Template
 import androidx.car.app.navigation.NavigationManager
@@ -18,12 +17,10 @@ import androidx.car.app.navigation.model.MessageInfo
 import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.car.app.navigation.model.RoutingInfo
 import androidx.car.app.navigation.model.Step
-import androidx.car.app.navigation.model.TravelEstimate
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import it.gdanav.gdanav.R
-import java.util.TimeZone
 
 /**
  * Lo schermo dell'auto: la mappa di gdanav sotto (col cruscotto), sopra la
@@ -171,12 +168,8 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
                 routing.setNextStep(dopo.build())
             }
             modello.setNavigationInfo(routing.build())
-            modello.setDestinationTravelEstimate(
-                TravelEstimate.Builder(
-                    distanza(guida.restantiM),
-                    DateTimeWithZone.create(guida.arrivoMs, TimeZone.getDefault()),
-                ).setRemainingTimeSeconds(guida.restantiS).build(),
-            )
+            // Arrivo, tempo e km che restano: niente riquadro di Android Auto
+            // in basso a sinistra, li disegna il pannello dentro il tachimetro.
         } else {
             // Da fermi la mappa resta pulita; il riquadro solo se c'è qualcosa
             // da dire («Calcolo il percorso…», un errore).
