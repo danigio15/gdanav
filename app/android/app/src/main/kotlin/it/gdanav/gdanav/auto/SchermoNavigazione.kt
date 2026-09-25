@@ -6,17 +6,11 @@ import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.CarIcon
-import androidx.car.app.model.Distance
 import androidx.car.app.model.Template
 import androidx.car.app.navigation.NavigationManager
 import androidx.car.app.navigation.NavigationManagerCallback
-import androidx.car.app.navigation.model.Lane
-import androidx.car.app.navigation.model.LaneDirection
-import androidx.car.app.navigation.model.Maneuver
 import androidx.car.app.navigation.model.MessageInfo
 import androidx.car.app.navigation.model.NavigationTemplate
-import androidx.car.app.navigation.model.RoutingInfo
-import androidx.car.app.navigation.model.Step
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -155,17 +149,10 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             modello.setPanModeListener { inPan -> if (!inPan) renderer.segui() }
         }
         if (guida != null) {
-            val routing = RoutingInfo.Builder().setCurrentStep(passo(guida), distanza(guida.distanzaM))
-            // Lo svincolo non va nella scheda (larga quanto vuole Android Auto):
-            // lo disegna il pannello, stretto, accanto alla scheda.
-            guida.dopoTipo?.let { tipo ->
-                val dopo = Step.Builder(guida.dopoStrada.ifEmpty { " " })
-                    .setManeuver(Maneuver.Builder(IconeManovra.tipo(tipo)).setIcon(icona(IconeManovra.icona(tipo))).build())
-                routing.setNextStep(dopo.build())
-            }
-            modello.setNavigationInfo(routing.build())
-            // Arrivo, tempo e km che restano: niente riquadro di Android Auto
-            // in basso a sinistra, li disegna il pannello dentro il tachimetro.
+            // La scheda della manovra (freccia, distanza, corsie, svincolo),
+            // l'arrivo e la velocità li disegna il pannello sopra la mappa: così
+            // hanno la forma e la misura che vogliamo, e Android Auto non mette
+            // le sue schede.
         } else {
             // Da fermi la mappa resta pulita; il riquadro solo se c'è qualcosa
             // da dire («Calcolo il percorso…», un errore).
@@ -175,49 +162,4 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         }
         return modello.build()
     }
-
-    /**
-     * La manovra: freccia (con l'uscita nelle rotonde), strada, cartello
-     * («Uscita 12 · A12 · Arnhem») e, avvicinandosi allo svincolo, le corsie
-     * con quella giusta evidenziata.
-     */
-    private fun passo(guida: PonteAuto.Guida): Step {
-        val manovra = Maneuver.Builder(IconeManovra.tipo(guida.tipo, guida.rotonda))
-            .setIcon(icona(IconeManovra.icona(guida.tipo)))
-        val rotonda = guida.rotonda
-        if (guida.tipo == 26 && rotonda != null && rotonda > 0) manovra.setRoundaboutExitNumber(rotonda)
-        val cartello = listOfNotNull(
-            guida.uscita.takeIf { it.isNotEmpty() }?.let { "Uscita $it" },
-            guida.verso.takeIf { it.isNotEmpty() },
-        ).joinToString(" · ")
-        val testo = when {
-            cartello.isNotEmpty() -> cartello
-            guida.strada.isNotEmpty() -> guida.strada
-            else -> guida.istruzione
-        }
-        val passo = Step.Builder(testo).setManeuver(manovra.build())
-        if (guida.strada.isNotEmpty()) passo.setRoad(guida.strada)
-        if (guida.corsie.isNotEmpty()) {
-            for (c in guida.corsie) {
-                val corsia = Lane.Builder()
-                val direzioni = c.direzioni.ifEmpty { listOf("dritto") }
-                for (d in direzioni) {
-                    val giusta = c.giusta && (c.consigliata == null || c.consigliata == d)
-                    corsia.addDirection(LaneDirection.create(IconeManovra.formaCorsia(d), giusta))
-                }
-                passo.addLane(corsia.build())
-            }
-            passo.setLanesImage(
-                CarIcon.Builder(IconCompat.createWithBitmap(ImmagineCorsie.disegna(guida.corsie))).build(),
-            )
-        }
-        return passo.build()
-    }
-
-    private fun distanza(metri: Double): Distance =
-        if (metri < 1000) {
-            Distance.create((Math.round(metri / 10.0) * 10).toDouble(), Distance.UNIT_METERS)
-        } else {
-            Distance.create(metri / 1000.0, Distance.UNIT_KILOMETERS)
-        }
 }

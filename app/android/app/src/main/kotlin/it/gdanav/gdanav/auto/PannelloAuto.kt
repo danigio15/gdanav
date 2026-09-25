@@ -17,9 +17,10 @@ import kotlin.math.roundToInt
  * basso a sinistra, dal lato di chi guida, una capsula con velocità, limite e
  * arrivo, e sopra una barra sottile coi dati dell'auto (batteria, km, alla
  * meta), il meteo e la prossima sosta; in alto solo l'avviso della
- * segnalazione che si avvicina, finché serve; avvicinandosi a un'uscita,
- * accanto alla scheda della manovra, lo svincolo in un popup stretto col
- * cartello dell'uscita.
+ * segnalazione che si avvicina, finché serve. In alto a sinistra la scheda
+ * della manovra, disegnata qui al posto di quella di Android Auto: freccia,
+ * distanza, direzione, corsie e, avvicinandosi a un'uscita, lo svincolo col
+ * cartello.
  */
 class PannelloAuto(context: Context, private val densita: Float) : View(context) {
     /** L'area non coperta dalle schede di Android Auto. */
@@ -61,16 +62,16 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val sinistra = a.left + margine
         val destra = a.right - margine
 
-        // In alto a sinistra, accanto alla scheda della manovra, avvicinandosi
-        // a un'uscita: lo svincolo in un popup stretto, col cartello.
+        // In alto a sinistra, al posto di quella di Android Auto, la scheda
+        // della manovra: freccia, distanza, direzione, corsie e, avvicinandosi
+        // a un'uscita, lo svincolo col cartello; sotto, piccolo, «Poi».
         val g = PonteAuto.guida
-        val vista = g?.svincolo?.let { id -> PonteAuto.svincoli[id]?.let { svincoloConCartello(it, id, g) } }
-        val popup = vista?.let { svincolo(canvas, sinistra, alto, a, it) }
+        val scheda = g?.let { manovra(canvas, margine, margine, it) }
 
         // Per il resto in alto niente, per vedere la strada davanti: solo
         // l'avviso che si avvicina (autovelox, polizia, incidente…), finché
-        // serve, accanto al popup.
-        avviso(canvas, popup?.let { it.right + dp(8f) } ?: sinistra, destra, alto)
+        // serve, accanto alla scheda.
+        avviso(canvas, scheda?.let { it.right + dp(8f) } ?: sinistra, destra, alto)
 
         // In basso a sinistra, dal lato di chi guida: la capsula con velocità,
         // limite e arrivo, e sopra una barra sottile coi dati dell'auto e il
@@ -80,24 +81,105 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
     }
 
     private val immagine = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val fondoScheda = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(32, 33, 36) }
+    private val fondoCorsie = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(18, 19, 22) }
+
+    /** Le corsie già disegnate, per non rifarle a ogni fotogramma. */
+    private var corsieFatte: Pair<List<PonteAuto.CorsiaAuto>, Bitmap>? = null
+
+    private fun icona(id: Int, lato: Float, x: Float, y: Float, canvas: Canvas) {
+        val d = androidx.core.content.ContextCompat.getDrawable(context, id)?.mutate() ?: return
+        d.setTint(Color.WHITE)
+        d.setBounds(x.toInt(), y.toInt(), (x + lato).toInt(), (y + lato).toInt())
+        d.draw(canvas)
+    }
+
+    /** Il testo in righe larghe al più [spazio], al massimo [n]. */
+    private fun righe(p: Paint, testo: String, spazio: Float, n: Int): List<String> {
+        val fuori = mutableListOf<String>()
+        var riga = ""
+        for (parola in testo.split(" ")) {
+            val prova = if (riga.isEmpty()) parola else "$riga $parola"
+            if (p.measureText(prova) <= spazio || riga.isEmpty()) {
+                riga = prova
+            } else {
+                fuori += riga
+                riga = parola
+            }
+        }
+        if (riga.isNotEmpty()) fuori += riga
+        if (fuori.size <= n) return fuori
+        return fuori.take(n - 1) + taglia(p, fuori.drop(n - 1).joinToString(" "), spazio)
+    }
 
     /**
-     * Il popup dello svincolo: stretto (al massimo 380 dp e metà dell'area
-     * libera), arrotondato, dall'angolo in alto a sinistra dell'area.
+     * La scheda della manovra, in alto a sinistra: la disegniamo noi (quella
+     * di Android Auto è larga quanto vuole lui). In cima freccia, distanza e
+     * direzione; sotto le corsie o, avvicinandosi a un'uscita, lo svincolo
+     * col cartello; sotto la scheda, piccolo, «Poi». Restituisce dove sta.
      */
-    private fun svincolo(canvas: Canvas, x: Float, y: Float, a: Rect, vista: Bitmap): RectF {
-        val w = minOf(dp(380f), a.width() * 0.5f)
-        val h = w * vista.height / vista.width
-        val box = RectF(x, y, x + w, y + h)
-        val raggio = dp(16f)
+    private fun manovra(canvas: Canvas, x: Float, y: Float, g: PonteAuto.Guida): RectF {
+        val w = dp(340f)
+        val p = dp(16f)
+        val lato = dp(52f)
+        val grande = font(32f)
+        val medio = font(18f, grassetto = false, colore = Color.argb(225, 255, 255, 255))
+        val cartello = listOfNotNull(
+            g.uscita.takeIf { it.isNotEmpty() }?.let { "Uscita $it" },
+            g.verso.takeIf { it.isNotEmpty() },
+        ).joinToString(" · ")
+        val testo = when {
+            cartello.isNotEmpty() -> cartello
+            g.strada.isNotEmpty() -> g.strada
+            else -> g.istruzione
+        }
+        val xt = x + p + lato + dp(14f)
+        val direzione = righe(medio, testo, x + w - p - xt, 2)
+        val hTesta = max(lato + p * 2, p + dp(34f) + direzione.size * dp(24f) + dp(10f))
+        val vista = g.svincolo?.let { id -> PonteAuto.svincoli[id]?.let { svincoloConCartello(it, id, g) } }
+        val hVista = vista?.let { w * it.height / it.width } ?: 0f
+        val conCorsie = vista == null && g.corsie.isNotEmpty()
+        val hCorsie = if (conCorsie) dp(60f) else 0f
+        val box = RectF(x, y, x + w, y + hTesta + hVista + hCorsie)
+        val raggio = dp(18f)
         canvas.save()
         canvas.clipPath(android.graphics.Path().apply { addRoundRect(box, raggio, raggio, android.graphics.Path.Direction.CW) })
-        canvas.drawBitmap(vista, null, box, immagine)
+        canvas.drawRect(box, fondoScheda)
+        icona(IconeManovra.icona(g.tipo), lato, x + p, y + (hTesta - lato) / 2, canvas)
+        canvas.drawText(distanza(g.distanzaM), xt, y + p + dp(30f), grande)
+        direzione.forEachIndexed { i, r -> canvas.drawText(r, xt, y + p + dp(58f) + i * dp(24f), medio) }
+        var sotto = y + hTesta
+        if (vista != null) {
+            canvas.drawBitmap(vista, null, RectF(x, sotto, x + w, sotto + hVista), immagine)
+            sotto += hVista
+        }
+        if (conCorsie) {
+            canvas.drawRect(RectF(x, sotto, x + w, sotto + hCorsie), fondoCorsie)
+            val fatte = corsieFatte?.takeIf { it.first == g.corsie }?.second
+                ?: ImmagineCorsie.disegna(g.corsie).also { corsieFatte = g.corsie to it }
+            val hc = dp(44f)
+            val wc = (hc * fatte.width / fatte.height).coerceAtMost(w - p * 2)
+            val hcr = wc * fatte.height / fatte.width
+            canvas.drawBitmap(fatte, null, RectF(x + (w - wc) / 2, sotto + (hCorsie - hcr) / 2, x + (w + wc) / 2, sotto + (hCorsie + hcr) / 2), immagine)
+        }
         canvas.restore()
-        bordo.color = Color.argb(200, 24, 28, 36)
-        bordo.strokeWidth = dp(3f)
-        canvas.drawRoundRect(box, raggio, raggio, bordo)
-        return box
+        // «Poi», sotto la scheda.
+        var fondo = box.bottom
+        g.dopoTipo?.let { tipo ->
+            val t = g.dopoStrada.ifEmpty { " " }
+            val poi = font(16f, grassetto = false, colore = muto)
+            val nome = font(17f)
+            val larghezza = p + poi.measureText("Poi") + dp(10f) + dp(24f) + dp(10f) + nome.measureText(t) + p
+            val riga = RectF(x, fondo + dp(8f), x + larghezza.coerceAtMost(w), fondo + dp(8f) + dp(40f))
+            canvas.drawRoundRect(riga, dp(14f), dp(14f), fondoScheda)
+            canvas.drawText("Poi", riga.left + p, riga.centerY() + dp(6f), poi)
+            val xi = riga.left + p + poi.measureText("Poi") + dp(10f)
+            icona(IconeManovra.icona(tipo), dp(24f), xi, riga.centerY() - dp(12f), canvas)
+            val xn = xi + dp(34f)
+            canvas.drawText(taglia(nome, t, riga.right - p - xn), xn, riga.centerY() + dp(6f), nome)
+            fondo = riga.bottom
+        }
+        return RectF(box.left, box.top, box.right, fondo)
     }
 
     /** L'ultima vista composta per la scheda: id, cartello, immagine. */
