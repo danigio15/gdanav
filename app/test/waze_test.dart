@@ -323,7 +323,7 @@ void main() {
     await tester.runAsync(() => a.auto.cambiaModalita(a.auto.modalita));
     a.posizioni.add(punti[11]);
     await aspetta(tester);
-    expect(find.text('auto · adesso'), findsOneWidget);
+    expect(find.text('auto\nadesso'), findsOneWidget);
     expect(testo('batteria-ora'), '${stimata - 4}%');
     expect(int.parse(testo('batteria-arrivo').replaceAll('%', '')), inInclusiveRange(arrivo - 5, arrivo - 3));
     await tester.tap(find.text('Fine'));

@@ -483,7 +483,7 @@ class _Batteria extends StatelessWidget {
           ),
           Text(
             etichetta,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: t.labelMedium?.copyWith(color: muto),
           ),
@@ -495,8 +495,8 @@ class _Batteria extends StatelessWidget {
         voce('partenza', guida.batteriaPartenza, chiave: const Key('batteria-partenza')),
         voce(
           switch ((ora?.misurata, guida.auto.stato)) {
-            // Quanto è fresco il dato dell'auto: «auto · adesso», «auto · 4 min fa».
-            (true, final s?) => 'auto · ${eta(DateTime.now().difference(s.letto))}',
+            // Quanto è fresco il dato dell'auto, sotto: «auto» e «adesso» o «4 min fa».
+            (true, final s?) => 'auto\n${eta(DateTime.now().difference(s.letto))}',
             _ => 'ora (stima)',
           },
           ora?.valore,
