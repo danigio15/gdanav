@@ -137,8 +137,6 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                             viaggio: p.viaggio,
                             manovra: m,
                             metri: metri,
-                            // Nelle prove niente scena vera.
-                            mappa: widget.mappa == null ? null : (_, _) => const ColoredBox(color: Color(0xFF9DB7A0)),
                             onChiudi: () => setState(() => _svincoliChiusi.add(m.inizio)),
                           ),
                           _ => _Banner(key: const ValueKey('banner'), guida: g),
