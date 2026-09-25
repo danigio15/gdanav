@@ -136,7 +136,7 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
      * è un'uscita numerata (strada extraurbana). Restituisce dove sta.
      */
     private fun cartelloUscita(canvas: Canvas, x: Float, y: Float, larghezzaMassima: Float, g: PonteAuto.Guida): RectF {
-        val autostrada = g.uscita.isNotEmpty() || Regex("^[AE] ?\\d").containsMatchIn(g.verso)
+        val autostrada = g.uscita.isNotEmpty() || g.tipo in 18..21 || Regex("^[AE] ?\\d").containsMatchIn(g.verso)
         val colore = if (autostrada) Color.rgb(0, 122, 61) else Color.rgb(21, 88, 176)
         val parti = g.verso.split(" · ", ";").flatMap { it.split(", ", "/") }.map { it.trim() }.filter { it.isNotEmpty() }
         val sigle = parti.filter { Regex("^[AESTR]{1,2} ?\\d+[a-z]?$").matches(it) }.take(3)
