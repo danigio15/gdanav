@@ -259,6 +259,13 @@ class PonteAuto {
       'secondi': (a?.restante ?? p.viaggio.percorso.durata).inSeconds,
       'arrivo': (guida.arrivoAlle ?? _ora()).millisecondsSinceEpoch,
       'destinazione': p.destinazione.nome,
+      'uscita': m?.uscita ?? '',
+      'verso': m?.verso ?? '',
+      'rotonda': m?.uscitaRotonda,
+      // Le corsie solo avvicinandosi allo svincolo, e se non vanno bene tutte.
+      if (m != null && m.corsieUtili && (a?.allaProssimaM ?? m.lunghezzaM) <= 2000)
+        'corsie': [for (final c in m.corsie) c.toJson()],
+      if (a?.dopo case final d?) ...{'dopo_tipo': d.tipo, 'dopo_strada': d.strada.isNotEmpty ? d.strada : d.istruzione},
     });
     _posizione();
   }
@@ -295,9 +302,12 @@ class PonteAuto {
     final m = meteo;
     final arrivoMeteo = p == null ? null : m?.delViaggio?.arrivo;
     final previsione = arrivoMeteo?.previsione ?? m?.qui;
+    final batteria = ora?.valore ?? s?.batteria;
+    final autonomia = auto == null ? null : guida.autonomiaOra;
     _manda('cruscotto', {
-      'batteria': ora?.valore ?? s?.batteria,
-      'autonomia_km': p == null ? auto?.autonomiaKm() : null,
+      'batteria': batteria,
+      'autonomia_km': autonomia?.km,
+      'autonomia_auto': autonomia?.dallAuto ?? false,
       'velocita': posizione.velocitaKmh,
       'limite': guida.attiva ? a?.limiteKmh : null,
       'arrivo_batteria': p == null ? null : guida.batteriaArrivo,

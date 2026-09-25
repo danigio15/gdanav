@@ -308,13 +308,21 @@ void main() {
     a.posizioni.add(punti[10]);
     await aspetta(tester);
 
-    String testo(String chiave) => tester.widget<Text>(find.byKey(Key(chiave))).data!;
+    String testo(String chiave) {
+      final t = tester.widget<Text>(find.byKey(Key(chiave)));
+      return t.data ?? t.textSpan!.toPlainText();
+    }
+
     expect(testo('batteria-partenza'), '90%');
     final stimata = int.parse(testo('batteria-ora').replaceAll('%', ''));
     final arrivo = int.parse(testo('batteria-arrivo').replaceAll('%', ''));
     expect(stimata, inExclusiveRange(arrivo, 90));
     expect(find.text('ora (stima)'), findsOneWidget);
-    expect(double.parse(testo('consumo').replaceAll(',', '.')), inInclusiveRange(8, 35));
+    expect(double.parse(testo('consumo').replaceAll(' kWh/100 km', '').replaceAll(',', '.')), inInclusiveRange(8, 35));
+    // L'autonomia adesso, stimata sul consumo del viaggio.
+    final km = int.parse(testo('autonomia').replaceAll(' km', ''));
+    expect(km, inInclusiveRange(100, 700));
+    expect(find.text('autonomia'), findsOneWidget);
 
     // L'auto manda la batteria vera, più bassa del previsto: arrivo e consumo si adeguano.
     a.auto.arbitro.registra(
@@ -324,6 +332,8 @@ void main() {
     a.posizioni.add(punti[11]);
     await aspetta(tester);
     expect(find.text('auto\nadesso'), findsOneWidget);
+    // Con la batteria più bassa, anche l'autonomia scende.
+    expect(int.parse(testo('autonomia').replaceAll(' km', '')), lessThan(km));
     expect(testo('batteria-ora'), '${stimata - 4}%');
     expect(int.parse(testo('batteria-arrivo').replaceAll('%', '')), inInclusiveRange(arrivo - 5, arrivo - 3));
     await tester.tap(find.text('Fine'));

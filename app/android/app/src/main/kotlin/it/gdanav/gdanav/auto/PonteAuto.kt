@@ -28,7 +28,16 @@ object PonteAuto {
         val restantiS: Long,
         val arrivoMs: Long,
         val destinazione: String,
+        val uscita: String = "",
+        val verso: String = "",
+        val rotonda: Int? = null,
+        val corsie: List<CorsiaAuto> = emptyList(),
+        val dopoTipo: Int? = null,
+        val dopoStrada: String = "",
     )
+
+    /** Una corsia prima dello svincolo: le frecce, se è giusta, quale seguire. */
+    data class CorsiaAuto(val direzioni: List<String>, val giusta: Boolean, val consigliata: String?)
 
     @Volatile var stileChiaro: String? = null
     @Volatile var stileScuro: String? = null
@@ -63,6 +72,8 @@ object PonteAuto {
     data class Cruscotto(
         val batteria: Double? = null,
         val autonomiaKm: Double? = null,
+        /** L'autonomia la dice l'auto (non una stima). */
+        val autonomiaAuto: Boolean = false,
         val velocita: Double? = null,
         val limite: Int? = null,
         val arrivoBatteria: Double? = null,
@@ -168,6 +179,7 @@ object PonteAuto {
             "cruscotto" -> cruscotto = Cruscotto(
                 batteria = numero(call, "batteria"),
                 autonomiaKm = numero(call, "autonomia_km"),
+                autonomiaAuto = call.argument<Boolean>("autonomia_auto") == true,
                 velocita = numero(call, "velocita"),
                 limite = numero(call, "limite")?.toInt(),
                 arrivoBatteria = numero(call, "arrivo_batteria"),
@@ -206,6 +218,18 @@ object PonteAuto {
                         restantiS = (call.argument<Number>("secondi") ?: 0).toLong(),
                         arrivoMs = (call.argument<Number>("arrivo") ?: System.currentTimeMillis()).toLong(),
                         destinazione = call.argument<String>("destinazione") ?: "",
+                        uscita = call.argument<String>("uscita") ?: "",
+                        verso = call.argument<String>("verso") ?: "",
+                        rotonda = numero(call, "rotonda")?.toInt(),
+                        corsie = (call.argument<List<Map<String, Any?>>>("corsie") ?: emptyList()).map { c ->
+                            CorsiaAuto(
+                                direzioni = (c["direzioni"] as? List<*>)?.map { "$it" } ?: emptyList(),
+                                giusta = c["giusta"] == true,
+                                consigliata = c["consigliata"] as? String,
+                            )
+                        },
+                        dopoTipo = numero(call, "dopo_tipo")?.toInt(),
+                        dopoStrada = call.argument<String>("dopo_strada") ?: "",
                     )
                 } else {
                     null

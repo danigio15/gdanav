@@ -5,6 +5,50 @@ import 'package:http/http.dart' as http;
 import '../geo/geo.dart';
 import '../motore/modello_consumo.dart';
 
+/// Dove porta una corsia: le frecce dipinte sull'asfalto.
+enum DirezioneCorsia {
+  inversioneSinistra('uturn'),
+  sinistraStretta('sharp left'),
+  sinistra('left'),
+  leggeraSinistra('slight left'),
+  dritto('straight'),
+  leggeraDestra('slight right'),
+  destra('right'),
+  destraStretta('sharp right'),
+  inversioneDestra('uturn right');
+
+  const DirezioneCorsia(this.osrm);
+
+  /// Come la scrive Valhalla nel formato OSRM.
+  final String osrm;
+
+  static DirezioneCorsia? da(String s) => switch (s) {
+        'uturn' => inversioneSinistra,
+        'merge to left' => leggeraSinistra,
+        'merge to right' => leggeraDestra,
+        'none' || '' => dritto,
+        _ => values.where((d) => d.osrm == s).firstOrNull,
+      };
+}
+
+/// Una corsia prima di uno svincolo: le sue frecce e se è una di quelle
+/// giuste per il percorso.
+class Corsia {
+  const Corsia(this.direzioni, {this.giusta = false, this.consigliata});
+
+  final List<DirezioneCorsia> direzioni;
+  final bool giusta;
+
+  /// Fra le frecce della corsia, quella da seguire.
+  final DirezioneCorsia? consigliata;
+
+  Map<String, Object?> toJson() => {
+        'direzioni': [for (final d in direzioni) d.name],
+        'giusta': giusta,
+        if (consigliata != null) 'consigliata': consigliata!.name,
+      };
+}
+
 /// Un'istruzione di guida, come la dà Valhalla.
 class Manovra {
   const Manovra({
@@ -15,6 +59,10 @@ class Manovra {
     this.tipo = 0,
     this.voce = '',
     this.strada = '',
+    this.corsie = const [],
+    this.uscita = '',
+    this.verso = '',
+    this.uscitaRotonda,
   });
 
   final String istruzione;
@@ -33,6 +81,36 @@ class Manovra {
 
   /// Indice in [PercorsoCalcolato.punti] da cui parte.
   final int inizio;
+
+  /// Le corsie arrivando alla manovra, da sinistra a destra; vuota se
+  /// OpenStreetMap non le conosce.
+  final List<Corsia> corsie;
+
+  /// Il numero d'uscita sul cartello («12»), se c'è.
+  final String uscita;
+
+  /// Verso dove, come sul cartello: «A12 · Arnhem, Rotterdam».
+  final String verso;
+
+  /// Nelle rotonde: quale uscita prendere.
+  final int? uscitaRotonda;
+
+  /// Le corsie servono solo se non vanno bene tutte.
+  bool get corsieUtili => corsie.length > 1 && corsie.any((c) => c.giusta) && corsie.any((c) => !c.giusta);
+
+  Manovra conCorsie(List<Corsia> c) => Manovra(
+        istruzione: istruzione,
+        lunghezzaM: lunghezzaM,
+        secondi: secondi,
+        inizio: inizio,
+        tipo: tipo,
+        voce: voce,
+        strada: strada,
+        corsie: c,
+        uscita: uscita,
+        verso: verso,
+        uscitaRotonda: uscitaRotonda,
+      );
 }
 
 /// Un percorso pronto per il motore: la geometria per la mappa e le
@@ -53,6 +131,43 @@ class PercorsoCalcolato {
 
   PercorsoCalcolato conLimiti(List<int?> limiti) =>
       PercorsoCalcolato(punti: punti, tratti: tratti, manovre: manovre, limiti: limiti);
+
+  /// Con le corsie di ogni manovra (dalla risposta OSRM dello stesso
+  /// percorso): se le manovre non tornano una a una, niente corsie.
+  PercorsoCalcolato conCorsie(List<List<Corsia>> corsie) {
+    if (corsie.length != manovre.length) return this;
+    return PercorsoCalcolato(
+      punti: punti,
+      tratti: tratti,
+      manovre: [for (var i = 0; i < manovre.length; i++) manovre[i].conCorsie(corsie[i])],
+      limiti: limiti,
+    );
+  }
+
+  /// Dalle `steps` del formato OSRM di Valhalla: per ogni manovra le corsie
+  /// dell'incrocio in cui la si fa.
+  static List<List<Corsia>> corsieDaOsrm(Map<String, Object?> json) {
+    List<Map> mappe(Object? x) => ((x as List?) ?? const []).whereType<Map>().toList();
+    final elenco = <List<Corsia>>[];
+    final rotta = mappe(json['routes']).firstOrNull;
+    for (final leg in mappe(rotta?['legs'])) {
+      for (final passo in mappe(leg['steps'])) {
+        final incrocio = mappe(passo['intersections']).firstOrNull;
+        elenco.add([
+          for (final c in mappe(incrocio?['lanes']))
+            Corsia(
+              [
+                for (final d in ((c['indications'] as List?) ?? const []).whereType<String>())
+                  if (DirezioneCorsia.da(d) case final x?) x,
+              ],
+              giusta: c['valid'] == true,
+              consigliata: DirezioneCorsia.da('${c['valid_indication'] ?? ''}'),
+            ),
+        ]);
+      }
+    }
+    return elenco;
+  }
 
   double get lunghezzaM => tratti.fold(0, (s, t) => s + t.lunghezzaM);
   Duration get durata => Duration(seconds: tratti.fold(0.0, (s, t) => s + t.secondi).round());
@@ -91,6 +206,12 @@ class PercorsoCalcolato {
           tipo: m['type'] as int? ?? 0,
           voce: m['verbal_pre_transition_instruction'] as String? ?? m['instruction'] as String? ?? '',
           strada: ((m['street_names'] as List?) ?? const []).cast<String>().join(', '),
+          uscita: _testi(m['sign'], 'exit_number_elements'),
+          verso: [
+            _testi(m['sign'], 'exit_branch_elements'),
+            _testi(m['sign'], 'exit_toward_elements'),
+          ].where((t) => t.isNotEmpty).join(' · '),
+          uscitaRotonda: m['roundabout_exit_count'] as int?,
         ));
         if (a <= da || lunghezza <= 0 || secondi <= 0) continue;
         final kmh = lunghezza / secondi * 3.6;
@@ -111,6 +232,17 @@ class PercorsoCalcolato {
     }
     return PercorsoCalcolato(punti: punti, tratti: tratti, manovre: manovre);
   }
+}
+
+/// I testi di un elemento del cartello di Valhalla (`sign`).
+String _testi(Object? cartello, String chiave) {
+  if (cartello is! Map) return '';
+  return ((cartello[chiave] as List?) ?? const [])
+      .whereType<Map>()
+      .map((e) => '${e['text'] ?? ''}')
+      .where((t) => t.isNotEmpty)
+      .take(3)
+      .join(', ');
 }
 
 class _Profilo {
@@ -268,7 +400,23 @@ class ClienteValhalla {
       throw ErroreValhalla(messaggio ?? 'errore ${r.statusCode}', stato: r.statusCode);
     }
     final json = jsonDecode(testo) as Map<String, Object?>;
-    final percorso = PercorsoCalcolato.daValhalla(json);
+    var percorso = PercorsoCalcolato.daValhalla(json);
+    // Le corsie agli svincoli: le dà solo il formato OSRM dello stesso
+    // percorso. Sono un di più: se non arrivano si guida lo stesso.
+    try {
+      final r = await _http
+          .post(
+            indirizzo.resolve('route'),
+            headers: {'content-type': 'application/json', if (chiave != null) 'x-gdanav-chiave': chiave!},
+            body: jsonEncode({...corpo, 'format': 'osrm', 'elevation_interval': 0}),
+          )
+          .timeout(const Duration(seconds: 30));
+      if (r.statusCode == 200) {
+        percorso = percorso.conCorsie(
+          PercorsoCalcolato.corsieDaOsrm(jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>),
+        );
+      }
+    } catch (_) {}
     // I limiti di velocità sono un di più: se il server non li dà, si guida
     // lo stesso.
     try {

@@ -73,16 +73,9 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
             basso = cy - r - dp(8f)
         }
 
-        // Batteria, sosta e meteo: una scheda per riga, allineate a destra.
+        // Sosta e meteo: una scheda per riga, allineate a destra, sopra la
+        // batteria.
         val righe = mutableListOf<Pair<String, String?>>()
-        c.batteria?.let { b ->
-            val sotto = when {
-                c.arrivoBatteria != null -> "${c.arrivoBatteria.roundToInt()}% all'arrivo"
-                c.autonomiaKm != null -> "${c.autonomiaKm.roundToInt()} km di autonomia"
-                else -> null
-            }
-            righe += "🔋 ${b.roundToInt()}%" to sotto
-        }
         if (c.sostaNome != null) {
             val dettagli = listOfNotNull(
                 c.sostaKm?.let { "tra ${it.roundToInt()} km" },
@@ -93,6 +86,7 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         if (c.meteoTemperatura != null) {
             righe += "${c.meteoEmoji ?: ""} ${c.meteoTemperatura.roundToInt()}°" to c.meteoDove
         }
+        c.batteria?.let { b -> basso = batteria(canvas, destra, basso, b, c) - dp(6f) }
         for ((titolo, sotto) in righe.asReversed()) {
             val larghezza = max(testo.measureText(titolo), sotto?.let { testoPiccolo.measureText(it) } ?: 0f) + dp(24f)
             val altezza = if (sotto != null) dp(50f) else dp(34f)
@@ -140,6 +134,56 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
             riga2?.let { canvas.drawText(it, x, box.top + dp(45f), testoPiccolo) }
             av.limite?.let { l -> cartello(canvas, box.right - dp(30f), box.centerY(), dp(21f), l) }
         }
+    }
+
+    /**
+     * La batteria come un'icona vera, piena quanto l'auto e colorata (verde,
+     * gialla, rossa), con la percentuale grande; sotto l'autonomia adesso
+     * (dall'auto o stimata sul consumo vero) e la batteria all'arrivo.
+     * Restituisce il bordo alto della scheda.
+     */
+    private fun batteria(canvas: Canvas, destra: Float, basso: Float, b: Double, c: PonteAuto.Cruscotto): Float {
+        val livello = (b / 100.0).coerceIn(0.0, 1.0).toFloat()
+        val colore = when {
+            b < 20 -> Color.rgb(229, 57, 53)
+            b < 50 -> Color.rgb(255, 179, 0)
+            else -> Color.rgb(67, 160, 71)
+        }
+        val grande = Paint(testo).apply { textSize = dp(24f) }
+        val percentuale = "${b.roundToInt()}%"
+        val autonomia = c.autonomiaKm?.let { "${it.roundToInt()} km" }
+        val fonte = if (c.autonomiaKm == null) null else if (c.autonomiaAuto) "dall'auto" else "stimati"
+        val arrivo = c.arrivoBatteria?.let { "${it.roundToInt()}% all'arrivo" }
+        val lIcona = dp(40f)
+        val larghezza = maxOf(
+            lIcona + dp(10f) + grande.measureText(percentuale),
+            (autonomia?.let { testo.measureText(it) + dp(6f) } ?: 0f) + (fonte?.let { testoPiccolo.measureText(it) } ?: 0f),
+            arrivo?.let { testoPiccolo.measureText(it) } ?: 0f,
+        ) + dp(26f)
+        val altezza = dp(44f) + (if (autonomia != null) dp(24f) else 0f) + (if (arrivo != null) dp(20f) else 0f)
+        val box = RectF(destra - larghezza, basso - altezza, destra, basso)
+        canvas.drawRoundRect(box, dp(16f), dp(16f), sfondo)
+        // L'icona: corpo, polo, riempimento.
+        val x = box.left + dp(13f)
+        val y = box.top + dp(12f)
+        val corpo = RectF(x, y, x + lIcona - dp(4f), y + dp(20f))
+        bordo.color = Color.WHITE
+        bordo.strokeWidth = dp(2f)
+        canvas.drawRoundRect(corpo, dp(4f), dp(4f), bordo)
+        pieno.color = Color.WHITE
+        canvas.drawRoundRect(RectF(corpo.right + dp(1f), y + dp(6f), corpo.right + dp(4f), y + dp(14f)), dp(1f), dp(1f), pieno)
+        pieno.color = colore
+        val dentro = RectF(corpo.left + dp(3f), corpo.top + dp(3f), corpo.right - dp(3f), corpo.bottom - dp(3f))
+        canvas.drawRoundRect(RectF(dentro.left, dentro.top, dentro.left + dentro.width() * max(livello, 0.04f), dentro.bottom), dp(2f), dp(2f), pieno)
+        canvas.drawText(percentuale, x + lIcona + dp(8f), y + dp(19f), grande)
+        var riga = box.top + dp(44f)
+        autonomia?.let {
+            canvas.drawText(it, box.left + dp(13f), riga + dp(16f), testo)
+            fonte?.let { f -> canvas.drawText(f, box.left + dp(19f) + testo.measureText(it), riga + dp(16f), testoPiccolo) }
+            riga += dp(24f)
+        }
+        arrivo?.let { canvas.drawText(it, box.left + dp(13f), riga + dp(14f), testoPiccolo) }
+        return box.top
     }
 
     /** Il cartello del limite: cerchio bianco col bordo rosso. */

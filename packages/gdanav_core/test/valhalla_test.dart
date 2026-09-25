@@ -65,7 +65,10 @@ void main() {
         expect(r.headers['x-gdanav-chiave'], 'segreto');
         if (r.url.path == '/trace_attributes') return http.Response('{"edges":[]}', 200);
         expect(r.url.toString(), 'https://valhalla.esempio.dev/route');
-        chiesto = jsonDecode(r.body) as Map<String, Object?>;
+        final corpo = jsonDecode(r.body) as Map<String, Object?>;
+        // La seconda richiesta, per le corsie, è in formato OSRM.
+        if (corpo['format'] == 'osrm') return http.Response('{"routes":[]}', 200);
+        chiesto = corpo;
         return http.Response(jsonEncode(utrecht()), 200, headers: {'content-type': 'application/json'});
       });
       final v = ClienteValhalla(Uri.parse('https://valhalla.esempio.dev/'), client: client, chiave: 'segreto');
@@ -151,4 +154,108 @@ void main() {
     expect(p.limiti.whereType<int>(), isNotEmpty);
     v.chiudi();
   }, skip: vero == null ? 'serve GDANAV_VALHALLA' : false);
+
+  test('corsie e cartelli agli svincoli: dal formato OSRM e da sign', () {
+    final nativo = {
+      'trip': {
+        'legs': [
+          {
+            'shape': codificaPolyline(const [Punto(52.0, 5.0), Punto(52.01, 5.0), Punto(52.02, 5.01)], precisione: 6),
+            'maneuvers': [
+              {
+                'type': 1,
+                'instruction': 'Parti',
+                'length': 1.1,
+                'time': 60,
+                'begin_shape_index': 0,
+                'end_shape_index': 1
+              },
+              {
+                'type': 23,
+                'instruction': 'Mantieni la destra per A12',
+                'length': 1.2,
+                'time': 50,
+                'begin_shape_index': 1,
+                'end_shape_index': 2,
+                'sign': {
+                  'exit_number_elements': [
+                    {'text': '12'}
+                  ],
+                  'exit_branch_elements': [
+                    {'text': 'A12'}
+                  ],
+                  'exit_toward_elements': [
+                    {'text': 'Arnhem'},
+                    {'text': 'Rotterdam'}
+                  ],
+                },
+              },
+              {
+                'type': 26,
+                'instruction': 'Rotonda',
+                'length': 0,
+                'time': 0,
+                'begin_shape_index': 2,
+                'end_shape_index': 2,
+                'roundabout_exit_count': 3
+              },
+            ],
+          },
+        ],
+      },
+    };
+    final osrm = {
+      'routes': [
+        {
+          'legs': [
+            {
+              'steps': [
+                {
+                  'intersections': [{}]
+                },
+                {
+                  'intersections': [
+                    {
+                      'lanes': [
+                        {
+                          'indications': ['straight'],
+                          'valid': false
+                        },
+                        {
+                          'indications': ['straight', 'slight right'],
+                          'valid': true,
+                          'valid_indication': 'slight right'
+                        },
+                        {
+                          'indications': ['slight right'],
+                          'valid': true,
+                          'valid_indication': 'slight right'
+                        },
+                      ],
+                    },
+                  ],
+                },
+                {
+                  'intersections': [{}]
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    final p = PercorsoCalcolato.daValhalla(nativo).conCorsie(PercorsoCalcolato.corsieDaOsrm(osrm));
+    final m = p.manovre[1];
+    expect(m.uscita, '12');
+    expect(m.verso, 'A12 · Arnhem, Rotterdam');
+    expect(m.corsie, hasLength(3));
+    expect(m.corsie.map((c) => c.giusta), [false, true, true]);
+    expect(m.corsie[1].direzioni, [DirezioneCorsia.dritto, DirezioneCorsia.leggeraDestra]);
+    expect(m.corsie[1].consigliata, DirezioneCorsia.leggeraDestra);
+    expect(m.corsieUtili, isTrue);
+    expect(p.manovre[0].corsieUtili, isFalse);
+    expect(p.manovre[2].uscitaRotonda, 3);
+    // Se le manovre non tornano una a una, niente corsie.
+    expect(PercorsoCalcolato.daValhalla(nativo).conCorsie([[], []]).manovre[1].corsie, isEmpty);
+  });
 }

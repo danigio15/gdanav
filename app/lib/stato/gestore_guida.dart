@@ -116,6 +116,27 @@ class GestoreGuida extends ChangeNotifier {
     return (piano.batteriaArrivo + scarto).clamp(0, 100).toDouble();
   }
 
+  /// L'autonomia adesso: quella dell'auto se la dice (Home Assistant,
+  /// Android Auto, OBD) ed è recente; altrimenti la batteria di adesso diviso
+  /// il consumo del viaggio (vero, o previsto); senza viaggio la stima a 90
+  /// km/h.
+  ({double km, bool dallAuto})? get autonomiaOra {
+    final s = auto.stato;
+    if (s != null &&
+        s.autonomiaKm != null &&
+        s.sorgente != TipoSorgente.stima &&
+        s.sorgente != TipoSorgente.manuale &&
+        _ora().difference(s.letto) < const Duration(minutes: 10)) {
+      return (km: s.autonomiaKm!, dallAuto: true);
+    }
+    final b = batteriaOra?.valore ?? s?.batteria, c = consumoKwh100;
+    if (b != null && c != null && c > 5) {
+      return (km: b / 100 * auto.veicolo.capacitaUtileKwh / c * 100, dallAuto: false);
+    }
+    final k = auto.autonomiaKm();
+    return k == null ? null : (km: k, dallAuto: false);
+  }
+
   /// Il consumo in kWh ogni 100 km: quello vero dopo qualche chilometro con i
   /// dati dell'auto, altrimenti quello previsto per il viaggio.
   double? get consumoKwh100 {

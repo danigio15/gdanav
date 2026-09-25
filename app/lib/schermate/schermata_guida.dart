@@ -268,7 +268,27 @@ class _Banner extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 14, 18, 16),
               child: Row(
                 children: [
-                  Icon(iconaManovra(m?.tipo ?? 8), color: Colors.white, size: 52),
+                  Container(
+                    width: 68,
+                    height: 68,
+                    decoration: BoxDecoration(color: const Color(0xFF3A4458), borderRadius: BorderRadius.circular(16)),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Icon(iconaManovra(m?.tipo ?? 8), color: Colors.white, size: 54),
+                        // Nelle rotonde, quale uscita.
+                        if (m?.uscitaRotonda case final n?)
+                          Positioned(
+                            right: 4,
+                            bottom: 2,
+                            child: Text(
+                              '$n',
+                              style: t.titleSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w900),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -284,6 +304,11 @@ class _Banner extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: t.titleMedium?.copyWith(color: Colors.white.withValues(alpha: 0.92)),
                         ),
+                        if (m != null && (m.verso.isNotEmpty || m.uscita.isNotEmpty))
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: CartelloSvincolo(manovra: m),
+                          ),
                       ],
                     ),
                   ),
@@ -291,6 +316,12 @@ class _Banner extends StatelessWidget {
               ),
             ),
           ),
+          // Le corsie, avvicinandosi allo svincolo: quale prendere.
+          if (m != null && m.corsieUtili && alla <= 2000)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: CorsieSvincolo(corsie: m.corsie),
+            ),
           if (a?.dopo case final dopo?)
             Align(
               alignment: Alignment.centerLeft,
@@ -303,6 +334,19 @@ class _Banner extends StatelessWidget {
                   children: [
                     Text('Poi ', style: t.labelLarge?.copyWith(color: Colors.white70)),
                     Icon(iconaManovra(dopo.tipo), color: Colors.white, size: 20),
+                    if (dopo.strada.isNotEmpty)
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 200),
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: Text(
+                            dopo.strada,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: t.labelLarge?.copyWith(color: Colors.white),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -420,6 +464,7 @@ class _Batteria extends StatelessWidget {
     final muto = Theme.of(context).colorScheme.onSurfaceVariant;
     final ora = guida.batteriaOra;
     final consumo = guida.consumoKwh100;
+    final autonomia = guida.autonomiaOra;
     String pc(double? v) => v == null ? '–' : '${v.round()}%';
     Color colore(double? v) => switch (v) {
       null => muto,
@@ -463,12 +508,31 @@ class _Batteria extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              // L'autonomia adesso: dall'auto, o stimata sul consumo vero.
               Text(
-                consumo == null ? '–' : consumo.toStringAsFixed(1).replaceAll('.', ','),
-                key: const Key('consumo'),
+                autonomia == null ? '– km' : '${autonomia.km.round()} km',
+                key: const Key('autonomia'),
                 style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
-              Text('kWh/100 km', maxLines: 1, style: t.labelMedium?.copyWith(color: muto)),
+              Text(
+                autonomia?.dallAuto == true ? 'autonomia (auto)' : 'autonomia',
+                maxLines: 1,
+                style: t.labelMedium?.copyWith(color: muto),
+              ),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: consumo == null ? '–' : consumo.toStringAsFixed(1).replaceAll('.', ','),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const TextSpan(text: ' kWh/100 km'),
+                  ],
+                ),
+                key: const Key('consumo'),
+                maxLines: 1,
+                style: t.labelMedium?.copyWith(color: muto),
+              ),
             ],
           ),
         ),

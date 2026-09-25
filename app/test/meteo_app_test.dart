@@ -31,7 +31,9 @@ void main() {
       MaterialApp(
         theme: temaGdanav(Brightness.light),
         home: Scaffold(
-          body: Stack(children: [SchedaViaggio(gestore: a.viaggio, onAvvia: () {}, meteo: meteo)]),
+          body: Stack(
+            children: [SchedaViaggio(gestore: a.viaggio, onAvvia: () {}, meteo: meteo)],
+          ),
         ),
       ),
     );
