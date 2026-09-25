@@ -178,4 +178,35 @@ void main() {
   },
       timeout: const Timeout(Duration(minutes: 4)),
       skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  // Le alternative e il traffico di adesso, coi server veri.
+  test('alternative Napoli → Milano col traffico TomTom', () async {
+    try {
+      final inizio = DateTime.now();
+      final scelte = await valhalla.alternative(napoli, milano);
+      final chiave = Platform.environment['GDANAV_TOMTOM'] ?? '';
+      final traffico = chiave.isEmpty ? null : TrafficoTomTom(chiave);
+      final righe = <String>[];
+      for (final s in scelte) {
+        var p = s;
+        String extra = '';
+        if (traffico != null) {
+          try {
+            p = await traffico.applica(s);
+            extra = ' · traffico +${p.ritardoTraffico.inMinutes} min, ${p.code.length} code'
+                '${p.code.isEmpty ? '' : ' (la prima a ${(p.code.first.daM / 1000).round()} km, ${(p.code.first.lunghezzaM / 1000).toStringAsFixed(1)} km)'}';
+          } catch (e) {
+            extra = ' · traffico: $e';
+          }
+        }
+        righe.add('${(p.lunghezzaM / 1000).round()} km ${p.durata.inMinutes} min via ${p.stradaPrincipale}'
+            '${p.conPedaggi ? ' (pedaggi)' : ''}$extra');
+      }
+      avviso('Alternative', '${DateTime.now().difference(inizio).inMilliseconds} ms | ${righe.join(' | ')}');
+    } catch (e) {
+      avviso('Alternative', 'errore: $e');
+    }
+  },
+      timeout: const Timeout(Duration(minutes: 3)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 }

@@ -155,6 +155,24 @@ void main() {
     v.chiudi();
   }, skip: vero == null ? 'serve GDANAV_VALHALLA' : false);
 
+  test('Valhalla vero: alternative, e quella scelta rifatta uguale con corsie e limiti', () async {
+    final v = ClienteValhalla(Uri.parse(vero!));
+    addTearDown(v.chiudi);
+    final scelte = await v.alternative(const Punto(52.0907, 5.1214), const Punto(52.064, 5.19));
+    expect(scelte, isNotEmpty);
+    print('alternative: ${[
+      for (final s in scelte)
+        '${(s.lunghezzaM / 1000).toStringAsFixed(1)} km ${s.durata.inMinutes} min ${s.stradaPrincipale}'
+    ]}');
+    final scelto = scelte.last;
+    final rifatto = await v.seguendo(scelto);
+    // Stessa strada: stessa lunghezza, a meno di qualche metro.
+    expect(rifatto.lunghezzaM, closeTo(scelto.lunghezzaM, scelto.lunghezzaM * 0.02));
+    expect(rifatto.limiti.whereType<int>(), isNotEmpty);
+    // Senza tappe di mezzo nel viaggio: nessun «sei arrivato» a metà.
+    expect(rifatto.manovre.where((m) => const {4, 5, 6}.contains(m.tipo)), hasLength(1));
+  }, skip: vero == null ? 'serve GDANAV_VALHALLA' : false);
+
   test('corsie e cartelli agli svincoli: dal formato OSRM e da sign', () {
     final nativo = {
       'trip': {

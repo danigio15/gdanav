@@ -113,10 +113,43 @@ class Manovra {
       );
 }
 
+/// Una coda sul percorso, dal traffico in tempo reale: da dove a dove
+/// (metri dall'inizio del percorso), quanto fa perdere e quanto è grave.
+class Coda {
+  const Coda(
+      {required this.daM, required this.aM, required this.ritardo, this.livello = 2, this.velocitaKmh, this.tipo});
+
+  final double daM;
+  final double aM;
+  final Duration ritardo;
+
+  /// 1 rallentamento, 2 coda, 3 coda ferma, 4 strada chiusa.
+  final int livello;
+
+  /// Quanto si va, dentro la coda.
+  final double? velocitaKmh;
+
+  /// «Lavori», «Incidente», «Strada chiusa»…, se si sa.
+  final String? tipo;
+
+  double get lunghezzaM => aM - daM;
+}
+
 /// Un percorso pronto per il motore: la geometria per la mappa e le
 /// colonnine, i tratti per i consumi, le manovre per la guida.
 class PercorsoCalcolato {
-  const PercorsoCalcolato({required this.punti, required this.tratti, required this.manovre, this.limiti = const []});
+  const PercorsoCalcolato({
+    required this.punti,
+    required this.tratti,
+    required this.manovre,
+    this.limiti = const [],
+    this.conPedaggi = false,
+    this.conAutostrade = false,
+    this.conTraghetti = false,
+    this.code = const [],
+    this.ritardoTraffico = Duration.zero,
+    this.trafficoVero = false,
+  });
 
   final List<Punto> punti;
   final List<Tratto> tratti;
@@ -126,22 +159,103 @@ class PercorsoCalcolato {
   /// OpenStreetMap non lo sa. Vuota se il server non l'ha dato.
   final List<int?> limiti;
 
+  /// Se passa da pedaggi, autostrade, traghetti: per scegliere fra i
+  /// percorsi.
+  final bool conPedaggi;
+  final bool conAutostrade;
+  final bool conTraghetti;
+
+  /// Le code di adesso lungo la strada (traffico in tempo reale), e quanto
+  /// fanno perdere in tutto: già dentro i tempi dei [tratti].
+  final List<Coda> code;
+  final Duration ritardoTraffico;
+
+  /// I tempi tengono conto del traffico di adesso (non solo delle velocità
+  /// delle strade).
+  final bool trafficoVero;
+
   /// Il limite sul segmento [i], se si conosce.
   int? limiteSul(int i) => i >= 0 && i < limiti.length ? limiti[i] : null;
 
-  PercorsoCalcolato conLimiti(List<int?> limiti) =>
-      PercorsoCalcolato(punti: punti, tratti: tratti, manovre: manovre, limiti: limiti);
+  PercorsoCalcolato _copia({
+    List<Tratto>? tratti,
+    List<Manovra>? manovre,
+    List<int?>? limiti,
+    List<Coda>? code,
+    Duration? ritardoTraffico,
+    bool? trafficoVero,
+  }) =>
+      PercorsoCalcolato(
+        punti: punti,
+        tratti: tratti ?? this.tratti,
+        manovre: manovre ?? this.manovre,
+        limiti: limiti ?? this.limiti,
+        conPedaggi: conPedaggi,
+        conAutostrade: conAutostrade,
+        conTraghetti: conTraghetti,
+        code: code ?? this.code,
+        ritardoTraffico: ritardoTraffico ?? this.ritardoTraffico,
+        trafficoVero: trafficoVero ?? this.trafficoVero,
+      );
+
+  PercorsoCalcolato conLimiti(List<int?> limiti) => _copia(limiti: limiti);
 
   /// Con le corsie di ogni manovra (dalla risposta OSRM dello stesso
   /// percorso): se le manovre non tornano una a una, niente corsie.
   PercorsoCalcolato conCorsie(List<List<Corsia>> corsie) {
     if (corsie.length != manovre.length) return this;
-    return PercorsoCalcolato(
-      punti: punti,
-      tratti: tratti,
-      manovre: [for (var i = 0; i < manovre.length; i++) manovre[i].conCorsie(corsie[i])],
-      limiti: limiti,
-    );
+    return _copia(manovre: [for (var i = 0; i < manovre.length; i++) manovre[i].conCorsie(corsie[i])]);
+  }
+
+  /// Col traffico di adesso: dentro ogni coda i tratti vanno piano quanto
+  /// basta a perdere il suo ritardo (o alla velocità della coda, se si
+  /// sa), così arrivo e consumi ne tengono conto. [code] con le distanze
+  /// sui [punti] di questo percorso.
+  PercorsoCalcolato conTraffico(List<Coda> code) {
+    final nuovi = List<Tratto>.of(tratti);
+    // Dove comincia ogni tratto, in metri.
+    final inizio = <double>[];
+    var m = 0.0;
+    for (final t in tratti) {
+      inizio.add(m);
+      m += t.lunghezzaM;
+    }
+    // Le distanze delle code sono sulla geometria; i tratti sono scalati
+    // sulle lunghezze di Valhalla: si riportano sulla stessa misura.
+    final geometrica = Linea(punti).lunghezzaM;
+    final k = geometrica > 0 ? m / geometrica : 1.0;
+    var ritardo = Duration.zero;
+    for (final c in code) {
+      final da = c.daM * k, a = c.aM * k;
+      final dentro = [
+        for (var i = 0; i < nuovi.length; i++)
+          if (inizio[i] + nuovi[i].lunghezzaM > da && inizio[i] < a) i,
+      ];
+      if (dentro.isEmpty) continue;
+      final secondi = dentro.fold(0.0, (s, i) => s + nuovi[i].secondi);
+      final lunghezza = dentro.fold(0.0, (s, i) => s + nuovi[i].lunghezzaM);
+      // La velocità nella coda: quella detta, o quella che fa perdere il ritardo.
+      final kmh = c.velocitaKmh ?? (lunghezza / (secondi + c.ritardo.inSeconds) * 3.6);
+      final v = kmh.clamp(3.0, 130.0);
+      for (final i in dentro) {
+        final t = nuovi[i];
+        if (v < t.velocitaKmh) nuovi[i] = Tratto(lunghezzaM: t.lunghezzaM, velocitaKmh: v, dislivelloM: t.dislivelloM);
+      }
+      ritardo += c.ritardo;
+    }
+    return _copia(tratti: nuovi, code: code, ritardoTraffico: ritardo, trafficoVero: true);
+  }
+
+  /// La strada fatta più a lungo («A1», «E45»): per chiamare il percorso.
+  String get stradaPrincipale {
+    final metri = <String, double>{};
+    for (final m in manovre) {
+      final nome = m.strada.split(', ').first.trim();
+      if (nome.isEmpty) continue;
+      metri[nome] = (metri[nome] ?? 0) + m.lunghezzaM;
+    }
+    if (metri.isEmpty) return '';
+    return (metri.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).first.key;
   }
 
   /// Dalle `steps` del formato OSRM di Valhalla: per ogni manovra le corsie
@@ -230,7 +344,15 @@ class PercorsoCalcolato {
         }
       }
     }
-    return PercorsoCalcolato(punti: punti, tratti: tratti, manovre: manovre);
+    final sommario = (trip['summary'] as Map?) ?? const {};
+    return PercorsoCalcolato(
+      punti: punti,
+      tratti: tratti,
+      manovre: manovre,
+      conPedaggi: sommario['has_toll'] == true,
+      conAutostrade: sommario['has_highway'] == true,
+      conTraghetti: sommario['has_ferry'] == true,
+    );
   }
 }
 
@@ -364,30 +486,25 @@ class ClienteValhalla {
   final String? chiave;
   final http.Client _http;
 
-  Future<PercorsoCalcolato> calcola(
-    List<Punto> tappe, {
-    String lingua = 'it-IT',
-    OpzioniPercorso opzioni = const OpzioniPercorso(),
-  }) async {
+  Map<String, String> get _intestazioni =>
+      {'content-type': 'application/json', if (chiave != null) 'x-gdanav-chiave': chiave!};
+
+  Map<String, Object?> _corpo(List<Map<String, Object?>> luoghi, String lingua, OpzioniPercorso opzioni) {
     final costi = opzioni.valhalla;
-    final corpo = {
-      'locations': [
-        for (final p in tappe) {'lat': p.lat, 'lon': p.lon},
-      ],
+    return {
+      'locations': luoghi,
       'costing': 'auto',
       if (costi.isNotEmpty) 'costing_options': {'auto': costi},
       'units': 'kilometers',
       'language': lingua,
       'elevation_interval': 30,
     };
-    final r = await _http
-        .post(
-          indirizzo.resolve('route'),
-          headers: {'content-type': 'application/json', if (chiave != null) 'x-gdanav-chiave': chiave!},
-          body: jsonEncode(corpo),
-        )
-        .timeout(const Duration(seconds: 60),
-            onTimeout: () => throw const ErroreValhalla('il server dei percorsi non risponde'));
+  }
+
+  Future<Map<String, Object?>> _route(Map<String, Object?> corpo) async {
+    final r = await _http.post(indirizzo.resolve('route'), headers: _intestazioni, body: jsonEncode(corpo)).timeout(
+        const Duration(seconds: 60),
+        onTimeout: () => throw const ErroreValhalla('il server dei percorsi non risponde'));
     final testo = utf8.decode(r.bodyBytes);
     if (r.statusCode != 200) {
       // Valhalla risponde in JSON; Caddy davanti (chiave sbagliata) no.
@@ -399,15 +516,91 @@ class ClienteValhalla {
       }
       throw ErroreValhalla(messaggio ?? 'errore ${r.statusCode}', stato: r.statusCode);
     }
-    final json = jsonDecode(testo) as Map<String, Object?>;
-    var percorso = PercorsoCalcolato.daValhalla(json);
+    return jsonDecode(testo) as Map<String, Object?>;
+  }
+
+  /// Il percorso fra le [tappe] (partenza, tappe intermedie, arrivo), con
+  /// corsie e limiti di velocità.
+  Future<PercorsoCalcolato> calcola(
+    List<Punto> tappe, {
+    String lingua = 'it-IT',
+    OpzioniPercorso opzioni = const OpzioniPercorso(),
+  }) =>
+      _calcola([
+        for (final p in tappe) {'lat': p.lat, 'lon': p.lon},
+      ], lingua, opzioni);
+
+  Future<PercorsoCalcolato> _calcola(List<Map<String, Object?>> luoghi, String lingua, OpzioniPercorso opzioni) async {
+    final corpo = _corpo(luoghi, lingua, opzioni);
+    final json = await _route(corpo);
+    return _arricchisci(PercorsoCalcolato.daValhalla(json), json, corpo);
+  }
+
+  /// Fino a [quante] percorsi diversi da [da] ad [a] (il migliore per primo),
+  /// senza corsie né limiti: per scegliere. Quello scelto si ricalcola con
+  /// [seguendo].
+  Future<List<PercorsoCalcolato>> alternative(
+    Punto da,
+    Punto a, {
+    int quante = 2,
+    String lingua = 'it-IT',
+    OpzioniPercorso opzioni = const OpzioniPercorso(),
+  }) async {
+    final json = await _route({
+      ..._corpo([
+        {'lat': da.lat, 'lon': da.lon},
+        {'lat': a.lat, 'lon': a.lon},
+      ], lingua, opzioni),
+      'alternates': quante,
+    });
+    return [
+      PercorsoCalcolato.daValhalla(json),
+      for (final alt in ((json['alternates'] as List?) ?? const []).whereType<Map>())
+        if (alt['trip'] is Map) PercorsoCalcolato.daValhalla({'trip': alt['trip']}),
+    ];
+  }
+
+  /// Rifà [scelto] (una delle [alternative]) con corsie e limiti: passa da
+  /// qualche suo punto, ognuno con la direzione in cui lo si percorre, così
+  /// Valhalla non cambia strada né carreggiata.
+  Future<PercorsoCalcolato> seguendo(
+    PercorsoCalcolato scelto, {
+    String lingua = 'it-IT',
+    OpzioniPercorso opzioni = const OpzioniPercorso(),
+    int passaggi = 8,
+  }) {
+    final p = scelto.punti;
+    final linea = Linea(p);
+    final luoghi = <Map<String, Object?>>[
+      {'lat': p.first.lat, 'lon': p.first.lon},
+    ];
+    for (var k = 1; k <= passaggi; k++) {
+      final m = linea.lunghezzaM * k / (passaggi + 1);
+      final i = linea.cumulate.indexWhere((c) => c >= m).clamp(1, p.length - 1);
+      luoghi.add({
+        'lat': p[i].lat,
+        'lon': p[i].lon,
+        'type': 'through',
+        'heading': rottaGradi(p[i - 1], p[i]).round(),
+        'heading_tolerance': 45,
+      });
+    }
+    luoghi.add({'lat': p.last.lat, 'lon': p.last.lon});
+    return _calcola(luoghi, lingua, opzioni);
+  }
+
+  Future<PercorsoCalcolato> _arricchisci(
+    PercorsoCalcolato percorso,
+    Map<String, Object?> json,
+    Map<String, Object?> corpo,
+  ) async {
     // Le corsie agli svincoli: le dà solo il formato OSRM dello stesso
     // percorso. Sono un di più: se non arrivano si guida lo stesso.
     try {
       final r = await _http
           .post(
             indirizzo.resolve('route'),
-            headers: {'content-type': 'application/json', if (chiave != null) 'x-gdanav-chiave': chiave!},
+            headers: _intestazioni,
             body: jsonEncode({...corpo, 'format': 'osrm', 'elevation_interval': 0}),
           )
           .timeout(const Duration(seconds: 30));
@@ -436,7 +629,7 @@ class ClienteValhalla {
   Future<List<int?>> _limitiTratto(String forma, int punti) async {
     final r = await _http.post(
       indirizzo.resolve('trace_attributes'),
-      headers: {'content-type': 'application/json', if (chiave != null) 'x-gdanav-chiave': chiave!},
+      headers: _intestazioni,
       body: jsonEncode({
         'encoded_polyline': forma,
         'shape_match': 'edge_walk',
