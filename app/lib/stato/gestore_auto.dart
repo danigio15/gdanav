@@ -45,6 +45,17 @@ class GestoreAuto extends ChangeNotifier {
 
   Abbinamento? abbinamento;
 
+  /// Elettrica: soste di ricarica, batteria, colonnine. Termica: il
+  /// navigatore e basta.
+  bool elettrica = true;
+
+  Future<void> impostaElettrica(bool si) async {
+    if (si == elettrica) return;
+    elettrica = si;
+    await archivio.salvaElettrica(si);
+    notifyListeners();
+  }
+
   /// L'auto dell'utente: da lei dipendono consumi, soste e prese.
   ProfiloVeicolo veicolo = ProfiloVeicolo.esempio;
   StatoAuto? stato;
@@ -83,6 +94,7 @@ class GestoreAuto extends ChangeNotifier {
 
   Future<void> avvia() async {
     veicolo = await archivio.veicolo();
+    elettrica = await archivio.elettrica();
     arbitro.capacitaUtileKwh = veicolo.capacitaUtileKwh;
     arbitro.modalita = await archivio.fonte();
     abbinamento = await archivio.abbinamento();

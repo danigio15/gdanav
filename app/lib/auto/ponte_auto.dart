@@ -348,15 +348,18 @@ class PonteAuto {
     final m = meteo;
     final arrivoMeteo = p == null ? null : m?.delViaggio?.arrivo;
     final previsione = arrivoMeteo?.previsione ?? m?.qui;
-    final batteria = ora?.valore ?? s?.batteria;
-    final autonomia = auto == null ? null : guida.autonomiaOra;
+    // Auto termica: niente batteria, autonomia né colonnine sull'auto.
+    final elettrica = auto?.elettrica ?? true;
+    final batteria = elettrica ? ora?.valore ?? s?.batteria : null;
+    final autonomia = auto == null || !elettrica ? null : guida.autonomiaOra;
     _manda('cruscotto', {
+      'elettrica': elettrica,
       'batteria': batteria,
       'autonomia_km': autonomia?.km,
       'autonomia_auto': autonomia?.dallAuto ?? false,
       'velocita': posizione.velocitaKmh,
       'limite': guida.attiva ? a?.limiteKmh : null,
-      'arrivo_batteria': p == null ? null : guida.batteriaArrivo,
+      'arrivo_batteria': p == null || !elettrica ? null : guida.batteriaArrivo,
       if (sosta != null) ...{
         'sosta_nome': sosta.colonnina.nome,
         'sosta_km': (sosta.colonnina.distanzaM - (a?.percorsiM ?? 0)) / 1000,

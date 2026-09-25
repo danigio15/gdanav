@@ -29,15 +29,28 @@ class Calcolo extends StatoViaggio {
 }
 
 class ViaggioPronto extends StatoViaggio {
-  const ViaggioPronto(this.destinazione, this.viaggio, this.batteriaPartenza, {required this.calcolatoAlle});
+  const ViaggioPronto(
+    this.destinazione,
+    this.viaggio,
+    this.batteriaPartenza, {
+    required this.calcolatoAlle,
+    this.termica = false,
+  });
   final Luogo destinazione;
   final Viaggio viaggio;
   final double batteriaPartenza;
 
+  /// Auto termica: solo il percorso, senza batteria né soste.
+  final bool termica;
+
   /// Per dire l'ora d'arrivo: partenza adesso più la durata.
   final DateTime calcolatoAlle;
 
-  DateTime? get arrivoAlle => viaggio.piano == null ? null : calcolatoAlle.add(viaggio.piano!.durata);
+  DateTime? get arrivoAlle => termica
+      ? calcolatoAlle.add(viaggio.percorso.durata)
+      : viaggio.piano == null
+      ? null
+      : calcolatoAlle.add(viaggio.piano!.durata);
 }
 
 class ErroreViaggio extends StatoViaggio {
@@ -184,6 +197,7 @@ class GestoreViaggio extends ChangeNotifier {
   Future<void> pianifica(Luogo destinazione) async {
     final impostazioni = await archivio.impostazioni();
     if (impostazioni.mancante case final m?) return _imposta(ErroreViaggio(m, destinazione: destinazione));
+    if (!auto.elettrica) return _percorsoSolo(destinazione, impostazioni);
     final batteria = auto.stato?.batteria;
     if (batteria == null) {
       return _imposta(
@@ -245,6 +259,53 @@ class GestoreViaggio extends ChangeNotifier {
             ? 'Per questo viaggio servono soste, ma le colonnine non sono arrivate. Riprova tra poco.'
             : 'Il viaggio non si è potuto calcolare: $e';
         _imposta(ErroreViaggio(messaggio, destinazione: destinazione));
+      }
+    }
+  }
+
+  /// Auto termica: il percorso e basta, come un navigatore normale.
+  Future<void> _percorsoSolo(Luogo destinazione, Impostazioni impostazioni) async {
+    final partenza = await posizione();
+    if (partenza == null) {
+      return _imposta(ErroreViaggio('Non so dove sei: attiva la posizione per gdanav.', destinazione: destinazione));
+    }
+    ultimaPosizione = partenza;
+    opzioni = await archivio.opzioniPercorso();
+    final calcolo = Calcolo(destinazione);
+    _imposta(calcolo);
+    condizioni = null;
+    try {
+      final percorso = await costruisci(
+        impostazioni,
+        auto.veicolo,
+        await archivio.preferenze(),
+        opzioni,
+      ).percorsi([partenza, destinazione.posizione]).timeout(tempoMassimo);
+      if (identical(stato, calcolo)) {
+        _imposta(
+          ViaggioPronto(
+            destinazione,
+            Viaggio(percorso: percorso, colonnine: const [], piano: null),
+            0,
+            calcolatoAlle: _ora(),
+            termica: true,
+          ),
+        );
+      }
+    } on TimeoutException {
+      if (identical(stato, calcolo)) {
+        _imposta(
+          ErroreViaggio(
+            'Il calcolo ci mette troppo: i server sono lenti. Riprova tra poco.',
+            destinazione: destinazione,
+          ),
+        );
+      }
+    } on ErroreValhalla catch (e) {
+      if (identical(stato, calcolo)) _imposta(ErroreViaggio(_spiega(e), destinazione: destinazione));
+    } catch (e) {
+      if (identical(stato, calcolo)) {
+        _imposta(ErroreViaggio('Il viaggio non si è potuto calcolare: $e', destinazione: destinazione));
       }
     }
   }

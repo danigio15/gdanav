@@ -41,6 +41,57 @@ class SchedaAuto extends StatelessWidget {
     return ListenableBuilder(
       listenable: Listenable.merge([auto, ?fotoCatalogo]),
       builder: (context, _) {
+        // Auto termica: niente batteria né colonnine, solo la tua auto.
+        if (!auto.elettrica) {
+          return Material(
+            key: const Key('scheda-auto-termica'),
+            color: s.surfaceContainerHighest.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(24),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: onApriAuto,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'La tua auto',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                              const Icon(Icons.expand_more),
+                            ],
+                          ),
+                          Text(
+                            'Termica · benzina, diesel, GPL o ibrida',
+                            maxLines: 2,
+                            style: t.bodyLarge?.copyWith(color: s.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _Foto(
+                    propria: auto.foto != null && File(auto.foto!).existsSync() ? File(auto.foto!) : null,
+                    catalogo: null,
+                    colore: coloreAuto(segnaposto),
+                    onFoto: onFoto,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
         final v = auto.veicolo;
         final st = auto.stato;
         final km = auto.autonomiaKm();

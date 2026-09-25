@@ -55,6 +55,7 @@ class _LaTuaAutoState extends State<LaTuaAuto> {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final scelta = widget.auto.veicolo;
+    final elettrica = widget.auto.elettrica;
     final elenco = catalogoVeicoli.where((v) => corrisponde(v, _filtro)).toList()
       ..sort((a, b) => semplice(a.nome).compareTo(semplice(b.nome)));
     // Le righe della lista: l'intestazione della marca, poi le sue auto.
@@ -72,35 +73,62 @@ class _LaTuaAutoState extends State<LaTuaAuto> {
         slivers: [
           SliverList.list(
             children: [
+              // Prima di tutto: elettrica o termica.
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                child: Card(
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 26,
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          child: Icon(Icons.electric_car, color: Theme.of(context).colorScheme.onPrimary, size: 28),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(scelta.nome, style: t.titleMedium),
-                              Text(schedaBreve(scelta), style: t.bodyMedium),
-                            ],
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+                child: SegmentedButton<bool>(
+                  key: const Key('tipo-auto'),
+                  segments: const [
+                    ButtonSegment(value: true, icon: Icon(Icons.electric_car), label: Text('Elettrica')),
+                    ButtonSegment(value: false, icon: Icon(Icons.local_gas_station), label: Text('Termica')),
+                  ],
+                  selected: {elettrica},
+                  onSelectionChanged: (v) async {
+                    await widget.auto.impostaElettrica(v.first);
+                    if (mounted) setState(() {});
+                  },
+                ),
+              ),
+              if (!elettrica)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 6, 20, 14),
+                  child: Text(
+                    'Benzina, diesel, GPL o ibrida: gdanav fa il navigatore normale, senza soste di ricarica, '
+                    'batteria e colonnine. Restano percorso, traffico, autovelox, segnalazioni, meteo e Android Auto.',
+                    key: const Key('spiega-termica'),
+                    style: t.bodyMedium,
+                  ),
+                ),
+              if (elettrica)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                  child: Card(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 26,
+                            backgroundColor: Theme.of(context).colorScheme.primary,
+                            child: Icon(Icons.electric_car, color: Theme.of(context).colorScheme.onPrimary, size: 28),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(scelta.nome, style: t.titleMedium),
+                                Text(schedaBreve(scelta), style: t.bodyMedium),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              if (widget.consumo case final c?) _ConsumoImparato(consumo: c),
+              if (widget.consumo case final c? when elettrica) _ConsumoImparato(consumo: c),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
                 child: Text('Come ti vedi sulla mappa', style: t.titleSmall),
@@ -124,22 +152,23 @@ class _LaTuaAutoState extends State<LaTuaAuto> {
                 ),
               ),
               const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextField(
-                  controller: _campo,
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search),
-                    hintText: 'Cerca fra ${catalogoVeicoli.length} auto: marca o modello',
+              if (elettrica)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    controller: _campo,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search),
+                      hintText: 'Cerca fra ${catalogoVeicoli.length} auto: marca o modello',
+                    ),
+                    onChanged: (s) => setState(() => _filtro = s),
                   ),
-                  onChanged: (s) => setState(() => _filtro = s),
                 ),
-              ),
             ],
           ),
           // 400 e passa auto: si costruiscono solo quelle che si vedono.
           SliverList.builder(
-            itemCount: righe.length,
+            itemCount: elettrica ? righe.length : 0,
             itemBuilder: (context, i) => switch (righe[i]) {
               final String marca => Padding(
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
@@ -160,20 +189,21 @@ class _LaTuaAutoState extends State<LaTuaAuto> {
               _ => const SizedBox.shrink(),
             },
           ),
-          if (elenco.isEmpty)
+          if (elettrica && elenco.isEmpty)
             const SliverToBoxAdapter(
               child: Padding(padding: EdgeInsets.all(20), child: Text('Nessuna auto con questo nome.')),
             ),
           SliverList.list(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                child: Text(
-                  'Valori indicativi dalle schede tecniche. I dati veri della tua auto (Home Assistant, OBD) '
-                  'correggono le stime col tempo.',
-                  style: t.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              if (elettrica)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  child: Text(
+                    'Valori indicativi dalle schede tecniche. I dati veri della tua auto (Home Assistant, OBD) '
+                    'correggono le stime col tempo.',
+                    style: t.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
                 ),
-              ),
               const SizedBox(height: 24),
             ],
           ),

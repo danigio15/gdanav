@@ -217,7 +217,34 @@ class _Pronta extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-            if (piano == null) ...[
+            if (pronto.termica) ...[
+              // Auto termica: un navigatore normale, arrivo e via.
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Arrivo ',
+                      style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w400),
+                    ),
+                    TextSpan(text: orario(pronto.arrivoAlle!), style: t.headlineSmall),
+                  ],
+                ),
+              ),
+              Text(
+                '${durata(v.percorso.durata)} · ${km.round()} km',
+                key: const Key('durata-termica'),
+                style: t.titleMedium?.copyWith(color: muto),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: onAvvia,
+                  icon: const Icon(Icons.navigation),
+                  label: const Text('Avvia'),
+                ),
+              ),
+            ] else if (piano == null) ...[
               Text('${km.round()} km', style: t.headlineSmall),
               const SizedBox(height: 6),
               const Text(
@@ -323,7 +350,7 @@ class _Pronta extends StatelessWidget {
             ],
             const SizedBox(height: 16),
             Text(
-              'Colonnine: © Open Charge Map contributors, PUN · Mappa: © OpenFreeMap © OpenStreetMap contributors',
+              pronto.termica ? 'Mappa: © OpenFreeMap © OpenStreetMap contributors' : 'Colonnine: © Open Charge Map contributors, PUN · Mappa: © OpenFreeMap © OpenStreetMap contributors',
               style: t.bodySmall?.copyWith(color: muto),
             ),
           ],

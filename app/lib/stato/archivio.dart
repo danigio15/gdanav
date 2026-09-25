@@ -58,6 +58,13 @@ class Archivio {
 
   Future<void> salvaVeicolo(ProfiloVeicolo v) => _p.write(key: _veicolo, value: v.id);
 
+  /// Auto elettrica (con soste di ricarica e batteria) o termica
+  /// (benzina, diesel, GPL, ibrida): navigatore normale. Di base elettrica.
+  Future<bool> elettrica() async => await _p.read(key: 'tipo_auto') != 'termica';
+
+  Future<void> salvaElettrica(bool si) =>
+      si ? _p.delete(key: 'tipo_auto') : _p.write(key: 'tipo_auto', value: 'termica');
+
   Future<PreferenzeRicarica> preferenze() async {
     final testo = await _p.read(key: _preferenze);
     if (testo == null) return const PreferenzeRicarica();

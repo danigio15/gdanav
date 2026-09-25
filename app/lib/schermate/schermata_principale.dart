@@ -323,9 +323,9 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 _VoceMenu(
-                  icona: Icons.electric_car,
+                  icona: widget.auto.elettrica ? Icons.electric_car : Icons.directions_car,
                   titolo: 'La tua auto',
-                  sotto: widget.auto.veicolo.nome,
+                  sotto: widget.auto.elettrica ? widget.auto.veicolo.nome : 'Termica: navigatore senza soste',
                   onTap: () => vai(LaTuaAuto(auto: widget.auto, posizione: widget.posizione, consumo: widget.consumo)),
                 ),
                 _VoceMenu(
@@ -336,21 +336,24 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                     OpzioniPercorsoSchermata(iniziali: widget.viaggio.opzioni, onCambia: widget.viaggio.cambiaOpzioni),
                   ),
                 ),
-                _VoceMenu(
-                  icona: Icons.ev_station,
-                  titolo: 'Ricarica',
-                  sotto: riassuntoPreferenze(_preferenze),
-                  onTap: () => vai(PreferenzeRicaricaSchermata(archivio: widget.archivio)),
-                ),
-                _VoceMenu(
-                  icona: Icons.battery_charging_full,
-                  titolo: 'Fonte dati auto',
-                  sotto: 'Da dove arriva la batteria',
-                  onTap: () {
-                    Navigator.of(contesto).pop();
-                    mostraFonteDatiAuto(context, widget.auto, consumo: widget.consumo);
-                  },
-                ),
+                // Ricarica e fonte della batteria servono solo all'elettrica.
+                if (widget.auto.elettrica)
+                  _VoceMenu(
+                    icona: Icons.ev_station,
+                    titolo: 'Ricarica',
+                    sotto: riassuntoPreferenze(_preferenze),
+                    onTap: () => vai(PreferenzeRicaricaSchermata(archivio: widget.archivio)),
+                  ),
+                if (widget.auto.elettrica)
+                  _VoceMenu(
+                    icona: Icons.battery_charging_full,
+                    titolo: 'Fonte dati auto',
+                    sotto: 'Da dove arriva la batteria',
+                    onTap: () {
+                      Navigator.of(contesto).pop();
+                      mostraFonteDatiAuto(context, widget.auto, consumo: widget.consumo);
+                    },
+                  ),
                 _VoceMenu(
                   icona: Icons.home_outlined,
                   titolo: 'Home Assistant',

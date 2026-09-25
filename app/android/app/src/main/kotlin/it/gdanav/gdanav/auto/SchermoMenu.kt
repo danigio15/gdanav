@@ -71,7 +71,7 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
         val lavoro = PonteAuto.lavoro()
         return elenco(
             "Menu",
-            listOf(
+            listOfNotNull(
                 if (casa != null) {
                     riga("Casa", casa.nome) { vai(casa) }
                 } else {
@@ -85,8 +85,13 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
                     }
                 },
                 riga("Preferiti e recenti", sfoglia = true) { screenManager.push(SchermoDestinazioni(carContext)) },
-                riga("Colonnine vicine", "Le rapide intorno a te", sfoglia = true) {
-                    screenManager.push(SchermoColonnine(carContext))
+                // Solo per l'auto elettrica.
+                if (PonteAuto.cruscotto.elettrica) {
+                    riga("Colonnine vicine", "Le rapide intorno a te", sfoglia = true) {
+                        screenManager.push(SchermoColonnine(carContext))
+                    }
+                } else {
+                    null
                 },
                 riga("Segnala", "Polizia, incidente, traffico, pericolo…", sfoglia = true) {
                     screenManager.push(SchermoSegnala(carContext))

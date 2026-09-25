@@ -94,7 +94,7 @@ class GestoreGuida extends ChangeNotifier {
   /// al punto in cui si è.
   ({double valore, bool misurata})? get batteriaOra {
     final p = pronto;
-    if (p == null) return null;
+    if (p == null || p.termica) return null;
     final s = auto.stato, partito = _partitoAlle;
     if (s != null &&
         partito != null &&
@@ -121,6 +121,7 @@ class GestoreGuida extends ChangeNotifier {
   /// il consumo del viaggio (vero, o previsto); senza viaggio la stima a 90
   /// km/h.
   ({double km, bool dallAuto})? get autonomiaOra {
+    if (!auto.elettrica || (pronto?.termica ?? false)) return null;
     final s = auto.stato;
     if (s != null &&
         s.autonomiaKm != null &&
@@ -241,6 +242,11 @@ class GestoreGuida extends ChangeNotifier {
 
   /// Si comincia a misurare sul piano nuovo, col modello senza correttivo.
   void _nuovoPiano(ViaggioPronto p) {
+    // Auto termica: niente batteria da misurare.
+    if (p.termica) {
+      _misuratore = null;
+      return;
+    }
     final senza = consumo?.condizioni(auto.stato, conFattore: false) ?? const Condizioni();
     _fattorePiano = consumo?.imparato.fattore ?? 1;
     _misuratore = MisuratoreConsumo(
@@ -254,7 +260,7 @@ class GestoreGuida extends ChangeNotifier {
   /// allontana dal piano, si ricalcolano le soste da dove si è.
   void _datiAuto() {
     final p = pronto, s = auto.stato, ora = batteriaOra;
-    if (!attiva || p == null || s == null || ora == null || !ora.misurata) return;
+    if (!attiva || p == null || p.termica || s == null || ora == null || !ora.misurata) return;
     final metri = avanzamento?.percorsiM ?? 0;
     final misura = _misuratore?.registra(batteria: s.batteria, metri: metri, inCarica: s.inCarica == true);
     if (misura != null) {

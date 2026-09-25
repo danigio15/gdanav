@@ -72,6 +72,8 @@ object PonteAuto {
 
     /** Sopra la mappa: batteria, velocità e limite, arrivo, sosta, meteo. */
     data class Cruscotto(
+        /** Auto termica: niente batteria né colonnine. */
+        val elettrica: Boolean = true,
         val batteria: Double? = null,
         val autonomiaKm: Double? = null,
         /** L'autonomia la dice l'auto (non una stima). */
@@ -182,6 +184,7 @@ object PonteAuto {
             }
             "messaggio" -> messaggio = call.argument<String>("testo")
             "cruscotto" -> cruscotto = Cruscotto(
+                elettrica = call.argument<Boolean>("elettrica") != false,
                 batteria = numero(call, "batteria"),
                 autonomiaKm = numero(call, "autonomia_km"),
                 autonomiaAuto = call.argument<Boolean>("autonomia_auto") == true,
