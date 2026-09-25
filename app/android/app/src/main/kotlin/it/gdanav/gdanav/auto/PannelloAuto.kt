@@ -66,17 +66,16 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val conCartello = g != null && (g.uscita.isNotEmpty() || g.verso.isNotEmpty()) && g.distanzaM <= 2500
         if (g != null && vista != null) {
             val box = svincolo(canvas, a, alto, vista, g)
-            if (conCartello) cartelloUscita(canvas, box.left + dp(10f), box.top + dp(10f), box.width() * 0.6f, g)
+            if (conCartello) {
+                // Sul lato dell'uscita, piantato sulla strada coi suoi pali.
+                val m = dp(12f)
+                cartelloUscita(canvas, box.left + m, box.right - m, box.top + m, box.width() * 0.44f, g, pali = box.top + box.height() * 0.5f)
+            }
             alto = box.bottom + dp(8f)
         } else if (g != null && conCartello) {
-            val box = cartelloUscita(canvas, sinistra, alto, (a.width() * 0.55f).coerceAtMost(dp(420f)), g)
-            // I dati accanto, se ci stanno; se no sotto.
-            val accanto = dati(canvas, box.right + dp(8f), alto, destra, c, prova = true) != null
-            alto = if (accanto) {
-                max(box.bottom, dati(canvas, box.right + dp(8f), alto, destra, c) ?: alto) + dp(8f)
-            } else {
-                (dati(canvas, sinistra, box.bottom + dp(8f), destra, c) ?: box.bottom) + dp(8f)
-            }
+            // Il cartello sul lato dell'uscita; i dati sotto.
+            val box = cartelloUscita(canvas, sinistra, destra, alto, (a.width() * 0.55f).coerceAtMost(dp(420f)), g)
+            alto = (dati(canvas, sinistra, box.bottom + dp(8f), destra, c) ?: box.bottom) + dp(8f)
             avviso(canvas, a, alto)
             velocita(canvas, a, c)
             return
@@ -133,9 +132,19 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
     /**
      * Il cartello dell'uscita come in autostrada: verde, bordo bianco, in alto
      * «USCITA» col numero, sotto le strade (A1, E45) e le direzioni. Blu se non
-     * è un'uscita numerata (strada extraurbana). Restituisce dove sta.
+     * è un'uscita numerata (strada extraurbana). Sta dal lato dell'uscita
+     * fra [sinistra] e [destra] (al centro se si va dritto); con [pali], i
+     * due pali fin lì sotto. Restituisce dove sta.
      */
-    private fun cartelloUscita(canvas: Canvas, x: Float, y: Float, larghezzaMassima: Float, g: PonteAuto.Guida): RectF {
+    private fun cartelloUscita(
+        canvas: Canvas,
+        sinistra: Float,
+        destra: Float,
+        y: Float,
+        larghezzaMassima: Float,
+        g: PonteAuto.Guida,
+        pali: Float? = null,
+    ): RectF {
         val autostrada = g.uscita.isNotEmpty() || g.tipo in 18..21 || Regex("^[AE] ?\\d").containsMatchIn(g.verso)
         val colore = if (autostrada) Color.rgb(0, 122, 61) else Color.rgb(21, 88, 176)
         val parti = g.verso.split(" · ", ";").flatMap { it.split(", ", "/") }.map { it.trim() }.filter { it.isNotEmpty() }
@@ -149,6 +158,10 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val hTesta = if (g.uscita.isNotEmpty()) dp(34f) else 0f
         val hSigle = if (sigle.isNotEmpty()) dp(32f) else 0f
         val hRiga = dp(28f)
+        // Nomi lunghi: prima si rimpicciolisce un po' il testo, poi si taglia.
+        val spazioNomi = larghezzaMassima - interno * 2 - dp(36f)
+        val piuLungo = righeLuoghi.maxOfOrNull { nome.measureText(it) } ?: 0f
+        if (piuLungo > spazioNomi && spazioNomi > 0) nome.textSize *= max(0.7f, spazioNomi / piuLungo)
         val larghezzaTesto = maxOf(
             righeLuoghi.maxOfOrNull { nome.measureText(it) } ?: 0f,
             sigle.sumOf { (sigla.measureText(it) + dp(22f)).toDouble() }.toFloat(),
@@ -156,7 +169,20 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         )
         val w = (larghezzaTesto + interno * 2 + dp(36f)).coerceIn(dp(180f), larghezzaMassima.coerceAtLeast(dp(180f)))
         val h = interno + hTesta + hSigle + hRiga * righeLuoghi.size.coerceAtLeast(1) + interno - dp(6f)
+        val x = when (lato(g.tipo)) {
+            1 -> destra - w
+            -1 -> sinistra
+            else -> (sinistra + destra - w) / 2
+        }
         val box = RectF(x, y, x + w, y + h)
+        pali?.let { fondo ->
+            // Due pali grigi sotto il cartello, fino alla strada.
+            pieno.color = Color.rgb(120, 126, 134)
+            for (f in listOf(0.22f, 0.78f)) {
+                val px = box.left + box.width() * f
+                canvas.drawRect(RectF(px - dp(3f), box.bottom - dp(4f), px + dp(3f), max(fondo, box.bottom)), pieno)
+            }
+        }
         pieno.color = colore
         canvas.drawRoundRect(box, dp(10f), dp(10f), pieno)
         bordo.color = Color.WHITE
@@ -190,9 +216,9 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
             riga += hSigle
         }
         // Le direzioni, con la freccia verso l'uscita.
-        val freccia = when (g.tipo) {
-            9, 10, 11, 18, 20, 23, 37 -> "↗"
-            14, 15, 16, 19, 21, 24, 38 -> "↖"
+        val freccia = when (lato(g.tipo)) {
+            1 -> "↗"
+            -1 -> "↖"
             else -> "↑"
         }
         for ((i, l) in righeLuoghi.withIndex()) {
@@ -388,6 +414,13 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         numero.textSize = dp(11f)
         canvas.drawText("km/h", cx, cy + dp(20f), numero)
         c.limite?.let { l -> cartello(canvas, cx - r * 2 - dp(8f), cy, r * 0.9f, l) }
+    }
+
+    /** Da che parte va la manovra: 1 destra, -1 sinistra, 0 dritto. */
+    private fun lato(tipo: Int) = when (tipo) {
+        9, 10, 11, 18, 20, 23, 37 -> 1
+        14, 15, 16, 19, 21, 24, 38 -> -1
+        else -> 0
     }
 
     /** Il cartello del limite: cerchio bianco col bordo rosso. */
