@@ -4,11 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import org.maplibre.android.MapLibre
-import org.maplibre.android.camera.CameraPosition
-import org.maplibre.android.geometry.LatLng
-import org.maplibre.android.snapshotter.MapSnapshot
-import org.maplibre.android.snapshotter.MapSnapshotter
 import android.os.Handler
 import android.os.Looper
 import io.flutter.plugin.common.BinaryMessenger
@@ -136,7 +131,6 @@ object PonteAuto {
 
     fun collega(messenger: BinaryMessenger, context: Context) {
         preferenze = context.applicationContext.getSharedPreferences("gdanav", Context.MODE_PRIVATE)
-        contesto = context.applicationContext
         canale = MethodChannel(messenger, "gdanav/schermo_auto").also { c ->
             c.setMethodCallHandler { call, risultato ->
                 gestisci(call)
@@ -210,7 +204,14 @@ object PonteAuto {
                 ancoraTesto = call.argument<String>("ancora_testo"),
             )
             "opzioni" -> opzioni = (call.arguments as? Map<*, *>)?.entries?.associate { "${it.key}" to it.value } ?: emptyMap()
-            "svincolo3d" -> fotografaSvincolo(call)
+            "svincolo" -> {
+                val id = numero(call, "id")?.toInt()
+                val png = call.argument<ByteArray>("png")
+                val bitmap = png?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+                if (id != null && bitmap != null) {
+                    svincoli = svincoli.entries.toList().takeLast(2).associate { it.key to it.value } + (id to bitmap)
+                }
+            }
             "immagini" -> {
                 val nuove = HashMap(immagini)
                 (call.argument<Map<String, ByteArray>>("png") ?: emptyMap()).forEach { (nome, byte) ->
@@ -252,65 +253,6 @@ object PonteAuto {
         if (call.method !in soloMappa && (call.method != "avviso" || avviso.ancoraId != prima)) versioneModello++
         avvisa()
     }
-
-    private var contesto: Context? = null
-
-    /**
-     * Lo svincolo in 3D: MapLibre fotografa la mappa vera (lo stile con la
-     * freccia, mandato dall'app) dall'inquadratura data. Pronta la foto,
-     * l'auto la mostra come immagine dello svincolo.
-     */
-    private fun fotografaSvincolo(call: MethodCall) {
-        val c = contesto ?: return
-        val id = numero(call, "id")?.toInt() ?: return
-        val scuro = (c.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-            android.content.res.Configuration.UI_MODE_NIGHT_YES
-        val stile = call.argument<String>(if (scuro) "scuro" else "chiaro") ?: return
-        val lat = numero(call, "lat") ?: return
-        val lon = numero(call, "lon") ?: return
-        val punta = call.argument<ByteArray>("punta")?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-        principale.post {
-            try {
-                MapLibre.getInstance(c)
-                val opzioni = MapSnapshotter.Options(800, 480)
-                    .withStyleJson(stile)
-                    .withCameraPosition(
-                        CameraPosition.Builder()
-                            .target(LatLng(lat, lon))
-                            .zoom(numero(call, "zoom") ?: 16.9)
-                            .tilt(numero(call, "inclinazione") ?: 60.0)
-                            .bearing(numero(call, "rotta") ?: 0.0)
-                            .build(),
-                    )
-                    .withPixelRatio(2f)
-                    .withLogo(false)
-                val fotografo = MapSnapshotter(c, opzioni)
-                punta?.let { fotografo.addImage("svincolo-punta", it, false) }
-                fotografo.start(
-                    object : MapSnapshotter.SnapshotReadyCallback {
-                        override fun onSnapshotReady(foto: MapSnapshot) {
-                            svincoli = svincoli.entries.toList().takeLast(2).associate { it.key to it.value } +
-                                (id to foto.bitmap)
-                            versioneModello++
-                            avvisa()
-                        }
-                    },
-                    object : MapSnapshotter.ErrorHandler {
-                        override fun onError(errore: String) {
-                            android.util.Log.w("gdanav", "svincolo 3D: $errore")
-                        }
-                    },
-                )
-                // Tenuto finché lavora.
-                fotografi.add(fotografo)
-                if (fotografi.size > 3) fotografi.removeAt(0)
-            } catch (e: Exception) {
-                android.util.Log.w("gdanav", "svincolo 3D: $e")
-            }
-        }
-    }
-
-    private val fotografi = mutableListOf<MapSnapshotter>()
 
     private fun numero(call: MethodCall, chiave: String): Double? = (call.argument<Any?>(chiave) as? Number)?.toDouble()
 

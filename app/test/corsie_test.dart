@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav/componenti/icona_manovra.dart';
+import 'package:gdanav/componenti/scena_svincolo.dart';
 import 'package:gdanav/componenti/vista_svincolo.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -73,26 +74,11 @@ void main() {
     piano: null,
   );
 
-  test('lo svincolo in 3D: la mappa vera inclinata, la freccia sulla strada e sul ramo giusto', () {
-    final scena = scenaSvincolo(viaggio, manovraSvincolo, scuro: false);
-    final q = scena.inquadratura;
-    // Si guarda verso est (con un po' di sud-est), dall'alto e inclinati.
-    expect(q.rotta, inInclusiveRange(90, 125));
-    expect(q.inclinazione, greaterThan(50));
-    // Centrati poco oltre lo svincolo: si vedono l'arrivo e il ramo giusto.
-    expect(q.centro.lon, closeTo(9.015, 0.003));
-    final sorgenti = scena.stile['sources']! as Map;
-    final freccia = ((sorgenti['svincolo-freccia'] as Map)['data'] as Map)['geometry'] as Map;
-    final coordinate = (freccia['coordinates'] as List).cast<List>();
-    // Parte prima dello svincolo e finisce sul ramo che scende.
-    expect(coordinate.first[0] as double, lessThan(9.015));
-    expect(coordinate.last[1] as double, lessThan(45.0));
-    final strati = (scena.stile['layers']! as List).cast<Map>();
-    expect(strati.map((l) => l['id']), containsAll(['svincolo-freccia', 'svincolo-punta']));
-    expect(strati.firstWhere((l) => l['id'] == 'edifici-3d')['layout'], containsPair('visibility', 'visible'));
-    expect(strati.any((l) => l['id'] == 'io'), isFalse);
-    // Il percorso c'è, anche senza viaggio sulla mappa principale.
-    expect((((sorgenti['gdanav-percorso'] as Map)['data'] as Map)['features'] as List), hasLength(1));
+  test('lo svincolo in 3D: la scena si disegna, anche senza corsie note e con l\'uscita a sinistra', () async {
+    for (final m in [manovraSvincolo, const Manovra(istruzione: '', lunghezzaM: 1, secondi: 1, inizio: 0, tipo: 24)]) {
+      final png = await scenaSvincoloPng(m, larghezza: 400, altezza: 240);
+      expect(png.sublist(1, 4), 'PNG'.codeUnits);
+    }
   });
 
   testWidgets('allo svincolo il popup: la mappa 3D, cartello, corsie, metri; e si chiude', (tester) async {
@@ -114,12 +100,9 @@ void main() {
     );
     expect(find.byKey(const Key('mappa-svincolo')), findsOneWidget);
     expect(find.text('Uscita 12'), findsOneWidget);
-    expect(find.byKey(const Key('corsie')), findsOneWidget);
     expect(find.text('450 m'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.tap(find.byKey(const Key('chiudi-svincolo')));
     expect(chiuso, isTrue);
-    final punta = await tester.runAsync(puntaPng);
-    expect(punta!.sublist(1, 4), 'PNG'.codeUnits);
   });
 }

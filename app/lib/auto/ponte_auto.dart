@@ -6,6 +6,7 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import '../componenti/icone_segnalazioni.dart';
 import '../componenti/stato_colonnina.dart' show testoDisponibilita;
+import '../componenti/scena_svincolo.dart';
 import '../componenti/vista_svincolo.dart';
 import '../mappa/dati_viaggio.dart';
 import '../mappa/segnaposto.dart';
@@ -286,20 +287,11 @@ class PonteAuto {
 
   int? _svincoloPronto;
 
-  /// Lo svincolo in 3D per l'auto: lo stile con la freccia e l'inquadratura;
-  /// l'immagine la fa MapLibre sul lato nativo.
+  /// Lo svincolo in 3D per l'auto: la stessa scena del telefono, in PNG.
   Future<void> _disegnaSvincolo(Manovra m) async {
-    final p = guida.pronto;
-    if (!_attivo || p == null) return;
+    if (!_attivo) return;
     try {
-      final chiara = scenaSvincolo(p.viaggio, m, scuro: false), scura = scenaSvincolo(p.viaggio, m, scuro: true);
-      _manda('svincolo3d', {
-        'id': m.inizio,
-        'chiaro': jsonEncode(chiara.stile),
-        'scuro': jsonEncode(scura.stile),
-        ...chiara.inquadratura.toJson(),
-        'punta': await puntaPng(),
-      });
+      _manda('svincolo', {'id': m.inizio, 'png': await scenaSvincoloPng(m)});
       _svincoloPronto = m.inizio;
       _guida();
     } catch (_) {
