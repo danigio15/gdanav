@@ -85,13 +85,15 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
                     }
                 },
                 riga("Preferiti e recenti", sfoglia = true) { screenManager.push(SchermoDestinazioni(carContext)) },
-                // Solo per l'auto elettrica.
+                // Elettrica: le colonnine; termica: i distributori.
                 if (PonteAuto.cruscotto.elettrica) {
                     riga("Colonnine vicine", "Le rapide intorno a te", sfoglia = true) {
                         screenManager.push(SchermoColonnine(carContext))
                     }
                 } else {
-                    null
+                    riga("Distributori vicini", "Benzina, diesel, GPL, metano", sfoglia = true) {
+                        screenManager.push(SchermoDistributori(carContext))
+                    }
                 },
                 riga("Segnala", "Polizia, incidente, traffico, pericolo…", sfoglia = true) {
                     screenManager.push(SchermoSegnala(carContext))
@@ -194,6 +196,40 @@ class SchermoColonnine(carContext: CarContext) : SchermoAggiornato(carContext) {
             .getContentLimit(androidx.car.app.constraints.ConstraintManager.CONTENT_LIMIT_TYPE_LIST)
     } catch (e: Exception) {
         6
+    }
+}
+
+/** Auto termica: i distributori vicini. In guida ci si passa e si prosegue. */
+class SchermoDistributori(carContext: CarContext) : SchermoAggiornato(carContext) {
+    private var distributori: List<PonteAuto.Luogo>? = null
+
+    override fun onCreate(owner: LifecycleOwner) {
+        super.onCreate(owner)
+        PonteAuto.distributori {
+            distributori = it
+            invalidate()
+        }
+    }
+
+    override fun onGetTemplate(): Template {
+        val trovati = distributori
+            ?: return ListTemplate.Builder().setTitle("Distributori vicini").setHeaderAction(Action.BACK).setLoading(true).build()
+        val limite = try {
+            carContext.getCarService(androidx.car.app.constraints.ConstraintManager::class.java)
+                .getContentLimit(androidx.car.app.constraints.ConstraintManager.CONTENT_LIMIT_TYPE_LIST)
+        } catch (e: Exception) {
+            6
+        }
+        return elenco(
+            "Distributori vicini",
+            trovati.take(limite).map { d ->
+                riga(d.nome, d.descrizione) {
+                    PonteAuto.passa(d)
+                    screenManager.popToRoot()
+                }
+            },
+            "Nessun distributore qui intorno",
+        )
     }
 }
 

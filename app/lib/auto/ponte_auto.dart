@@ -13,6 +13,7 @@ import '../mappa/segnaposto.dart';
 import '../mappa/stile.dart';
 import '../servizi.dart';
 import '../stato/avvisi_strada.dart';
+import '../stato/distributori.dart';
 import '../stato/gestore_auto.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_luoghi.dart';
@@ -142,6 +143,32 @@ class PonteAuto {
       case 'ancora':
         final s = _avvisi?.passata;
         if (s != null && s.id == a['id']) _avvisi!.rispondi(s, a['si'] == true);
+      // Auto termica: i distributori intorno; in guida si passa da lì.
+      case 'distributori':
+        final qui = guida.avanzamento?.posizioneSulPercorso ?? posizione.qui ?? viaggio.ultimaPosizione;
+        if (qui == null) return const <Object>[];
+        try {
+          return [
+            for (final d in (await distributoriVicini(qui)).take(12))
+              {
+                'nome': d.nome,
+                'descrizione': descriviDistributore(d, qui),
+                'lat': d.posizione.lat,
+                'lon': d.posizione.lon,
+              },
+          ];
+        } catch (_) {
+          return const <Object>[];
+        }
+      case 'passa':
+        final l = luogoDaJson(call.arguments);
+        if (l == null) return null;
+        if (guida.attiva) {
+          await guida.passaDa(l);
+        } else {
+          await viaggio.vaiA(l);
+          if (viaggio.stato is ViaggioPronto) guida.avvia();
+        }
       case 'colonnine':
         final qui = posizione.qui ?? viaggio.ultimaPosizione;
         final v = auto?.veicolo;

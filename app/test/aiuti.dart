@@ -144,6 +144,7 @@ Future<Ambiente> ambiente(
   int km = 500,
   Punto? posizione = const Punto(42, 12),
   ArchivioAutovelox? autovelox,
+  CostruisciPianificatore? costruisci,
 }) async {
   // Uno schermo da telefono, non gli 800×600 delle prove.
   tester.view.physicalSize = const Size(1170, 2532);
@@ -160,7 +161,7 @@ Future<Ambiente> ambiente(
     auto: auto,
     consumo: consumo,
     posizione: () async => posizione,
-    costruisci: pianificatoreFinto(km),
+    costruisci: costruisci ?? pianificatoreFinto(km),
     luoghi: LuoghiFinti(),
   );
   final posizioni = StreamController<Punto>.broadcast();

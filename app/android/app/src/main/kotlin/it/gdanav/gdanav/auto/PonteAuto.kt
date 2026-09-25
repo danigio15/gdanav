@@ -288,6 +288,20 @@ object PonteAuto {
     fun ancora(id: String, si: Boolean) = chiedi("ancora", mapOf("id" to id, "si" to si))
 
     /** Le colonnine rapide vicine, come luoghi da raggiungere. */
+    /** Auto termica: i distributori intorno. */
+    fun distributori(risultati: (List<Luogo>) -> Unit) = chiedi("distributori", null) { r ->
+        @Suppress("UNCHECKED_CAST")
+        risultati(((r as? List<Map<String, Any?>>) ?: emptyList()).mapNotNull { luogo(it + ("tipo" to "distributore")) })
+    }
+
+    /** In guida: si passa dal distributore e poi si prosegue; fermi, ci si va. */
+    fun passa(l: Luogo) {
+        messaggio = "Passo da ${l.etichetta}…"
+        versioneModello++
+        avvisa()
+        principale.post { canale?.invokeMethod("passa", l.comeMappa()) }
+    }
+
     fun colonnine(risultati: (List<Luogo>) -> Unit) = chiedi("colonnine", null) { r ->
         @Suppress("UNCHECKED_CAST")
         risultati(((r as? List<Map<String, Any?>>) ?: emptyList()).mapNotNull { luogo(it + ("tipo" to "colonnina")) })

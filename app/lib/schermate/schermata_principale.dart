@@ -33,6 +33,7 @@ import 'pannello_partenza.dart';
 import 'premium.dart';
 import 'ricarica.dart';
 import 'scheda_viaggio.dart';
+import 'distributori.dart';
 import 'segnala.dart';
 import 'schermata_guida.dart';
 
@@ -454,7 +455,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
             right: 16,
             top: alto + 10,
             child: ListenableBuilder(
-              listenable: controllo,
+              listenable: Listenable.merge([controllo, widget.auto]),
               builder: (context, _) => Column(
                 children: [
                   _BottoneMappa(
@@ -471,6 +472,14 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                     onPressed: controllo.centra,
                     child: Icon(Icons.near_me_rounded, size: 28, color: Theme.of(context).colorScheme.primary),
                   ),
+                  // Auto termica: i distributori qui intorno.
+                  if (!widget.auto.elettrica) ...[
+                    const SizedBox(height: 14),
+                    BottoneDistributori(
+                      onTap: () =>
+                          mostraDistributori(context, qui: widget.posizione.qui, onScegli: (l) => viaggio.vaiA(l)),
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -25,6 +25,7 @@ export const PRIVACY = `<!doctype html>
   <li><b>Traffico e colonnine libere/occupate</b>: la zona della mappa e le colonnine delle soste a TomTom.</li>
   <li><b>Meteo</b> (Premium): alcuni punti del percorso e la zona in cui sei, arrotondati a circa un chilometro, a MET Norway (api.met.no) per le previsioni.</li>
   <li><b>Colonnine fuori dall'archivio dell'app</b>: la zona del percorso al relay di gdanav, che le chiede a OpenStreetMap.</li>
+  <li><b>Distributori di carburante</b> (auto termica): la zona in cui sei, entro 5 km, ai server Overpass di OpenStreetMap.</li>
 </ul>
 
 <h2>Dati dell'auto e Home Assistant</h2>

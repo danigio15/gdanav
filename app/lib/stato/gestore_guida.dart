@@ -224,6 +224,8 @@ class GestoreGuida extends ChangeNotifier {
     if (g == null || !attiva) return;
     final a = g.aggiorna(qui);
     avanzamento = a;
+    // Arrivati al distributore: da qui si prosegue verso la meta.
+    if (viaggio.tappa case final t? when distanzaM(qui, t.posizione) < 60) viaggio.tappa = null;
     if (a.daDire case final frase? when !muto) unawaited(voce.parla(frase));
     if (a.arrivato) {
       _evento('arrivo');
@@ -293,6 +295,25 @@ class GestoreGuida extends ChangeNotifier {
     await _ricalcola(perConsumo: true, detto: true);
   }
 
+  /// Auto termica: si passa da [l] (un distributore) e poi si prosegue
+  /// verso la meta di prima.
+  Future<void> passaDa(Luogo l) async {
+    final d = viaggio.destinazione;
+    if (d == null) return;
+    viaggio.tappa = l;
+    ricalcolando = true;
+    _ultimoRicalcolo = _ora();
+    notifyListeners();
+    if (!muto) unawaited(voce.parla('Passo da ${l.nome}, poi proseguo.'));
+    await viaggio.pianifica(d);
+    ricalcolando = false;
+    if (pronto case final p?) {
+      _guida = Guida(p.viaggio.percorso);
+      _nuovoPiano(p);
+    }
+    notifyListeners();
+  }
+
   /// «No» alla proposta.
   void lasciaCosi() {
     proposta = null;
@@ -309,6 +330,10 @@ class GestoreGuida extends ChangeNotifier {
     final fatti = avanzamento?.percorsiM ?? 0;
     for (final c in pronto?.viaggio.colonnine ?? const <ColonninaSulPercorso>[]) {
       if (c.distanzaM <= fatti) viaggio.obbligate.remove(c.id);
+    }
+    // Il distributore già passato non si ripete.
+    if ((viaggio.tappa, pronto) case (final t?, final p?)) {
+      if (Linea(p.viaggio.percorso.punti).proietta(t.posizione).lungoM <= fatti) viaggio.tappa = null;
     }
     notifyListeners();
     if (!perConsumo && !muto) unawaited(voce.parla('Ricalcolo il percorso.'));

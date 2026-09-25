@@ -173,9 +173,13 @@ class GestoreViaggio extends ChangeNotifier {
     ErroreViaggio(:final destinazione) => destinazione,
   };
 
+  /// Auto termica: un distributore dove passare prima della meta.
+  Luogo? tappa;
+
   /// Una meta nuova: le soste scelte per la vecchia non valgono più.
   Future<void> vaiA(Luogo destinazione) {
     obbligate.clear();
+    tappa = null;
     return pianifica(destinazione);
   }
 
@@ -280,7 +284,7 @@ class GestoreViaggio extends ChangeNotifier {
         auto.veicolo,
         await archivio.preferenze(),
         opzioni,
-      ).percorsi([partenza, destinazione.posizione]).timeout(tempoMassimo);
+      ).percorsi([partenza, ?tappa?.posizione, destinazione.posizione]).timeout(tempoMassimo);
       if (identical(stato, calcolo)) {
         _imposta(
           ViaggioPronto(
@@ -312,6 +316,7 @@ class GestoreViaggio extends ChangeNotifier {
 
   void annulla() {
     obbligate.clear();
+    tappa = null;
     _imposta(const NessunViaggio());
   }
 

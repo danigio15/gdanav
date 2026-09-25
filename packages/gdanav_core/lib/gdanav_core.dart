@@ -9,6 +9,7 @@ export 'src/colonnine/colonnine_locali.dart';
 export 'src/colonnine/disponibilita_tomtom.dart';
 export 'src/colonnine/colonnine_relay.dart';
 export 'src/colonnine/overpass.dart';
+export 'src/distributori/distributori.dart';
 export 'src/geo/geo.dart';
 export 'src/guida/guida.dart';
 export 'src/luoghi/luoghi.dart';

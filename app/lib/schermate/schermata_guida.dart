@@ -18,6 +18,7 @@ import '../stato/gestore_segnalazioni.dart';
 import '../tema.dart';
 import 'scheda_viaggio.dart' show durata, orario;
 import 'schermata_principale.dart' show CostruisciMappa;
+import 'distributori.dart';
 import 'segnala.dart';
 
 /// La guida: la mappa ti segue inclinata, in alto la prossima manovra, in
@@ -188,6 +189,18 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                                     ),
                                   ),
                                 ),
+                                // Auto termica: un distributore per strada, e poi si prosegue.
+                                if (g.pronto?.termica ?? false) ...[
+                                  const SizedBox(height: 12),
+                                  BottoneDistributori(
+                                    onTap: () => mostraDistributori(
+                                      context,
+                                      qui: g.avanzamento?.posizioneSulPercorso ?? widget.posizione.qui,
+                                      inGuida: true,
+                                      onScegli: g.passaDa,
+                                    ),
+                                  ),
+                                ],
                                 const SizedBox(height: 12),
                                 if (widget.segnalazioni case final seg?)
                                   BottoneSegnala(onTap: () => mostraSegnala(context, seg)),
