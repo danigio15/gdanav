@@ -209,4 +209,41 @@ void main() {
   },
       timeout: const Timeout(Duration(minutes: 3)),
       skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  // Un viaggio vero dentro Utrecht (la mappa delle anteprime): le strade e
+  // il traffico di adesso, stampati per disegnarli.
+  test('anteprima: strade e traffico a Utrecht', () async {
+    try {
+      final scelte = await valhalla.alternative(const Punto(52.1150, 5.0700), const Punto(52.0560, 5.1500));
+      final chiave = Platform.environment['GDANAV_TOMTOM'] ?? '';
+      final traffico = chiave.isEmpty ? null : TrafficoTomTom(chiave);
+      final fuori = <Map<String, Object?>>[];
+      for (final s in scelte) {
+        var p = s;
+        if (traffico != null) {
+          try {
+            p = await traffico.applica(s);
+          } catch (_) {}
+        }
+        fuori.add({
+          'forma': codificaPolyline(p.punti, precisione: 6),
+          'm': p.lunghezzaM,
+          's': p.base.durata.inSeconds,
+          'via': p.stradaPrincipale,
+          'pedaggi': p.conPedaggi,
+          'code': [
+            for (final c in p.code)
+              {'da': c.daM, 'a': c.aM, 'r': c.ritardo.inSeconds, 'l': c.livello, 'v': c.velocitaKmh, 't': c.tipo},
+          ],
+        });
+      }
+      stdout.writeln('ANTEPRIMA:${jsonEncode(fuori)}');
+      avviso(
+          'Anteprima Utrecht', '${fuori.length} strade, code: ${[for (final f in fuori) (f['code'] as List).length]}');
+    } catch (e) {
+      avviso('Anteprima Utrecht', 'errore: $e');
+    }
+  },
+      timeout: const Timeout(Duration(minutes: 2)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 }
