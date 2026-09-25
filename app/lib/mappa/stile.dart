@@ -175,7 +175,7 @@ const _vuota = {'type': 'FeatureCollection', 'features': <Object>[]};
 /// Con [chiaveTraffico] (una chiave gratuita di TomTom) sulle strade si
 /// vedono le code, come in Waze: solo dove si va più piano del solito, e
 /// gli incidenti e i lavori.
-Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}) {
+Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '', bool perAuto = false}) {
   final traffico = chiaveTraffico.trim();
   final t = scuro ? _scuro : _chiaro;
   final classi = {
@@ -442,17 +442,30 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}
             ['get', 'rank'],
             99,
           ],
-          [
-            'step',
-            ['zoom'],
-            6,
-            15.5,
-            14,
-            16.5,
-            30,
-            17.5,
-            99,
-          ],
+          // Sull'auto meno punti: chi guida vede solo i più importanti.
+          perAuto
+              ? [
+                  'step',
+                  ['zoom'],
+                  8,
+                  16,
+                  14,
+                  17,
+                  20,
+                  18,
+                  40,
+                ]
+              : [
+                  'step',
+                  ['zoom'],
+                  6,
+                  15.5,
+                  14,
+                  16.5,
+                  30,
+                  17.5,
+                  99,
+                ],
         ],
         'layout': {
           'icon-image': esprPoi((c) => c.immagine),

@@ -170,7 +170,13 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         } else {
             modello.setNavigationInfo(
                 MessageInfo.Builder("GDA NAV")
-                    .setText(PonteAuto.messaggio ?: "Tocca la lente per cercare, o Menu per Casa, Lavoro e colonnine.")
+                    .setText(
+                        PonteAuto.messaggio ?: if (PonteAuto.cruscotto.elettrica) {
+                            "Tocca la lente per cercare, o Menu per Casa, Lavoro e colonnine."
+                        } else {
+                            "Tocca la lente per cercare, o Menu per Casa, Lavoro e distributori."
+                        },
+                    )
                     .build(),
             )
         }

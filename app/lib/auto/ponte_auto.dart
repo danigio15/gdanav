@@ -69,8 +69,8 @@ class PonteAuto {
   void avvia() {
     _canale.setMethodCallHandler(_dallAuto);
     _manda('stili', {
-      'chiaro': jsonEncode(stileMappa(scuro: false, chiaveTraffico: Servizi.chiaveTomTom)),
-      'scuro': jsonEncode(stileMappa(scuro: true, chiaveTraffico: Servizi.chiaveTomTom)),
+      'chiaro': jsonEncode(stileMappa(scuro: false, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true)),
+      'scuro': jsonEncode(stileMappa(scuro: true, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true)),
     });
     _immagini();
     viaggio.addListener(_viaggio);
