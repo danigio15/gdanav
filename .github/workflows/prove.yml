@@ -230,7 +230,11 @@ jobs:
         working-directory: .
         run: |
           gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
-          gh release upload anteprima svincoli/*.png --clobber
+          if ls svincoli/*.png > /dev/null 2>&1; then
+            gh release upload anteprima svincoli/*.png --clobber
+          else
+            echo "::notice title=Svincoli::nessuna immagine (manca il segreto GDANAV_MAPILLARY_TOKEN?)"
+          fi
 
   # Le colonnine rapide per l'archivio dentro l'app, dagli estratti completi
   # di OpenStreetMap (Geofabrik) filtrati con osmium: niente Overpass, che è
