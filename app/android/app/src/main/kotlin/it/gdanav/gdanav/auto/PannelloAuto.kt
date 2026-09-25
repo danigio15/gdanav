@@ -14,11 +14,12 @@ import kotlin.math.roundToInt
 
 /**
  * Sopra la mappa dell'auto, poco e in basso, perché la mappa si veda: in
- * basso a destra velocità e limite e, accanto, una barra sottile coi dati
- * dell'auto (batteria, km, alla meta), il meteo e la prossima sosta; in alto
- * solo l'avviso della segnalazione che si avvicina, finché serve. Tutto
- * dentro l'area lasciata libera da Android Auto. Disegna anche il cartello
- * dell'uscita sulla vista dello svincolo, per la scheda in alto a sinistra.
+ * basso a sinistra, dal lato di chi guida, una capsula con velocità, limite e
+ * arrivo, e sopra una barra sottile coi dati dell'auto (batteria, km, alla
+ * meta), il meteo e la prossima sosta; in alto solo l'avviso della
+ * segnalazione che si avvicina, finché serve. Disegna anche il cartello
+ * dell'uscita, piccolo, sulla vista dello svincolo per la scheda in alto a
+ * sinistra.
  */
 class PannelloAuto(context: Context, private val densita: Float) : View(context) {
     /** L'area non coperta dalle schede di Android Auto. */
@@ -64,8 +65,9 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         // avvicina (autovelox, polizia, incidente…), finché serve.
         avviso(canvas, sinistra, destra, alto)
 
-        // In basso a destra, su una riga: velocità e limite, e accanto una
-        // barra sottile coi dati dell'auto e il meteo.
+        // In basso a sinistra, dal lato di chi guida: la capsula con velocità,
+        // limite e arrivo, e sopra una barra sottile coi dati dell'auto e il
+        // meteo.
         val tachimetro = velocita(canvas, a, c)
         barra(canvas, a, tachimetro, c)
     }
@@ -83,11 +85,12 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val chiave = "${g.uscita}|${g.verso}|${g.tipo}|${g.strada}"
         composta?.let { (i, k, b) -> if (i == id && k == chiave) return b }
         val b = vista.copy(Bitmap.Config.ARGB_8888, true)
-        // Nella scheda l'immagine è larga circa 400 dp: il cartello in proporzione.
-        scala = b.width / (400f * densita)
+        // Il cartello piccolo, nel cielo dal lato dell'uscita: la scena deve
+        // restare libera per vedere le corsie.
+        scala = b.width / (600f * densita)
         try {
             val m = dp(10f)
-            cartelloUscita(Canvas(b), m, b.width - m, m, b.width * 0.46f, g, pali = b.height * 0.5f)
+            cartelloUscita(Canvas(b), m, b.width - m, m, b.width * 0.38f, g, pali = b.height * 0.52f, righe = 2)
         } finally {
             scala = 1f
         }
@@ -110,19 +113,21 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         larghezzaMassima: Float,
         g: PonteAuto.Guida,
         pali: Float? = null,
+        righe: Int = 3,
     ): RectF {
         val autostrada = g.uscita.isNotEmpty() || g.tipo in 18..21 || Regex("^[AE] ?\\d").containsMatchIn(g.verso)
         val colore = if (autostrada) Color.rgb(0, 122, 61) else Color.rgb(21, 88, 176)
         val parti = g.verso.split(" · ", ";").flatMap { it.split(", ", "/") }.map { it.trim() }.filter { it.isNotEmpty() }
         val sigle = parti.filter { Regex("^[AESTR]{1,2} ?\\d+[a-z]?$").matches(it) }.take(3)
-        val luoghi = parti.filter { it !in sigle }.take(3)
+        val luoghi = parti.filter { it !in sigle }.take(righe)
         val nome = Paint(testo).apply { textSize = dp(22f) }
         val etichetta = Paint(testo).apply { textSize = dp(13f) }
         val sigla = Paint(testo).apply { textSize = dp(16f) }
         val righeLuoghi = luoghi.ifEmpty { listOf(g.strada.ifEmpty { g.istruzione }) }.filter { it.isNotEmpty() }
         val interno = dp(14f)
         val hTesta = if (g.uscita.isNotEmpty()) dp(34f) else 0f
-        val hSigle = if (sigle.isNotEmpty()) dp(32f) else 0f
+        // Col numero d'uscita, le strade stanno sulla stessa riga.
+        val hSigle = if (sigle.isNotEmpty() && g.uscita.isEmpty()) dp(32f) else 0f
         val hRiga = dp(28f)
         // Nomi lunghi: prima si rimpicciolisce un po' il testo, poi si taglia.
         val spazioNomi = larghezzaMassima - interno * 2 - dp(36f)
@@ -130,8 +135,8 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         if (piuLungo > spazioNomi && spazioNomi > 0) nome.textSize *= max(0.7f, spazioNomi / piuLungo)
         val larghezzaTesto = maxOf(
             righeLuoghi.maxOfOrNull { nome.measureText(it) } ?: 0f,
-            sigle.sumOf { (sigla.measureText(it) + dp(22f)).toDouble() }.toFloat(),
-            if (g.uscita.isNotEmpty()) etichetta.measureText("USCITA") + dp(60f) else 0f,
+            sigle.sumOf { (sigla.measureText(it) + dp(22f)).toDouble() }.toFloat() +
+                if (g.uscita.isNotEmpty()) etichetta.measureText("USCITA") + dp(60f) else 0f,
         )
         val w = (larghezzaTesto + interno * 2 + dp(36f)).coerceIn(dp(180f), larghezzaMassima.coerceAtLeast(dp(180f)))
         val h = interno + hTesta + hSigle + hRiga * righeLuoghi.size.coerceAtLeast(1) + interno - dp(6f)
@@ -156,6 +161,7 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val dentro = RectF(box.left + dp(4f), box.top + dp(4f), box.right - dp(4f), box.bottom - dp(4f))
         canvas.drawRoundRect(dentro, dp(7f), dp(7f), bordo)
         var riga = box.top + interno
+        var inizioSigle = box.left + interno
         if (g.uscita.isNotEmpty()) {
             // «USCITA 12» in un riquadro bianco col numero verde.
             canvas.drawText("USCITA", box.left + interno, riga + dp(19f), etichetta)
@@ -166,21 +172,22 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
             canvas.drawRoundRect(RectF(xn, riga, xn + nw, riga + dp(26f)), dp(5f), dp(5f), pieno)
             val numeroVerde = Paint(sigla).apply { color = colore }
             canvas.drawText(n, xn + dp(8f), riga + dp(19f), numeroVerde)
-            riga += hTesta
+            inizioSigle = xn + nw + dp(10f)
         }
         if (sigle.isNotEmpty()) {
-            var xs = box.left + interno
+            var xs = inizioSigle
+            val y0 = if (g.uscita.isNotEmpty()) riga + dp(1f) else riga
             for (s in sigle) {
                 // Autostrade: riquadro verde chiaro; strade europee: verde col bordo.
                 val sw = sigla.measureText(s) + dp(14f)
                 pieno.color = if (s.startsWith("E")) Color.rgb(0, 150, 70) else Color.WHITE
-                canvas.drawRoundRect(RectF(xs, riga, xs + sw, riga + dp(24f)), dp(5f), dp(5f), pieno)
+                canvas.drawRoundRect(RectF(xs, y0, xs + sw, y0 + dp(24f)), dp(5f), dp(5f), pieno)
                 val t = Paint(sigla).apply { color = if (s.startsWith("E")) Color.WHITE else colore }
-                canvas.drawText(s, xs + dp(7f), riga + dp(18f), t)
+                canvas.drawText(s, xs + dp(7f), y0 + dp(18f), t)
                 xs += sw + dp(8f)
             }
-            riga += hSigle
         }
+        riga += hTesta + hSigle
         // Le direzioni, con la freccia verso l'uscita.
         val freccia = when (lato(g.tipo)) {
             1 -> "↗"
@@ -217,10 +224,9 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
     }
 
     /**
-     * La barra dei dati, sottile, in basso a destra accanto al tachimetro:
+     * La barra dei dati, sottile, in basso a sinistra sopra il tachimetro:
      * batteria (icona e %), km che restano, batteria alla meta, meteo; sopra,
-     * piccola, la prossima sosta. Con la termica solo il meteo. Se accanto al
-     * tachimetro non ci sta, va sopra.
+     * piccola, la prossima sosta. Con la termica solo il meteo.
      */
     private fun barra(canvas: Canvas, a: Rect, tachimetro: RectF?, c: PonteAuto.Cruscotto) {
         val b = c.batteria
@@ -287,16 +293,9 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val hSosta = if (sosta != null) dp(24f) else 0f
         val h = hRiga + hSosta
 
-        // Dove: accanto al tachimetro se ci sta, se no sopra.
-        val destra = a.right - margine
-        val limiteSinistro = a.left + margine
-        val (x, basso) = if (tachimetro != null && tachimetro.left - dp(10f) - w >= limiteSinistro) {
-            (tachimetro.left - dp(10f) - w) to tachimetro.bottom
-        } else if (tachimetro != null) {
-            (destra - w) to (tachimetro.top - dp(8f))
-        } else {
-            (destra - w) to (a.bottom - margine)
-        }
+        // Dove: in basso a sinistra, sopra la capsula del tachimetro.
+        val x = margine
+        val basso = tachimetro?.let { it.top - dp(8f) } ?: (a.bottom - margine)
         val box = RectF(x, basso - h, x + w, basso)
         canvas.drawRoundRect(box, dp(18f), dp(18f), sfondoScheda)
         sosta?.let {
@@ -361,8 +360,9 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
     }
 
     /**
-     * In basso a destra, in una capsula sola: arrivo, tempo e km che restano
-     * (in guida), il limite e la velocità. Restituisce dove sta.
+     * In basso a sinistra, dal lato di chi guida, in una capsula sola: la
+     * velocità, il limite e (in guida) arrivo, tempo e km che restano.
+     * Restituisce dove sta.
      */
     private fun velocita(canvas: Canvas, a: Rect, c: PonteAuto.Cruscotto): RectF? {
         val v = c.velocita
@@ -370,27 +370,31 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         if (v == null && g == null) return null
         val margine = dp(10f)
         val h = dp(54f)
-        val destra = a.right - margine
+        val sinistra = margine
         val basso = a.bottom - margine
         val cy = basso - h / 2
         val r = dp(22f)
 
-        // Da destra: velocità, limite, poi arrivo e tempo.
-        var x = destra - dp(5f)
-        val cxVelocita = v?.let { x - r }
-        if (v != null) x -= r * 2 + dp(6f)
-        val cxLimite = c.limite?.takeIf { v != null }?.let { x - r * 0.9f }
-        if (cxLimite != null) x -= r * 1.8f + dp(8f)
+        // Da sinistra: velocità, limite, poi arrivo e tempo.
+        var x = sinistra + dp(5f)
+        val cxVelocita = v?.let { x + r }
+        if (v != null) x += r * 2 + dp(6f)
+        val cxLimite = c.limite?.takeIf { v != null }?.let { x + r * 0.9f }
+        if (cxLimite != null) x += r * 1.8f + dp(8f)
         val ora = g?.let { java.text.SimpleDateFormat("HH:mm", java.util.Locale.ITALY).format(java.util.Date(it.arrivoMs)) }
         val sotto = g?.let { "${tempo(it.restantiS)} · ${distanza(it.restantiM)}" }
         val forte = font(21f)
         val piccolo = font(13f, grassetto = false, colore = muto)
-        val larghezzaTesti = if (g != null) max(forte.measureText(ora!!), piccolo.measureText(sotto!!)) + dp(18f) + dp(8f) else dp(5f)
-        val box = RectF(x - larghezzaTesti, basso - h, destra, basso)
+        val destra = if (ora != null && sotto != null) {
+            x + dp(6f) + max(forte.measureText(ora), piccolo.measureText(sotto)) + dp(18f)
+        } else {
+            x
+        }
+        val box = RectF(sinistra, basso - h, destra, basso)
         canvas.drawRoundRect(box, h / 2, h / 2, sfondoScheda)
-        if (g != null) {
-            canvas.drawText(ora!!, box.left + dp(18f), cy - dp(1f), forte)
-            canvas.drawText(sotto!!, box.left + dp(18f), cy + dp(17f), piccolo)
+        if (ora != null && sotto != null) {
+            canvas.drawText(ora, x + dp(6f), cy - dp(1f), forte)
+            canvas.drawText(sotto, x + dp(6f), cy + dp(17f), piccolo)
         }
         cxLimite?.let { cartello(canvas, it, cy, r * 0.9f, c.limite!!) }
         if (v != null && cxVelocita != null) {

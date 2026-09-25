@@ -408,7 +408,7 @@ class PonteAuto {
   Future<void> _disegnaSvincolo(Manovra m) async {
     if (!_attivo) return;
     try {
-      _manda('svincolo', {'id': m.inizio, 'png': await scenaSvincoloPng(m, larghezza: 960, altezza: 620)});
+      _manda('svincolo', {'id': m.inizio, 'png': await scenaSvincoloPng(m, larghezza: 960, altezza: 440)});
       _svincoloPronto = m.inizio;
       _guida();
     } catch (_) {
