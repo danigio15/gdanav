@@ -3,9 +3,11 @@
 /// i tempi escono come avvisi di GitHub.
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:gdanav_core/gdanav_core.dart';
+import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 
 void avviso(String titolo, String testo) => stdout.writeln('::notice title=$titolo::$testo');
@@ -71,6 +73,29 @@ void main() {
       );
     } catch (e) {
       avviso('Prezzi MIMIT', 'errore dopo ${orologio.elapsedMilliseconds} ms: $e');
+    }
+  }, skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  // I dati grezzi del Ministero intorno a Napoli, per le anteprime dell'app.
+  test('prezzi grezzi del Ministero, a Napoli', () async {
+    try {
+      final r = await http.post(
+        Uri.parse('https://carburanti.mise.gov.it/ospzApi/search/zone'),
+        headers: {'content-type': 'application/json', 'accept': 'application/json'},
+        body: jsonEncode({
+          'points': [
+            {'lat': 40.8518, 'lng': 14.2681},
+          ],
+          'radius': 3,
+          'fuelType': '0-x',
+          'priceOrder': 'asc',
+        }),
+      );
+      final json = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>;
+      final risultati = (json['results'] as List).take(14).toList();
+      avviso('Prezzi MIMIT grezzi', jsonEncode({'results': risultati}));
+    } catch (e) {
+      avviso('Prezzi MIMIT grezzi', 'errore: $e');
     }
   }, skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 }
