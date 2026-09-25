@@ -152,7 +152,7 @@ class PonteAuto {
             for (final d in (await distributoriVicini(qui)).take(12))
               {
                 'nome': d.nome,
-                'descrizione': descriviDistributore(d, qui),
+                'descrizione': descriviDistributore(d, qui, carburante: auto?.carburante ?? Carburante.benzina),
                 'lat': d.posizione.lat,
                 'lon': d.posizione.lon,
               },

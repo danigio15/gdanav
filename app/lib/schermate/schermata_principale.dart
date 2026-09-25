@@ -476,8 +476,12 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                   if (!widget.auto.elettrica) ...[
                     const SizedBox(height: 14),
                     BottoneDistributori(
-                      onTap: () =>
-                          mostraDistributori(context, qui: widget.posizione.qui, onScegli: (l) => viaggio.vaiA(l)),
+                      onTap: () => mostraDistributori(
+                        context,
+                        qui: widget.posizione.qui,
+                        carburante: widget.auto.carburante,
+                        onScegli: (l) => viaggio.vaiA(l),
+                      ),
                     ),
                   ],
                 ],

@@ -197,6 +197,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                                       context,
                                       qui: g.avanzamento?.posizioneSulPercorso ?? widget.posizione.qui,
                                       inGuida: true,
+                                      carburante: g.auto.carburante,
                                       onScegli: g.passaDa,
                                     ),
                                   ),

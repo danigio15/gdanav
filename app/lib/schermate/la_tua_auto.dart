@@ -94,11 +94,36 @@ class _LaTuaAutoState extends State<LaTuaAuto> {
                   padding: const EdgeInsets.fromLTRB(20, 6, 20, 14),
                   child: Text(
                     'Benzina, diesel, GPL o ibrida: gdanav fa il navigatore normale, senza soste di ricarica, '
-                    'batteria e colonnine. Restano percorso, traffico, autovelox, segnalazioni, meteo e Android Auto.',
+                    'batteria e colonnine, e ti mostra i distributori vicini coi prezzi. Restano percorso, traffico, '
+                    'autovelox, segnalazioni, meteo e Android Auto.',
                     key: const Key('spiega-termica'),
                     style: t.bodyMedium,
                   ),
                 ),
+              if (!elettrica) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Text('Che carburante fa', style: t.titleSmall),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                  child: Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final c in Carburante.values)
+                        ChoiceChip(
+                          key: Key('mio-carburante-${c.name}'),
+                          label: Text(c.nome),
+                          selected: widget.auto.carburante == c,
+                          onSelected: (_) async {
+                            await widget.auto.impostaCarburante(c);
+                            if (mounted) setState(() {});
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ],
               if (elettrica)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),

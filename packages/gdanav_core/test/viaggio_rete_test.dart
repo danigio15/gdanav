@@ -57,4 +57,20 @@ void main() {
   },
       skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false,
       timeout: const Timeout(Duration(minutes: 10)));
+
+  test('i prezzi veri del Ministero, a Milano', () async {
+    final orologio = Stopwatch()..start();
+    try {
+      final d = await ClientePrezziMimit().vicino(milano, km: 3);
+      final primo = d.isEmpty ? null : d.first;
+      avviso(
+        'Prezzi MIMIT',
+        '${orologio.elapsedMilliseconds} ms, ${d.length} distributori; il primo: ${primo?.nome} '
+            '${primo?.prezzi.map((p) => '${p.nome} ${p.euro}${p.self ? ' self' : ''}').join(', ')} '
+            'aggiornato ${primo?.aggiornato}',
+      );
+    } catch (e) {
+      avviso('Prezzi MIMIT', 'errore dopo ${orologio.elapsedMilliseconds} ms: $e');
+    }
+  }, skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 }
