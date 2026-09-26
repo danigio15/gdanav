@@ -102,6 +102,22 @@ class GestoreAuto extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Perché non arriva nessun dato dell'auto, quando lo si sa: la scheda lo
+  /// dice invece di un «Nessun dato» muto. `null` se non c'è niente di
+  /// collegato (allora va scelta una fonte).
+  String? get percheSenzaDati {
+    if (gdahome case final g?) {
+      if (!g.collegata) return 'gdahome non è collegata alla casa';
+      if (g.auto == null) return 'Nella plancia di gdahome non c\'è un\'auto elettrica';
+      if (g.ultima == null) return 'Nella sezione Auto di gdahome manca il sensore della batteria, o non risponde';
+    }
+    if (abbinamento != null) {
+      if (!homeAssistantConsentito) return 'Home Assistant è collegato, ma fa parte di Premium';
+      return 'Home Assistant è collegato, ma non ha ancora mandato la batteria';
+    }
+    return null;
+  }
+
   /// In viaggio: che Home Assistant rilegga l'auto e mandi i dati freschi.
   Future<void> chiediAggiornamento() async {
     if (_sorgenti[TipoSorgente.homeAssistant] case final SorgenteHomeAssistant h) await h.chiediAggiornamento();

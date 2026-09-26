@@ -91,4 +91,26 @@ void main() {
     expect(find.text('Casa collegata'), findsOneWidget);
     expect(find.text('64%'), findsOneWidget);
   });
+
+  test('senza dati la scheda dice perché', () async {
+    // Dentro gdahome: casa scollegata, niente auto, auto senza batteria.
+    final g = SorgenteGdahome();
+    final auto = GestoreAuto(archivio: Archivio(), gdahome: g);
+    await auto.avvia();
+    expect(auto.percheSenzaDati, 'gdahome non è collegata alla casa');
+    g.collegamento(true);
+    expect(auto.percheSenzaDati, contains('non c\'è un\'auto elettrica'));
+    g.descrivi(const AutoDiGdahome(marca: 'Leapmotor', modello: 'B10'));
+    expect(auto.percheSenzaDati, contains('manca il sensore della batteria'));
+    g.manda(StatoAuto(sorgente: TipoSorgente.gdahome, letto: DateTime.now(), batteria: 64));
+    expect(auto.percheSenzaDati, isNull);
+    await pumpEventQueue();
+    auto.dispose();
+
+    // L'app da sola, abbinata a Home Assistant ma senza Premium.
+    final sola = GestoreAuto(archivio: Archivio())
+      ..abbinamento = Abbinamento.nuovo(relay: Uri.parse('https://esempio.it'))
+      ..homeAssistantConsentito = false;
+    expect(sola.percheSenzaDati, contains('Premium'));
+  });
 }

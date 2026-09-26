@@ -419,20 +419,33 @@ class RendererMappa(
         return ((da + d * t) % 360.0 + 360.0) % 360.0
     }
 
-    /** Le immagini del segnaposto, prese dagli asset dell'app Flutter. */
+    /**
+     * Le immagini del segnaposto, prese dagli asset dell'app Flutter. gdanav
+     * è un pacchetto: le sue immagini stanno sotto `packages/gdanav_app/`,
+     * sia nell'app gdanav sia dentro gdahome (il posto vecchio resta come
+     * riserva).
+     */
     private fun caricaSegnaposto(s: Style) {
         for (nome in listOf("freccia", "auto_blu", "auto_bianca", "auto_rossa", "auto_nera", "auto_grigia")) {
-            try {
-                carContext.assets.open("flutter_assets/assets/segnaposto/$nome.png").use {
-                    s.addImage(nome, BitmapFactory.decodeStream(it))
+            for (cartella in CARTELLE_SEGNAPOSTO) {
+                val bitmap = try {
+                    carContext.assets.open("$cartella/$nome.png").use { BitmapFactory.decodeStream(it) }
+                } catch (e: Exception) {
+                    null
                 }
-            } catch (e: Exception) {
-                // Senza immagine il segnaposto non si vede; la guida resta.
+                if (bitmap != null) {
+                    s.addImage(nome, bitmap)
+                    break
+                }
             }
         }
     }
 
     private companion object {
         const val VUOTA = "{\"type\":\"FeatureCollection\",\"features\":[]}"
+        val CARTELLE_SEGNAPOSTO = listOf(
+            "flutter_assets/packages/gdanav_app/assets/segnaposto",
+            "flutter_assets/assets/segnaposto",
+        )
     }
 }
