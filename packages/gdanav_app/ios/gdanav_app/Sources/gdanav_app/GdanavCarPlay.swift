@@ -22,6 +22,53 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     /// La scena di CarPlay aperta adesso, per chi deve mostrare qualcosa.
     public private(set) static weak var attuale: GdanavCarPlay?
 
+    /// Chiamata quando CarPlay si collega (`true`) o si scollega (`false`):
+    /// gdahome ci accende gdanav anche se la sua sezione non si è mai aperta.
+    public static var alCollegamento: ((Bool) -> Void)?
+
+    /// Se CarPlay è collegato adesso.
+    public static var collegato: Bool { attuale != nil }
+
+    /// Dove si è, come lo sa gdanav.
+    public static var posizione: CLLocationCoordinate2D? {
+        PonteAuto.shared.qui.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
+    }
+
+    /// Dov'è Casa, fra i luoghi di gdanav.
+    public static var casaSalvata: CLLocationCoordinate2D? {
+        PonteAuto.shared.casa().map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
+    }
+
+    /// Un messaggio breve sopra la mappa, come i toast di Android Auto.
+    public static func mostra(_ testo: String) {
+        attuale?.avvisa(testo)
+    }
+
+    /// Una proposta sopra la mappa con due tasti («Quasi a casa: Fallo / Non ora»).
+    public static func proponi(
+        _ titolo: String,
+        sotto: String,
+        immagine: UIImage?,
+        si: String,
+        no: String,
+        azione: @escaping () -> Void
+    ) {
+        guard let t = attuale?.modello else { return }
+        let alert = CPNavigationAlert(
+            titleVariants: [titolo],
+            subtitleVariants: [sotto],
+            image: immagine,
+            primaryAction: CPAlertAction(title: si, style: .default) { _ in azione() },
+            secondaryAction: CPAlertAction(title: no, style: .cancel) { _ in },
+            duration: 15
+        )
+        if t.currentNavigationAlert != nil {
+            t.dismissNavigationAlert(animated: false) { _ in t.present(navigationAlert: alert, animated: true) }
+        } else {
+            t.present(navigationAlert: alert, animated: true)
+        }
+    }
+
     private var controllore: CPInterfaceController?
     private var finestra: CPWindow?
     private var mappa: MappaCarPlay?
@@ -62,6 +109,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
 
         ascolto = PonteAuto.shared.ascolta { [weak self] in self?.novita() }
         novita()
+        GdanavCarPlay.alCollegamento?(true)
     }
 
     public func templateApplicationScene(
@@ -82,6 +130,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         controllore = nil
         finestra = nil
         if GdanavCarPlay.attuale === self { GdanavCarPlay.attuale = nil }
+        GdanavCarPlay.alCollegamento?(false)
     }
 
     // MARK: - Le novità dal telefono
@@ -175,7 +224,8 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     /// Senza gdanav Premium la mappa c'è, ma la navigazione no: si dice come
     /// sbloccarlo dal telefono. Appena l'app lo sblocca, l'avviso se ne va.
     private func controllaPremium() {
-        guard let c = controllore else { return }
+        // Finché l'app non ha parlato (niente stile) non si sa ancora niente.
+        guard let c = controllore, PonteAuto.shared.stileChiaro != nil else { return }
         let premium = PonteAuto.shared.premium
         if premium && premiumMostrato {
             premiumMostrato = false
