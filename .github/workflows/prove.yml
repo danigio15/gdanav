@@ -323,10 +323,13 @@ jobs:
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
       - run: cp build/app/outputs/flutter-apk/app-release.apk gdanav.apk
       # Il pacchetto per il Play Store (test interno): da lì Android Auto
-      # mostra l'app senza «Origini sconosciute». Qui Premium si compra;
-      # nell'APK d'anteprima qui sopra è già sbloccato.
+      # mostra l'app senza «Origini sconosciute». Anche qui è tutto
+      # sbloccato, come in gdahome, finché i pagamenti non si decidono:
+      # senza, Google Play non trova l'abbonamento e spegne Home Assistant,
+      # e il revisore di Google non può provare l'app (EP-1).
       - run: >-
           flutter build appbundle --release --build-number=${{ github.run_number }}
+          --dart-define=GDANAV_TUTTO_SBLOCCATO=true
           --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM"
           --dart-define=GDANAV_OCM_CHIAVE="$OCM"
         env:
