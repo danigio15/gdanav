@@ -82,6 +82,8 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     private var messaggioMostrato: String?
     private var premiumMostrato = false
     private var spostamentoPrima: CGPoint = .zero
+    private var cruscottoMostrato: String?
+    private var sostaAvvisata: String?
 
     // MARK: - La scena
 
@@ -140,6 +142,10 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         m.aggiorna()
         sincronizzaGuida()
         mostraAvviso()
+        avvisaLaSosta()
+        // Il tasto coi dati dell'auto cambia con la batteria e i km, che non
+        // toccano il resto dei tasti.
+        if SchermiCarPlay.testoCruscotto() != cruscottoMostrato { aggiornaTasti() }
         // I tasti si rifanno solo se cambia qualcosa che mostrano.
         if PonteAuto.shared.versioneModello != versione {
             versione = PonteAuto.shared.versioneModello
@@ -170,13 +176,27 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     private func aggiornaTasti() {
         guard let t = modello, let m = mappa else { return }
         let ponte = PonteAuto.shared
-        var sinistra: [CPBarButton] = [tasto("magnifyingglass") { [weak self] in self?.apriCerca() }]
-        if GdanavCarPlay.casa != nil {
-            sinistra.append(tasto("house.fill") { [weak self] in self?.apriCasa() })
+        // A sinistra i dati dell'auto (quelli che Android Auto disegna sulla
+        // mappa: CarPlay vuole la mappa pulita, e li tiene in un tasto che
+        // apre il viaggio) e la lente. A destra la casa (dentro gdahome) e il
+        // Menu; in guida Menu e Fine, e la casa passa nel Menu.
+        var sinistra: [CPBarButton] = []
+        cruscottoMostrato = SchermiCarPlay.testoCruscotto()
+        if let dati = cruscottoMostrato {
+            sinistra.append(tasto(titolo: dati) { [weak self] in self?.apriViaggio() })
         }
-        var destra: [CPBarButton] = [tasto(titolo: "Menu") { [weak self] in self?.apriMenu() }]
+        sinistra.append(tasto("magnifyingglass") { [weak self] in self?.apriCerca() })
+        var destra: [CPBarButton] = []
         if ponte.guida != nil {
-            destra.append(tasto(titolo: "Fine") { [weak self] in self?.fine() })
+            destra = [
+                tasto(titolo: "Menu") { [weak self] in self?.apriMenu() },
+                tasto(titolo: "Fine") { [weak self] in self?.fine() },
+            ]
+        } else {
+            if GdanavCarPlay.casa != nil {
+                destra.append(tasto("house.fill") { [weak self] in self?.apriCasa() })
+            }
+            destra.append(tasto(titolo: "Menu") { [weak self] in self?.apriMenu() })
         }
         t.leadingNavigationBarButtons = sinistra
         t.trailingNavigationBarButtons = destra
@@ -212,6 +232,11 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     private func apriMenu() {
         guard let c = controllore, let m = mappa else { return }
         c.pushTemplate(SchermiCarPlay.menu(c, mappa: m), animated: true, completion: nil)
+    }
+
+    private func apriViaggio() {
+        guard let c = controllore else { return }
+        c.pushTemplate(SchermiCarPlay.viaggio(), animated: true, completion: nil)
     }
 
     private func apriCasa() {
@@ -326,16 +351,12 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     private func manovreDa(_ g: GuidaAuto) -> [CPManeuver] {
         let ponte = PonteAuto.shared
         let m = CPManeuver()
-        var righe: [String] = []
-        let testo = g.istruzione.isEmpty ? g.strada : g.istruzione
-        if !g.uscita.isEmpty || !g.verso.isEmpty {
-            let uscita = [g.uscita.isEmpty ? nil : "Uscita \(g.uscita)", g.verso.isEmpty ? nil : g.verso]
-                .compactMap { $0 }
-                .joined(separator: " · ")
-            righe.append("\(testo) · \(uscita)")
-        }
-        righe.append(testo)
+        // Lo stesso testo della scheda di Android Auto; CarPlay sceglie la
+        // variante che ci sta, dalla più lunga.
+        let testo = ManovreCarPlay.testo(g)
+        var righe = [testo]
         if !g.strada.isEmpty && g.strada != testo { righe.append(g.strada) }
+        if !g.istruzione.isEmpty && !righe.contains(g.istruzione) { righe.append(g.istruzione) }
         m.instructionVariants = righe
         m.symbolImage = ManovreCarPlay.immagine(g.tipo)
         m.initialTravelEstimates = CPTravelEstimates(
@@ -344,7 +365,8 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         )
         // La vista dello svincolo, o le corsie da tenere.
         if let id = g.svincolo, let vista = ponte.svincoli[id] {
-            m.junctionImage = ManovreCarPlay.dentro(vista, CGSize(width: 140, height: 100))
+            // Col cartello verde dell'uscita, come su Android Auto.
+            m.junctionImage = ManovreCarPlay.dentro(ManovreCarPlay.svincoloConCartello(vista, g), CGSize(width: 140, height: 100))
         } else if let strisce = ManovreCarPlay.corsie(g.corsie) {
             m.junctionImage = ManovreCarPlay.dentro(strisce, CGSize(width: 140, height: 100))
         }
@@ -388,6 +410,30 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                 duration: 8
             )
         }
+        if t.currentNavigationAlert != nil {
+            t.dismissNavigationAlert(animated: false) { _ in t.present(navigationAlert: alert, animated: true) }
+        } else {
+            t.present(navigationAlert: alert, animated: true)
+        }
+    }
+
+    /// La prossima sosta di ricarica, avvicinandosi (a 15 km): quello che su
+    /// Android Auto sta nella riga «⚡ Area 180 · 176 km · arrivi col 21%».
+    private func avvisaLaSosta() {
+        let c = PonteAuto.shared.cruscotto
+        guard PonteAuto.shared.guida != nil, let nome = c.sostaNome, let km = c.sostaKm else { return }
+        guard km <= 15, sostaAvvisata != nome, let t = modello else { return }
+        sostaAvvisata = nome
+        var sotto = ["tra \(Int(km.rounded())) km"]
+        if let b = c.sostaBatteria { sotto.append("arrivi col \(Int(b.rounded()))%") }
+        let alert = CPNavigationAlert(
+            titleVariants: ["Prossima sosta: \(nome)", "Sosta: \(nome)"],
+            subtitleVariants: [sotto.joined(separator: " · ")],
+            image: UIImage(systemName: "bolt.car.fill")?.withTintColor(.systemGreen, renderingMode: .alwaysOriginal),
+            primaryAction: CPAlertAction(title: "OK", style: .cancel) { _ in },
+            secondaryAction: nil,
+            duration: 10
+        )
         if t.currentNavigationAlert != nil {
             t.dismissNavigationAlert(animated: false) { _ in t.present(navigationAlert: alert, animated: true) }
         } else {

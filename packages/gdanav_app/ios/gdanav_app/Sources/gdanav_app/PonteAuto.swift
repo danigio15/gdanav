@@ -63,6 +63,8 @@ struct CruscottoAuto {
     var elettrica = true
     var batteria: Double?
     var autonomiaKm: Double?
+    /// L'autonomia la dice l'auto (non una stima).
+    var autonomiaAuto = false
     var velocita: Double?
     var limite: Int?
     var arrivoBatteria: Double?
@@ -191,6 +193,7 @@ final class PonteAuto {
                 elettrica: (a["elettrica"] as? Bool) != false,
                 batteria: numero(a["batteria"]),
                 autonomiaKm: numero(a["autonomia_km"]),
+                autonomiaAuto: (a["autonomia_auto"] as? Bool) == true,
                 velocita: numero(a["velocita"]),
                 limite: numero(a["limite"]).map { Int($0) },
                 arrivoBatteria: numero(a["arrivo_batteria"]),

@@ -101,6 +101,86 @@ enum SchermiCarPlay {
     private static let verde = UIColor.systemGreen
     private static let giallo = UIColor.systemYellow
 
+    // MARK: - I dati dell'auto e il viaggio
+
+    /// Il testo del tasto in alto a sinistra: «79% · 259 km» (con la termica
+    /// il meteo). `nil` se non c'è niente da dire.
+    static func testoCruscotto() -> String? {
+        let c = PonteAuto.shared.cruscotto
+        if c.elettrica, let b = c.batteria {
+            if let km = c.autonomiaKm { return "\(Int(b.rounded()))% · \(Int(km.rounded())) km" }
+            return "\(Int(b.rounded()))%"
+        }
+        if let t = c.meteoTemperatura { return "\(c.meteoEmoji ?? "") \(Int(t.rounded()))°".trimmingCharacters(in: .whitespaces) }
+        return nil
+    }
+
+    private static func righeViaggio() -> [CPListSection] {
+        let p = PonteAuto.shared
+        let c = p.cruscotto
+        var auto: [CPListItem] = []
+        if c.elettrica, let b = c.batteria {
+            let km = c.autonomiaKm.map { "\(Int($0.rounded())) km di autonomia" + (c.autonomiaAuto ? " (dall'auto)" : " (stima)") }
+            auto.append(CPListItem(text: "Batteria \(Int(b.rounded()))%", detailText: km, image: icona("battery.75", verde)))
+        }
+        if c.elettrica, let a = c.arrivoBatteria {
+            auto.append(CPListItem(text: "Alla meta \(Int(a.rounded()))%", detailText: "La batteria quando arrivi", image: icona("flag.fill", a < 10 ? .systemRed : verde)))
+        }
+        if let nome = c.sostaNome {
+            var sotto: [String] = []
+            if let km = c.sostaKm { sotto.append("tra \(Int(km.rounded())) km") }
+            if let b = c.sostaBatteria { sotto.append("arrivi col \(Int(b.rounded()))%") }
+            auto.append(CPListItem(text: "Prossima sosta: \(nome)", detailText: sotto.joined(separator: " · "), image: icona("bolt.car.fill", verde)))
+        }
+        if let t = c.meteoTemperatura {
+            auto.append(CPListItem(
+                text: "\(c.meteoEmoji ?? "") \(Int(t.rounded()))°".trimmingCharacters(in: .whitespaces),
+                detailText: c.meteoDove.map { "Meteo \($0)" } ?? "Meteo",
+                image: icona("cloud.sun.fill")
+            ))
+        }
+        if let v = c.velocita {
+            let limite = c.limite.map { "limite \($0) km/h" }
+            let oltre = c.limite.map { v > Double($0) + 3 } ?? false
+            auto.append(CPListItem(text: "\(Int(v.rounded())) km/h", detailText: limite, image: icona("speedometer", oltre ? .systemRed : nil)))
+        }
+        var viaggio: [CPListItem] = []
+        if let g = p.guida {
+            let ora = DateFormatter()
+            ora.dateFormat = "HH:mm"
+            let minuti = max(Int((g.restantiS + 30) / 60), 1)
+            let durata = minuti < 60 ? "\(minuti) min" : "\(minuti / 60) h \(String(format: "%02d", minuti % 60))"
+            let d = ManovreCarPlay.distanza(g.restantiM)
+            let km = d.unit == .kilometers
+                ? String(format: "%.0f km", d.value)
+                : "\(Int(d.value)) m"
+            viaggio.append(CPListItem(text: "Arrivo \(ora.string(from: g.arrivo))", detailText: "\(durata) · \(km) · \(g.destinazione)", image: icona("flag.checkered")))
+        }
+        return [
+            CPListSection(items: auto, header: "L'auto", sectionIndexTitle: nil),
+            CPListSection(items: viaggio, header: "Il viaggio", sectionIndexTitle: nil),
+        ].filter { !$0.items.isEmpty }
+    }
+
+    /// Il viaggio: tutto quello che su Android Auto sta sopra la mappa, in un
+    /// elenco che si rifà da solo (al massimo ogni due secondi).
+    static func viaggio() -> CPListTemplate {
+        let t = CPListTemplate(title: "Il viaggio", sections: righeViaggio())
+        t.emptyViewTitleVariants = ["Ancora nessun dato dall'auto"]
+        var ultima = Date.distantPast
+        var ascolto: UUID?
+        ascolto = PonteAuto.shared.ascolta { [weak t] in
+            guard let t else {
+                if let a = ascolto { PonteAuto.shared.smetti(a) }
+                return
+            }
+            guard Date().timeIntervalSince(ultima) >= 2 else { return }
+            ultima = Date()
+            t.updateSections(righeViaggio())
+        }
+        return t
+    }
+
     // MARK: - Il menu
 
     /// Il menu dell'auto, come Waze: Casa e Lavoro (un tocco e si parte),
@@ -109,6 +189,13 @@ enum SchermiCarPlay {
         elenco("Menu") { [weak c, weak mappa] in
             let p = PonteAuto.shared
             var vaiA: [CPListItem] = []
+            // Dentro gdahome: la casa, che in guida non ha il suo tasto sulla mappa.
+            if let casa = GdanavCarPlay.casa {
+                vaiA.append(riga("La tua casa", "Comandi rapidi e dispositivi", icona: icona("house.fill", .systemOrange), sfoglia: true) {
+                    guard let c else { return }
+                    c.pushTemplate(casa(c), animated: true, completion: nil)
+                })
+            }
             if let casa = p.casa() {
                 vaiA.append(riga("Casa", casa.nome, icona: icona("house.fill", blu)) { vai(casa, c) })
             } else {
