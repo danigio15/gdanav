@@ -113,9 +113,29 @@ class GestoreAuto extends ChangeNotifier {
     }
     if (abbinamento != null) {
       if (!homeAssistantConsentito) return 'Home Assistant è collegato, ma fa parte di Premium';
-      return 'Home Assistant è collegato, ma non ha ancora mandato la batteria';
+      return switch (_sorgenti[TipoSorgente.homeAssistant]) {
+        final SorgenteHomeAssistant h => percheHomeAssistant(h),
+        _ => 'Home Assistant è abbinato, ma il collegamento non è partito',
+      };
     }
     return null;
+  }
+
+  /// Dove si ferma il filo con Home Assistant: telefono → relay → Home
+  /// Assistant → sensore della batteria.
+  static String percheHomeAssistant(SorgenteHomeAssistant h) {
+    final r = h.relay;
+    if (!r.collegato) return 'Non raggiungo il relay di Home Assistant: controlla la rete';
+    if (r.casa == false) {
+      return 'Home Assistant non è collegato al relay: controlla l\'integrazione gdanav in Home Assistant';
+    }
+    if (r.scartate > 0 && r.aperte == 0) {
+      return 'I dati di Home Assistant non si aprono: controlla l\'ora di Home Assistant o rifai l\'abbinamento';
+    }
+    if (h.senzaBatteria) {
+      return 'Home Assistant non dice la batteria: scegli il sensore nell\'integrazione gdanav';
+    }
+    return 'Home Assistant è collegato, ma non ha ancora mandato la batteria';
   }
 
   /// In viaggio: che Home Assistant rilegga l'auto e mandi i dati freschi.

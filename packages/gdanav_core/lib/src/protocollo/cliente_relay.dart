@@ -31,6 +31,22 @@ class ClienteRelay {
   /// `true` quando Home Assistant è collegato al relay.
   Stream<bool> get casaPresente => _casaPresente.stream;
 
+  /// Per capire dove si ferma il filo, quando i dati non arrivano: il relay
+  /// risponde? Home Assistant c'è dall'altra parte? Le buste si aprono?
+  bool collegato = false;
+
+  /// `null` finché il relay non l'ha detto.
+  bool? casa;
+
+  /// Le buste della casa aperte e quelle buttate (chiave sbagliata, orologio
+  /// fuori tempo): tante buttate e nessuna aperta vuol dire abbinamento da
+  /// rifare, o l'ora di Home Assistant o del telefono sbagliata.
+  int aperte = 0;
+  int scartate = 0;
+
+  /// L'ultimo errore nel collegarsi al relay (rete, abbinamento rifiutato).
+  String? ultimoErrore;
+
   Future<void> avvia() async {
     _attivo = true;
     _busta ??= await Busta.per(abbinamento);
@@ -57,8 +73,11 @@ class ClienteRelay {
     try {
       await c.ready;
       _tentativi = 0;
+      collegato = true;
+      ultimoErrore = null;
       await manda(Messaggio(tipo: TipoMessaggio.richiediStato));
-    } catch (_) {
+    } catch (e) {
+      ultimoErrore = '$e';
       _programmaRiprova();
       return;
     }
@@ -70,12 +89,17 @@ class ClienteRelay {
     final json = jsonDecode(dato) as Map<String, Object?>;
     // I messaggi del relay stesso sono in chiaro e non portano segreti.
     if (json.containsKey('relay')) {
-      if (json['ruolo'] == 'casa') _casaPresente.add(json['relay'] == 'presente');
+      if (json['ruolo'] == 'casa') {
+        casa = json['relay'] == 'presente';
+        _casaPresente.add(casa!);
+      }
       return;
     }
     try {
       _messaggi.add(await _busta!.apri(dato, Mittente.casa));
+      aperte++;
     } on Object {
+      scartate++;
       // Una busta che non si apre si butta: può essere rumore o un attacco,
       // in entrambi i casi non c'è niente da farci.
     }
@@ -83,6 +107,7 @@ class ClienteRelay {
 
   void _programmaRiprova() {
     _canale = null;
+    collegato = false;
     if (!_attivo) return;
     _riprova?.cancel();
     final secondi = [1, 2, 5, 10, 30, 60][_tentativi.clamp(0, 5)];

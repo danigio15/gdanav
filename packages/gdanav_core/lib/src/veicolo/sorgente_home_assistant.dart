@@ -14,6 +14,10 @@ class SorgenteHomeAssistant implements SorgenteDatiAuto {
   StreamSubscription<Messaggio>? _iscrizione;
   final _letture = StreamController<StatoAuto>.broadcast();
 
+  /// L'ultimo stato arrivato da Home Assistant non diceva la batteria (il
+  /// sensore scelto nell'integrazione manca o non è disponibile).
+  bool senzaBatteria = false;
+
   @override
   TipoSorgente get tipo => TipoSorgente.homeAssistant;
 
@@ -24,6 +28,7 @@ class SorgenteHomeAssistant implements SorgenteDatiAuto {
   Future<void> avvia() async {
     _iscrizione = relay.messaggi.where((m) => m.tipo == TipoMessaggio.statoAuto).listen((m) {
       final stato = statoDaMessaggio(m);
+      senzaBatteria = stato == null;
       if (stato != null) _letture.add(stato);
     });
     await relay.avvia();

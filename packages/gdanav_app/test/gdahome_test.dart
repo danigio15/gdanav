@@ -113,4 +113,21 @@ void main() {
       ..homeAssistantConsentito = false;
     expect(sola.percheSenzaDati, contains('Premium'));
   });
+
+  test('Home Assistant: la scheda dice dove si ferma il filo', () {
+    final r = ClienteRelay(Abbinamento.nuovo(relay: Uri.parse('https://esempio.it')));
+    final h = SorgenteHomeAssistant(r);
+    expect(GestoreAuto.percheHomeAssistant(h), contains('Non raggiungo il relay'));
+    r.collegato = true;
+    r.casa = false;
+    expect(GestoreAuto.percheHomeAssistant(h), contains('integrazione gdanav'));
+    r.casa = true;
+    r.scartate = 3;
+    expect(GestoreAuto.percheHomeAssistant(h), contains('non si aprono'));
+    r.aperte = 1;
+    h.senzaBatteria = true;
+    expect(GestoreAuto.percheHomeAssistant(h), contains('non dice la batteria'));
+    h.senzaBatteria = false;
+    expect(GestoreAuto.percheHomeAssistant(h), contains('non ha ancora mandato'));
+  });
 }
