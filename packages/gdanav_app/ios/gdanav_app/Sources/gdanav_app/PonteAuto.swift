@@ -299,7 +299,7 @@ final class PonteAuto {
     func chiedi(_ metodo: String, _ argomenti: Any? = nil, risposta: @escaping (Any?) -> Void = { _ in }) {
         guard let c = canale else { return risposta(nil) }
         c.invokeMethod(metodo, arguments: argomenti) { r in
-            if r is FlutterError || (r as AnyObject?) === FlutterMethodNotImplemented {
+            if r is FlutterError || (r as? NSObject) === FlutterMethodNotImplemented {
                 risposta(nil)
             } else {
                 risposta(r)

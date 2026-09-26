@@ -37,9 +37,10 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     }
 
     init() {
-        tridimensionale = preferenze.object(forKey: "gdanav.auto_3d") as? Bool ?? true
-        zoomGuida = preferenze.object(forKey: "gdanav.auto_zoom_guida") as? Double ?? 16.5
-        zoomFermo = preferenze.object(forKey: "gdanav.auto_zoom_fermo") as? Double ?? 15.5
+        let p = UserDefaults.standard
+        tridimensionale = p.object(forKey: "gdanav.auto_3d") as? Bool ?? true
+        zoomGuida = p.object(forKey: "gdanav.auto_zoom_guida") as? Double ?? 16.5
+        zoomFermo = p.object(forKey: "gdanav.auto_zoom_fermo") as? Double ?? 15.5
         super.init(nibName: nil, bundle: nil)
     }
 

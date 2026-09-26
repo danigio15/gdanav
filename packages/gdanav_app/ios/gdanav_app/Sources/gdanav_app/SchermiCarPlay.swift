@@ -52,7 +52,7 @@ enum SchermiCarPlay {
     }
 
     /// Quante righe l'auto mostra.
-    static var righeMassime: Int { max(CPListTemplate.maximumItemCount, 6) }
+    static var righeMassime: Int { CPListTemplate.maximumItemCount }
 
     /// Un elenco che si rifà quando cambia qualcosa che mostra.
     static func elenco(
@@ -343,6 +343,7 @@ enum SchermiCarPlay {
             let (tipo, nome, simbolo) = voce
             let immagine = PonteAuto.shared.immagini["segnala-\(tipo)"]
                 ?? icona(simbolo, giallo)
+                ?? icona("exclamationmark.triangle.fill", giallo)
                 ?? UIImage()
             return CPGridButton(titleVariants: [nome], image: immagine) { [weak c] _ in
                 PonteAuto.shared.segnala(tipo) { frase in
