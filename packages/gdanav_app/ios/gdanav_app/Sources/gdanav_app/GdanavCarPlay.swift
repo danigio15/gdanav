@@ -26,6 +26,12 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     /// gdahome ci accende gdanav anche se la sua sezione non si è mai aperta.
     public static var alCollegamento: ((Bool) -> Void)?
 
+    /// I dati sopra la mappa come su Android Auto (batteria, km, meta,
+    /// meteo, sosta, tachimetro col limite, avvisi piccoli). Le regole di
+    /// Apple per i navigatori chiedono la mappa pulita: se la revisione li
+    /// rifiuta, qui si spengono, e i dati passano agli avvisi di CarPlay.
+    public static var pannelliSullaMappa = true
+
     /// Se CarPlay è collegato adesso.
     public static var collegato: Bool { attuale != nil }
 
@@ -82,7 +88,6 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     private var messaggioMostrato: String?
     private var premiumMostrato = false
     private var spostamentoPrima: CGPoint = .zero
-    private var cruscottoMostrato: String?
     private var sostaAvvisata: String?
 
     // MARK: - La scena
@@ -142,10 +147,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         m.aggiorna()
         sincronizzaGuida()
         mostraAvviso()
-        avvisaLaSosta()
-        // Il tasto coi dati dell'auto cambia con la batteria e i km, che non
-        // toccano il resto dei tasti.
-        if SchermiCarPlay.testoCruscotto() != cruscottoMostrato { aggiornaTasti() }
+        if !GdanavCarPlay.pannelliSullaMappa { avvisaLaSosta() }
         // I tasti si rifanno solo se cambia qualcosa che mostrano.
         if PonteAuto.shared.versioneModello != versione {
             versione = PonteAuto.shared.versioneModello
@@ -159,6 +161,11 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
 
     private func tasto(_ simbolo: String, _ azione: @escaping () -> Void) -> CPBarButton {
         CPBarButton(image: UIImage(systemName: simbolo) ?? UIImage()) { _ in azione() }
+    }
+
+    /// Da fermi «Cerca» con la lente; in guida, dove c'è meno posto, solo la lente.
+    private func tasto(titolo: String, simbolo: String, _ azione: @escaping () -> Void) -> CPBarButton {
+        titolo.isEmpty ? tasto(simbolo, azione) : tasto(titolo: titolo, azione)
     }
 
     private func tasto(titolo: String, _ azione: @escaping () -> Void) -> CPBarButton {
@@ -180,23 +187,24 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         // mappa: CarPlay vuole la mappa pulita, e li tiene in un tasto che
         // apre il viaggio) e la lente. A destra la casa (dentro gdahome) e il
         // Menu; in guida Menu e Fine, e la casa passa nel Menu.
+        // Come su Android Auto: la lente e la casa (dentro gdahome) a
+        // sinistra, Menu e (in guida) Fine a destra. Appena passata una
+        // segnalazione, a sinistra «C'è ancora» e «No».
         var sinistra: [CPBarButton] = []
-        cruscottoMostrato = SchermiCarPlay.testoCruscotto()
-        if let dati = cruscottoMostrato {
-            sinistra.append(tasto(titolo: dati) { [weak self] in self?.apriViaggio() })
-        }
-        sinistra.append(tasto("magnifyingglass") { [weak self] in self?.apriCerca() })
-        var destra: [CPBarButton] = []
-        if ponte.guida != nil {
-            destra = [
-                tasto(titolo: "Menu") { [weak self] in self?.apriMenu() },
-                tasto(titolo: "Fine") { [weak self] in self?.fine() },
+        if let id = ponte.avviso.ancoraId, GdanavCarPlay.pannelliSullaMappa {
+            sinistra = [
+                tasto(titolo: "C'è ancora") { PonteAuto.shared.ancora(id, si: true) },
+                tasto(titolo: "No") { PonteAuto.shared.ancora(id, si: false) },
             ]
         } else {
+            sinistra.append(tasto(titolo: ponte.guida == nil ? "Cerca" : "", simbolo: "magnifyingglass") { [weak self] in self?.apriCerca() })
             if GdanavCarPlay.casa != nil {
-                destra.append(tasto("house.fill") { [weak self] in self?.apriCasa() })
+                sinistra.append(tasto("house.fill") { [weak self] in self?.apriCasa() })
             }
-            destra.append(tasto(titolo: "Menu") { [weak self] in self?.apriMenu() })
+        }
+        var destra = [tasto(titolo: "Menu") { [weak self] in self?.apriMenu() }]
+        if ponte.guida != nil {
+            destra.append(tasto(titolo: "Fine") { [weak self] in self?.fine() })
         }
         t.leadingNavigationBarButtons = sinistra
         t.trailingNavigationBarButtons = destra
@@ -232,11 +240,6 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     private func apriMenu() {
         guard let c = controllore, let m = mappa else { return }
         c.pushTemplate(SchermiCarPlay.menu(c, mappa: m), animated: true, completion: nil)
-    }
-
-    private func apriViaggio() {
-        guard let c = controllore else { return }
-        c.pushTemplate(SchermiCarPlay.viaggio(), animated: true, completion: nil)
     }
 
     private func apriCasa() {
@@ -382,7 +385,10 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     /// Una segnalazione davanti, o «C'è ancora?» dopo averla passata: un
     /// avviso di navigazione, come quelli di Mappe.
     private func mostraAvviso() {
+        // Coi pannelli l'avviso è la capsula piccola sulla mappa, e «c'è
+        // ancora?» si risponde coi tasti in alto, come su Android Auto.
         guard let t = modello, let a = PonteAuto.shared.prendiAvvisoNuovo() else { return }
+        guard !GdanavCarPlay.pannelliSullaMappa else { return }
         let immagine = a.tipo.flatMap { PonteAuto.shared.immagini["segnala-\($0)"] }
         let alert: CPNavigationAlert
         if let id = a.ancoraId {

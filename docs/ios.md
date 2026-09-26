@@ -25,22 +25,26 @@ HTTPS).
 
 ### CarPlay, e cosa è diverso da Android Auto
 
-Gli schermi sono gli stessi: la mappa di gdanav, Cerca, il Menu (Casa, Lavoro,
-preferiti e recenti, colonnine o distributori, Segnala, Impostazioni), le
-opzioni del percorso, la batteria all'arrivo, «C'è ancora?» dopo una
-segnalazione. Tre differenze vengono da Apple, non da noi:
+Gli schermi sono gli stessi: la mappa di gdanav, Cerca, la casa (dentro
+gdahome), il Menu (Casa, Lavoro, preferiti e recenti, colonnine o
+distributori, Segnala, Impostazioni), le opzioni del percorso, la batteria
+all'arrivo, «C'è ancora?» dopo una segnalazione.
 
-- **Sopra la mappa niente pannelli.** Su Android Auto la scheda della manovra,
-  la velocità col limite e la barra con batteria e meteo le disegna gdanav.
-  Apple vuole la mappa pulita e la guida nelle sue schede: la manovra, la vista
-  dello svincolo o le corsie, la distanza e l'arrivo le mostra CarPlay; gli
-  autovelox e le segnalazioni arrivano come avvisi di navigazione; la batteria
-  all'arrivo sta nel riepilogo del viaggio. La velocità e il limite in CarPlay
-  non si possono mostrare.
-- **CarPlay non dà i dati dell'auto** (batteria, velocità, chilometri): restano
-  Home Assistant, il dongle OBD e l'inserimento a mano.
-- **Niente tocco sulla mappa**: le colonnine e i distributori si scelgono dagli
-  elenchi del Menu.
+Sopra la mappa c'è quello che c'è su Android Auto (`PannelloCarPlay.swift`,
+la copia di `PannelloAuto.kt`): la barra con batteria, km, batteria alla
+meta, meteo e prossima sosta; il tachimetro col cartello del limite; l'avviso
+piccolo della segnalazione che si avvicina. La scheda della manovra (con le
+corsie e lo svincolo col cartello verde dell'uscita) e arrivo, durata e km li
+disegna CarPlay.
+
+**Da sapere per la revisione di Apple**: le regole di CarPlay per i
+navigatori chiedono la mappa senza pannelli sopra. Se Apple li rifiuta, si
+spengono con una riga, `GdanavCarPlay.pannelliSullaMappa = false`: i dati
+passano agli avvisi di CarPlay e la guida resta completa.
+
+CarPlay **non dà i dati dell'auto** (batteria, velocità, chilometri): restano
+Home Assistant, il dongle OBD e l'inserimento a mano. E **niente tocco sulla
+mappa**: le colonnine e i distributori si scelgono dagli elenchi del Menu.
 
 ## Una volta sola, dalla parte di Apple
 

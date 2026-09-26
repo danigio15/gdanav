@@ -9,6 +9,7 @@ import UIKit
 /// tempi e gli avvisi li mostra lui.
 final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     private var mappa: MLNMapView!
+    private let pannello = PannelloCarPlay(frame: .zero)
     private var stileCaricato: String?
     private var stilePronto = false
     private var inclinataOra: Bool?
@@ -33,7 +34,10 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
 
     /// L'area non coperta dai tasti e dai pannelli di CarPlay.
     var areaSicura: UIEdgeInsets = .zero {
-        didSet { aggiorna() }
+        didSet {
+            pannello.area = areaSicura
+            aggiorna()
+        }
     }
 
     init() {
@@ -59,7 +63,13 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         m.showsScale = false
         m.showsUserLocation = false
         mappa = m
-        view = m
+        // Sopra la mappa il pannello coi dati, come su Android Auto.
+        let contenitore = UIView(frame: .zero)
+        m.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        pannello.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        contenitore.addSubview(m)
+        contenitore.addSubview(pannello)
+        view = contenitore
     }
 
     override func viewDidLoad() {
@@ -161,6 +171,8 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     /// Chiamata a ogni novità dal telefono.
     func aggiorna() {
         guard isViewLoaded else { return }
+        pannello.isHidden = !GdanavCarPlay.pannelliSullaMappa
+        pannello.aggiorna()
         let ponte = PonteAuto.shared
         guard let json = (scuro ? ponte.stileScuro : ponte.stileChiaro) ?? ponte.stileChiaro else { return }
         if json != stileCaricato {
