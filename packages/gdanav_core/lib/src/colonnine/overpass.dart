@@ -17,13 +17,14 @@ class ClienteOverpass implements FonteColonnine {
     List<Uri>? server,
     this.scaglione = const Duration(seconds: 12),
     this.attesa = const Duration(seconds: 50),
-  })  : _http = client ?? http.Client(),
-        server = server ??
-            [
-              Uri.parse('https://overpass-api.de/api/interpreter'),
-              Uri.parse('https://overpass.private.coffee/api/interpreter'),
-              Uri.parse('https://overpass.kumi.systems/api/interpreter'),
-            ];
+  }) : _http = client ?? http.Client(),
+       server =
+           server ??
+           [
+             Uri.parse('https://overpass-api.de/api/interpreter'),
+             Uri.parse('https://overpass.private.coffee/api/interpreter'),
+             Uri.parse('https://overpass.kumi.systems/api/interpreter'),
+           ];
 
   /// Si chiede al primo; se dopo [scaglione] non ha risposto (dal telefono,
   /// con l'indirizzo condiviso dell'operatore, capita che ci metta in coda)
@@ -54,12 +55,14 @@ class ClienteOverpass implements FonteColonnine {
       final tratto = pezzi.sublist(i, math.min(i + passo + 1, pezzi.length));
       final lat = tratto.map((p) => p.lat), lon = tratto.map((p) => p.lon);
       final coseno = math.cos(tratto.first.lat * math.pi / 180).abs().clamp(0.2, 1.0);
-      riquadri.add([
-        (lat.reduce(math.min) - margine).toStringAsFixed(4),
-        (lon.reduce(math.min) - margine / coseno).toStringAsFixed(4),
-        (lat.reduce(math.max) + margine).toStringAsFixed(4),
-        (lon.reduce(math.max) + margine / coseno).toStringAsFixed(4),
-      ].join(','));
+      riquadri.add(
+        [
+          (lat.reduce(math.min) - margine).toStringAsFixed(4),
+          (lon.reduce(math.min) - margine / coseno).toStringAsFixed(4),
+          (lat.reduce(math.max) + margine).toStringAsFixed(4),
+          (lon.reduce(math.max) + margine / coseno).toStringAsFixed(4),
+        ].join(','),
+      );
     }
     const rapide = '[~"^socket:(type2_combo|chademo|tesla_supercharger.*)\$"~"."]';
     final filtri = [
@@ -87,20 +90,23 @@ class ClienteOverpass implements FonteColonnine {
       if (esito.isCompleted || prossimo >= server.length) return;
       final s = server[prossimo++];
       sveglia = Timer(scaglione, parti);
-      _chiedi(s, corpo).then((c) {
-        if (esito.isCompleted) return;
-        sveglia?.cancel();
-        esito.complete(c);
-      }, onError: (Object e) {
-        errori.add('${s.host}: $e');
-        if (esito.isCompleted) return;
-        if (errori.length == server.length) {
+      _chiedi(s, corpo).then(
+        (c) {
+          if (esito.isCompleted) return;
           sveglia?.cancel();
-          esito.completeError(Exception('colonnine: ${errori.join('; ')}'));
-        } else {
-          parti();
-        }
-      });
+          esito.complete(c);
+        },
+        onError: (Object e) {
+          errori.add('${s.host}: $e');
+          if (esito.isCompleted) return;
+          if (errori.length == server.length) {
+            sveglia?.cancel();
+            esito.completeError(Exception('colonnine: ${errori.join('; ')}'));
+          } else {
+            parti();
+          }
+        },
+      );
     }
 
     parti();
@@ -108,9 +114,9 @@ class ClienteOverpass implements FonteColonnine {
   }
 
   Future<List<Colonnina>> _chiedi(Uri s, Map<String, String> corpo) async {
-    final r = await _http.post(s, body: corpo, headers: {'user-agent': 'gdanav (github.com/danigio15/gdanav)'}).timeout(
-      attesa,
-    );
+    final r = await _http
+        .post(s, body: corpo, headers: {'user-agent': 'gdanav (github.com/danigio15/gdanav)'})
+        .timeout(attesa);
     if (r.statusCode != 200) throw 'Overpass: ${r.statusCode}';
     final json = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>;
     // In tempo scaduto Overpass risponde 200 con un avviso e niente dati:
@@ -121,9 +127,9 @@ class ClienteOverpass implements FonteColonnine {
   }
 
   static List<Colonnina> leggi(Map<String, Object?> json) => [
-        for (final e in ((json['elements'] as List?) ?? const []).cast<Map<String, Object?>>())
-          if (_colonnina(e) case final c?) c,
-      ];
+    for (final e in ((json['elements'] as List?) ?? const []).cast<Map<String, Object?>>())
+      if (_colonnina(e) case final c?) c,
+  ];
 
   static Colonnina? _colonnina(Map<String, Object?> e) {
     final tag = ((e['tags'] as Map?) ?? const {}).cast<String, Object?>();

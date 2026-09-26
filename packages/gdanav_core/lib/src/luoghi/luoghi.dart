@@ -24,8 +24,8 @@ abstract interface class FonteLuoghi {
 /// l'indirizzo si cambia.
 class ClientePhoton implements FonteLuoghi {
   ClientePhoton({http.Client? client, Uri? indirizzo})
-      : _http = client ?? http.Client(),
-        indirizzo = indirizzo ?? Uri.parse('https://photon.komoot.io/api/');
+    : _http = client ?? http.Client(),
+      indirizzo = indirizzo ?? Uri.parse('https://photon.komoot.io/api/');
 
   final Uri indirizzo;
   final http.Client _http;
@@ -34,11 +34,13 @@ class ClientePhoton implements FonteLuoghi {
   Future<List<Luogo>> cerca(String testo, {Punto? vicinoA}) async {
     final q = testo.trim();
     if (q.length < 3) return const [];
-    final uri = indirizzo.replace(queryParameters: {
-      'q': q,
-      'limit': '10',
-      if (vicinoA != null) ...{'lat': '${vicinoA.lat}', 'lon': '${vicinoA.lon}'},
-    });
+    final uri = indirizzo.replace(
+      queryParameters: {
+        'q': q,
+        'limit': '10',
+        if (vicinoA != null) ...{'lat': '${vicinoA.lat}', 'lon': '${vicinoA.lon}'},
+      },
+    );
     final r = await _http.get(uri, headers: {'user-agent': 'gdanav (github.com/danigio15/gdanav)'});
     if (r.statusCode != 200) throw Exception('Photon: ${r.statusCode}');
     return leggi(jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>);
@@ -59,8 +61,9 @@ class ClientePhoton implements FonteLuoghi {
         p['city'] ?? p['county'],
         p['state'],
       ].whereType<String>().where((s) => s != nome).toSet().join(', ');
-      luoghi
-          .add(Luogo(nome: nome, descrizione: descrizione, posizione: Punto(coord[1].toDouble(), coord[0].toDouble())));
+      luoghi.add(
+        Luogo(nome: nome, descrizione: descrizione, posizione: Punto(coord[1].toDouble(), coord[0].toDouble())),
+      );
     }
     return luoghi;
   }

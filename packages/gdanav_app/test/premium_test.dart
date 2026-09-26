@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/schermate/premium.dart';
@@ -14,16 +15,17 @@ import 'aiuti.dart';
 
 /// Google Play finto: risponde come vogliamo.
 class NegozioFinto implements NegozioPremium {
-  NegozioFinto({this.giaComprato = false, this.esito = PurchaseStatus.purchased});
+  NegozioFinto({this.giaComprato = false, this.esito = PurchaseStatus.purchased, this.idProdotto = idPremium});
 
   final bool giaComprato;
+  final String idProdotto;
   final PurchaseStatus esito;
   final _flusso = StreamController<List<PurchaseDetails>>.broadcast();
   final completati = <String>[];
   final comprati = <String>[];
 
   PurchaseDetails _acquisto(PurchaseStatus s) => PurchaseDetails(
-    productID: idPremium,
+    productID: idProdotto,
     verificationData: PurchaseVerificationData(localVerificationData: '', serverVerificationData: '', source: 'finto'),
     transactionDate: '0',
     status: s,
@@ -216,5 +218,37 @@ void main() {
     expect(negozio.comprati, [pianoMensile]);
     expect(find.text('Premium è attivo: grazie!'), findsOneWidget);
     expect(find.byKey(const Key('compra-premium')), findsNothing);
+  });
+
+  test('su iPhone: i due prodotti dell\'App Store sono Premium, e il negozio si chiama col suo nome', () {
+    expect(eDiPremium(idPremium), isTrue);
+    expect(eDiPremium('gdanav_premium_mensile'), isTrue);
+    expect(eDiPremium('gdanav_premium_annuale'), isTrue);
+    expect(eDiPremium('altro'), isFalse);
+    expect(nomeNegozio, 'Play Store');
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      expect(nomeNegozio, 'App Store');
+      expect(negozioDelTelefono(), isA<NegozioAppStore>());
+      expect(PannelloPremium.schermoAuto, 'CarPlay');
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  test('su iPhone l\'acquisto dall\'App Store sblocca Premium', () async {
+    preparaPiattaforma();
+    final negozio = NegozioFinto(idProdotto: 'gdanav_premium_annuale');
+    final p = GestorePremium(
+      archivio: Archivio(),
+      negozio: negozio,
+      tuttoSbloccato: false,
+      attesaConferma: const Duration(milliseconds: 50),
+    );
+    await p.carica();
+    await pausa();
+    await p.compra(pianoAnnuale);
+    await pausa();
+    expect(p.sbloccato, isTrue);
   });
 }

@@ -169,7 +169,5 @@ List<int>? leggiRisposta(String testo, String pid) {
 
 List<int>? _byte(String esadecimale) {
   if (esadecimale.length.isOdd) return null;
-  return [
-    for (var i = 0; i < esadecimale.length; i += 2) int.parse(esadecimale.substring(i, i + 2), radix: 16),
-  ];
+  return [for (var i = 0; i < esadecimale.length; i += 2) int.parse(esadecimale.substring(i, i + 2), radix: 16)];
 }

@@ -12,15 +12,14 @@ void main() {
     Disponibilita d = Disponibilita.sconosciuta,
     bool obbligata = false,
     String? id,
-  }) =>
-      ColonninaSulPercorso(
-        id: id ?? 'c$km',
-        nome: 'Area $km',
-        distanzaM: km * 1000.0,
-        potenzaKw: kw,
-        disponibilita: d,
-        obbligata: obbligata,
-      );
+  }) => ColonninaSulPercorso(
+    id: id ?? 'c$km',
+    nome: 'Area $km',
+    distanzaM: km * 1000.0,
+    potenzaKw: kw,
+    disponibilita: d,
+    obbligata: obbligata,
+  );
 
   group('soste scelte dall\'utente', () {
     final pianificatore = PianificatoreSoste(profilo: p);
@@ -93,11 +92,8 @@ void main() {
   });
 
   group('grafico della batteria', () {
-    final piano = PianificatoreSoste(profilo: p).pianifica(
-      percorso: lungo,
-      batteriaPartenza: 90,
-      colonnine: [for (var km = 50; km < 450; km += 50) c(km)],
-    )!;
+    final piano = PianificatoreSoste(profilo: p)
+        .pianifica(percorso: lungo, batteriaPartenza: 90, colonnine: [for (var km = 50; km < 450; km += 50) c(km)])!;
     final g = piano.profiloBatteria;
 
     test('parte dalla partenza e finisce all\'arrivo', () {
@@ -146,11 +142,9 @@ void main() {
       // I furgoni e i monovolume da nove posti, a 120 all'ora, possono
       // davvero chiedere due soste: qui contano le auto.
       for (final v in catalogoVeicoli.where((v) => v.capacitaUtileKwh >= 40 && v.cdA < 0.9)) {
-        final piano = PianificatoreSoste(profilo: v).pianifica(
-          percorso: tratta,
-          batteriaPartenza: 90,
-          colonnine: [for (var km = 30; km < 215; km += 30) c(km)],
-        );
+        final piano = PianificatoreSoste(
+          profilo: v,
+        ).pianifica(percorso: tratta, batteriaPartenza: 90, colonnine: [for (var km = 30; km < 215; km += 30) c(km)]);
         expect(piano, isNotNull, reason: v.nome);
         expect(piano!.soste.length, lessThanOrEqualTo(1), reason: v.nome);
       }

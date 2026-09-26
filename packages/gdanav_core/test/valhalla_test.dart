@@ -115,8 +115,10 @@ void main() {
     });
 
     test('senza limiti dal server il percorso arriva lo stesso', () async {
-      final client = MockClient((r) async =>
-          r.url.path == '/route' ? http.Response(jsonEncode(utrecht()), 200) : http.Response('{"error":"no"}', 400));
+      final client = MockClient(
+        (r) async =>
+            r.url.path == '/route' ? http.Response(jsonEncode(utrecht()), 200) : http.Response('{"error":"no"}', 400),
+      );
       final v = ClienteValhalla(Uri.parse('https://valhalla.esempio.dev/'), client: client);
       final p = await v.calcola(const [Punto(52.0907, 5.1214), Punto(52.064, 5.19)]);
       expect(p.manovre, hasLength(14));
@@ -137,9 +139,11 @@ void main() {
       final v = ClienteValhalla(Uri.parse('https://valhalla.esempio.dev/'), client: client);
       expect(
         v.calcola(const [Punto(0, 0), Punto(1, 1)]),
-        throwsA(isA<ErroreValhalla>()
-            .having((e) => e.stato, 'stato', 401)
-            .having((e) => e.messaggio, 'messaggio', 'Non autorizzato')),
+        throwsA(
+          isA<ErroreValhalla>()
+              .having((e) => e.stato, 'stato', 401)
+              .having((e) => e.messaggio, 'messaggio', 'Non autorizzato'),
+        ),
       );
     });
   });
@@ -160,10 +164,9 @@ void main() {
     addTearDown(v.chiudi);
     final scelte = await v.alternative(const Punto(52.0907, 5.1214), const Punto(52.064, 5.19));
     expect(scelte, isNotEmpty);
-    print('alternative: ${[
-      for (final s in scelte)
-        '${(s.lunghezzaM / 1000).toStringAsFixed(1)} km ${s.durata.inMinutes} min ${s.stradaPrincipale}'
-    ]}');
+    print(
+      'alternative: ${[for (final s in scelte) '${(s.lunghezzaM / 1000).toStringAsFixed(1)} km ${s.durata.inMinutes} min ${s.stradaPrincipale}']}',
+    );
     final scelto = scelte.last;
     final rifatto = await v.seguendo(scelto);
     // Stessa strada: stessa lunghezza, a meno di qualche metro.
@@ -186,7 +189,7 @@ void main() {
                 'length': 1.1,
                 'time': 60,
                 'begin_shape_index': 0,
-                'end_shape_index': 1
+                'end_shape_index': 1,
               },
               {
                 'type': 23,
@@ -197,14 +200,14 @@ void main() {
                 'end_shape_index': 2,
                 'sign': {
                   'exit_number_elements': [
-                    {'text': '12'}
+                    {'text': '12'},
                   ],
                   'exit_branch_elements': [
-                    {'text': 'A12'}
+                    {'text': 'A12'},
                   ],
                   'exit_toward_elements': [
                     {'text': 'Arnhem'},
-                    {'text': 'Rotterdam'}
+                    {'text': 'Rotterdam'},
                   ],
                 },
               },
@@ -215,7 +218,7 @@ void main() {
                 'time': 0,
                 'begin_shape_index': 2,
                 'end_shape_index': 2,
-                'roundabout_exit_count': 3
+                'roundabout_exit_count': 3,
               },
             ],
           },
@@ -229,7 +232,7 @@ void main() {
             {
               'steps': [
                 {
-                  'intersections': [{}]
+                  'intersections': [{}],
                 },
                 {
                   'intersections': [
@@ -237,24 +240,24 @@ void main() {
                       'lanes': [
                         {
                           'indications': ['straight'],
-                          'valid': false
+                          'valid': false,
                         },
                         {
                           'indications': ['straight', 'slight right'],
                           'valid': true,
-                          'valid_indication': 'slight right'
+                          'valid_indication': 'slight right',
                         },
                         {
                           'indications': ['slight right'],
                           'valid': true,
-                          'valid_indication': 'slight right'
+                          'valid_indication': 'slight right',
                         },
                       ],
                     },
                   ],
                 },
                 {
-                  'intersections': [{}]
+                  'intersections': [{}],
                 },
               ],
             },

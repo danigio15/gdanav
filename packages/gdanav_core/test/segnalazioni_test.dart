@@ -43,10 +43,7 @@ void main() {
       Uri.parse('https://relay.esempio.dev/'),
       client: MockClient((_) async => http.Response('{"errore":"troppe segnalazioni, riprova tra poco"}', 429)),
     );
-    expect(
-      c.invia(TipoSegnalazione.polizia, const Punto(45, 9)),
-      throwsA(predicate((e) => '$e'.contains('troppe'))),
-    );
+    expect(c.invia(TipoSegnalazione.polizia, const Punto(45, 9)), throwsA(predicate((e) => '$e'.contains('troppe'))));
   });
 
   // Contro il relay vero: GDANAV_RELAY=ws://127.0.0.1:8799 (lo stesso della prova del relay).

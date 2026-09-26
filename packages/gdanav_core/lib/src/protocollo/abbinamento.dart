@@ -42,12 +42,16 @@ class Abbinamento {
   final Uri relay;
   final String nomeAuto;
 
-  String get uri => Uri(scheme: 'gdanav', host: 'abbina', queryParameters: {
-        'v': '1',
-        'k': base64UrlSenzaPadding.encode(chiave),
-        'r': relay.toString(),
-        if (nomeAuto.isNotEmpty) 'n': nomeAuto,
-      }).toString();
+  String get uri => Uri(
+    scheme: 'gdanav',
+    host: 'abbina',
+    queryParameters: {
+      'v': '1',
+      'k': base64UrlSenzaPadding.encode(chiave),
+      'r': relay.toString(),
+      if (nomeAuto.isNotEmpty) 'n': nomeAuto,
+    },
+  ).toString();
 
   /// Il nome della stanza sul relay.
   Future<String> canale() async => (await _deriva('gdanav/canale/v1')).substring(0, 22);

@@ -66,7 +66,8 @@ void main() {
   });
 
   test('gli elenchi CSV di «Salvati»: virgolette, righe vuote, coordinate nel link', () {
-    const testo = 'Title,Note,URL,Tags,Comment\r\n'
+    const testo =
+        'Title,Note,URL,Tags,Comment\r\n'
         ',,,,\r\n'
         '"Trattoria da Mario, Firenze","la ribollita ""buona""",https://www.google.com/maps/place/Trattoria+da+Mario/data=!4m2!3m1!1s0x0:0x1,,\r\n'
         'Spiaggia,,https://www.google.com/maps/place/Spiaggia/@40.63,14.60,17z/data=!3d40.6301!4d14.6021,,\r\n'

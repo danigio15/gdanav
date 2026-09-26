@@ -7,24 +7,24 @@ import 'package:test/test.dart';
 
 /// Una risposta di locationforecast 2.0 `compact`, ridotta: tre ore.
 Map<String, Object?> _risposta(DateTime da, {double temperatura = 12, String simbolo = 'rain'}) => {
-      'properties': {
-        'timeseries': [
-          for (var h = 0; h < 3; h++)
-            {
-              'time': da.add(Duration(hours: h)).toIso8601String(),
-              'data': {
-                'instant': {
-                  'details': {'air_temperature': temperatura + h, 'wind_speed': 5.0, 'wind_from_direction': 0.0},
-                },
-                'next_1_hours': {
-                  'summary': {'symbol_code': simbolo},
-                  'details': {'precipitation_amount': 1.2},
-                },
-              },
+  'properties': {
+    'timeseries': [
+      for (var h = 0; h < 3; h++)
+        {
+          'time': da.add(Duration(hours: h)).toIso8601String(),
+          'data': {
+            'instant': {
+              'details': {'air_temperature': temperatura + h, 'wind_speed': 5.0, 'wind_from_direction': 0.0},
             },
-        ],
-      },
-    };
+            'next_1_hours': {
+              'summary': {'symbol_code': simbolo},
+              'details': {'precipitation_amount': 1.2},
+            },
+          },
+        },
+    ],
+  },
+};
 
 void main() {
   final ora = DateTime.utc(2026, 9, 25, 8);
@@ -116,8 +116,10 @@ void main() {
 
   test('previsioni troppo lontane nel tempo non valgono', () {
     final p = MeteoMetNorway.leggi(_risposta(ora));
-    expect(MeteoViaggio.piuVicina(p, ora.add(const Duration(hours: 1, minutes: 20)))!.ora,
-        ora.add(const Duration(hours: 1)));
+    expect(
+      MeteoViaggio.piuVicina(p, ora.add(const Duration(hours: 1, minutes: 20)))!.ora,
+      ora.add(const Duration(hours: 1)),
+    );
     expect(MeteoViaggio.piuVicina(p, ora.add(const Duration(hours: 6))), isNull);
   });
 }

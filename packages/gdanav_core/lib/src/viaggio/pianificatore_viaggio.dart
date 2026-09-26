@@ -66,22 +66,21 @@ class PreferenzeRicarica {
     double? massimoRicarica,
     double? potenzaMinimaKw,
     bool? evitaOccupate,
-  }) =>
-      PreferenzeRicarica(
-        minimoArrivo: minimoArrivo ?? this.minimoArrivo,
-        minimoSosta: minimoSosta ?? this.minimoSosta,
-        massimoRicarica: massimoRicarica ?? this.massimoRicarica,
-        potenzaMinimaKw: potenzaMinimaKw ?? this.potenzaMinimaKw,
-        evitaOccupate: evitaOccupate ?? this.evitaOccupate,
-      );
+  }) => PreferenzeRicarica(
+    minimoArrivo: minimoArrivo ?? this.minimoArrivo,
+    minimoSosta: minimoSosta ?? this.minimoSosta,
+    massimoRicarica: massimoRicarica ?? this.massimoRicarica,
+    potenzaMinimaKw: potenzaMinimaKw ?? this.potenzaMinimaKw,
+    evitaOccupate: evitaOccupate ?? this.evitaOccupate,
+  );
 
   Map<String, Object?> toJson() => {
-        'minimo_arrivo': minimoArrivo,
-        'minimo_sosta': minimoSosta,
-        'massimo_ricarica': massimoRicarica,
-        'potenza_minima_kw': potenzaMinimaKw,
-        'evita_occupate': evitaOccupate,
-      };
+    'minimo_arrivo': minimoArrivo,
+    'minimo_sosta': minimoSosta,
+    'massimo_ricarica': massimoRicarica,
+    'potenza_minima_kw': potenzaMinimaKw,
+    'evita_occupate': evitaOccupate,
+  };
 }
 
 /// A che punto è il calcolo, per dirlo a chi aspetta.
@@ -124,7 +123,7 @@ class PianificatoreViaggio {
     final a = alternative;
     final trovati = a == null
         ? [
-            await percorsi([partenza, arrivo])
+            await percorsi([partenza, arrivo]),
           ]
         : await a(partenza, arrivo);
     final t = traffico;
@@ -171,12 +170,13 @@ class PianificatoreViaggio {
     return [
       for (final c in da.code)
         Coda(
-            daM: c.daM * f,
-            aM: c.aM * f,
-            ritardo: c.ritardo,
-            livello: c.livello,
-            velocitaKmh: c.velocitaKmh,
-            tipo: c.tipo),
+          daM: c.daM * f,
+          aM: c.aM * f,
+          ritardo: c.ritardo,
+          livello: c.livello,
+          velocitaKmh: c.velocitaKmh,
+          tipo: c.tipo,
+        ),
     ];
   }
 
@@ -224,19 +224,18 @@ class PianificatoreViaggio {
     avanzamento?.call(FaseViaggio.soste);
     final prese = profilo.connettori;
     Future<(List<ColonninaSulPercorso>, PianoViaggio?)> calcola(List<Colonnina> tutte) => Isolate.run(() {
-          final vicine = colonnineSulPercorso(
-            Linea(percorso.punti),
-            tutte,
-            compatibili: prese,
-            potenzaMinimaKw: p.potenzaMinimaKw,
-            obbligate: obbligate,
-          );
-          return (
-            vicine,
-            senzaSoste ??
-                pianificatore.pianifica(percorso: percorso.tratti, batteriaPartenza: batteria, colonnine: vicine),
-          );
-        });
+      final vicine = colonnineSulPercorso(
+        Linea(percorso.punti),
+        tutte,
+        compatibili: prese,
+        potenzaMinimaKw: p.potenzaMinimaKw,
+        obbligate: obbligate,
+      );
+      return (
+        vicine,
+        senzaSoste ?? pianificatore.pianifica(percorso: percorso.tratti, batteriaPartenza: batteria, colonnine: vicine),
+      );
+    });
     var (vicine, piano) = await calcola(trovate);
 
     // Come ABRP: le soste scelte si controllano adesso (libere, occupate,

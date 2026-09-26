@@ -42,19 +42,22 @@ void main() {
   });
 
   test('col codice sbagliato non si apre', () async {
-    expect(
-      CodiceAbbinamento.apri(vettore['codice_busta'] as String, '0000000000'),
-      throwsA(isA<FormatException>()),
-    );
+    expect(CodiceAbbinamento.apri(vettore['codice_busta'] as String, '0000000000'), throwsA(isA<FormatException>()));
   });
 
   test('l\'indirizzo http del relay', () {
-    expect(CodiceAbbinamento.indirizzo(Uri.parse('wss://relay.esempio.dev'), 'x').toString(),
-        'https://relay.esempio.dev/v1/codici/x');
-    expect(CodiceAbbinamento.indirizzo(Uri.parse('ws://127.0.0.1:8799/'), 'x').toString(),
-        'http://127.0.0.1:8799/v1/codici/x');
-    expect(CodiceAbbinamento.indirizzo(Uri.parse('https://gdanav.gdahome.org/'), 'x').toString(),
-        'https://gdanav.gdahome.org/v1/codici/x');
+    expect(
+      CodiceAbbinamento.indirizzo(Uri.parse('wss://relay.esempio.dev'), 'x').toString(),
+      'https://relay.esempio.dev/v1/codici/x',
+    );
+    expect(
+      CodiceAbbinamento.indirizzo(Uri.parse('ws://127.0.0.1:8799/'), 'x').toString(),
+      'http://127.0.0.1:8799/v1/codici/x',
+    );
+    expect(
+      CodiceAbbinamento.indirizzo(Uri.parse('https://gdanav.gdahome.org/'), 'x').toString(),
+      'https://gdanav.gdahome.org/v1/codici/x',
+    );
   });
 
   test('scritto il codice, prende la busta dal relay e la apre', () async {
@@ -64,8 +67,11 @@ void main() {
       chiesti.add(r.url);
       return http.Response(busta, 200);
     });
-    final letto =
-        await CodiceAbbinamento.recupera(Uri.parse('https://gdanav.gdahome.org/'), '7kq2m-9xapd', client: client);
+    final letto = await CodiceAbbinamento.recupera(
+      Uri.parse('https://gdanav.gdahome.org/'),
+      '7kq2m-9xapd',
+      client: client,
+    );
     expect(letto.uri, a.uri);
     expect(chiesti.single.toString(), 'https://gdanav.gdahome.org/v1/codici/${vettore['codice_id']}');
   });

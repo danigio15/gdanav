@@ -11,7 +11,7 @@ import 'messaggio.dart';
 /// con attese crescenti, fino a un minuto.
 class ClienteRelay {
   ClienteRelay(this.abbinamento, {WebSocketChannel Function(Uri)? connetti})
-      : _connetti = connetti ?? WebSocketChannel.connect;
+    : _connetti = connetti ?? WebSocketChannel.connect;
 
   final Abbinamento abbinamento;
   final WebSocketChannel Function(Uri) _connetti;

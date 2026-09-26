@@ -96,13 +96,14 @@ abstract interface class FonteDistributori {
 /// chiavi né costi. Si prova un server dopo l'altro.
 class ClienteDistributori implements FonteDistributori {
   ClienteDistributori({http.Client? client, List<Uri>? server, this.attesa = const Duration(seconds: 25)})
-      : _http = client ?? http.Client(),
-        server = server ??
-            [
-              Uri.parse('https://overpass-api.de/api/interpreter'),
-              Uri.parse('https://overpass.private.coffee/api/interpreter'),
-              Uri.parse('https://overpass.kumi.systems/api/interpreter'),
-            ];
+    : _http = client ?? http.Client(),
+      server =
+          server ??
+          [
+            Uri.parse('https://overpass-api.de/api/interpreter'),
+            Uri.parse('https://overpass.private.coffee/api/interpreter'),
+            Uri.parse('https://overpass.kumi.systems/api/interpreter'),
+          ];
 
   final http.Client _http;
   final List<Uri> server;
@@ -117,11 +118,13 @@ class ClienteDistributori implements FonteDistributori {
     final errori = <String>[];
     for (final s in server) {
       try {
-        final r = await _http.post(
-          s,
-          body: {'data': richiesta(qui, km)},
-          headers: {'user-agent': 'gdanav (github.com/danigio15/gdanav)'},
-        ).timeout(attesa);
+        final r = await _http
+            .post(
+              s,
+              body: {'data': richiesta(qui, km)},
+              headers: {'user-agent': 'gdanav (github.com/danigio15/gdanav)'},
+            )
+            .timeout(attesa);
         if (r.statusCode != 200) throw 'HTTP ${r.statusCode}';
         final json = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>;
         final avviso = json['remark'];
@@ -136,9 +139,9 @@ class ClienteDistributori implements FonteDistributori {
   }
 
   static List<Distributore> leggi(Map<String, Object?> json) => [
-        for (final e in ((json['elements'] as List?) ?? const []).cast<Map<String, Object?>>())
-          if (_distributore(e) case final d?) d,
-      ];
+    for (final e in ((json['elements'] as List?) ?? const []).cast<Map<String, Object?>>())
+      if (_distributore(e) case final d?) d,
+  ];
 
   static Distributore? _distributore(Map<String, Object?> e) {
     final tag = ((e['tags'] as Map?) ?? const {}).cast<String, Object?>();
@@ -180,8 +183,8 @@ class ClienteDistributori implements FonteDistributori {
 /// devono comunicarli a ogni cambio. Pubblico, senza chiave; solo in Italia.
 class ClientePrezziMimit implements FonteDistributori {
   ClientePrezziMimit({http.Client? client, Uri? indirizzo, this.attesa = const Duration(seconds: 15)})
-      : _http = client ?? http.Client(),
-        indirizzo = indirizzo ?? Uri.parse('https://carburanti.mise.gov.it/ospzApi/search/zone');
+    : _http = client ?? http.Client(),
+      indirizzo = indirizzo ?? Uri.parse('https://carburanti.mise.gov.it/ospzApi/search/zone');
 
   final http.Client _http;
   final Uri indirizzo;
@@ -218,9 +221,9 @@ class ClientePrezziMimit implements FonteDistributori {
   }
 
   static List<Distributore> leggi(Map<String, Object?> json) => [
-        for (final e in ((json['results'] as List?) ?? const []).whereType<Map>())
-          if (_distributore(e.cast<String, Object?>()) case final d?) d,
-      ];
+    for (final e in ((json['results'] as List?) ?? const []).whereType<Map>())
+      if (_distributore(e.cast<String, Object?>()) case final d?) d,
+  ];
 
   /// Il tipo dal codice del Ministero (1 benzina, 2 gasolio, 3 metano, 4 GPL,
   /// 323/324 GNC/GNL) o, per le varianti «premium», dal nome.
@@ -285,8 +288,8 @@ class ClientePrezziMimit implements FonteDistributori {
 /// Ministero non risponde, quelli di OpenStreetMap senza prezzi.
 class DistributoriConPrezzi implements FonteDistributori {
   DistributoriConPrezzi({FonteDistributori? prezzi, FonteDistributori? mappa})
-      : prezzi = prezzi ?? ClientePrezziMimit(),
-        mappa = mappa ?? ClienteDistributori();
+    : prezzi = prezzi ?? ClientePrezziMimit(),
+      mappa = mappa ?? ClienteDistributori();
 
   final FonteDistributori prezzi;
   final FonteDistributori mappa;

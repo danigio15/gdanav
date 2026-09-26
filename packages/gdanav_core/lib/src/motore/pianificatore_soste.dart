@@ -41,8 +41,12 @@ class ColonninaSulPercorso {
 }
 
 class Sosta {
-  const Sosta(
-      {required this.colonnina, required this.batteriaArrivo, required this.batteriaPartenza, required this.ricarica});
+  const Sosta({
+    required this.colonnina,
+    required this.batteriaArrivo,
+    required this.batteriaPartenza,
+    required this.ricarica,
+  });
 
   final ColonninaSulPercorso colonnina;
   final double batteriaArrivo;
@@ -163,12 +167,13 @@ class PianificatoreSoste {
       }
     }
 
-    void guida(
-        {required int? daIndice,
-        required double batteria,
-        required double secondi,
-        required int indiceDa,
-        required (int, int, int)? precedente}) {
+    void guida({
+      required int? daIndice,
+      required double batteria,
+      required double secondi,
+      required int indiceDa,
+      required (int, int, int)? precedente,
+    }) {
       final e0 = daIndice == null ? 0.0 : eKwh[daIndice] - devKwh[daIndice];
       final s0 = daIndice == null ? 0.0 : eSec[daIndice] - devSec[daIndice];
       for (var j = indiceDa; j <= limite[indiceDa]; j++) {
@@ -252,12 +257,14 @@ class PianificatoreSoste {
     while (passo != null) {
       final (i, arrivo, partenza) = passo;
       final c = ordinate[i];
-      soste.add(Sosta(
-        colonnina: c,
-        batteriaArrivo: arrivo.toDouble(),
-        batteriaPartenza: partenza.toDouble(),
-        ricarica: Duration(seconds: _secondiRicarica(arrivo.toDouble(), partenza.toDouble(), c.potenzaKw).round()),
-      ));
+      soste.add(
+        Sosta(
+          colonnina: c,
+          batteriaArrivo: arrivo.toDouble(),
+          batteriaPartenza: partenza.toDouble(),
+          ricarica: Duration(seconds: _secondiRicarica(arrivo.toDouble(), partenza.toDouble(), c.potenzaKw).round()),
+        ),
+      );
       passo = da[(i, arrivo)];
     }
     final ordinateSoste = soste.reversed.toList();

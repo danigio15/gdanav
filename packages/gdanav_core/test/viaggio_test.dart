@@ -31,16 +31,19 @@ void main() {
   }
 
   Colonnina colonnina(int km, {double kw = 150}) => Colonnina(
-        id: 'c$km',
-        nome: 'Area $km',
-        posizione: Punto(42 + km * 0.009, 12.002),
-        connettori: [Connettore(tipo: TipoConnettore.ccs2, potenzaKw: kw)],
-      );
+    id: 'c$km',
+    nome: 'Area $km',
+    posizione: Punto(42 + km * 0.009, 12.002),
+    connettori: [Connettore(tipo: TipoConnettore.ccs2, potenzaKw: kw)],
+  );
 
   test('un viaggio corto non ha soste, ma mostra le colonnine lungo la strada', () async {
     final fonti = FontiFinte([colonnina(50)]);
-    final p =
-        PianificatoreViaggio(percorsi: (_) async => dritta(80), colonnine: fonti, profilo: ProfiloVeicolo.esempio);
+    final p = PianificatoreViaggio(
+      percorsi: (_) async => dritta(80),
+      colonnine: fonti,
+      profilo: ProfiloVeicolo.esempio,
+    );
     final v = await p.pianifica(partenza: const Punto(42, 12), arrivo: const Punto(43, 12), batteria: 90);
     expect(fonti.chiamate, 1);
     expect(v.piano!.soste, isEmpty);
@@ -49,8 +52,11 @@ void main() {
 
   test('un viaggio lungo si ferma alle colonnine lungo la strada', () async {
     final fonti = FontiFinte([for (var km = 60; km < 500; km += 60) colonnina(km)]);
-    final p =
-        PianificatoreViaggio(percorsi: (_) async => dritta(500), colonnine: fonti, profilo: ProfiloVeicolo.esempio);
+    final p = PianificatoreViaggio(
+      percorsi: (_) async => dritta(500),
+      colonnine: fonti,
+      profilo: ProfiloVeicolo.esempio,
+    );
     final v = await p.pianifica(partenza: const Punto(42, 12), arrivo: const Punto(46.5, 12), batteria: 80);
     expect(fonti.chiamate, 1);
     expect(v.colonnine, hasLength(8));
@@ -61,8 +67,11 @@ void main() {
 
   test('le colonnine lente non contano per il viaggio', () async {
     final fonti = FontiFinte([for (var km = 60; km < 500; km += 60) colonnina(km, kw: 22)]);
-    final p =
-        PianificatoreViaggio(percorsi: (_) async => dritta(500), colonnine: fonti, profilo: ProfiloVeicolo.esempio);
+    final p = PianificatoreViaggio(
+      percorsi: (_) async => dritta(500),
+      colonnine: fonti,
+      profilo: ProfiloVeicolo.esempio,
+    );
     final v = await p.pianifica(partenza: const Punto(42, 12), arrivo: const Punto(46.5, 12), batteria: 80);
     expect(v.colonnine, isEmpty);
     expect(v.piano, isNull);

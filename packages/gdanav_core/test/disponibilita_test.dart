@@ -24,39 +24,41 @@ void main() {
       expect(r.url.queryParameters['key'], 'chiave');
       if (r.url.path.contains('nearbySearch')) {
         return http.Response(
-            jsonEncode({
-              'results': [
-                {
-                  'position': {'lat': 44.6012, 'lon': 10.9},
-                  'dataSources': {
-                    'chargingAvailability': {'id': 'lontana'},
-                  },
-                },
-                {
-                  'position': {'lat': 44.6001, 'lon': 10.9},
-                  'dataSources': {
-                    'chargingAvailability': {'id': 'giusta'},
-                  },
-                },
-              ],
-            }),
-            200);
-      }
-      expect(r.url.queryParameters['chargingAvailability'], 'giusta');
-      return http.Response(
           jsonEncode({
-            'chargingAvailability': 'giusta',
-            'connectors': [
+            'results': [
               {
-                'type': 'IEC62196Type2CCS',
-                'total': 4,
-                'availability': {
-                  'current': {'available': 1, 'occupied': 2, 'reserved': 0, 'unknown': 0, 'outOfService': 1},
+                'position': {'lat': 44.6012, 'lon': 10.9},
+                'dataSources': {
+                  'chargingAvailability': {'id': 'lontana'},
+                },
+              },
+              {
+                'position': {'lat': 44.6001, 'lon': 10.9},
+                'dataSources': {
+                  'chargingAvailability': {'id': 'giusta'},
                 },
               },
             ],
           }),
-          200);
+          200,
+        );
+      }
+      expect(r.url.queryParameters['chargingAvailability'], 'giusta');
+      return http.Response(
+        jsonEncode({
+          'chargingAvailability': 'giusta',
+          'connectors': [
+            {
+              'type': 'IEC62196Type2CCS',
+              'total': 4,
+              'availability': {
+                'current': {'available': 1, 'occupied': 2, 'reserved': 0, 'unknown': 0, 'outOfService': 1},
+              },
+            },
+          ],
+        }),
+        200,
+      );
     });
     final t = DisponibilitaTomTom('chiave', client: client, validita: Duration.zero);
     final c = await t.aggiorna(area);
@@ -80,16 +82,16 @@ void main() {
         if (troppe-- > 0) return http.Response('', 429);
         if (r.url.path.contains('nearbySearch')) {
           Map<String, Object?> punto(String id, double lat, String presa) => {
-                'position': {'lat': lat, 'lon': 10.9},
-                'dataSources': {
-                  'chargingAvailability': {'id': id},
-                },
-                'chargingPark': {
-                  'connectors': [
-                    {'connectorType': presa, 'ratedPowerKW': 22},
-                  ],
-                },
-              };
+            'position': {'lat': lat, 'lon': 10.9},
+            'dataSources': {
+              'chargingAvailability': {'id': id},
+            },
+            'chargingPark': {
+              'connectors': [
+                {'connectorType': presa, 'ratedPowerKW': 22},
+              ],
+            },
+          };
           return http.Response(
             jsonEncode({
               'results': [punto('lente', 44.6, 'Chademo'), punto('rapide', 44.6008, 'IEC62196Type2CCS')],
@@ -118,8 +120,10 @@ void main() {
   });
 
   test('TomTom non la conosce: resta com\'era', () async {
-    final t =
-        DisponibilitaTomTom('chiave', client: MockClient((_) async => http.Response(jsonEncode({'results': []}), 200)));
+    final t = DisponibilitaTomTom(
+      'chiave',
+      client: MockClient((_) async => http.Response(jsonEncode({'results': []}), 200)),
+    );
     expect(identical(await t.aggiorna(area), area), isTrue);
   });
 
@@ -136,11 +140,11 @@ void main() {
       manovre: const [],
     );
     Colonnina colonnina(int km) => Colonnina(
-          id: 'c$km',
-          nome: 'Area $km',
-          posizione: Punto(42 + km * 0.009, 12.002),
-          connettori: const [Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150)],
-        );
+      id: 'c$km',
+      nome: 'Area $km',
+      posizione: Punto(42 + km * 0.009, 12.002),
+      connettori: const [Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150)],
+    );
     final tutte = [for (var km = 60; km < 500; km += 60) colonnina(km)];
     final senza = await PianificatoreViaggio(
       percorsi: (_) async => percorso,

@@ -46,12 +46,12 @@ Future<GdanavApp> preparaGdanav({
   bool senzaPremium = false,
 }) async {
   final archivio = Archivio(portachiavi);
-  // Premium (Android Auto e Home Assistant): si sa subito se è sbloccato,
-  // il Play Store conferma dopo. [senzaPremium]: tutto sbloccato e niente
+  // Premium (Android Auto o CarPlay, e Home Assistant): si sa subito se è
+  // sbloccato, il negozio conferma dopo. [senzaPremium]: tutto sbloccato e niente
   // negozio né voce «Premium» (gdahome, finché i pagamenti non ci sono).
   final premium = senzaPremium
       ? GestorePremium(archivio: archivio, tuttoSbloccato: true)
-      : GestorePremium(archivio: archivio, negozio: NegozioGooglePlay());
+      : GestorePremium(archivio: archivio, negozio: negozioDelTelefono());
   await premium.carica();
   final auto = GestoreAuto(archivio: archivio, gdahome: gdahome)..homeAssistantConsentito = premium.sbloccato;
   await auto.avvia();

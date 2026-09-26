@@ -47,8 +47,11 @@ class Busta {
     final c = base64UrlSenzaPadding.decode(json['c'] as String);
     if (c.length < 16) throw const FormatException('Busta troppo corta');
     final chiaro = await _aes.decrypt(
-      SecretBox(c.sublist(0, c.length - 16),
-          nonce: base64UrlSenzaPadding.decode(json['n'] as String), mac: Mac(c.sublist(c.length - 16))),
+      SecretBox(
+        c.sublist(0, c.length - 16),
+        nonce: base64UrlSenzaPadding.decode(json['n'] as String),
+        mac: Mac(c.sublist(c.length - 16)),
+      ),
       secretKey: SecretKey(_chiave),
       aad: _aad(da),
     );

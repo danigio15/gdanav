@@ -53,8 +53,10 @@ Future<void> main(List<String> argomenti) async {
   await File(argomenti.first).writeAsString(testo);
   final conLimite = tutti.where((a) => a.$3 != null).length;
   final conDirezione = tutti.where((a) => a.$4 != null).length;
-  stdout.writeln('::notice title=Autovelox::${tutti.length} fissi, $conLimite col limite, '
-      '$conDirezione con la direzione, ${testo.length ~/ 1024} kB');
+  stdout.writeln(
+    '::notice title=Autovelox::${tutti.length} fissi, $conLimite col limite, '
+    '$conDirezione con la direzione, ${testo.length ~/ 1024} kB',
+  );
   if (tutti.length < 100) {
     stdout.writeln('::error title=Autovelox::troppo pochi, qualcosa non va');
     exitCode = 1;

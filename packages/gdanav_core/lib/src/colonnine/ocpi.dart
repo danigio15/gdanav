@@ -6,9 +6,9 @@ import 'colonnina.dart';
 /// stato e caratteristiche delle colonnine.
 abstract final class Ocpi {
   static List<Colonnina> leggiLocations(List<Object?> json) => [
-        for (final l in json.cast<Map<String, Object?>>())
-          if (_location(l) case final c?) c,
-      ];
+    for (final l in json.cast<Map<String, Object?>>())
+      if (_location(l) case final c?) c,
+  ];
 
   static Colonnina? _location(Map<String, Object?> l) {
     final coord = l['coordinates'] as Map<String, Object?>?;
@@ -36,20 +36,20 @@ abstract final class Ocpi {
 
   /// `null` per le prese che non esistono ancora o non più.
   static StatoPresa? _stato(String? s) => switch (s) {
-        'AVAILABLE' => StatoPresa.disponibile,
-        'CHARGING' || 'RESERVED' || 'BLOCKED' => StatoPresa.occupata,
-        'INOPERATIVE' || 'OUTOFORDER' => StatoPresa.fuoriServizio,
-        'PLANNED' || 'REMOVED' => null,
-        _ => StatoPresa.sconosciuto,
-      };
+    'AVAILABLE' => StatoPresa.disponibile,
+    'CHARGING' || 'RESERVED' || 'BLOCKED' => StatoPresa.occupata,
+    'INOPERATIVE' || 'OUTOFORDER' => StatoPresa.fuoriServizio,
+    'PLANNED' || 'REMOVED' => null,
+    _ => StatoPresa.sconosciuto,
+  };
 
   static TipoConnettore _tipo(String? s) => switch (s) {
-        'IEC_62196_T2_COMBO' => TipoConnettore.ccs2,
-        'IEC_62196_T2' => TipoConnettore.tipo2,
-        'CHADEMO' => TipoConnettore.chademo,
-        'TESLA_S' || 'TESLA_R' => TipoConnettore.tesla,
-        _ => TipoConnettore.altro,
-      };
+    'IEC_62196_T2_COMBO' => TipoConnettore.ccs2,
+    'IEC_62196_T2' => TipoConnettore.tipo2,
+    'CHADEMO' => TipoConnettore.chademo,
+    'TESLA_S' || 'TESLA_R' => TipoConnettore.tesla,
+    _ => TipoConnettore.altro,
+  };
 
   /// `max_electric_power` in watt se c'è, altrimenti tensione × corrente
   /// (per tre, in trifase: in OCPI la tensione è fase-neutro).
@@ -82,14 +82,16 @@ List<Colonnina> unisciColonnine(List<Colonnina> anagrafica, List<Colonnina> temp
     }
     if (vicina != null && vicina.connettori.isNotEmpty) {
       usate.add(vicina);
-      risultato.add(Colonnina(
-        id: a.id,
-        nome: a.nome,
-        posizione: a.posizione,
-        connettori: vicina.connettori,
-        operatore: vicina.operatore ?? a.operatore,
-        fonte: '${a.fonte}+${vicina.fonte}',
-      ));
+      risultato.add(
+        Colonnina(
+          id: a.id,
+          nome: a.nome,
+          posizione: a.posizione,
+          connettori: vicina.connettori,
+          operatore: vicina.operatore ?? a.operatore,
+          fonte: '${a.fonte}+${vicina.fonte}',
+        ),
+      );
     } else {
       risultato.add(a);
     }

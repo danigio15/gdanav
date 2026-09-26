@@ -6,16 +6,16 @@ import 'package:http/testing.dart';
 import 'package:test/test.dart';
 
 Colonnina colonnina(String id, double lat, double lon) => Colonnina(
-      id: id,
-      nome: 'Area $id',
-      operatore: 'Ionity',
-      posizione: Punto(lat, lon),
-      connettori: const [
-        Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 350),
-        Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 350),
-        Connettore(tipo: TipoConnettore.tipo2, potenzaKw: 22),
-      ],
-    );
+  id: id,
+  nome: 'Area $id',
+  operatore: 'Ionity',
+  posizione: Punto(lat, lon),
+  connettori: const [
+    Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 350),
+    Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 350),
+    Connettore(tipo: TipoConnettore.tipo2, potenzaKw: 22),
+  ],
+);
 
 void main() {
   test('il formato compatto va e torna', () {
@@ -55,18 +55,19 @@ void main() {
       client: MockClient((r) async {
         chiesti.add(r.url.path);
         return http.Response(
-            jsonEncode({
-              'elements': [
-                {
-                  'type': 'node',
-                  'id': r.url.path.hashCode,
-                  'lat': 47.2,
-                  'lon': 11.3,
-                  'tags': {'amenity': 'charging_station', 'socket:type2_combo': '1'},
-                },
-              ],
-            }),
-            200);
+          jsonEncode({
+            'elements': [
+              {
+                'type': 'node',
+                'id': r.url.path.hashCode,
+                'lat': 47.2,
+                'lon': 11.3,
+                'tags': {'amenity': 'charging_station', 'socket:type2_combo': '1'},
+              },
+            ],
+          }),
+          200,
+        );
       }),
     );
     final locali = ColonnineLocali(Future.value(ArchivioColonnine([colonnina('bo', 44.6, 11.35)])), riserva: relay);

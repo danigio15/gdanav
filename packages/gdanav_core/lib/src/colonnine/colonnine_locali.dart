@@ -102,7 +102,7 @@ class ArchivioColonnine {
       'generato': (generato ?? DateTime.now().toUtc()).toIso8601String(),
       if (coperti != null)
         'q': [
-          for (final (r, c) in coperti) [r, c]
+          for (final (r, c) in coperti) [r, c],
         ],
       'c': righe,
     });

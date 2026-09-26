@@ -87,14 +87,14 @@ class ProfiloVeicolo {
   /// Una curva di ricarica con la forma tipica delle batterie a 400 V:
   /// sale fino al picco verso il 10%, lo tiene fino al 40% e poi cala.
   static List<PuntoCurva> curvaTipica(double piccoKw) => [
-        PuntoCurva(0, piccoKw * 0.8),
-        PuntoCurva(10, piccoKw),
-        PuntoCurva(40, piccoKw),
-        PuntoCurva(60, piccoKw * 0.75),
-        PuntoCurva(80, piccoKw * 0.45),
-        PuntoCurva(90, piccoKw * 0.25),
-        PuntoCurva(100, piccoKw * 0.08),
-      ];
+    PuntoCurva(0, piccoKw * 0.8),
+    PuntoCurva(10, piccoKw),
+    PuntoCurva(40, piccoKw),
+    PuntoCurva(60, piccoKw * 0.75),
+    PuntoCurva(80, piccoKw * 0.45),
+    PuntoCurva(90, piccoKw * 0.25),
+    PuntoCurva(100, piccoKw * 0.08),
+  ];
 
   /// Un'auto media di segmento C, per le prove e per chi non ha ancora
   /// scelto il suo modello.

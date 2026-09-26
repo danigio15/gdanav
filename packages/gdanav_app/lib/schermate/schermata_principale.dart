@@ -464,10 +464,12 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                     _VoceMenu(
                       icona: Icons.directions_car_filled_rounded,
                       colore: const Color(0xFF475569),
-                      titolo: 'Android Auto',
+                      titolo: PannelloPremium.schermoAuto,
                       sotto: sbloccato ? 'Controlla perché non compare sull\'auto' : 'Premium',
                       onTap: () {
-                        if (!sbloccato) return vai(SchermataPremium(premium: widget.premium!, perche: 'Android Auto'));
+                        if (!sbloccato) {
+                          return vai(SchermataPremium(premium: widget.premium!, perche: PannelloPremium.schermoAuto));
+                        }
                         Navigator.of(contesto).pop();
                         mostraDiagnosiAuto(context);
                       },
@@ -495,8 +497,8 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                         colore: const Color(0xFFD97706),
                         titolo: 'Premium',
                         sotto: p.sbloccato
-                            ? 'Attivo: Android Auto e Home Assistant'
-                            : 'Sblocca Android Auto e Home Assistant',
+                            ? 'Attivo: ${PannelloPremium.schermoAuto} e Home Assistant'
+                            : 'Sblocca ${PannelloPremium.schermoAuto} e Home Assistant',
                         onTap: () => vai(SchermataPremium(premium: p)),
                       ),
                   ],

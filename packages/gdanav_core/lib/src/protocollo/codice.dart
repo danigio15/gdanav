@@ -30,8 +30,11 @@ abstract final class CodiceAbbinamento {
   /// Quello che ha scritto la persona, pulito: maiuscole, senza trattini né
   /// spazi, O come zero e I/L come uno. `null` se non è un codice.
   static String? normalizza(String testo) {
-    final c =
-        testo.toUpperCase().replaceAll(RegExp('[^0-9A-Z]'), '').replaceAll('O', '0').replaceAll(RegExp('[IL]'), '1');
+    final c = testo
+        .toUpperCase()
+        .replaceAll(RegExp('[^0-9A-Z]'), '')
+        .replaceAll('O', '0')
+        .replaceAll(RegExp('[IL]'), '1');
     if (c.length != lunghezza || c.split('').any((x) => !alfabeto.contains(x))) return null;
     return c;
   }
@@ -41,10 +44,11 @@ abstract final class CodiceAbbinamento {
 
   /// La chiave della busta e il nome sul relay.
   static Future<(Uint8List, String)> deriva(String codice) async {
-    final k = await Pbkdf2(macAlgorithm: Hmac.sha256(), iterations: iterazioni, bits: 512).deriveKey(
-      secretKey: SecretKey(utf8.encode(codice)),
-      nonce: utf8.encode('gdanav/codice/v1'),
-    );
+    final k = await Pbkdf2(
+      macAlgorithm: Hmac.sha256(),
+      iterations: iterazioni,
+      bits: 512,
+    ).deriveKey(secretKey: SecretKey(utf8.encode(codice)), nonce: utf8.encode('gdanav/codice/v1'));
     final b = Uint8List.fromList(await k.extractBytes());
     final id = base64UrlSenzaPadding.encode((await Sha256().hash(b.sublist(32))).bytes).substring(0, 22);
     return (b.sublist(0, 32), id);
@@ -75,8 +79,11 @@ abstract final class CodiceAbbinamento {
       if (j['v'] != 1) throw const FormatException('Versione del codice non supportata');
       final c = base64UrlSenzaPadding.decode(j['c'] as String);
       final chiaro = await AesGcm.with256bits().decrypt(
-        SecretBox(c.sublist(0, c.length - 16),
-            nonce: base64UrlSenzaPadding.decode(j['n'] as String), mac: Mac(c.sublist(c.length - 16))),
+        SecretBox(
+          c.sublist(0, c.length - 16),
+          nonce: base64UrlSenzaPadding.decode(j['n'] as String),
+          mac: Mac(c.sublist(c.length - 16)),
+        ),
         secretKey: SecretKey(chiave),
         aad: _aad,
       );

@@ -11,8 +11,8 @@ import 'colonnina.dart';
 /// Si chiede per `polyline`: una sola richiesta per tutto il percorso.
 class ClienteOpenChargeMap implements FonteColonnine {
   ClienteOpenChargeMap({required this.chiave, http.Client? client, Uri? indirizzo})
-      : _http = client ?? http.Client(),
-        indirizzo = indirizzo ?? Uri.parse('https://api.openchargemap.io/v3/poi');
+    : _http = client ?? http.Client(),
+      indirizzo = indirizzo ?? Uri.parse('https://api.openchargemap.io/v3/poi');
 
   final String chiave;
   final Uri indirizzo;
@@ -30,25 +30,28 @@ class ClienteOpenChargeMap implements FonteColonnine {
       passo *= 2;
       polyline = codificaPolyline(semplifica(percorso, passo));
     }
-    final uri = indirizzo.replace(queryParameters: {
-      'output': 'json',
-      'compact': 'true',
-      'verbose': 'false',
-      'maxresults': '1000',
-      'polyline': polyline,
-      'distance': '$distanzaKm',
-      'distanceunit': 'KM',
-    });
+    final uri = indirizzo.replace(
+      queryParameters: {
+        'output': 'json',
+        'compact': 'true',
+        'verbose': 'false',
+        'maxresults': '1000',
+        'polyline': polyline,
+        'distance': '$distanzaKm',
+        'distanceunit': 'KM',
+      },
+    );
     final r = await _http
-        .get(uri, headers: {if (chiave.isNotEmpty) 'X-API-Key': chiave}).timeout(const Duration(seconds: 45));
+        .get(uri, headers: {if (chiave.isNotEmpty) 'X-API-Key': chiave})
+        .timeout(const Duration(seconds: 45));
     if (r.statusCode != 200) throw Exception('colonnine: Open Charge Map ${r.statusCode}');
     return leggi(jsonDecode(utf8.decode(r.bodyBytes)) as List);
   }
 
   static List<Colonnina> leggi(List<Object?> json) => [
-        for (final p in json.cast<Map<String, Object?>>())
-          if (_colonnina(p) case final c?) c,
-      ];
+    for (final p in json.cast<Map<String, Object?>>())
+      if (_colonnina(p) case final c?) c,
+  ];
 
   static Colonnina? _colonnina(Map<String, Object?> p) {
     final stato = p['StatusTypeID'] as int?;
@@ -79,18 +82,18 @@ class ClienteOpenChargeMap implements FonteColonnine {
 
   /// Gli ID di `ConnectionType` di Open Charge Map.
   static TipoConnettore _tipo(int? id) => switch (id) {
-        33 => TipoConnettore.ccs2,
-        2 => TipoConnettore.chademo,
-        25 || 1036 => TipoConnettore.tipo2,
-        27 => TipoConnettore.tesla,
-        _ => TipoConnettore.altro,
-      };
+    33 => TipoConnettore.ccs2,
+    2 => TipoConnettore.chademo,
+    25 || 1036 => TipoConnettore.tipo2,
+    27 => TipoConnettore.tesla,
+    _ => TipoConnettore.altro,
+  };
 
   /// Gli ID di `StatusType`.
   static StatoPresa _stato(int? id) => switch (id) {
-        10 => StatoPresa.disponibile,
-        20 => StatoPresa.occupata,
-        30 || 100 => StatoPresa.fuoriServizio,
-        _ => StatoPresa.sconosciuto,
-      };
+    10 => StatoPresa.disponibile,
+    20 => StatoPresa.occupata,
+    30 || 100 => StatoPresa.fuoriServizio,
+    _ => StatoPresa.sconosciuto,
+  };
 }

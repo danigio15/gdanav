@@ -19,7 +19,7 @@ final _http = http.Client();
 
 Future<Map<String, Object?>> _chiedi(String host, Map<String, String> q) async {
   final uri = Uri.https(host, '/w/api.php', {'format': 'json', 'formatversion': '2', ...q});
-  for (var tentativo = 0;; tentativo++) {
+  for (var tentativo = 0; ; tentativo++) {
     final r = await _http.get(uri, headers: {'user-agent': _agente});
     if (r.statusCode == 200) return jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>;
     if (tentativo >= 3) throw Exception('$host: ${r.statusCode}');

@@ -92,11 +92,7 @@ void main() {
 
   test('sul percorso: solo quelle utili, ordinate, con la deviazione', () {
     final linea = Linea(const [Punto(44.5, 10.8), Punto(44.7, 11.0)]);
-    final vicine = colonnineSulPercorso(
-      linea,
-      ClienteOpenChargeMap.leggi(dati('ocm_esempio.json')),
-      compatibili: ccs,
-    );
+    final vicine = colonnineSulPercorso(linea, ClienteOpenChargeMap.leggi(dati('ocm_esempio.json')), compatibili: ccs);
     expect(vicine.map((c) => c.id), ['ocm:101']);
     final c = vicine.single;
     expect(c.potenzaKw, 350);

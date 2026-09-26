@@ -23,12 +23,12 @@ enum DirezioneCorsia {
   final String osrm;
 
   static DirezioneCorsia? da(String s) => switch (s) {
-        'uturn' => inversioneSinistra,
-        'merge to left' => leggeraSinistra,
-        'merge to right' => leggeraDestra,
-        'none' || '' => dritto,
-        _ => values.where((d) => d.osrm == s).firstOrNull,
-      };
+    'uturn' => inversioneSinistra,
+    'merge to left' => leggeraSinistra,
+    'merge to right' => leggeraDestra,
+    'none' || '' => dritto,
+    _ => values.where((d) => d.osrm == s).firstOrNull,
+  };
 }
 
 /// Una corsia prima di uno svincolo: le sue frecce e se è una di quelle
@@ -43,10 +43,10 @@ class Corsia {
   final DirezioneCorsia? consigliata;
 
   Map<String, Object?> toJson() => {
-        'direzioni': [for (final d in direzioni) d.name],
-        'giusta': giusta,
-        if (consigliata != null) 'consigliata': consigliata!.name,
-      };
+    'direzioni': [for (final d in direzioni) d.name],
+    'giusta': giusta,
+    if (consigliata != null) 'consigliata': consigliata!.name,
+  };
 }
 
 /// Un'istruzione di guida, come la dà Valhalla.
@@ -99,25 +99,31 @@ class Manovra {
   bool get corsieUtili => corsie.length > 1 && corsie.any((c) => c.giusta) && corsie.any((c) => !c.giusta);
 
   Manovra conCorsie(List<Corsia> c) => Manovra(
-        istruzione: istruzione,
-        lunghezzaM: lunghezzaM,
-        secondi: secondi,
-        inizio: inizio,
-        tipo: tipo,
-        voce: voce,
-        strada: strada,
-        corsie: c,
-        uscita: uscita,
-        verso: verso,
-        uscitaRotonda: uscitaRotonda,
-      );
+    istruzione: istruzione,
+    lunghezzaM: lunghezzaM,
+    secondi: secondi,
+    inizio: inizio,
+    tipo: tipo,
+    voce: voce,
+    strada: strada,
+    corsie: c,
+    uscita: uscita,
+    verso: verso,
+    uscitaRotonda: uscitaRotonda,
+  );
 }
 
 /// Una coda sul percorso, dal traffico in tempo reale: da dove a dove
 /// (metri dall'inizio del percorso), quanto fa perdere e quanto è grave.
 class Coda {
-  const Coda(
-      {required this.daM, required this.aM, required this.ritardo, this.livello = 2, this.velocitaKmh, this.tipo});
+  const Coda({
+    required this.daM,
+    required this.aM,
+    required this.ritardo,
+    this.livello = 2,
+    this.velocitaKmh,
+    this.tipo,
+  });
 
   final double daM;
   final double aM;
@@ -193,20 +199,19 @@ class PercorsoCalcolato {
     Duration? ritardoTraffico,
     bool? trafficoVero,
     PercorsoCalcolato? senzaTraffico,
-  }) =>
-      PercorsoCalcolato(
-        punti: punti,
-        tratti: tratti ?? this.tratti,
-        manovre: manovre ?? this.manovre,
-        limiti: limiti ?? this.limiti,
-        conPedaggi: conPedaggi,
-        conAutostrade: conAutostrade,
-        conTraghetti: conTraghetti,
-        code: code ?? this.code,
-        ritardoTraffico: ritardoTraffico ?? this.ritardoTraffico,
-        trafficoVero: trafficoVero ?? this.trafficoVero,
-        senzaTraffico: senzaTraffico ?? this.senzaTraffico,
-      );
+  }) => PercorsoCalcolato(
+    punti: punti,
+    tratti: tratti ?? this.tratti,
+    manovre: manovre ?? this.manovre,
+    limiti: limiti ?? this.limiti,
+    conPedaggi: conPedaggi,
+    conAutostrade: conAutostrade,
+    conTraghetti: conTraghetti,
+    code: code ?? this.code,
+    ritardoTraffico: ritardoTraffico ?? this.ritardoTraffico,
+    trafficoVero: trafficoVero ?? this.trafficoVero,
+    senzaTraffico: senzaTraffico ?? this.senzaTraffico,
+  );
 
   PercorsoCalcolato conLimiti(List<int?> limiti) => _copia(limiti: limiti);
 
@@ -340,21 +345,23 @@ class PercorsoCalcolato {
         final da = m['begin_shape_index'] as int, a = m['end_shape_index'] as int;
         final lunghezza = (m['length'] as num).toDouble() * 1000;
         final secondi = (m['time'] as num).toDouble();
-        manovre.add(Manovra(
-          istruzione: m['instruction'] as String? ?? '',
-          lunghezzaM: lunghezza,
-          secondi: secondi,
-          inizio: base + da,
-          tipo: m['type'] as int? ?? 0,
-          voce: m['verbal_pre_transition_instruction'] as String? ?? m['instruction'] as String? ?? '',
-          strada: ((m['street_names'] as List?) ?? const []).cast<String>().join(', '),
-          uscita: _testi(m['sign'], 'exit_number_elements'),
-          verso: [
-            _testi(m['sign'], 'exit_branch_elements'),
-            _testi(m['sign'], 'exit_toward_elements'),
-          ].where((t) => t.isNotEmpty).join(' · '),
-          uscitaRotonda: m['roundabout_exit_count'] as int?,
-        ));
+        manovre.add(
+          Manovra(
+            istruzione: m['instruction'] as String? ?? '',
+            lunghezzaM: lunghezza,
+            secondi: secondi,
+            inizio: base + da,
+            tipo: m['type'] as int? ?? 0,
+            voce: m['verbal_pre_transition_instruction'] as String? ?? m['instruction'] as String? ?? '',
+            strada: ((m['street_names'] as List?) ?? const []).cast<String>().join(', '),
+            uscita: _testi(m['sign'], 'exit_number_elements'),
+            verso: [
+              _testi(m['sign'], 'exit_branch_elements'),
+              _testi(m['sign'], 'exit_toward_elements'),
+            ].where((t) => t.isNotEmpty).join(' · '),
+            uscitaRotonda: m['roundabout_exit_count'] as int?,
+          ),
+        );
         if (a <= da || lunghezza <= 0 || secondi <= 0) continue;
         final kmh = lunghezza / secondi * 3.6;
         // Le distanze fra i punti non tornano mai al metro con quelle di
@@ -364,11 +371,13 @@ class PercorsoCalcolato {
         for (var i = da + 1; i <= a; i++) {
           final metri = (linea.cumulate[i] - linea.cumulate[i - 1]) * scala;
           if (metri <= 0) continue;
-          tratti.add(Tratto(
-            lunghezzaM: metri,
-            velocitaKmh: kmh,
-            dislivelloM: quota.a(linea.cumulate[i]) - quota.a(linea.cumulate[i - 1]),
-          ));
+          tratti.add(
+            Tratto(
+              lunghezzaM: metri,
+              velocitaKmh: kmh,
+              dislivelloM: quota.a(linea.cumulate[i]) - quota.a(linea.cumulate[i - 1]),
+            ),
+          );
         }
       }
     }
@@ -397,7 +406,7 @@ String _testi(Object? cartello, String chiave) {
 
 class _Profilo {
   _Profilo(List<double> campioni, this.passoM)
-      : _q = campioni.any((q) => q <= PercorsoCalcolato._senzaQuota) ? const [] : campioni;
+    : _q = campioni.any((q) => q <= PercorsoCalcolato._senzaQuota) ? const [] : campioni;
 
   final List<double> _q;
   final double passoM;
@@ -447,12 +456,12 @@ class OpzioniPercorso {
   });
 
   factory OpzioniPercorso.daJson(Map<String, Object?> j) => OpzioniPercorso(
-        modo: ModoGuida.values.where((m) => m.name == j['modo']).firstOrNull ?? ModoGuida.veloce,
-        evitaPedaggi: j['evita_pedaggi'] as bool? ?? false,
-        evitaAutostrade: j['evita_autostrade'] as bool? ?? false,
-        evitaTraghetti: j['evita_traghetti'] as bool? ?? false,
-        ricalcoloAutomatico: j['ricalcolo_automatico'] as bool? ?? true,
-      );
+    modo: ModoGuida.values.where((m) => m.name == j['modo']).firstOrNull ?? ModoGuida.veloce,
+    evitaPedaggi: j['evita_pedaggi'] as bool? ?? false,
+    evitaAutostrade: j['evita_autostrade'] as bool? ?? false,
+    evitaTraghetti: j['evita_traghetti'] as bool? ?? false,
+    ricalcoloAutomatico: j['ricalcolo_automatico'] as bool? ?? true,
+  );
 
   final ModoGuida modo;
   final bool evitaPedaggi;
@@ -469,39 +478,38 @@ class OpzioniPercorso {
     bool? evitaAutostrade,
     bool? evitaTraghetti,
     bool? ricalcoloAutomatico,
-  }) =>
-      OpzioniPercorso(
-        modo: modo ?? this.modo,
-        evitaPedaggi: evitaPedaggi ?? this.evitaPedaggi,
-        evitaAutostrade: evitaAutostrade ?? this.evitaAutostrade,
-        evitaTraghetti: evitaTraghetti ?? this.evitaTraghetti,
-        ricalcoloAutomatico: ricalcoloAutomatico ?? this.ricalcoloAutomatico,
-      );
+  }) => OpzioniPercorso(
+    modo: modo ?? this.modo,
+    evitaPedaggi: evitaPedaggi ?? this.evitaPedaggi,
+    evitaAutostrade: evitaAutostrade ?? this.evitaAutostrade,
+    evitaTraghetti: evitaTraghetti ?? this.evitaTraghetti,
+    ricalcoloAutomatico: ricalcoloAutomatico ?? this.ricalcoloAutomatico,
+  );
 
   Map<String, Object?> toJson() => {
-        'modo': modo.name,
-        'evita_pedaggi': evitaPedaggi,
-        'evita_autostrade': evitaAutostrade,
-        'evita_traghetti': evitaTraghetti,
-        'ricalcolo_automatico': ricalcoloAutomatico,
-      };
+    'modo': modo.name,
+    'evita_pedaggi': evitaPedaggi,
+    'evita_autostrade': evitaAutostrade,
+    'evita_traghetti': evitaTraghetti,
+    'ricalcolo_automatico': ricalcoloAutomatico,
+  };
 
   /// I `costing_options.auto` di Valhalla: 0 vuol dire «solo se non c'è
   /// altro modo».
   Map<String, Object> get valhalla => {
-        if (modo.velocitaMassima case final v?) 'top_speed': v,
-        if (evitaPedaggi) 'use_tolls': 0.0,
-        if (evitaAutostrade) 'use_highways': 0.0,
-        if (evitaTraghetti) 'use_ferry': 0.0,
-      };
+    if (modo.velocitaMassima case final v?) 'top_speed': v,
+    if (evitaPedaggi) 'use_tolls': 0.0,
+    if (evitaAutostrade) 'use_highways': 0.0,
+    if (evitaTraghetti) 'use_ferry': 0.0,
+  };
 
   /// «Risparmio · senza pedaggi»: per dire in breve com'è calcolato.
   String get riassunto => [
-        modo.nome,
-        if (evitaPedaggi) 'senza pedaggi',
-        if (evitaAutostrade) 'senza autostrade',
-        if (evitaTraghetti) 'senza traghetti',
-      ].join(' · ');
+    modo.nome,
+    if (evitaPedaggi) 'senza pedaggi',
+    if (evitaAutostrade) 'senza autostrade',
+    if (evitaTraghetti) 'senza traghetti',
+  ].join(' · ');
 }
 
 /// Il client di Valhalla, sul server gratuito (vedi `valhalla/`).
@@ -514,8 +522,10 @@ class ClienteValhalla {
   final String? chiave;
   final http.Client _http;
 
-  Map<String, String> get _intestazioni =>
-      {'content-type': 'application/json', if (chiave != null) 'x-gdanav-chiave': chiave!};
+  Map<String, String> get _intestazioni => {
+    'content-type': 'application/json',
+    if (chiave != null) 'x-gdanav-chiave': chiave!,
+  };
 
   Map<String, Object?> _corpo(List<Map<String, Object?>> luoghi, String lingua, OpzioniPercorso opzioni) {
     final costi = opzioni.valhalla;
@@ -530,9 +540,12 @@ class ClienteValhalla {
   }
 
   Future<Map<String, Object?>> _route(Map<String, Object?> corpo) async {
-    final r = await _http.post(indirizzo.resolve('route'), headers: _intestazioni, body: jsonEncode(corpo)).timeout(
-        const Duration(seconds: 60),
-        onTimeout: () => throw const ErroreValhalla('il server dei percorsi non risponde'));
+    final r = await _http
+        .post(indirizzo.resolve('route'), headers: _intestazioni, body: jsonEncode(corpo))
+        .timeout(
+          const Duration(seconds: 60),
+          onTimeout: () => throw const ErroreValhalla('il server dei percorsi non risponde'),
+        );
     final testo = utf8.decode(r.bodyBytes);
     if (r.statusCode != 200) {
       // Valhalla risponde in JSON; Caddy davanti (chiave sbagliata) no.
@@ -553,10 +566,13 @@ class ClienteValhalla {
     List<Punto> tappe, {
     String lingua = 'it-IT',
     OpzioniPercorso opzioni = const OpzioniPercorso(),
-  }) =>
-      _calcola([
-        for (final p in tappe) {'lat': p.lat, 'lon': p.lon},
-      ], lingua, opzioni);
+  }) => _calcola(
+    [
+      for (final p in tappe) {'lat': p.lat, 'lon': p.lon},
+    ],
+    lingua,
+    opzioni,
+  );
 
   Future<PercorsoCalcolato> _calcola(List<Map<String, Object?>> luoghi, String lingua, OpzioniPercorso opzioni) async {
     final corpo = _corpo(luoghi, lingua, opzioni);
@@ -575,10 +591,14 @@ class ClienteValhalla {
     OpzioniPercorso opzioni = const OpzioniPercorso(),
   }) async {
     final json = await _route({
-      ..._corpo([
-        {'lat': da.lat, 'lon': da.lon},
-        {'lat': a.lat, 'lon': a.lon},
-      ], lingua, opzioni),
+      ..._corpo(
+        [
+          {'lat': da.lat, 'lon': da.lon},
+          {'lat': a.lat, 'lon': a.lon},
+        ],
+        lingua,
+        opzioni,
+      ),
       'alternates': quante,
     });
     return [

@@ -76,18 +76,20 @@ Future<void> main(List<String> argomenti) async {
         'lon': c.$2,
         'tags': {
           for (final MapEntry(:key, :value) in tag.entries)
-            if (!key.startsWith('@')) key: '$value'
+            if (!key.startsWith('@')) key: '$value',
         },
       });
     }
   }
   final colonnine = {
-    for (final c in ClienteOverpass.leggi({'elements': elementi})) c.id: c
+    for (final c in ClienteOverpass.leggi({'elements': elementi})) c.id: c,
   }.values.toList();
   final testo = ArchivioColonnine.scrivi(colonnine, coperti: coperti);
   await File(argomenti.first).writeAsString(testo);
-  stdout.writeln('::notice title=Archivio colonnine::${colonnine.length} rapide su $tutte colonnine, '
-      '${coperti.length} riquadri coperti, ${testo.length ~/ 1024} kB');
+  stdout.writeln(
+    '::notice title=Archivio colonnine::${colonnine.length} rapide su $tutte colonnine, '
+    '${coperti.length} riquadri coperti, ${testo.length ~/ 1024} kB',
+  );
   if (colonnine.length < 1000) {
     stdout.writeln('::error title=Archivio colonnine::troppo poche, qualcosa non va');
     exitCode = 1;

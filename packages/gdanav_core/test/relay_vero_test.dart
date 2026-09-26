@@ -34,8 +34,9 @@ void main() {
       final m = await busta.apri(dato, Mittente.app);
       ricevuti.add(m);
       if (m.tipo == TipoMessaggio.richiediStato) {
-        casa.sink
-            .add(await busta.chiudi(Messaggio(tipo: TipoMessaggio.statoAuto, dati: {'batteria': 67.5}), Mittente.casa));
+        casa.sink.add(
+          await busta.chiudi(Messaggio(tipo: TipoMessaggio.statoAuto, dati: {'batteria': 67.5}), Mittente.casa),
+        );
       }
     });
 
@@ -69,9 +70,6 @@ void main() {
 
     final letto = await CodiceAbbinamento.recupera(a.relay, CodiceAbbinamento.mostra(codice).toLowerCase());
     expect(letto.uri, a.uri);
-    await expectLater(
-      CodiceAbbinamento.recupera(a.relay, codice),
-      throwsA(predicate((e) => '$e'.contains('scaduto'))),
-    );
+    await expectLater(CodiceAbbinamento.recupera(a.relay, codice), throwsA(predicate((e) => '$e'.contains('scaduto'))));
   }, skip: relay == null ? 'serve GDANAV_RELAY' : false);
 }
