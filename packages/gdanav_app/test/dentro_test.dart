@@ -9,7 +9,7 @@ import 'aiuti.dart';
 void main() {
   setUp(preparaPiattaforma);
 
-  testWidgets('il tasto del menu apre quello di chi ospita', (tester) async {
+  testWidgets('il ☰ apre il menu di gdanav, il tasto accanto quello di chi ospita', (tester) async {
     final a = await ambiente(tester);
     var aperto = 0;
     final apriIlMenu = ValueNotifier(false);
@@ -17,21 +17,42 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: GdanavDentro(app: a.app() as GdanavApp, menuOspite: () => aperto++, apriIlMenu: apriIlMenu),
+          body: GdanavDentro(
+            app: a.app() as GdanavApp,
+            menuOspite: () => aperto++,
+            iconaOspite: const Icon(Icons.cottage),
+            apriIlMenu: apriIlMenu,
+          ),
         ),
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Menu'));
+    await tester.tap(find.byTooltip('Menu dell\'app'));
     await tester.pumpAndSettle();
     expect(aperto, 1);
+    expect(find.byIcon(Icons.cottage), findsOneWidget);
     expect(find.text('La tua auto'), findsNothing);
 
-    // Le impostazioni del navigatore, chieste da fuori.
+    // Il menu di gdanav: dal suo ☰, sulla mappa.
+    await tester.tap(find.byTooltip('Menu'));
+    await tester.pumpAndSettle();
+    expect(find.text('La tua auto'), findsOneWidget);
+    Navigator.of(tester.element(find.text('La tua auto'))).pop();
+    await tester.pumpAndSettle();
+
+    // E chiesto da fuori (la tessera di gdahome).
     apriIlMenu.value = true;
     await tester.pumpAndSettle();
     expect(find.text('La tua auto'), findsOneWidget);
     expect(apriIlMenu.value, isFalse);
+  });
+
+  testWidgets('da sola, gdanav ha il suo ☰ e basta', (tester) async {
+    final a = await ambiente(tester);
+    await tester.pumpWidget(a.app());
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Menu'), findsOneWidget);
+    expect(find.byTooltip('Menu dell\'app'), findsNothing);
   });
 
   testWidgets('chiesto prima che ci fosse, il menu si apre appena c\'è', (tester) async {

@@ -25,6 +25,7 @@ import 'tema.dart';
 // la lettura che le si manda.
 export 'package:gdanav_core/gdanav_core.dart' show StatoAuto, TipoSorgente;
 
+export 'risorse.dart' show logoGdanav;
 export 'schermate/schermata_principale.dart' show VoceOspite;
 export 'sorgenti/sorgente_gdahome.dart';
 
@@ -165,10 +166,12 @@ class GdanavApp extends StatelessWidget {
   /// La prima schermata, senza l'app intorno: la usa [GdanavDentro].
   Widget schermata({
     VoidCallback? menuOspite,
+    Widget? iconaOspite,
     ValueNotifier<bool>? apriIlMenu,
     List<VoceOspite> vociOspite = const [],
   }) => SchermataPrincipale(
     menuOspite: menuOspite,
+    iconaOspite: iconaOspite,
     apriIlMenu: apriIlMenu,
     vociOspite: vociOspite,
     auto: auto,
@@ -199,9 +202,13 @@ class GdanavDentro extends StatelessWidget {
     required this.app,
     this.navigatore,
     this.menuOspite,
+    this.iconaOspite,
     this.apriIlMenu,
     this.vociOspite = const [],
   });
+
+  /// Il disegno del tasto del menu di chi ospita (il suo marchio).
+  final Widget? iconaOspite;
 
   /// Le voci che chi ospita aggiunge al menu di gdanav.
   final List<VoceOspite> vociOspite;
@@ -209,7 +216,7 @@ class GdanavDentro extends StatelessWidget {
   final GdanavApp app;
   final GlobalKey<NavigatorState>? navigatore;
 
-  /// Il menu di chi ospita: lo apre il tasto in alto a sinistra di gdanav.
+  /// Il menu di chi ospita: lo apre il suo tasto, accanto al menu di gdanav.
   final VoidCallback? menuOspite;
 
   /// Per aprire da fuori il menu di gdanav (le sue impostazioni).
@@ -224,7 +231,12 @@ class GdanavDentro extends StatelessWidget {
           key: navigatore,
           onGenerateRoute: (impostazioni) => MaterialPageRoute<void>(
             settings: impostazioni,
-            builder: (_) => app.schermata(menuOspite: menuOspite, apriIlMenu: apriIlMenu, vociOspite: vociOspite),
+            builder: (_) => app.schermata(
+              menuOspite: menuOspite,
+              iconaOspite: iconaOspite,
+              apriIlMenu: apriIlMenu,
+              vociOspite: vociOspite,
+            ),
           ),
         ),
       ),

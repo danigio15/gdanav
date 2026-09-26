@@ -57,6 +57,7 @@ class SchermataPrincipale extends StatefulWidget {
     this.premium,
     this.mappeOffline,
     this.menuOspite,
+    this.iconaOspite,
     this.apriIlMenu,
     this.vociOspite = const [],
   });
@@ -65,10 +66,11 @@ class SchermataPrincipale extends StatefulWidget {
   /// rapidi in auto). Stanno sotto «gdahome».
   final List<VoceOspite> vociOspite;
 
-  /// Dentro un'altra app (gdahome): il tasto del menu in alto apre il menu di
-  /// quell'app, come i tre trattini della sua plancia. Il menu di gdanav si
-  /// apre allora da fuori, con [apriIlMenu].
+  /// Dentro un'altra app (gdahome): accanto al menu di gdanav, in alto, un
+  /// secondo tasto apre il menu di quell'app, come i tre trattini della sua
+  /// plancia. Il disegno del tasto e' [iconaOspite] (il suo marchio).
   final VoidCallback? menuOspite;
+  final Widget? iconaOspite;
 
   /// Messo a `true` da chi ospita gdanav: si apre il menu di gdanav (le sue
   /// impostazioni), e torna `false`.
@@ -489,10 +491,24 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                   message: 'Menu',
                   child: Vetro(
                     raggio: 18,
-                    onTap: widget.menuOspite ?? _menu,
+                    onTap: _menu,
                     child: const SizedBox.square(dimension: 60, child: Icon(Icons.menu_rounded, size: 32)),
                   ),
                 ),
+                if (widget.menuOspite case final apri?) ...[
+                  const SizedBox(width: 10),
+                  Tooltip(
+                    message: 'Menu dell\'app',
+                    child: Vetro(
+                      raggio: 18,
+                      onTap: apri,
+                      child: SizedBox.square(
+                        dimension: 60,
+                        child: Center(child: widget.iconaOspite ?? const Icon(Icons.home_rounded, size: 30)),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

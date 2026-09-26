@@ -13,6 +13,7 @@ void main() {
     for (final nome in ['colonnine.json', 'autovelox.json', 'foto_auto.json']) {
       expect(await rootBundle.loadString('$radiceRisorse/$nome'), isNotEmpty, reason: nome);
     }
+    expect((await rootBundle.load(logoGdanav)).lengthInBytes, greaterThan(0));
   });
 
   test('i segnaposto si trovano', () async {

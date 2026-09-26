@@ -47,6 +47,7 @@ flutter:
   # `risorse.dart`.
   assets:
     - assets/segnaposto/
+    - assets/logo/
     - assets/foto_auto.json
     - assets/colonnine.json
     - assets/autovelox.json
