@@ -10,6 +10,8 @@
     <!-- Il dongle OBD Bluetooth: solo per parlarci, non per localizzare. -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- La notifica di navigazione con la prossima manovra (Android 13+). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <queries>
         <!-- La voce della guida: la sintesi vocale del telefono. -->
         <intent>

@@ -60,6 +60,29 @@ object IconeManovra {
         else -> R.drawable.manovra_dritto
     }
 
+    /** La manovra in due parole, per la notifica: «Gira a destra», «Esci a destra». */
+    fun frase(valhalla: Int): String = when (valhalla) {
+        4, 5, 6 -> "Arrivo"
+        9 -> "Tieni la destra"
+        2, 10 -> "Gira a destra"
+        11 -> "Svolta stretta a destra"
+        12, 13 -> "Inversione"
+        14 -> "Svolta stretta a sinistra"
+        3, 15 -> "Gira a sinistra"
+        16 -> "Tieni la sinistra"
+        18 -> "Entra a destra"
+        19 -> "Entra a sinistra"
+        20 -> "Esci a destra"
+        21 -> "Esci a sinistra"
+        23 -> "Al bivio a destra"
+        24 -> "Al bivio a sinistra"
+        25, 37, 38 -> "Immettiti"
+        26 -> "Alla rotonda"
+        27 -> "Esci dalla rotonda"
+        28, 29 -> "Traghetto"
+        else -> "Prosegui"
+    }
+
     /** Dalla freccia della corsia (come la manda l'app) alla forma di Android Auto. */
     fun formaCorsia(direzione: String): Int = when (direzione) {
         "dritto" -> androidx.car.app.navigation.model.LaneDirection.SHAPE_STRAIGHT

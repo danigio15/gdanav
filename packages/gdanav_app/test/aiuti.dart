@@ -14,6 +14,7 @@ import 'package:gdanav_app/stato/gestore_guida.dart';
 import 'package:gdanav_app/stato/gestore_posizione.dart';
 import 'package:gdanav_app/stato/gestore_segnalazioni.dart';
 import 'package:gdanav_app/stato/gestore_viaggio.dart';
+import 'package:gdanav_app/stato/prova_di_guida.dart';
 import 'package:gdanav_app/stato/voce.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 import 'package:http/http.dart' as http;
@@ -145,6 +146,7 @@ Future<Ambiente> ambiente(
   Punto? posizione = const Punto(42, 12),
   ArchivioAutovelox? autovelox,
   CostruisciPianificatore? costruisci,
+  ProvaDiGuida? prova,
 }) async {
   // Uno schermo da telefono, non gli 800×600 delle prove.
   tester.view.physicalSize = const Size(1170, 2532);
@@ -170,14 +172,17 @@ Future<Ambiente> ambiente(
   final guida = GestoreGuida(
     viaggio: viaggio,
     auto: auto,
-    posizioni: () => posizioni.stream,
+    posizioni: prova?.posizioni(() => posizioni.stream) ?? () => posizioni.stream,
     voce: voce,
     consumo: consumo,
   );
   addTearDown(guida.dispose);
   final gps = StreamController<Lettura>.broadcast();
   addTearDown(gps.close);
-  final segnaposto = GestorePosizione(archivio: archivio, letture: () => gps.stream);
+  final segnaposto = GestorePosizione(
+    archivio: archivio,
+    letture: prova?.letture(() => gps.stream) ?? () => gps.stream,
+  );
   await tester.runAsync(segnaposto.carica);
   addTearDown(segnaposto.dispose);
   final relay = RelayFinto();
