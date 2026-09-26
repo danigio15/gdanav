@@ -6,24 +6,15 @@ import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.CarIcon
-import androidx.car.app.model.DateTimeWithZone
-import androidx.car.app.model.Distance
 import androidx.car.app.model.Template
 import androidx.car.app.navigation.NavigationManager
 import androidx.car.app.navigation.NavigationManagerCallback
-import androidx.car.app.navigation.model.Lane
-import androidx.car.app.navigation.model.LaneDirection
-import androidx.car.app.navigation.model.Maneuver
 import androidx.car.app.navigation.model.MessageInfo
 import androidx.car.app.navigation.model.NavigationTemplate
-import androidx.car.app.navigation.model.RoutingInfo
-import androidx.car.app.navigation.model.Step
-import androidx.car.app.navigation.model.TravelEstimate
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import it.gdanav.gdanav_app.R
-import java.util.TimeZone
 
 /**
  * Lo schermo dell'auto: la mappa di gdanav sotto (col cruscotto), sopra la
@@ -50,6 +41,12 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         lifecycle.addObserver(this)
         carContext.getCarService(AppManager::class.java).setSurfaceCallback(renderer)
         renderer.alCambio = { invalidate() }
+        // Tocco su un distributore, una colonnina o un ristorante: la scheda.
+        renderer.alPunto = { proprieta, lat, lon ->
+            PonteAuto.punto(proprieta, lat, lon) { info ->
+                if (info != null) screenManager.push(SchermoPunto(carContext, info))
+            }
+        }
         navigazione.setNavigationManagerCallback(object : NavigationManagerCallback {
             override fun onStopNavigation() {
                 PonteAuto.fermaDallAuto()
@@ -87,7 +84,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     private fun tasto(id: Int, azione: () -> Unit) =
         Action.Builder().setIcon(icona(id)).setOnClickListener { azione() }.build()
 
-    /** In alto: Cerca, la casa (dentro gdahome), Menu e Fine; appena passata una segnalazione, «C'è ancora?» Sì / No. */
+    /** In alto: Cerca, la casa (dentro gdahome) e Menu (in guida anche Fine); appena passata una segnalazione, «C'è ancora?» Sì / No. */
     private fun azioni(): ActionStrip {
         val striscia = ActionStrip.Builder()
         val ancora = PonteAuto.avviso.ancoraId
@@ -98,16 +95,22 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             striscia.addAction(tasto(R.drawable.auto_no) { PonteAuto.ancora(ancora, false) })
             return striscia.build()
         }
-        striscia.addAction(tasto(R.drawable.auto_cerca) { screenManager.push(SchermoCerca(carContext)) })
-        // La casa, se chi porta gdanav dentro ne ha una (gdahome): al massimo
-        // quattro tasti, e con Cerca, Menu e Fine ci sta.
-        GdanavInAuto.casa?.let { casa ->
-            striscia.addAction(tasto(R.drawable.auto_casa) { screenManager.push(casa(carContext)) })
-        }
         if (PonteAuto.guida != null) {
+            // In guida c'è poco spazio: solo la lente.
+            striscia.addAction(tasto(R.drawable.auto_cerca) { screenManager.push(SchermoCerca(carContext)) })
+            casa(striscia)
             striscia.addAction(tasto(R.drawable.auto_menu) { screenManager.push(SchermoMenu(carContext, renderer)) })
             striscia.addAction(Action.Builder().setTitle("Fine").setOnClickListener { PonteAuto.fermaDallAuto() }.build())
         } else {
+            // Da fermi, come Google Maps: «Cerca» e «Menu» ben leggibili.
+            striscia.addAction(
+                Action.Builder()
+                    .setTitle("Cerca")
+                    .setIcon(icona(R.drawable.auto_cerca))
+                    .setOnClickListener { screenManager.push(SchermoCerca(carContext)) }
+                    .build(),
+            )
+            casa(striscia)
             striscia.addAction(
                 Action.Builder()
                     .setTitle("Menu")
@@ -117,6 +120,16 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             )
         }
         return striscia.build()
+    }
+
+    /**
+     * La casa, se chi porta gdanav dentro ne ha una (gdahome): un tasto col
+     * solo disegno. Al massimo quattro tasti, e con Cerca, Menu e Fine ci sta.
+     */
+    private fun casa(striscia: ActionStrip.Builder) {
+        GdanavInAuto.casa?.let { casa ->
+            striscia.addAction(tasto(R.drawable.auto_casa) { screenManager.push(casa(carContext)) })
+        }
     }
 
     /** A lato della mappa: sposta, + e −, e 2D/3D (o Centra se la si è spostata). */
@@ -148,76 +161,17 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             modello.setPanModeListener { inPan -> if (!inPan) renderer.segui() }
         }
         if (guida != null) {
-            val routing = RoutingInfo.Builder().setCurrentStep(passo(guida), distanza(guida.distanzaM))
-            // Avvicinandosi a un'uscita o a un bivio: lo svincolo in grande,
-            // con le corsie giuste e la freccia.
-            guida.svincolo?.let { PonteAuto.svincoli[it] }?.let { vista ->
-                routing.setJunctionImage(CarIcon.Builder(IconCompat.createWithBitmap(vista)).build())
-            }
-            guida.dopoTipo?.let { tipo ->
-                val dopo = Step.Builder(guida.dopoStrada.ifEmpty { " " })
-                    .setManeuver(Maneuver.Builder(IconeManovra.tipo(tipo)).setIcon(icona(IconeManovra.icona(tipo))).build())
-                routing.setNextStep(dopo.build())
-            }
-            modello.setNavigationInfo(routing.build())
-            modello.setDestinationTravelEstimate(
-                TravelEstimate.Builder(
-                    distanza(guida.restantiM),
-                    DateTimeWithZone.create(guida.arrivoMs, TimeZone.getDefault()),
-                ).setRemainingTimeSeconds(guida.restantiS).build(),
-            )
+            // La scheda della manovra (freccia, distanza, corsie, svincolo),
+            // l'arrivo e la velocità li disegna il pannello sopra la mappa: così
+            // hanno la forma e la misura che vogliamo, e Android Auto non mette
+            // le sue schede.
         } else {
-            modello.setNavigationInfo(
-                MessageInfo.Builder("GDA NAV")
-                    .setText(PonteAuto.messaggio ?: "Tocca la lente per cercare, o Menu per Casa, Lavoro e colonnine.")
-                    .build(),
-            )
+            // Da fermi la mappa resta pulita; il riquadro solo se c'è qualcosa
+            // da dire («Calcolo il percorso…», un errore).
+            PonteAuto.messaggio?.let { testo ->
+                modello.setNavigationInfo(MessageInfo.Builder(testo).build())
+            }
         }
         return modello.build()
     }
-
-    /**
-     * La manovra: freccia (con l'uscita nelle rotonde), strada, cartello
-     * («Uscita 12 · A12 · Arnhem») e, avvicinandosi allo svincolo, le corsie
-     * con quella giusta evidenziata.
-     */
-    private fun passo(guida: PonteAuto.Guida): Step {
-        val manovra = Maneuver.Builder(IconeManovra.tipo(guida.tipo, guida.rotonda))
-            .setIcon(icona(IconeManovra.icona(guida.tipo)))
-        val rotonda = guida.rotonda
-        if (guida.tipo == 26 && rotonda != null && rotonda > 0) manovra.setRoundaboutExitNumber(rotonda)
-        val cartello = listOfNotNull(
-            guida.uscita.takeIf { it.isNotEmpty() }?.let { "Uscita $it" },
-            guida.verso.takeIf { it.isNotEmpty() },
-        ).joinToString(" · ")
-        val testo = when {
-            cartello.isNotEmpty() -> cartello
-            guida.strada.isNotEmpty() -> guida.strada
-            else -> guida.istruzione
-        }
-        val passo = Step.Builder(testo).setManeuver(manovra.build())
-        if (guida.strada.isNotEmpty()) passo.setRoad(guida.strada)
-        if (guida.corsie.isNotEmpty()) {
-            for (c in guida.corsie) {
-                val corsia = Lane.Builder()
-                val direzioni = c.direzioni.ifEmpty { listOf("dritto") }
-                for (d in direzioni) {
-                    val giusta = c.giusta && (c.consigliata == null || c.consigliata == d)
-                    corsia.addDirection(LaneDirection.create(IconeManovra.formaCorsia(d), giusta))
-                }
-                passo.addLane(corsia.build())
-            }
-            passo.setLanesImage(
-                CarIcon.Builder(IconCompat.createWithBitmap(ImmagineCorsie.disegna(guida.corsie))).build(),
-            )
-        }
-        return passo.build()
-    }
-
-    private fun distanza(metri: Double): Distance =
-        if (metri < 1000) {
-            Distance.create((Math.round(metri / 10.0) * 10).toDouble(), Distance.UNIT_METERS)
-        } else {
-            Distance.create(metri / 1000.0, Distance.UNIT_KILOMETERS)
-        }
 }

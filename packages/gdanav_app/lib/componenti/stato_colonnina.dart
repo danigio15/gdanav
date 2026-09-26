@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../mappa/dati_viaggio.dart';
+import '../stato/gestore_premium.dart';
 import '../tema.dart';
 
 Color coloreStato(BuildContext context, StatoColonnina s) {
@@ -14,7 +15,8 @@ Color coloreStato(BuildContext context, StatoColonnina s) {
   };
 }
 
-/// «2 libere su 4», «Piena», «Guasta», «Stato non disponibile».
+/// «2 libere su 4», «Piena», «Guasta»; se il gestore non lo comunica, lo
+/// dice (e senza Premium dice che lo stato di adesso è con Premium).
 String testoDisponibilita(Disponibilita d) {
   final funzionanti = d.totali - d.guaste;
   return switch (statoDi(d)) {
@@ -22,7 +24,7 @@ String testoDisponibilita(Disponibilita d) {
       funzionanti == 1 ? 'Libera' : '${d.libere} ${d.libere == 1 ? 'libera' : 'libere'} su $funzionanti',
     StatoColonnina.piena => funzionanti == 1 ? 'Occupata' : 'Piena · $funzionanti occupate',
     StatoColonnina.guasta => 'Fuori servizio',
-    StatoColonnina.ignota => 'Stato non disponibile',
+    StatoColonnina.ignota => GestorePremium.attivo.value ? 'Stato non comunicato' : 'Libere/occupate con Premium',
   };
 }
 

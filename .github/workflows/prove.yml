@@ -159,10 +159,15 @@ jobs:
 
   # Il viaggio vero, coi server pubblici: quanto ci mette ogni pezzo. Non
   # blocca niente: i server degli altri possono essere lenti.
+  # Gira anche sui rami di lavoro (dove il relay non si pubblica), per
+  # provare coi dati veri prima di pubblicare l'APK.
   rete:
     needs: [pubblica-relay]
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     continue-on-error: true
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: packages/gdanav_core
@@ -175,6 +180,36 @@ jobs:
       - run: dart test test/viaggio_rete_test.dart --reporter expanded
         env:
           GDANAV_RETE: "1"
+          GDANAV_PREZZI: ${{ github.workspace }}/prezzi_napoli.json
+          GDANAV_COLONNINE: ${{ github.workspace }}/colonnine_utrecht.json
+          GDANAV_TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
+          GDANAV_ANTEPRIME: ${{ github.workspace }}
+      # Prezzi veri di Napoli e colonnine vere di Utrecht nella release, per
+      # le anteprime dell'app.
+      - name: Dati veri per le anteprime nella release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
+          for f in prezzi_napoli.json colonnine_utrecht.json; do
+            [ -s "$f" ] && gh release upload anteprima "$f" --clobber
+          done
+          true
+      # Sui rami di lavoro: i viaggi veri per le anteprime in una release a
+      # parte («lavoro»), senza toccare quella dell'app.
+      - name: Dati veri per le anteprime (rami di lavoro)
+        if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "gdanav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app è nella release «anteprima»."
+          for f in anteprima.json anteprima_tappa.json; do
+            [ -s "$f" ] && gh release upload lavoro "$f" --clobber
+          done
+          true
       - name: Com'è fatto il traffico TomTom
         working-directory: .
         env:

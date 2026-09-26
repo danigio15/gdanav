@@ -7,7 +7,7 @@ enum TipoPreferito { casa, lavoro, altro }
 
 /// Un posto salvato: Casa, Lavoro, o un preferito col suo nome.
 class Preferito {
-  const Preferito(this.tipo, this.luogo, {this.nome = ''});
+  const Preferito(this.tipo, this.luogo, {this.nome = '', this.lista = ''});
 
   final TipoPreferito tipo;
   final Luogo luogo;
@@ -15,20 +15,29 @@ class Preferito {
   /// Per gli «altro»: come l'ha chiamato chi l'ha salvato.
   final String nome;
 
+  /// L'elenco da cui viene (importato da Google Maps: «Preferiti», «Voglio
+  /// andarci»…); vuoto per quelli salvati qui.
+  final String lista;
+
   String get etichetta => switch (tipo) {
     TipoPreferito.casa => 'Casa',
     TipoPreferito.lavoro => 'Lavoro',
     TipoPreferito.altro => nome.isEmpty ? luogo.nome : nome,
   };
 
-  Map<String, Object?> toJson() => {'tipo': tipo.name, 'nome': nome, 'luogo': luogoJson(luogo)};
+  Map<String, Object?> toJson() => {
+    'tipo': tipo.name,
+    'nome': nome,
+    if (lista.isNotEmpty) 'lista': lista,
+    'luogo': luogoJson(luogo),
+  };
 
   static Preferito? daJson(Object? j) {
     if (j is! Map) return null;
     final tipo = TipoPreferito.values.where((t) => t.name == j['tipo']).firstOrNull;
     final luogo = luogoDaJson(j['luogo']);
     if (tipo == null || luogo == null) return null;
-    return Preferito(tipo, luogo, nome: j['nome'] as String? ?? '');
+    return Preferito(tipo, luogo, nome: j['nome'] as String? ?? '', lista: j['lista'] as String? ?? '');
   }
 }
 
@@ -79,6 +88,36 @@ class GestoreLuoghi extends ChangeNotifier {
       p,
     ];
     await _scrivi();
+  }
+
+  /// Tanti preferiti insieme (un'importazione): quelli che ci sono già
+  /// (stesso nome, a meno di 30 m) non si ripetono. Restituisce quanti ne
+  /// sono entrati.
+  Future<int> aggiungiTanti(Iterable<Preferito> nuovi) async {
+    final lista = List.of(preferiti);
+    var entrati = 0;
+    for (final p in nuovi) {
+      final doppio = lista.any(
+        (q) => q.etichetta == p.etichetta && distanzaM(q.luogo.posizione, p.luogo.posizione) < 30,
+      );
+      if (doppio) continue;
+      lista.add(p);
+      entrati++;
+    }
+    preferiti = lista;
+    await _scrivi();
+    return entrati;
+  }
+
+  /// I preferiti che contengono [testo] nel nome o nell'indirizzo, per la
+  /// ricerca.
+  List<Preferito> cercaSalvati(String testo) {
+    final t = testo.trim().toLowerCase();
+    if (t.isEmpty) return const [];
+    return [
+      for (final p in preferiti)
+        if (p.etichetta.toLowerCase().contains(t) || p.luogo.descrizione.toLowerCase().contains(t)) p,
+    ];
   }
 
   Future<void> togli(Preferito p) async {

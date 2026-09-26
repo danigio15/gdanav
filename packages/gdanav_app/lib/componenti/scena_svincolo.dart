@@ -25,7 +25,9 @@ class ScenaSvincolo extends CustomPainter {
   @override
   void paint(Canvas canvas, Size s) {
     final w = s.width, h = s.height;
-    final orizzonte = h * 0.36;
+    // Nelle viste basse e larghe (la scheda dell'auto) meno cielo: le corsie
+    // con le frecce restano dentro.
+    final orizzonte = h * (w / h > 2.2 ? 0.25 : 0.36);
     _cielo(canvas, w, orizzonte);
     _terreno(canvas, w, h, orizzonte);
 

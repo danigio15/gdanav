@@ -3,9 +3,11 @@
 /// i tempi escono come avvisi di GitHub.
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:gdanav_core/gdanav_core.dart';
+import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 
 void avviso(String titolo, String testo) => stdout.writeln('::notice title=$titolo::$testo');
@@ -57,4 +59,214 @@ void main() {
   },
       skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false,
       timeout: const Timeout(Duration(minutes: 10)));
+
+  test('i prezzi veri del Ministero, a Milano', () async {
+    final orologio = Stopwatch()..start();
+    try {
+      final d = await ClientePrezziMimit().vicino(milano, km: 3);
+      final primo = d.isEmpty ? null : d.first;
+      avviso(
+        'Prezzi MIMIT',
+        '${orologio.elapsedMilliseconds} ms, ${d.length} distributori; il primo: ${primo?.nome} '
+            '${primo?.prezzi.map((p) => '${p.nome} ${p.euro}${p.self ? ' self' : ''}').join(', ')} '
+            'aggiornato ${primo?.aggiornato}',
+      );
+    } catch (e) {
+      avviso('Prezzi MIMIT', 'errore dopo ${orologio.elapsedMilliseconds} ms: $e');
+    }
+  }, skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  // I dati grezzi del Ministero intorno a Napoli, per le anteprime dell'app.
+  test('prezzi grezzi del Ministero, a Napoli', () async {
+    try {
+      final r = await http.post(
+        Uri.parse('https://carburanti.mise.gov.it/ospzApi/search/zone'),
+        headers: {'content-type': 'application/json', 'accept': 'application/json'},
+        body: jsonEncode({
+          'points': [
+            {'lat': 40.8518, 'lng': 14.2681},
+          ],
+          'radius': 3,
+          'fuelType': '0-x',
+          'priceOrder': 'asc',
+        }),
+      );
+      final json = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>;
+      final risultati = json['results'] as List;
+      avviso('Prezzi MIMIT grezzi', '${risultati.length} distributori');
+      if (Platform.environment['GDANAV_PREZZI'] case final file?) {
+        File(file).writeAsStringSync(jsonEncode({'results': risultati}));
+      }
+    } catch (e) {
+      avviso('Prezzi MIMIT grezzi', 'errore: $e');
+    }
+  }, skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  // Le colonnine vere intorno a Utrecht, con lo stato TomTom se c'è la
+  // chiave: per le anteprime dell'app.
+  test('colonnine vere intorno a Utrecht', () async {
+    const qui = Punto(52.0907, 5.1214);
+    try {
+      final tutte = await ClienteColonnineRelay(Uri.parse('https://gdanav.gdahome.org/')).lungo([qui], distanzaKm: 8);
+      final rapide = [
+        for (final c in tutte)
+          if (c.connettori.any((x) => x.potenzaKw >= 50)) c,
+      ]..sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
+      final chiave = Platform.environment['GDANAV_TOMTOM'] ?? '';
+      final stato = chiave.isEmpty ? null : DisponibilitaTomTom(chiave);
+      // Tutte insieme: una alla volta non si sta nel tempo.
+      final elenco = await Future.wait([
+        for (final c in rapide.take(25))
+          if (stato == null)
+            Future.value(c)
+          else
+            stato.aggiorna(c).timeout(const Duration(seconds: 10)).catchError((Object _) => c),
+      ]);
+      final note = elenco.where((c) => c.connettori.any((x) => x.stato != StatoPresa.sconosciuto)).length;
+      avviso('Colonnine Utrecht', '${tutte.length} in tutto, ${rapide.length} rapide, con stato TomTom: $note');
+      if (Platform.environment['GDANAV_COLONNINE'] case final file?) {
+        File(file).writeAsStringSync(
+          jsonEncode([
+            for (final c in elenco)
+              {
+                'id': c.id,
+                'nome': c.nome,
+                'operatore': c.operatore,
+                'lat': c.posizione.lat,
+                'lon': c.posizione.lon,
+                'connettori': [
+                  for (final x in c.connettori) {'tipo': x.tipo.name, 'kw': x.potenzaKw, 'stato': x.stato.name},
+                ],
+              },
+          ]),
+        );
+      }
+    } catch (e) {
+      avviso('Colonnine Utrecht', 'errore: $e');
+    }
+  },
+      timeout: const Timeout(Duration(minutes: 4)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  // In Italia: quante colonnine rapide intorno a Napoli hanno lo stato di
+  // adesso da TomTom.
+  test('stato delle colonnine intorno a Napoli', () async {
+    const qui = Punto(40.8518, 14.2681);
+    final chiave = Platform.environment['GDANAV_TOMTOM'] ?? '';
+    if (chiave.isEmpty) return;
+    try {
+      final tutte = await ClienteColonnineRelay(Uri.parse('https://gdanav.gdahome.org/')).lungo([qui], distanzaKm: 10);
+      final rapide = [
+        for (final c in tutte)
+          if (c.connettori.any((x) => x.potenzaKw >= 40)) c,
+      ]..sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
+      final stato = DisponibilitaTomTom(chiave);
+      final elenco = await Future.wait([
+        for (final c in rapide.take(15))
+          stato.aggiorna(c).timeout(const Duration(seconds: 60)).catchError((Object _) => c),
+      ]);
+      avviso(
+          'Colonnine Napoli',
+          [
+            '${tutte.length} in tutto, ${rapide.length} rapide',
+            for (final c in elenco)
+              '${c.nome} (${c.operatore}): ${c.connettori.map((x) => '${x.tipo.name}=${x.stato.name}').join(' ')}',
+          ].join(' | '));
+    } catch (e) {
+      avviso('Colonnine Napoli', 'errore: $e');
+    }
+  },
+      timeout: const Timeout(Duration(minutes: 4)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  // Le alternative e il traffico di adesso, coi server veri.
+  test('alternative Napoli → Milano col traffico TomTom', () async {
+    try {
+      final inizio = DateTime.now();
+      final scelte = await valhalla.alternative(napoli, milano);
+      final chiave = Platform.environment['GDANAV_TOMTOM'] ?? '';
+      final traffico = chiave.isEmpty ? null : TrafficoTomTom(chiave);
+      final righe = <String>[];
+      for (final s in scelte) {
+        var p = s;
+        String extra = '';
+        if (traffico != null) {
+          try {
+            p = await traffico.applica(s);
+            extra = ' · traffico +${p.ritardoTraffico.inMinutes} min, ${p.code.length} code'
+                '${p.code.isEmpty ? '' : ' (la prima a ${(p.code.first.daM / 1000).round()} km, ${(p.code.first.lunghezzaM / 1000).toStringAsFixed(1)} km)'}';
+          } catch (e) {
+            extra = ' · traffico: $e';
+          }
+        }
+        righe.add('${(p.lunghezzaM / 1000).round()} km ${p.durata.inMinutes} min via ${p.stradaPrincipale}'
+            '${p.conPedaggi ? ' (pedaggi)' : ''}$extra');
+      }
+      avviso('Alternative', '${DateTime.now().difference(inizio).inMilliseconds} ms | ${righe.join(' | ')}');
+    } catch (e) {
+      avviso('Alternative', 'errore: $e');
+    }
+  },
+      timeout: const Timeout(Duration(minutes: 3)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  // Un viaggio vero dentro Utrecht (la mappa delle anteprime): le strade e
+  // il traffico di adesso, stampati per disegnarli.
+  test('anteprima: strade e traffico a Utrecht', () async {
+    try {
+      final scelte = await valhalla.alternative(const Punto(52.1150, 5.0700), const Punto(52.0560, 5.1500));
+      final chiave = Platform.environment['GDANAV_TOMTOM'] ?? '';
+      final traffico = chiave.isEmpty ? null : TrafficoTomTom(chiave);
+      final fuori = <Map<String, Object?>>[];
+      for (final s in scelte) {
+        var p = s;
+        if (traffico != null) {
+          try {
+            p = await traffico.applica(s);
+          } catch (_) {}
+        }
+        fuori.add({
+          'forma': codificaPolyline(p.punti, precisione: 6),
+          'm': p.lunghezzaM,
+          's': p.base.durata.inSeconds,
+          'via': p.stradaPrincipale,
+          'pedaggi': p.conPedaggi,
+          'code': [
+            for (final c in p.code)
+              {'da': c.daM, 'a': c.aM, 'r': c.ritardo.inSeconds, 'l': c.livello, 'v': c.velocitaKmh, 't': c.tipo},
+          ],
+        });
+      }
+      stdout.writeln('ANTEPRIMA:${jsonEncode(fuori)}');
+      final cartella = Platform.environment['GDANAV_ANTEPRIME'];
+      if (cartella != null) File('$cartella/anteprima.json').writeAsStringSync(jsonEncode(fuori));
+      // Lo stesso viaggio passando da Utrecht Centraal.
+      final conTappa =
+          await valhalla.calcola(const [Punto(52.1150, 5.0700), Punto(52.0894, 5.1100), Punto(52.0560, 5.1500)]);
+      stdout.writeln(
+        'ANTEPRIMA_TAPPA:${jsonEncode({
+              'forma': codificaPolyline(conTappa.punti, precisione: 6),
+              'm': conTappa.lunghezzaM,
+              's': conTappa.durata.inSeconds,
+              'via': conTappa.stradaPrincipale
+            })}',
+      );
+      if (cartella != null) {
+        File('$cartella/anteprima_tappa.json').writeAsStringSync(
+          jsonEncode({
+            'forma': codificaPolyline(conTappa.punti, precisione: 6),
+            'm': conTappa.lunghezzaM,
+            's': conTappa.durata.inSeconds,
+            'via': conTappa.stradaPrincipale,
+          }),
+        );
+      }
+      avviso(
+          'Anteprima Utrecht', '${fuori.length} strade, code: ${[for (final f in fuori) (f['code'] as List).length]}');
+    } catch (e) {
+      avviso('Anteprima Utrecht', 'errore: $e');
+    }
+  },
+      timeout: const Timeout(Duration(minutes: 2)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 }

@@ -65,6 +65,21 @@ class Archivio {
 
   Future<void> salvaAutoGdahome(String chiave) => _p.write(key: _autoGdahome, value: chiave);
 
+  /// Auto elettrica (con soste di ricarica e batteria) o termica
+  /// (benzina, diesel, GPL, ibrida): navigatore normale. Di base elettrica.
+  Future<bool> elettrica() async => await _p.read(key: 'tipo_auto') != 'termica';
+
+  /// Auto termica: il carburante che fa, per i prezzi dei distributori.
+  Future<Carburante> carburante() async {
+    final nome = await _p.read(key: 'carburante');
+    return Carburante.values.where((c) => c.name == nome).firstOrNull ?? Carburante.benzina;
+  }
+
+  Future<void> salvaCarburante(Carburante c) => _p.write(key: 'carburante', value: c.name);
+
+  Future<void> salvaElettrica(bool si) =>
+      si ? _p.delete(key: 'tipo_auto') : _p.write(key: 'tipo_auto', value: 'termica');
+
   Future<PreferenzeRicarica> preferenze() async {
     final testo = await _p.read(key: _preferenze);
     if (testo == null) return const PreferenzeRicarica();

@@ -15,19 +15,33 @@ import '../stato/avvisi_strada.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_segnalazioni.dart';
+import '../stato/gestore_viaggio.dart';
+import '../stato/gestore_vicini.dart';
 import '../tema.dart';
 import 'scheda_viaggio.dart' show durata, orario;
 import 'schermata_principale.dart' show CostruisciMappa;
+import 'distributori.dart';
+import 'scheda_punto.dart';
 import 'segnala.dart';
 
 /// La guida: la mappa ti segue inclinata, in alto la prossima manovra, in
 /// basso arrivo, chilometri e la prossima sosta.
 class SchermataGuida extends StatefulWidget {
-  const SchermataGuida({super.key, required this.guida, required this.posizione, this.segnalazioni, this.mappa});
+  const SchermataGuida({
+    super.key,
+    required this.guida,
+    required this.posizione,
+    this.segnalazioni,
+    this.vicini,
+    this.mappa,
+  });
 
   final GestoreGuida guida;
   final GestorePosizione posizione;
   final GestoreSegnalazioni? segnalazioni;
+
+  /// Distributori o colonnine intorno, sulla mappa.
+  final GestoreVicini? vicini;
   final CostruisciMappa? mappa;
 
   @override
@@ -84,6 +98,16 @@ class _SchermataGuidaState extends State<SchermataGuida> {
     super.dispose();
   }
 
+  /// Un punto scelto in guida: con la termica ci si passa e si prosegue;
+  /// con l'elettrica (le soste le fa il piano) diventa la nuova meta.
+  Future<void> _vaiDurante(Luogo l) async {
+    final g = widget.guida;
+    if (g.pronto?.termica ?? false) return g.passaDa(l);
+    await g.ferma();
+    await g.viaggio.vaiA(l);
+    if (g.viaggio.stato is ViaggioPronto) g.avvia();
+  }
+
   /// «Fine», come in Waze: si torna alla mappa senza viaggio.
   Future<void> _fine() async {
     await widget.guida.ferma();
@@ -112,6 +136,16 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                     segnalazioni: widget.segnalazioni,
                     onPuntoScelto: (_) {},
                     onColonnina: (_) {},
+                    vicini: widget.vicini,
+                    onPunto: (p) => mostraPunto(
+                      context,
+                      p,
+                      vicini: widget.vicini,
+                      qui: g.avanzamento?.posizioneSulPercorso ?? widget.posizione.qui,
+                      carburante: g.auto.carburante,
+                      vai: (g.pronto?.termica ?? false) ? 'Passa di qui e prosegui' : 'Vai qui',
+                      onVai: _vaiDurante,
+                    ),
                   ),
             ),
             ListenableBuilder(
@@ -137,8 +171,6 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                             viaggio: p.viaggio,
                             manovra: m,
                             metri: metri,
-                            // Nelle prove niente scena vera.
-                            mappa: widget.mappa == null ? null : (_, _) => const ColoredBox(color: Color(0xFF9DB7A0)),
                             onChiudi: () => setState(() => _svincoliChiusi.add(m.inizio)),
                           ),
                           _ => _Banner(key: const ValueKey('banner'), guida: g),
@@ -190,6 +222,19 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                                     ),
                                   ),
                                 ),
+                                // Auto termica: un distributore per strada, e poi si prosegue.
+                                if (g.pronto?.termica ?? false) ...[
+                                  const SizedBox(height: 12),
+                                  BottoneDistributori(
+                                    onTap: () => mostraDistributori(
+                                      context,
+                                      qui: g.avanzamento?.posizioneSulPercorso ?? widget.posizione.qui,
+                                      inGuida: true,
+                                      carburante: g.auto.carburante,
+                                      onScegli: g.passaDa,
+                                    ),
+                                  ),
+                                ],
                                 const SizedBox(height: 12),
                                 if (widget.segnalazioni case final seg?)
                                   BottoneSegnala(onTap: () => mostraSegnala(context, seg)),
@@ -477,8 +522,8 @@ class _Fondo extends StatelessWidget {
                     ),
                   ],
                 ),
-                const Divider(height: 20),
-                _Batteria(guida: guida),
+                // Con l'auto termica niente batteria: solo arrivo e strada.
+                if (!(p?.termica ?? false)) ...[const Divider(height: 20), _Batteria(guida: guida)],
                 if (sosta != null) ...[
                   const Divider(height: 20),
                   Row(

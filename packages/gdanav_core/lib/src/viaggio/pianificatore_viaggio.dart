@@ -95,6 +95,9 @@ class PianificatoreViaggio {
     required this.profilo,
     this.preferenze = const PreferenzeRicarica(),
     this.disponibilita,
+    this.traffico,
+    this.alternative,
+    this.seguendo,
   });
 
   final Future<PercorsoCalcolato> Function(List<Punto> tappe) percorsi;
@@ -105,17 +108,93 @@ class PianificatoreViaggio {
   /// Lo stato delle prese in tempo reale, per controllare le soste.
   final FonteDisponibilita? disponibilita;
 
+  /// Il traffico di adesso sul percorso (Premium): tempi e consumi con le
+  /// code. Se non risponde si pianifica senza.
+  final Future<PercorsoCalcolato> Function(PercorsoCalcolato percorso)? traffico;
+
+  /// Più percorsi fra due punti, per scegliere (senza corsie né limiti).
+  final Future<List<PercorsoCalcolato>> Function(Punto da, Punto a)? alternative;
+
+  /// Quello scelto fra le [alternative], rifatto con corsie e limiti.
+  final Future<PercorsoCalcolato> Function(PercorsoCalcolato scelto)? seguendo;
+
+  /// I percorsi fra cui scegliere, ognuno col traffico se c'è: il primo è
+  /// il migliore. Senza [alternative], quello solo.
+  Future<List<PercorsoCalcolato>> scelte({required Punto partenza, required Punto arrivo}) async {
+    final a = alternative;
+    final trovati = a == null
+        ? [
+            await percorsi([partenza, arrivo])
+          ]
+        : await a(partenza, arrivo);
+    final t = traffico;
+    if (t == null) return trovati;
+    final conTraffico = await Future.wait([
+      for (final p in trovati) t(p).timeout(const Duration(seconds: 25)).catchError((Object _) => p),
+    ]);
+    // Col traffico il migliore può cambiare.
+    return conTraffico..sort((x, y) => x.durata.compareTo(y.durata));
+  }
+
+  /// Il percorso da [partenza] ad [arrivo] passando dalle [tappe], col
+  /// traffico se c'è. [scelto]: un percorso già calcolato da usare (una
+  /// delle alternative), senza richiederlo.
+  Future<PercorsoCalcolato> percorso({
+    required Punto partenza,
+    required Punto arrivo,
+    List<Punto> tappe = const [],
+    PercorsoCalcolato? scelto,
+  }) async {
+    var p = scelto ?? await percorsi([partenza, ...tappe, arrivo]);
+    // Uno scelto fra le alternative si rifà con corsie e limiti; il
+    // traffico già letto resta.
+    if (scelto != null && seguendo != null) {
+      try {
+        final rifatto = await seguendo!(scelto);
+        p = scelto.trafficoVero ? rifatto.conTraffico(_riporta(scelto, rifatto)) : rifatto;
+      } catch (_) {}
+    }
+    final t = traffico;
+    if (t == null || p.trafficoVero) return p;
+    try {
+      return await t(p).timeout(const Duration(seconds: 25));
+    } catch (_) {
+      return p;
+    }
+  }
+
+  /// Le code di [da] sui metri di [a] (lo stesso percorso rifatto).
+  static List<Coda> _riporta(PercorsoCalcolato da, PercorsoCalcolato a) {
+    final k = Linea(da.punti).lunghezzaM;
+    final l = Linea(a.punti).lunghezzaM;
+    final f = k > 0 ? l / k : 1.0;
+    return [
+      for (final c in da.code)
+        Coda(
+            daM: c.daM * f,
+            aM: c.aM * f,
+            ritardo: c.ritardo,
+            livello: c.livello,
+            velocitaKmh: c.velocitaKmh,
+            tipo: c.tipo),
+    ];
+  }
+
   /// [obbligate]: gli id delle colonnine dove l'utente vuole fermarsi.
+  /// [tappe]: dove passare prima dell'[arrivo], in ordine; le soste si
+  /// pianificano sul viaggio intero.
   Future<Viaggio> pianifica({
     required Punto partenza,
     required Punto arrivo,
     required double batteria,
+    List<Punto> tappe = const [],
+    PercorsoCalcolato? scelto,
     Condizioni condizioni = const Condizioni(),
     Set<String> obbligate = const {},
     void Function(FaseViaggio fase)? avanzamento,
   }) async {
     avanzamento?.call(FaseViaggio.percorso);
-    final percorso = await percorsi([partenza, arrivo]);
+    final percorso = await this.percorso(partenza: partenza, arrivo: arrivo, tappe: tappe, scelto: scelto);
     final p = preferenze;
     final pianificatore = PianificatoreSoste(
       profilo: profilo,

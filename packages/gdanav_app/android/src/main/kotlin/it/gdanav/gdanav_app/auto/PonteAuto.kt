@@ -50,6 +50,10 @@ object PonteAuto {
     /** Dove sei: centro della mappa, e la rotta in gradi. */
     @Volatile var qui: DoubleArray? = null
     @Volatile var rotta: Double = 0.0
+
+    /** La rotta del segnaposto (la mappa guarda un po' avanti) e la sua immagine. */
+    @Volatile var rottaIo: Double = 0.0
+    @Volatile var icona: String = "freccia"
     @Volatile var guida: Guida? = null
 
     /** Un posto da scegliere in auto: Casa, Lavoro, un preferito, un recente o un risultato. */
@@ -72,6 +76,8 @@ object PonteAuto {
 
     /** Sopra la mappa: batteria, velocità e limite, arrivo, sosta, meteo. */
     data class Cruscotto(
+        /** Auto termica: niente batteria né colonnine. */
+        val elettrica: Boolean = true,
         val batteria: Double? = null,
         val autonomiaKm: Double? = null,
         /** L'autonomia la dice l'auto (non una stima). */
@@ -176,12 +182,15 @@ object PonteAuto {
                 val lon = call.argument<Double>("lon")
                 qui = if (lat != null && lon != null) doubleArrayOf(lat, lon) else null
                 rotta = call.argument<Double>("rotta") ?: 0.0
+                rottaIo = call.argument<Double>("rotta_io") ?: rotta
+                call.argument<String>("icona")?.let { icona = it }
             }
             "luoghi" -> {
                 luoghi = (call.argument<List<Map<String, Any?>>>("elenco") ?: emptyList()).mapNotNull(::luogo)
             }
             "messaggio" -> messaggio = call.argument<String>("testo")
             "cruscotto" -> cruscotto = Cruscotto(
+                elettrica = call.argument<Boolean>("elettrica") != false,
                 batteria = numero(call, "batteria"),
                 autonomiaKm = numero(call, "autonomia_km"),
                 autonomiaAuto = call.argument<Boolean>("autonomia_auto") == true,
@@ -285,6 +294,30 @@ object PonteAuto {
     fun ancora(id: String, si: Boolean) = chiedi("ancora", mapOf("id" to id, "si" to si))
 
     /** Le colonnine rapide vicine, come luoghi da raggiungere. */
+    /** Un punto toccato sulla mappa: il telefono dice cosa è e cosa sapere. */
+    fun punto(proprieta: Map<String, Any?>, lat: Double, lon: Double, risposta: (Map<String, Any?>?) -> Unit) =
+        chiedi("punto", mapOf("proprieta" to proprieta, "lat" to lat, "lon" to lon)) { r ->
+            @Suppress("UNCHECKED_CAST")
+            risposta(r as? Map<String, Any?>)
+        }
+
+    /** La scheda del punto, per [SchermoPunto]. */
+    fun luogoDa(m: Map<String, Any?>): Luogo? = luogo(m)
+
+    /** Auto termica: i distributori intorno. */
+    fun distributori(risultati: (List<Luogo>) -> Unit) = chiedi("distributori", null) { r ->
+        @Suppress("UNCHECKED_CAST")
+        risultati(((r as? List<Map<String, Any?>>) ?: emptyList()).mapNotNull { luogo(it + ("tipo" to "distributore")) })
+    }
+
+    /** In guida: si passa dal distributore e poi si prosegue; fermi, ci si va. */
+    fun passa(l: Luogo) {
+        messaggio = "Passo da ${l.etichetta}…"
+        versioneModello++
+        avvisa()
+        principale.post { canale?.invokeMethod("passa", l.comeMappa()) }
+    }
+
     fun colonnine(risultati: (List<Luogo>) -> Unit) = chiedi("colonnine", null) { r ->
         @Suppress("UNCHECKED_CAST")
         risultati(((r as? List<Map<String, Any?>>) ?: emptyList()).mapNotNull { luogo(it + ("tipo" to "colonnina")) })

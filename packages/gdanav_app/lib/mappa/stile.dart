@@ -6,15 +6,30 @@
 /// arrivo) con le loro sorgenti vuote: l'app ne cambia solo i dati.
 library;
 
+import 'categorie_poi.dart';
+
 const sorgentePercorso = 'gdanav-percorso';
 const sorgenteColonnine = 'gdanav-colonnine';
 const sorgenteArrivo = 'gdanav-arrivo';
 const sorgenteIo = 'gdanav-io';
 const sorgenteSegnalazioni = 'gdanav-segnalazioni';
 const sorgenteManovra = 'gdanav-manovra';
+const sorgenteDistributori = 'gdanav-distributori';
+const sorgenteVicine = 'gdanav-vicine';
+const sorgenteCode = 'gdanav-code';
+const sorgenteAlternative = 'gdanav-alternative';
+const sorgenteTappe = 'gdanav-tappe';
 const stratoTraffico = 'traffico';
 const stratoTrafficoLocale = 'traffico-locale';
-const stratiToccabili = ['gdanav-soste', 'gdanav-colonnine'];
+const stratiToccabili = [
+  'alternative-etichetta',
+  'alternative',
+  'gdanav-soste',
+  'gdanav-colonnine',
+  'gdanav-distributori',
+  'gdanav-vicine',
+  'nomi-poi',
+];
 
 /// Dall'alto gli edifici sono piatti e puliti; inclinando la mappa si
 /// accendono quelli in 3D e si spengono i piatti.
@@ -46,6 +61,8 @@ class _Tavolozza {
     required this.poi,
     required this.percorso,
     required this.percorsoBordo,
+    required this.alternativa,
+    required this.alternativaBordo,
     required this.contorno,
     required this.libera,
     required this.piena,
@@ -58,6 +75,9 @@ class _Tavolozza {
   final String autostrada, autostradaBordo, principale, principaleBordo, strada, stradaBordo, sentiero, ferrovia;
   final String etichetta, etichettaAlone, luogo, poi;
   final String percorso, percorsoBordo, contorno;
+
+  /// Le strade alternative: grigio-azzurre, dietro al percorso.
+  final String alternativa, alternativaBordo;
   final String libera, piena, guasta, ignota, arrivo;
 }
 
@@ -88,6 +108,8 @@ const _chiaro = _Tavolozza(
   poi: '#8A919A',
   percorso: '#27A2F8',
   percorsoBordo: '#0A6CC2',
+  alternativa: '#A9C7E3',
+  alternativaBordo: '#6F93B8',
   contorno: '#FFFFFF',
   libera: '#16A34A',
   piena: '#D97706',
@@ -121,6 +143,8 @@ const _scuro = _Tavolozza(
   poi: '#7D8797',
   percorso: '#3AB0FF',
   percorsoBordo: '#0B5AA6',
+  alternativa: '#4E6A86',
+  alternativaBordo: '#2E4459',
   contorno: '#0F1420',
   libera: '#4ADE80',
   piena: '#FBBF24',
@@ -171,7 +195,7 @@ const _vuota = {'type': 'FeatureCollection', 'features': <Object>[]};
 /// Con [chiaveTraffico] (una chiave gratuita di TomTom) sulle strade si
 /// vedono le code, come in Waze: solo dove si va più piano del solito, e
 /// gli incidenti e i lavori.
-Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}) {
+Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '', bool perAuto = false}) {
   final traffico = chiaveTraffico.trim();
   final t = scuro ? _scuro : _chiaro;
   final classi = {
@@ -239,11 +263,16 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}
     'sources': {
       'openmaptiles': {'type': 'vector', 'url': 'https://tiles.openfreemap.org/planet'},
       sorgentePercorso: {'type': 'geojson', 'data': _vuota},
+      sorgenteCode: {'type': 'geojson', 'data': _vuota},
+      sorgenteAlternative: {'type': 'geojson', 'data': _vuota},
+      sorgenteTappe: {'type': 'geojson', 'data': _vuota},
       sorgenteColonnine: {'type': 'geojson', 'data': _vuota},
       sorgenteArrivo: {'type': 'geojson', 'data': _vuota},
       sorgenteIo: {'type': 'geojson', 'data': _vuota},
       sorgenteSegnalazioni: {'type': 'geojson', 'data': _vuota},
       sorgenteManovra: {'type': 'geojson', 'data': _vuota},
+      sorgenteDistributori: {'type': 'geojson', 'data': _vuota},
+      sorgenteVicine: {'type': 'geojson', 'data': _vuota},
       if (traffico.isNotEmpty)
         'traffico': {
           'type': 'vector',
@@ -421,14 +450,14 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}
         },
         'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 2},
       },
+      // I punti di interesse come in Google Maps: il bollino colorato della
+      // categoria col simbolo, e il nome dello stesso colore accanto.
       {
-        // I nomi dei posti (distributori, scuole, negozi): piccoli e grigi,
-        // come in Waze.
         'id': 'nomi-poi',
         'type': 'symbol',
         'source': 'openmaptiles',
         'source-layer': 'poi',
-        'minzoom': 15.5,
+        'minzoom': 14.5,
         'filter': [
           '<=',
           [
@@ -436,16 +465,76 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}
             ['get', 'rank'],
             99,
           ],
-          20,
+          // Sull'auto meno punti: chi guida vede solo i più importanti.
+          perAuto
+              ? [
+                  'step',
+                  ['zoom'],
+                  8,
+                  16,
+                  14,
+                  17,
+                  20,
+                  18,
+                  40,
+                ]
+              : [
+                  'step',
+                  ['zoom'],
+                  6,
+                  15.5,
+                  14,
+                  16.5,
+                  30,
+                  17.5,
+                  99,
+                ],
         ],
         'layout': {
+          'icon-image': esprPoi((c) => c.immagine),
+          'icon-size': 0.62,
+          'icon-allow-overlap': false,
           'text-field': ['get', 'name'],
           'text-font': ['Noto Sans Regular'],
           'text-size': 11.5,
           'text-max-width': 8,
-          'text-padding': 4,
+          'text-variable-anchor': ['left', 'right', 'top', 'bottom'],
+          'text-radial-offset': 1.0,
+          'text-justify': 'auto',
+          'text-optional': true,
+          'text-padding': 3,
         },
-        'paint': {'text-color': t.poi, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 1.5},
+        'paint': {
+          'text-color': scuro ? t.poi : esprPoi((c) => c.colore),
+          'text-halo-color': t.etichettaAlone,
+          'text-halo-width': 1.5,
+        },
+      },
+      // Le strade alternative, sotto il percorso: grigio-azzurre, toccandole
+      // si sceglie quella.
+      {
+        'id': 'alternative-bordo',
+        'type': 'line',
+        'source': sorgenteAlternative,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'LineString',
+        ],
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {'line-color': t.alternativaBordo, 'line-width': _largo(7.5, 20)},
+      },
+      {
+        'id': 'alternative',
+        'type': 'line',
+        'source': sorgenteAlternative,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'LineString',
+        ],
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {'line-color': t.alternativa, 'line-width': _largo(5, 15)},
       },
       // Il percorso: un alone morbido, il bordo blu scuro, la linea blu e le
       // frecce della direzione. Sempre blu: nessuna strada ha quel colore.
@@ -469,6 +558,28 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}
         'source': sorgentePercorso,
         'layout': {'line-cap': 'round', 'line-join': 'round'},
         'paint': {'line-color': t.percorso, 'line-width': _largo(5.5, 18)},
+      },
+      // Le code di adesso sopra il percorso: dal giallo (rallenta) al rosso
+      // (fermo), bordeaux se è chiusa.
+      {
+        'id': 'code',
+        'type': 'line',
+        'source': sorgenteCode,
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {
+          'line-color': [
+            'match',
+            ['get', 'livello'],
+            1,
+            '#F9A825',
+            2,
+            '#EF6C00',
+            3,
+            '#D32F2F',
+            '#7B1F1F',
+          ],
+          'line-width': _largo(5.5, 18),
+        },
       },
       {
         'id': 'percorso-frecce',
@@ -550,6 +661,60 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}
         ],
         'paint': {'fill-color': '#FFFFFF', 'fill-antialias': true},
       },
+      // Intorno a te: i distributori col prezzo (auto termica) o le
+      // colonnine rapide col colore dello stato (auto elettrica).
+      {
+        'id': 'gdanav-vicine',
+        'type': 'symbol',
+        'source': sorgenteVicine,
+        'minzoom': 10,
+        'layout': {
+          'icon-image': [
+            'concat',
+            'punto-colonnina-',
+            ['get', 'stato'],
+          ],
+          'icon-size': 0.8,
+          'icon-allow-overlap': true,
+          'text-field': [
+            'step',
+            ['zoom'],
+            '',
+            13,
+            ['get', 'etichetta'],
+          ],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 11,
+          'text-anchor': 'top',
+          'text-offset': [0, 1.1],
+          'text-optional': true,
+        },
+        'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 1.6},
+      },
+      {
+        'id': 'gdanav-distributori',
+        'type': 'symbol',
+        'source': sorgenteDistributori,
+        'minzoom': 10,
+        'layout': {
+          'icon-image': 'punto-distributore',
+          'icon-size': 0.8,
+          'icon-allow-overlap': true,
+          'text-field': [
+            'step',
+            ['zoom'],
+            '',
+            12.5,
+            ['get', 'etichetta'],
+          ],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 11.5,
+          'text-anchor': 'top',
+          'text-offset': [0, 1.1],
+          'text-optional': true,
+        },
+        'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 1.6},
+      },
       {
         'id': 'gdanav-colonnine',
         'type': 'circle',
@@ -592,6 +757,55 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = ''}
           'text-allow-overlap': true,
         },
         'paint': {'text-color': '#FFFFFF'},
+      },
+      // Le tappe: un cerchio bianco col numero, bordo blu.
+      {
+        'id': 'tappe',
+        'type': 'circle',
+        'source': sorgenteTappe,
+        'paint': {
+          'circle-radius': 12,
+          'circle-color': '#FFFFFF',
+          'circle-stroke-color': t.percorsoBordo,
+          'circle-stroke-width': 3.5,
+        },
+      },
+      {
+        'id': 'tappe-numeri',
+        'type': 'symbol',
+        'source': sorgenteTappe,
+        'layout': {
+          'text-field': [
+            'to-string',
+            ['get', 'numero'],
+          ],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 13,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        'paint': {'text-color': t.percorsoBordo},
+      },
+      // Quanto fa guadagnare o perdere ogni alternativa: il fumetto sulla
+      // strada, da toccare per sceglierla.
+      {
+        'id': 'alternative-etichetta',
+        'type': 'symbol',
+        'source': sorgenteAlternative,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'Point',
+        ],
+        'layout': {
+          'text-field': ['get', 'etichetta'],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 13,
+          'text-line-height': 1.15,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        'paint': {'text-color': '#FFFFFF', 'text-halo-color': t.alternativaBordo, 'text-halo-width': 6},
       },
       {
         'id': 'arrivo',

@@ -116,6 +116,19 @@ class _CercaDestinazioneState extends State<CercaDestinazione> {
           : ListView(
               children: [
                 if (_testo.text.trim().length < 3 && widget.salvati != null) ..._salvati(context),
+                // I posti salvati che corrispondono, prima di quelli trovati.
+                if (_testo.text.trim().length >= 2 && widget.salvati != null)
+                  for (final p in widget.salvati!.cercaSalvati(_testo.text).take(5))
+                    ListTile(
+                      leading: Icon(Icons.star_rounded, color: Colors.amber.shade700),
+                      title: Text(p.etichetta),
+                      subtitle: Text(
+                        [if (p.lista.isNotEmpty) p.lista, p.luogo.descrizione].where((x) => x.isNotEmpty).join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () => Navigator.of(context).pop(p.luogo),
+                    ),
                 for (final l in _risultati)
                   ListTile(
                     leading: const Icon(Icons.place_outlined),
@@ -133,7 +146,11 @@ class _CercaDestinazioneState extends State<CercaDestinazione> {
   Iterable<Widget> _salvati(BuildContext context) sync* {
     final g = widget.salvati!;
     final muto = Theme.of(context).colorScheme.onSurfaceVariant;
-    for (final p in g.preferiti) {
+    // Casa e Lavoro, poi i primi preferiti; tutti gli altri in «Tutti i
+    // salvati» (importati da Google possono essere centinaia).
+    final altri = g.altri.toList();
+    final primi = [?g.casa, ?g.lavoro, ...altri.take(4)];
+    for (final p in primi) {
       yield ListTile(
         leading: Icon(switch (p.tipo) {
           TipoPreferito.casa => Icons.home_rounded,
@@ -145,6 +162,20 @@ class _CercaDestinazioneState extends State<CercaDestinazione> {
         onTap: () => Navigator.of(context).pop(p.luogo),
       );
     }
+    if (altri.length > 4) {
+      yield ListTile(
+        key: const Key('tutti-i-salvati'),
+        leading: const Icon(Icons.bookmarks_rounded),
+        title: const Text('Tutti i salvati'),
+        subtitle: Text('${altri.length} posti'),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () async {
+          final l = await Navigator.of(context)
+              .push<Luogo>(MaterialPageRoute(builder: (_) => LuoghiSalvati(salvati: g)));
+          if (l != null && context.mounted) Navigator.of(context).pop(l);
+        },
+      );
+    }
     for (final l in g.recenti) {
       yield ListTile(
         leading: Icon(Icons.history, color: muto),
@@ -153,5 +184,64 @@ class _CercaDestinazioneState extends State<CercaDestinazione> {
         onTap: () => Navigator.of(context).pop(l),
       );
     }
+  }
+}
+
+/// Tutti i posti salvati, divisi per elenco (quelli importati da Google
+/// Maps tengono il loro), con un filtro in cima. Toccarne uno lo
+/// restituisce.
+class LuoghiSalvati extends StatefulWidget {
+  const LuoghiSalvati({super.key, required this.salvati});
+
+  final GestoreLuoghi salvati;
+
+  @override
+  State<LuoghiSalvati> createState() => _LuoghiSalvatiState();
+}
+
+class _LuoghiSalvatiState extends State<LuoghiSalvati> {
+  var _filtro = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final muto = Theme.of(context).colorScheme.onSurfaceVariant;
+    final f = _filtro.trim().toLowerCase();
+    final gruppi = <String, List<Preferito>>{};
+    for (final p in widget.salvati.altri) {
+      if (f.isNotEmpty && !p.etichetta.toLowerCase().contains(f) && !p.luogo.descrizione.toLowerCase().contains(f)) {
+        continue;
+      }
+      (gruppi[p.lista.isEmpty ? 'Preferiti' : p.lista] ??= []).add(p);
+    }
+    final nomi = gruppi.keys.toList()..sort();
+    return Scaffold(
+      appBar: AppBar(
+        title: TextField(
+          decoration: const InputDecoration(hintText: 'Cerca fra i salvati', border: InputBorder.none),
+          onChanged: (v) => setState(() => _filtro = v),
+        ),
+      ),
+      body: ListView(
+        children: [
+          for (final n in nomi) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Text('$n · ${gruppi[n]!.length}', style: t.titleSmall?.copyWith(color: muto)),
+            ),
+            for (final p in gruppi[n]!)
+              ListTile(
+                leading: const Icon(Icons.place_outlined),
+                title: Text(p.etichetta),
+                subtitle: p.luogo.descrizione.isEmpty
+                    ? null
+                    : Text(p.luogo.descrizione, maxLines: 1, overflow: TextOverflow.ellipsis),
+                onTap: () => Navigator.of(context).pop(p.luogo),
+              ),
+          ],
+          if (nomi.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('Nessun posto salvato.')),
+        ],
+      ),
+    );
   }
 }

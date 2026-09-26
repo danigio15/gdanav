@@ -3,6 +3,7 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import '../componenti/anello_batteria.dart';
 import '../componenti/grafico_batteria.dart';
+import '../componenti/itinerario.dart';
 import '../componenti/meteo_viaggio.dart';
 import '../componenti/stato_colonnina.dart';
 import '../mappa/dati_viaggio.dart';
@@ -23,9 +24,19 @@ String orario(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.to
 /// Il riquadro in basso: sta calcolando, il viaggio con le sue soste, o
 /// cosa non va.
 class SchedaViaggio extends StatelessWidget {
-  const SchedaViaggio({super.key, required this.gestore, required this.onAvvia, this.soglia = 15, this.meteo});
+  const SchedaViaggio({
+    super.key,
+    required this.gestore,
+    required this.onAvvia,
+    this.soglia = 15,
+    this.meteo,
+    this.onCercaTappa,
+  });
 
   final GestoreViaggio gestore;
+
+  /// Apre la ricerca per una tappa in più; `null`: niente tappe.
+  final Future<Luogo?> Function()? onCercaTappa;
 
   /// Il meteo lungo la strada (Premium); `null` nelle prove.
   final GestoreMeteo? meteo;
@@ -91,6 +102,7 @@ class SchedaViaggio extends StatelessWidget {
           soglia: soglia,
           onAvvia: onAvvia,
           meteo: meteo,
+          onCercaTappa: onCercaTappa,
         ),
       },
     );
@@ -144,7 +156,16 @@ class _Piccola extends StatelessWidget {
 }
 
 class _Pronta extends StatelessWidget {
-  const _Pronta({required this.pronto, required this.gestore, required this.soglia, required this.onAvvia, this.meteo});
+  const _Pronta({
+    required this.pronto,
+    required this.gestore,
+    required this.soglia,
+    required this.onAvvia,
+    this.meteo,
+    this.onCercaTappa,
+  });
+
+  final Future<Luogo?> Function()? onCercaTappa;
 
   final GestoreMeteo? meteo;
   final ViaggioPronto pronto;
@@ -163,6 +184,31 @@ class _Pronta extends StatelessWidget {
     final soste = piano?.soste ?? const <Sosta>[];
     final idSoste = {for (final s in soste) s.colonnina.id};
     final altre = v.colonnine.where((c) => !idSoste.contains(c.id)).toList();
+
+    // Le strade fra cui scegliere e le tappe: sotto «Avvia», come per tutti.
+    final cerca = onCercaTappa;
+    Future<void> aggiungiTappa() async {
+      if (await cerca?.call() case final l?) await gestore.aggiungiTappa(l);
+    }
+
+    final stradeETappe = <Widget>[
+      if (pronto.scelte.length > 1) ...[
+        const SizedBox(height: 18),
+        Text('Strade', style: t.titleSmall),
+        const SizedBox(height: 8),
+        ScelteStrada(scelte: pronto.scelte, scelta: pronto.scelta, onScegli: gestore.scegli),
+      ],
+      if (pronto.tappe.isNotEmpty) ...[
+        const SizedBox(height: 18),
+        Itinerario(
+          destinazione: pronto.destinazione,
+          tappe: pronto.tappe,
+          onAggiungi: cerca == null ? null : aggiungiTappa,
+          onTogli: gestore.togliTappa,
+          onSposta: gestore.spostaTappa,
+        ),
+      ],
+    ];
 
     return DraggableScrollableSheet(
       initialChildSize: 0.46,
@@ -207,23 +253,63 @@ class _Pronta extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: ActionChip(
-                key: const Key('opzioni-percorso'),
-                avatar: const Icon(Icons.tune, size: 18),
-                label: Text(gestore.opzioni.riassunto),
-                onPressed: () => mostraOpzioniPercorso(context, gestore.opzioni, gestore.cambiaOpzioni),
-              ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                ActionChip(
+                  key: const Key('opzioni-percorso'),
+                  avatar: const Icon(Icons.tune, size: 18),
+                  label: Text(gestore.opzioni.riassunto),
+                  onPressed: () => mostraOpzioniPercorso(context, gestore.opzioni, gestore.cambiaOpzioni),
+                ),
+                if (cerca != null)
+                  ActionChip(
+                    key: const Key('aggiungi-tappa-chip'),
+                    avatar: const Icon(Icons.add_location_alt_outlined, size: 18),
+                    label: const Text('Tappa'),
+                    onPressed: aggiungiTappa,
+                  ),
+              ],
             ),
             const SizedBox(height: 10),
-            if (piano == null) ...[
+            if (pronto.termica) ...[
+              // Auto termica: un navigatore normale, arrivo e via.
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Arrivo ',
+                      style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w400),
+                    ),
+                    TextSpan(text: orario(pronto.arrivoAlle!), style: t.headlineSmall),
+                  ],
+                ),
+              ),
+              Text(
+                '${durata(v.percorso.durata)} · ${km.round()} km',
+                key: const Key('durata-termica'),
+                style: t.titleMedium?.copyWith(color: muto),
+              ),
+              RigaTraffico(percorso: v.percorso),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: onAvvia,
+                  icon: const Icon(Icons.navigation),
+                  label: const Text('Avvia'),
+                ),
+              ),
+              ...stradeETappe,
+            ] else if (piano == null) ...[
               Text('${km.round()} km', style: t.headlineSmall),
               const SizedBox(height: 6),
               const Text(
                 'Con questa batteria non ci si arriva, e lungo la strada non ci sono colonnine adatte abbastanza vicine. '
                 'Prova ad abbassare la potenza minima nelle preferenze di ricarica.',
               ),
+              ...stradeETappe,
             ] else ...[
               Text.rich(
                 TextSpan(
@@ -237,6 +323,7 @@ class _Pronta extends StatelessWidget {
                 ),
               ),
               Text('${durata(piano.durata)} · ${km.round()} km', style: t.titleMedium?.copyWith(color: muto)),
+              RigaTraffico(percorso: v.percorso),
               const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
@@ -246,6 +333,7 @@ class _Pronta extends StatelessWidget {
                   label: const Text('Avvia'),
                 ),
               ),
+              ...stradeETappe,
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -323,7 +411,7 @@ class _Pronta extends StatelessWidget {
             ],
             const SizedBox(height: 16),
             Text(
-              'Colonnine: © Open Charge Map contributors, PUN · Mappa: © OpenFreeMap © OpenStreetMap contributors',
+              pronto.termica ? 'Mappa: © OpenFreeMap © OpenStreetMap contributors' : 'Colonnine: © Open Charge Map contributors, PUN · Mappa: © OpenFreeMap © OpenStreetMap contributors',
               style: t.bodySmall?.copyWith(color: muto),
             ),
           ],

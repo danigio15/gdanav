@@ -32,6 +32,10 @@ class GestoreGuida extends ChangeNotifier {
 
   /// Ogni quanto, in viaggio, si chiedono dati freschi a Home Assistant.
   static const intervalloDatiAuto = Duration(minutes: 1);
+
+  /// Ogni quanto, in viaggio, si rilegge il traffico sul percorso.
+  static const intervalloTraffico = Duration(minutes: 5);
+  DateTime? _ultimoTraffico;
   DateTime _ultimaRichiestaDati = DateTime(0);
 
   /// Si chiede a ogni posizione, se è passato un minuto: niente timer.
@@ -94,7 +98,7 @@ class GestoreGuida extends ChangeNotifier {
   /// al punto in cui si è.
   ({double valore, bool misurata})? get batteriaOra {
     final p = pronto;
-    if (p == null) return null;
+    if (p == null || p.termica) return null;
     final s = auto.stato, partito = _partitoAlle;
     if (s != null &&
         partito != null &&
@@ -121,6 +125,7 @@ class GestoreGuida extends ChangeNotifier {
   /// il consumo del viaggio (vero, o previsto); senza viaggio la stima a 90
   /// km/h.
   ({double km, bool dallAuto})? get autonomiaOra {
+    if (!auto.elettrica || (pronto?.termica ?? false)) return null;
     final s = auto.stato;
     if (s != null &&
         s.autonomiaKm != null &&
@@ -182,6 +187,8 @@ class GestoreGuida extends ChangeNotifier {
     _partitoAlle = _ora();
     _vicinoDetto = false;
     _guida = Guida(p.viaggio.percorso);
+    // Partiti: i ricalcoli partono da dove si è, non dalle strade proposte.
+    viaggio.dimenticaScelte();
     _batteriaInizio = p.batteriaPartenza;
     _kmMisurati = 0;
     _whMisurati = 0;
@@ -217,12 +224,19 @@ class GestoreGuida extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// L'ultima posizione vista in guida.
+  Punto? _ultimaPosizione;
+
   Future<void> _posizione(Punto qui) async {
+    _ultimaPosizione = qui;
     _forseChiediDati();
     final g = _guida;
     if (g == null || !attiva) return;
     final a = g.aggiorna(qui);
     avanzamento = a;
+    // Arrivati al distributore: da qui si prosegue verso la meta.
+    // Arrivati a una tappa (o al distributore): da qui si prosegue.
+    viaggio.tappeFatte(qui);
     if (a.daDire case final frase? when !muto) unawaited(voce.parla(frase));
     if (a.arrivato) {
       _evento('arrivo');
@@ -235,12 +249,22 @@ class GestoreGuida extends ChangeNotifier {
       _evento('arrivo_vicino', {'minuti': a.restante.inMinutes});
     }
     if (a.fuoriPercorso && !ricalcolando) unawaited(_ricalcola());
+    final ultimo = _ultimoTraffico ??= _ora();
+    if (!ricalcolando && _ora().difference(ultimo) >= intervalloTraffico) {
+      _ultimoTraffico = _ora();
+      unawaited(aggiornaTraffico());
+    }
     if (_ultimoRacconto == null || _ora().difference(_ultimoRacconto!) > const Duration(minutes: 1)) _racconta();
     notifyListeners();
   }
 
   /// Si comincia a misurare sul piano nuovo, col modello senza correttivo.
   void _nuovoPiano(ViaggioPronto p) {
+    // Auto termica: niente batteria da misurare.
+    if (p.termica) {
+      _misuratore = null;
+      return;
+    }
     final senza = consumo?.condizioni(auto.stato, conFattore: false) ?? const Condizioni();
     _fattorePiano = consumo?.imparato.fattore ?? 1;
     _misuratore = MisuratoreConsumo(
@@ -254,7 +278,7 @@ class GestoreGuida extends ChangeNotifier {
   /// allontana dal piano, si ricalcolano le soste da dove si è.
   void _datiAuto() {
     final p = pronto, s = auto.stato, ora = batteriaOra;
-    if (!attiva || p == null || s == null || ora == null || !ora.misurata) return;
+    if (!attiva || p == null || p.termica || s == null || ora == null || !ora.misurata) return;
     final metri = avanzamento?.percorsiM ?? 0;
     final misura = _misuratore?.registra(batteria: s.batteria, metri: metri, inCarica: s.inCarica == true);
     if (misura != null) {
@@ -287,6 +311,48 @@ class GestoreGuida extends ChangeNotifier {
     await _ricalcola(perConsumo: true, detto: true);
   }
 
+  /// Auto termica: si passa da [l] (un distributore) e poi si prosegue
+  /// verso la meta di prima.
+  Future<void> passaDa(Luogo l) async {
+    final d = viaggio.destinazione;
+    if (d == null) return;
+    viaggio.tappa = l;
+    ricalcolando = true;
+    _ultimoRicalcolo = _ora();
+    notifyListeners();
+    if (!muto) unawaited(voce.parla('Passo da ${l.nome}, poi proseguo.'));
+    await viaggio.pianifica(d);
+    ricalcolando = false;
+    if (pronto case final p?) {
+      _guida = Guida(p.viaggio.percorso);
+      _nuovoPiano(p);
+    }
+    notifyListeners();
+  }
+
+  /// Il traffico di adesso sulla strada che si sta facendo: l'arrivo si
+  /// aggiorna, le code sulla mappa pure; se il ritardo cambia di parecchio
+  /// lo si dice.
+  Future<void> aggiornaTraffico() async {
+    final prima = pronto?.viaggio.percorso;
+    final nuovo = await viaggio.aggiornaTraffico();
+    final g = _guida;
+    if (nuovo == null || g == null || !attiva) return;
+    _guida = g.conTempi(nuovo.viaggio.percorso);
+    final ritardo = nuovo.viaggio.percorso.ritardoTraffico;
+    final differenza = ritardo - (prima?.ritardoTraffico ?? Duration.zero);
+    if (differenza.inMinutes.abs() >= 5 && !muto) {
+      unawaited(
+        voce.parla(
+          differenza.isNegative
+              ? 'Il traffico si è alleggerito: ${differenza.inMinutes.abs()} minuti in meno.'
+              : 'Traffico più avanti: ${differenza.inMinutes} minuti in più.',
+        ),
+      );
+    }
+    notifyListeners();
+  }
+
   /// «No» alla proposta.
   void lasciaCosi() {
     proposta = null;
@@ -304,6 +370,8 @@ class GestoreGuida extends ChangeNotifier {
     for (final c in pronto?.viaggio.colonnine ?? const <ColonninaSulPercorso>[]) {
       if (c.distanzaM <= fatti) viaggio.obbligate.remove(c.id);
     }
+    // Le tappe e il distributore già passati non si ripetono.
+    if (_ultimaPosizione case final q?) viaggio.tappeFatte(q, fattiM: fatti);
     notifyListeners();
     if (!perConsumo && !muto) unawaited(voce.parla('Ricalcolo il percorso.'));
     await viaggio.pianifica(d);
