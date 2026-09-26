@@ -66,7 +66,8 @@ mappa**: le colonnine e i distributori si scelgono dagli elenchi del Menu.
    bundle ID `it.gdanav.gdanav`, SKU a piacere (`gdanav`).
 4. **La chiave per GitHub**: App Store Connect → Utenti e accesso →
    Integrazioni → App Store Connect API → Chiavi del team → `+`, ruolo
-   **App Manager**. Si scarica il file `.p8` (una volta sola: poi Apple non lo
+   **Amministrazione** (Admin: il certificato di distribuzione, che Xcode
+   si fa dare da Apple a ogni build, con «Gestore dell'app» non si crea). Si scarica il file `.p8` (una volta sola: poi Apple non lo
    ridà), e si segnano l'**ID chiave** e l'**ID emittente** scritti in alto.
    L'**ID del team** è in developer.apple.com → Account → Membership.
 5. **I quattro segreti** su GitHub, Settings → Secrets and variables →
