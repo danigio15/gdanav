@@ -23,6 +23,8 @@ import '../stato/gestore_meteo.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
+import '../stato/prova_di_guida.dart';
+import 'richiesta_navigazione.dart';
 import '../stato/gestore_vicini.dart';
 
 /// Tiene aggiornato lo schermo di Android Auto: stile, percorso, colonnine,
@@ -43,6 +45,7 @@ class PonteAuto {
     this.segnalazioni,
     this.meteo,
     this.vicini,
+    this.prova,
     MethodChannel? canale,
     DateTime Function()? orologio,
   }) : _canale = canale ?? const MethodChannel('gdanav/schermo_auto'),
@@ -60,6 +63,9 @@ class PonteAuto {
 
   /// Distributori o colonnine intorno, anche sulla mappa dell'auto.
   final GestoreVicini? vicini;
+
+  /// La prova di guida che Android Auto accende (il «test drive»).
+  final ProvaDiGuida? prova;
   final MethodChannel _canale;
   final DateTime Function() _ora;
   var _attivo = true;
@@ -121,6 +127,17 @@ class PonteAuto {
   Future<Object?> _dallAuto(MethodCall call) async {
     final a = (call.arguments as Map?) ?? const {};
     switch (call.method) {
+      // Android Auto accende la prova di guida: da qui ogni guida si percorre
+      // da sola, e se non c'è ancora una meta se ne sceglie una.
+      case 'prova_guida':
+        await provaDiGuida();
+      // La sessione dell'auto è finita: la prova di guida pure.
+      case 'prova_fine':
+        _conProva = false;
+        _seguiProva();
+      // «Ok Google, naviga verso…» o un'altra app che chiede un percorso.
+      case 'naviga':
+        await naviga(a['uri'] as String? ?? '');
       // «Fine» premuto sullo schermo dell'auto.
       case 'ferma':
         if (guida.attiva) await guida.ferma();
@@ -348,7 +365,95 @@ class PonteAuto {
     });
   }
 
+  /// Una richiesta di navigazione (NF-6, VC-1): con il punto si parte
+  /// subito, altrimenti si cerca e si va al primo risultato; una tappa
+  /// (`add_a_stop`) in guida si aggiunge al viaggio.
+  Future<void> naviga(String uri) async {
+    final r = RichiestaNavigazione.leggi(uri);
+    if (r == null) {
+      _manda('messaggio', {'testo': 'Non ho capito dove andare.'});
+      return;
+    }
+    Luogo? meta;
+    if (r.punto case final p?) {
+      meta = Luogo(nome: r.testo ?? 'Destinazione', posizione: p);
+    } else {
+      try {
+        final trovati = await viaggio.luoghi.cerca(r.testo!, vicinoA: posizione.qui ?? viaggio.ultimaPosizione);
+        meta = trovati.firstOrNull;
+      } catch (_) {
+        meta = null;
+      }
+    }
+    if (meta == null) {
+      _manda('messaggio', {'testo': 'Non trovo «${r.testo}».'});
+      return;
+    }
+    if (r.tappa && guida.attiva) {
+      await guida.passaDa(meta);
+      return;
+    }
+    if (guida.attiva) await guida.ferma();
+    await luoghi?.usato(meta);
+    await viaggio.vaiA(meta);
+    if (viaggio.stato is ViaggioPronto) guida.avvia();
+  }
+
+  var _conProva = false;
+
+  /// La prova di guida (NF-7): la guida in corso si percorre da sola; senza
+  /// guida si parte verso il viaggio pronto o, se non c'è, verso Casa,
+  /// Lavoro, l'ultima meta o un punto poco più avanti.
+  Future<void> provaDiGuida() async {
+    if (prova == null) return;
+    _conProva = true;
+    if (!guida.attiva) {
+      if (viaggio.stato is! ViaggioPronto) {
+        final meta = _metaDiProva();
+        if (meta == null) {
+          _manda('messaggio', {'testo': 'Prova di guida: scegli una meta con Cerca.'});
+          return;
+        }
+        await viaggio.vaiA(meta);
+      }
+      if (viaggio.stato is ViaggioPronto) guida.avvia();
+    }
+    _guida();
+  }
+
+  Luogo? _metaDiProva() {
+    final g = luoghi;
+    final salvata = g?.casa?.luogo ?? g?.lavoro?.luogo ?? g?.recenti.firstOrNull;
+    final qui = posizione.qui ?? viaggio.ultimaPosizione;
+    if (salvata != null && (qui == null || distanzaM(qui, salvata.posizione) > 500)) return salvata;
+    if (qui == null) return null;
+    // Tre chilometri verso nord-est.
+    return Luogo(nome: 'Prova di guida', posizione: Punto(qui.lat + 0.019, qui.lon + 0.026));
+  }
+
+  /// Con la prova accesa la posizione finta segue la guida, da dove si è.
+  void _seguiProva() {
+    final pr = prova, p = guida.pronto;
+    if (pr == null) return;
+    if (!guida.attiva || p == null || !_conProva) {
+      if (pr.attiva) pr.ferma();
+      _percorsoProva = null;
+      return;
+    }
+    if (!pr.attiva || !identical(_percorsoProva, p.viaggio.percorso)) {
+      // Percorso nuovo (ricalcolo, traffico, tappa fatta): si riparte dal
+      // punto in cui si era, portato sul nuovo.
+      final qui = pr.attiva ? guida.avanzamento?.posizioneSulPercorso : null;
+      _percorsoProva = p.viaggio.percorso;
+      final daM = qui == null ? 0.0 : Linea(p.viaggio.percorso.punti).proietta(qui).lungoM;
+      pr.percorri(p.viaggio.percorso, daM: daM);
+    }
+  }
+
+  PercorsoCalcolato? _percorsoProva;
+
   void _guida() {
+    _seguiProva();
     final a = guida.avanzamento;
     final p = guida.pronto;
     if (!guida.attiva || p == null) {

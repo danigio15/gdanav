@@ -3,8 +3,10 @@ package it.gdanav.gdanav.auto
 import android.content.pm.ApplicationInfo
 import androidx.car.app.CarAppService
 import androidx.car.app.Session
+import androidx.car.app.SessionInfo
 import androidx.car.app.validation.HostValidator
 import it.gdanav.gdanav_app.auto.SessioneGdanav
+import it.gdanav.gdanav_app.auto.SessioniGdanav
 
 /**
  * gdanav su Android Auto: un'app di navigazione. Gli schermi stanno nel
@@ -21,6 +23,10 @@ class GdanavCarAppService : CarAppService() {
                 .build()
         }
 
-    // Se l'app sul telefono non è aperta, la si accende qui.
+    // Se l'app sul telefono non è aperta, la si accende qui. Sul quadro
+    // strumenti (NF-9) solo la mappa.
     override fun onCreateSession(): Session = SessioneGdanav { MotoreFlutter.assicura(it) }
+
+    override fun onCreateSession(sessionInfo: SessionInfo): Session =
+        SessioniGdanav.per(sessionInfo) { SessioneGdanav { MotoreFlutter.assicura(it) } }
 }

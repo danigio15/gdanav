@@ -13,14 +13,14 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * Sopra la mappa dell'auto, poco e in basso, perché la mappa si veda: in
- * basso a sinistra, dal lato di chi guida, una capsula con velocità, limite e
- * arrivo, e sopra una barra sottile coi dati dell'auto (batteria, km, alla
- * meta), il meteo e la prossima sosta; in alto solo l'avviso della
- * segnalazione che si avvicina, finché serve. In alto a sinistra la scheda
- * della manovra, disegnata qui al posto di quella di Android Auto: freccia,
- * distanza, direzione, corsie e, avvicinandosi a un'uscita, lo svincolo col
- * cartello.
+ * Sopra la mappa dell'auto, poco e dentro l'area che le schede di Android
+ * Auto lasciano libera, perché la mappa si veda: in basso a sinistra, dal
+ * lato di chi guida, velocità e limite, e sopra una barra sottile coi dati
+ * dell'auto (batteria, km, alla meta), il meteo e la prossima sosta; in alto
+ * solo l'avviso della segnalazione che si avvicina, finché serve. Manovra,
+ * corsie, svincolo e arrivo no: stanno nelle schede di Android Auto, come
+ * vuole Google per i navigatori (NF-2). Qui si compone solo l'immagine dello
+ * svincolo col cartello, che va nella scheda ([svincoloConCartello]).
  */
 class PannelloAuto(context: Context, private val densita: Float) : View(context) {
     /** L'area non coperta dalle schede di Android Auto. */
@@ -58,138 +58,25 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val a = area ?: Rect(0, 0, width, height)
         val margine = dp(10f)
         val c = PonteAuto.cruscotto
-        val alto = a.top + margine
-        val sinistra = a.left + margine
-        val destra = a.right - margine
 
-        // In alto a sinistra, al posto di quella di Android Auto, la scheda
-        // della manovra: freccia, distanza, direzione, corsie e, avvicinandosi
-        // a un'uscita, lo svincolo col cartello; sotto, piccolo, «Poi».
-        val g = PonteAuto.guida
-        val scheda = g?.let { manovra(canvas, margine, margine, it) }
+        // In alto niente, per vedere la strada davanti: solo l'avviso che si
+        // avvicina (autovelox, polizia, incidente…), finché serve.
+        avviso(canvas, a.left + margine, a.right - margine, a.top + margine)
 
-        // Per il resto in alto niente, per vedere la strada davanti: solo
-        // l'avviso che si avvicina (autovelox, polizia, incidente…), finché
-        // serve, accanto alla scheda.
-        avviso(canvas, scheda?.let { it.right + dp(8f) } ?: sinistra, destra, alto)
-
-        // In basso a sinistra, dal lato di chi guida: la capsula con velocità,
-        // limite e arrivo, e sopra una barra sottile coi dati dell'auto e il
-        // meteo.
+        // In basso a sinistra, dal lato di chi guida: velocità e limite, e
+        // sopra una barra sottile coi dati dell'auto e il meteo.
         val tachimetro = velocita(canvas, a, c)
         barra(canvas, a, tachimetro, c)
-    }
-
-    private val immagine = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    private val fondoScheda = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(32, 33, 36) }
-    private val fondoCorsie = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(18, 19, 22) }
-
-    /** Le corsie già disegnate, per non rifarle a ogni fotogramma. */
-    private var corsieFatte: Pair<List<PonteAuto.CorsiaAuto>, Bitmap>? = null
-
-    private fun icona(id: Int, lato: Float, x: Float, y: Float, canvas: Canvas) {
-        val d = androidx.core.content.ContextCompat.getDrawable(context, id)?.mutate() ?: return
-        d.setTint(Color.WHITE)
-        d.setBounds(x.toInt(), y.toInt(), (x + lato).toInt(), (y + lato).toInt())
-        d.draw(canvas)
-    }
-
-    /** Il testo in righe larghe al più [spazio], al massimo [n]. */
-    private fun righe(p: Paint, testo: String, spazio: Float, n: Int): List<String> {
-        val fuori = mutableListOf<String>()
-        var riga = ""
-        for (parola in testo.split(" ")) {
-            val prova = if (riga.isEmpty()) parola else "$riga $parola"
-            if (p.measureText(prova) <= spazio || riga.isEmpty()) {
-                riga = prova
-            } else {
-                fuori += riga
-                riga = parola
-            }
-        }
-        if (riga.isNotEmpty()) fuori += riga
-        if (fuori.size <= n) return fuori
-        return fuori.take(n - 1) + taglia(p, fuori.drop(n - 1).joinToString(" "), spazio)
-    }
-
-    /**
-     * La scheda della manovra, in alto a sinistra: la disegniamo noi (quella
-     * di Android Auto è larga quanto vuole lui). In cima freccia, distanza e
-     * direzione; sotto le corsie o, avvicinandosi a un'uscita, lo svincolo
-     * col cartello; sotto la scheda, piccolo, «Poi». Restituisce dove sta.
-     */
-    private fun manovra(canvas: Canvas, x: Float, y: Float, g: PonteAuto.Guida): RectF {
-        val w = dp(340f)
-        val p = dp(16f)
-        val lato = dp(52f)
-        val grande = font(32f)
-        val medio = font(18f, grassetto = false, colore = Color.argb(225, 255, 255, 255))
-        val cartello = listOfNotNull(
-            g.uscita.takeIf { it.isNotEmpty() }?.let { "Uscita $it" },
-            g.verso.takeIf { it.isNotEmpty() },
-        ).joinToString(" · ")
-        val testo = when {
-            cartello.isNotEmpty() -> cartello
-            g.strada.isNotEmpty() -> g.strada
-            else -> g.istruzione
-        }
-        val xt = x + p + lato + dp(14f)
-        val direzione = righe(medio, testo, x + w - p - xt, 2)
-        val hTesta = max(lato + p * 2, p + dp(34f) + direzione.size * dp(24f) + dp(10f))
-        val vista = g.svincolo?.let { id -> PonteAuto.svincoli[id]?.let { svincoloConCartello(it, id, g) } }
-        val hVista = vista?.let { w * it.height / it.width } ?: 0f
-        val conCorsie = vista == null && g.corsie.isNotEmpty()
-        val hCorsie = if (conCorsie) dp(60f) else 0f
-        val box = RectF(x, y, x + w, y + hTesta + hVista + hCorsie)
-        val raggio = dp(18f)
-        canvas.save()
-        canvas.clipPath(android.graphics.Path().apply { addRoundRect(box, raggio, raggio, android.graphics.Path.Direction.CW) })
-        canvas.drawRect(box, fondoScheda)
-        icona(IconeManovra.icona(g.tipo), lato, x + p, y + (hTesta - lato) / 2, canvas)
-        canvas.drawText(distanza(g.distanzaM), xt, y + p + dp(30f), grande)
-        direzione.forEachIndexed { i, r -> canvas.drawText(r, xt, y + p + dp(58f) + i * dp(24f), medio) }
-        var sotto = y + hTesta
-        if (vista != null) {
-            canvas.drawBitmap(vista, null, RectF(x, sotto, x + w, sotto + hVista), immagine)
-            sotto += hVista
-        }
-        if (conCorsie) {
-            canvas.drawRect(RectF(x, sotto, x + w, sotto + hCorsie), fondoCorsie)
-            val fatte = corsieFatte?.takeIf { it.first == g.corsie }?.second
-                ?: ImmagineCorsie.disegna(g.corsie).also { corsieFatte = g.corsie to it }
-            val hc = dp(44f)
-            val wc = (hc * fatte.width / fatte.height).coerceAtMost(w - p * 2)
-            val hcr = wc * fatte.height / fatte.width
-            canvas.drawBitmap(fatte, null, RectF(x + (w - wc) / 2, sotto + (hCorsie - hcr) / 2, x + (w + wc) / 2, sotto + (hCorsie + hcr) / 2), immagine)
-        }
-        canvas.restore()
-        // «Poi», sotto la scheda.
-        var fondo = box.bottom
-        g.dopoTipo?.let { tipo ->
-            val t = g.dopoStrada.ifEmpty { " " }
-            val poi = font(16f, grassetto = false, colore = muto)
-            val nome = font(17f)
-            val larghezza = p + poi.measureText("Poi") + dp(10f) + dp(24f) + dp(10f) + nome.measureText(t) + p
-            val riga = RectF(x, fondo + dp(8f), x + larghezza.coerceAtMost(w), fondo + dp(8f) + dp(40f))
-            canvas.drawRoundRect(riga, dp(14f), dp(14f), fondoScheda)
-            canvas.drawText("Poi", riga.left + p, riga.centerY() + dp(6f), poi)
-            val xi = riga.left + p + poi.measureText("Poi") + dp(10f)
-            icona(IconeManovra.icona(tipo), dp(24f), xi, riga.centerY() - dp(12f), canvas)
-            val xn = xi + dp(34f)
-            canvas.drawText(taglia(nome, t, riga.right - p - xn), xn, riga.centerY() + dp(6f), nome)
-            fondo = riga.bottom
-        }
-        return RectF(box.left, box.top, box.right, fondo)
     }
 
     /** L'ultima vista composta per la scheda: id, cartello, immagine. */
     private var composta: Triple<Int, String, Bitmap>? = null
 
     /**
-     * La vista dello svincolo per il popup, col cartello dell'uscita disegnato sopra dal lato giusto e
-     * piantato coi suoi pali.
+     * La vista dello svincolo per la scheda della manovra, col cartello
+     * dell'uscita disegnato sopra dal lato giusto e piantato coi suoi pali.
      */
-    private fun svincoloConCartello(vista: Bitmap, id: Int, g: PonteAuto.Guida): Bitmap {
+    fun svincoloConCartello(vista: Bitmap, id: Int, g: PonteAuto.Guida): Bitmap {
         if (g.uscita.isEmpty() && g.verso.isEmpty()) return vista
         val chiave = "${g.uscita}|${g.verso}|${g.tipo}|${g.strada}"
         composta?.let { (i, k, b) -> if (i == id && k == chiave) return b }
@@ -403,7 +290,7 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val h = hRiga + hSosta
 
         // Dove: in basso a sinistra, sopra la capsula del tachimetro.
-        val x = margine
+        val x = a.left + margine
         val basso = tachimetro?.let { it.top - dp(8f) } ?: (a.bottom - margine)
         val box = RectF(x, basso - h, x + w, basso)
         canvas.drawRoundRect(box, dp(18f), dp(18f), sfondoScheda)
@@ -470,58 +357,36 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
 
     /**
      * In basso a sinistra, dal lato di chi guida, in una capsula sola: la
-     * velocità, il limite e (in guida) arrivo, tempo e km che restano.
-     * Restituisce dove sta.
+     * velocità e il limite. Arrivo, tempo e km che restano sono nella scheda
+     * di Android Auto. Restituisce dove sta.
      */
     private fun velocita(canvas: Canvas, a: Rect, c: PonteAuto.Cruscotto): RectF? {
-        val v = c.velocita
-        val g = PonteAuto.guida
-        if (v == null && g == null) return null
+        val v = c.velocita ?: return null
         val margine = dp(10f)
         val h = dp(54f)
-        val sinistra = margine
+        val sinistra = a.left + margine
         val basso = a.bottom - margine
         val cy = basso - h / 2
         val r = dp(22f)
 
-        // Da sinistra: velocità, limite, poi arrivo e tempo.
+        // Da sinistra: velocità, poi il limite.
         var x = sinistra + dp(5f)
-        val cxVelocita = v?.let { x + r }
-        if (v != null) x += r * 2 + dp(6f)
-        val cxLimite = c.limite?.takeIf { v != null }?.let { x + r * 0.9f }
-        if (cxLimite != null) x += r * 1.8f + dp(8f)
-        val ora = g?.let { java.text.SimpleDateFormat("HH:mm", java.util.Locale.ITALY).format(java.util.Date(it.arrivoMs)) }
-        val sotto = g?.let { "${tempo(it.restantiS)} · ${distanza(it.restantiM)}" }
-        val forte = font(21f)
-        val piccolo = font(13f, grassetto = false, colore = muto)
-        val destra = if (ora != null && sotto != null) {
-            x + dp(6f) + max(forte.measureText(ora), piccolo.measureText(sotto)) + dp(18f)
-        } else {
-            x
-        }
-        val box = RectF(sinistra, basso - h, destra, basso)
+        val cxVelocita = x + r
+        x += r * 2 + dp(6f)
+        val cxLimite = c.limite?.let { x + r * 0.9f }
+        if (cxLimite != null) x += r * 1.8f + dp(4f)
+        val box = RectF(sinistra, basso - h, x + dp(1f), basso)
         canvas.drawRoundRect(box, h / 2, h / 2, sfondoScheda)
-        if (ora != null && sotto != null) {
-            canvas.drawText(ora, x + dp(6f), cy - dp(1f), forte)
-            canvas.drawText(sotto, x + dp(6f), cy + dp(17f), piccolo)
-        }
         cxLimite?.let { cartello(canvas, it, cy, r * 0.9f, c.limite!!) }
-        if (v != null && cxVelocita != null) {
-            val oltre = c.limite != null && v > c.limite + 3
-            pieno.color = if (oltre) Color.rgb(229, 57, 53) else Color.WHITE
-            canvas.drawCircle(cxVelocita, cy, r, pieno)
-            numero.color = if (oltre) Color.WHITE else Color.rgb(32, 38, 51)
-            numero.textSize = dp(19f)
-            canvas.drawText("${v.roundToInt()}", cxVelocita, cy + dp(4f), numero)
-            numero.textSize = dp(8.5f)
-            canvas.drawText("km/h", cxVelocita, cy + dp(15f), numero)
-        }
+        val oltre = c.limite != null && v > c.limite + 3
+        pieno.color = if (oltre) Color.rgb(229, 57, 53) else Color.WHITE
+        canvas.drawCircle(cxVelocita, cy, r, pieno)
+        numero.color = if (oltre) Color.WHITE else Color.rgb(32, 38, 51)
+        numero.textSize = dp(19f)
+        canvas.drawText("${v.roundToInt()}", cxVelocita, cy + dp(4f), numero)
+        numero.textSize = dp(8.5f)
+        canvas.drawText("km/h", cxVelocita, cy + dp(15f), numero)
         return box
-    }
-
-    private fun tempo(secondi: Long): String {
-        val minuti = ((secondi + 30) / 60).coerceAtLeast(1)
-        return if (minuti < 60) "$minuti min" else "${minuti / 60} h ${"%02d".format(minuti % 60)}"
     }
 
     /** Da che parte va la manovra: 1 destra, -1 sinistra, 0 dritto. */

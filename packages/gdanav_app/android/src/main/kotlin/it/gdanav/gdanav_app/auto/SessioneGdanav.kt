@@ -35,7 +35,28 @@ open class SessioneGdanav(private val accendi: (Context) -> Unit) : Session() {
         accendi(carContext)
         ascoltaEnergia()
         // Android Auto fa parte di gdanav Premium.
-        return if (PonteAuto.premium(carContext)) SchermoNavigazione(carContext) else SchermoPremium(carContext)
+        if (!PonteAuto.premium(carContext)) return SchermoPremium(carContext)
+        val schermo = SchermoNavigazione(carContext)
+        naviga(intent)
+        return schermo
+    }
+
+    /** «Ok Google, naviga verso…» o un'altra app, con gdanav già aperto sull'auto. */
+    override fun onNewIntent(intent: Intent) {
+        if (intent.action != CarContext.ACTION_NAVIGATE || !PonteAuto.premium(carContext)) return
+        carContext.getCarService(androidx.car.app.ScreenManager::class.java).popToRoot()
+        naviga(intent)
+    }
+
+    /**
+     * Una richiesta di navigazione (NF-6, VC-1): `geo:45.4,9.1?q=…` o
+     * `geo:0,0?q=Via Roma 1, Milano`. La legge il telefono, che cerca se serve
+     * e parte.
+     */
+    private fun naviga(intent: Intent) {
+        if (intent.action != CarContext.ACTION_NAVIGATE) return
+        val uri = intent.dataString ?: return
+        PonteAuto.naviga(uri)
     }
 
     /** Batteria, autonomia, velocità e contachilometri dall'auto, se li passa: molte non lo fanno. */

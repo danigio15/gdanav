@@ -17,6 +17,7 @@ import 'stato/gestore_posizione.dart';
 import 'stato/gestore_segnalazioni.dart';
 import 'stato/gestore_vicini.dart';
 import 'stato/gestore_viaggio.dart';
+import 'stato/prova_di_guida.dart';
 import 'stato/posizione.dart';
 import 'stato/voce.dart';
 import 'sorgenti/sorgente_gdahome.dart';
@@ -62,14 +63,16 @@ Future<GdanavApp> preparaGdanav({
   auto.addListener(() => consumo.carica(auto.veicolo.id));
   final viaggio = GestoreViaggio(archivio: archivio, auto: auto, posizione: posizioneAttuale, consumo: consumo);
   viaggio.opzioni = await archivio.opzioniPercorso();
+  // La prova di guida di Android Auto: posizioni finte al posto del GPS.
+  final prova = ProvaDiGuida();
   final guida = GestoreGuida(
     viaggio: viaggio,
     auto: auto,
-    posizioni: posizioniGuida,
+    posizioni: prova.posizioni(posizioniGuida),
     voce: VoceTelefono(),
     consumo: consumo,
   );
-  final posizione = GestorePosizione(archivio: archivio, letture: lettureGps);
+  final posizione = GestorePosizione(archivio: archivio, letture: prova.letture(lettureGps));
   await posizione.carica();
   final segnalazioni = GestoreSegnalazioni(posizione: posizione, autovelox: archivioAutovelox());
   // Il meteo lungo la strada (Premium): nel consumo e sullo schermo.
@@ -99,6 +102,7 @@ Future<GdanavApp> preparaGdanav({
       segnalazioni: segnalazioni,
       meteo: meteo,
       vicini: vicini,
+      prova: prova,
     )..avvia();
     ponte.premium(premium.sbloccato);
     premium.addListener(() => ponte.premium(premium.sbloccato));

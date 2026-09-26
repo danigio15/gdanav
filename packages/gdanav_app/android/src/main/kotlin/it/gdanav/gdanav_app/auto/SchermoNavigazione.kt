@@ -1,5 +1,8 @@
 package it.gdanav.gdanav_app.auto
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
@@ -11,21 +14,25 @@ import androidx.car.app.navigation.NavigationManager
 import androidx.car.app.navigation.NavigationManagerCallback
 import androidx.car.app.navigation.model.MessageInfo
 import androidx.car.app.navigation.model.NavigationTemplate
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import it.gdanav.gdanav_app.R
 
 /**
- * Lo schermo dell'auto: la mappa di gdanav sotto (col cruscotto), sopra la
- * prossima manovra con la distanza e l'arrivo, come vuole Android Auto. In
- * alto Cerca, Menu e Fine; a lato sposta, + e −, 2D/3D e Centra.
+ * Lo schermo dell'auto: la mappa di gdanav sotto (con velocità, limite e dati
+ * dell'auto), sopra la prossima manovra con corsie, svincolo e arrivo nelle
+ * schede di Android Auto. In alto Cerca, Menu e Fine; a lato sposta, + e −,
+ * 2D/3D e Centra. In guida il viaggio va anche al cruscotto dell'auto e
+ * nella notifica di navigazione.
  */
 class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLifecycleObserver {
     private val renderer = RendererMappa(carContext)
     private val navigazione = carContext.getCarService(NavigationManager::class.java)
     private var navigando = false
     private var versione = -1
+    private val guidaAuto = GuidaAuto(carContext)
     private val aggiorna: () -> Unit = {
         renderer.aggiorna()
         sincronizzaNavigazione()
@@ -33,7 +40,19 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         // concede pochi aggiornamenti.
         if (PonteAuto.versioneModello != versione) {
             versione = PonteAuto.versioneModello
+            viaggioAlCruscotto()
             invalidate()
+        }
+    }
+
+    /** Il viaggio anche al cruscotto dell'auto e alle altre schermate (NF-4). */
+    private fun viaggioAlCruscotto() {
+        val g = PonteAuto.guida ?: return
+        if (!navigando) return
+        try {
+            navigazione.updateTrip(guidaAuto.viaggio(g))
+        } catch (e: Exception) {
+            // Un'auto senza cruscotto per le app: si guida lo stesso.
         }
     }
 
@@ -52,7 +71,11 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
                 PonteAuto.fermaDallAuto()
             }
 
-            override fun onAutoDriveEnabled() {}
+            // La prova di guida (NF-7): il revisore la accende da fermo, e il
+            // telefono percorre il viaggio da solo.
+            override fun onAutoDriveEnabled() {
+                PonteAuto.provaDiGuida()
+            }
         })
     }
 
@@ -63,6 +86,8 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
 
     override fun onDestroy(owner: LifecycleOwner) {
         PonteAuto.smetti(aggiorna)
+        // Finita la sessione in auto finisce anche la prova di guida.
+        PonteAuto.fineProva()
         if (navigando) navigazione.navigationEnded()
         navigando = false
     }
@@ -73,9 +98,27 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         if (guida && !navigando) {
             navigazione.navigationStarted()
             navigando = true
+            chiediNotifiche()
+            viaggioAlCruscotto()
         } else if (!guida && navigando) {
             navigazione.navigationEnded()
             navigando = false
+        }
+    }
+
+    private var notificheChieste = false
+
+    /** Da Android 13 le notifiche (quella della guida) vanno chieste: una volta. */
+    private fun chiediNotifiche() {
+        if (notificheChieste || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        notificheChieste = true
+        if (ContextCompat.checkSelfPermission(carContext, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
+        try {
+            carContext.requestPermissions(listOf(Manifest.permission.POST_NOTIFICATIONS)) { concessi, _ ->
+                if (concessi.isNotEmpty()) NotificaGuida.aggiorna(carContext, PonteAuto.guida)
+            }
+        } catch (e: Exception) {
+            // Chi non può chiederlo in auto lo chiederà l'app sul telefono.
         }
     }
 
@@ -161,10 +204,12 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             modello.setPanModeListener { inPan -> if (!inPan) renderer.segui() }
         }
         if (guida != null) {
-            // La scheda della manovra (freccia, distanza, corsie, svincolo),
-            // l'arrivo e la velocità li disegna il pannello sopra la mappa: così
-            // hanno la forma e la misura che vogliamo, e Android Auto non mette
-            // le sue schede.
+            // La manovra (freccia, distanza, corsie, svincolo col cartello)
+            // e l'arrivo nelle schede di Android Auto, come vuole Google per
+            // i navigatori (NF-2): sulla mappa restano velocità, limite e dati
+            // dell'auto.
+            modello.setNavigationInfo(guidaAuto.scheda(guida))
+            modello.setDestinationTravelEstimate(guidaAuto.stima(guida))
         } else {
             // Da fermi la mappa resta pulita; il riquadro solo se c'è qualcosa
             // da dire («Calcolo il percorso…», un errore).

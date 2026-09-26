@@ -135,7 +135,12 @@ object PonteAuto {
 
     fun smetti(f: () -> Unit) = ascoltatori.remove(f)
 
+    /** Per la notifica di navigazione. */
+    private var contesto: Context? = null
+    private var ultimaNotifica = 0L
+
     fun collega(messenger: BinaryMessenger, context: Context) {
+        contesto = context.applicationContext
         preferenze = context.applicationContext.getSharedPreferences("gdanav", Context.MODE_PRIVATE)
         canale = MethodChannel(messenger, "gdanav/schermo_auto").also { c ->
             c.setMethodCallHandler { call, risultato ->
@@ -260,7 +265,26 @@ object PonteAuto {
             }
         }
         if (call.method !in soloMappa && (call.method != "avviso" || avviso.ancoraId != prima)) versioneModello++
+        if (call.method == "guida") notifica()
         avvisa()
+    }
+
+    private var manovraNotificata: Int? = null
+
+    /**
+     * La notifica di navigazione segue la guida: subito se cambia la
+     * manovra o finisce, altrimenti (la distanza che scende) al più una volta
+     * al secondo.
+     */
+    private fun notifica() {
+        val c = contesto ?: return
+        val g = guida
+        val ora = System.currentTimeMillis()
+        val chiave = g?.let { "${it.tipo}|${it.strada}|${it.uscita}" }?.hashCode()
+        if (g != null && chiave == manovraNotificata && ora - ultimaNotifica < 1000) return
+        manovraNotificata = chiave
+        ultimaNotifica = ora
+        NotificaGuida.aggiorna(c, g)
     }
 
     private fun numero(call: MethodCall, chiave: String): Double? = (call.argument<Any?>(chiave) as? Number)?.toDouble()
@@ -394,6 +418,44 @@ object PonteAuto {
         dati["letto_ms"] = System.currentTimeMillis()
         principale.post { sinkEnergia?.success(dati) }
     }
+
+    /**
+     * Una richiesta di navigazione dall'assistente o da un'altra app: può
+     * arrivare mentre il motore Flutter si accende, e allora si riprova
+     * finché l'app non risponde (al più una ventina di secondi).
+     */
+    fun naviga(uri: String) {
+        messaggio = "Cerco la destinazione…"
+        versioneModello++
+        avvisa()
+        mandaConRiprova("naviga", mapOf("uri" to uri), 40)
+    }
+
+    private fun mandaConRiprova(metodo: String, argomenti: Any?, tentativi: Int) {
+        principale.post {
+            val c = canale
+            val riprova = {
+                if (tentativi > 1) principale.postDelayed({ mandaConRiprova(metodo, argomenti, tentativi - 1) }, 500)
+            }
+            if (c == null) {
+                riprova()
+                return@post
+            }
+            c.invokeMethod(metodo, argomenti, object : MethodChannel.Result {
+                override fun success(r: Any?) {}
+
+                override fun error(codice: String, messaggio: String?, dettagli: Any?) {}
+
+                override fun notImplemented() = riprova()
+            })
+        }
+    }
+
+    /** La sessione dell'auto è finita: la prova di guida smette con lei. */
+    fun fineProva() = principale.post { canale?.invokeMethod("prova_fine", null) }
+
+    /** Android Auto ha acceso la prova di guida (NF-7): la simula il telefono. */
+    fun provaDiGuida() = principale.post { canale?.invokeMethod("prova_guida", null) }
 
     /** L'auto ha chiesto di finire la guida (tasto sullo schermo o assistente). */
     fun fermaDallAuto() = principale.post { canale?.invokeMethod("ferma", null) }
