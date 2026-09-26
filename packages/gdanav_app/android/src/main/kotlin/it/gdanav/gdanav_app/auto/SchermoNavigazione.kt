@@ -31,15 +31,24 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     private val renderer = RendererMappa(carContext)
     private val navigazione = carContext.getCarService(NavigationManager::class.java)
     private var navigando = false
-    private var versione = -1
     private val guidaAuto = GuidaAuto(carContext)
+
+    /**
+     * Quello che questo schermo ha in pagina: la manovra, il messaggio da
+     * fermi, la segnalazione appena passata. La mappa sotto si ridisegna per
+     * conto suo, che il modello si rifaccia o no.
+     */
+    private fun firma(): Any? = listOf(PonteAuto.guida, PonteAuto.messaggio, PonteAuto.avviso.ancoraId)
+
+    private var disegnata: Any? = null
     private val aggiorna: () -> Unit = {
         renderer.aggiorna()
         sincronizzaNavigazione()
-        // Il modello si rifà solo se cambia qualcosa che mostra: l'auto
-        // concede pochi aggiornamenti.
-        if (PonteAuto.versioneModello != versione) {
-            versione = PonteAuto.versioneModello
+        // Il modello si rifà solo se cambia quello che mostra: l'auto concede
+        // pochi aggiornamenti.
+        val ora = firma()
+        if (ora != disegnata) {
+            disegnata = ora
             viaggioAlCruscotto()
             invalidate()
         }
@@ -195,7 +204,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     }
 
     override fun onGetTemplate(): Template {
-        versione = PonteAuto.versioneModello
+        disegnata = firma()
         val guida = PonteAuto.guida
         val modello = NavigationTemplate.Builder()
             .setActionStrip(azioni())

@@ -164,18 +164,7 @@ object PonteAuto {
         })
     }
 
-    /**
-     * Cresce quando cambia qualcosa dei modelli di Android Auto (manovra,
-     * messaggi, luoghi, opzioni): il resto (posizione, cruscotto) ridisegna
-     * solo la mappa, senza consumare gli aggiornamenti concessi dall'auto.
-     */
-    @Volatile var versioneModello = 0
-        private set
-
-    private val soloMappa = setOf("posizione", "sorgenti", "cruscotto", "immagini", "stili")
-
     private fun gestisci(call: MethodCall) {
-        val prima = avviso.ancoraId
         when (call.method) {
             "stili" -> {
                 stileChiaro = call.argument("chiaro")
@@ -271,7 +260,6 @@ object PonteAuto {
                 }
             }
         }
-        if (call.method !in soloMappa && (call.method != "avviso" || avviso.ancoraId != prima)) versioneModello++
         if (call.method == "guida") notifica()
         avvisa()
     }
@@ -344,7 +332,6 @@ object PonteAuto {
     /** In guida: si passa dal distributore e poi si prosegue; fermi, ci si va. */
     fun passa(l: Luogo) {
         messaggio = "Passo da ${l.etichetta}…"
-        versioneModello++
         avvisa()
         principale.post { canale?.invokeMethod("passa", l.comeMappa()) }
     }
@@ -386,11 +373,16 @@ object PonteAuto {
     /** Una meta scelta sull'auto: il telefono calcola e parte la guida. */
     fun vai(l: Luogo) {
         messaggio = "Calcolo il percorso per ${l.etichetta}…"
-        versioneModello++
         avvisa()
         principale.post { canale?.invokeMethod("vai", l.comeMappa()) }
     }
 
+    /**
+     * Il telefono ha mandato qualcosa. Ogni schermo aperto guarda da sé se è
+     * cambiato quello che ha in pagina (la firma di [SchermoAggiornato]) e
+     * solo allora si rifà: la guida arriva ogni secondo, e rifare tutto ogni
+     * secondo fa tremare gli schermi che della guida non mostrano niente.
+     */
     private fun avvisa() = principale.post { ascoltatori.forEach { it() } }
 
     private var ultimaVelocita: Double? = null
@@ -433,7 +425,6 @@ object PonteAuto {
      */
     fun naviga(uri: String) {
         messaggio = "Cerco la destinazione…"
-        versioneModello++
         avvisa()
         mandaConRiprova("naviga", mapOf("uri" to uri), 40)
     }

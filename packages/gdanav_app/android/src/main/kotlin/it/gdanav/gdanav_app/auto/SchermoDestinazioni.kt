@@ -1,37 +1,21 @@
 package it.gdanav.gdanav_app.auto
 
 import androidx.car.app.CarContext
-import androidx.car.app.Screen
 import androidx.car.app.constraints.ConstraintManager
 import androidx.car.app.model.Action
 import androidx.car.app.model.CarColor
-import androidx.car.app.model.CarIcon
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
-import androidx.core.graphics.drawable.IconCompat
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
 import it.gdanav.gdanav_app.R
 
 /** «Dove andiamo?» sull'auto: Cerca, poi Casa, Lavoro, i preferiti e i recenti. */
-class SchermoDestinazioni(carContext: CarContext) : Screen(carContext), DefaultLifecycleObserver {
-    private val aggiorna: () -> Unit = { invalidate() }
+class SchermoDestinazioni(carContext: CarContext) : SchermoAggiornato(carContext) {
+    // In pagina: le mete che manda il telefono, e basta.
+    override fun firma(): Any? = PonteAuto.luoghi
 
-    init {
-        lifecycle.addObserver(this)
-    }
-
-    override fun onCreate(owner: LifecycleOwner) {
-        PonteAuto.ascolta(aggiorna)
-    }
-
-    override fun onDestroy(owner: LifecycleOwner) {
-        PonteAuto.smetti(aggiorna)
-    }
-
-    override fun onGetTemplate(): Template {
+    override fun schermata(): Template {
         val elenco = ItemList.Builder()
         elenco.addItem(
             Row.Builder()
@@ -64,9 +48,6 @@ class SchermoDestinazioni(carContext: CarContext) : Screen(carContext), DefaultL
             .setSingleList(elenco.build())
             .build()
     }
-
-    private fun icona(id: Int, colore: CarColor = CarColor.DEFAULT): CarIcon =
-        CarIcon.Builder(IconCompat.createWithResource(carContext, id)).setTint(colore).build()
 
     private fun titolo(l: PonteAuto.Luogo): String = when (l.tipo) {
         "casa" -> "Casa"
