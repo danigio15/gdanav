@@ -34,10 +34,15 @@ class SchermoPremium(carContext: CarContext) : Screen(carContext), DefaultLifecy
     }
 
     override fun onGetTemplate(): Template {
+        val ospite = PonteAuto.premiumOspite(carContext)
         val messaggio = MessageTemplate.Builder(
-            "La navigazione in auto fa parte di gdanav Premium. Sbloccalo dall'app sul telefono: menu → Premium.",
+            if (ospite) {
+                "La navigazione in auto fa parte del Premium di gdahome. Attivalo dall'app gdahome sul telefono."
+            } else {
+                "La navigazione in auto fa parte di gdanav Premium. Sbloccalo dall'app sul telefono: menu → Premium."
+            },
         )
-            .setTitle("gdanav Premium")
+            .setTitle(if (ospite) "gdahome Premium" else "gdanav Premium")
             .setHeaderAction(Action.APP_ICON)
             .addAction(
                 Action.Builder()

@@ -217,4 +217,33 @@ void main() {
     expect(find.text('Premium è attivo: grazie!'), findsOneWidget);
     expect(find.byKey(const Key('compra-premium')), findsNothing);
   });
+
+  testWidgets('dentro gdahome Premium lo decide gdahome, senza il negozio di gdanav', (tester) async {
+    final gdahome = ValueNotifier(false);
+    final p = GestorePremium(archivio: Archivio(), ospite: gdahome, tuttoSbloccato: false);
+    await tester.runAsync(p.carica);
+    expect(p.sbloccato, isFalse);
+    expect(p.daOspite, isTrue);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: temaGdanav(Brightness.light),
+        home: SchermataPremium(premium: p, perche: 'Home Assistant'),
+      ),
+    );
+    expect(find.textContaining('fa parte del Premium di gdahome'), findsOneWidget);
+    expect(find.byKey(const Key('compra-premium')), findsNothing);
+
+    // Comprato in gdahome: si sblocca tutto, subito.
+    gdahome.value = true;
+    await tester.pump();
+    expect(p.sbloccato, isTrue);
+    expect(GestorePremium.attivo.value, isTrue);
+    expect(find.textContaining('Premium è attivo con gdahome'), findsOneWidget);
+
+    // Scaduto in gdahome: si richiude.
+    gdahome.value = false;
+    await tester.pump();
+    expect(p.sbloccato, isFalse);
+    p.dispose();
+  });
 }
