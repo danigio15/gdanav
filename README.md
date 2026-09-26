@@ -13,7 +13,8 @@ arrivano gli abbonati.
 | Cartella | Cosa | Linguaggio |
 | --- | --- | --- |
 | [`packages/gdanav_core`](packages/gdanav_core) | Il motore: consumi, soste di ricarica, sorgenti dei dati dell'auto, protocollo con Home Assistant | Dart puro |
-| [`app`](app) | L'app Android e iOS: mappa, switch «Fonte dati auto», abbinamento con Home Assistant | Flutter |
+| [`packages/gdanav_app`](packages/gdanav_app) | Lo schermo: mappa, guida, switch «Fonte dati auto», abbinamento con Home Assistant. Lo usano l'app e gdahome | Flutter |
+| [`app`](app) | L'app Android e iOS: l'involucro del pacchetto qui sopra, con Android Auto | Flutter |
 | [`custom_components/gdanav`](custom_components/gdanav) | L'integrazione Home Assistant, da installare con HACS | Python |
 | [`relay`](relay) | Il punto d'incontro fra Home Assistant e l'app, cifrato end-to-end | Cloudflare Worker |
 | [`valhalla`](valhalla) | Il server dei percorsi, per Oracle Cloud Always Free | Docker + Caddy |
@@ -27,8 +28,11 @@ lì: questa repository si aggiunge a HACS così com'è.
     # Il motore
     cd packages/gdanav_core && dart pub get && dart test
 
+    # Lo schermo
+    cd packages/gdanav_app && flutter pub get && flutter analyze && flutter test
+
     # L'app
-    cd app && flutter pub get && flutter analyze && flutter test
+    cd app && flutter pub get && flutter analyze
 
     # L'integrazione (serve Python 3.13)
     pip install -r requirements_test.txt && pytest

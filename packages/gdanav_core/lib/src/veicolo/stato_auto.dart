@@ -10,6 +10,10 @@ enum TipoSorgente {
   /// Dongle OBD-II via Bluetooth LE.
   obd,
 
+  /// gdahome: l'auto della sezione Auto della sua plancia, quando gdanav gira
+  /// dentro l'app gdahome. Senza abbinamento: la casa è già collegata lì.
+  gdahome,
+
   /// Home Assistant, attraverso l'integrazione gdanav.
   homeAssistant,
 

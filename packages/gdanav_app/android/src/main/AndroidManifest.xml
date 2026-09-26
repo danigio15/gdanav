@@ -1,0 +1,19 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Quello che serve a gdanav sul telefono, in qualunque app stia: si
+         unisce da solo al manifesto di chi lo porta dentro (l'app gdanav,
+         gdahome). Android Auto invece lo dichiara l'app. -->
+    <!-- Mappe, percorsi, relay di Home Assistant. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- La posizione per navigare. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Il dongle OBD Bluetooth: solo per parlarci, non per localizzare. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <queries>
+        <!-- La voce della guida: la sintesi vocale del telefono. -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+</manifest>

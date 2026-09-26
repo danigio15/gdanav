@@ -24,18 +24,24 @@ jobs:
 
   app:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: app
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.47.5
           channel: stable
+      # Lo schermo di gdanav sta nel pacchetto (lo porta dentro anche gdahome):
+      # le prove sono lì. L'app è l'involucro, e basta che compili.
       - run: flutter pub get
+        working-directory: packages/gdanav_app
       - run: flutter analyze
+        working-directory: packages/gdanav_app
       - run: flutter test
+        working-directory: packages/gdanav_app
+      - run: flutter pub get
+        working-directory: app
+      - run: flutter analyze
+        working-directory: app
 
   integrazione:
     runs-on: ubuntu-latest
@@ -214,7 +220,7 @@ jobs:
 
   # Le foto vere delle auto, da Wikimedia Commons: solo quando il commit lo
   # chiede con «[foto-auto]». Il JSON va nella release «anteprima», da
-  # controllare e mettere in app/assets.
+  # controllare e mettere in packages/gdanav_app/assets.
   foto-auto:
     if: contains(github.event.head_commit.message, '[foto-auto]')
     runs-on: ubuntu-latest
@@ -240,7 +246,7 @@ jobs:
   # Le colonnine rapide per l'archivio dentro l'app, dagli estratti completi
   # di OpenStreetMap (Geofabrik) filtrati con osmium: niente Overpass, che è
   # spesso sovraccarico. Solo quando il commit lo chiede con «[colonnine]»;
-  # il JSON va nella release «anteprima», da mettere in app/assets.
+  # il JSON va nella release «anteprima», da mettere in packages/gdanav_app/assets.
   colonnine-dati:
     if: contains(github.event.head_commit.message, '[colonnine]')
     runs-on: ubuntu-latest
@@ -342,3 +348,24 @@ jobs:
           gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "$note"
           gh release upload anteprima gdanav.apk gdanav.aab --clobber
           gh release edit anteprima --notes "$note"
+
+  # gdahome si aggiorna da sola a ogni gdanav nuovo su main: le si dice che
+  # c'è, e il suo workflow «Aggiorna gdanav» porta il nuovo pacchetto, fa le
+  # prove e apre la richiesta di unione. Serve il segreto GDAHOME_TOKEN (un
+  # token con permesso Actions e Contents su danigio15/gdahomeapp): senza,
+  # gdahome se ne accorge lo stesso al suo giro di ogni notte.
+  avvisa-gdahome:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [app, motore]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GDAHOME_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::gdahome non avvisata: manca il segreto GDAHOME_TOKEN. Si aggiornerà al suo giro di ogni notte."
+            exit 0
+          fi
+          gh api repos/danigio15/gdahomeapp/dispatches \
+            -f event_type=gdanav-aggiornato \
+            -f "client_payload[commit]=$GITHUB_SHA"

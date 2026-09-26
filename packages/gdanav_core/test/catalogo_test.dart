@@ -83,4 +83,24 @@ void main() {
       expect(veicoloPerId('nissan-leaf-e-plus')!.connettori, isNot(contains(TipoConnettore.ccs2)));
     });
   });
+
+  group('l\'auto scritta da gdahome', () {
+    test('marca e modello come li scrive la plancia', () {
+      expect(veicoloPerNome('Renault', 'Zoe R135')?.id, 'renault-zoe-r135');
+      expect(veicoloPerNome('Tesla', 'Model 3 Long Range')?.id, 'tesla-model-3-lr');
+      expect(veicoloPerNome('Tesla', 'Tesla Model 3 Long Range')?.id, 'tesla-model-3-lr');
+      expect(veicoloPerNome('fiat', '500e', kwh: 37.3)?.marca, 'Fiat');
+    });
+
+    test('a parità di parole vince la batteria più vicina', () {
+      expect(veicoloPerNome('Renault', '5 E-Tech', kwh: 52)?.id, 'renault-5-52');
+      expect(veicoloPerNome('Renault', '5 E-Tech', kwh: 40)?.id, 'renault-5-40');
+    });
+
+    test('se non torna niente, niente', () {
+      expect(veicoloPerNome('Renault', ''), isNull);
+      expect(veicoloPerNome('Marca che non c\'è', 'Qualcosa'), isNull);
+      expect(veicoloPerNome('Tesla', 'Cybertruck'), isNull);
+    });
+  });
 }

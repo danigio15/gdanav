@@ -30,17 +30,20 @@ class ArbitroSorgenti {
     TipoSorgente.automotive,
     TipoSorgente.androidAuto,
     TipoSorgente.obd,
+    TipoSorgente.gdahome,
     TipoSorgente.homeAssistant,
     TipoSorgente.manuale,
   ];
 
   /// Oltre questa età una lettura non conta più come fresca. Home Assistant
-  /// ha più margine perché le integrazioni dei costruttori aggiornano piano;
+  /// (anche quello che arriva da gdahome) ha più margine perché le
+  /// integrazioni dei costruttori aggiornano piano;
   /// il manuale vale solo come punto di partenza della stima.
   static const freschezzaPredefinita = {
     TipoSorgente.automotive: Duration(seconds: 30),
     TipoSorgente.androidAuto: Duration(seconds: 30),
     TipoSorgente.obd: Duration(seconds: 30),
+    TipoSorgente.gdahome: Duration(minutes: 5),
     TipoSorgente.homeAssistant: Duration(minutes: 5),
     TipoSorgente.manuale: Duration.zero,
   };
