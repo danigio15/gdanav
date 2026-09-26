@@ -420,16 +420,16 @@ jobs:
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
           printf '%s' "$CHIAVE" > ~/.appstoreconnect/private_keys/AuthKey_$CHIAVE_ID.p8
-          # Con la chiave dell'App Store Connect, Xcode si fa dare certificato
-          # e profilo da Apple: niente da tenere nei segreti oltre a lei.
+          # L'archivio si fa senza firma: con la firma automatica Xcode lo
+          # firmerebbe «per sviluppo», e quel profilo vuole almeno un iPhone
+          # registrato nell'account. La firma per l'App Store la mette
+          # l'esportazione qui sotto: con la chiave dell'App Store Connect,
+          # certificato e profilo li tiene Apple, niente nei segreti oltre a lei.
           xcodebuild -workspace ios/Runner.xcworkspace \
             -scheme Runner -configuration Release -sdk iphoneos \
             -archivePath build/gdanav.xcarchive archive \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_$CHIAVE_ID.p8 \
-            -authenticationKeyID "$CHIAVE_ID" \
-            -authenticationKeyIssuerID "$EMITTENTE" \
-            DEVELOPMENT_TEAM="$SQUADRA" CODE_SIGN_STYLE=Automatic
+            DEVELOPMENT_TEAM="$SQUADRA" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
       # Su TestFlight solo da main (o a mano): le richieste di unione si
       # fermano all'archivio firmato.
       - name: Su TestFlight
