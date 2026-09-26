@@ -24,6 +24,7 @@ import '../stato/gestore_posizione.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/prova_di_guida.dart';
+import 'richiesta_navigazione.dart';
 import '../stato/gestore_vicini.dart';
 
 /// Tiene aggiornato lo schermo di Android Auto: stile, percorso, colonnine,
@@ -129,6 +130,13 @@ class PonteAuto {
       // da sola, e se non c'è ancora una meta se ne sceglie una.
       case 'prova_guida':
         await provaDiGuida();
+      // La sessione dell'auto è finita: la prova di guida pure.
+      case 'prova_fine':
+        _conProva = false;
+        _seguiProva();
+      // «Ok Google, naviga verso…» o un'altra app che chiede un percorso.
+      case 'naviga':
+        await naviga(a['uri'] as String? ?? '');
       // «Fine» premuto sullo schermo dell'auto.
       case 'ferma':
         if (guida.attiva) await guida.ferma();
@@ -354,6 +362,40 @@ class PonteAuto {
       },
       if (passata != null) ...{'ancora_id': passata.id, 'ancora_testo': '${passata.tipo.nome}: c\'è ancora?'},
     });
+  }
+
+  /// Una richiesta di navigazione (NF-6, VC-1): con il punto si parte
+  /// subito, altrimenti si cerca e si va al primo risultato; una tappa
+  /// (`add_a_stop`) in guida si aggiunge al viaggio.
+  Future<void> naviga(String uri) async {
+    final r = RichiestaNavigazione.leggi(uri);
+    if (r == null) {
+      _manda('messaggio', {'testo': 'Non ho capito dove andare.'});
+      return;
+    }
+    Luogo? meta;
+    if (r.punto case final p?) {
+      meta = Luogo(nome: r.testo ?? 'Destinazione', posizione: p);
+    } else {
+      try {
+        final trovati = await viaggio.luoghi.cerca(r.testo!, vicinoA: posizione.qui ?? viaggio.ultimaPosizione);
+        meta = trovati.firstOrNull;
+      } catch (_) {
+        meta = null;
+      }
+    }
+    if (meta == null) {
+      _manda('messaggio', {'testo': 'Non trovo «${r.testo}».'});
+      return;
+    }
+    if (r.tappa && guida.attiva) {
+      await guida.passaDa(meta);
+      return;
+    }
+    if (guida.attiva) await guida.ferma();
+    await luoghi?.usato(meta);
+    await viaggio.vaiA(meta);
+    if (viaggio.stato is ViaggioPronto) guida.avvia();
   }
 
   var _conProva = false;

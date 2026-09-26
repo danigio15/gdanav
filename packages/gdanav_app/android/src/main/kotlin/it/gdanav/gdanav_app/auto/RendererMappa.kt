@@ -38,7 +38,11 @@ import kotlin.math.ln
  * stessi dati e stesso segnaposto del telefono. Si sposta e si ingrandisce
  * col dito (o la manopola): dopo un po' torna da sola sull'auto.
  */
-class RendererMappa(private val carContext: CarContext) : SurfaceCallback {
+class RendererMappa(
+    private val carContext: CarContext,
+    /** Sul quadro strumenti (NF-9): solo la mappa, niente sopra. */
+    private val soloMappa: Boolean = false,
+) : SurfaceCallback {
     private var display: VirtualDisplay? = null
     private var presentazione: Presentation? = null
     private var mappaView: MapView? = null
@@ -75,7 +79,7 @@ class RendererMappa(private val carContext: CarContext) : SurfaceCallback {
         val superficie = contenitore.surface ?: return
         val gestore = carContext.getSystemService(DisplayManager::class.java)
         val d = gestore.createVirtualDisplay(
-            "gdanav-auto",
+            if (soloMappa) "gdanav-quadro" else "gdanav-auto",
             contenitore.width,
             contenitore.height,
             contenitore.dpi,
@@ -89,11 +93,11 @@ class RendererMappa(private val carContext: CarContext) : SurfaceCallback {
         val p = Presentation(carContext, d.display)
         val contenuto = FrameLayout(p.context)
         val vista = MapView(p.context)
-        val sopra = PannelloAuto(p.context, contenitore.dpi / 160f)
-        sopra.area = areaVisibile
+        val sopra = if (soloMappa) null else PannelloAuto(p.context, contenitore.dpi / 160f)
+        sopra?.area = areaVisibile
         val tutto = FrameLayout.LayoutParams.MATCH_PARENT
         contenuto.addView(vista, FrameLayout.LayoutParams(tutto, tutto))
-        contenuto.addView(sopra, FrameLayout.LayoutParams(tutto, tutto))
+        sopra?.let { contenuto.addView(it, FrameLayout.LayoutParams(tutto, tutto)) }
         p.setContentView(contenuto)
         vista.onCreate(null)
         vista.onStart()

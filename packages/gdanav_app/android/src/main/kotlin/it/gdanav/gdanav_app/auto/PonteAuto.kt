@@ -419,6 +419,41 @@ object PonteAuto {
         principale.post { sinkEnergia?.success(dati) }
     }
 
+    /**
+     * Una richiesta di navigazione dall'assistente o da un'altra app: può
+     * arrivare mentre il motore Flutter si accende, e allora si riprova
+     * finché l'app non risponde (al più una ventina di secondi).
+     */
+    fun naviga(uri: String) {
+        messaggio = "Cerco la destinazione…"
+        versioneModello++
+        avvisa()
+        mandaConRiprova("naviga", mapOf("uri" to uri), 40)
+    }
+
+    private fun mandaConRiprova(metodo: String, argomenti: Any?, tentativi: Int) {
+        principale.post {
+            val c = canale
+            val riprova = {
+                if (tentativi > 1) principale.postDelayed({ mandaConRiprova(metodo, argomenti, tentativi - 1) }, 500)
+            }
+            if (c == null) {
+                riprova()
+                return@post
+            }
+            c.invokeMethod(metodo, argomenti, object : MethodChannel.Result {
+                override fun success(r: Any?) {}
+
+                override fun error(codice: String, messaggio: String?, dettagli: Any?) {}
+
+                override fun notImplemented() = riprova()
+            })
+        }
+    }
+
+    /** La sessione dell'auto è finita: la prova di guida smette con lei. */
+    fun fineProva() = principale.post { canale?.invokeMethod("prova_fine", null) }
+
     /** Android Auto ha acceso la prova di guida (NF-7): la simula il telefono. */
     fun provaDiGuida() = principale.post { canale?.invokeMethod("prova_guida", null) }
 

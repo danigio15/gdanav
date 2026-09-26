@@ -43,6 +43,13 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- «Ok Google, naviga verso…» e le altre app che chiedono un
+                 percorso in auto (NF-6): le riceve la sessione d'auto. -->
+            <intent-filter>
+                <action android:name="androidx.car.app.action.NAVIGATE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="geo" />
+            </intent-filter>
         </activity>
         <service
             android:name=".auto.GdanavCarAppService"
@@ -50,6 +57,8 @@
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
                 <category android:name="androidx.car.app.category.NAVIGATION" />
+                <!-- Anche il quadro strumenti dietro al volante (NF-9). -->
+                <category android:name="androidx.car.app.category.FEATURE_CLUSTER" />
             </intent-filter>
         </service>
         <meta-data

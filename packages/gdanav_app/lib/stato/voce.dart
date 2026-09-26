@@ -16,9 +16,15 @@ class VoceTelefono implements Voce {
       if (!_pronta) {
         await _tts.setLanguage('it-IT');
         await _tts.setSpeechRate(0.5);
+        // Android: la voce sul canale della navigazione, che abbassa la musica
+        // mentre parla invece di sovrapporsi (DD-1). Altrove non c'è.
+        try {
+          await _tts.setAudioAttributesForNavigation();
+        } catch (_) {}
         _pronta = true;
       }
-      await _tts.speak(frase);
+      // Il fuoco audio per la frase, poi la musica torna su.
+      await _tts.speak(frase, focus: true);
     } catch (_) {
       // Senza sintesi vocale si guida lo stesso: il banner c'è.
     }

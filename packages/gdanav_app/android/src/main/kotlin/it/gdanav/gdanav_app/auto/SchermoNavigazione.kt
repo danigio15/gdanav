@@ -86,6 +86,8 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
 
     override fun onDestroy(owner: LifecycleOwner) {
         PonteAuto.smetti(aggiorna)
+        // Finita la sessione in auto finisce anche la prova di guida.
+        PonteAuto.fineProva()
         if (navigando) navigazione.navigationEnded()
         navigando = false
     }
