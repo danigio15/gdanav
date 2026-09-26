@@ -349,6 +349,121 @@ jobs:
           gh release upload anteprima gdanav.apk gdanav.aab --clobber
           gh release edit anteprima --notes "$note"
 
+  # L'app per iPhone. La costruisce solo un Mac, e i Mac di GitHub costano
+  # dieci volte i minuti degli altri: gira su main, sulle richieste di unione
+  # e a mano, non a ogni push.
+  #
+  # Compila sempre (senza firma): se è verde, i plugin nativi e CarPlay stanno
+  # in piedi. Con le chiavi di Apple nei segreti (vedi docs/ios.md) firma e
+  # manda su TestFlight, da dove si installa sull'iPhone. Senza, finisce
+  # verde lo stesso e dice cosa manca.
+  iphone:
+    runs-on: macos-15
+    needs: [app, motore]
+    if: github.event_name != 'push' || github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      # L'App Store vuole l'SDK di iOS più recente: si usa l'Xcode più nuovo
+      # che la macchina ha.
+      - name: L'Xcode più recente
+        run: |
+          xcode="$(ls -d /Applications/Xcode_*.app | grep -v -i beta | sort -V | tail -1)"
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+      - run: flutter pub get
+      # Il numero sale a ogni build: TestFlight non accetta due volte lo stesso.
+      - name: Compila (senza firma)
+        run: >-
+          flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
+          --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM"
+          --dart-define=GDANAV_OCM_CHIAVE="$OCM"
+        env:
+          TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
+          OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
+      - name: Ci sono le chiavi di Apple?
+        id: chiavi
+        env:
+          CHIAVE: ${{ secrets.APPLE_CHIAVE_P8 }}
+          CHIAVE_ID: ${{ secrets.APPLE_CHIAVE_ID }}
+          EMITTENTE: ${{ secrets.APPLE_EMITTENTE }}
+          SQUADRA: ${{ secrets.APPLE_SQUADRA }}
+        run: |
+          if [ -n "$CHIAVE" ] && [ -n "$CHIAVE_ID" ] && [ -n "$EMITTENTE" ] && [ -n "$SQUADRA" ]; then
+            echo "ci-sono=si" >> "$GITHUB_OUTPUT"
+          else
+            echo "ci-sono=no" >> "$GITHUB_OUTPUT"
+            {
+              echo "### L'app per iPhone è compilata, e non è firmata"
+              echo ""
+              echo "Per TestFlight servono i quattro segreti di Apple: vedi docs/ios.md."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      # CarPlay si accende solo quando Apple ha concesso il permesso
+      # (variabile GDANAV_CARPLAY = si): prima, la firma non passerebbe.
+      - name: CarPlay
+        if: vars.GDANAV_CARPLAY == 'si'
+        run: cp ios/Runner/RunnerCarPlay.entitlements ios/Runner/Runner.entitlements
+      - name: L'archivio firmato
+        if: steps.chiavi.outputs.ci-sono == 'si'
+        env:
+          CHIAVE: ${{ secrets.APPLE_CHIAVE_P8 }}
+          CHIAVE_ID: ${{ secrets.APPLE_CHIAVE_ID }}
+          EMITTENTE: ${{ secrets.APPLE_EMITTENTE }}
+          SQUADRA: ${{ secrets.APPLE_SQUADRA }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          printf '%s' "$CHIAVE" > ~/.appstoreconnect/private_keys/AuthKey_$CHIAVE_ID.p8
+          # L'archivio si fa senza firma: con la firma automatica Xcode lo
+          # firmerebbe «per sviluppo», e quel profilo vuole almeno un iPhone
+          # registrato nell'account. La firma per l'App Store la mette
+          # l'esportazione qui sotto: con la chiave dell'App Store Connect,
+          # certificato e profilo li tiene Apple, niente nei segreti oltre a lei.
+          xcodebuild -workspace ios/Runner.xcworkspace \
+            -scheme Runner -configuration Release -sdk iphoneos \
+            -archivePath build/gdanav.xcarchive archive \
+            DEVELOPMENT_TEAM="$SQUADRA" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+      # Su TestFlight solo da main (o a mano): le richieste di unione si
+      # fermano all'archivio firmato.
+      - name: Su TestFlight
+        if: steps.chiavi.outputs.ci-sono == 'si' && github.event_name != 'pull_request'
+        env:
+          CHIAVE_ID: ${{ secrets.APPLE_CHIAVE_ID }}
+          EMITTENTE: ${{ secrets.APPLE_EMITTENTE }}
+          SQUADRA: ${{ secrets.APPLE_SQUADRA }}
+        run: |
+          cat > build/esporta.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>$SQUADRA</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>destination</key><string>upload</string>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath build/gdanav.xcarchive \
+            -exportPath build/ipa \
+            -exportOptionsPlist build/esporta.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_$CHIAVE_ID.p8 \
+            -authenticationKeyID "$CHIAVE_ID" \
+            -authenticationKeyIssuerID "$EMITTENTE"
+          {
+            echo "### gdanav ${{ github.run_number }} su TestFlight"
+            echo ""
+            echo "Fra qualche minuto arriva la notifica di Apple: da TestFlight sull'iPhone si installa."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # gdahome si aggiorna da sola a ogni gdanav nuovo su main: le si dice che
   # c'è, e il suo workflow «Aggiorna gdanav» porta il nuovo pacchetto, fa le
   # prove e apre la richiesta di unione. Serve il segreto GDAHOME_TOKEN (un

@@ -4,7 +4,7 @@ Flutter, Android e iOS. Il motore sta in
 [`../packages/gdanav_core`](../packages/gdanav_core); lo schermo — mappa,
 guida, schermate — in [`../packages/gdanav_app`](../packages/gdanav_app), che
 porta gdanav anche dentro gdahome come sezione. Qui resta l'app: l'icona,
-Android Auto, iOS.
+Android Auto, iOS. Per l'iPhone e CarPlay: [`../docs/ios.md`](../docs/ios.md).
 
     flutter pub get
     flutter analyze
@@ -42,12 +42,13 @@ alla compilazione:
                 --dart-define=GDANAV_VALHALLA_CHIAVE=... \
                 --dart-define=GDANAV_OCM_CHIAVE=...
 
-## Android Auto
+## Android Auto e CarPlay
 
-Il lato Dart è pronto: `SorgenteAndroidAuto` ascolta l'`EventChannel`
-`gdanav/auto` e si aspetta mappe `{batteria, autonomia_km, letto_ms,
-automotive}`. Manca il lato Kotlin: un `CarAppService` di categoria
-navigazione che registra `CarInfo.addEnergyLevelListener` e gira le letture
-sul canale (permessi `com.google.android.gms.permission.CAR_FUEL` e
-`CAR_MILEAGE`). Se l'auto non passa i dati il canale tace e l'arbitro usa
-un'altra sorgente.
+Lo schermo dell'auto parla col Dart sul canale `gdanav/schermo_auto`
+(`../packages/gdanav_app/lib/auto/ponte_auto.dart`). Dall'altra parte c'è
+Android Auto (`../packages/gdanav_app/android/.../auto`, con la sessione in
+`android/app/src/main/kotlin/it/gdanav/gdanav/auto`) o CarPlay
+(`../packages/gdanav_app/ios/gdanav_app/Sources/gdanav_app`, con la scena
+dichiarata in `ios/Runner/Info.plist`). Batteria, velocità e chilometri
+dall'auto (`EventChannel` `gdanav/auto`) li dà solo Android Auto: CarPlay non
+li passa, e l'arbitro usa un'altra sorgente.

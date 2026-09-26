@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../stato/gestore_premium.dart';
 
@@ -12,13 +14,22 @@ class PannelloPremium extends StatefulWidget {
   /// Cosa si stava cercando di aprire: «Android Auto», «Il traffico».
   final String? perche;
 
-  static const funzioni = <(IconData, String, String)>[
+  /// Lo schermo dell'auto: Android Auto o, su iPhone, CarPlay.
+  static const privacy = 'https://gdanav.gdahome.org/privacy';
+
+  /// Le condizioni d'uso: quelle standard di Apple (EULA), valide anche per
+  /// Google Play finché gdanav non ne ha di sue.
+  static const condizioni = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+
+  static String get schermoAuto => defaultTargetPlatform == TargetPlatform.iOS ? 'CarPlay' : 'Android Auto';
+
+  static List<(IconData, String, String)> get funzioni => <(IconData, String, String)>[
     (
       Icons.bolt,
       'Pianificazione EV con dati in tempo reale',
       'Batteria vera dall\'auto, soste ricalcolate sul consumo reale',
     ),
-    (Icons.directions_car_filled, 'Android Auto', 'Mappa, guida e soste sullo schermo dell\'auto · CarPlay in arrivo'),
+    (Icons.directions_car_filled, schermoAuto, 'Mappa, guida e soste sullo schermo dell\'auto'),
     (Icons.traffic, 'Traffico in tempo reale', 'Code e rallentamenti sulla mappa'),
     (Icons.ev_station, 'Colonnine libere e occupate', 'In tempo reale; le soste evitano quelle piene o guaste'),
     (Icons.speed, 'Autovelox', 'Fissi e segnalati, con l\'avviso e il limite'),
@@ -107,16 +118,27 @@ class _PannelloPremiumState extends State<PannelloPremium> {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
                     '${scelto.giorniProva > 0 ? 'Poi ' : ''}${scelto.prezzo}${_periodo(scelto)}, rinnovo automatico. '
-                    'Disdici quando vuoi dal Play Store'
+                    'Disdici quando vuoi dal$_negozio'
                     '${scelto.giorniProva > 0 ? ': se disdici durante la prova non paghi nulla.' : '.'}',
                     textAlign: TextAlign.center,
                     style: t.bodySmall?.copyWith(color: s.onSurfaceVariant),
                   ),
                 ),
               TextButton(onPressed: p.inCorso ? null : p.ripristina, child: const Text('Ripristina abbonamento')),
+              // L'App Store vuole i due link accanto all'abbonamento.
+              Wrap(
+                alignment: WrapAlignment.center,
+                children: [
+                  TextButton(onPressed: () => _apri(PannelloPremium.privacy), child: const Text('Privacy')),
+                  TextButton(
+                    onPressed: () => _apri(PannelloPremium.condizioni),
+                    child: const Text('Condizioni d\'uso'),
+                  ),
+                ],
+              ),
               if (piani.isEmpty && !p.inCorso)
                 Text(
-                  'Premium si attiva dall\'app scaricata dal Play Store.',
+                  'Premium si attiva dall\'app scaricata dal$_negozio.',
                   textAlign: TextAlign.center,
                   style: t.bodySmall?.copyWith(color: s.onSurfaceVariant),
                 ),
@@ -135,6 +157,15 @@ class _PannelloPremiumState extends State<PannelloPremium> {
       },
     );
   }
+
+  static Future<void> _apri(String indirizzo) async {
+    try {
+      await launchUrl(Uri.parse(indirizzo), mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
+  /// « Play Store» o «l'App Store», dopo «dal».
+  static String get _negozio => nomeNegozio == 'App Store' ? 'l\'App Store' : ' $nomeNegozio';
 
   static String _periodo(PianoPremium p) => p.id == pianoAnnuale ? '/anno' : '/mese';
 

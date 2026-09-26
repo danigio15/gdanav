@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
+import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
+import 'package:in_app_purchase_storekit/store_kit_2_wrappers.dart';
+import 'package:in_app_purchase_storekit/store_kit_wrappers.dart';
 
 import '../servizi.dart';
 import 'archivio.dart';
@@ -12,6 +15,26 @@ import 'archivio.dart';
 const idPremium = 'gdanav_premium';
 const pianoMensile = 'mensile';
 const pianoAnnuale = 'annuale';
+
+/// Sull'App Store non ci sono i piani base: ogni piano è un prodotto a sé,
+/// nello stesso gruppo di abbonamenti (App Store Connect → Abbonamenti →
+/// gruppo «gdanav Premium»), ciascuno con l'offerta introduttiva gratuita.
+const idAppStore = {pianoMensile: '${idPremium}_mensile', pianoAnnuale: '${idPremium}_annuale'};
+
+/// La prova gratuita configurata su App Store Connect: StoreKit dice se
+/// spetta, non quanto dura.
+const giorniProvaAppStore = 14;
+
+/// Un acquisto di Premium, da qualunque negozio venga.
+bool eDiPremium(String productID) => productID == idPremium || idAppStore.containsValue(productID);
+
+/// Come si chiama il negozio da cui si compra, per dirlo a chi compra.
+String get nomeNegozio => defaultTargetPlatform == TargetPlatform.iOS ? 'App Store' : 'Play Store';
+
+/// Il negozio giusto per il telefono: App Store su iPhone, Google Play sugli
+/// altri.
+NegozioPremium negozioDelTelefono() =>
+    defaultTargetPlatform == TargetPlatform.iOS ? NegozioAppStore() : NegozioGooglePlay();
 
 /// Un piano dell'abbonamento come lo propone il negozio.
 class PianoPremium {
@@ -107,10 +130,60 @@ class NegozioGooglePlay implements NegozioPremium {
   Future<void> completa(PurchaseDetails p) => _iap.completePurchase(p);
 }
 
+class NegozioAppStore implements NegozioPremium {
+  final _iap = InAppPurchase.instance;
+  final _perPiano = <String, ProductDetails>{};
+
+  @override
+  Future<bool> disponibile() => _iap.isAvailable();
+
+  @override
+  Future<List<PianoPremium>> piani() async {
+    final r = await _iap.queryProductDetails(idAppStore.values.toSet());
+    _perPiano.clear();
+    final piani = <PianoPremium>[];
+    for (final MapEntry(key: piano, value: id) in idAppStore.entries) {
+      final d = r.productDetails.where((d) => d.id == id).firstOrNull;
+      if (d == null) continue;
+      _perPiano[piano] = d;
+      // La prova spetta una volta sola per gruppo: chi l'ha già usata paga subito.
+      var prova = false;
+      if (d is AppStoreProduct2Details) {
+        try {
+          prova = await SK2Product.isIntroductoryOfferEligible(id);
+        } catch (_) {}
+      } else if (d is AppStoreProductDetails) {
+        prova = d.skProduct.introductoryPrice?.paymentMode == SKProductDiscountPaymentMode.freeTrail;
+      }
+      piani.add(PianoPremium(id: piano, prezzo: d.price, giorniProva: prova ? giorniProvaAppStore : 0));
+    }
+    return piani;
+  }
+
+  @override
+  Stream<List<PurchaseDetails>> get acquisti => _iap.purchaseStream;
+
+  @override
+  Future<void> compra(String piano) async {
+    if (_perPiano.isEmpty) await piani();
+    final d = _perPiano[piano];
+    if (d == null) throw StateError('Piano $piano non disponibile nel negozio');
+    // L'offerta introduttiva la applica l'App Store da sé, se spetta.
+    await _iap.buyNonConsumable(purchaseParam: PurchaseParam(productDetails: d));
+  }
+
+  @override
+  Future<void> ripristina() => _iap.restorePurchases();
+
+  @override
+  Future<void> completa(PurchaseDetails p) => _iap.completePurchase(p);
+}
+
 /// gdanav Premium, in abbonamento (mensile o annuale, con la prova gratuita):
 /// Android Auto, Home Assistant, traffico, colonnine libere/occupate,
-/// autovelox. Si ritrova su un altro telefono con lo stesso account Google;
-/// se l'abbonamento scade, si torna alla versione gratuita.
+/// autovelox. Si ritrova su un altro telefono con lo stesso account Google
+/// (o Apple, su iPhone); se l'abbonamento scade, si torna alla versione
+/// gratuita.
 class GestorePremium extends ChangeNotifier {
   /// Premium attivo adesso, per chi non ha il gestore in mano (la mappa col
   /// traffico, il pianificatore con le colonnine in tempo reale, gli
@@ -128,7 +201,7 @@ class GestorePremium extends ChangeNotifier {
 
   final Archivio archivio;
 
-  /// `null`: nessun negozio (prove, iPhone per ora).
+  /// `null`: nessun negozio (prove, gdahome).
   final NegozioPremium? negozio;
 
   /// Dentro un'altra app (gdahome) Premium lo decide lei: se lì è stato
@@ -219,7 +292,7 @@ class GestorePremium extends ChangeNotifier {
     try {
       await n.compra(piano);
     } catch (e) {
-      _errore('Il Play Store non risponde. Riprova tra poco.');
+      _errore('$nomeNegozio non risponde. Riprova tra poco.');
     }
   }
 
@@ -229,12 +302,12 @@ class GestorePremium extends ChangeNotifier {
     try {
       await negozio?.ripristina();
     } catch (e) {
-      _errore('Il Play Store non risponde. Riprova tra poco.');
+      _errore('$nomeNegozio non risponde. Riprova tra poco.');
     }
   }
 
   Future<void> _acquisti(List<PurchaseDetails> elenco) async {
-    for (final p in elenco.where((p) => p.productID == idPremium)) {
+    for (final p in elenco.where((p) => eDiPremium(p.productID))) {
       switch (p.status) {
         case PurchaseStatus.purchased || PurchaseStatus.restored:
           await _sblocca();
@@ -247,7 +320,8 @@ class GestorePremium extends ChangeNotifier {
           inCorso = true;
           notifyListeners();
       }
-      // Google Play vuole la conferma, altrimenti dopo tre giorni rimborsa.
+      // Google Play vuole la conferma, altrimenti dopo tre giorni rimborsa;
+      // l'App Store la vuole per chiudere la transazione.
       if (p.pendingCompletePurchase) await negozio?.completa(p);
     }
   }

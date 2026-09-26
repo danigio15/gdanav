@@ -43,7 +43,8 @@ export 'sorgenti/sorgente_gdahome.dart';
 /// abbinamento.
 ///
 /// Premium:
-/// - **gdanav da sola**: l'abbonamento di gdanav dal Play Store;
+/// - **gdanav da sola**: l'abbonamento di gdanav dal Play Store o dall'App
+///   Store;
 /// - **dentro un'altra app** ([premiumOspite], gdahome): lo decide lei. Se lì
 ///   è stato comprato il suo Premium è tutto sbloccato; se no, gdanav dice di
 ///   comprarlo lì, senza il negozio di gdanav;
@@ -57,13 +58,13 @@ Future<GdanavApp> preparaGdanav({
   bool senzaPremium = false,
 }) async {
   final archivio = Archivio(portachiavi);
-  // Premium (Android Auto e Home Assistant): si sa subito se è sbloccato,
-  // il Play Store conferma dopo.
+  // Premium (Android Auto o CarPlay, e Home Assistant): si sa subito se è
+  // sbloccato, il negozio del telefono (Play Store o App Store) conferma dopo.
   final premium = senzaPremium
       ? GestorePremium(archivio: archivio, tuttoSbloccato: true)
       : premiumOspite != null
       ? GestorePremium(archivio: archivio, ospite: premiumOspite)
-      : GestorePremium(archivio: archivio, negozio: NegozioGooglePlay());
+      : GestorePremium(archivio: archivio, negozio: negozioDelTelefono());
   await premium.carica();
   final auto = GestoreAuto(archivio: archivio, gdahome: gdahome)..homeAssistantConsentito = premium.sbloccato;
   await auto.avvia();

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -6,8 +7,17 @@ import '../tema.dart';
 const _canale = MethodChannel('gdanav/diagnosi');
 
 /// «Android Auto» nel menu: cosa vede il telefono, e cosa fare se gdanav
-/// non compare sull'auto.
+/// non compare sull'auto. Su iPhone, «CarPlay»: cosa controllare.
 Future<void> mostraDiagnosiAuto(BuildContext context) async {
+  if (defaultTargetPlatform == TargetPlatform.iOS) {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (contesto) => const SafeArea(child: AiutoCarPlay()),
+    );
+    return;
+  }
   Map<Object?, Object?>? dati;
   try {
     dati = await _canale.invokeMethod<Map<Object?, Object?>>('androidAuto');
@@ -82,6 +92,38 @@ class DiagnosiAuto extends StatelessWidget {
               '3. Impostazioni del telefono → App → Android Auto → Arresto forzato.\n'
               '4. Scollega e ricollega il telefono all\'auto.\n'
               '5. Impostazioni di Android Auto → «Personalizza avvio app»: gdanav deve esserci.',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Su iPhone non c'è niente da leggere: CarPlay mostra gdanav da sé, se il
+/// telefono è collegato e l'app è consentita.
+class AiutoCarPlay extends StatelessWidget {
+  const AiutoCarPlay({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('CarPlay', style: t.titleLarge),
+          const SizedBox(height: 12),
+          Text('Se gdanav non compare sull\'auto', style: t.titleMedium),
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Text(
+              '1. Impostazioni dell\'iPhone → Generali → CarPlay: l\'auto deve esserci.\n'
+              '2. Tocca l\'auto → Personalizza: gdanav deve essere fra le app mostrate.\n'
+              '3. Impostazioni → Tempo di utilizzo → Restrizioni: CarPlay non deve essere bloccato.\n'
+              '4. Impostazioni → gdanav → Posizione: «Sempre», così la guida continua con lo schermo del telefono spento.\n'
+              '5. Scollega e ricollega l\'iPhone all\'auto.',
             ),
           ),
         ],

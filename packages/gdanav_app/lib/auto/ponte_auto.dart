@@ -32,8 +32,9 @@ import '../stato/gestore_vicini.dart';
 /// velocità e limite, arrivo, prossima sosta, meteo, avvisi). Dall'auto
 /// arrivano la ricerca, la meta scelta (che parte subito in guida), Casa e
 /// Lavoro da salvare, le opzioni del percorso, le segnalazioni e «Fine». Il
-/// lato nativo è in `android/app/src/main/kotlin/it/gdanav/gdanav/auto`. Su
-/// iPhone e nelle prove il canale non c'è, e si tace.
+/// lato nativo è in `android/src/main/kotlin/it/gdanav/gdanav_app/auto` e, per
+/// CarPlay, in `ios/gdanav_app/Sources/gdanav_app`. Nelle prove il canale non
+/// c'è, e si tace.
 class PonteAuto {
   PonteAuto({
     required this.viaggio,
@@ -477,6 +478,11 @@ class PonteAuto {
       'secondi': (a?.restante ?? p.viaggio.percorso.durata).inSeconds,
       'arrivo': (guida.arrivoAlle ?? _ora()).millisecondsSinceEpoch,
       'destinazione': p.destinazione.nome,
+      // Dove si arriva: CarPlay vuole il viaggio con partenza e arrivo.
+      'destinazione_lat': p.destinazione.posizione.lat,
+      'destinazione_lon': p.destinazione.posizione.lon,
+      // Con quanta batteria si arriva, per il riepilogo del viaggio.
+      if (auto?.elettrica ?? true) 'arrivo_batteria': ?guida.batteriaArrivo,
       'uscita': m?.uscita ?? '',
       'verso': m?.verso ?? '',
       'rotonda': m?.uscitaRotonda,

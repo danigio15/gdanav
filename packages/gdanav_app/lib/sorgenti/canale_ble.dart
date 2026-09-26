@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:gdanav_core/gdanav_core.dart';
@@ -23,11 +24,13 @@ class CanaleBle implements CanaleObd {
   StreamSubscription<List<int>>? _notifiche;
 
   /// Chiede i permessi Bluetooth (Android 12 e oltre) o la posizione (prima).
+  /// Su iPhone il permesso lo chiede il sistema da sé alla prima ricerca:
+  /// qui si dice di sì e basta.
   static Future<bool> permessi() async {
     try {
       return await _permessi.invokeMethod<bool>('bluetooth') ?? false;
     } on MissingPluginException {
-      return false;
+      return defaultTargetPlatform == TargetPlatform.iOS;
     }
   }
 

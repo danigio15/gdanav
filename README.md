@@ -14,7 +14,7 @@ arrivano gli abbonati.
 | --- | --- | --- |
 | [`packages/gdanav_core`](packages/gdanav_core) | Il motore: consumi, soste di ricarica, sorgenti dei dati dell'auto, protocollo con Home Assistant | Dart puro |
 | [`packages/gdanav_app`](packages/gdanav_app) | Lo schermo: mappa, guida, switch «Fonte dati auto», abbinamento con Home Assistant. Lo usano l'app e gdahome | Flutter |
-| [`app`](app) | L'app Android e iOS: l'involucro del pacchetto qui sopra, con Android Auto | Flutter |
+| [`app`](app) | L'app Android e iOS: l'involucro del pacchetto qui sopra, con Android Auto e CarPlay ([iPhone](docs/ios.md)) | Flutter |
 | [`custom_components/gdanav`](custom_components/gdanav) | L'integrazione Home Assistant, da installare con HACS | Python |
 | [`relay`](relay) | Il punto d'incontro fra Home Assistant e l'app, cifrato end-to-end | Cloudflare Worker |
 | [`valhalla`](valhalla) | Il server dei percorsi, per Oracle Cloud Always Free | Docker + Caddy |
@@ -82,8 +82,11 @@ soste sulla mappa, la scheda con batteria all'arrivo e ricariche.
 Da fare, in ordine: accendere Valhalla su Oracle ([`valhalla/`](valhalla),
 scritto ma non ancora provato su una macchina vera), l'indirizzo vero della
 PUN, la scelta del modello d'auto, navigazione passo-passo (Ferrostar),
-il `CarAppService` Kotlin per Android Auto, OBD via Bluetooth, segnalazioni
-della community.
+segnalazioni della community.
+
+Su iPhone c'è tutto quello che c'è su Android, CarPlay compreso: cosa manca
+dalla parte di Apple (account, chiavi, il permesso di CarPlay) e come esce una
+versione su TestFlight è in [`docs/ios.md`](docs/ios.md).
 
 Le colonnine vanno citate: «© Open Charge Map contributors», e la PUN per i
 dati in tempo reale.
