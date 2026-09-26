@@ -373,4 +373,61 @@ final class PonteAuto {
     func fermaDallAuto() {
         chiedi("ferma")
     }
+
+    // MARK: - Siri e la prova di guida
+
+    /// Una richiesta di navigazione da Siri, come `geo:` di Android Auto
+    /// (`geo:0,0?q=Via Roma 1, Milano`, `intent=add_a_stop` per una tappa):
+    /// la legge il telefono, che cerca se serve e parte. Può arrivare mentre
+    /// il motore Flutter si accende (Siri apre l'app da spenta): si riprova
+    /// finché l'app non risponde, al più una ventina di secondi.
+    func naviga(_ uri: String, fatto: @escaping (Bool) -> Void = { _ in }) {
+        messaggio = "Cerco la destinazione…"
+        versioneModello += 1
+        avvisa()
+        mandaConRiprova("naviga", ["uri": uri], tentativi: 40, fatto: fatto)
+    }
+
+    /// Una meta già nota (Casa, Lavoro) chiesta a Siri: i luoghi arrivano
+    /// dall'app quando il motore è acceso, e fino ad allora si aspetta.
+    func vaiA(_ trova: @escaping () -> LuogoAuto?, tentativi: Int = 40, fatto: @escaping (Bool) -> Void) {
+        if let l = trova() {
+            vai(l)
+            return fatto(true)
+        }
+        guard tentativi > 1 else { return fatto(false) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.vaiA(trova, tentativi: tentativi - 1, fatto: fatto)
+        }
+    }
+
+    private func mandaConRiprova(_ metodo: String, _ argomenti: Any?, tentativi: Int, fatto: @escaping (Bool) -> Void) {
+        let riprova = { [weak self] in
+            guard tentativi > 1 else { return fatto(false) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self?.mandaConRiprova(metodo, argomenti, tentativi: tentativi - 1, fatto: fatto)
+            }
+        }
+        guard let c = canale else { return riprova() }
+        c.invokeMethod(metodo, arguments: argomenti) { r in
+            if (r as? NSObject) === FlutterMethodNotImplemented {
+                riprova()
+            } else {
+                fatto(!(r is FlutterError))
+            }
+        }
+    }
+
+    /// La prova di guida (il «test drive» di Android Auto): il percorso si fa
+    /// da solo, con le posizioni finte del telefono. Su CarPlay la si accende
+    /// dalle Impostazioni, e si spegne con l'auto.
+    private(set) var provaAccesa = false
+
+    func prova(_ accesa: Bool) {
+        guard accesa != provaAccesa else { return }
+        provaAccesa = accesa
+        versioneModello += 1
+        avvisa()
+        chiedi(accesa ? "prova_guida" : "prova_fine")
+    }
 }

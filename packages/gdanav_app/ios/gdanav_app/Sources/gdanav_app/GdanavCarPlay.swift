@@ -45,6 +45,25 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         PonteAuto.shared.casa().map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
     }
 
+    /// «Ehi Siri, naviga con gdanav»: [testo] è quello che si è detto (un
+    /// indirizzo, un posto), [tappa] per aggiungerlo al viaggio in corso.
+    /// Come «Ok Google, naviga verso…» su Android Auto: il telefono cerca e
+    /// parte, anche con l'app ancora spenta. [fatto] dice se l'app ha
+    /// risposto.
+    public static func naviga(_ testo: String, tappa: Bool = false, fatto: @escaping (Bool) -> Void = { _ in }) {
+        var c = URLComponents()
+        c.queryItems = [URLQueryItem(name: "q", value: testo)] + (tappa ? [URLQueryItem(name: "intent", value: "add_a_stop")] : [])
+        // Il «+» in una domanda vale uno spazio: quello vero va scritto.
+        let q = (c.percentEncodedQuery ?? "").replacingOccurrences(of: "+", with: "%2B")
+        PonteAuto.shared.naviga("geo:0,0?" + q, fatto: fatto)
+    }
+
+    /// «Portami a casa» o «al lavoro» (`casa`, `lavoro`): [fatto] è `false`
+    /// se il posto non è ancora impostato.
+    public static func vaiA(_ tipo: String, fatto: @escaping (Bool) -> Void = { _ in }) {
+        PonteAuto.shared.vaiA({ PonteAuto.shared.luoghi.first { $0.tipo == tipo } }, fatto: fatto)
+    }
+
     /// Un messaggio breve sopra la mappa, come i toast di Android Auto.
     public static func mostra(_ testo: String) {
         attuale?.avvisa(testo)
@@ -126,6 +145,8 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     ) {
         if let a = ascolto { PonteAuto.shared.smetti(a) }
         ascolto = nil
+        // Come su Android Auto: la prova di guida finisce con l'auto.
+        PonteAuto.shared.prova(false)
         sessione?.finishTrip()
         sessione = nil
         viaggio = nil

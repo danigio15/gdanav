@@ -214,6 +214,12 @@ enum SchermiCarPlay {
                 guard let c else { return }
                 c.pushTemplate(SchermiCarPlay.opzioni(), animated: true, completion: nil)
             })
+            righe.append(interruttore(
+                "Prova di guida",
+                PonteAuto.shared.provaAccesa,
+                "Il percorso si fa da solo, per provare senza muoversi",
+                icona: icona("steeringwheel", blu)
+            ) { acceso in PonteAuto.shared.prova(acceso) })
             righe.append(riga("Imposta Casa", PonteAuto.shared.casa()?.nome ?? "Non ancora impostata", icona: icona("house.fill"), sfoglia: true) {
                 guard let c else { return }
                 c.pushTemplate(cerca(c, imposta: "casa"), animated: true, completion: nil)

@@ -16,6 +16,8 @@ volta sola dalla parte di Apple, e come esce una versione.
 | La posizione in guida (`AndroidSettings`) | `AppleSettings` per l'auto, anche con CarPlay acceso e il telefono in tasca | `stato/posizione.dart` |
 | La voce | La voce abbassa la musica e si sente anche a schermo spento | `stato/voce.dart` |
 | Diagnosi di Android Auto | Cosa controllare se gdanav non compare in CarPlay | `schermate/diagnosi_auto.dart` |
+| «Ok Google, naviga verso…» (`geo:`) | «Ehi Siri, naviga con gdanav», «Portami a casa con gdanav», «Portami al lavoro con gdanav», «Aggiungi una tappa con gdanav»: anche in CarPlay, anche con l'app chiusa. Siri chiede dove, il telefono cerca e parte | `app/ios/Runner/ComandiVocali.swift` |
+| La prova di guida di Android Auto | In CarPlay → Menu → Impostazioni → **Prova di guida**: il percorso si fa da solo. Si spegne con l'auto | `SchermiCarPlay.swift` |
 
 Il progetto iOS è **solo iPhone** (niente iPad: meno schermate da preparare e
 una revisione in meno), dall'iOS 15, con il privacy manifest
@@ -41,6 +43,10 @@ disegna CarPlay.
 navigatori chiedono la mappa senza pannelli sopra. Se Apple li rifiuta, si
 spengono con una riga, `GdanavCarPlay.pannelliSullaMappa = false`: i dati
 passano agli avvisi di CarPlay e la guida resta completa.
+
+Le frasi di Siri sono in italiano: con Siri in un'altra lingua non si
+sentono. Su iOS 15 i comandi vocali non ci sono (servono gli App Intents,
+dall'iOS 16).
 
 CarPlay **non dà i dati dell'auto** (batteria, velocità, chilometri): restano
 Home Assistant, il dongle OBD e l'inserimento a mano. E **niente tocco sulla
