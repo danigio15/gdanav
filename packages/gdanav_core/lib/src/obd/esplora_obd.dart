@@ -76,6 +76,6 @@ class EsploraObd {
 
 /// Dalla maschera di 4 byte della richiesta 01xx ai PID supportati.
 List<int> pidDaMaschera(int base, List<int> maschera) => [
-  for (var i = 0; i < 32; i++)
-    if (maschera[i ~/ 8] & (0x80 >> (i % 8)) != 0) base + i + 1,
-];
+      for (var i = 0; i < 32; i++)
+        if (maschera[i ~/ 8] & (0x80 >> (i % 8)) != 0) base + i + 1,
+    ];

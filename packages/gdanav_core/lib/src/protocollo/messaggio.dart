@@ -23,16 +23,16 @@ abstract final class TipoMessaggio {
 
 class Messaggio {
   Messaggio({required this.tipo, Map<String, Object?>? dati, String? id, DateTime? ts})
-    : dati = dati ?? const {},
-      id = id ?? _nuovoId(),
-      ts = (ts ?? DateTime.now()).toUtc();
+      : dati = dati ?? const {},
+        id = id ?? _nuovoId(),
+        ts = (ts ?? DateTime.now()).toUtc();
 
   factory Messaggio.daJson(Map<String, Object?> json) => Messaggio(
-    tipo: json['tipo'] as String,
-    id: json['id'] as String,
-    ts: DateTime.parse(json['ts'] as String),
-    dati: (json['dati'] as Map?)?.cast<String, Object?>() ?? const {},
-  );
+        tipo: json['tipo'] as String,
+        id: json['id'] as String,
+        ts: DateTime.parse(json['ts'] as String),
+        dati: (json['dati'] as Map?)?.cast<String, Object?>() ?? const {},
+      );
 
   final String tipo;
   final String id;

@@ -6,16 +6,16 @@ import 'package:http/testing.dart';
 import 'package:test/test.dart';
 
 Map<String, Object?> riquadro(int id, double lat, double lon) => {
-  'elements': [
-    {
-      'type': 'node',
-      'id': id,
-      'lat': lat,
-      'lon': lon,
-      'tags': {'amenity': 'charging_station', 'socket:type2_combo': '2', 'socket:type2_combo:output': '150 kW'},
-    },
-  ],
-};
+      'elements': [
+        {
+          'type': 'node',
+          'id': id,
+          'lat': lat,
+          'lon': lon,
+          'tags': {'amenity': 'charging_station', 'socket:type2_combo': '2', 'socket:type2_combo:output': '150 kW'},
+        },
+      ],
+    };
 
 void main() {
   // Da Bologna verso nord-ovest, una cinquantina di km.
@@ -45,13 +45,11 @@ void main() {
     // Un percorso lungo: una decina di riquadri.
     final lungo = [for (var i = 0; i <= 40; i++) Punto(42 + i * 0.1, 12)];
     Future<List<Colonnina>> con(bool Function(String percorso) rotto) => ClienteColonnineRelay(
-      Uri.parse('https://gdanav.gdahome.org/'),
-      client: MockClient(
-        (r) async => rotto(r.url.path)
-            ? http.Response('{"errore":"colonnine: overpass"}', 502)
-            : http.Response(jsonEncode(riquadro(r.url.path.hashCode, 44.5, 11.3)), 200),
-      ),
-    ).lungo(lungo);
+          Uri.parse('https://gdanav.gdahome.org/'),
+          client: MockClient((r) async => rotto(r.url.path)
+              ? http.Response('{"errore":"colonnine: overpass"}', 502)
+              : http.Response(jsonEncode(riquadro(r.url.path.hashCode, 44.5, 11.3)), 200)),
+        ).lungo(lungo);
 
     final quanti = ClienteColonnineRelay.riquadri(lungo, 3).length;
     expect(quanti, greaterThanOrEqualTo(8));

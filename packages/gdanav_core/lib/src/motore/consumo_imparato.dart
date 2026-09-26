@@ -18,13 +18,19 @@ enum TipoStrada {
   static TipoStrada daVelocita(double kmh) => kmh < 60
       ? TipoStrada.urbana
       : kmh <= 100
-      ? TipoStrada.extraurbana
-      : TipoStrada.autostrada;
+          ? TipoStrada.extraurbana
+          : TipoStrada.autostrada;
 }
 
 /// Quello che si è misurato su un tipo di strada.
 class ConsumoStrada {
-  const ConsumoStrada({this.fattore = 1, this.km = 0, this.previstoWh = 0, this.realeWh = 0, this.erroreWh = 0});
+  const ConsumoStrada({
+    this.fattore = 1,
+    this.km = 0,
+    this.previstoWh = 0,
+    this.realeWh = 0,
+    this.erroreWh = 0,
+  });
 
   factory ConsumoStrada.daJson(Map<String, Object?> j) {
     double n(String k, [double d = 0]) => (j[k] as num?)?.toDouble() ?? d;
@@ -61,12 +67,12 @@ class ConsumoStrada {
   double? get realeKwh100 => km <= 0 ? null : realeWh / km / 10;
 
   Map<String, Object?> toJson() => {
-    'fattore': fattore,
-    'km': km,
-    'previsto_wh': previstoWh,
-    'reale_wh': realeWh,
-    'errore_wh': erroreWh,
-  };
+        'fattore': fattore,
+        'km': km,
+        'previsto_wh': previstoWh,
+        'reale_wh': realeWh,
+        'errore_wh': erroreWh,
+      };
 }
 
 /// Quanto consuma davvero la tua auto rispetto al modello, imparato
@@ -80,13 +86,13 @@ class ConsumoImparato {
   const ConsumoImparato({this.fattore = 1, this.kmOsservati = 0, this.strade = const {}});
 
   factory ConsumoImparato.daJson(Map<String, Object?> j) => ConsumoImparato(
-    fattore: ((j['fattore'] as num?)?.toDouble() ?? 1).clamp(minimo, massimo).toDouble(),
-    kmOsservati: (j['km'] as num?)?.toDouble() ?? 0,
-    strade: {
-      for (final t in TipoStrada.values)
-        if ((j['strade'] as Map?)?[t.name] case final Map m) t: ConsumoStrada.daJson(m.cast()),
-    },
-  );
+        fattore: ((j['fattore'] as num?)?.toDouble() ?? 1).clamp(minimo, massimo).toDouble(),
+        kmOsservati: (j['km'] as num?)?.toDouble() ?? 0,
+        strade: {
+          for (final t in TipoStrada.values)
+            if ((j['strade'] as Map?)?[t.name] case final Map m) t: ConsumoStrada.daJson(m.cast()),
+        },
+      );
 
   final double fattore;
   final double kmOsservati;
@@ -134,10 +140,11 @@ class ConsumoImparato {
   int get scartoPercento => ((fattore - 1) * 100).round();
 
   Map<String, Object?> toJson() => {
-    'fattore': fattore,
-    'km': kmOsservati,
-    if (strade.isNotEmpty) 'strade': {for (final MapEntry(:key, :value) in strade.entries) key.name: value.toJson()},
-  };
+        'fattore': fattore,
+        'km': kmOsservati,
+        if (strade.isNotEmpty)
+          'strade': {for (final MapEntry(:key, :value) in strade.entries) key.name: value.toJson()},
+      };
 }
 
 /// Una misura del consumo su un tratto guidato.

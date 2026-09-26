@@ -82,10 +82,12 @@ void main() {
   });
 
   test('stato_auto diventa uno StatoAuto di Home Assistant', () {
-    final m = Messaggio(
-      tipo: TipoMessaggio.statoAuto,
-      dati: {'batteria': 64, 'autonomia_km': 280.5, 'in_carica': true, 'letto': '2026-09-23T09:50:00.000Z'},
-    );
+    final m = Messaggio(tipo: TipoMessaggio.statoAuto, dati: {
+      'batteria': 64,
+      'autonomia_km': 280.5,
+      'in_carica': true,
+      'letto': '2026-09-23T09:50:00.000Z',
+    });
     final s = SorgenteHomeAssistant.statoDaMessaggio(m)!;
     expect(s.sorgente, TipoSorgente.homeAssistant);
     expect(s.batteria, 64);
@@ -95,9 +97,7 @@ void main() {
   });
 
   test('senza batteria non inventa niente', () {
-    expect(
-      SorgenteHomeAssistant.statoDaMessaggio(Messaggio(tipo: TipoMessaggio.statoAuto, dati: {'in_carica': true})),
-      isNull,
-    );
+    expect(SorgenteHomeAssistant.statoDaMessaggio(Messaggio(tipo: TipoMessaggio.statoAuto, dati: {'in_carica': true})),
+        isNull);
   });
 }

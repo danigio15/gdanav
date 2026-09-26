@@ -154,23 +154,23 @@ void main() {
 
   group('alternative e passaggi', () {
     Map<String, Object?> trip(double lat) => {
-      'summary': {'has_toll': lat > 45.05},
-      'legs': [
-        {
-          'shape': codificaPolyline([const Punto(45, 9), Punto(lat, 9.01), const Punto(45.1, 9)], precisione: 6),
-          'maneuvers': [
+          'summary': {'has_toll': lat > 45.05},
+          'legs': [
             {
-              'instruction': 'Parti',
-              'length': 12.0,
-              'time': 600,
-              'begin_shape_index': 0,
-              'end_shape_index': 2,
-              'street_names': ['A${(lat * 100).round() % 10}'],
+              'shape': codificaPolyline([const Punto(45, 9), Punto(lat, 9.01), const Punto(45.1, 9)], precisione: 6),
+              'maneuvers': [
+                {
+                  'instruction': 'Parti',
+                  'length': 12.0,
+                  'time': 600,
+                  'begin_shape_index': 0,
+                  'end_shape_index': 2,
+                  'street_names': ['A${(lat * 100).round() % 10}'],
+                },
+              ],
             },
           ],
-        },
-      ],
-    };
+        };
 
     test('Valhalla dà il migliore e le alternative, coi pedaggi e la strada', () async {
       Map<String, Object?>? corpo;
@@ -265,12 +265,12 @@ class _Nessuna implements FonteColonnine {
 class _Colonnine implements FonteColonnine {
   @override
   Future<List<Colonnina>> lungo(List<Punto> percorso, {double distanzaKm = 3}) async => [
-    for (var km = 60; km < 500; km += 60)
-      Colonnina(
-        id: 'c$km',
-        nome: 'Area $km',
-        posizione: Punto(42 + km * 0.009, 12.002),
-        connettori: const [Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150)],
-      ),
-  ];
+        for (var km = 60; km < 500; km += 60)
+          Colonnina(
+            id: 'c$km',
+            nome: 'Area $km',
+            posizione: Punto(42 + km * 0.009, 12.002),
+            connettori: const [Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150)],
+          ),
+      ];
 }

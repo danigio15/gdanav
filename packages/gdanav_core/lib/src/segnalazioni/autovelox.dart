@@ -39,18 +39,18 @@ class ArchivioAutovelox {
   }
 
   static String scrivi(List<(double, double, int?, double?)> autovelox, {DateTime? generato}) => jsonEncode({
-    'v': 1,
-    'generato': (generato ?? DateTime.now().toUtc()).toIso8601String(),
-    'a': [
-      for (final (lat, lon, limite, direzione) in autovelox)
-        [
-          double.parse(lat.toStringAsFixed(5)),
-          double.parse(lon.toStringAsFixed(5)),
-          limite ?? 0,
-          direzione?.round() ?? -1,
+        'v': 1,
+        'generato': (generato ?? DateTime.now().toUtc()).toIso8601String(),
+        'a': [
+          for (final (lat, lon, limite, direzione) in autovelox)
+            [
+              double.parse(lat.toStringAsFixed(5)),
+              double.parse(lon.toStringAsFixed(5)),
+              limite ?? 0,
+              direzione?.round() ?? -1,
+            ],
         ],
-    ],
-  });
+      });
 
   static ArchivioAutovelox leggi(String testo) {
     final j = jsonDecode(testo) as Map<String, Object?>;
@@ -59,17 +59,15 @@ class ArchivioAutovelox {
     final tutti = <Segnalazione>[];
     for (final (i, r) in (j['a'] as List).cast<List>().indexed) {
       final limite = (r[2] as num).toInt(), direzione = (r[3] as num).toDouble();
-      tutti.add(
-        Segnalazione(
-          id: 'fisso-$i',
-          tipo: TipoSegnalazione.autovelox,
-          punto: Punto((r[0] as num).toDouble(), (r[1] as num).toDouble()),
-          creata: zero,
-          fissa: true,
-          limiteKmh: limite > 0 ? limite : null,
-          direzioneGradi: direzione >= 0 ? direzione : null,
-        ),
-      );
+      tutti.add(Segnalazione(
+        id: 'fisso-$i',
+        tipo: TipoSegnalazione.autovelox,
+        punto: Punto((r[0] as num).toDouble(), (r[1] as num).toDouble()),
+        creata: zero,
+        fissa: true,
+        limiteKmh: limite > 0 ? limite : null,
+        direzioneGradi: direzione >= 0 ? direzione : null,
+      ));
     }
     return ArchivioAutovelox(tutti, generato: DateTime.tryParse('${j['generato']}'));
   }

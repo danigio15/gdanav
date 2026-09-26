@@ -77,20 +77,20 @@ class StatoAuto {
   Duration eta(DateTime ora) => ora.difference(letto);
 
   StatoAuto conBatteria(double batteria, {TipoSorgente? sorgente, DateTime? letto}) => StatoAuto(
-    sorgente: sorgente ?? this.sorgente,
-    letto: letto ?? this.letto,
-    batteria: batteria.clamp(0, 100).toDouble(),
-    autonomiaKm: autonomiaKm,
-    inCarica: inCarica,
-    potenzaCaricaKw: potenzaCaricaKw,
-    temperaturaBatteriaC: temperaturaBatteriaC,
-    latitudine: latitudine,
-    longitudine: longitudine,
-    temperaturaEsternaC: temperaturaEsternaC,
-    velocitaKmh: velocitaKmh,
-    potenzaKw: potenzaKw,
-    odometroKm: odometroKm,
-  );
+        sorgente: sorgente ?? this.sorgente,
+        letto: letto ?? this.letto,
+        batteria: batteria.clamp(0, 100).toDouble(),
+        autonomiaKm: autonomiaKm,
+        inCarica: inCarica,
+        potenzaCaricaKw: potenzaCaricaKw,
+        temperaturaBatteriaC: temperaturaBatteriaC,
+        latitudine: latitudine,
+        longitudine: longitudine,
+        temperaturaEsternaC: temperaturaEsternaC,
+        velocitaKmh: velocitaKmh,
+        potenzaKw: potenzaKw,
+        odometroKm: odometroKm,
+      );
 
   @override
   String toString() => 'StatoAuto(${sorgente.name}, ${batteria.toStringAsFixed(1)}%, $letto)';

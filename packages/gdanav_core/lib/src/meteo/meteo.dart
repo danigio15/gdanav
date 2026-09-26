@@ -36,13 +36,13 @@ class Previsione {
   double ventoControMs(double rotta) => ventoMs * math.cos((ventoDaGradi - rotta) * math.pi / 180);
 
   Map<String, Object?> toJson() => {
-    'ora': ora.toIso8601String(),
-    'temperatura': temperaturaC,
-    'vento': ventoMs,
-    'vento_da': ventoDaGradi,
-    'pioggia': pioggiaMm,
-    'simbolo': simbolo,
-  };
+        'ora': ora.toIso8601String(),
+        'temperatura': temperaturaC,
+        'vento': ventoMs,
+        'vento_da': ventoDaGradi,
+        'pioggia': pioggiaMm,
+        'simbolo': simbolo,
+      };
 }
 
 /// Il cielo, in poche famiglie: per l'icona e per dirlo a voce.
@@ -83,8 +83,8 @@ abstract interface class FonteMeteo {
 /// (un chilometro), così le richieste vicine vengono dalla cache.
 class MeteoMetNorway implements FonteMeteo {
   MeteoMetNorway({http.Client? client, DateTime Function()? orologio})
-    : _http = client ?? http.Client(),
-      _ora = orologio ?? DateTime.now;
+      : _http = client ?? http.Client(),
+        _ora = orologio ?? DateTime.now;
 
   static const citazione = 'Dati meteo: MET Norway';
   static const _agente = 'gdanav/1.0 github.com/danigio15/gdanav';
@@ -141,13 +141,8 @@ class MeteoMetNorway implements FonteMeteo {
 
 /// Il meteo in un punto del viaggio, all'ora in cui ci si passa.
 class MeteoTappa {
-  const MeteoTappa({
-    required this.punto,
-    required this.km,
-    required this.quando,
-    required this.previsione,
-    this.rotta = 0,
-  });
+  const MeteoTappa(
+      {required this.punto, required this.km, required this.quando, required this.previsione, this.rotta = 0});
 
   final Punto punto;
   final double km;
@@ -238,7 +233,9 @@ class MeteoViaggio {
     final tappe = await Future.wait([
       for (final (p, m, rotta) in scelti)
         () async {
-          final quando = partenza.add(Duration(seconds: totale <= 0 ? 0 : (durata.inSeconds * m / totale).round()));
+          final quando = partenza.add(
+            Duration(seconds: totale <= 0 ? 0 : (durata.inSeconds * m / totale).round()),
+          );
           try {
             final prev = piuVicina(await fonte.previsioni(p), quando);
             if (prev == null) return null;

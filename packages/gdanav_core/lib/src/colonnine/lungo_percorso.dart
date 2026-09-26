@@ -37,19 +37,17 @@ List<ColonninaSulPercorso> colonnineSulPercorso(
     }
     final p = percorso.proietta(c.posizione);
     if (!obbligata && p.lontanoM > distanzaMassimaM) continue;
-    out.add(
-      ColonninaSulPercorso(
-        id: c.id,
-        nome: c.nome,
-        distanzaM: p.lungoM,
-        potenzaKw: funzionante > 0 ? funzionante : nominale,
-        // In linea d'aria è troppo ottimista: le strade girano.
-        deviazioneM: p.lontanoM * fattoreDeviazione,
-        disponibilita: c.disponibilitaPer(compatibili, minimaKw: soglia),
-        obbligata: obbligata,
-        dettaglio: c,
-      ),
-    );
+    out.add(ColonninaSulPercorso(
+      id: c.id,
+      nome: c.nome,
+      distanzaM: p.lungoM,
+      potenzaKw: funzionante > 0 ? funzionante : nominale,
+      // In linea d'aria è troppo ottimista: le strade girano.
+      deviazioneM: p.lontanoM * fattoreDeviazione,
+      disponibilita: c.disponibilitaPer(compatibili, minimaKw: soglia),
+      obbligata: obbligata,
+      dettaglio: c,
+    ));
   }
   out.sort((a, b) => a.distanzaM.compareTo(b.distanzaM));
   return out;

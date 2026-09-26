@@ -27,17 +27,16 @@ class TrafficoTomTom {
     if (p.punti.length < 2) return p;
     final punti = _dirada(p.punti);
     final da = punti.first, a = punti.last;
-    final uri = Uri.parse('https://api.tomtom.com/routing/1/calculateRoute/${da.lat},${da.lon}:${a.lat},${a.lon}/json')
-        .replace(
-          queryParameters: {
-            'key': chiave,
-            'traffic': 'true',
-            'sectionType': 'traffic',
-            'routeRepresentation': 'polyline',
-            'computeTravelTimeFor': 'all',
-            'travelMode': 'car',
-          },
-        );
+    final uri = Uri.parse(
+      'https://api.tomtom.com/routing/1/calculateRoute/${da.lat},${da.lon}:${a.lat},${a.lon}/json',
+    ).replace(queryParameters: {
+      'key': chiave,
+      'traffic': 'true',
+      'sectionType': 'traffic',
+      'routeRepresentation': 'polyline',
+      'computeTravelTimeFor': 'all',
+      'travelMode': 'car',
+    });
     final r = await _http
         .post(
           uri,
@@ -92,20 +91,18 @@ class TrafficoTomTom {
               1,
               math.min(3, grandezza > 0 && grandezza < 4 ? grandezza : _livelloDaVelocita(velocita, ritardo, aM - daM)),
             );
-      code.add(
-        Coda(
-          daM: daM,
-          aM: aM,
-          ritardo: Duration(seconds: ritardo),
-          velocitaKmh: velocita,
-          livello: livello,
-          tipo: switch (categoria) {
-            'ROAD_WORK' => 'Lavori',
-            'ROAD_CLOSURE' => chiusa ? 'Strada chiusa' : 'Lavori',
-            _ => null,
-          },
-        ),
-      );
+      code.add(Coda(
+        daM: daM,
+        aM: aM,
+        ritardo: Duration(seconds: ritardo),
+        velocitaKmh: velocita,
+        livello: livello,
+        tipo: switch (categoria) {
+          'ROAD_WORK' => 'Lavori',
+          'ROAD_CLOSURE' => chiusa ? 'Strada chiusa' : 'Lavori',
+          _ => null,
+        },
+      ));
     }
     return code;
   }

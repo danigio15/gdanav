@@ -24,8 +24,7 @@ void main() {
 
     test('salire e riscendere costa più che stare in piano', () {
       final piano = energiaTrattoWh(const Tratto(lunghezzaM: 2000, velocitaKmh: 80), p);
-      final suEGiu =
-          energiaTrattoWh(const Tratto(lunghezzaM: 1000, velocitaKmh: 80, dislivelloM: 50), p) +
+      final suEGiu = energiaTrattoWh(const Tratto(lunghezzaM: 1000, velocitaKmh: 80, dislivelloM: 50), p) +
           energiaTrattoWh(const Tratto(lunghezzaM: 1000, velocitaKmh: 80, dislivelloM: -50), p);
       expect(suEGiu, greaterThan(piano));
     });
@@ -84,12 +83,7 @@ void main() {
         colonnine: [
           for (final c in colonnine)
             ColonninaSulPercorso(
-              id: c.id,
-              nome: c.nome,
-              distanzaM: c.distanzaM,
-              potenzaKw: 50,
-              deviazioneM: c.deviazioneM,
-            ),
+                id: c.id, nome: c.nome, distanzaM: c.distanzaM, potenzaKw: 50, deviazioneM: c.deviazioneM),
         ],
       )!;
       expect(lente.durata, greaterThan(veloci.durata));

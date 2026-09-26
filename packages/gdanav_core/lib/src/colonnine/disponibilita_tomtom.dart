@@ -17,7 +17,7 @@ abstract interface class FonteDisponibilita {
 /// OpenStreetMap si ritrova fra quelle di TomTom per posizione.
 class DisponibilitaTomTom implements FonteDisponibilita {
   DisponibilitaTomTom(this.chiave, {http.Client? client, this.validita = const Duration(minutes: 2)})
-    : _http = client ?? http.Client();
+      : _http = client ?? http.Client();
 
   final String chiave;
   final http.Client _http;
@@ -42,7 +42,7 @@ class DisponibilitaTomTom implements FonteDisponibilita {
   Future<void> _turno = Future.value();
 
   Future<Map<String, Object?>> _chiedi(String percorso, Map<String, String> q) async {
-    for (var tentativo = 0; ; tentativo++) {
+    for (var tentativo = 0;; tentativo++) {
       final prima = _turno;
       final fatto = Completer<void>();
       _turno = fatto.future;
@@ -94,12 +94,12 @@ class DisponibilitaTomTom implements FonteDisponibilita {
   }
 
   static TipoConnettore? _tipo(String? t) => switch (t) {
-    'IEC62196Type2CCS' => TipoConnettore.ccs2,
-    'Chademo' => TipoConnettore.chademo,
-    'IEC62196Type2CableAttached' || 'IEC62196Type2Outlet' => TipoConnettore.tipo2,
-    'Tesla' => TipoConnettore.tesla,
-    _ => null,
-  };
+        'IEC62196Type2CCS' => TipoConnettore.ccs2,
+        'Chademo' => TipoConnettore.chademo,
+        'IEC62196Type2CableAttached' || 'IEC62196Type2Outlet' => TipoConnettore.tipo2,
+        'Tesla' => TipoConnettore.tesla,
+        _ => null,
+      };
 
   @override
   Future<Colonnina> aggiorna(Colonnina c) async {

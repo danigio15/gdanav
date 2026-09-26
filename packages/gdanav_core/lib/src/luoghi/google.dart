@@ -73,15 +73,13 @@ abstract final class ImportaGoogle {
       final url = [prop['google_maps_url'], prop['Google Maps URL']].whereType<String>().firstOrNull;
       p ??= url == null ? null : coordinateDaUrl(url);
       if (nome == null && p == null) continue;
-      fuori.add(
-        LuogoGoogle(
-          nome: nome ?? 'Posto salvato',
-          indirizzo: nome == indirizzo ? '' : indirizzo,
-          posizione: p,
-          lista: lista,
-          nota: [prop['Comment'], prop['comment']].whereType<String>().firstOrNull ?? '',
-        ),
-      );
+      fuori.add(LuogoGoogle(
+        nome: nome ?? 'Posto salvato',
+        indirizzo: nome == indirizzo ? '' : indirizzo,
+        posizione: p,
+        lista: lista,
+        nota: [prop['Comment'], prop['comment']].whereType<String>().firstOrNull ?? '',
+      ));
     }
     return fuori;
   }
@@ -112,8 +110,7 @@ abstract final class ImportaGoogle {
       final p = coordinateDaUrl(url);
       if (nome.isEmpty && p == null) continue;
       fuori.add(
-        LuogoGoogle(nome: nome.isEmpty ? 'Posto salvato' : nome, posizione: p, lista: lista, nota: campo(iNota)),
-      );
+          LuogoGoogle(nome: nome.isEmpty ? 'Posto salvato' : nome, posizione: p, lista: lista, nota: campo(iNota)));
     }
     return fuori;
   }
@@ -220,10 +217,9 @@ abstract final class ImportaGoogle {
           trovati.add((
             p,
             Luogo(
-              nome: p.nome,
-              descrizione: primo.descrizione.isEmpty ? primo.nome : primo.descrizione,
-              posizione: primo.posizione,
-            ),
+                nome: p.nome,
+                descrizione: primo.descrizione.isEmpty ? primo.nome : primo.descrizione,
+                posizione: primo.posizione)
           ));
         }
       } catch (_) {

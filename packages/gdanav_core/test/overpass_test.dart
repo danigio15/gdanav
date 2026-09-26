@@ -80,11 +80,9 @@ void main() {
   });
 
   test('in tempo scaduto non si dice «nessuna colonnina»: si prova l\'altro server', () async {
-    final client = MockClient(
-      (r) async => r.url.host == 'uno.esempio'
-          ? http.Response('{"elements":[],"remark":"runtime error: Query timed out in \\"query\\""}', 200)
-          : http.Response(jsonEncode(risposta), 200),
-    );
+    final client = MockClient((r) async => r.url.host == 'uno.esempio'
+        ? http.Response('{"elements":[],"remark":"runtime error: Query timed out in \\"query\\""}', 200)
+        : http.Response(jsonEncode(risposta), 200));
     final o = ClienteOverpass(
       client: client,
       server: [Uri.parse('https://uno.esempio/api'), Uri.parse('https://due.esempio/api')],
