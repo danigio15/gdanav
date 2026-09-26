@@ -594,7 +594,8 @@ class PonteAuto {
   }
 
   /// Premium sbloccato o no: l'auto lo ricorda anche a telefono spento.
-  void premium(bool sbloccato) => _manda('premium', {'sbloccato': sbloccato});
+  /// [ospite]: Premium si compra nell'app che ospita gdanav (gdahome).
+  void premium(bool sbloccato, {bool ospite = false}) => _manda('premium', {'sbloccato': sbloccato, 'ospite': ospite});
 
   void _manda(String metodo, Map<String, Object?> dati) {
     if (!_attivo) return;

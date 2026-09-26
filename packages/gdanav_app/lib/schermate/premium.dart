@@ -71,7 +71,11 @@ class _PannelloPremiumState extends State<PannelloPremium> {
             ),
             const SizedBox(height: 8),
             Text(
-              p.sbloccato
+              p.daOspite
+                  ? p.sbloccato
+                        ? 'Premium è attivo con gdahome: tutto sbloccato.'
+                        : '${widget.perche ?? 'Tutto gdanav'} fa parte del Premium di gdahome: attivalo dall\'app gdahome.'
+                  : p.sbloccato
                   ? 'Premium è attivo: grazie!'
                   : widget.perche == null
                   ? 'Tutto gdanav, con 14 giorni di prova gratuita.'
@@ -82,7 +86,7 @@ class _PannelloPremiumState extends State<PannelloPremium> {
             for (final (icona, titolo, testo) in PannelloPremium.funzioni)
               _Voce(icona: icona, titolo: titolo, testo: testo),
             const SizedBox(height: 12),
-            if (!p.sbloccato) ...[
+            if (!p.sbloccato && !p.daOspite) ...[
               if (piani.isNotEmpty) ...[
                 for (final id in [pianoAnnuale, pianoMensile])
                   if (piani[id] case final piano?)

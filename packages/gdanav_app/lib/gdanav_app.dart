@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -40,18 +41,29 @@ export 'sorgenti/sorgente_gdahome.dart';
 /// lo decide lei ([conLAuto]). Lì c'è anche [gdahome]: l'auto della
 /// sezione Auto della sua plancia, coi dati in tempo reale dalla casa, senza
 /// abbinamento.
+///
+/// Premium:
+/// - **gdanav da sola**: l'abbonamento di gdanav dal Play Store o dall'App
+///   Store;
+/// - **dentro un'altra app** ([premiumOspite], gdahome): lo decide lei. Se lì
+///   è stato comprato il suo Premium è tutto sbloccato; se no, gdanav dice di
+///   comprarlo lì, senza il negozio di gdanav;
+/// - [senzaPremium]: tutto sbloccato e niente voce «Premium» (per chi non ha
+///   ancora i pagamenti).
 Future<GdanavApp> preparaGdanav({
   FlutterSecureStorage? portachiavi,
   bool conLAuto = true,
   SorgenteGdahome? gdahome,
+  ValueListenable<bool>? premiumOspite,
   bool senzaPremium = false,
 }) async {
   final archivio = Archivio(portachiavi);
   // Premium (Android Auto o CarPlay, e Home Assistant): si sa subito se è
-  // sbloccato, il negozio conferma dopo. [senzaPremium]: tutto sbloccato e niente
-  // negozio né voce «Premium» (gdahome, finché i pagamenti non ci sono).
+  // sbloccato, il negozio del telefono (Play Store o App Store) conferma dopo.
   final premium = senzaPremium
       ? GestorePremium(archivio: archivio, tuttoSbloccato: true)
+      : premiumOspite != null
+      ? GestorePremium(archivio: archivio, ospite: premiumOspite)
       : GestorePremium(archivio: archivio, negozio: negozioDelTelefono());
   await premium.carica();
   final auto = GestoreAuto(archivio: archivio, gdahome: gdahome)..homeAssistantConsentito = premium.sbloccato;
@@ -104,8 +116,8 @@ Future<GdanavApp> preparaGdanav({
       vicini: vicini,
       prova: prova,
     )..avvia();
-    ponte.premium(premium.sbloccato);
-    premium.addListener(() => ponte.premium(premium.sbloccato));
+    ponte.premium(premium.sbloccato, ospite: premium.daOspite);
+    premium.addListener(() => ponte.premium(premium.sbloccato, ospite: premium.daOspite));
   }
   return GdanavApp(
     archivio: archivio,

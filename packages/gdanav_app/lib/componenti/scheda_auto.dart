@@ -102,7 +102,7 @@ class SchedaAuto extends StatelessWidget {
           < 30 => c.piena,
           _ => c.libera,
         };
-        final (puntino, stato) = statoCollegamento(st, DateTime.now(), c);
+        final (puntino, stato) = statoCollegamento(st, DateTime.now(), c, perche: auto.percheSenzaDati);
         final (titolo, sottotitolo) = nomeInDueRighe(v);
         return Material(
           color: s.surfaceContainerHighest.withValues(alpha: 0.45),
@@ -207,7 +207,7 @@ class SchedaAuto extends StatelessWidget {
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerLeft,
-                        child: Text(stato, maxLines: 1, style: t.bodyMedium),
+                        child: Text(stato, maxLines: 2, overflow: TextOverflow.ellipsis, style: t.bodyMedium),
                       ),
                     ),
                     TextButton(
@@ -305,8 +305,9 @@ class _Foto extends StatelessWidget {
 
 /// Il puntino e la frase dello stato: verde se i dati arrivano freschi
 /// dall'auto, ambra se sono vecchi, grigio se sono a mano o stimati.
-(Color, String) statoCollegamento(StatoAuto? s, DateTime ora, ColoriGdanav c) {
-  if (s == null) return (c.ignota, 'Nessun dato: tocca «Fonte dati»');
+/// Senza dati, [perche] dice cosa non va, se lo si sa.
+(Color, String) statoCollegamento(StatoAuto? s, DateTime ora, ColoriGdanav c, {String? perche}) {
+  if (s == null) return (c.ignota, perche ?? 'Nessun dato: tocca «Fonte dati»');
   final da = nomeSorgente(s.sorgente);
   return switch (s.sorgente) {
     TipoSorgente.manuale => (c.ignota, 'Batteria scritta a mano · ${eta(ora.difference(s.letto))}'),

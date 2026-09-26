@@ -312,10 +312,10 @@ jobs:
       # Le chiavi facoltative (TomTom: traffico e colonnine libere/occupate;
       # Open Charge Map) arrivano dai segreti del repository.
       # Il numero di versione sale a ogni build: il Play Store non accetta due
-      # volte lo stesso.
+      # volte lo stesso. Premium si compra anche nell'APK, come nel Play
+      # Store: gdanav da sola chiede sempre l'abbonamento.
       - run: >-
           flutter build apk --release --build-number=${{ github.run_number }}
-          --dart-define=GDANAV_TUTTO_SBLOCCATO=true
           --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM"
           --dart-define=GDANAV_OCM_CHIAVE="$OCM"
         env:
@@ -323,8 +323,8 @@ jobs:
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
       - run: cp build/app/outputs/flutter-apk/app-release.apk gdanav.apk
       # Il pacchetto per il Play Store (test interno): da lì Android Auto
-      # mostra l'app senza «Origini sconosciute». Qui Premium si compra;
-      # nell'APK d'anteprima qui sopra è già sbloccato.
+      # mostra l'app senza «Origini sconosciute». Premium si compra, come
+      # nell'APK qui sopra.
       - run: >-
           flutter build appbundle --release --build-number=${{ github.run_number }}
           --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM"

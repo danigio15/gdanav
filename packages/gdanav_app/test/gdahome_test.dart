@@ -91,4 +91,43 @@ void main() {
     expect(find.text('Casa collegata'), findsOneWidget);
     expect(find.text('64%'), findsOneWidget);
   });
+
+  test('senza dati la scheda dice perché', () async {
+    // Dentro gdahome: casa scollegata, niente auto, auto senza batteria.
+    final g = SorgenteGdahome();
+    final auto = GestoreAuto(archivio: Archivio(), gdahome: g);
+    await auto.avvia();
+    expect(auto.percheSenzaDati, 'gdahome non è collegata alla casa');
+    g.collegamento(true);
+    expect(auto.percheSenzaDati, contains('non c\'è un\'auto elettrica'));
+    g.descrivi(const AutoDiGdahome(marca: 'Leapmotor', modello: 'B10'));
+    expect(auto.percheSenzaDati, contains('manca il sensore della batteria'));
+    g.manda(StatoAuto(sorgente: TipoSorgente.gdahome, letto: DateTime.now(), batteria: 64));
+    expect(auto.percheSenzaDati, isNull);
+    await pumpEventQueue();
+    auto.dispose();
+
+    // L'app da sola, abbinata a Home Assistant ma senza Premium.
+    final sola = GestoreAuto(archivio: Archivio())
+      ..abbinamento = Abbinamento.nuovo(relay: Uri.parse('https://esempio.it'))
+      ..homeAssistantConsentito = false;
+    expect(sola.percheSenzaDati, contains('Premium'));
+  });
+
+  test('Home Assistant: la scheda dice dove si ferma il filo', () {
+    final r = ClienteRelay(Abbinamento.nuovo(relay: Uri.parse('https://esempio.it')));
+    final h = SorgenteHomeAssistant(r);
+    expect(GestoreAuto.percheHomeAssistant(h), contains('Non raggiungo il relay'));
+    r.collegato = true;
+    r.casa = false;
+    expect(GestoreAuto.percheHomeAssistant(h), contains('integrazione gdanav'));
+    r.casa = true;
+    r.scartate = 3;
+    expect(GestoreAuto.percheHomeAssistant(h), contains('non si aprono'));
+    r.aperte = 1;
+    h.senzaBatteria = true;
+    expect(GestoreAuto.percheHomeAssistant(h), contains('non dice la batteria'));
+    h.senzaBatteria = false;
+    expect(GestoreAuto.percheHomeAssistant(h), contains('non ha ancora mandato'));
+  });
 }

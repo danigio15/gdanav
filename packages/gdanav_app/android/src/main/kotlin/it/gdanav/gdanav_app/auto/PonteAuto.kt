@@ -125,6 +125,10 @@ object PonteAuto {
     fun premium(context: Context): Boolean =
         context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).getBoolean("premium", false)
 
+    /** Premium si compra nell'app che ospita gdanav (gdahome), non in gdanav. */
+    fun premiumOspite(context: Context): Boolean =
+        context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).getBoolean("premium_ospite", false)
+
     private val principale = Handler(Looper.getMainLooper())
     private val ascoltatori = CopyOnWriteArrayList<() -> Unit>()
     private var canale: MethodChannel? = null
@@ -233,7 +237,10 @@ object PonteAuto {
                 }
                 immagini = nuove
             }
-            "premium" -> preferenze?.edit()?.putBoolean("premium", call.argument<Boolean>("sbloccato") == true)?.apply()
+            "premium" -> preferenze?.edit()
+                ?.putBoolean("premium", call.argument<Boolean>("sbloccato") == true)
+                ?.putBoolean("premium_ospite", call.argument<Boolean>("ospite") == true)
+                ?.apply()
             "guida" -> {
                 guida = if (call.argument<Boolean>("attiva") == true) {
                     Guida(
