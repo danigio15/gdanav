@@ -83,7 +83,13 @@ Future<GdanavApp> preparaGdanav({
     voce: VoceTelefono(),
     consumo: consumo,
   );
-  final posizione = GestorePosizione(archivio: archivio, letture: prova.letture(lettureGps));
+  // La velocità dell'auto entra anche qui: serve a sapere se si è fermi, e da
+  // fermi il segnaposto non deve girare dietro al ballonzolamento del GPS.
+  final posizione = GestorePosizione(
+    archivio: archivio,
+    letture: prova.letture(lettureGps),
+    velocitaDellAuto: auto.velocitaAuto,
+  );
   await posizione.carica();
   final segnalazioni = GestoreSegnalazioni(posizione: posizione, autovelox: archivioAutovelox());
   // Il meteo lungo la strada (Premium): nel consumo e sullo schermo.
