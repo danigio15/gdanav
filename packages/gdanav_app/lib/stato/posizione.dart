@@ -43,9 +43,18 @@ Stream<Position> _flusso() => _gps ??= Geolocator.getPositionStream(
 /// Le posizioni mentre si guida.
 Stream<Punto> posizioniGuida() => _flusso().map((p) => Punto(p.latitude, p.longitude));
 
-/// Le letture per il segnaposto: posizione, direzione e velocità.
+/// Le letture per il segnaposto: posizione, direzione, velocità, e quanto il
+/// telefono dice di potersi sbagliare.
+///
+/// La direzione passa da [rottaDaFidarsi]: Android quella casella la riempie
+/// sempre, e quando non ce l'ha ci mette zero — che vuol dire nord.
 Stream<Lettura> lettureGps() => _flusso().map(
-  (p) => Lettura(Punto(p.latitude, p.longitude), rotta: p.heading >= 0 ? p.heading : null, velocitaMs: p.speed),
+  (p) => Lettura(
+    Punto(p.latitude, p.longitude),
+    rotta: rottaDaFidarsi(p.heading, p.headingAccuracy),
+    velocitaMs: p.speed,
+    precisioneM: p.accuracy > 0 ? p.accuracy : null,
+  ),
 );
 
 /// Dove si è adesso, chiedendo il permesso la prima volta. `null` se la

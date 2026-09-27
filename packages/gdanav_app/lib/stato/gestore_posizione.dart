@@ -8,10 +8,35 @@ import 'archivio.dart';
 
 /// Una lettura del GPS: dove, e verso dove si va se il telefono lo sa.
 class Lettura {
-  const Lettura(this.punto, {this.rotta, this.velocitaMs = 0});
+  const Lettura(this.punto, {this.rotta, this.velocitaMs = 0, this.precisioneM});
   final Punto punto;
   final double? rotta;
   final double velocitaMs;
+
+  /// Il raggio entro cui il telefono dice di trovarsi, in metri. `null`
+  /// quando non lo dice.
+  ///
+  /// Non e' un di piu': e' il telefono stesso che ammette di non saperlo. Fra
+  /// i palazzi dichiara cinquanta, ottanta metri, ed e' proprio li' che il
+  /// puntino «esce dalla carreggiata e rientra».
+  final double? precisioneM;
+}
+
+/// La direzione che ha mandato il telefono, se c'e' da fidarsi.
+///
+/// Android la casella la riempie **sempre**: quando la direzione non ce l'ha
+/// ci mette zero, non «niente» — e zero vuol dire nord. Un telefono senza
+/// bussola avrebbe fatto puntare il segnaposto a nord per tutto il viaggio,
+/// e con l'aria di un dato vero.
+///
+/// Si guarda la precisione della direzione, che c'e' da Android 8 e su
+/// iPhone: quando dice qualcosa, la direzione e' una direzione. Quando tace,
+/// uno zero tondo non e' nord — e' una casella non riempita; qualunque altro
+/// valore invece nessuno lo scrive per sbaglio.
+double? rottaDaFidarsi(double gradi, [double precisione = 0]) {
+  if (!gradi.isFinite || gradi < 0 || gradi >= 360) return null;
+  if (precisione > 0) return gradi;
+  return gradi == 0 ? null : gradi;
 }
 
 /// Dove sei e verso dove guardi, per il segnaposto sulla mappa, e quale
@@ -66,9 +91,35 @@ class GestorePosizione extends ChangeNotifier {
     _iscrizione ??= letture().listen(_nuova, onError: (Object _) {});
   }
 
+  /// Oltre questo raggio la lettura non dice piu' dove si e': dice in quale
+  /// isolato. Cinquanta metri sono mezza strada.
+  static const double _troppoImprecisa = 50;
+
+  /// Quanto si puo' restare senza una lettura buona prima di prendere quella
+  /// che c'e'. Meglio un puntino impreciso che nessun puntino: chi ha appena
+  /// acceso l'app, o e' uscito da un tunnel, deve vedersi sulla mappa.
+  static const Duration _senzaNienteDaTroppo = Duration(seconds: 10);
+
+  /* Il telefono dichiara lui stesso quanto puo' sbagliare, e in citta' lo
+   * dichiara grosso: cinquanta, ottanta metri fra i palazzi. Un punto cosi'
+   * sposta il segnaposto di mezza carreggiata, e da fuori si vede il puntino
+   * uscire dalla strada e rientrare — che e' esattamente la segnalazione.
+   *
+   * Si scarta, ma non a occhi chiusi: se non ne arriva una buona per dieci
+   * secondi si prende quella che c'e'. Una mappa senza puntino e' peggio di
+   * un puntino largo. */
+  bool _daButtare(Lettura l, DateTime ora) {
+    final quanto = l.precisioneM;
+    if (quanto == null || quanto <= _troppoImprecisa) return false;
+    final ultima = lettoAlle;
+    if (qui == null || ultima == null) return false;
+    return ora.difference(ultima) < _senzaNienteDaTroppo;
+  }
+
   void _nuova(Lettura l) {
     final prima = qui;
     final ora = _ora();
+    if (_daButtare(l, ora)) return;
     final lettaPrima = lettoAlle;
     // Molti telefoni non danno la velocità: la si ricava dallo spostamento.
     var v = l.velocitaMs;

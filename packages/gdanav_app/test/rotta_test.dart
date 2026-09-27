@@ -4,6 +4,8 @@
  * macchinina girava su se stessa ferma al semaforo.
  */
 
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/stato/archivio.dart';
 import 'package:gdanav_app/stato/gestore_posizione.dart';
@@ -29,6 +31,66 @@ void main() {
   setUp(() {
     adesso = DateTime(2026, 9, 26, 19, 31);
     daMandare = [];
+  });
+
+  test('la direzione che Android non ha non e\' nord', () {
+    /* Android quella casella la riempie sempre: quando la direzione non ce
+     * l'ha ci mette zero, e zero vuol dire nord. Un telefono senza bussola
+     * avrebbe fatto puntare il segnaposto a nord per tutto il viaggio, con
+     * l'aria di un dato vero. */
+    expect(rottaDaFidarsi(0), isNull, reason: 'zero tondo e senza precisione: e\' la casella vuota');
+    expect(rottaDaFidarsi(0, 12), 0, reason: 'con la precisione, zero e\' nord davvero');
+    expect(rottaDaFidarsi(187.5), 187.5, reason: 'un valore cosi\' nessuno lo scrive per sbaglio');
+    expect(rottaDaFidarsi(187.5, 20), 187.5);
+    // Quello che non e\' una direzione non lo diventa.
+    expect(rottaDaFidarsi(-1), isNull);
+    expect(rottaDaFidarsi(360), isNull);
+    expect(rottaDaFidarsi(double.nan), isNull);
+  });
+
+  test('una lettura che il telefono stesso dichiara sbagliata si scarta', () async {
+    /* «Fra i palazzi si vede: il puntino esce dalla carreggiata e rientra.»
+     * Il telefono lo dichiara lui, quanto puo' sbagliare: in citta' dice
+     * cinquanta, ottanta metri. Un punto cosi' sposta il segnaposto di mezza
+     * strada. */
+    const dove = Punto(40.9700, 14.2060);
+    daMandare = [
+      const Lettura(dove, precisioneM: 8),
+      const Lettura(Punto(40.9700 + _dieciMetri * 8, 14.2060), precisioneM: 80),
+    ];
+    final p = costruisci(auto: () => 0);
+    p.avvia();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(p.qui, dove, reason: 'la seconda non dice dove si e\': dice in quale isolato');
+  });
+
+  test('ma senza niente da dieci secondi si prende quella che c\'e\'', () async {
+    /* Una mappa senza puntino e' peggio di un puntino largo: chi ha appena
+     * acceso l'app, o e' uscito da un tunnel, deve vedersi. */
+    const larga = Punto(40.9750, 14.2100);
+    daMandare = [const Lettura(larga, precisioneM: 90)];
+    final p = costruisci(auto: () => 0);
+    p.avvia();
+    await Future<void>.delayed(Duration.zero);
+    expect(p.qui, larga, reason: 'la prima non si scarta mai: non c\'e\' niente da tenere');
+
+    // Passano dieci secondi senza letture buone, e ne arriva un'altra larga.
+    final controllo = StreamController<Lettura>();
+    final q = GestorePosizione(
+      archivio: Archivio(),
+      letture: () => controllo.stream,
+      velocitaDellAuto: () => 0,
+      orologio: () => adesso,
+    );
+    q.avvia();
+    controllo.add(const Lettura(Punto(40.9700, 14.2060), precisioneM: 8));
+    await Future<void>.delayed(Duration.zero);
+    adesso = adesso.add(const Duration(seconds: 11));
+    controllo.add(const Lettura(larga, precisioneM: 90));
+    await Future<void>.delayed(Duration.zero);
+    expect(q.qui, larga);
+    await controllo.close();
   });
 
   test('ferma al semaforo, il GPS balla e il segnaposto non si muove', () async {
