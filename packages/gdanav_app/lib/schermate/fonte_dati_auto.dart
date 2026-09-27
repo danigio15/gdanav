@@ -7,7 +7,14 @@ import '../componenti/indicatore_batteria.dart';
 import 'esplora_auto.dart';
 import 'scegli_dongle.dart';
 
-/// Lo switch «Fonte dati auto»: Automatica, oppure una sorgente fissa.
+/// Da dove gdanav prende i dati dell'auto: Automatica, o una sorgente fissa.
+///
+/// Questo foglio risponde a **una** domanda: da dove li prendiamo. Cosa sta
+/// leggendo davvero dalla vettura — batteria, autonomia, temperature — sta in
+/// [DatiDallAuto], dietro l'ultima riga. Prima erano la stessa lista lunga, e
+/// scorrendola non si capiva piu' dove finiva la scelta e dove cominciava il
+/// referto: «dividi la sezione da dove recuperare i dati con quelli che sta
+/// leggendo dalla vettura».
 Future<void> mostraFonteDatiAuto(BuildContext context, GestoreAuto gestore, {GestoreConsumo? consumo}) {
   return showModalBottomSheet<void>(
     context: context,
@@ -53,9 +60,10 @@ class FonteDatiAuto extends StatelessWidget {
             child: ListView(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
                   child: Text('Fonte dati auto', style: Theme.of(context).textTheme.titleLarge),
                 ),
+                const _Titoletto('Da dove prendere i dati'),
                 RadioListTile<TipoSorgente?>(
                   value: null,
                   title: const Text('Automatica'),
@@ -74,24 +82,107 @@ class FonteDatiAuto extends StatelessWidget {
                       subtitle: gestore.disponibili.contains(t) ? null : const Text('Non collegata'),
                     ),
                 const Divider(),
+                const _Titoletto('Il dongle, e la batteria a mano'),
                 _Dongle(gestore: gestore),
-                const Divider(),
                 _BatteriaManuale(gestore: gestore),
                 const Divider(),
-                DatiUsati(stato: gestore.stato),
-                if (consumo case final c?) ...[
-                  const Divider(),
-                  ListenableBuilder(
-                    listenable: c,
-                    builder: (context, _) => PrecisioneConsumo(imparato: c.imparato),
-                  ),
-                ],
+                const _Titoletto('Cosa sta leggendo dalla vettura'),
+                _PortaAiDati(gestore: gestore, consumo: consumo),
                 const SizedBox(height: 24),
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+/// Un titoletto che separa le due domande di questo foglio.
+class _Titoletto extends StatelessWidget {
+  const _Titoletto(this.testo);
+
+  final String testo;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Text(
+        testo.toUpperCase(),
+        style: t.labelMedium?.copyWith(
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
+}
+
+/// La riga che porta ai dati veri: da chi arrivano, di quando sono, e quanti
+/// ne arrivano davvero. Il numero e' quello che conta — «cinque su dieci» dice
+/// in un colpo se l'auto sta parlando o sta tacendo.
+class _PortaAiDati extends StatelessWidget {
+  const _PortaAiDati({required this.gestore, this.consumo});
+
+  final GestoreAuto gestore;
+  final GestoreConsumo? consumo;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = gestore.stato;
+    final quanti = s == null ? 0 : quantiDatiArrivano(s);
+    return ListTile(
+      leading: const Icon(Icons.fact_check_outlined),
+      title: const Text('Dati che arrivano dall\'auto'),
+      subtitle: Text(
+        s == null
+            ? 'Nessun dato: gdanav stima la batteria'
+            : 'Da ${nomeSorgente(s.sorgente)} · ${eta(DateTime.now().difference(s.letto))} · '
+                  '$quanti su $datiPossibili',
+      ),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => DatiDallAuto(gestore: gestore, consumo: consumo),
+        ),
+      ),
+    );
+  }
+}
+
+/// Cosa sta leggendo dalla vettura, e quanto ci prende il calcolo del consumo.
+///
+/// Una schermata sua, non una coda del foglio della fonte: qui non si sceglie
+/// niente, si guarda soltanto.
+class DatiDallAuto extends StatelessWidget {
+  const DatiDallAuto({super.key, required this.gestore, this.consumo});
+
+  final GestoreAuto gestore;
+  final GestoreConsumo? consumo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Dati dall\'auto')),
+      body: ListenableBuilder(
+        listenable: gestore,
+        builder: (context, _) => ListView(
+          padding: const EdgeInsets.only(bottom: 24),
+          children: [
+            DatiUsati(stato: gestore.stato),
+            if (consumo case final c?) ...[
+              const Divider(),
+              ListenableBuilder(
+                listenable: c,
+                builder: (context, _) => PrecisioneConsumo(imparato: c.imparato),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

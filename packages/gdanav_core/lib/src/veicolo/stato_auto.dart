@@ -95,3 +95,30 @@ class StatoAuto {
   @override
   String toString() => 'StatoAuto(${sorgente.name}, ${batteria.toStringAsFixed(1)}%, $letto)';
 }
+
+/// Quanti dati, al massimo, un'auto puo' mandare: i dieci di [StatoAuto].
+///
+/// La batteria non si conta fra questi: senza quella non c'e' nemmeno uno
+/// stato. Sono i dieci che la schermata «Dati che arrivano dall'auto» elenca,
+/// e li conta anche l'auto: cosi' «tre su dieci» vuol dire la stessa cosa sul
+/// telefono, su Android Auto e su CarPlay.
+const int datiPossibili = 10;
+
+/// Quanti di quei dieci stanno arrivando adesso.
+///
+/// Serve a dire in una riga sola se l'auto sta parlando o sta tacendo, senza
+/// aprire l'elenco: un dongle appena collegato ne da' due o tre, gdahome col
+/// sensore giusto ne da' molti di piu'.
+int quantiDatiArrivano(StatoAuto s) {
+  var quanti = 1; // la batteria, che c'e' sempre
+  if (s.autonomiaKm != null) quanti++;
+  if (s.inCarica != null) quanti++;
+  if (s.potenzaCaricaKw != null) quanti++;
+  if (s.temperaturaEsternaC != null) quanti++;
+  if (s.temperaturaBatteriaC != null) quanti++;
+  if (s.velocitaKmh != null) quanti++;
+  if (s.potenzaKw != null) quanti++;
+  if (s.odometroKm != null) quanti++;
+  if (s.latitudine != null && s.longitudine != null) quanti++;
+  return quanti;
+}
