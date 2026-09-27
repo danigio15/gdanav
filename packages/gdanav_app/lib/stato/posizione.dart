@@ -31,13 +31,25 @@ Future<bool> haPosizione() async {
 Stream<Position>? _gps;
 
 Stream<Position> _flusso() => _gps ??= Geolocator.getPositionStream(
-  locationSettings: defaultTargetPlatform == TargetPlatform.android
-      ? AndroidSettings(
-          accuracy: LocationAccuracy.bestForNavigation,
-          distanceFilter: 0,
-          intervalDuration: const Duration(seconds: 1),
-        )
-      : const LocationSettings(accuracy: LocationAccuracy.bestForNavigation, distanceFilter: 0),
+  locationSettings: switch (defaultTargetPlatform) {
+    TargetPlatform.android => AndroidSettings(
+      accuracy: LocationAccuracy.bestForNavigation,
+      distanceFilter: 0,
+      intervalDuration: const Duration(seconds: 1),
+    ),
+    // Su iPhone, con CarPlay acceso, l'app sul telefono sta dietro: la
+    // posizione deve continuare ad arrivare, e iOS non deve metterla in pausa
+    // a un semaforo lungo.
+    TargetPlatform.iOS => AppleSettings(
+      accuracy: LocationAccuracy.bestForNavigation,
+      distanceFilter: 0,
+      activityType: ActivityType.automotiveNavigation,
+      pauseLocationUpdatesAutomatically: false,
+      allowBackgroundLocationUpdates: true,
+      showBackgroundLocationIndicator: true,
+    ),
+    _ => const LocationSettings(accuracy: LocationAccuracy.bestForNavigation, distanceFilter: 0),
+  },
 ).asBroadcastStream();
 
 /// Le posizioni mentre si guida.

@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'auto/ponte_auto.dart';
+import 'schermate/aggiorna_gdanav.dart';
 import 'schermate/schermata_principale.dart';
 import 'stato/archivio.dart';
+import 'stato/gestore_aggiornamento.dart';
 import 'stato/gestore_auto.dart';
 import 'stato/foto_auto.dart';
 import 'stato/gestore_consumo.dart';
@@ -17,6 +19,7 @@ import 'stato/gestore_meteo.dart';
 import 'stato/gestore_posizione.dart';
 import 'stato/gestore_segnalazioni.dart';
 import 'stato/gestore_vicini.dart';
+import 'stato/licenza.dart';
 import 'stato/gestore_viaggio.dart';
 import 'stato/prova_di_guida.dart';
 import 'stato/posizione.dart';
@@ -42,13 +45,21 @@ export 'sorgenti/sorgente_gdahome.dart';
 /// sezione Auto della sua plancia, coi dati in tempo reale dalla casa, senza
 /// abbinamento.
 ///
-/// Premium:
-/// - **gdanav da sola**: l'abbonamento di gdanav dal Play Store;
+/// Premium (Home Assistant e la batteria letta dall'auto, il percorso con le
+/// soste e le colonnine in tempo reale, Android Auto e CarPlay; il resto è per
+/// tutti):
+/// - **gdanav da sola**: l'abbonamento di gdanav dal Play Store o dall'App
+///   Store, oppure un codice regalo riscattato per questo telefono (le
+///   licenze di `docs/LICENZE.md` di gdahome);
 /// - **dentro un'altra app** ([premiumOspite], gdahome): lo decide lei. Se lì
 ///   è stato comprato il suo Premium è tutto sbloccato; se no, gdanav dice di
 ///   comprarlo lì, senza il negozio di gdanav;
 /// - [senzaPremium]: tutto sbloccato e niente voce «Premium» (per chi non ha
 ///   ancora i pagamenti).
+///
+/// Le versioni troppo vecchie ([GestoreAggiornamento]) si fermano solo in
+/// gdanav da sola: dentro un'altra app ([premiumOspite], [gdahome] o
+/// [senzaPremium]) ci pensa lei.
 Future<GdanavApp> preparaGdanav({
   FlutterSecureStorage? portachiavi,
   bool conLAuto = true,
@@ -57,23 +68,39 @@ Future<GdanavApp> preparaGdanav({
   bool senzaPremium = false,
 }) async {
   final archivio = Archivio(portachiavi);
-  // Premium (Android Auto e Home Assistant): si sa subito se è sbloccato,
-  // il Play Store conferma dopo.
+  final aggiornamento = GestoreAggiornamento.per(
+    archivio: archivio,
+    premiumOspite: premiumOspite,
+    gdahome: gdahome,
+    senzaPremium: senzaPremium,
+  );
+  // L'ultima versione minima salvata vale subito; il relay conferma dopo.
+  await aggiornamento?.avvia();
+  // Premium: si sa subito se è sbloccato; il negozio del telefono (Play Store
+  // o App Store) e il quadro delle licenze confermano dopo.
   final premium = senzaPremium
       ? GestorePremium(archivio: archivio, tuttoSbloccato: true)
       : premiumOspite != null
       ? GestorePremium(archivio: archivio, ospite: premiumOspite)
-      : GestorePremium(archivio: archivio, negozio: NegozioGooglePlay());
+      : GestorePremium(archivio: archivio, negozio: negozioDelTelefono(), licenze: ClienteLicenze());
   await premium.carica();
-  final auto = GestoreAuto(archivio: archivio, gdahome: gdahome)..homeAssistantConsentito = premium.sbloccato;
+  final auto = GestoreAuto(archivio: archivio, gdahome: gdahome)..premium = premium.sbloccato;
   await auto.avvia();
-  premium.addListener(() => auto.consentiHomeAssistant(premium.sbloccato));
+  premium.addListener(() => auto.consentiPremium(premium.sbloccato));
   // Il consumo imparato del modello scelto; cambiando auto si cambia storia.
   final consumo = GestoreConsumo(archivio);
   await consumo.carica(auto.veicolo.id);
   auto.addListener(() => consumo.carica(auto.veicolo.id));
   final viaggio = GestoreViaggio(archivio: archivio, auto: auto, posizione: posizioneAttuale, consumo: consumo);
   viaggio.opzioni = await archivio.opzioniPercorso();
+  // Premium comprato o scaduto con un viaggio aperto: si ricalcola, con le
+  // soste o senza.
+  var eraPremium = premium.sbloccato;
+  premium.addListener(() {
+    if (premium.sbloccato == eraPremium) return;
+    eraPremium = premium.sbloccato;
+    if (viaggio.stato is ViaggioPronto && viaggio.destinazione != null) unawaited(viaggio.pianifica(viaggio.destinazione!));
+  });
   // La prova di guida di Android Auto: posizioni finte al posto del GPS.
   final prova = ProvaDiGuida();
   final guida = GestoreGuida(
@@ -92,7 +119,7 @@ Future<GdanavApp> preparaGdanav({
   );
   await posizione.carica();
   final segnalazioni = GestoreSegnalazioni(posizione: posizione, autovelox: archivioAutovelox());
-  // Il meteo lungo la strada (Premium): nel consumo e sullo schermo.
+  // Il meteo lungo la strada (per tutti): nel consumo e sullo schermo.
   final meteo = GestoreMeteo(viaggio: viaggio, posizione: posizione);
   viaggio.stimaMeteo = meteo.stima;
   // Distributori o colonnine intorno, sulla mappa del telefono e dell'auto.
@@ -121,8 +148,13 @@ Future<GdanavApp> preparaGdanav({
       vicini: vicini,
       prova: prova,
     )..avvia();
-    ponte.premium(premium.sbloccato, ospite: premium.daOspite);
-    premium.addListener(() => ponte.premium(premium.sbloccato, ospite: premium.daOspite));
+    // Una versione da aggiornare spegne anche l'auto: lì si dice di
+    // aggiornare gdanav sul telefono.
+    void premiumInAuto() =>
+        ponte.premium(premium.sbloccato, ospite: premium.daOspite, aggiorna: aggiornamento?.daAggiornare ?? false);
+    premiumInAuto();
+    premium.addListener(premiumInAuto);
+    aggiornamento?.addListener(premiumInAuto);
   }
   return GdanavApp(
     archivio: archivio,
@@ -137,6 +169,7 @@ Future<GdanavApp> preparaGdanav({
     consumo: consumo,
     fotoAuto: fotoAuto,
     premium: senzaPremium ? null : premium,
+    aggiornamento: aggiornamento,
     chiediPosizione: chiediPosizione,
   );
 }
@@ -158,6 +191,7 @@ class GdanavApp extends StatelessWidget {
     this.consumo,
     this.fotoAuto,
     this.premium,
+    this.aggiornamento,
   });
 
   final Archivio archivio;
@@ -176,6 +210,10 @@ class GdanavApp extends StatelessWidget {
   /// `null` nelle prove: tutto sbloccato.
   final GestorePremium? premium;
 
+  /// Le versioni troppo vecchie: se questa lo è, al posto di tutto c'è
+  /// [SchermataAggiorna]. `null` dentro un'altra app e nelle prove.
+  final GestoreAggiornamento? aggiornamento;
+
   /// Nelle prove e nelle anteprime si passa un'altra mappa: quella vera vuole
   /// il codice nativo.
   final CostruisciMappa? mappa;
@@ -188,6 +226,13 @@ class GdanavApp extends StatelessWidget {
       theme: temaGdanav(Brightness.light),
       darkTheme: temaGdanav(Brightness.dark),
       home: schermata(),
+      builder: aggiornamento == null
+          ? null
+          : (context, figlio) => ListenableBuilder(
+              listenable: aggiornamento!,
+              builder: (context, _) =>
+                  aggiornamento!.daAggiornare ? const SchermataAggiorna() : figlio ?? const SizedBox(),
+            ),
     );
   }
 

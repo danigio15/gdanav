@@ -523,7 +523,7 @@ class _Fondo extends StatelessWidget {
                   ],
                 ),
                 // Con l'auto termica niente batteria: solo arrivo e strada.
-                if (!(p?.termica ?? false)) ...[const Divider(height: 20), _Batteria(guida: guida)],
+                if (!(p?.soloPercorso ?? false)) ...[const Divider(height: 20), _Batteria(guida: guida)],
                 if (sosta != null) ...[
                   const Divider(height: 20),
                   Row(

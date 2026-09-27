@@ -24,11 +24,16 @@ dependencies:
   image_picker: ^1.1.2
   path_provider: ^2.1.6
   http: ^1.2.0
+  # La firma dei gettoni delle licenze (Ed25519), come in gdanav_core.
+  cryptography: ^2.7.0
   in_app_purchase: ^3.3.1
   in_app_purchase_android: ^0.5.3
+  in_app_purchase_storekit: ^0.4.13
   # Importazione dei posti salvati da Google Maps (Takeout).
   file_picker: ^13.1.0
   archive: ^4.3.0
+  # I link della schermata Premium (privacy e condizioni, voluti dall'App Store).
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:
@@ -39,11 +44,13 @@ flutter:
   uses-material-design: true
 
   # Il pezzo nativo che serve anche dentro un'altra app: i permessi Bluetooth
-  # per il dongle OBD. Android Auto invece resta nell'app gdanav.
+  # per il dongle OBD, Android Auto e CarPlay.
   plugin:
     platforms:
       android:
         package: it.gdanav.gdanav_app
+        pluginClass: GdanavAppPlugin
+      ios:
         pluginClass: GdanavAppPlugin
 
   # Dentro il pacchetto si leggono come `packages/gdanav_app/assets/…`: vedi

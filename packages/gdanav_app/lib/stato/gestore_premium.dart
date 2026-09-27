@@ -3,15 +3,49 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
+import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
+import 'package:in_app_purchase_storekit/store_kit_2_wrappers.dart';
+import 'package:in_app_purchase_storekit/store_kit_wrappers.dart';
 
 import '../servizi.dart';
 import 'archivio.dart';
+import 'chiave_licenze.dart';
+import 'licenza.dart';
 
 /// L'abbonamento da creare nella Play Console (Monetizza → Prodotti →
 /// Abbonamenti), con due piani base e, per ciascuno, l'offerta di prova.
 const idPremium = 'gdanav_premium';
 const pianoMensile = 'mensile';
 const pianoAnnuale = 'annuale';
+
+/// Sull'App Store non ci sono i piani base: ogni piano è un prodotto a sé,
+/// nello stesso gruppo di abbonamenti (App Store Connect → Abbonamenti →
+/// gruppo «gdanav Premium»), ciascuno con l'offerta introduttiva gratuita.
+const idAppStore = {pianoMensile: '${idPremium}_mensile', pianoAnnuale: '${idPremium}_annuale'};
+
+/// La prova gratuita configurata su App Store Connect: StoreKit dice se
+/// spetta, non quanto dura.
+const giorniProvaAppStore = 14;
+
+/// I prezzi di listino, gli stessi messi nella Play Console e in App Store
+/// Connect: si mostrano solo quando il negozio non risponde (niente rete, app
+/// non scaricata dal negozio). Quando risponde valgono i suoi, nella valuta
+/// del telefono.
+const pianiDiListino = [
+  PianoPremium(id: pianoMensile, prezzo: '2,99 €'),
+  PianoPremium(id: pianoAnnuale, prezzo: '29,99 €'),
+];
+
+/// Un acquisto di Premium, da qualunque negozio venga.
+bool eDiPremium(String productID) => productID == idPremium || idAppStore.containsValue(productID);
+
+/// Come si chiama il negozio da cui si compra, per dirlo a chi compra.
+String get nomeNegozio => defaultTargetPlatform == TargetPlatform.iOS ? 'App Store' : 'Play Store';
+
+/// Il negozio giusto per il telefono: App Store su iPhone, Google Play sugli
+/// altri.
+NegozioPremium negozioDelTelefono() =>
+    defaultTargetPlatform == TargetPlatform.iOS ? NegozioAppStore() : NegozioGooglePlay();
 
 /// Un piano dell'abbonamento come lo propone il negozio.
 class PianoPremium {
@@ -107,15 +141,72 @@ class NegozioGooglePlay implements NegozioPremium {
   Future<void> completa(PurchaseDetails p) => _iap.completePurchase(p);
 }
 
+class NegozioAppStore implements NegozioPremium {
+  final _iap = InAppPurchase.instance;
+  final _perPiano = <String, ProductDetails>{};
+
+  @override
+  Future<bool> disponibile() => _iap.isAvailable();
+
+  @override
+  Future<List<PianoPremium>> piani() async {
+    final r = await _iap.queryProductDetails(idAppStore.values.toSet());
+    _perPiano.clear();
+    final piani = <PianoPremium>[];
+    for (final MapEntry(key: piano, value: id) in idAppStore.entries) {
+      final d = r.productDetails.where((d) => d.id == id).firstOrNull;
+      if (d == null) continue;
+      _perPiano[piano] = d;
+      // La prova spetta una volta sola per gruppo: chi l'ha già usata paga subito.
+      var prova = false;
+      if (d is AppStoreProduct2Details) {
+        try {
+          prova = await SK2Product.isIntroductoryOfferEligible(id);
+        } catch (_) {}
+      } else if (d is AppStoreProductDetails) {
+        prova = d.skProduct.introductoryPrice?.paymentMode == SKProductDiscountPaymentMode.freeTrail;
+      }
+      piani.add(PianoPremium(id: piano, prezzo: d.price, giorniProva: prova ? giorniProvaAppStore : 0));
+    }
+    return piani;
+  }
+
+  @override
+  Stream<List<PurchaseDetails>> get acquisti => _iap.purchaseStream;
+
+  @override
+  Future<void> compra(String piano) async {
+    if (_perPiano.isEmpty) await piani();
+    final d = _perPiano[piano];
+    if (d == null) throw StateError('Piano $piano non disponibile nel negozio');
+    // L'offerta introduttiva la applica l'App Store da sé, se spetta.
+    await _iap.buyNonConsumable(purchaseParam: PurchaseParam(productDetails: d));
+  }
+
+  @override
+  Future<void> ripristina() => _iap.restorePurchases();
+
+  @override
+  Future<void> completa(PurchaseDetails p) => _iap.completePurchase(p);
+}
+
 /// gdanav Premium, in abbonamento (mensile o annuale, con la prova gratuita):
-/// Android Auto, Home Assistant, traffico, colonnine libere/occupate,
-/// autovelox. Si ritrova su un altro telefono con lo stesso account Google;
-/// se l'abbonamento scade, si torna alla versione gratuita.
+/// Home Assistant e la batteria letta dall'auto (OBD, Android Auto, gdahome),
+/// il percorso con le soste alle colonnine e il loro stato in tempo reale,
+/// Android Auto e CarPlay. Traffico, autovelox e meteo sono per tutti.
+///
+/// Premium è attivo se c'è almeno una di queste:
+/// - l'abbonamento del negozio (Play Store o App Store): si ritrova su un
+///   altro telefono con lo stesso account; se scade, si torna alla versione
+///   gratuita;
+/// - un gettone di licenza valido per questo telefono (un codice regalo,
+///   `docs/LICENZE.md` di gdahome), rinnovato dal quadro all'avvio e ogni 6
+///   ore;
+/// - dentro gdahome ([ospite]), il Premium della casa.
 class GestorePremium extends ChangeNotifier {
-  /// Premium attivo adesso, per chi non ha il gestore in mano (la mappa col
-  /// traffico, il pianificatore con le colonnine in tempo reale, gli
-  /// autovelox). Vero finché l'app non dice altro: le prove non passano dal
-  /// negozio.
+  /// Premium attivo adesso, per chi non ha il gestore in mano (il
+  /// pianificatore con le soste e le colonnine in tempo reale). Vero finché
+  /// l'app non dice altro: le prove non passano dal negozio.
   static final attivo = ValueNotifier<bool>(true);
 
   GestorePremium({
@@ -124,11 +215,17 @@ class GestorePremium extends ChangeNotifier {
     this.ospite,
     bool? tuttoSbloccato,
     this.attesaConferma = const Duration(seconds: 8),
-  }) : _tuttoSbloccato = tuttoSbloccato ?? Servizi.tuttoSbloccato;
+    this.licenze,
+    String? chiaveLicenze,
+    this.ogniQuanto = const Duration(hours: 6),
+    DateTime Function()? orologio,
+  }) : _tuttoSbloccato = tuttoSbloccato ?? Servizi.tuttoSbloccato,
+       chiaveLicenze = chiaveLicenze ?? chiavePubblicaLicenze,
+       _ora = orologio ?? DateTime.now;
 
   final Archivio archivio;
 
-  /// `null`: nessun negozio (prove, iPhone per ora).
+  /// `null`: nessun negozio (prove, gdahome).
   final NegozioPremium? negozio;
 
   /// Dentro un'altra app (gdahome) Premium lo decide lei: se lì è stato
@@ -138,15 +235,43 @@ class GestorePremium extends ChangeNotifier {
   /// Premium si compra nell'app che ospita gdanav, non qui.
   bool get daOspite => ospite != null;
 
-  /// Solo le build fatte apposta con GDANAV_TUTTO_SBLOCCATO: le versioni
-  /// pubblicate (APK e Play Store) chiedono l'abbonamento.
+  /// Le build con GDANAV_TUTTO_SBLOCCATO: le prove a mano, e quelle della CI
+  /// finche' i pagamenti sono spenti (GDANAV_PAGAMENTI, vedi `servizi.dart`).
   final bool _tuttoSbloccato;
 
   /// Quanto si aspetta che il Play Store confermi l'abbonamento, prima di
   /// considerarlo scaduto.
   final Duration attesaConferma;
 
-  var sbloccato = false;
+  /// Il quadro delle licenze, per i codici regalo; `null`: niente codici.
+  final ClienteLicenze? licenze;
+
+  /// La chiave pubblica con cui si verificano i gettoni; vuota (di serie):
+  /// i gettoni non valgono e Premium arriva solo dal negozio.
+  final String chiaveLicenze;
+
+  /// Ogni quanto si chiede al quadro il gettone nuovo.
+  final Duration ogniQuanto;
+  final DateTime Function() _ora;
+
+  /// L'abbonamento del negozio è attivo (o lo era l'ultima volta).
+  var _dalNegozio = false;
+
+  /// L'abbonamento del negozio è attivo.
+  bool get negozioAttivo => _dalNegozio;
+
+  /// La licenza del telefono (codice regalo), se c'è e vale.
+  GettoneLicenza? licenza;
+
+  /// Premium attivo: dal negozio, da una licenza, o da chi ospita.
+  bool get sbloccato {
+    if (_tuttoSbloccato) return true;
+    if (ospite case final o?) return o.value;
+    return _dalNegozio || (licenza != null && licenza!.fino.isAfter(_ora()));
+  }
+
+  /// Si può scrivere un codice regalo: gdanav da sola, con le licenze accese.
+  bool get codiciRegalo => !daOspite && licenze != null && chiaveLicenze.isNotEmpty;
 
   /// I piani da proporre; vuoto se il negozio non risponde.
   var piani = <PianoPremium>[];
@@ -157,8 +282,16 @@ class GestorePremium extends ChangeNotifier {
   /// L'ultimo problema da dire a chi compra.
   String? errore;
 
+  /// Perché il codice regalo non è passato.
+  String? erroreCodice;
+
+  /// Mentre il quadro controlla un codice regalo.
+  var riscattoInCorso = false;
+
   StreamSubscription<List<PurchaseDetails>>? _iscrizione;
+  Timer? _rinnovo;
   var _confermato = false;
+  IdentitaTelefono? _io;
 
   @override
   void notifyListeners() {
@@ -166,25 +299,94 @@ class GestorePremium extends ChangeNotifier {
     super.notifyListeners();
   }
 
-  /// Quello che si sa subito (dal telefono); il Play Store risponde dopo,
-  /// senza far aspettare l'avvio dell'app.
+  /// Quello che si sa subito (dal telefono); il Play Store e il quadro
+  /// rispondono dopo, senza far aspettare l'avvio dell'app.
   Future<void> carica() async {
     if (ospite case final o?) {
-      sbloccato = _tuttoSbloccato || o.value;
       o.addListener(_dallOspite);
       notifyListeners();
       return;
     }
-    sbloccato = _tuttoSbloccato || await archivio.premium();
+    _dalNegozio = await archivio.premium();
+    if (chiaveLicenze.isNotEmpty) {
+      _io = await archivio.identitaTelefono();
+      if (await archivio.gettoneLicenza() case final g?) {
+        licenza = await verificaGettone(g, soggetto: _io!.telefono, chiavePubblica: chiaveLicenze, adesso: _ora());
+      }
+    }
     notifyListeners();
     if (!_tuttoSbloccato) unawaited(_apriNegozio());
+    if (codiciRegalo) {
+      unawaited(rinnovaLicenza());
+      _rinnovo = Timer.periodic(ogniQuanto, (_) => rinnovaLicenza());
+    }
   }
 
+  bool? _ultimoOspite;
+
   void _dallOspite() {
-    final si = _tuttoSbloccato || ospite!.value;
-    if (si == sbloccato) return;
-    sbloccato = si;
+    final si = ospite!.value;
+    if (si == _ultimoOspite) return;
+    _ultimoOspite = si;
     notifyListeners();
+  }
+
+  /// Chiede al quadro il gettone di adesso. Senza rete si tiene quello che
+  /// c'è (vale fino a `fino`, al massimo 8 giorni); se il quadro risponde
+  /// senza gettoni la licenza è stata tolta.
+  Future<void> rinnovaLicenza() async {
+    final l = licenze, io = _io;
+    if (l == null || io == null || chiaveLicenze.isEmpty) return;
+    try {
+      final gettoni = await l.rinnova(io);
+      await _gettoni(gettoni);
+    } catch (e) {
+      debugPrint('licenze: $e');
+      // Il gettone vecchio vale finché non scade.
+      if (licenza case final g? when !g.fino.isAfter(_ora())) {
+        licenza = null;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<GettoneLicenza?> _gettoni(List<String> gettoni) async {
+    final g = await gettoneMigliore(gettoni, soggetto: _io!.telefono, chiavePubblica: chiaveLicenze, adesso: _ora());
+    licenza = g;
+    await archivio.salvaGettoneLicenza(g?.testo);
+    notifyListeners();
+    return g;
+  }
+
+  /// Riscatta un codice regalo (`GDA-XXXX-XXXX-XXXX`) per questo telefono.
+  /// `true` se ora Premium è attivo; altrimenti [erroreCodice] dice perché.
+  Future<bool> riscattaCodice(String scritto) async {
+    final l = licenze;
+    if (l == null || !codiciRegalo) return false;
+    erroreCodice = null;
+    final codice = normalizzaCodice(scritto);
+    if (codice == null) {
+      erroreCodice = 'Il codice è fatto così: GDA-XXXX-XXXX-XXXX.';
+      notifyListeners();
+      return false;
+    }
+    riscattoInCorso = true;
+    notifyListeners();
+    try {
+      _io ??= await archivio.identitaTelefono();
+      final g = await _gettoni(await l.riscatta(codice, _io!));
+      if (g == null) {
+        erroreCodice = 'Il codice è stato accettato, ma non vale per gdanav su questo telefono.';
+        return false;
+      }
+      return true;
+    } on ErroreLicenza catch (e) {
+      erroreCodice = e.messaggio;
+      return false;
+    } finally {
+      riscattoInCorso = false;
+      notifyListeners();
+    }
   }
 
   Future<void> _apriNegozio() async {
@@ -200,8 +402,8 @@ class GestorePremium extends ChangeNotifier {
       // Il negozio risponde ma non c'è un abbonamento attivo: scaduto o
       // disdetto. Senza rete non si arriva qui, e resta com'era.
       await Future<void>.delayed(attesaConferma);
-      if (sbloccato && !_confermato && !inCorso) {
-        sbloccato = false;
+      if (_dalNegozio && !_confermato && !inCorso) {
+        _dalNegozio = false;
         await archivio.salvaPremium(false);
         notifyListeners();
       }
@@ -219,7 +421,7 @@ class GestorePremium extends ChangeNotifier {
     try {
       await n.compra(piano);
     } catch (e) {
-      _errore('Il Play Store non risponde. Riprova tra poco.');
+      _errore('$nomeNegozio non risponde. Riprova tra poco.');
     }
   }
 
@@ -229,12 +431,12 @@ class GestorePremium extends ChangeNotifier {
     try {
       await negozio?.ripristina();
     } catch (e) {
-      _errore('Il Play Store non risponde. Riprova tra poco.');
+      _errore('$nomeNegozio non risponde. Riprova tra poco.');
     }
   }
 
   Future<void> _acquisti(List<PurchaseDetails> elenco) async {
-    for (final p in elenco.where((p) => p.productID == idPremium)) {
+    for (final p in elenco.where((p) => eDiPremium(p.productID))) {
       switch (p.status) {
         case PurchaseStatus.purchased || PurchaseStatus.restored:
           await _sblocca();
@@ -247,7 +449,8 @@ class GestorePremium extends ChangeNotifier {
           inCorso = true;
           notifyListeners();
       }
-      // Google Play vuole la conferma, altrimenti dopo tre giorni rimborsa.
+      // Google Play vuole la conferma, altrimenti dopo tre giorni rimborsa;
+      // l'App Store la vuole per chiudere la transazione.
       if (p.pendingCompletePurchase) await negozio?.completa(p);
     }
   }
@@ -256,8 +459,8 @@ class GestorePremium extends ChangeNotifier {
     _confermato = true;
     inCorso = false;
     errore = null;
-    if (!sbloccato) {
-      sbloccato = true;
+    if (!_dalNegozio) {
+      _dalNegozio = true;
       await archivio.salvaPremium(true);
     }
     notifyListeners();
@@ -273,6 +476,7 @@ class GestorePremium extends ChangeNotifier {
   void dispose() {
     ospite?.removeListener(_dallOspite);
     _iscrizione?.cancel();
+    _rinnovo?.cancel();
     super.dispose();
   }
 }

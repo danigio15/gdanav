@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 /// Chi parla durante la guida. Nelle prove se ne usa una che scrive e basta.
@@ -16,11 +17,21 @@ class VoceTelefono implements Voce {
       if (!_pronta) {
         await _tts.setLanguage('it-IT');
         await _tts.setSpeechRate(0.5);
-        // Android: la voce sul canale della navigazione, che abbassa la musica
-        // mentre parla invece di sovrapporsi (DD-1). Altrove non c'è.
-        try {
-          await _tts.setAudioAttributesForNavigation();
-        } catch (_) {}
+        if (defaultTargetPlatform == TargetPlatform.iOS) {
+          // Come i navigatori di sistema: abbassa la musica mentre parla, si
+          // sente anche con lo schermo spento e in CarPlay, e poi la rialza.
+          await _tts.setSharedInstance(true);
+          await _tts.setIosAudioCategory(IosTextToSpeechAudioCategory.playback, [
+            IosTextToSpeechAudioCategoryOptions.duckOthers,
+            IosTextToSpeechAudioCategoryOptions.interruptSpokenAudioAndMixWithOthers,
+          ], IosTextToSpeechAudioMode.voicePrompt);
+        } else {
+          // Android: la voce sul canale della navigazione, che abbassa la
+          // musica mentre parla invece di sovrapporsi (DD-1). Altrove non c'è.
+          try {
+            await _tts.setAudioAttributesForNavigation();
+          } catch (_) {}
+        }
         _pronta = true;
       }
       // Il fuoco audio per la frase, poi la musica torna su.

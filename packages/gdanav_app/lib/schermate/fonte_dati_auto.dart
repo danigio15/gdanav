@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -15,22 +16,42 @@ import 'scegli_dongle.dart';
 /// scorrendola non si capiva piu' dove finiva la scelta e dove cominciava il
 /// referto: «dividi la sezione da dove recuperare i dati con quelli che sta
 /// leggendo dalla vettura».
-Future<void> mostraFonteDatiAuto(BuildContext context, GestoreAuto gestore, {GestoreConsumo? consumo}) {
+///
+/// Senza Premium le fonti automatiche si vedono col lucchetto: toccate,
+/// chiudono il foglio e aprono Premium ([onPremium]).
+Future<void> mostraFonteDatiAuto(
+  BuildContext context,
+  GestoreAuto gestore, {
+  GestoreConsumo? consumo,
+  VoidCallback? onPremium,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
-    builder: (_) => FractionallySizedBox(
+    builder: (foglio) => FractionallySizedBox(
       heightFactor: 0.9,
-      child: FonteDatiAuto(gestore: gestore, consumo: consumo),
+      child: FonteDatiAuto(
+        gestore: gestore,
+        consumo: consumo,
+        onPremium: onPremium == null
+            ? null
+            : () {
+                Navigator.of(foglio).pop();
+                onPremium();
+              },
+      ),
     ),
   );
 }
 
 class FonteDatiAuto extends StatelessWidget {
-  const FonteDatiAuto({super.key, required this.gestore, this.consumo});
+  const FonteDatiAuto({super.key, required this.gestore, this.consumo, this.onPremium});
 
   final GestoreAuto gestore;
+
+  /// Toccando una fonte col lucchetto (senza Premium).
+  final VoidCallback? onPremium;
 
   /// Il consumo imparato: per dire quanto è preciso il calcolo.
   final GestoreConsumo? consumo;
@@ -53,6 +74,10 @@ class FonteDatiAuto extends StatelessWidget {
           Automatica() => null,
           Fissa(:final sorgente) => sorgente,
         };
+        final premium = gestore.premium;
+        final automatica = gestore.gdahome == null
+            ? 'Auto, poi OBD, poi Home Assistant se recente, poi stima'
+            : 'Auto, poi OBD, poi gdahome e Home Assistant se recenti, poi stima';
         return SafeArea(
           child: RadioGroup<TipoSorgente?>(
             groupValue: scelta,
@@ -64,26 +89,40 @@ class FonteDatiAuto extends StatelessWidget {
                   child: Text('Fonte dati auto', style: Theme.of(context).textTheme.titleLarge),
                 ),
                 const _Titoletto('Da dove prendere i dati'),
-                RadioListTile<TipoSorgente?>(
-                  value: null,
-                  title: const Text('Automatica'),
-                  subtitle: Text(
-                    gestore.gdahome == null
-                        ? 'Auto, poi OBD, poi Home Assistant se recente, poi stima'
-                        : 'Auto, poi OBD, poi gdahome e Home Assistant se recenti, poi stima',
-                  ),
-                ),
+                if (!premium) _SoloAMano(onPremium: onPremium),
+                if (premium)
+                  RadioListTile<TipoSorgente?>(
+                    value: null,
+                    title: const Text('Automatica'),
+                    subtitle: Text(automatica),
+                  )
+                else
+                  _Bloccata(titolo: 'Automatica', sotto: automatica, onTap: onPremium),
                 for (final t in _scelte)
-                  // gdahome c'è solo dentro l'app gdahome.
-                  if (t != TipoSorgente.gdahome || gestore.gdahome != null)
-                    RadioListTile<TipoSorgente?>(
-                      value: t,
-                      title: Text(nomeSorgente(t)),
-                      subtitle: gestore.disponibili.contains(t) ? null : const Text('Non collegata'),
-                    ),
+                  // gdahome c'è solo dentro l'app gdahome; Android Auto solo
+                  // su Android (CarPlay la batteria non la dice).
+                  if ((t != TipoSorgente.gdahome || gestore.gdahome != null) &&
+                      (t != TipoSorgente.androidAuto || defaultTargetPlatform != TargetPlatform.iOS))
+                    if (premium || t == TipoSorgente.manuale)
+                      RadioListTile<TipoSorgente?>(
+                        key: Key('fonte-${t.name}'),
+                        value: t,
+                        title: Text(nomeSorgente(t)),
+                        subtitle: gestore.disponibili.contains(t) ? null : const Text('Non collegata'),
+                      )
+                    else
+                      _Bloccata(key: Key('fonte-${t.name}'), titolo: nomeSorgente(t), onTap: onPremium),
                 const Divider(),
                 const _Titoletto('Il dongle, e la batteria a mano'),
-                _Dongle(gestore: gestore),
+                if (premium)
+                  _Dongle(gestore: gestore)
+                else
+                  _Bloccata(
+                    icona: Icons.cable,
+                    titolo: gestore.dongle?.nome ?? 'Dongle OBD Bluetooth',
+                    sotto: 'Batteria, velocità e temperatura dalla presa OBD',
+                    onTap: onPremium,
+                  ),
                 _BatteriaManuale(gestore: gestore),
                 const Divider(),
                 const _Titoletto('Cosa sta leggendo dalla vettura'),
@@ -94,6 +133,80 @@ class FonteDatiAuto extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Senza Premium: la batteria si scrive a mano, quella letta dall'auto è
+/// Premium.
+class _SoloAMano extends StatelessWidget {
+  const _SoloAMano({this.onPremium});
+
+  final VoidCallback? onPremium;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final s = Theme.of(context).colorScheme;
+    return Container(
+      key: const Key('fonti-premium'),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 6),
+      decoration: BoxDecoration(
+        color: s.primaryContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Senza Premium la batteria si scrive a mano, qui sotto: gdanav la stima man mano che guidi.',
+            style: t.bodyMedium,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            defaultTargetPlatform == TargetPlatform.iOS
+                ? 'Letta dall\'auto (OBD, gdahome, Home Assistant) è con Premium.'
+                : 'Letta dall\'auto (Android Auto, OBD, gdahome, Home Assistant) è con Premium.',
+            style: t.bodySmall?.copyWith(color: s.onSurfaceVariant),
+          ),
+          if (onPremium != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onPremium,
+                icon: const Icon(Icons.workspace_premium, size: 18),
+                label: const Text('Scopri Premium'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Una fonte che senza Premium non si sceglie: il lucchetto, e Premium al
+/// tocco.
+class _Bloccata extends StatelessWidget {
+  const _Bloccata({super.key, required this.titolo, this.sotto, this.icona, this.onTap});
+
+  final String titolo;
+  final String? sotto;
+  final IconData? icona;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final muto = Theme.of(context).colorScheme.onSurfaceVariant;
+    return ListTile(
+      leading: Padding(
+        padding: const EdgeInsets.only(left: 8, right: 4),
+        child: Icon(icona ?? Icons.lock_outline, color: muto),
+      ),
+      title: Text(titolo, style: TextStyle(color: muto)),
+      subtitle: Text(sotto == null ? 'Premium' : '$sotto · Premium'),
+      trailing: icona == null ? null : Icon(Icons.lock_outline, color: muto, size: 20),
+      onTap: onTap,
     );
   }
 }

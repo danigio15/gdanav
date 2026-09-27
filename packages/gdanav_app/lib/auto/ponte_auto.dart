@@ -32,8 +32,9 @@ import '../stato/gestore_vicini.dart';
 /// velocità e limite, arrivo, prossima sosta, meteo, avvisi). Dall'auto
 /// arrivano la ricerca, la meta scelta (che parte subito in guida), Casa e
 /// Lavoro da salvare, le opzioni del percorso, le segnalazioni e «Fine». Il
-/// lato nativo è in `android/app/src/main/kotlin/it/gdanav/gdanav/auto`. Su
-/// iPhone e nelle prove il canale non c'è, e si tace.
+/// lato nativo è in `android/src/main/kotlin/it/gdanav/gdanav_app/auto` e, per
+/// CarPlay, in `ios/gdanav_app/Sources/gdanav_app`. Nelle prove il canale non
+/// c'è, e si tace.
 class PonteAuto {
   PonteAuto({
     required this.viaggio,
@@ -483,6 +484,11 @@ class PonteAuto {
       'secondi': (a?.restante ?? p.viaggio.percorso.durata).inSeconds,
       'arrivo': (guida.arrivoAlle ?? _ora()).millisecondsSinceEpoch,
       'destinazione': p.destinazione.nome,
+      // Dove si arriva: CarPlay vuole il viaggio con partenza e arrivo.
+      'destinazione_lat': p.destinazione.posizione.lat,
+      'destinazione_lon': p.destinazione.posizione.lon,
+      // Con quanta batteria si arriva, per il riepilogo del viaggio.
+      if (auto?.elettrica ?? true) 'arrivo_batteria': ?guida.batteriaArrivo,
       'uscita': m?.uscita ?? '',
       'verso': m?.verso ?? '',
       'rotonda': m?.uscitaRotonda,
@@ -595,7 +601,11 @@ class PonteAuto {
 
   /// Premium sbloccato o no: l'auto lo ricorda anche a telefono spento.
   /// [ospite]: Premium si compra nell'app che ospita gdanav (gdahome).
-  void premium(bool sbloccato, {bool ospite = false}) => _manda('premium', {'sbloccato': sbloccato, 'ospite': ospite});
+  /// [aggiorna]: questa versione è troppo vecchia (`GestoreAggiornamento`):
+  /// l'auto resta ferma sullo schermo che dice di aggiornare gdanav sul
+  /// telefono, come senza Premium.
+  void premium(bool sbloccato, {bool ospite = false, bool aggiorna = false}) =>
+      _manda('premium', {'sbloccato': sbloccato && !aggiorna, 'ospite': ospite, 'aggiorna': aggiorna});
 
   void _manda(String metodo, Map<String, Object?> dati) {
     if (!_attivo) return;

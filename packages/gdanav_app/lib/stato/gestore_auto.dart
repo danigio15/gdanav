@@ -50,7 +50,8 @@ class GestoreAuto extends ChangeNotifier {
   final manuale = SorgenteManuale();
 
   /// La fonte gdahome, quando gdanav gira dentro l'app gdahome: si accende da
-  /// sola, senza abbinamento, e non è Premium.
+  /// sola, senza abbinamento. Come le altre fonti automatiche, la sua
+  /// batteria vale solo con Premium (lì: la casa è Premium).
   final SorgenteGdahome? gdahome;
 
   final _sorgenti = <TipoSorgente, SorgenteDatiAuto>{};
@@ -84,7 +85,53 @@ class GestoreAuto extends ChangeNotifier {
   ProfiloVeicolo veicolo = ProfiloVeicolo.esempio;
   StatoAuto? stato;
 
+  /// Lo switch come l'ha messo l'utente. Senza Premium l'arbitro usa
+  /// comunque la batteria scritta a mano ([modalita]); tornato Premium, torna
+  /// la scelta dell'utente.
+  ModalitaFonte sceltaUtente = const Automatica();
+
+  /// Quello che l'arbitro usa adesso.
   ModalitaFonte get modalita => arbitro.modalita;
+
+  /// Le fonti automatiche della batteria (Android Auto, OBD, gdahome, Home
+  /// Assistant) sono Premium: senza, vale solo la batteria scritta a mano (e
+  /// la stima che ne deriva).
+  static const automatiche = {
+    TipoSorgente.automotive,
+    TipoSorgente.androidAuto,
+    TipoSorgente.obd,
+    TipoSorgente.gdahome,
+    TipoSorgente.homeAssistant,
+  };
+
+  /// Premium attivo: fonti automatiche e Home Assistant. Vero finché l'app
+  /// non dice altro (le prove).
+  var premium = true;
+
+  /// Premium cambia (comprato, scaduto, codice regalo): si accendono o si
+  /// spengono Home Assistant e il dongle, e l'arbitro passa dalla scelta
+  /// dell'utente alla batteria scritta a mano, o viceversa.
+  Future<void> consentiPremium(bool si) async {
+    if (si == premium) return;
+    // Si perde Premium: la batteria appena letta dall'auto diventa quella
+    // scritta a mano, per non restare senza.
+    if (!si && elettrica && stato != null && automatiche.contains(stato!.sorgente)) {
+      manuale.imposta(stato!.batteria);
+      await Future<void>.delayed(Duration.zero);
+    }
+    premium = si;
+    arbitro.modalita = _modalitaEffettiva;
+    if (!si) {
+      await _spegni(TipoSorgente.homeAssistant);
+      await _spegni(TipoSorgente.obd);
+    } else {
+      if (abbinamento case final a?) await _accendi(SorgenteHomeAssistant(ClienteRelay(a)));
+      if (dongle != null) await _accendiObd();
+    }
+    _aggiorna();
+  }
+
+  ModalitaFonte get _modalitaEffettiva => premium ? sceltaUtente : const Fissa(TipoSorgente.manuale);
 
   /// Il filo con Home Assistant, se l'auto è abbinata: la guida ci manda
   /// viaggio ed eventi.
@@ -97,31 +144,25 @@ class GestoreAuto extends ChangeNotifier {
   Iterable<TipoSorgente> get disponibili => _sorgenti.keys;
 
   /// Home Assistant fa parte di Premium: senza, l'abbinamento resta salvato
-  /// ma il collegamento non parte.
-  var homeAssistantConsentito = true;
+  /// ma il collegamento non parte. Lo stesso di [premium].
+  bool get homeAssistantConsentito => premium;
+  set homeAssistantConsentito(bool si) => premium = si;
 
-  Future<void> consentiHomeAssistant(bool si) async {
-    if (si == homeAssistantConsentito) return;
-    homeAssistantConsentito = si;
-    if (!si) {
-      await _spegni(TipoSorgente.homeAssistant);
-    } else if (abbinamento case final a?) {
-      await _accendi(SorgenteHomeAssistant(ClienteRelay(a)));
-    }
-    notifyListeners();
-  }
+  Future<void> consentiHomeAssistant(bool si) => consentiPremium(si);
 
   /// Perché non arriva nessun dato dell'auto, quando lo si sa: la scheda lo
   /// dice invece di un «Nessun dato» muto. `null` se non c'è niente di
   /// collegato (allora va scelta una fonte).
   String? get percheSenzaDati {
+    if (!premium && (gdahome != null || abbinamento != null || dongle != null)) {
+      return 'La batteria letta dall\'auto fa parte di Premium: scrivila a mano';
+    }
     if (gdahome case final g?) {
       if (!g.collegata) return 'gdahome non è collegata alla casa';
       if (g.auto == null) return 'Nella plancia di gdahome non c\'è un\'auto elettrica';
       if (g.ultima == null) return 'Nella sezione Auto di gdahome manca il sensore della batteria, o non risponde';
     }
     if (abbinamento != null) {
-      if (!homeAssistantConsentito) return 'Home Assistant è collegato, ma fa parte di Premium';
       return switch (_sorgenti[TipoSorgente.homeAssistant]) {
         final SorgenteHomeAssistant h => percheHomeAssistant(h),
         _ => 'Home Assistant è abbinato, ma il collegamento non è partito',
@@ -193,7 +234,8 @@ class GestoreAuto extends ChangeNotifier {
     elettrica = await archivio.elettrica();
     carburante = await archivio.carburante();
     arbitro.capacitaUtileKwh = veicolo.capacitaUtileKwh;
-    arbitro.modalita = await archivio.fonte();
+    sceltaUtente = await archivio.fonte();
+    arbitro.modalita = _modalitaEffettiva;
     abbinamento = await archivio.abbinamento();
     await _accendi(manuale);
     await _accendi(SorgenteAndroidAuto(onVelocita: _velocita));
@@ -202,12 +244,12 @@ class GestoreAuto extends ChangeNotifier {
       g.addListener(_autoDaGdahome);
       await _autoDaGdahome();
     }
-    if (abbinamento != null && homeAssistantConsentito) {
+    if (abbinamento != null && premium) {
       await _accendi(SorgenteHomeAssistant(ClienteRelay(abbinamento!)));
     }
     foto = await archivio.fotoAuto();
     dongle = await archivio.dongleObd();
-    if (dongle != null) unawaited(_accendiObd());
+    if (dongle != null && premium) unawaited(_accendiObd());
     // Anche senza letture nuove l'età del dato cambia: si ricalcola ogni tanto.
     _orologio = Timer.periodic(const Duration(seconds: 5), (_) {
       _aggiorna();
@@ -253,8 +295,13 @@ class GestoreAuto extends ChangeNotifier {
     return s.batteria / 100 * veicolo.capacitaUtileKwh * 1000 / whKm;
   }
 
+  /// Senza Premium lo switch non si cambia (le fonti automatiche hanno il
+  /// lucchetto): resta la batteria scritta a mano, e la scelta di prima
+  /// torna col Premium.
   Future<void> cambiaModalita(ModalitaFonte m) async {
-    arbitro.modalita = m;
+    if (!premium) return;
+    sceltaUtente = m;
+    arbitro.modalita = _modalitaEffettiva;
     await archivio.salvaFonte(m);
     _aggiorna();
   }
@@ -263,7 +310,7 @@ class GestoreAuto extends ChangeNotifier {
     await _spegni(TipoSorgente.homeAssistant);
     abbinamento = a;
     await archivio.salvaAbbinamento(a);
-    if (homeAssistantConsentito) await _accendi(SorgenteHomeAssistant(ClienteRelay(a)));
+    if (premium) await _accendi(SorgenteHomeAssistant(ClienteRelay(a)));
     notifyListeners();
   }
 
@@ -288,7 +335,7 @@ class GestoreAuto extends ChangeNotifier {
     dongle = (id: id, nome: nome);
     await archivio.salvaDongleObd(dongle);
     notifyListeners();
-    await _accendiObd();
+    if (premium) await _accendiObd();
   }
 
   /// Il giro di sola lettura per conoscere l'auto: si ferma la lettura

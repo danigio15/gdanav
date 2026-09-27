@@ -6,6 +6,13 @@ name = "gdanav-relay"
 main = "src/index.js"
 compatibility_date = "2025-09-01"
 
+[vars]
+# La build più vecchia dell'app ancora buona (il numero della corsa della
+# CI, github.run_number): le build più vecchie chiedono di aggiornarsi, in
+# GET /v1/versioni. "0" = nessun blocco. Il giorno dei pagamenti va messo il
+# numero della prima build pubblica a pagamento: vedi docs/architettura.md.
+VERSIONE_MINIMA_APP = "0"
+
 [[durable_objects.bindings]]
 name = "STANZE"
 class_name = "Stanza"

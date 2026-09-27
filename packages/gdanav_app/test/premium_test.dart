@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/schermate/premium.dart';
@@ -14,16 +15,17 @@ import 'aiuti.dart';
 
 /// Google Play finto: risponde come vogliamo.
 class NegozioFinto implements NegozioPremium {
-  NegozioFinto({this.giaComprato = false, this.esito = PurchaseStatus.purchased});
+  NegozioFinto({this.giaComprato = false, this.esito = PurchaseStatus.purchased, this.idProdotto = idPremium});
 
   final bool giaComprato;
+  final String idProdotto;
   final PurchaseStatus esito;
   final _flusso = StreamController<List<PurchaseDetails>>.broadcast();
   final completati = <String>[];
   final comprati = <String>[];
 
   PurchaseDetails _acquisto(PurchaseStatus s) => PurchaseDetails(
-    productID: idPremium,
+    productID: idProdotto,
     verificationData: PurchaseVerificationData(localVerificationData: '', serverVerificationData: '', source: 'finto'),
     transactionDate: '0',
     status: s,
@@ -190,11 +192,21 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: temaGdanav(Brightness.light),
-        home: SchermataPremium(premium: p, perche: 'Il traffico'),
+        home: SchermataPremium(premium: p, perche: 'Le soste di ricarica'),
       ),
     );
-    expect(find.textContaining('Il traffico fa parte di Premium'), findsOneWidget);
-    expect(find.text('Previsioni meteo'), findsOneWidget);
+    expect(find.textContaining('Le soste di ricarica fa parte di Premium'), findsOneWidget);
+    // Solo quello che c'è davvero: niente cronologia, niente più veicoli.
+    expect(find.text('Home Assistant e batteria letta dall\'auto'), findsOneWidget);
+    expect(find.text('Percorso con le soste alle colonnine'), findsOneWidget);
+    // Lo schermo dell'auto della piattaforma, non tutti e due.
+    expect(find.text('Android Auto'), findsOneWidget);
+    expect(find.textContaining('CarPlay'), findsNothing);
+    expect(find.textContaining('Cronologia'), findsNothing);
+    expect(find.textContaining('Più veicoli'), findsNothing);
+    expect(find.textContaining('traffico, autovelox e meteo'), findsOneWidget);
+    // Senza chiave delle licenze (di serie) niente codici regalo.
+    expect(find.byKey(const Key('codice-regalo')), findsNothing);
     expect(find.text('25,00 €/anno'), findsOneWidget);
     expect(find.text('3,00 €/mese'), findsOneWidget);
     expect(find.text('Risparmi il 31%'), findsOneWidget);
@@ -218,6 +230,38 @@ void main() {
     expect(find.byKey(const Key('compra-premium')), findsNothing);
   });
 
+  test('su iPhone: i due prodotti dell\'App Store sono Premium, e il negozio si chiama col suo nome', () {
+    expect(eDiPremium(idPremium), isTrue);
+    expect(eDiPremium('gdanav_premium_mensile'), isTrue);
+    expect(eDiPremium('gdanav_premium_annuale'), isTrue);
+    expect(eDiPremium('altro'), isFalse);
+    expect(nomeNegozio, 'Play Store');
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      expect(nomeNegozio, 'App Store');
+      expect(negozioDelTelefono(), isA<NegozioAppStore>());
+      expect(PannelloPremium.schermoAuto, 'CarPlay');
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  test('su iPhone l\'acquisto dall\'App Store sblocca Premium', () async {
+    preparaPiattaforma();
+    final negozio = NegozioFinto(idProdotto: 'gdanav_premium_annuale');
+    final p = GestorePremium(
+      archivio: Archivio(),
+      negozio: negozio,
+      tuttoSbloccato: false,
+      attesaConferma: const Duration(milliseconds: 50),
+    );
+    await p.carica();
+    await pausa();
+    await p.compra(pianoAnnuale);
+    await pausa();
+    expect(p.sbloccato, isTrue);
+  });
+
   testWidgets('dentro gdahome Premium lo decide gdahome, senza il negozio di gdanav', (tester) async {
     final gdahome = ValueNotifier(false);
     final p = GestorePremium(archivio: Archivio(), ospite: gdahome, tuttoSbloccato: false);
@@ -232,6 +276,9 @@ void main() {
     );
     expect(find.textContaining('fa parte del Premium di gdahome'), findsOneWidget);
     expect(find.byKey(const Key('compra-premium')), findsNothing);
+    // Il codice regalo di gdahome si riscatta per la casa, nell'app gdahome.
+    expect(find.byKey(const Key('codice-regalo')), findsNothing);
+    expect(find.text('Ripristina abbonamento'), findsNothing);
 
     // Comprato in gdahome: si sblocca tutto, subito.
     gdahome.value = true;
@@ -245,5 +292,18 @@ void main() {
     await tester.pump();
     expect(p.sbloccato, isFalse);
     p.dispose();
+  });
+
+  testWidgets('il negozio non risponde: i prezzi di listino, senza poter comprare', (tester) async {
+    preparaPiattaforma();
+    final p = GestorePremium(archivio: Archivio(), tuttoSbloccato: false);
+    await tester.runAsync(p.carica);
+    await tester.pumpWidget(MaterialApp(theme: temaGdanav(Brightness.light), home: SchermataPremium(premium: p)));
+    expect(find.text('29,99 €/anno'), findsOneWidget);
+    expect(find.text('2,99 €/mese'), findsOneWidget);
+    expect(find.text('Risparmi il 16%'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('compra-premium')));
+    expect(tester.widget<FilledButton>(find.byKey(const Key('compra-premium'))).onPressed, isNull);
+    expect(find.textContaining('Il Play Store non risponde'), findsOneWidget);
   });
 }
