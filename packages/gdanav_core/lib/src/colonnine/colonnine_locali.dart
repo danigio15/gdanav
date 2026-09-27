@@ -70,6 +70,10 @@ class ArchivioColonnine {
 
   int get quante => _perRiquadro.values.fold(0, (n, l) => n + l.length);
 
+  /// Tutte quelle che ci sono, senza riquadri: serve a chi deve guardarle una
+  /// per una — l'elenco degli operatori da cui si sceglie chi non vedere.
+  Iterable<Colonnina> get tutte => _perRiquadro.values.expand((l) => l);
+
   bool copre((int, int) q) => _coperti.contains(q);
   List<Colonnina> nel((int, int) q) => _perRiquadro[q] ?? const [];
 

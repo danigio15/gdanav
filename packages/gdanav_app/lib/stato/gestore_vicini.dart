@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../mappa/dati_viaggio.dart';
+import 'archivio.dart';
 import 'distributori.dart';
 import 'gestore_auto.dart';
 import 'gestore_posizione.dart';
@@ -16,12 +17,16 @@ class GestoreVicini extends ChangeNotifier {
   GestoreVicini({
     required this.auto,
     required this.posizione,
+    Archivio? archivio,
     Future<List<Distributore>> Function(Punto qui)? distributori,
     Future<List<Colonnina>> Function(Punto qui, ProfiloVeicolo v)? colonnine,
     Future<Colonnina> Function(Colonnina c)? statoAdesso,
   }) : _statoAdesso = statoAdesso ?? statoColonninaAdesso,
        _cercaDistributori = distributori ?? distributoriVicini,
-       _cercaColonnine = colonnine ?? ((q, v) => colonnineVicine(q, v, km: 12, quante: 25)) {
+       /* Con la scelta fatta in «Ricarica»: gli operatori che non si vogliono
+        * vedere non si vedono nemmeno qui intorno. */
+       _cercaColonnine =
+           colonnine ?? ((q, v) => colonnineVicineComeSiVuole(q, v, archivio ?? Archivio(), km: 12, quante: 25)) {
     auto.addListener(_forse);
     posizione.addListener(_forse);
     _forse();

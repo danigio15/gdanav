@@ -38,6 +38,51 @@ class Disponibilita {
 }
 
 /// Un punto di ricarica, da qualunque fonte arrivi.
+/// Il nome di un operatore ridotto a come si confronta.
+///
+/// Le fonti lo scrivono ognuna a modo suo — «Enel X», «enel x », «ENEL  X» —
+/// e chi sceglie di non vederlo lo sceglie una volta: il confronto si fa su
+/// questo, non sul nome com'e' arrivato.
+String operatoreNormale(String? nome) => (nome ?? '').trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+/// Se questa colonnina e' di un operatore che si e' scelto di non vedere.
+///
+/// Una colonnina **senza** operatore non si esclude mai: non si puo' tenere
+/// fuori quello che non ha un nome, e una colonnina in piu' si guarda; una in
+/// meno non si trova.
+bool operatoreEscluso(Colonnina c, Set<String> esclusi) {
+  if (esclusi.isEmpty) return false;
+  final nome = operatoreNormale(c.operatore);
+  return nome.isNotEmpty && esclusi.contains(nome);
+}
+
+/// Quelle che restano, tolti gli operatori esclusi.
+List<Colonnina> senzaGliEsclusi(Iterable<Colonnina> tutte, Set<String> esclusi) => esclusi.isEmpty
+    ? tutte.toList()
+    : [
+        for (final c in tutte)
+          if (!operatoreEscluso(c, esclusi)) c
+      ];
+
+/// Gli operatori che ci sono, dal piu' diffuso: e' l'elenco da cui si sceglie
+/// chi non vedere, e uno sceglie fra quelli che incontra davvero.
+List<String> operatoriFra(Iterable<Colonnina> colonnine) {
+  final quante = <String, int>{};
+  final comeScritto = <String, String>{};
+  for (final c in colonnine) {
+    final chiave = operatoreNormale(c.operatore);
+    if (chiave.isEmpty) continue;
+    quante[chiave] = (quante[chiave] ?? 0) + 1;
+    comeScritto[chiave] ??= c.operatore!.trim();
+  }
+  final chiavi = quante.keys.toList()
+    ..sort((a, b) {
+      final d = quante[b]!.compareTo(quante[a]!);
+      return d != 0 ? d : a.compareTo(b);
+    });
+  return [for (final k in chiavi) comeScritto[k]!];
+}
+
 class Colonnina {
   const Colonnina({
     required this.id,

@@ -30,6 +30,7 @@ class PreferenzeRicarica {
     this.massimoRicarica = 80,
     this.potenzaMinimaKw = 50,
     this.evitaOccupate = true,
+    this.operatoriEsclusi = const {},
   });
 
   factory PreferenzeRicarica.daJson(Map<String, Object?> j) {
@@ -41,6 +42,10 @@ class PreferenzeRicarica {
       massimoRicarica: n('massimo_ricarica', d.massimoRicarica),
       potenzaMinimaKw: n('potenza_minima_kw', d.potenzaMinimaKw),
       evitaOccupate: j['evita_occupate'] as bool? ?? d.evitaOccupate,
+      operatoriEsclusi: {
+        for (final o in (j['operatori_esclusi'] as List<Object?>? ?? const []))
+          if (operatoreNormale(o as String?) case final n when n.isNotEmpty) n,
+      },
     );
   }
 
@@ -60,12 +65,21 @@ class PreferenzeRicarica {
   /// preferiscono quelle libere.
   final bool evitaOccupate;
 
+  /// Gli operatori che non si vogliono vedere, scritti come li scrive
+  /// [operatoreNormale]. Vuoto vuol dire tutti.
+  ///
+  /// Si esclude e non si include: un elenco di quelli buoni farebbe sparire
+  /// in silenzio un operatore nuovo, e a chi guarda sembrerebbe che li' non
+  /// c'e' niente.
+  final Set<String> operatoriEsclusi;
+
   PreferenzeRicarica copia({
     double? minimoArrivo,
     double? minimoSosta,
     double? massimoRicarica,
     double? potenzaMinimaKw,
     bool? evitaOccupate,
+    Set<String>? operatoriEsclusi,
   }) =>
       PreferenzeRicarica(
         minimoArrivo: minimoArrivo ?? this.minimoArrivo,
@@ -73,6 +87,7 @@ class PreferenzeRicarica {
         massimoRicarica: massimoRicarica ?? this.massimoRicarica,
         potenzaMinimaKw: potenzaMinimaKw ?? this.potenzaMinimaKw,
         evitaOccupate: evitaOccupate ?? this.evitaOccupate,
+        operatoriEsclusi: operatoriEsclusi ?? this.operatoriEsclusi,
       );
 
   Map<String, Object?> toJson() => {
@@ -81,6 +96,7 @@ class PreferenzeRicarica {
         'massimo_ricarica': massimoRicarica,
         'potenza_minima_kw': potenzaMinimaKw,
         'evita_occupate': evitaOccupate,
+        'operatori_esclusi': operatoriEsclusi.toList()..sort(),
       };
 }
 
@@ -229,6 +245,7 @@ class PianificatoreViaggio {
             tutte,
             compatibili: prese,
             potenzaMinimaKw: p.potenzaMinimaKw,
+            operatoriEsclusi: p.operatoriEsclusi,
             obbligate: obbligate,
           );
           return (

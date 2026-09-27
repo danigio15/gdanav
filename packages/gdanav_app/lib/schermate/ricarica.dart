@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../stato/archivio.dart';
+import '../stato/gestore_viaggio.dart';
 
 String riassuntoPreferenze(PreferenzeRicarica p) =>
     'Arrivo ≥ ${p.minimoArrivo.round()}% · fino all\'${p.massimoRicarica.round()}% · ≥ ${p.potenzaMinimaKw.round()} kW';
@@ -20,10 +21,20 @@ class PreferenzeRicaricaSchermata extends StatefulWidget {
 class _PreferenzeRicaricaSchermataState extends State<PreferenzeRicaricaSchermata> {
   PreferenzeRicarica? _p;
 
+  /// Gli operatori che ci sono intorno, dal più diffuso: è da questi che si
+  /// sceglie chi non vedere. Vuoto finché l'archivio non è letto.
+  List<String> _operatori = const [];
+
   @override
   void initState() {
     super.initState();
     widget.archivio.preferenze().then((p) => mounted ? setState(() => _p = p) : null);
+    /* Non si scrive un nome a mano: si tocca quello che si incontra. Le
+     * colonnine scaricate sono quelle dei posti dove si passa, ed è lì che un
+     * operatore lo si conosce o lo si evita. */
+    archivioColonnine().then((a) {
+      if (mounted) setState(() => _operatori = operatoriFra(a.tutte).take(24).toList());
+    });
   }
 
   void _cambia(PreferenzeRicarica p) {
@@ -65,7 +76,12 @@ class _PreferenzeRicaricaSchermataState extends State<PreferenzeRicaricaSchermat
                   onChanged: (v) => _cambia(p.copia(massimoRicarica: v)),
                 ),
                 const SizedBox(height: 12),
-                Text('Colonnine da proporre (kW)', style: t.titleSmall),
+                Text('Quali colonnine (kW)', style: t.titleSmall),
+                const SizedBox(height: 4),
+                Text(
+                  'Vale per le soste del viaggio e per quelle che vedi intorno a te.',
+                  style: t.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
                 const SizedBox(height: 8),
                 SegmentedButton<double>(
                   segments: const [
@@ -76,6 +92,12 @@ class _PreferenzeRicaricaSchermataState extends State<PreferenzeRicaricaSchermat
                   ],
                   selected: {p.potenzaMinimaKw},
                   onSelectionChanged: (s) => _cambia(p.copia(potenzaMinimaKw: s.first)),
+                ),
+                const SizedBox(height: 16),
+                _Operatori(
+                  tutti: _operatori,
+                  esclusi: p.operatoriEsclusi,
+                  cambia: (esclusi) => _cambia(p.copia(operatoriEsclusi: esclusi)),
                 ),
                 const SizedBox(height: 12),
                 SwitchListTile(
@@ -89,6 +111,62 @@ class _PreferenzeRicaricaSchermataState extends State<PreferenzeRicaricaSchermat
                 ),
               ],
             ),
+    );
+  }
+}
+
+/// Gli operatori che non si vogliono vedere.
+///
+/// Si **esclude**, non si include: un elenco di quelli buoni farebbe sparire
+/// in silenzio un operatore nuovo, e a chi guarda sembrerebbe che lì non c'è
+/// niente. Toccato, l'operatore si spegne: le sue colonnine non si propongono
+/// come sosta e non compaiono fra quelle intorno.
+class _Operatori extends StatelessWidget {
+  const _Operatori({required this.tutti, required this.esclusi, required this.cambia});
+
+  final List<String> tutti;
+  final Set<String> esclusi;
+  final ValueChanged<Set<String>> cambia;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final colori = Theme.of(context).colorScheme;
+    if (tutti.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Operatori', style: t.titleSmall),
+        const SizedBox(height: 4),
+        Text(
+          esclusi.isEmpty
+              ? 'Li vedi tutti. Tocca quelli che non vuoi vedere.'
+              : '${esclusi.length} spenti: le loro colonnine non si propongono e non si vedono.',
+          style: t.bodySmall?.copyWith(color: colori.onSurfaceVariant),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final nome in tutti)
+              FilterChip(
+                label: Text(nome),
+                selected: !esclusi.contains(operatoreNormale(nome)),
+                onSelected: (tienilo) {
+                  final chiave = operatoreNormale(nome);
+                  final nuovi = {...esclusi};
+                  if (tienilo) {
+                    nuovi.remove(chiave);
+                  } else {
+                    nuovi.add(chiave);
+                  }
+                  cambia(nuovi);
+                },
+              ),
+          ],
+        ),
+      ],
     );
   }
 }

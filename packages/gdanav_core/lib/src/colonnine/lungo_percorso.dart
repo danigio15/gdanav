@@ -12,10 +12,15 @@ List<ColonninaSulPercorso> colonnineSulPercorso(
   double distanzaMassimaM = 3000,
   double fattoreDeviazione = 1.4,
   Set<String> obbligate = const {},
+  Set<String> operatoriEsclusi = const {},
 }) {
   final out = <ColonninaSulPercorso>[];
   for (final c in colonnine) {
     final obbligata = obbligate.contains(c.id);
+    /* Un operatore che si e' scelto di non vedere non si propone come sosta.
+     * Una sosta scelta a mano resta: l'ha voluta chi guida, e chi guida
+     * scavalca un filtro che ha messo lui. */
+    if (!obbligata && operatoreEscluso(c, operatoriEsclusi)) continue;
     // Di targa: anche una colonnina guasta si mostra (in rosso), ma non ci
     // si ferma.
     final nominale = c.potenzaNominalePer(compatibili);

@@ -256,7 +256,7 @@ class PonteAuto {
         final qui = posizione.qui ?? viaggio.ultimaPosizione;
         final v = auto?.veicolo;
         if (qui == null || v == null) return const <Object>[];
-        final trovate = await colonnineVicine(qui, v);
+        final trovate = await colonnineVicineComeSiVuole(qui, v, viaggio.archivio);
         return [
           for (final c in trovate)
             {

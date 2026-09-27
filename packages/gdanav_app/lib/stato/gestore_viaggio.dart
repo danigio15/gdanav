@@ -541,17 +541,26 @@ class GestoreViaggio extends ChangeNotifier {
 
 /// Le colonnine rapide intorno a [qui] adatte all'auto, dalla più vicina; con
 /// Premium anche libere e occupate adesso. Per «Colonnine vicine» sull'auto.
+///
+/// [operatoriEsclusi] e [potenzaMinimaKw] sono la scelta fatta nelle
+/// preferenze di ricarica: quello che non si vuole vedere non si vede nemmeno
+/// qui. Senza, si vede tutto — è il comportamento di sempre.
 Future<List<Colonnina>> colonnineVicine(
   Punto qui,
   ProfiloVeicolo veicolo, {
   double km = 15,
   int quante = 8,
   int conStato = 10,
+  Set<String> operatoriEsclusi = const {},
+  double potenzaMinimaKw = 0,
 }) async {
   final fonte = ColonnineLocali(archivioColonnine(), riserva: ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni)));
   final adatte = [
     for (final c in await fonte.lungo([qui], distanzaKm: km))
-      if (c.potenzaNominalePer(veicolo.connettori) > 0 && distanzaM(qui, c.posizione) <= km * 1000) c,
+      if (c.potenzaNominalePer(veicolo.connettori) >= (potenzaMinimaKw > 0 ? potenzaMinimaKw : 0.1) &&
+          !operatoreEscluso(c, operatoriEsclusi) &&
+          distanzaM(qui, c.posizione) <= km * 1000)
+        c,
   ]..sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
   final prime = adatte.take(quante).toList();
   final d = GestorePremium.attivo.value ? _disponibilita : null;
@@ -562,6 +571,29 @@ Future<List<Colonnina>> colonnineVicine(
     for (final (i, c) in prime.indexed)
       i < conStato ? d.aggiorna(c).timeout(const Duration(seconds: 30)).catchError((Object _) => c) : Future.value(c),
   ]);
+}
+
+/// Le colonnine vicine filtrate come si è scelto in «Ricarica»: la potenza
+/// minima e gli operatori che non si vogliono vedere.
+///
+/// È la porta da cui passano l'elenco del telefono e quello dell'auto, così
+/// la scelta vale in tutt'e due senza che nessuno se la debba ricordare.
+Future<List<Colonnina>> colonnineVicineComeSiVuole(
+  Punto qui,
+  ProfiloVeicolo veicolo,
+  Archivio archivio, {
+  double km = 15,
+  int quante = 8,
+}) async {
+  final p = await archivio.preferenze();
+  return colonnineVicine(
+    qui,
+    veicolo,
+    km: km,
+    quante: quante,
+    operatoriEsclusi: p.operatoriEsclusi,
+    potenzaMinimaKw: p.potenzaMinimaKw,
+  );
 }
 
 /// Lo stato di adesso di una colonnina (con Premium); senza, com'era.
