@@ -126,6 +126,10 @@ class PonteAuto {
   Future<Object?> _dallAuto(MethodCall call) async {
     final a = (call.arguments as Map?) ?? const {};
     switch (call.method) {
+      // Lo schermo dell'auto si è acceso o spento: qualcuno sta guardando, e
+      // i dati dell'auto si chiedono freschi anche senza un percorso.
+      case 'in_auto':
+        auto?.schermoDellAuto(a['si'] == true);
       // Android Auto accende la prova di guida: da qui ogni guida si percorre
       // da sola, e se non c'è ancora una meta se ne sceglie una.
       case 'prova_guida':

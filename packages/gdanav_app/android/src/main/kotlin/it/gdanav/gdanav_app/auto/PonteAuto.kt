@@ -449,6 +449,20 @@ object PonteAuto {
         }
     }
 
+    /**
+     * Lo schermo dell'auto si è acceso o spento.
+     *
+     * Serve al telefono per sapere che **qualcuno sta guardando**: con lo
+     * schermo acceso i dati dell'auto si chiedono freschi, anche senza un
+     * percorso impostato. Prima li chiedeva solo la guida, e fermi in garage
+     * la batteria restava quella di mezz'ora prima.
+     *
+     * Si manda anche se il Dart non c'è ancora: il motore Flutter si accende
+     * insieme alla sessione, e il filo si apre qualche istante dopo. Con la
+     * riprova arriva lo stesso, invece di perdersi.
+     */
+    fun inAuto(si: Boolean) = mandaConRiprova("in_auto", mapOf("si" to si), 40)
+
     /** La sessione dell'auto è finita: la prova di guida smette con lei. */
     fun fineProva() = principale.post { canale?.invokeMethod("prova_fine", null) }
 

@@ -12,11 +12,20 @@ import 'archivio.dart';
 /// Tiene accese le sorgenti dei dati dell'auto e dice all'interfaccia
 /// quale stato vale adesso, secondo lo switch «Fonte dati auto».
 class GestoreAuto extends ChangeNotifier {
-  GestoreAuto({required this.archivio, Future<CanaleObd> Function(String id)? apriObd, this.gdahome})
-    : arbitro = ArbitroSorgenti(capacitaUtileKwh: ProfiloVeicolo.esempio.capacitaUtileKwh),
-      _apriObd = apriObd ?? CanaleBle.apri;
+  GestoreAuto({
+    required this.archivio,
+    Future<CanaleObd> Function(String id)? apriObd,
+    this.gdahome,
+    DateTime Function()? ora,
+  }) : arbitro = ArbitroSorgenti(capacitaUtileKwh: ProfiloVeicolo.esempio.capacitaUtileKwh),
+       _apriObd = apriObd ?? CanaleBle.apri,
+       _ora = ora ?? DateTime.now;
 
   final Future<CanaleObd> Function(String id) _apriObd;
+
+  /// Che ora è, per il passo con cui si chiedono dati freschi. Nelle prove si
+  /// sposta a mano, invece di aspettare un minuto vero.
+  final DateTime Function() _ora;
 
   /// La foto della propria auto, se l'utente l'ha messa.
   String? foto;
@@ -140,7 +149,43 @@ class GestoreAuto extends ChangeNotifier {
 
   /// In viaggio: che Home Assistant rilegga l'auto e mandi i dati freschi.
   Future<void> chiediAggiornamento() async {
+    _chiestoIl = _ora();
     if (_sorgenti[TipoSorgente.homeAssistant] case final SorgenteHomeAssistant h) await h.chiediAggiornamento();
+  }
+
+  /// Ogni quanto si chiedono dati freschi mentre qualcuno sta guardando.
+  ///
+  /// È lo stesso passo della guida (`GestoreGuida.intervalloDatiAuto`), e per
+  /// la stessa ragione: molte integrazioni la batteria la rileggono solo se
+  /// gliela si chiede.
+  static const ognisQuanto = Duration(minutes: 1);
+
+  DateTime _chiestoIl = DateTime(0);
+
+  /// Se lo schermo dell'auto è acceso. Lo dice Android Auto
+  /// (`SessioneGdanav`), e cambia una cosa sola ma grossa: **qualcuno sta
+  /// guardando**.
+  ///
+  /// Dal campo: «i dati batteria non si aggiornano finché non apro l'app dal
+  /// cellulare». Era vero, ed era questo. I dati freschi si chiedevano solo
+  /// mentre si guidava verso una meta (`GestoreGuida._forseChiediDati`), e
+  /// lungo il resto del tempo — schermo dell'auto acceso, mappa davanti,
+  /// nessun percorso impostato — non li chiedeva nessuno. Restava quello che
+  /// Home Assistant aveva mandato per conto suo, che su molte integrazioni
+  /// vuol dire ogni mezz'ora o all'apertura dell'app.
+  ///
+  /// Guidare non è l'unico modo di guardare la batteria: la si guarda anche
+  /// fermi in garage, prima di partire, o girando senza una meta.
+  bool get schermoDellAutoAcceso => _schermoDellAuto;
+  bool _schermoDellAuto = false;
+
+  /// Lo schermo dell'auto si è acceso o spento. Acceso, i dati freschi si
+  /// chiedono subito e poi ogni minuto: si è appena saliti in macchina, ed è
+  /// il momento in cui il numero vecchio si nota di più.
+  void schermoDellAuto(bool acceso) {
+    if (acceso == _schermoDellAuto) return;
+    _schermoDellAuto = acceso;
+    if (acceso) unawaited(chiediAggiornamento());
   }
 
   Future<void> avvia() async {
@@ -164,7 +209,10 @@ class GestoreAuto extends ChangeNotifier {
     dongle = await archivio.dongleObd();
     if (dongle != null) unawaited(_accendiObd());
     // Anche senza letture nuove l'età del dato cambia: si ricalcola ogni tanto.
-    _orologio = Timer.periodic(const Duration(seconds: 5), (_) => _aggiorna());
+    _orologio = Timer.periodic(const Duration(seconds: 5), (_) {
+      _aggiorna();
+      _forseChiedi();
+    });
   }
 
   /// L'auto della plancia di gdahome diventa la tua auto: marca e modello
@@ -286,6 +334,24 @@ class GestoreAuto extends ChangeNotifier {
   Future<void> _spegni(TipoSorgente tipo) async {
     await _sorgenti.remove(tipo)?.ferma();
   }
+
+  /* Dati freschi a Home Assistant, se c'è qualcuno che guarda.
+   *
+   * «Qualcuno guarda» qui vuol dire lo schermo dell'auto acceso. Il telefono
+   * lo dice da sé — la sezione aperta chiama [chiediAggiornamento] quando si
+   * apre — e mentre si guida ci pensa già la guida, col suo passo. Senza
+   * nessuno che guarda non si chiede niente: una richiesta a Home Assistant
+   * ogni minuto per tutta la notte non serve a nessuno e si paga.
+   *
+   * Si guarda l'orologio e non un timer suo: il giro dei cinque secondi c'è
+   * già, e un timer in più è una cosa in più da spegnere. */
+  void _forseChiedi() {
+    if (vaChiestoAdesso) unawaited(chiediAggiornamento());
+  }
+
+  /// Se adesso tocca chiedere dati freschi: qualcuno guarda, ed è passato il
+  /// passo dall'ultima volta.
+  bool get vaChiestoAdesso => _schermoDellAuto && _ora().difference(_chiestoIl) >= ognisQuanto;
 
   void _aggiorna() {
     stato = arbitro.statoAttuale(DateTime.now());
