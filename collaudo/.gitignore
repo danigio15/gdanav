@@ -1,0 +1,5 @@
+# Le fotografie sono un attrezzo per guardare, non una prova: si rifanno a
+# mano quando serve (`flutter test --update-goldens test/foto/...`). Dentro la
+# repository non ci stanno — sarebbero mezzo mega a scatto, e diventerebbero
+# rosse per un carattere disegnato mezzo punto piu' in la'.
+foto/

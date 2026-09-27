@@ -10,9 +10,16 @@ String riassuntoPreferenze(PreferenzeRicarica p) =>
 /// Come preferisci ricaricare: il pianificatore ne tiene conto. Si salva a
 /// ogni tocco.
 class PreferenzeRicaricaSchermata extends StatefulWidget {
-  const PreferenzeRicaricaSchermata({super.key, required this.archivio});
+  const PreferenzeRicaricaSchermata({super.key, required this.archivio, this.operatori});
 
   final Archivio archivio;
+
+  /// Gli operatori fra cui scegliere chi non vedere. Di serie, quelli delle
+  /// colonnine già scaricate — che sono quelle dei posti dove si passa.
+  ///
+  /// Si può passare da fuori per guardare la pagina senza l'archivio addosso:
+  /// è così che si fanno le fotografie (`test/foto/ricarica_foto.dart`).
+  final Future<List<String>> Function()? operatori;
 
   @override
   State<PreferenzeRicaricaSchermata> createState() => _PreferenzeRicaricaSchermataState();
@@ -32,10 +39,13 @@ class _PreferenzeRicaricaSchermataState extends State<PreferenzeRicaricaSchermat
     /* Non si scrive un nome a mano: si tocca quello che si incontra. Le
      * colonnine scaricate sono quelle dei posti dove si passa, ed è lì che un
      * operatore lo si conosce o lo si evita. */
-    archivioColonnine().then((a) {
-      if (mounted) setState(() => _operatori = operatoriFra(a.tutte).take(24).toList());
+    (widget.operatori ?? _dallArchivio)().then((elenco) {
+      if (mounted) setState(() => _operatori = elenco);
     });
   }
+
+  static Future<List<String>> _dallArchivio() async =>
+      operatoriFra((await archivioColonnine()).tutte).take(24).toList();
 
   void _cambia(PreferenzeRicarica p) {
     setState(() => _p = p);
@@ -132,7 +142,12 @@ class _Operatori extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final colori = Theme.of(context).colorScheme;
-    if (tutti.isEmpty) return const SizedBox.shrink();
+    /* Quelli spenti ci sono sempre, anche se non sono fra i più diffusi qui
+     * intorno: spegnerne uno raro e non ritrovarlo più sarebbe una trappola —
+     * resterebbe spento per sempre senza un modo di riaccenderlo. */
+    final conosciuti = {for (final nome in tutti) operatoreNormale(nome)};
+    final elenco = [...tutti, ...esclusi.where((o) => !conosciuti.contains(o))];
+    if (elenco.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -149,17 +164,17 @@ class _Operatori extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final nome in tutti)
-              FilterChip(
-                label: Text(nome),
-                selected: !esclusi.contains(operatoreNormale(nome)),
-                onSelected: (tienilo) {
+            for (final nome in elenco)
+              _UnOperatore(
+                nome: nome,
+                spento: esclusi.contains(operatoreNormale(nome)),
+                cambia: (spegnilo) {
                   final chiave = operatoreNormale(nome);
                   final nuovi = {...esclusi};
-                  if (tienilo) {
-                    nuovi.remove(chiave);
-                  } else {
+                  if (spegnilo) {
                     nuovi.add(chiave);
+                  } else {
+                    nuovi.remove(chiave);
                   }
                   cambia(nuovi);
                 },
@@ -167,6 +182,37 @@ class _Operatori extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Una pastiglia: acceso è lo stato normale, e lo stato normale non urla.
+///
+/// Acceso non porta nessun segno — sono decine, e decine di spunte blu sono
+/// una pagina che sembra piena di scelte quando invece non si è scelto
+/// niente. Spento invece si vede da lontano: il nome barrato e l'occhio
+/// chiuso, che è quello che vuol dire.
+class _UnOperatore extends StatelessWidget {
+  const _UnOperatore({required this.nome, required this.spento, required this.cambia});
+
+  final String nome;
+  final bool spento;
+  final ValueChanged<bool> cambia;
+
+  @override
+  Widget build(BuildContext context) {
+    final colori = Theme.of(context).colorScheme;
+    return FilterChip(
+      showCheckmark: false,
+      selected: spento,
+      selectedColor: colori.surfaceContainerHighest,
+      avatar: spento ? Icon(Icons.visibility_off_rounded, size: 18, color: colori.onSurfaceVariant) : null,
+      label: Text(
+        nome,
+        style: spento ? TextStyle(decoration: TextDecoration.lineThrough, color: colori.onSurfaceVariant) : null,
+      ),
+      tooltip: spento ? 'Tocca per rivederlo' : 'Tocca per non vederlo più',
+      onSelected: cambia,
     );
   }
 }
