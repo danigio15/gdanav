@@ -446,7 +446,9 @@ class PonteAuto {
     if (!pr.attiva || !identical(_percorsoProva, p.viaggio.percorso)) {
       // Percorso nuovo (ricalcolo, traffico, tappa fatta): si riparte dal
       // punto in cui si era, portato sul nuovo.
-      final qui = pr.attiva ? guida.avanzamento?.posizioneSulPercorso : null;
+      /* Da fuori percorso l'aggancio non c'e' piu' — e' la regola nuova — ma
+       * la prova di guida deve ripartire da dove si e', non dall'inizio. */
+      final qui = pr.attiva ? guida.avanzamento?.posizioneSulPercorso ?? posizione.qui : null;
       _percorsoProva = p.viaggio.percorso;
       final daM = qui == null ? 0.0 : Linea(p.viaggio.percorso.punti).proietta(qui).lungoM;
       pr.percorri(p.viaggio.percorso, daM: daM);

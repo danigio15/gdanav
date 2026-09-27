@@ -81,6 +81,83 @@ void main() {
     expect(g.aggiorna(percorso.punti[41]).fuoriPercorso, isFalse);
   });
 
+  test("sulla strada il segnaposto si aggancia; fuori no, e non si mente", () {
+    /* «Un navigatore normalmente fa map-matching: quando sei in navigazione e
+     * il punto cade a pochi metri dalla strada, il segnaposto si posa sulla
+     * strada.» L'aggancio c'era gia'; quello che mancava era il suo limite.
+     *
+     * Era senza condizioni: a trecento metri dalla linea il puntino restava
+     * incollato alla strada, e lo restava per tre letture — il tempo che
+     * serve al ricalcolo ad accorgersene — proprio mentre chi guida doveva
+     * capire di aver sbagliato svolta. «Mentire sarebbe peggio»: adesso
+     * fuori tolleranza non c'e' nessun aggancio, e chi disegna torna al punto
+     * grezzo. */
+    final g = Guida(percorso);
+    final sulla = g.aggiorna(percorso.punti[40]);
+    expect(sulla.agganciato, isTrue);
+    expect(sulla.posizioneSulPercorso, isNotNull);
+    expect(distanzaM(sulla.posizioneSulPercorso!, percorso.punti[40]), lessThan(1));
+    expect(sulla.rotta, isNotNull);
+
+    // Trecento metri a nord: si e' in un'altra strada, e lo si dice.
+    final lontano = Punto(percorso.punti[40].lat + 0.003, percorso.punti[40].lon);
+    final via = g.aggiorna(lontano);
+    expect(via.agganciato, isFalse);
+    expect(via.posizioneSulPercorso, isNull);
+    expect(via.rotta, isNull);
+    /* Il resto dell'avanzamento continua a esserci: quanto si e' percorso e
+     * quanto manca si sanno lo stesso, ed e' giusto — sono la proiezione,
+     * non il segnaposto. E la telecamera guarda avanti anche da fuori: e' da
+     * li' che si vede dove si sarebbe dovuti andare. */
+    expect(via.lontanoM, greaterThan(100));
+    expect(via.restantiM, greaterThan(0));
+    expect(via.rottaMappa, isNotNull);
+
+    // Tornati in strada, si riaggancia.
+    expect(g.aggiorna(percorso.punti[41]).agganciato, isTrue);
+  });
+
+  test("fra agganciato e no non si lampeggia: due soglie, non una", () {
+    /* Con una soglia sola, stando alla distanza esatta della soglia — e a
+     * venti metri dalla mezzeria ci si sta per minuti interi, su una statale
+     * larga — una lettura aggancia e la successiva sgancia: il puntino salta
+     * fra la strada e il prato accanto. Si aggancia stando vicini, ci si
+     * stacca solo andando via davvero.
+     *
+     * La strada e' dritta verso nord apposta: cosi' spostarsi a est e'
+     * spostarsi di traverso, e i metri che si chiedono sono i metri che si
+     * misurano. Sul percorso vero di Utrecht non lo sarebbero — li' andando a
+     * nord si scorre lungo la linea, e a duecento metri si e' ancora a
+     * ventisei dalla strada. */
+    const lat = 52.09, lon = 5.12;
+    const gradoLat = 1 / 111320; // un metro in gradi di latitudine
+    const gradoLon = 1 / 68540; // un metro in gradi di longitudine, a 52°
+    final dritta = [for (var i = 0; i <= 40; i++) Punto(lat + i * 20 * gradoLat, lon)];
+    final g = Guida(
+      PercorsoCalcolato(
+        punti: dritta,
+        tratti: const [],
+        manovre: const [Manovra(istruzione: 'Parti', lunghezzaM: 800, secondi: 60, inizio: 0, tipo: 1)],
+      ),
+      sogliaAggancioM: 20,
+      sogliaSgancioM: 32,
+    );
+    Punto diLato(double metri) => Punto(dritta[20].lat, lon + metri * gradoLon);
+    /* Quanto si chiede e' quanto si misura: se questa cade, e' la prova a
+     * essere sbagliata, non l'aggancio. */
+    expect(g.aggiorna(diLato(25)).lontanoM, closeTo(25, 1));
+
+    // Arrivando da lontano, a venticinque metri non si aggancia.
+    expect(g.aggiorna(diLato(200)).agganciato, isFalse);
+    expect(g.aggiorna(diLato(25)).agganciato, isFalse);
+    // Avvicinandosi sotto i venti, si'.
+    expect(g.aggiorna(diLato(10)).agganciato, isTrue);
+    // E a venticinque si resta agganciati: non si e' andati via davvero.
+    expect(g.aggiorna(diLato(25)).agganciato, isTrue);
+    // A quaranta si'.
+    expect(g.aggiorna(diLato(40)).agganciato, isFalse);
+  });
+
   test('distanze da dire e da scrivere', () {
     expect(distanzaParlata(47), '50 metri');
     expect(distanzaParlata(430), '450 metri');
@@ -110,13 +187,13 @@ void main() {
     );
     // Lontano dalla curva, sul dritto: guarda dritto.
     final lontano = g.aggiorna(punti[5]);
-    expect((lontano.rotta + 540) % 360 - 180, closeTo(0, 1));
-    expect((lontano.rottaMappa + 540) % 360 - 180, closeTo(0, 1));
+    expect((lontano.rotta! + 540) % 360 - 180, closeTo(0, 1));
+    expect((lontano.rottaMappa! + 540) % 360 - 180, closeTo(0, 1));
     // A 100 m dal bivio la strada va ancora a nord, ma la mappa gira già
     // verso la curva (a ovest), per mostrare dove si va.
     final vicino = g.aggiorna(punti[20]);
-    expect((vicino.rotta + 540) % 360 - 180, closeTo(0, 1));
-    final gira = (vicino.rottaMappa + 540) % 360 - 180;
+    expect((vicino.rotta! + 540) % 360 - 180, closeTo(0, 1));
+    final gira = (vicino.rottaMappa! + 540) % 360 - 180;
     expect(gira, lessThan(-15));
     expect(gira, greaterThan(-90));
   });

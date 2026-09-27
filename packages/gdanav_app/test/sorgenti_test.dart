@@ -150,9 +150,11 @@ class _DongleFinto implements CanaleObd {
 /// Un gestore che conta le richieste di dati freschi, e che ha un orologio
 /// spostabile a mano.
 class _AutoSpia extends GestoreAuto {
-  _AutoSpia(this._adesso) : super(archivio: Archivio(), ora: () => _adesso());
+  /* L'orologio si passa e basta, non si tiene: tenuto in un campo, quel
+   * campo non lo legge nessuno — la chiusura qui sopra prende il parametro,
+   * non il campo — e l'analizzatore lo dice. */
+  _AutoSpia(DateTime Function() adesso) : super(archivio: Archivio(), ora: adesso);
 
-  final DateTime Function() _adesso;
   int chieste = 0;
 
   @override
