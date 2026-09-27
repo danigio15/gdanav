@@ -40,17 +40,33 @@ class Avanzamento {
   final bool fuoriPercorso;
   final bool arrivato;
 
-  /// Il punto del percorso più vicino, per agganciarci la freccia.
-  final Punto posizioneSulPercorso;
+  /// Il punto del percorso su cui posare il segnaposto, **o niente**.
+  ///
+  /// Un navigatore aggancia: se sei in strada, il puntino sta in strada, e
+  /// non balla insieme al GPS fra i palazzi. Ma agganciare e' una bugia utile
+  /// solo finche' e' vera. A quaranta metri dalla linea — che e' un'altra via,
+  /// o il parcheggio accanto — un puntino incollato alla strada racconta un
+  /// viaggio che non si sta facendo, e lo racconta proprio nel momento in cui
+  /// chi guida deve capire che ha sbagliato. Quindi fuori tolleranza qui non
+  /// c'e' niente, e chi disegna torna al punto grezzo:
+  ///
+  /// ```dart
+  /// final qui = avanzamento?.posizioneSulPercorso ?? posizione.qui;
+  /// ```
+  final Punto? posizioneSulPercorso;
+
+  /// Vero quando il segnaposto sta sulla strada e non dove dice il GPS.
+  bool get agganciato => posizioneSulPercorso != null;
 
   /// La direzione della strada in quel punto, in gradi da nord in senso
-  /// orario: per girare l'auto e la mappa.
-  final double rotta;
+  /// orario: per girare l'auto e la mappa. Niente quando non si e'
+  /// agganciati, per la stessa ragione del punto.
+  final double? rotta;
 
   /// Dove guarda la mappa: un po' più avanti lungo il percorso, così su una
   /// rampa in curva la prossima manovra resta in vista invece di finire di
   /// lato. Sul dritto è uguale a [rotta].
-  double get rottaMappa => _rottaMappa ?? rotta;
+  double? get rottaMappa => _rottaMappa ?? rotta;
   final double? _rottaMappa;
 
   /// Il limite di velocità dove si è, se si conosce.
@@ -63,18 +79,43 @@ class Avanzamento {
 /// Segue chi guida lungo un percorso di Valhalla: a ogni posizione GPS dice
 /// a che punto si è, la prossima manovra e se è ora di annunciarla.
 class Guida {
-  Guida(this.percorso, {this.sogliaFuoriM = 45, this.lettureFuori = 3}) : _linea = Linea(percorso.punti) {
+  Guida(
+    this.percorso, {
+    this.sogliaFuoriM = 45,
+    this.lettureFuori = 3,
+    this.sogliaAggancioM = 20,
+    this.sogliaSgancioM = 32,
+  }) : _linea = Linea(percorso.punti) {
     _secondi = _secondiCumulati();
   }
 
   final PercorsoCalcolato percorso;
   final double sogliaFuoriM;
   final int lettureFuori;
+
+  /* Quanto vicini alla linea per posare il segnaposto sulla strada, e quanto
+   * lontani per toglierlo.
+   *
+   * Sono due numeri e non uno perche' uno solo fa lampeggiare. Con una soglia
+   * sola, a venti metri esatti — e a venti metri ci si sta per interi minuti,
+   * su una statale larga — una lettura aggancia e la successiva sgancia, e il
+   * puntino salta avanti e indietro fra la strada e il prato accanto. Con due
+   * ci si aggancia stando vicini e ci si stacca solo andando via davvero.
+   *
+   * E sono piu' stretti dei quarantacinque metri del «fuori percorso», perche'
+   * le due domande sono diverse: quella chiede «devo ricalcolare?» e se ne
+   * puo' permettere la calma, questa chiede «dove disegno l'auto?» e un
+   * errore si vede subito. A quaranta metri dalla linea si e' in un'altra
+   * strada, e un puntino incollato a quella giusta racconta un viaggio che non
+   * si sta facendo. */
+  final double sogliaAggancioM;
+  final double sogliaSgancioM;
   final Linea _linea;
   late final List<double> _secondi;
 
   var _segmento = 0;
   var _fuori = 0;
+  var _agganciato = false;
   final _annunciate = <String>{};
 
   /// Le distanze a cui si annuncia una manovra: da lontano e all'ultimo.
@@ -88,6 +129,7 @@ class Guida {
     final g = Guida(nuovo, sogliaFuoriM: sogliaFuoriM, lettureFuori: lettureFuori);
     if (nuovo.punti.length != percorso.punti.length) return g;
     g._segmento = _segmento;
+    g._agganciato = _agganciato;
     g._annunciate.addAll(_annunciate);
     return g;
   }
@@ -115,6 +157,10 @@ class Guida {
     final alla = prossima == null ? 0.0 : _linea.cumulate[_indice(prossima)] - percorsi;
     final arrivato = restanti < 25;
 
+    /* Si aggancia stando vicini, ci si stacca solo andando via davvero. */
+    _agganciato = p.lontanoM <= (_agganciato ? sogliaSgancioM : sogliaAggancioM);
+    final sulla = _agganciato ? _punto(i, p.t) : null;
+
     return Avanzamento(
       percorsiM: percorsi,
       restantiM: restanti,
@@ -125,8 +171,11 @@ class Guida {
       dopo: dopo,
       fuoriPercorso: _fuori >= lettureFuori,
       arrivato: arrivato,
-      posizioneSulPercorso: _punto(i, p.t),
-      rotta: _rotta(i),
+      posizioneSulPercorso: sulla,
+      rotta: _agganciato ? _rotta(i) : null,
+      /* La telecamera invece guarda avanti comunque: e' il suo mestiere
+       * mostrare dove porta la strada, e da fuori percorso serve ancora di
+       * piu' — e' da li' che si vede dove si sarebbe dovuti andare. */
       rottaMappa: _rottaAvanti(_punto(i, p.t), percorsi, prossima == null ? null : alla),
       // In fondo a un segmento si è già all'inizio del prossimo.
       limiteKmh: percorso.limiteSul(p.t > 0.999 ? i + 1 : i),

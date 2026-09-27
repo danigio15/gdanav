@@ -4,10 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import 'gestore_posizione.dart';
-import 'gestore_premium.dart';
 import 'gestore_viaggio.dart';
 
-/// Il meteo (Premium): lungo il viaggio calcolato, ognuno all'ora in cui ci si
+/// Il meteo (per tutti): lungo il viaggio calcolato, ognuno all'ora in cui ci si
 /// passa, e dove sei adesso. Serve al consumo (freddo, caldo, vento contro) e
 /// si mostra nella scheda del viaggio e sullo schermo dell'auto.
 class GestoreMeteo extends ChangeNotifier {
@@ -16,7 +15,6 @@ class GestoreMeteo extends ChangeNotifier {
       _ora = orologio ?? DateTime.now {
     viaggio.addListener(_viaggio);
     posizione?.addListener(_posizione);
-    GestorePremium.attivo.addListener(_premium);
   }
 
   final GestoreViaggio viaggio;
@@ -24,7 +22,7 @@ class GestoreMeteo extends ChangeNotifier {
   final FonteMeteo fonte;
   final DateTime Function() _ora;
 
-  /// Il meteo del viaggio pronto; `null` finché non arriva (o senza Premium).
+  /// Il meteo del viaggio pronto; `null` finché non arriva.
   MeteoViaggio? delViaggio;
 
   /// Adesso, dove sei.
@@ -38,9 +36,8 @@ class GestoreMeteo extends ChangeNotifier {
 
   /// Prima di calcolare il viaggio, a grandi linee (in linea d'aria, alla
   /// velocità di un'autostrada): la temperatura media e il vento contro.
-  /// `null` senza Premium o se il meteo non risponde in fretta.
+  /// `null` se il meteo non risponde in fretta.
   Future<({double temperaturaC, double ventoControMs})?> stima(Punto da, Punto a) async {
-    if (!GestorePremium.attivo.value) return null;
     try {
       final km = distanzaM(da, a) / 1000 * 1.3;
       final m = await MeteoViaggio.lungo(
@@ -72,7 +69,7 @@ class GestoreMeteo extends ChangeNotifier {
     _perViaggio = s;
     delViaggio = null;
     notifyListeners();
-    if (GestorePremium.attivo.value) unawaited(_lungo(s));
+    unawaited(_lungo(s));
   }
 
   Future<void> _lungo(ViaggioPronto s) async {
@@ -95,7 +92,7 @@ class GestoreMeteo extends ChangeNotifier {
   /// Dove sei: ogni mezz'ora, o dopo dieci chilometri.
   void _posizione() {
     final p = posizione?.qui;
-    if (p == null || !GestorePremium.attivo.value) return;
+    if (p == null) return;
     final u = _ultimoQui;
     if (u != null && distanzaM(u, p) < 10000 && _ora().difference(_ultimaVolta) < const Duration(minutes: 30)) return;
     _ultimoQui = p;
@@ -112,24 +109,10 @@ class GestoreMeteo extends ChangeNotifier {
     }
   }
 
-  void _premium() {
-    if (GestorePremium.attivo.value) {
-      _perViaggio = null;
-      _viaggio();
-      _ultimoQui = null;
-      _posizione();
-    } else {
-      delViaggio = null;
-      qui = null;
-      notifyListeners();
-    }
-  }
-
   @override
   void dispose() {
     viaggio.removeListener(_viaggio);
     posizione?.removeListener(_posizione);
-    GestorePremium.attivo.removeListener(_premium);
     super.dispose();
   }
 }

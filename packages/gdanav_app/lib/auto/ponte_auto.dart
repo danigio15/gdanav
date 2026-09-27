@@ -127,6 +127,10 @@ class PonteAuto {
   Future<Object?> _dallAuto(MethodCall call) async {
     final a = (call.arguments as Map?) ?? const {};
     switch (call.method) {
+      // Lo schermo dell'auto si è acceso o spento: qualcuno sta guardando, e
+      // i dati dell'auto si chiedono freschi anche senza un percorso.
+      case 'in_auto':
+        auto?.schermoDellAuto(a['si'] == true);
       // Android Auto accende la prova di guida: da qui ogni guida si percorre
       // da sola, e se non c'è ancora una meta se ne sceglie una.
       case 'prova_guida':
@@ -253,7 +257,7 @@ class PonteAuto {
         final qui = posizione.qui ?? viaggio.ultimaPosizione;
         final v = auto?.veicolo;
         if (qui == null || v == null) return const <Object>[];
-        final trovate = await colonnineVicine(qui, v);
+        final trovate = await colonnineVicineComeSiVuole(qui, v, viaggio.archivio);
         return [
           for (final c in trovate)
             {
@@ -443,7 +447,9 @@ class PonteAuto {
     if (!pr.attiva || !identical(_percorsoProva, p.viaggio.percorso)) {
       // Percorso nuovo (ricalcolo, traffico, tappa fatta): si riparte dal
       // punto in cui si era, portato sul nuovo.
-      final qui = pr.attiva ? guida.avanzamento?.posizioneSulPercorso : null;
+      /* Da fuori percorso l'aggancio non c'e' piu' — e' la regola nuova — ma
+       * la prova di guida deve ripartire da dove si e', non dall'inizio. */
+      final qui = pr.attiva ? guida.avanzamento?.posizioneSulPercorso ?? posizione.qui : null;
       _percorsoProva = p.viaggio.percorso;
       final daM = qui == null ? 0.0 : Linea(p.viaggio.percorso.punti).proietta(qui).lungoM;
       pr.percorri(p.viaggio.percorso, daM: daM);
@@ -595,7 +601,11 @@ class PonteAuto {
 
   /// Premium sbloccato o no: l'auto lo ricorda anche a telefono spento.
   /// [ospite]: Premium si compra nell'app che ospita gdanav (gdahome).
-  void premium(bool sbloccato, {bool ospite = false}) => _manda('premium', {'sbloccato': sbloccato, 'ospite': ospite});
+  /// [aggiorna]: questa versione è troppo vecchia (`GestoreAggiornamento`):
+  /// l'auto resta ferma sullo schermo che dice di aggiornare gdanav sul
+  /// telefono, come senza Premium.
+  void premium(bool sbloccato, {bool ospite = false, bool aggiorna = false}) =>
+      _manda('premium', {'sbloccato': sbloccato && !aggiorna, 'ospite': ospite, 'aggiorna': aggiorna});
 
   void _manda(String metodo, Map<String, Object?> dati) {
     if (!_attivo) return;

@@ -129,6 +129,10 @@ object PonteAuto {
     fun premiumOspite(context: Context): Boolean =
         context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).getBoolean("premium_ospite", false)
 
+    /** Questa versione è troppo vecchia: si aggiorna gdanav sul telefono (e intanto niente Premium). */
+    fun aggiorna(context: Context): Boolean =
+        context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).getBoolean("aggiorna", false)
+
     private val principale = Handler(Looper.getMainLooper())
     private val ascoltatori = CopyOnWriteArrayList<() -> Unit>()
     private var canale: MethodChannel? = null
@@ -164,18 +168,7 @@ object PonteAuto {
         })
     }
 
-    /**
-     * Cresce quando cambia qualcosa dei modelli di Android Auto (manovra,
-     * messaggi, luoghi, opzioni): il resto (posizione, cruscotto) ridisegna
-     * solo la mappa, senza consumare gli aggiornamenti concessi dall'auto.
-     */
-    @Volatile var versioneModello = 0
-        private set
-
-    private val soloMappa = setOf("posizione", "sorgenti", "cruscotto", "immagini", "stili")
-
     private fun gestisci(call: MethodCall) {
-        val prima = avviso.ancoraId
         when (call.method) {
             "stili" -> {
                 stileChiaro = call.argument("chiaro")
@@ -240,6 +233,7 @@ object PonteAuto {
             "premium" -> preferenze?.edit()
                 ?.putBoolean("premium", call.argument<Boolean>("sbloccato") == true)
                 ?.putBoolean("premium_ospite", call.argument<Boolean>("ospite") == true)
+                ?.putBoolean("aggiorna", call.argument<Boolean>("aggiorna") == true)
                 ?.apply()
             "guida" -> {
                 guida = if (call.argument<Boolean>("attiva") == true) {
@@ -271,7 +265,6 @@ object PonteAuto {
                 }
             }
         }
-        if (call.method !in soloMappa && (call.method != "avviso" || avviso.ancoraId != prima)) versioneModello++
         if (call.method == "guida") notifica()
         avvisa()
     }
@@ -344,7 +337,6 @@ object PonteAuto {
     /** In guida: si passa dal distributore e poi si prosegue; fermi, ci si va. */
     fun passa(l: Luogo) {
         messaggio = "Passo da ${l.etichetta}…"
-        versioneModello++
         avvisa()
         principale.post { canale?.invokeMethod("passa", l.comeMappa()) }
     }
@@ -386,11 +378,16 @@ object PonteAuto {
     /** Una meta scelta sull'auto: il telefono calcola e parte la guida. */
     fun vai(l: Luogo) {
         messaggio = "Calcolo il percorso per ${l.etichetta}…"
-        versioneModello++
         avvisa()
         principale.post { canale?.invokeMethod("vai", l.comeMappa()) }
     }
 
+    /**
+     * Il telefono ha mandato qualcosa. Ogni schermo aperto guarda da sé se è
+     * cambiato quello che ha in pagina (la firma di [SchermoAggiornato]) e
+     * solo allora si rifà: la guida arriva ogni secondo, e rifare tutto ogni
+     * secondo fa tremare gli schermi che della guida non mostrano niente.
+     */
     private fun avvisa() = principale.post { ascoltatori.forEach { it() } }
 
     private var ultimaVelocita: Double? = null
@@ -433,7 +430,6 @@ object PonteAuto {
      */
     fun naviga(uri: String) {
         messaggio = "Cerco la destinazione…"
-        versioneModello++
         avvisa()
         mandaConRiprova("naviga", mapOf("uri" to uri), 40)
     }
@@ -457,6 +453,20 @@ object PonteAuto {
             })
         }
     }
+
+    /**
+     * Lo schermo dell'auto si è acceso o spento.
+     *
+     * Serve al telefono per sapere che **qualcuno sta guardando**: con lo
+     * schermo acceso i dati dell'auto si chiedono freschi, anche senza un
+     * percorso impostato. Prima li chiedeva solo la guida, e fermi in garage
+     * la batteria restava quella di mezz'ora prima.
+     *
+     * Si manda anche se il Dart non c'è ancora: il motore Flutter si accende
+     * insieme alla sessione, e il filo si apre qualche istante dopo. Con la
+     * riprova arriva lo stesso, invece di perdersi.
+     */
+    fun inAuto(si: Boolean) = mandaConRiprova("in_auto", mapOf("si" to si), 40)
 
     /** La sessione dell'auto è finita: la prova di guida smette con lei. */
     fun fineProva() = principale.post { canale?.invokeMethod("prova_fine", null) }

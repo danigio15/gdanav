@@ -35,12 +35,24 @@ void main() {
     }
 
     await leggi(const Lettura(Punto(45, 9), rotta: 80, velocitaMs: 10));
-    expect(a.posizione.rotta, 80);
-    await leggi(const Lettura(Punto(45.001, 9))); // 110 m a nord, senza bussola
-    expect(a.posizione.rotta, closeTo(0, 0.5));
-    await leggi(const Lettura(Punto(45.00101, 9), rotta: 250, velocitaMs: 0.2)); // fermi
-    expect(a.posizione.rotta, closeTo(0, 0.5));
-    expect(a.posizione.qui, const Punto(45.00101, 9));
+    expect(a.posizione.rotta, 80, reason: 'la prima non si smorza');
+
+    /* 110 m a nord, senza bussola: la direzione la danno i due punti. Ma non
+     * ci arriva in una lettura sola, e non e' un difetto: da quando una
+     * lettura storta non deve piu' bastare a girare il segnaposto, ogni
+     * lettura sposta il 60% e il resto lo fanno le successive. */
+    await leggi(const Lettura(Punto(45.001, 9)));
+    expect(a.posizione.rotta, closeTo(32, 1), reason: "da 80 verso 0, il 60% della strada");
+    await leggi(const Lettura(Punto(45.002, 9)));
+    await leggi(const Lettura(Punto(45.003, 9)));
+    await leggi(const Lettura(Punto(45.004, 9)));
+    expect(a.posizione.rotta, closeTo(0, 3), reason: 'e in poche letture ci arriva');
+
+    // Fermi: la bussola dice 250, e non la si ascolta.
+    final primaDelSemaforo = a.posizione.rotta;
+    await leggi(const Lettura(Punto(45.00401, 9), rotta: 250, velocitaMs: 0.2));
+    expect(a.posizione.rotta, primaDelSemaforo);
+    expect(a.posizione.qui, const Punto(45.00401, 9));
   });
 
   testWidgets('il segnaposto si sceglie in «La tua auto» e si ricorda', (tester) async {

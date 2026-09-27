@@ -5,6 +5,7 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import '../mappa/segnaposto.dart';
 import '../servizi.dart';
+import 'licenza.dart';
 
 /// Quello che l'app ricorda: l'abbinamento con Home Assistant (contiene la
 /// chiave, quindi sta nel portachiavi del telefono) e come è messo lo switch.
@@ -22,6 +23,8 @@ class Archivio {
   static const _segnaposto = 'segnaposto';
   static const _luoghi = 'luoghi';
   static const _autoGdahome = 'auto_gdahome';
+  static const _telefono = 'licenza_telefono';
+  static const _gettone = 'licenza_gettone';
 
   Future<Abbinamento?> abbinamento() async {
     final uri = await _p.read(key: _abbinamento);
@@ -109,6 +112,27 @@ class Archivio {
 
   Future<void> salvaPremium(bool v) => v ? _p.write(key: _premium, value: 'sì') : _p.delete(key: _premium);
 
+  /// L'identità di questo telefono verso il quadro delle licenze (i codici
+  /// regalo): nasce una volta sola e resta qui, col suo segreto.
+  Future<IdentitaTelefono> identitaTelefono() async {
+    try {
+      final j = jsonDecode(await _p.read(key: _telefono) ?? '') as Map<String, Object?>;
+      final t = j['telefono'], s = j['segreto'];
+      if (t is String && RegExp(r'^tel_[0-9a-f]{32}$').hasMatch(t) && s is String && s.length >= 32) {
+        return (telefono: t, segreto: s);
+      }
+    } catch (_) {}
+    final nuova = nuovaIdentitaTelefono();
+    await _p.write(key: _telefono, value: jsonEncode({'telefono': nuova.telefono, 'segreto': nuova.segreto}));
+    return nuova;
+  }
+
+  /// L'ultimo gettone della licenza del telefono (codice regalo), da
+  /// verificare a ogni avvio.
+  Future<String?> gettoneLicenza() => _p.read(key: _gettone);
+
+  Future<void> salvaGettoneLicenza(String? g) => g == null ? _p.delete(key: _gettone) : _p.write(key: _gettone, value: g);
+
   Future<void> salvaOpzioniPercorso(OpzioniPercorso o) =>
       _p.write(key: _opzioniPercorso, value: jsonEncode(o.toJson()));
 
@@ -164,6 +188,12 @@ class Archivio {
       _p.write(key: 'consumo_$veicolo', value: jsonEncode(c.toJson()));
 
   Future<void> salvaSegnaposto(Segnaposto s) => _p.write(key: _segnaposto, value: s.name);
+
+  /// L'ultima versione minima detta dal relay: si ricorda perché senza rete
+  /// una versione da aggiornare resti bloccata. 0 se non l'ha mai detta.
+  Future<int> versioneMinima() async => int.tryParse(await _p.read(key: 'versione_minima') ?? '') ?? 0;
+
+  Future<void> salvaVersioneMinima(int n) => _p.write(key: 'versione_minima', value: '$n');
 }
 
 /// Dove stanno i servizi: vedi [Servizi].

@@ -76,6 +76,46 @@ curva di ricarica del modello.
    40 kW.
 5. `PianificatoreSoste` sceglie le soste.
 
+## Fermare le versioni vecchie
+
+Le build di prova escono con Premium sbloccato (finché la variabile del
+repository `GDANAV_PAGAMENTI` non è `si`). Il giorno dei pagamenti vanno
+spente, e lo fa il relay:
+
+- ogni build della CI conosce il suo numero (`GDANAV_COSTRUZIONE`, lo
+  stesso `github.run_number` del `--build-number`);
+- l'app sola (non dentro gdahome, che ha il suo controllo) chiede
+  `GET https://gdanav.gdahome.org/v1/versioni` → `{"gdanav": {"minima": N}}`
+  all'avvio, tornando in primo piano e ogni 6 ore, e ricorda l'ultimo `N`:
+  senza rete non si sblocca niente;
+- se la sua build è più vecchia di `N` resta solo la schermata «C'è una
+  versione nuova di gdanav: aggiornala per continuare», con un solo
+  bottone: il Play Store su Android, l'App Store su iPhone. Android Auto e
+  CarPlay dicono di aggiornare gdanav sul telefono.
+
+Le build fatte a mano (numero 0) e quelle di debug non si fermano mai. Di
+base `N` è 0: nessun blocco.
+
+Il giorno dei pagamenti:
+
+1. la variabile del repository `GDANAV_PAGAMENTI` = `si`, poi una build
+   su `main`: è la prima build pubblica a pagamento; se ne annota il numero
+   della corsa (lo mostra Actions, ed è il numero della versione);
+2. quando quella build è davvero nei negozi, in `relay/wrangler.toml`
+   `VERSIONE_MINIMA_APP = "<quel numero>"`, e una push su `main` ripubblica
+   il relay. Va cambiato lì e non dal pannello di Cloudflare: ogni
+   pubblicazione della CI rimette le variabili di `wrangler.toml`.
+
+Per tornare indietro basta rimettere `"0"`: le app si sbloccano alla
+domanda successiva. L'ID dell'app sull'App Store va scritto in
+`idAppStoreGdanav` (`packages/gdanav_app/lib/stato/gestore_aggiornamento.dart`)
+appena c'è: finché è vuoto il bottone apre solo l'App Store.
+
+Le build fatte prima di questo controllo non chiedono niente al relay e non
+si fermano: non serve, perché erano già a pagamento (da `67ec680` anche
+l'APK di prova chiedeva l'abbonamento). Le build di prova con Premium
+sbloccato hanno tutte il controllo.
+
 ## Costi
 
 Zero al lancio. Il primo server a pagamento (~50 €/mese) arriva con gli

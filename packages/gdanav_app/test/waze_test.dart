@@ -216,9 +216,10 @@ void main() {
     a.gps.add(Lettura(punti[0]));
     await aspetta(tester, 60);
     expect(a.segnalazioni.vicine.where((s) => s.fissa), hasLength(2));
-    // Senza Premium gli autovelox non ci sono.
+    // Gli autovelox sono per tutti, anche senza Premium.
     GestorePremium.attivo.value = false;
-    expect(a.segnalazioni.vicine.where((s) => s.fissa), isEmpty);
+    addTearDown(() => GestorePremium.attivo.value = true);
+    expect(a.segnalazioni.vicine.where((s) => s.fissa), hasLength(2));
     GestorePremium.attivo.value = true;
 
     await tester.tap(find.text('Avvia'));

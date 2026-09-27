@@ -36,6 +36,7 @@ class ViaggioPronto extends StatoViaggio {
     this.batteriaPartenza, {
     required this.calcolatoAlle,
     this.termica = false,
+    this.senzaSoste = false,
     this.scelte = const [],
     this.scelta = 0,
     this.tappe = const [],
@@ -55,10 +56,18 @@ class ViaggioPronto extends StatoViaggio {
   /// Auto termica: solo il percorso, senza batteria né soste.
   final bool termica;
 
+  /// Auto elettrica senza Premium: il percorso e basta, senza le soste di
+  /// ricarica (sono Premium). La batteria resta quella scritta a mano.
+  final bool senzaSoste;
+
+  /// Solo il percorso, senza piano della batteria: termica, o elettrica
+  /// senza Premium.
+  bool get soloPercorso => termica || senzaSoste;
+
   /// Per dire l'ora d'arrivo: partenza adesso più la durata.
   final DateTime calcolatoAlle;
 
-  DateTime? get arrivoAlle => termica
+  DateTime? get arrivoAlle => soloPercorso
       ? calcolatoAlle.add(viaggio.percorso.durata)
       : viaggio.piano == null
       ? null
@@ -105,13 +114,13 @@ PianificatoreViaggio pianificatoreVero(
     Uri.parse(i.valhalla.endsWith('/') ? i.valhalla : '${i.valhalla}/'),
     chiave: i.chiaveValhalla.isEmpty ? null : i.chiaveValhalla,
   );
-  final traffico = GestorePremium.attivo.value ? _traffico : null;
+  final traffico = _traffico;
   return PianificatoreViaggio(
     percorsi: (tappe) => valhalla.calcola(tappe, opzioni: opzioni),
     alternative: (da, a) => valhalla.alternative(da, a, opzioni: opzioni),
     seguendo: (p) => valhalla.seguendo(p, opzioni: opzioni),
-    // Il traffico di adesso sul percorso (Premium): arrivo e soste lo
-    // mettono in conto.
+    // Il traffico di adesso sul percorso (per tutti, se c'è la chiave
+    // TomTom): arrivo e soste lo mettono in conto.
     traffico: traffico?.applica,
     // Open Charge Map se c'è la chiave (ha anche lo stato delle prese), e
     // comunque OpenStreetMap: dall'archivio dentro l'app, fuori archivio dal
@@ -158,7 +167,7 @@ class GestoreViaggio extends ChangeNotifier {
 
   StatoViaggio stato = const NessunViaggio();
 
-  /// Il meteo previsto lungo la strada (Premium), per il consumo: freddo,
+  /// Il meteo previsto lungo la strada (per tutti), per il consumo: freddo,
   /// caldo e vento contro. `null`, o risposta `null`: si pianifica senza.
   Future<({double temperaturaC, double ventoControMs})?> Function(Punto da, Punto a)? stimaMeteo;
 
@@ -227,12 +236,12 @@ class GestoreViaggio extends ChangeNotifier {
     return pianifica(destinazione, conScelte: true);
   }
 
-  /// Il traffico di adesso sul percorso (Premium, con la chiave TomTom);
+  /// Il traffico di adesso sul percorso (per tutti, con la chiave TomTom);
   /// nelle prove se ne passa uno finto.
   Future<PercorsoCalcolato> Function(PercorsoCalcolato percorso)? trafficoFinto;
 
   Future<PercorsoCalcolato> Function(PercorsoCalcolato percorso)? get _trafficoAdesso =>
-      trafficoFinto ?? (GestorePremium.attivo.value ? _traffico?.applica : null);
+      trafficoFinto ?? _traffico?.applica;
 
   /// Rilegge il traffico sul viaggio pronto (in guida, ogni tanto): stessa
   /// strada, tempi e code nuovi. `null` se non si può o non è cambiato
@@ -255,6 +264,7 @@ class GestoreViaggio extends ChangeNotifier {
       s.batteriaPartenza,
       calcolatoAlle: s.calcolatoAlle,
       termica: s.termica,
+      senzaSoste: s.senzaSoste,
       scelte: s.scelte,
       scelta: s.scelta,
       tappe: s.tappe,
@@ -353,6 +363,11 @@ class GestoreViaggio extends ChangeNotifier {
       _scelta = 0;
     }
     if (!auto.elettrica) return _percorsoSolo(destinazione, impostazioni, conScelte: conScelte);
+    // Le soste di ricarica sono Premium: senza, l'elettrica ha il percorso
+    // come la termica (e la scheda dice che le soste sono con Premium).
+    if (!GestorePremium.attivo.value) {
+      return _percorsoSolo(destinazione, impostazioni, conScelte: conScelte, senzaSoste: true);
+    }
     final batteria = auto.stato?.batteria;
     if (batteria == null) {
       return _imposta(
@@ -433,8 +448,14 @@ class GestoreViaggio extends ChangeNotifier {
     }
   }
 
-  /// Auto termica: il percorso e basta, come un navigatore normale.
-  Future<void> _percorsoSolo(Luogo destinazione, Impostazioni impostazioni, {bool conScelte = false}) async {
+  /// Auto termica: il percorso e basta, come un navigatore normale. Anche
+  /// per l'elettrica senza Premium ([senzaSoste]).
+  Future<void> _percorsoSolo(
+    Luogo destinazione,
+    Impostazioni impostazioni, {
+    bool conScelte = false,
+    bool senzaSoste = false,
+  }) async {
     final partenza = await posizione();
     if (partenza == null) {
       return _imposta(ErroreViaggio('Non so dove sei: attiva la posizione per gdanav.', destinazione: destinazione));
@@ -460,9 +481,10 @@ class GestoreViaggio extends ChangeNotifier {
           ViaggioPronto(
             destinazione,
             Viaggio(percorso: percorso, colonnine: const [], piano: null),
-            0,
+            senzaSoste ? auto.stato?.batteria ?? 0 : 0,
             calcolatoAlle: _ora(),
-            termica: true,
+            termica: !senzaSoste,
+            senzaSoste: senzaSoste,
             scelte: _scelte,
             scelta: _scelta,
             tappe: List.of(tappe),
@@ -540,18 +562,29 @@ class GestoreViaggio extends ChangeNotifier {
 }
 
 /// Le colonnine rapide intorno a [qui] adatte all'auto, dalla più vicina; con
-/// Premium anche libere e occupate adesso. Per «Colonnine vicine» sull'auto.
+/// Premium anche libere e occupate adesso. Per «Colonnine vicine» sull'auto e
+/// sul telefono: senza Premium l'elenco c'è lo stesso, con lo stato che dice
+/// la fonte (spesso nessuno) invece di quello in tempo reale.
+///
+/// [operatoriEsclusi] e [potenzaMinimaKw] sono la scelta fatta nelle
+/// preferenze di ricarica: quello che non si vuole vedere non si vede nemmeno
+/// qui. Senza, si vede tutto — è il comportamento di sempre.
 Future<List<Colonnina>> colonnineVicine(
   Punto qui,
   ProfiloVeicolo veicolo, {
   double km = 15,
   int quante = 8,
   int conStato = 10,
+  Set<String> operatoriEsclusi = const {},
+  double potenzaMinimaKw = 0,
 }) async {
   final fonte = ColonnineLocali(archivioColonnine(), riserva: ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni)));
   final adatte = [
     for (final c in await fonte.lungo([qui], distanzaKm: km))
-      if (c.potenzaNominalePer(veicolo.connettori) > 0 && distanzaM(qui, c.posizione) <= km * 1000) c,
+      if (c.potenzaNominalePer(veicolo.connettori) >= (potenzaMinimaKw > 0 ? potenzaMinimaKw : 0.1) &&
+          !operatoreEscluso(c, operatoriEsclusi) &&
+          distanzaM(qui, c.posizione) <= km * 1000)
+        c,
   ]..sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
   final prime = adatte.take(quante).toList();
   final d = GestorePremium.attivo.value ? _disponibilita : null;
@@ -562,6 +595,29 @@ Future<List<Colonnina>> colonnineVicine(
     for (final (i, c) in prime.indexed)
       i < conStato ? d.aggiorna(c).timeout(const Duration(seconds: 30)).catchError((Object _) => c) : Future.value(c),
   ]);
+}
+
+/// Le colonnine vicine filtrate come si è scelto in «Ricarica»: la potenza
+/// minima e gli operatori che non si vogliono vedere.
+///
+/// È la porta da cui passano l'elenco del telefono e quello dell'auto, così
+/// la scelta vale in tutt'e due senza che nessuno se la debba ricordare.
+Future<List<Colonnina>> colonnineVicineComeSiVuole(
+  Punto qui,
+  ProfiloVeicolo veicolo,
+  Archivio archivio, {
+  double km = 15,
+  int quante = 8,
+}) async {
+  final p = await archivio.preferenze();
+  return colonnineVicine(
+    qui,
+    veicolo,
+    km: km,
+    quante: quante,
+    operatoriEsclusi: p.operatoriEsclusi,
+    potenzaMinimaKw: p.potenzaMinimaKw,
+  );
 }
 
 /// Lo stato di adesso di una colonnina (con Premium); senza, com'era.

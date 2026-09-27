@@ -132,6 +132,13 @@ final class PonteAuto {
     /// gdanav Premium: l'app lo dice, l'auto lo ricorda anche a telefono spento.
     var premium: Bool { UserDefaults.standard.bool(forKey: "gdanav.premium") }
 
+    /// Premium si compra nell'app che ospita gdanav (gdahome), non in gdanav.
+    var premiumOspite: Bool { UserDefaults.standard.bool(forKey: "gdanav.premium_ospite") }
+
+    /// Questa versione è troppo vecchia: si aggiorna gdanav sul telefono (e
+    /// intanto niente Premium).
+    var aggiorna: Bool { UserDefaults.standard.bool(forKey: "gdanav.aggiorna") }
+
     func casa() -> LuogoAuto? { luoghi.first { $0.tipo == "casa" } }
     func lavoro() -> LuogoAuto? { luoghi.first { $0.tipo == "lavoro" } }
 
@@ -237,6 +244,8 @@ final class PonteAuto {
             }
         case "premium":
             UserDefaults.standard.set((a["sbloccato"] as? Bool) == true, forKey: "gdanav.premium")
+            UserDefaults.standard.set((a["ospite"] as? Bool) == true, forKey: "gdanav.premium_ospite")
+            UserDefaults.standard.set((a["aggiorna"] as? Bool) == true, forKey: "gdanav.aggiorna")
         case "guida":
             guida = (a["attiva"] as? Bool) == true ? guidaDa(a) : nil
         default:

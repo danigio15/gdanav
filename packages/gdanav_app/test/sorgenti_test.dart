@@ -55,6 +55,45 @@ void main() {
     await sorgente.ferma();
   });
 
+  test('con lo schermo dell\'auto acceso i dati si chiedono freschi', () async {
+    /* Dal campo, con la foto dello schermo dell'auto: «i dati batteria non si
+     * aggiornano fino a che non apro app dal cellulare».
+     *
+     * I dati freschi si chiedevano solo mentre si guidava verso una meta
+     * (`GestoreGuida._forseChiediDati`). Fermi in garage, o girando senza una
+     * meta, con lo schermo dell'auto acceso davanti, non li chiedeva nessuno:
+     * restava quello che Home Assistant aveva mandato per conto suo. */
+    preparaPiattaforma();
+    var adesso = DateTime(2026, 9, 27, 10, 37);
+    final auto = _AutoSpia(() => adesso);
+    await auto.avvia();
+    addTearDown(auto.dispose);
+
+    // Col telefono in tasca e nessuno che guarda, non si chiede niente.
+    expect(auto.vaChiestoAdesso, isFalse);
+    adesso = adesso.add(const Duration(hours: 3));
+    expect(auto.vaChiestoAdesso, isFalse, reason: 'senza nessuno che guarda');
+
+    // Si sale in macchina: subito, perché è il momento in cui il numero
+    // vecchio si nota di più.
+    auto.schermoDellAuto(true);
+    expect(auto.chieste, 1);
+    expect(auto.vaChiestoAdesso, isFalse, reason: 'appena chiesto');
+
+    // E poi ogni minuto, finché si è lì.
+    adesso = adesso.add(GestoreAuto.ognisQuanto ~/ 2);
+    expect(auto.vaChiestoAdesso, isFalse);
+    adesso = adesso.add(GestoreAuto.ognisQuanto);
+    expect(auto.vaChiestoAdesso, isTrue);
+
+    // Scesi dalla macchina si smette: una richiesta al minuto per tutta la
+    // notte non serve a nessuno e si paga.
+    auto.schermoDellAuto(false);
+    adesso = adesso.add(const Duration(hours: 1));
+    expect(auto.vaChiestoAdesso, isFalse);
+    expect(auto.chieste, 1);
+  });
+
   test('un dongle OBD scelto dà i dati dell\'auto e resta salvato', () async {
     preparaPiattaforma();
     final dongle = _DongleFinto({'015B': '7E803415BA3', '010D': '7E803410D3C'});
@@ -106,4 +145,21 @@ class _DongleFinto implements CanaleObd {
 
   @override
   Future<void> chiudi() async {}
+}
+
+/// Un gestore che conta le richieste di dati freschi, e che ha un orologio
+/// spostabile a mano.
+class _AutoSpia extends GestoreAuto {
+  /* L'orologio si passa e basta, non si tiene: tenuto in un campo, quel
+   * campo non lo legge nessuno — la chiusura qui sopra prende il parametro,
+   * non il campo — e l'analizzatore lo dice. */
+  _AutoSpia(DateTime Function() adesso) : super(archivio: Archivio(), ora: adesso);
+
+  int chieste = 0;
+
+  @override
+  Future<void> chiediAggiornamento() async {
+    chieste += 1;
+    await super.chiediAggiornamento();
+  }
 }

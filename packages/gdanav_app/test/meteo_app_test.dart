@@ -44,7 +44,7 @@ void main() {
     expect(find.text(MeteoMetNorway.citazione, skipOffstage: false), findsOneWidget);
   });
 
-  testWidgets('senza Premium niente meteo: si calcola come prima', (tester) async {
+  testWidgets('il meteo è per tutti: anche senza Premium, lungo il percorso senza soste', (tester) async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
     final a = await ambiente(tester, km: 300);
     final fonte = MeteoFinto(-2);
@@ -57,9 +57,24 @@ void main() {
 
     await tester.runAsync(() => a.viaggio.vaiA(const Luogo(nome: 'Milano', posizione: Punto(45.46, 9.19))));
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-    expect(a.viaggio.stato, isA<ViaggioPronto>());
-    expect(a.viaggio.condizioni!.temperaturaC, 20);
-    expect(meteo.delViaggio, isNull);
-    expect(fonte.richieste, 0);
+    final pronto = a.viaggio.stato as ViaggioPronto;
+    expect(pronto.senzaSoste, isTrue);
+    expect(meteo.delViaggio, isNotNull);
+    expect(fonte.richieste, greaterThan(0));
+    // E la stima prima del calcolo risponde anche senza Premium.
+    expect(await tester.runAsync(() => meteo.stima(const Punto(42, 12), const Punto(45.46, 9.19))), isNotNull);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: temaGdanav(Brightness.light),
+        home: Scaffold(
+          body: Stack(
+            children: [SchedaViaggio(gestore: a.viaggio, onAvvia: () {}, meteo: meteo)],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('meteo-viaggio'), skipOffstage: false), findsOneWidget);
   });
 }

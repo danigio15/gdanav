@@ -21,9 +21,22 @@ abstract final class Servizi {
   /// di gdanav su Cloudflare.
   static const segnalazioni = String.fromEnvironment('GDANAV_SEGNALAZIONI', defaultValue: _segnalazioni);
 
-  /// Le build d'anteprima (l'APK da GitHub, che non passa dal Play Store)
-  /// hanno Premium già sbloccato; quella per il Play Store no.
+  /// Premium sbloccato per tutti, senza negozio:
+  /// `--dart-define=GDANAV_TUTTO_SBLOCCATO=true`. Le build della CI lo
+  /// accendono finche' la variabile del repository GDANAV_PAGAMENTI non e'
+  /// «si» (la fase di prova, coi pagamenti spenti); da li' l'APK, il Play
+  /// Store e l'App Store chiedono l'abbonamento (o un codice regalo).
   static const tuttoSbloccato = bool.fromEnvironment('GDANAV_TUTTO_SBLOCCATO');
+
+  /// Il numero della build: la CI passa quello della corsa
+  /// (`--dart-define=GDANAV_COSTRUZIONE=${{ github.run_number }}`), lo stesso
+  /// del `--build-number`. 0 nelle build fatte a mano, che non si bloccano
+  /// mai: vedi `GestoreAggiornamento`.
+  static const costruzione = int.fromEnvironment('GDANAV_COSTRUZIONE');
+
+  /// La versione più vecchia ancora buona: la dice il relay, in
+  /// `GET /v1/versioni`.
+  static Uri get versioni => Uri.parse(segnalazioni).resolve('v1/versioni');
 }
 
 // Le chiavi di gdanav.

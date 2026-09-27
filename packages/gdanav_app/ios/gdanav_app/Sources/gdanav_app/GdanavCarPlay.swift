@@ -282,7 +282,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         } else if !premium && !premiumMostrato {
             premiumMostrato = true
             var azioni = [
-                CPAlertAction(title: "Ho sbloccato", style: .default) { [weak self] _ in
+                CPAlertAction(title: PonteAuto.shared.aggiorna ? "Ho aggiornato" : "Ho sbloccato", style: .default) { [weak self] _ in
                     guard let self else { return }
                     if PonteAuto.shared.premium {
                         self.premiumMostrato = false
@@ -298,11 +298,23 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                     self.controllore?.dismissTemplate(animated: true) { _, _ in self.apriCasa() }
                 })
             }
+            // Dentro gdahome Premium si attiva lì, non nel negozio di gdanav.
+            // Una versione troppo vecchia va prima aggiornata.
             let avviso = CPAlertTemplate(
-                titleVariants: [
-                    "La navigazione in auto fa parte di gdanav Premium. Sbloccalo dall'app sul telefono: menu → Premium.",
-                    "gdanav Premium: sbloccalo dal telefono.",
-                ],
+                titleVariants: PonteAuto.shared.aggiorna
+                    ? [
+                        "C'è una versione nuova di gdanav. Aggiorna gdanav sul telefono per continuare.",
+                        "Aggiorna gdanav sul telefono.",
+                    ]
+                    : PonteAuto.shared.premiumOspite
+                    ? [
+                        "La navigazione in auto fa parte del Premium di gdahome. Attivalo dall'app gdahome sul telefono.",
+                        "gdahome Premium: attivalo dall'app gdahome.",
+                    ]
+                    : [
+                        "La navigazione in auto fa parte di gdanav Premium. Sbloccalo dall'app sul telefono: menu → Premium.",
+                        "gdanav Premium: sbloccalo dal telefono.",
+                    ],
                 actions: azioni
             )
             c.presentTemplate(avviso, animated: true, completion: nil)

@@ -192,11 +192,21 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: temaGdanav(Brightness.light),
-        home: SchermataPremium(premium: p, perche: 'Il traffico'),
+        home: SchermataPremium(premium: p, perche: 'Le soste di ricarica'),
       ),
     );
-    expect(find.textContaining('Il traffico fa parte di Premium'), findsOneWidget);
-    expect(find.text('Previsioni meteo'), findsOneWidget);
+    expect(find.textContaining('Le soste di ricarica fa parte di Premium'), findsOneWidget);
+    // Solo quello che c'è davvero: niente cronologia, niente più veicoli.
+    expect(find.text('Home Assistant e batteria letta dall\'auto'), findsOneWidget);
+    expect(find.text('Percorso con le soste alle colonnine'), findsOneWidget);
+    // Lo schermo dell'auto della piattaforma, non tutti e due.
+    expect(find.text('Android Auto'), findsOneWidget);
+    expect(find.textContaining('CarPlay'), findsNothing);
+    expect(find.textContaining('Cronologia'), findsNothing);
+    expect(find.textContaining('Più veicoli'), findsNothing);
+    expect(find.textContaining('traffico, autovelox e meteo'), findsOneWidget);
+    // Senza chiave delle licenze (di serie) niente codici regalo.
+    expect(find.byKey(const Key('codice-regalo')), findsNothing);
     expect(find.text('25,00 €/anno'), findsOneWidget);
     expect(find.text('3,00 €/mese'), findsOneWidget);
     expect(find.text('Risparmi il 31%'), findsOneWidget);
@@ -266,6 +276,9 @@ void main() {
     );
     expect(find.textContaining('fa parte del Premium di gdahome'), findsOneWidget);
     expect(find.byKey(const Key('compra-premium')), findsNothing);
+    // Il codice regalo di gdahome si riscatta per la casa, nell'app gdahome.
+    expect(find.byKey(const Key('codice-regalo')), findsNothing);
+    expect(find.text('Ripristina abbonamento'), findsNothing);
 
     // Comprato in gdahome: si sblocca tutto, subito.
     gdahome.value = true;
@@ -279,5 +292,18 @@ void main() {
     await tester.pump();
     expect(p.sbloccato, isFalse);
     p.dispose();
+  });
+
+  testWidgets('il negozio non risponde: i prezzi di listino, senza poter comprare', (tester) async {
+    preparaPiattaforma();
+    final p = GestorePremium(archivio: Archivio(), tuttoSbloccato: false);
+    await tester.runAsync(p.carica);
+    await tester.pumpWidget(MaterialApp(theme: temaGdanav(Brightness.light), home: SchermataPremium(premium: p)));
+    expect(find.text('29,99 €/anno'), findsOneWidget);
+    expect(find.text('2,99 €/mese'), findsOneWidget);
+    expect(find.text('Risparmi il 16%'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('compra-premium')));
+    expect(tester.widget<FilledButton>(find.byKey(const Key('compra-premium'))).onPressed, isNull);
+    expect(find.textContaining('Il Play Store non risponde'), findsOneWidget);
   });
 }

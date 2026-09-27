@@ -12,6 +12,8 @@ import androidx.car.app.hardware.info.EnergyLevel
 import androidx.car.app.hardware.info.Mileage
 import androidx.car.app.hardware.info.Speed
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 
 /**
  * Quello che l'app che porta gdanav dentro può aggiungere in auto.
@@ -31,6 +33,29 @@ object GdanavInAuto {
  * ogni app ha il suo (l'app gdanav il suo `MotoreFlutter`, gdahome il suo).
  */
 open class SessioneGdanav(private val accendi: (Context) -> Unit) : Session() {
+    /*
+     * Finché lo schermo dell'auto è acceso, il telefono lo sa.
+     *
+     * Non è un dettaglio da niente: è l'unico modo che ha il telefono di
+     * sapere che **qualcuno sta guardando** mentre lui sta in tasca. Da lì
+     * dipende se i dati dell'auto si chiedono freschi o si lasciano
+     * invecchiare — «i dati batteria non si aggiornano finché non apro l'app
+     * dal cellulare» nasceva da qui.
+     *
+     * Si guarda il ciclo di vita della sessione e non quello di uno schermo:
+     * gli schermi si aprono e si chiudono fra loro — il menu, le colonnine,
+     * le impostazioni — e in macchina ci si resta lo stesso.
+     */
+    init {
+        lifecycle.addObserver(
+            object : DefaultLifecycleObserver {
+                override fun onStart(owner: LifecycleOwner) = PonteAuto.inAuto(true)
+
+                override fun onStop(owner: LifecycleOwner) = PonteAuto.inAuto(false)
+            },
+        )
+    }
+
     override fun onCreateScreen(intent: Intent): Screen {
         accendi(carContext)
         ascoltaEnergia()

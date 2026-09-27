@@ -31,18 +31,44 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     private val renderer = RendererMappa(carContext)
     private val navigazione = carContext.getCarService(NavigationManager::class.java)
     private var navigando = false
-    private var versione = -1
     private val guidaAuto = GuidaAuto(carContext)
+
+    /**
+     * Quello che questo schermo ha in pagina: la manovra, il messaggio da
+     * fermi, la segnalazione appena passata. La mappa sotto si ridisegna per
+     * conto suo, che il modello si rifaccia o no.
+     */
+    private fun firma(): Any? = listOf(PonteAuto.guida, PonteAuto.messaggio, PonteAuto.avviso.ancoraId)
+
+    private var disegnata: Any? = null
+    private var daAggiornare = false
     private val aggiorna: () -> Unit = {
+        fermaSeVecchia()
         renderer.aggiorna()
         sincronizzaNavigazione()
-        // Il modello si rifà solo se cambia qualcosa che mostra: l'auto
-        // concede pochi aggiornamenti.
-        if (PonteAuto.versioneModello != versione) {
-            versione = PonteAuto.versioneModello
+        // Il modello si rifà solo se cambia quello che mostra: l'auto concede
+        // pochi aggiornamenti.
+        val ora = firma()
+        if (ora != disegnata) {
+            disegnata = ora
             viaggioAlCruscotto()
             invalidate()
         }
+    }
+
+    /**
+     * Questa versione di gdanav è troppo vecchia (lo dice il telefono, vedi
+     * `GestoreAggiornamento`): la guida si ferma e sopra la mappa resta lo
+     * schermo che dice di aggiornare gdanav sul telefono.
+     */
+    private fun fermaSeVecchia() {
+        val vecchia = PonteAuto.aggiorna(carContext)
+        if (vecchia && !daAggiornare) {
+            if (PonteAuto.guida != null) PonteAuto.fermaDallAuto()
+            screenManager.popToRoot()
+            screenManager.push(SchermoPremium(carContext, sopraLaMappa = true))
+        }
+        daAggiornare = vecchia
     }
 
     /** Il viaggio anche al cruscotto dell'auto e alle altre schermate (NF-4). */
@@ -195,7 +221,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     }
 
     override fun onGetTemplate(): Template {
-        versione = PonteAuto.versioneModello
+        disegnata = firma()
         val guida = PonteAuto.guida
         val modello = NavigationTemplate.Builder()
             .setActionStrip(azioni())

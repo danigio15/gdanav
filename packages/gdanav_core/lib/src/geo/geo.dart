@@ -38,6 +38,20 @@ double rottaGradi(Punto a, Punto b) {
   return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
 }
 
+/// Di quanto si gira per passare da [da] ad [a], fra -180 e 180.
+///
+/// Negativo verso sinistra, positivo verso destra. Serve perché i gradi
+/// tornano a zero: da 350° a 10° ci sono **venti gradi a destra**, non
+/// trecentoquaranta a sinistra, e una sottrazione secca direbbe la seconda.
+double diQuantoSiGira(double da, double a) => ((a - da + 540) % 360) - 180;
+
+/// Un passo da [da] verso [a]: tutto con [quanto] a 1, niente con 0.
+///
+/// È lo smorzamento della direzione del segnaposto. Una lettura del GPS
+/// storta, da sola, non deve spostarlo; una curva vera sì, perché le letture
+/// storte non sono tutte dalla stessa parte e quelle giuste si sommano.
+double versoDiLa(double da, double a, double quanto) => (da + diQuantoSiGira(da, a) * quanto + 360) % 360;
+
 /// Decodifica una polyline codificata: precisione 6 per Valhalla, 5 per
 /// Google e Open Charge Map.
 List<Punto> decodificaPolyline(String codificata, {int precisione = 6}) {

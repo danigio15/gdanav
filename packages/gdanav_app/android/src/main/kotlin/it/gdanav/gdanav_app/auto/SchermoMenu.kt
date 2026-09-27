@@ -19,18 +19,38 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import it.gdanav.gdanav_app.R
 
-/** Uno schermo dell'auto che si rifà quando il telefono manda novità. */
+/**
+ * Uno schermo dell'auto che si rifà quando cambia quello che ha in pagina.
+ *
+ * Il telefono manda novità in continuazione: mentre si guida, la distanza
+ * alla prossima manovra scende ogni secondo. Rifare a ogni novità anche gli
+ * schermi che della guida non mostrano niente li fa tremare, e consuma gli
+ * aggiornamenti che l'auto concede. Perciò ogni schermo dice con [firma] cosa
+ * ha in pagina, e si rifà solo quando quella cambia.
+ */
 abstract class SchermoAggiornato(carContext: CarContext) : Screen(carContext), DefaultLifecycleObserver {
-    private var versione = PonteAuto.versioneModello
+    /** Quello che questo schermo mostra: cambia lei, si rifà lui. */
+    protected abstract fun firma(): Any?
+
+    /** Come si disegna: al posto di `onGetTemplate`, che qui segna la firma. */
+    protected abstract fun schermata(): Template
+
+    private var disegnata: Any? = null
     private val aggiorna: () -> Unit = {
-        if (PonteAuto.versioneModello != versione) {
-            versione = PonteAuto.versioneModello
+        val ora = firma()
+        if (ora != disegnata) {
+            disegnata = ora
             invalidate()
         }
     }
 
     init {
         lifecycle.addObserver(this)
+    }
+
+    final override fun onGetTemplate(): Template {
+        disegnata = firma()
+        return schermata()
     }
 
     override fun onCreate(owner: LifecycleOwner) {
@@ -107,7 +127,11 @@ abstract class SchermoAggiornato(carContext: CarContext) : Screen(carContext), D
  * è il minimo che ogni auto mostra.
  */
 class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) : SchermoAggiornato(carContext) {
-    override fun onGetTemplate(): Template {
+    // In pagina: i nomi di Casa e Lavoro, e se l'auto è elettrica (colonnine
+    // o distributori). Della guida non mostra niente.
+    override fun firma(): Any? = listOf(PonteAuto.casa()?.nome, PonteAuto.lavoro()?.nome, PonteAuto.cruscotto.elettrica)
+
+    override fun schermata(): Template {
         val casa = PonteAuto.casa()
         val lavoro = PonteAuto.lavoro()
         val blu = CarColor.BLUE
@@ -177,7 +201,11 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
 
 /** Vista, voce, opzioni del percorso, e dove sono Casa e Lavoro. */
 class SchermoImpostazioni(carContext: CarContext, private val renderer: RendererMappa) : SchermoAggiornato(carContext) {
-    override fun onGetTemplate(): Template {
+    // In pagina: le opzioni, la vista della mappa, Casa e Lavoro.
+    override fun firma(): Any? =
+        listOf(PonteAuto.opzioni, renderer.tridimensionale, PonteAuto.casa()?.nome, PonteAuto.lavoro()?.nome)
+
+    override fun schermata(): Template {
         val o = PonteAuto.opzioni
         val casa = PonteAuto.casa()
         val lavoro = PonteAuto.lavoro()
@@ -239,7 +267,10 @@ class SchermoImpostazioni(carContext: CarContext, private val renderer: Renderer
 class SchermoArrivo(carContext: CarContext) : SchermoAggiornato(carContext) {
     private val scelte = listOf(5, 10, 15, 20, 25, 30)
 
-    override fun onGetTemplate(): Template {
+    // In pagina: qual è la scelta di adesso.
+    override fun firma(): Any? = PonteAuto.opzioni["arrivo"]
+
+    override fun schermata(): Template {
         val ora = (PonteAuto.opzioni["arrivo"] as? Number)?.toInt()
         return elenco(
             "Batteria all'arrivo",
@@ -257,7 +288,10 @@ class SchermoArrivo(carContext: CarContext) : SchermoAggiornato(carContext) {
 class SchermoOpzioni(carContext: CarContext) : SchermoAggiornato(carContext) {
     private val modi = listOf("veloce" to "Veloce", "equilibrato" to "Equilibrato", "risparmio" to "Risparmio")
 
-    override fun onGetTemplate(): Template {
+    // In pagina: le opzioni del percorso.
+    override fun firma(): Any? = PonteAuto.opzioni
+
+    override fun schermata(): Template {
         val o = PonteAuto.opzioni
         val modo = o["modo"] as? String ?: "veloce"
         val i = modi.indexOfFirst { it.first == modo }.coerceAtLeast(0)
@@ -290,7 +324,11 @@ class SchermoColonnine(carContext: CarContext) : SchermoAggiornato(carContext) {
         }
     }
 
-    override fun onGetTemplate(): Template {
+    // Le colonnine se le chiede da sé e da sé si rifà: del telefono, in
+    // pagina, non c'è niente.
+    override fun firma(): Any? = Unit
+
+    override fun schermata(): Template {
         val trovate = colonnine
             ?: return ListTemplate.Builder().setTitle("Colonnine vicine").setHeaderAction(Action.BACK).setLoading(true).build()
         return elenco(
@@ -325,7 +363,10 @@ class SchermoDistributori(carContext: CarContext) : SchermoAggiornato(carContext
         }
     }
 
-    override fun onGetTemplate(): Template {
+    // Come le colonnine: l'elenco se lo chiede da sé.
+    override fun firma(): Any? = Unit
+
+    override fun schermata(): Template {
         val trovati = distributori
             ?: return ListTemplate.Builder().setTitle("Distributori vicini").setHeaderAction(Action.BACK).setLoading(true).build()
         val limite = try {
@@ -358,7 +399,10 @@ class SchermoSegnala(carContext: CarContext) : SchermoAggiornato(carContext) {
         "autovelox" to "Autovelox",
     )
 
-    override fun onGetTemplate(): Template = elenco(
+    // In pagina: i disegni delle segnalazioni, che arrivano dal telefono.
+    override fun firma(): Any? = PonteAuto.immagini
+
+    override fun schermata(): Template = elenco(
         "Segnala",
         tipi.map { (tipo, nome) ->
             riga(nome, icona = immagine("segnala-$tipo") ?: icona(R.drawable.icona_segnala, CarColor.YELLOW)) {

@@ -15,7 +15,7 @@ export const PRIVACY = `<!doctype html>
 </head>
 <body>
 <h1>gdanav · Informativa sulla privacy</h1>
-<p>gdanav è un navigatore per auto elettriche. Non ha account, pubblicità né statistiche d'uso: non raccoglie dati per profilarti e non li vende.</p>
+<p>gdanav è un navigatore per auto elettriche e termiche. Non ha account, pubblicità né statistiche d'uso: non raccoglie dati per profilarti e non li vende.</p>
 
 <h2>Posizione</h2>
 <p>La posizione del telefono serve a calcolare il percorso, guidarti e mostrarti colonnine, traffico e segnalazioni vicine. Resta sul telefono; ai servizi qui sotto arrivano solo i punti necessari a ogni richiesta, senza nessun identificativo tuo:</p>
@@ -23,7 +23,7 @@ export const PRIVACY = `<!doctype html>
   <li><b>Percorsi</b>: partenza, tappe e arrivo al server Valhalla di FOSSGIS (OpenStreetMap Germania).</li>
   <li><b>Ricerca dei luoghi</b>: il testo cercato e la zona a Photon (Komoot).</li>
   <li><b>Traffico e colonnine libere/occupate</b>: la zona della mappa e le colonnine delle soste a TomTom.</li>
-  <li><b>Meteo</b> (Premium): alcuni punti del percorso e la zona in cui sei, arrotondati a circa un chilometro, a MET Norway (api.met.no) per le previsioni.</li>
+  <li><b>Meteo</b>: alcuni punti del percorso e la zona in cui sei, arrotondati a circa un chilometro, a MET Norway (api.met.no) per le previsioni.</li>
   <li><b>Colonnine fuori dall'archivio dell'app</b>: la zona del percorso al relay di gdanav, che le chiede a OpenStreetMap.</li>
   <li><b>Distributori e prezzi dei carburanti</b> (auto termica): la zona in cui sei, entro 5 km, all'Osservaprezzi carburanti del Ministero delle Imprese (in Italia) o ai server Overpass di OpenStreetMap (altrove).</li>
 </ul>
@@ -39,9 +39,10 @@ export const PRIVACY = `<!doctype html>
 <p>La foto della tua auto, se la scegli, resta sul telefono. Le foto dei modelli si scaricano da Wikimedia Commons.</p>
 
 <h2>Abbonamento Premium</h2>
-<p>L'abbonamento si compra e si gestisce con Google Play: pagamento e dati della carta li tratta Google, secondo la sua informativa. gdanav riceve da Google Play solo se l'abbonamento è attivo, e lo ricorda sul telefono.</p>
+<p>Premium costa 2,99 € al mese o 29,99 € all'anno, con 14 giorni di prova gratuita la prima volta. L'abbonamento si compra e si gestisce con Google Play (Android) o con l'App Store (iPhone): pagamento e dati della carta li tratta Google o Apple, secondo la sua informativa. gdanav riceve dal negozio solo se l'abbonamento è attivo, e lo ricorda sul telefono. Dentro l'app gdahome, Premium è compreso in gdahome Premium.</p>
+<p>Se riscatti un <b>codice regalo</b>, il telefono si presenta al quadro delle licenze di gdahome (quadro.gdahome.org) con un identificativo casuale nato sul telefono (<code>tel_…</code>, non legato a te né al telefono vero) e un segreto: il quadro tiene il codice usato, la licenza e l'impronta del segreto, e ogni 6 ore rinnova la licenza a quello stesso identificativo. Nient'altro: né posizione né dati dell'auto.</p>
 <h2>Cancellazione</h2>
-<p>Tutto quello che gdanav salva è sul telefono: disinstallando l'app si cancella. Scollegando Home Assistant la chiave di abbinamento sparisce.</p>
+<p>Tutto quello che gdanav salva è sul telefono: disinstallando l'app si cancella (sul quadro delle licenze, se hai riscattato un codice, resta solo la licenza legata all'identificativo casuale). Scollegando Home Assistant la chiave di abbinamento sparisce.</p>
 
 <h2>Contatti</h2>
 <p>Per domande: <a href="https://github.com/danigio15/gdanav/issues">github.com/danigio15/gdanav/issues</a>.</p>
