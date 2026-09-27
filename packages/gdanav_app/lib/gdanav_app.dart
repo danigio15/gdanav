@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'auto/ponte_auto.dart';
+import 'schermate/aggiorna_gdanav.dart';
 import 'schermate/schermata_principale.dart';
 import 'stato/archivio.dart';
+import 'stato/gestore_aggiornamento.dart';
 import 'stato/gestore_auto.dart';
 import 'stato/foto_auto.dart';
 import 'stato/gestore_consumo.dart';
@@ -54,6 +56,10 @@ export 'sorgenti/sorgente_gdahome.dart';
 ///   comprarlo lì, senza il negozio di gdanav;
 /// - [senzaPremium]: tutto sbloccato e niente voce «Premium» (per chi non ha
 ///   ancora i pagamenti).
+///
+/// Le versioni troppo vecchie ([GestoreAggiornamento]) si fermano solo in
+/// gdanav da sola: dentro un'altra app ([premiumOspite], [gdahome] o
+/// [senzaPremium]) ci pensa lei.
 Future<GdanavApp> preparaGdanav({
   FlutterSecureStorage? portachiavi,
   bool conLAuto = true,
@@ -62,6 +68,14 @@ Future<GdanavApp> preparaGdanav({
   bool senzaPremium = false,
 }) async {
   final archivio = Archivio(portachiavi);
+  final aggiornamento = GestoreAggiornamento.per(
+    archivio: archivio,
+    premiumOspite: premiumOspite,
+    gdahome: gdahome,
+    senzaPremium: senzaPremium,
+  );
+  // L'ultima versione minima salvata vale subito; il relay conferma dopo.
+  await aggiornamento?.avvia();
   // Premium: si sa subito se è sbloccato; il negozio del telefono (Play Store
   // o App Store) e il quadro delle licenze confermano dopo.
   final premium = senzaPremium
@@ -128,8 +142,13 @@ Future<GdanavApp> preparaGdanav({
       vicini: vicini,
       prova: prova,
     )..avvia();
-    ponte.premium(premium.sbloccato, ospite: premium.daOspite);
-    premium.addListener(() => ponte.premium(premium.sbloccato, ospite: premium.daOspite));
+    // Una versione da aggiornare spegne anche l'auto: lì si dice di
+    // aggiornare gdanav sul telefono.
+    void premiumInAuto() =>
+        ponte.premium(premium.sbloccato, ospite: premium.daOspite, aggiorna: aggiornamento?.daAggiornare ?? false);
+    premiumInAuto();
+    premium.addListener(premiumInAuto);
+    aggiornamento?.addListener(premiumInAuto);
   }
   return GdanavApp(
     archivio: archivio,
@@ -144,6 +163,7 @@ Future<GdanavApp> preparaGdanav({
     consumo: consumo,
     fotoAuto: fotoAuto,
     premium: senzaPremium ? null : premium,
+    aggiornamento: aggiornamento,
     chiediPosizione: chiediPosizione,
   );
 }
@@ -165,6 +185,7 @@ class GdanavApp extends StatelessWidget {
     this.consumo,
     this.fotoAuto,
     this.premium,
+    this.aggiornamento,
   });
 
   final Archivio archivio;
@@ -183,6 +204,10 @@ class GdanavApp extends StatelessWidget {
   /// `null` nelle prove: tutto sbloccato.
   final GestorePremium? premium;
 
+  /// Le versioni troppo vecchie: se questa lo è, al posto di tutto c'è
+  /// [SchermataAggiorna]. `null` dentro un'altra app e nelle prove.
+  final GestoreAggiornamento? aggiornamento;
+
   /// Nelle prove e nelle anteprime si passa un'altra mappa: quella vera vuole
   /// il codice nativo.
   final CostruisciMappa? mappa;
@@ -195,6 +220,13 @@ class GdanavApp extends StatelessWidget {
       theme: temaGdanav(Brightness.light),
       darkTheme: temaGdanav(Brightness.dark),
       home: schermata(),
+      builder: aggiornamento == null
+          ? null
+          : (context, figlio) => ListenableBuilder(
+              listenable: aggiornamento!,
+              builder: (context, _) =>
+                  aggiornamento!.daAggiornare ? const SchermataAggiorna() : figlio ?? const SizedBox(),
+            ),
     );
   }
 

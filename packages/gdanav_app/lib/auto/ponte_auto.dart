@@ -595,7 +595,11 @@ class PonteAuto {
 
   /// Premium sbloccato o no: l'auto lo ricorda anche a telefono spento.
   /// [ospite]: Premium si compra nell'app che ospita gdanav (gdahome).
-  void premium(bool sbloccato, {bool ospite = false}) => _manda('premium', {'sbloccato': sbloccato, 'ospite': ospite});
+  /// [aggiorna]: questa versione è troppo vecchia (`GestoreAggiornamento`):
+  /// l'auto resta ferma sullo schermo che dice di aggiornare gdanav sul
+  /// telefono, come senza Premium.
+  void premium(bool sbloccato, {bool ospite = false, bool aggiorna = false}) =>
+      _manda('premium', {'sbloccato': sbloccato && !aggiorna, 'ospite': ospite, 'aggiorna': aggiorna});
 
   void _manda(String metodo, Map<String, Object?> dati) {
     if (!_attivo) return;

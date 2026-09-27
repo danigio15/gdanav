@@ -33,7 +33,9 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     private var navigando = false
     private var versione = -1
     private val guidaAuto = GuidaAuto(carContext)
+    private var daAggiornare = false
     private val aggiorna: () -> Unit = {
+        fermaSeVecchia()
         renderer.aggiorna()
         sincronizzaNavigazione()
         // Il modello si rifà solo se cambia qualcosa che mostra: l'auto
@@ -43,6 +45,21 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             viaggioAlCruscotto()
             invalidate()
         }
+    }
+
+    /**
+     * Questa versione di gdanav è troppo vecchia (lo dice il telefono, vedi
+     * `GestoreAggiornamento`): la guida si ferma e sopra la mappa resta lo
+     * schermo che dice di aggiornare gdanav sul telefono.
+     */
+    private fun fermaSeVecchia() {
+        val vecchia = PonteAuto.aggiorna(carContext)
+        if (vecchia && !daAggiornare) {
+            if (PonteAuto.guida != null) PonteAuto.fermaDallAuto()
+            screenManager.popToRoot()
+            screenManager.push(SchermoPremium(carContext, sopraLaMappa = true))
+        }
+        daAggiornare = vecchia
     }
 
     /** Il viaggio anche al cruscotto dell'auto e alle altre schermate (NF-4). */

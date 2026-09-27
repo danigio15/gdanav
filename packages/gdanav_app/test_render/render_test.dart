@@ -17,9 +17,11 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/gdanav_app.dart';
+import 'package:gdanav_app/schermate/aggiorna_gdanav.dart';
 import 'package:gdanav_app/schermate/fonte_dati_auto.dart';
 import 'package:gdanav_app/schermate/premium.dart';
 import 'package:gdanav_app/stato/archivio.dart';
+import 'package:gdanav_app/stato/gestore_aggiornamento.dart';
 import 'package:gdanav_app/stato/gestore_auto.dart';
 import 'package:gdanav_app/stato/gestore_premium.dart';
 import 'package:gdanav_app/stato/licenza.dart';
@@ -228,6 +230,61 @@ void main() {
     await tester.scrollUntilVisible(find.text('Mappe offline'), 200, scrollable: find.byType(Scrollable).last);
     await _scatta(tester, 'menu_con_premium_fondo');
   });
+
+  _rendi('versione da aggiornare', (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final a = await ambiente(tester);
+    _telefono(tester);
+    final g = GestoreAggiornamento(
+      archivio: a.archivio,
+      client: MockClient((_) async => http.Response('{"gdanav":{"minima":50}}', 200)),
+      costruzione: 40,
+      debug: false,
+    );
+    await tester.runAsync(g.controlla);
+    addTearDown(g.dispose);
+    final p = GestorePremium(archivio: a.archivio, tuttoSbloccato: true);
+    await tester.runAsync(p.carica);
+    addTearDown(p.dispose);
+    await tester.pumpWidget(
+      _cornice(
+        GdanavApp(
+          posizione: a.posizione,
+          archivio: a.archivio,
+          auto: a.auto,
+          viaggio: a.viaggio,
+          guida: a.guida,
+          premium: p,
+          aggiornamento: g,
+          mappa: (_, c) => const ColoredBox(color: Color(0xFFE5E7EB)),
+        ),
+      ),
+    );
+    await _immagini(tester);
+    await _scatta(tester, 'aggiorna_gdanav');
+    // L'APK di GitHub: anche la pagina delle versioni.
+    await tester.pumpWidget(
+      _cornice(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: temaGdanav(Brightness.light),
+          home: const SchermataAggiorna(daGithub: true),
+        ),
+      ),
+    );
+    await _immagini(tester);
+    await _scatta(tester, 'aggiorna_gdanav_apk');
+  });
+}
+
+/// Le immagini (il logo) si leggono fuori dal tempo finto.
+Future<void> _immagini(WidgetTester tester) async {
+  await tester.runAsync(() async {
+    for (final e in find.byType(Image).evaluate()) {
+      await precacheImage((e.widget as Image).image, e);
+    }
+  });
+  await tester.pump();
 }
 
 Widget _app(Ambiente a, GestorePremium p) => GdanavApp(

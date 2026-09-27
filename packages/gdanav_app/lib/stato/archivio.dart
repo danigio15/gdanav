@@ -188,6 +188,12 @@ class Archivio {
       _p.write(key: 'consumo_$veicolo', value: jsonEncode(c.toJson()));
 
   Future<void> salvaSegnaposto(Segnaposto s) => _p.write(key: _segnaposto, value: s.name);
+
+  /// L'ultima versione minima detta dal relay: si ricorda perché senza rete
+  /// una versione da aggiornare resti bloccata. 0 se non l'ha mai detta.
+  Future<int> versioneMinima() async => int.tryParse(await _p.read(key: 'versione_minima') ?? '') ?? 0;
+
+  Future<void> salvaVersioneMinima(int n) => _p.write(key: 'versione_minima', value: '$n');
 }
 
 /// Dove stanno i servizi: vedi [Servizi].

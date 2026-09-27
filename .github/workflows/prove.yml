@@ -107,7 +107,8 @@ jobs:
           # Il primo certificato del dominio può metterci qualche minuto.
           for i in $(seq 1 30); do
             if curl -sf "https://gdanav.gdahome.org/v1/segnalazioni?lat=45&lon=9" > /dev/null \
-              && curl -sf "https://gdanav.gdahome.org/privacy" | grep -q "Informativa"; then echo "ok"; exit 0; fi
+              && curl -sf "https://gdanav.gdahome.org/privacy" | grep -q "Informativa" \
+              && curl -sf "https://gdanav.gdahome.org/v1/versioni" | grep -q '"minima"'; then echo "ok"; exit 0; fi
             sleep 10
           done
           echo "::error::https://gdanav.gdahome.org non risponde"; exit 1
@@ -319,11 +320,18 @@ jobs:
       # Variables). Finche' non c'e', siamo in prova: APK, Play Store e
       # TestFlight escono con Premium sbloccato per tutti, e il negozio non si
       # apre. Quando c'e', Premium si compra (o arriva con un codice regalo).
+      #
+      # GDANAV_COSTRUZIONE e' lo stesso numero, letto dall'app: se il relay
+      # dice che la versione minima e' piu' alta (VERSIONE_MINIMA_APP), l'app
+      # chiede di aggiornarla. GDANAV_DA_GITHUB solo nell'APK: chi lo ha
+      # scaricato da qui trova anche il link alle versioni di GitHub.
       - run: >-
           flutter build apk --release --build-number=${{ github.run_number }}
           --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM"
           --dart-define=GDANAV_OCM_CHIAVE="$OCM"
           --dart-define=GDANAV_TUTTO_SBLOCCATO=${{ vars.GDANAV_PAGAMENTI != 'si' }}
+          --dart-define=GDANAV_COSTRUZIONE=${{ github.run_number }}
+          --dart-define=GDANAV_DA_GITHUB=si
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
@@ -336,6 +344,7 @@ jobs:
           --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM"
           --dart-define=GDANAV_OCM_CHIAVE="$OCM"
           --dart-define=GDANAV_TUTTO_SBLOCCATO=${{ vars.GDANAV_PAGAMENTI != 'si' }}
+          --dart-define=GDANAV_COSTRUZIONE=${{ github.run_number }}
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
@@ -392,6 +401,7 @@ jobs:
           --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM"
           --dart-define=GDANAV_OCM_CHIAVE="$OCM"
           --dart-define=GDANAV_TUTTO_SBLOCCATO=${{ vars.GDANAV_PAGAMENTI != 'si' }}
+          --dart-define=GDANAV_COSTRUZIONE=${{ github.run_number }}
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}

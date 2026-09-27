@@ -27,6 +27,20 @@ abstract final class Servizi {
   /// «si» (la fase di prova, coi pagamenti spenti); da li' l'APK, il Play
   /// Store e l'App Store chiedono l'abbonamento (o un codice regalo).
   static const tuttoSbloccato = bool.fromEnvironment('GDANAV_TUTTO_SBLOCCATO');
+
+  /// Il numero della build: la CI passa quello della corsa
+  /// (`--dart-define=GDANAV_COSTRUZIONE=${{ github.run_number }}`), lo stesso
+  /// del `--build-number`. 0 nelle build fatte a mano, che non si bloccano
+  /// mai: vedi `GestoreAggiornamento`.
+  static const costruzione = int.fromEnvironment('GDANAV_COSTRUZIONE');
+
+  /// L'APK scaricato da GitHub (`--dart-define=GDANAV_DA_GITHUB=si`): per
+  /// aggiornarlo c'è anche la pagina delle versioni, non solo il negozio.
+  static const daGithub = String.fromEnvironment('GDANAV_DA_GITHUB') == 'si';
+
+  /// La versione più vecchia ancora buona: la dice il relay, in
+  /// `GET /v1/versioni`.
+  static Uri get versioni => Uri.parse(segnalazioni).resolve('v1/versioni');
 }
 
 // Le chiavi di gdanav.

@@ -15,3 +15,7 @@ piano gratuito di Cloudflare.
 
 L'indirizzo che stampa `deploy` va in `RELAY_PREDEFINITO`
 (`custom_components/gdanav/const.py`).
+
+`GET /v1/versioni` dice all'app la build più vecchia ancora buona
+(`VERSIONE_MINIMA_APP` in `wrangler.toml`, di base `"0"`: nessun blocco).
+Quando e come cambiarla: [`../docs/architettura.md`](../docs/architettura.md#fermare-le-versioni-vecchie).

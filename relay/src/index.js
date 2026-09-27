@@ -24,6 +24,7 @@ import {
   zona,
   zoneVicine,
 } from './segnalazioni.js';
+import { versioni } from './versioni.js';
 
 const json = (dati, stato = 200) =>
   new Response(JSON.stringify(dati), { status: stato, headers: { 'content-type': 'application/json' } });
@@ -34,6 +35,7 @@ export default {
     if (percorso === '/privacy') {
       return new Response(PRIVACY, { headers: { 'content-type': 'text/html; charset=utf-8' } });
     }
+    if (percorso === '/v1/versioni') return versioni(richiesta, env);
     if (percorso.startsWith('/v1/segnalazioni')) return segnalazioni(richiesta, env);
     if (percorso.startsWith('/v1/codici/')) return codici(richiesta, env);
     if (percorso.startsWith('/v1/colonnine/')) return colonnine(richiesta, ctx);

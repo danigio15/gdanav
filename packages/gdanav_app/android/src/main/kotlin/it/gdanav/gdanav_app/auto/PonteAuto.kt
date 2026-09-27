@@ -129,6 +129,10 @@ object PonteAuto {
     fun premiumOspite(context: Context): Boolean =
         context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).getBoolean("premium_ospite", false)
 
+    /** Questa versione è troppo vecchia: si aggiorna gdanav sul telefono (e intanto niente Premium). */
+    fun aggiorna(context: Context): Boolean =
+        context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).getBoolean("aggiorna", false)
+
     private val principale = Handler(Looper.getMainLooper())
     private val ascoltatori = CopyOnWriteArrayList<() -> Unit>()
     private var canale: MethodChannel? = null
@@ -240,6 +244,7 @@ object PonteAuto {
             "premium" -> preferenze?.edit()
                 ?.putBoolean("premium", call.argument<Boolean>("sbloccato") == true)
                 ?.putBoolean("premium_ospite", call.argument<Boolean>("ospite") == true)
+                ?.putBoolean("aggiorna", call.argument<Boolean>("aggiorna") == true)
                 ?.apply()
             "guida" -> {
                 guida = if (call.argument<Boolean>("attiva") == true) {
