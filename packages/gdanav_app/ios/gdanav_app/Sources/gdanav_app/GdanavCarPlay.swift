@@ -298,11 +298,17 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                     self.controllore?.dismissTemplate(animated: true) { _, _ in self.apriCasa() }
                 })
             }
+            // Dentro gdahome Premium si attiva lì, non nel negozio di gdanav.
             let avviso = CPAlertTemplate(
-                titleVariants: [
-                    "La navigazione in auto fa parte di gdanav Premium. Sbloccalo dall'app sul telefono: menu → Premium.",
-                    "gdanav Premium: sbloccalo dal telefono.",
-                ],
+                titleVariants: PonteAuto.shared.premiumOspite
+                    ? [
+                        "La navigazione in auto fa parte del Premium di gdahome. Attivalo dall'app gdahome sul telefono.",
+                        "gdahome Premium: attivalo dall'app gdahome.",
+                    ]
+                    : [
+                        "La navigazione in auto fa parte di gdanav Premium. Sbloccalo dall'app sul telefono: menu → Premium.",
+                        "gdanav Premium: sbloccalo dal telefono.",
+                    ],
                 actions: azioni
             )
             c.presentTemplate(avviso, animated: true, completion: nil)

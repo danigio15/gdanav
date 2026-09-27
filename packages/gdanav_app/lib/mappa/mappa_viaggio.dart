@@ -12,7 +12,6 @@ import '../schermate/scheda_punto.dart';
 import '../servizi.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_posizione.dart';
-import '../stato/gestore_premium.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/gestore_vicini.dart';
@@ -86,11 +85,6 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.guida?.addListener(_io);
     widget.segnalazioni?.addListener(_segnalazioni);
     widget.vicini?.addListener(_vicini);
-    GestorePremium.attivo.addListener(_premium);
-  }
-
-  void _premium() {
-    if (mounted) setState(() {});
   }
 
   @override
@@ -101,7 +95,6 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.guida?.removeListener(_io);
     widget.segnalazioni?.removeListener(_segnalazioni);
     widget.vicini?.removeListener(_vicini);
-    GestorePremium.attivo.removeListener(_premium);
     super.dispose();
   }
 
@@ -271,8 +264,8 @@ class _MappaViaggioState extends State<MappaViaggio> {
   @override
   Widget build(BuildContext context) {
     final scuro = Theme.of(context).brightness == Brightness.dark;
-    // Il traffico è Premium.
-    final traffico = GestorePremium.attivo.value ? Servizi.chiaveTomTom : '';
+    // Il traffico è per tutti: c'è se c'è la chiave TomTom.
+    const traffico = Servizi.chiaveTomTom;
     final mappa = MapLibreMap(
       // Cambia stile col tema (e col traffico): la chiave rifà la mappa.
       key: ValueKey((scuro, traffico.isNotEmpty)),

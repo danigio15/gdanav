@@ -21,8 +21,10 @@ abstract final class Servizi {
   /// di gdanav su Cloudflare.
   static const segnalazioni = String.fromEnvironment('GDANAV_SEGNALAZIONI', defaultValue: _segnalazioni);
 
-  /// Le build d'anteprima (l'APK da GitHub, che non passa dal Play Store)
-  /// hanno Premium già sbloccato; quella per il Play Store no.
+  /// Premium sbloccato per tutti: solo in una build fatta apposta con
+  /// `--dart-define=GDANAV_TUTTO_SBLOCCATO=true` (prove a mano). Nessuna build
+  /// pubblicata lo usa: l'APK di GitHub, il Play Store e l'App Store chiedono
+  /// l'abbonamento (o un codice regalo).
   static const tuttoSbloccato = bool.fromEnvironment('GDANAV_TUTTO_SBLOCCATO');
 }
 

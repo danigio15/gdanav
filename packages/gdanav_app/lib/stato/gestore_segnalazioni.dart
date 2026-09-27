@@ -7,7 +7,6 @@ import 'package:gdanav_core/gdanav_core.dart';
 import '../servizi.dart';
 import 'gestore_posizione.dart';
 import '../risorse.dart';
-import 'gestore_premium.dart';
 
 /// Le segnalazioni della comunità intorno a te: si scaricano a ogni nuova
 /// posizione, se sono passati due minuti o cinque chilometri; si aggiungono
@@ -24,10 +23,7 @@ class GestoreSegnalazioni extends ChangeNotifier {
            cliente ??
            ((cablato ?? Servizi.segnalazioni.isNotEmpty)
                ? ClienteSegnalazioni(Uri.parse(Servizi.segnalazioni))
-               : null) {
-    // Premium cambia: gli autovelox compaiono o spariscono.
-    GestorePremium.attivo.addListener(notifyListeners);
-  }
+               : null);
 
   final GestorePosizione posizione;
 
@@ -39,14 +35,8 @@ class GestoreSegnalazioni extends ChangeNotifier {
 
   final DateTime Function() _ora;
 
-  /// Quelle della comunità e gli autovelox fissi, intorno a te.
-  List<Segnalazione> get vicine => GestorePremium.attivo.value
-      ? [..._comunita, ..._fisse]
-      // Gli autovelox (fissi e segnalati) sono Premium.
-      : [
-          for (final s in _comunita)
-            if (s.tipo != TipoSegnalazione.autovelox) s,
-        ];
+  /// Quelle della comunità e gli autovelox fissi, intorno a te: per tutti.
+  List<Segnalazione> get vicine => [..._comunita, ..._fisse];
   var _comunita = <Segnalazione>[];
   var _fisse = <Segnalazione>[];
   var _avviato = false;
@@ -120,7 +110,6 @@ class GestoreSegnalazioni extends ChangeNotifier {
   @override
   void dispose() {
     posizione.removeListener(_forse);
-    GestorePremium.attivo.removeListener(notifyListeners);
     cliente?.chiudi();
     super.dispose();
   }

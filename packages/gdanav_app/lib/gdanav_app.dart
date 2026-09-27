@@ -17,6 +17,7 @@ import 'stato/gestore_meteo.dart';
 import 'stato/gestore_posizione.dart';
 import 'stato/gestore_segnalazioni.dart';
 import 'stato/gestore_vicini.dart';
+import 'stato/licenza.dart';
 import 'stato/gestore_viaggio.dart';
 import 'stato/prova_di_guida.dart';
 import 'stato/posizione.dart';
@@ -42,9 +43,12 @@ export 'sorgenti/sorgente_gdahome.dart';
 /// sezione Auto della sua plancia, coi dati in tempo reale dalla casa, senza
 /// abbinamento.
 ///
-/// Premium:
+/// Premium (Home Assistant e la batteria letta dall'auto, il percorso con le
+/// soste e le colonnine in tempo reale, Android Auto e CarPlay; il resto è per
+/// tutti):
 /// - **gdanav da sola**: l'abbonamento di gdanav dal Play Store o dall'App
-///   Store;
+///   Store, oppure un codice regalo riscattato per questo telefono (le
+///   licenze di `docs/LICENZE.md` di gdahome);
 /// - **dentro un'altra app** ([premiumOspite], gdahome): lo decide lei. Se lì
 ///   è stato comprato il suo Premium è tutto sbloccato; se no, gdanav dice di
 ///   comprarlo lì, senza il negozio di gdanav;
@@ -58,23 +62,31 @@ Future<GdanavApp> preparaGdanav({
   bool senzaPremium = false,
 }) async {
   final archivio = Archivio(portachiavi);
-  // Premium (Android Auto o CarPlay, e Home Assistant): si sa subito se è
-  // sbloccato, il negozio del telefono (Play Store o App Store) conferma dopo.
+  // Premium: si sa subito se è sbloccato; il negozio del telefono (Play Store
+  // o App Store) e il quadro delle licenze confermano dopo.
   final premium = senzaPremium
       ? GestorePremium(archivio: archivio, tuttoSbloccato: true)
       : premiumOspite != null
       ? GestorePremium(archivio: archivio, ospite: premiumOspite)
-      : GestorePremium(archivio: archivio, negozio: negozioDelTelefono());
+      : GestorePremium(archivio: archivio, negozio: negozioDelTelefono(), licenze: ClienteLicenze());
   await premium.carica();
-  final auto = GestoreAuto(archivio: archivio, gdahome: gdahome)..homeAssistantConsentito = premium.sbloccato;
+  final auto = GestoreAuto(archivio: archivio, gdahome: gdahome)..premium = premium.sbloccato;
   await auto.avvia();
-  premium.addListener(() => auto.consentiHomeAssistant(premium.sbloccato));
+  premium.addListener(() => auto.consentiPremium(premium.sbloccato));
   // Il consumo imparato del modello scelto; cambiando auto si cambia storia.
   final consumo = GestoreConsumo(archivio);
   await consumo.carica(auto.veicolo.id);
   auto.addListener(() => consumo.carica(auto.veicolo.id));
   final viaggio = GestoreViaggio(archivio: archivio, auto: auto, posizione: posizioneAttuale, consumo: consumo);
   viaggio.opzioni = await archivio.opzioniPercorso();
+  // Premium comprato o scaduto con un viaggio aperto: si ricalcola, con le
+  // soste o senza.
+  var eraPremium = premium.sbloccato;
+  premium.addListener(() {
+    if (premium.sbloccato == eraPremium) return;
+    eraPremium = premium.sbloccato;
+    if (viaggio.stato is ViaggioPronto && viaggio.destinazione != null) unawaited(viaggio.pianifica(viaggio.destinazione!));
+  });
   // La prova di guida di Android Auto: posizioni finte al posto del GPS.
   final prova = ProvaDiGuida();
   final guida = GestoreGuida(
@@ -87,7 +99,7 @@ Future<GdanavApp> preparaGdanav({
   final posizione = GestorePosizione(archivio: archivio, letture: prova.letture(lettureGps));
   await posizione.carica();
   final segnalazioni = GestoreSegnalazioni(posizione: posizione, autovelox: archivioAutovelox());
-  // Il meteo lungo la strada (Premium): nel consumo e sullo schermo.
+  // Il meteo lungo la strada (per tutti): nel consumo e sullo schermo.
   final meteo = GestoreMeteo(viaggio: viaggio, posizione: posizione);
   viaggio.stimaMeteo = meteo.stima;
   // Distributori o colonnine intorno, sulla mappa del telefono e dell'auto.

@@ -108,7 +108,7 @@ class PianificatoreViaggio {
   /// Lo stato delle prese in tempo reale, per controllare le soste.
   final FonteDisponibilita? disponibilita;
 
-  /// Il traffico di adesso sul percorso (Premium): tempi e consumi con le
+  /// Il traffico di adesso sul percorso (per tutti): tempi e consumi con le
   /// code. Se non risponde si pianifica senza.
   final Future<PercorsoCalcolato> Function(PercorsoCalcolato percorso)? traffico;
 

@@ -31,9 +31,13 @@ class SchedaViaggio extends StatelessWidget {
     this.soglia = 15,
     this.meteo,
     this.onCercaTappa,
+    this.onPremium,
   });
 
   final GestoreViaggio gestore;
+
+  /// Apre la schermata Premium (le soste di ricarica); `null`: niente tasto.
+  final VoidCallback? onPremium;
 
   /// Apre la ricerca per una tappa in più; `null`: niente tappe.
   final Future<Luogo?> Function()? onCercaTappa;
@@ -103,6 +107,7 @@ class SchedaViaggio extends StatelessWidget {
           onAvvia: onAvvia,
           meteo: meteo,
           onCercaTappa: onCercaTappa,
+          onPremium: onPremium,
         ),
       },
     );
@@ -163,9 +168,11 @@ class _Pronta extends StatelessWidget {
     required this.onAvvia,
     this.meteo,
     this.onCercaTappa,
+    this.onPremium,
   });
 
   final Future<Luogo?> Function()? onCercaTappa;
+  final VoidCallback? onPremium;
 
   final GestoreMeteo? meteo;
   final ViaggioPronto pronto;
@@ -273,8 +280,9 @@ class _Pronta extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            if (pronto.termica) ...[
-              // Auto termica: un navigatore normale, arrivo e via.
+            if (pronto.soloPercorso) ...[
+              // Auto termica (o elettrica senza Premium): un navigatore
+              // normale, arrivo e via.
               Text.rich(
                 TextSpan(
                   children: [
@@ -301,7 +309,14 @@ class _Pronta extends StatelessWidget {
                   label: const Text('Avvia'),
                 ),
               ),
+              // Elettrica senza Premium: subito sotto «Avvia», che resta in vista.
+              if (pronto.senzaSoste) ...[
+                const SizedBox(height: 12),
+                AvvisoSosteConPremium(batteria: pronto.batteriaPartenza, onPremium: onPremium),
+              ],
               ...stradeETappe,
+              // Il meteo lungo la strada è per tutti.
+              if (meteo case final m?) MeteoLungoLaStrada(meteo: m),
             ] else if (piano == null) ...[
               Text('${km.round()} km', style: t.headlineSmall),
               const SizedBox(height: 6),
@@ -411,7 +426,7 @@ class _Pronta extends StatelessWidget {
             ],
             const SizedBox(height: 16),
             Text(
-              pronto.termica ? 'Mappa: © OpenFreeMap © OpenStreetMap contributors' : 'Colonnine: © Open Charge Map contributors, PUN · Mappa: © OpenFreeMap © OpenStreetMap contributors',
+              pronto.soloPercorso ? 'Mappa: © OpenFreeMap © OpenStreetMap contributors' : 'Colonnine: © Open Charge Map contributors, PUN · Mappa: © OpenFreeMap © OpenStreetMap contributors',
               style: t.bodySmall?.copyWith(color: muto),
             ),
           ],
@@ -540,6 +555,72 @@ class _SchedaSosta extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Elettrica senza Premium: il percorso c'è, le soste di ricarica no. Lo dice
+/// chiaro, con il tasto per Premium.
+class AvvisoSosteConPremium extends StatelessWidget {
+  const AvvisoSosteConPremium({super.key, required this.batteria, this.onPremium});
+
+  /// La batteria scritta a mano alla partenza (0: non scritta).
+  final double batteria;
+  final VoidCallback? onPremium;
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    final t = tema.textTheme;
+    final s = tema.colorScheme;
+    return Container(
+      key: const Key('soste-con-premium'),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      decoration: BoxDecoration(
+        color: s.primaryContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.ev_station, color: s.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Le soste di ricarica sono con Premium',
+                      style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      batteria > 0
+                          ? 'Parti col ${batteria.round()}% scritto a mano: gdanav ti porta a destinazione, '
+                                'ma non sceglie dove fermarti a caricare.'
+                          : 'gdanav ti porta a destinazione, ma non sceglie dove fermarti a caricare.',
+                      style: t.bodySmall?.copyWith(color: s.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (onPremium != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                key: const Key('apri-premium-soste'),
+                onPressed: onPremium,
+                icon: const Icon(Icons.workspace_premium, size: 18),
+                label: const Text('Scopri Premium'),
+              ),
+            ),
+        ],
       ),
     );
   }

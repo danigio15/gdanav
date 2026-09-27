@@ -339,6 +339,16 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
     if (viaggio.stato is ViaggioPronto && viaggio.destinazione != null) await viaggio.pianifica(viaggio.destinazione!);
   }
 
+  /// «Fonte dati auto»: senza Premium le fonti automatiche portano a Premium.
+  void _fonteDatiAuto() => mostraFonteDatiAuto(
+    context,
+    widget.auto,
+    consumo: widget.consumo,
+    onPremium: widget.premium == null
+        ? null
+        : () => _apri(SchermataPremium(premium: widget.premium!, perche: 'La batteria letta dall\'auto')),
+  );
+
   void _menu() {
     showModalBottomSheet<void>(
       context: context,
@@ -428,10 +438,10 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                         icona: Icons.battery_charging_full_rounded,
                         colore: const Color(0xFF0D9488),
                         titolo: 'Fonte dati auto',
-                        sotto: 'Da dove arriva la batteria',
+                        sotto: sbloccato ? 'Da dove arriva la batteria' : 'A mano; dall\'auto con Premium',
                         onTap: () {
                           Navigator.of(contesto).pop();
-                          mostraFonteDatiAuto(context, widget.auto, consumo: widget.consumo);
+                          _fonteDatiAuto();
                         },
                       ),
                     _VoceMenu(
@@ -455,8 +465,14 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                       icona: Icons.cottage_rounded,
                       colore: const Color(0xFFEA580C),
                       titolo: 'gdahome',
-                      sotto: riassuntoGdahome(widget.auto),
+                      // Dentro gdahome, senza Premium, la batteria dalla casa non arriva.
+                      sotto: sbloccato || widget.auto.gdahome == null
+                          ? riassuntoGdahome(widget.auto)
+                          : 'La batteria dalla casa è con Premium',
                       onTap: () {
+                        if (!sbloccato && widget.auto.gdahome != null) {
+                          return vai(SchermataPremium(premium: widget.premium!, perche: 'La batteria da gdahome'));
+                        }
                         Navigator.of(contesto).pop();
                         mostraFonteGdahome(context, widget.auto);
                       },
@@ -497,8 +513,8 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                         colore: const Color(0xFFD97706),
                         titolo: 'Premium',
                         sotto: p.sbloccato
-                            ? 'Attivo: ${PannelloPremium.schermoAuto} e Home Assistant'
-                            : 'Sblocca ${PannelloPremium.schermoAuto} e Home Assistant',
+                            ? 'Attivo: tutto sbloccato'
+                            : 'Batteria, soste e ${PannelloPremium.schermoAuto}',
                         onTap: () => vai(SchermataPremium(premium: p)),
                       ),
                   ],
@@ -644,7 +660,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                                 onApriAuto: () => _apri(
                                   LaTuaAuto(auto: widget.auto, posizione: widget.posizione, consumo: widget.consumo),
                                 ),
-                                onFonte: () => mostraFonteDatiAuto(context, widget.auto, consumo: widget.consumo),
+                                onFonte: _fonteDatiAuto,
                                 onFoto: _foto,
                                 fotoCatalogo: widget.fotoAuto,
                               ),
@@ -656,6 +672,9 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                             soglia: _preferenze.minimoArrivo,
                             meteo: widget.meteo,
                             onCercaTappa: () => _scegli(titolo: 'Aggiungi una tappa'),
+                            onPremium: widget.premium == null
+                                ? null
+                                : () => _apri(SchermataPremium(premium: widget.premium!, perche: 'Le soste di ricarica')),
                           ),
                   ),
                 ],
