@@ -235,8 +235,8 @@ class GestorePremium extends ChangeNotifier {
   /// Premium si compra nell'app che ospita gdanav, non qui.
   bool get daOspite => ospite != null;
 
-  /// Solo le build fatte apposta con GDANAV_TUTTO_SBLOCCATO: le versioni
-  /// pubblicate (APK e Play Store) chiedono l'abbonamento.
+  /// Le build con GDANAV_TUTTO_SBLOCCATO: le prove a mano, e quelle della CI
+  /// finche' i pagamenti sono spenti (GDANAV_PAGAMENTI, vedi `servizi.dart`).
   final bool _tuttoSbloccato;
 
   /// Quanto si aspetta che il Play Store confermi l'abbonamento, prima di
