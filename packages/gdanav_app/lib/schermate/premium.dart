@@ -14,17 +14,18 @@ class PannelloPremium extends StatefulWidget {
   /// Cosa si stava cercando di aprire: «Android Auto», «Il traffico».
   final String? perche;
 
-  /// Lo schermo dell'auto: Android Auto o, su iPhone, CarPlay.
   static const privacy = 'https://gdanav.gdahome.org/privacy';
 
   /// Le condizioni d'uso: quelle standard di Apple (EULA), valide anche per
   /// Google Play finché gdanav non ne ha di sue.
   static const condizioni = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 
+  /// Lo schermo dell'auto: Android Auto o, su iPhone, CarPlay. Solo quello
+  /// della piattaforma: l'App Store non vuole nomi di Android nell'app.
   static String get schermoAuto => defaultTargetPlatform == TargetPlatform.iOS ? 'CarPlay' : 'Android Auto';
 
   /// Cosa comprende Premium: solo quello che c'è davvero.
-  static List<(IconData, String, String)> get funzioni => const <(IconData, String, String)>[
+  static List<(IconData, String, String)> get funzioni => <(IconData, String, String)>[
     (
       Icons.home_outlined,
       'Home Assistant e batteria letta dall\'auto',
@@ -35,7 +36,7 @@ class PannelloPremium extends StatefulWidget {
       'Percorso con le soste alle colonnine',
       'Dove fermarti e quanto caricare, con le colonnine libere o occupate in tempo reale',
     ),
-    (Icons.directions_car_filled, 'Android Auto e CarPlay', 'Mappa, guida e soste sullo schermo dell\'auto'),
+    (Icons.directions_car_filled, schermoAuto, 'Mappa, guida e soste sullo schermo dell\'auto'),
   ];
 
   /// Quello che resta gratis per tutti, detto una volta.

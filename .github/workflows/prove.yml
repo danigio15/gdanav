@@ -323,15 +323,13 @@ jobs:
       #
       # GDANAV_COSTRUZIONE e' lo stesso numero, letto dall'app: se il relay
       # dice che la versione minima e' piu' alta (VERSIONE_MINIMA_APP), l'app
-      # chiede di aggiornarla. GDANAV_DA_GITHUB solo nell'APK: chi lo ha
-      # scaricato da qui trova anche il link alle versioni di GitHub.
+      # chiede di aggiornarla, solo dal Play Store.
       - run: >-
           flutter build apk --release --build-number=${{ github.run_number }}
           --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM"
           --dart-define=GDANAV_OCM_CHIAVE="$OCM"
           --dart-define=GDANAV_TUTTO_SBLOCCATO=${{ vars.GDANAV_PAGAMENTI != 'si' }}
           --dart-define=GDANAV_COSTRUZIONE=${{ github.run_number }}
-          --dart-define=GDANAV_DA_GITHUB=si
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}

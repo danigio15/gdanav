@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -90,8 +91,10 @@ class FonteDatiAuto extends StatelessWidget {
                 else
                   _Bloccata(titolo: 'Automatica', sotto: automatica, onTap: onPremium),
                 for (final t in _scelte)
-                  // gdahome c'è solo dentro l'app gdahome.
-                  if (t != TipoSorgente.gdahome || gestore.gdahome != null)
+                  // gdahome c'è solo dentro l'app gdahome; Android Auto solo
+                  // su Android (CarPlay la batteria non la dice).
+                  if ((t != TipoSorgente.gdahome || gestore.gdahome != null) &&
+                      (t != TipoSorgente.androidAuto || defaultTargetPlatform != TargetPlatform.iOS))
                     if (premium || t == TipoSorgente.manuale)
                       RadioListTile<TipoSorgente?>(
                         key: Key('fonte-${t.name}'),
@@ -160,7 +163,9 @@ class _SoloAMano extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            'Letta dall\'auto (Android Auto, OBD, gdahome, Home Assistant) è con Premium.',
+            defaultTargetPlatform == TargetPlatform.iOS
+                ? 'Letta dall\'auto (OBD, gdahome, Home Assistant) è con Premium.'
+                : 'Letta dall\'auto (Android Auto, OBD, gdahome, Home Assistant) è con Premium.',
             style: t.bodySmall?.copyWith(color: s.onSurfaceVariant),
           ),
           if (onPremium != null)

@@ -34,10 +34,6 @@ abstract final class Servizi {
   /// mai: vedi `GestoreAggiornamento`.
   static const costruzione = int.fromEnvironment('GDANAV_COSTRUZIONE');
 
-  /// L'APK scaricato da GitHub (`--dart-define=GDANAV_DA_GITHUB=si`): per
-  /// aggiornarlo c'è anche la pagina delle versioni, non solo il negozio.
-  static const daGithub = String.fromEnvironment('GDANAV_DA_GITHUB') == 'si';
-
   /// La versione più vecchia ancora buona: la dice il relay, in
   /// `GET /v1/versioni`.
   static Uri get versioni => Uri.parse(segnalazioni).resolve('v1/versioni');

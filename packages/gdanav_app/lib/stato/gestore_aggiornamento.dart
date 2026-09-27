@@ -18,9 +18,6 @@ const idPlayStore = 'it.gdanav.gdanav';
 /// solo l'App Store.
 const idAppStoreGdanav = '';
 
-/// Dove si scaricano gli APK di gdanav.
-const paginaVersioniGithub = 'https://github.com/danigio15/gdanav/releases';
-
 /// Il negozio da aprire per aggiornare: prima l'indirizzo dell'app del
 /// negozio, poi (se non si apre) quello del sito.
 List<Uri> indirizziNegozio(TargetPlatform piattaforma) => piattaforma == TargetPlatform.iOS

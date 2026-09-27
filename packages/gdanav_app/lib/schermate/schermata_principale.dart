@@ -424,7 +424,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                       icona: Icons.bookmarks_rounded,
                       colore: const Color(0xFFEA4335),
                       titolo: 'Importa da Google Maps',
-                      sotto: salvati == 0 ? 'I posti che hai salvato, qui come preferiti' : '$salvati posti salvati',
+                      sotto: salvati == 0 ? 'I posti salvati, come preferiti' : '$salvati posti salvati',
                       onTap: () =>
                           vai(ImportaGoogleMaps(luoghi: luoghi, fonte: viaggio.luoghi, vicinoA: widget.posizione.qui)),
                     ),
@@ -481,7 +481,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                       icona: Icons.directions_car_filled_rounded,
                       colore: const Color(0xFF475569),
                       titolo: PannelloPremium.schermoAuto,
-                      sotto: sbloccato ? 'Controlla perché non compare sull\'auto' : 'Premium',
+                      sotto: sbloccato ? 'Se non compare sull\'auto' : 'Premium',
                       onTap: () {
                         if (!sbloccato) {
                           return vai(SchermataPremium(premium: widget.premium!, perche: PannelloPremium.schermoAuto));
@@ -499,7 +499,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                       icona: Icons.download_for_offline_rounded,
                       colore: const Color(0xFF7C3AED),
                       titolo: 'Mappe offline',
-                      sotto: 'Scarica le regioni per quando non c\'è rete',
+                      sotto: 'Le regioni da usare senza rete',
                       onTap: () => vai(
                         MappeOffline(
                           gestore: widget.mappeOffline ?? GestoreMappeOffline(ArchivioMapLibre()),

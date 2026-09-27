@@ -3,17 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../risorse.dart';
-import '../servizi.dart';
 import '../stato/gestore_aggiornamento.dart';
 
 /// Questa versione di gdanav non va più: si può solo aggiornarla. Prende
 /// tutto lo schermo al posto del navigatore di gdanav (`GdanavApp`): sotto
 /// non c'è niente da riaprire.
 class SchermataAggiorna extends StatelessWidget {
-  const SchermataAggiorna({super.key, this.daGithub = Servizi.daGithub, this.apri = _apri});
-
-  /// L'APK di GitHub: c'è anche la pagina delle versioni.
-  final bool daGithub;
+  const SchermataAggiorna({super.key, this.apri = _apri});
 
   /// Apre il primo indirizzo che si apre (nelle prove: finto).
   final Future<void> Function(List<Uri> indirizzi) apri;
@@ -71,16 +67,6 @@ class SchermataAggiorna extends StatelessWidget {
                     icon: const Icon(Icons.system_update),
                     label: Text(ios ? 'Aggiorna dall\'App Store' : 'Aggiorna dal Play Store'),
                   ),
-                  if (daGithub) ...[
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      key: const Key('aggiorna-github'),
-                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                      onPressed: () => apri([Uri.parse(paginaVersioniGithub)]),
-                      icon: const Icon(Icons.download),
-                      label: const Text('Scarica l\'APK da GitHub'),
-                    ),
-                  ],
                 ],
               ),
             ),

@@ -89,9 +89,9 @@ spente, e lo fa il relay:
   all'avvio, tornando in primo piano e ogni 6 ore, e ricorda l'ultimo `N`:
   senza rete non si sblocca niente;
 - se la sua build è più vecchia di `N` resta solo la schermata «C'è una
-  versione nuova di gdanav: aggiornala per continuare», col bottone del
-  Play Store o dell'App Store (e, nell'APK, la pagina delle versioni di
-  GitHub). Android Auto e CarPlay dicono di aggiornare gdanav sul telefono.
+  versione nuova di gdanav: aggiornala per continuare», con un solo
+  bottone: il Play Store su Android, l'App Store su iPhone. Android Auto e
+  CarPlay dicono di aggiornare gdanav sul telefono.
 
 Le build fatte a mano (numero 0) e quelle di debug non si fermano mai. Di
 base `N` è 0: nessun blocco.

@@ -6,6 +6,11 @@
 // Scrive i PNG in /home/user/render/gdanav/ (o in GDANAV_RENDER), a 390×844
 // punti con densità 2, coi caratteri veri (Roboto e le icone Material dalla
 // cache di Flutter). La mappa è un fondo grigio: quella vera vuole il nativo.
+//
+// Ogni schermata esce due volte: `_android` e `_ios` (con
+// `debugDefaultTargetPlatformOverride`, così i nomi del negozio e dello
+// schermo dell'auto seguono). Su iOS il carattere di sistema (San Francisco)
+// qui non c'è: al suo posto c'è Roboto.
 
 import 'dart:async';
 import 'dart:io';
@@ -17,7 +22,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/gdanav_app.dart';
-import 'package:gdanav_app/schermate/aggiorna_gdanav.dart';
 import 'package:gdanav_app/schermate/fonte_dati_auto.dart';
 import 'package:gdanav_app/schermate/premium.dart';
 import 'package:gdanav_app/stato/archivio.dart';
@@ -47,6 +51,14 @@ Future<void> _caricaFont() async {
     roboto.addFont(leggi('Roboto-$peso.ttf'));
   }
   await roboto.load();
+  // I nomi dei caratteri di sistema di iOS, che il tema usa sull'iPhone.
+  for (final famiglia in ['CupertinoSystemText', 'CupertinoSystemDisplay', '.SF UI Text', '.SF UI Display', '.SF Pro Text', '.SF Pro Display']) {
+    final f = FontLoader(famiglia);
+    for (final peso in ['Light', 'Regular', 'Medium', 'Bold', 'Black']) {
+      f.addFont(leggi('Roboto-$peso.ttf'));
+    }
+    await f.load();
+  }
   await (FontLoader('MaterialIcons')..addFont(leggi('MaterialIcons-Regular.otf'))).load();
 }
 
@@ -80,22 +92,30 @@ Future<void> _scatta(WidgetTester tester, String nome) async {
   await tester.runAsync(() async {
     final immagine = await confine.toImage(pixelRatio: 2);
     final dati = await immagine.toByteData(format: ui.ImageByteFormat.png);
-    final f = File('$cartella/$nome.png');
+    final piattaforma = defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
+    final f = File('$cartella/${nome}_$piattaforma.png');
     await f.parent.create(recursive: true);
     await f.writeAsBytes(dati!.buffer.asUint8List());
     debugPrint('scritto ${f.path}');
   });
 }
 
-/// Una prova che disegna, con le ombre vere (le prove di solito le spengono).
-void _rendi(String nome, Future<void> Function(WidgetTester tester) corpo) => testWidgets(nome, (tester) async {
-  debugDisableShadows = false;
-  try {
-    await corpo(tester);
-  } finally {
-    debugDisableShadows = true;
+/// Una prova che disegna, con le ombre vere (le prove di solito le spengono),
+/// due volte: Android e iOS.
+void _rendi(String nome, Future<void> Function(WidgetTester tester) corpo) {
+  for (final piattaforma in [TargetPlatform.android, TargetPlatform.iOS]) {
+    testWidgets('$nome (${piattaforma.name})', (tester) async {
+      debugDisableShadows = false;
+      debugDefaultTargetPlatformOverride = piattaforma;
+      try {
+        await corpo(tester);
+      } finally {
+        debugDisableShadows = true;
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
   }
-});
+}
 
 void _telefono(WidgetTester tester) {
   tester.view.physicalSize = const Size(1170, 2532);
@@ -262,18 +282,6 @@ void main() {
     );
     await _immagini(tester);
     await _scatta(tester, 'aggiorna_gdanav');
-    // L'APK di GitHub: anche la pagina delle versioni.
-    await tester.pumpWidget(
-      _cornice(
-        MaterialApp(
-          debugShowCheckedModeBanner: false,
-          theme: temaGdanav(Brightness.light),
-          home: const SchermataAggiorna(daGithub: true),
-        ),
-      ),
-    );
-    await _immagini(tester);
-    await _scatta(tester, 'aggiorna_gdanav_apk');
   });
 }
 

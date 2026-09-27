@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -175,17 +176,28 @@ void main() {
     await tester.pump();
     expect(find.text(SchermataAggiorna.titolo), findsOneWidget);
     expect(find.byKey(const Key('aggiorna-negozio')), findsOneWidget);
-    // Non è l'APK di GitHub: solo il negozio.
-    expect(find.byKey(const Key('aggiorna-github')), findsNothing);
+    // Solo il negozio: nessun altro bottone.
+    expect(find.byType(OutlinedButton), findsNothing);
   });
 
-  testWidgets("l'APK di GitHub ha anche la pagina delle versioni", (tester) async {
+  testWidgets('il bottone apre il negozio della piattaforma, e basta', (tester) async {
     final aperti = <List<Uri>>[];
-    await tester.pumpWidget(MaterialApp(home: SchermataAggiorna(daGithub: true, apri: (u) async => aperti.add(u))));
+    await tester.pumpWidget(MaterialApp(home: SchermataAggiorna(apri: (u) async => aperti.add(u))));
+    expect(find.text('Aggiorna dal Play Store'), findsOneWidget);
+    expect(find.textContaining('GitHub'), findsNothing);
+    expect(find.textContaining('APK'), findsNothing);
     await tester.tap(find.byKey(const Key('aggiorna-negozio')));
-    await tester.tap(find.byKey(const Key('aggiorna-github')));
-    expect(aperti.first.first.toString(), 'market://details?id=it.gdanav.gdanav');
-    expect(aperti.last.single.toString(), 'https://github.com/danigio15/gdanav/releases');
+    expect(aperti.single.first.toString(), 'market://details?id=it.gdanav.gdanav');
+
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      await tester.pumpWidget(MaterialApp(home: SchermataAggiorna(key: UniqueKey(), apri: (u) async => aperti.add(u))));
+      expect(find.text('Aggiorna dall\'App Store'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('aggiorna-negozio')));
+      expect(aperti.last.first.scheme, 'itms-apps');
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets("l'auto sa che va aggiornata, e senza Premium", (tester) async {

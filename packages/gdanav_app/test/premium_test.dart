@@ -199,7 +199,9 @@ void main() {
     // Solo quello che c'è davvero: niente cronologia, niente più veicoli.
     expect(find.text('Home Assistant e batteria letta dall\'auto'), findsOneWidget);
     expect(find.text('Percorso con le soste alle colonnine'), findsOneWidget);
-    expect(find.text('Android Auto e CarPlay'), findsOneWidget);
+    // Lo schermo dell'auto della piattaforma, non tutti e due.
+    expect(find.text('Android Auto'), findsOneWidget);
+    expect(find.textContaining('CarPlay'), findsNothing);
     expect(find.textContaining('Cronologia'), findsNothing);
     expect(find.textContaining('Più veicoli'), findsNothing);
     expect(find.textContaining('traffico, autovelox e meteo'), findsOneWidget);
