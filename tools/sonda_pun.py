@@ -146,6 +146,23 @@ relativi = collections.Counter(
     p for p in re.findall(r'["\'](/(?:api|rest|v\d|ocpi|services|data|geoserver|wfs|arcgis)[A-Za-z0-9._/{}$-]{0,80})["\']', testo)
 )
 
+# Non indovinare i percorsi: contarli tutti. Il backend della PUN è sullo
+# stesso dominio (nessun altro dominio nel codice), quindi il suo indirizzo
+# è una stringa che comincia per «/» dentro il bundle. Si guardano i primi
+# pezzi di percorso più frequenti: quello dell'API salta fuori da solo.
+tutti = collections.Counter(
+    x for x in re.findall(r'["\'](/[a-zA-Z][A-Za-z0-9._/-]{3,70})["\']', testo)
+)
+primi = collections.Counter(x.split("/")[1] for x in tutti)
+avviso("PUN primi pezzi", str(dict(primi.most_common(24))))
+# E quelli che nominano la ricarica, in qualunque forma.
+suonano = [
+    x
+    for x in tutti
+    if any(k in x.lower() for k in ("ricaric", "charg", "colonn", "stazion", "punti", "pdr", "evse", "infrastrutt", "mappa", "map"))
+]
+avviso("PUN percorsi che suonano", " · ".join(sorted(set(suonano))[:20]) or "nessuno")
+
 ospiti = collections.Counter(urllib.parse.urlparse(u).netloc for u in interi)
 avviso("PUN domini", str(dict(ospiti.most_common(14))))
 avviso("PUN percorsi", " · ".join(p for p, _ in relativi.most_common(18)) or "nessun percorso che sembri un'API")
@@ -165,6 +182,7 @@ for t, _ in tracce.most_common(12):
         # Un id di mappa web: la si chiede al portale pubblico di ArcGIS.
         candidati.append(f"https://www.arcgis.com/sharing/rest/content/items/{t}?f=pjson")
         candidati.append(f"https://www.arcgis.com/sharing/rest/content/items/{t}/data?f=pjson")
+candidati += [urllib.parse.urljoin(base, x) for x in sorted(set(suonano))[:12]]
 candidati += [u for u in interi if any(k in u.lower() for k in parole)]
 candidati += [urllib.parse.urljoin(base, p) for p in relativi if any(k in p.lower() for k in parole)]
 # E comunque tutti i percorsi relativi trovati: sono pochi e vale la pena.
