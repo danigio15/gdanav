@@ -87,6 +87,18 @@ def prova(url: str, secondi: int = 12) -> tuple[int, bytes]:
         return 0, b""
 
 
+def controllo(dominio: str) -> int:
+    """Cosa risponde questo sito a un indirizzo che non esiste di sicuro.
+
+    Serve a non prendere per una porta OCPI quello che è solo il firewall
+    del sito che respinge tutto: se `/ocpi/versions` e
+    `/questo-non-esiste-gdanav` rispondono la stessa cosa, la risposta non
+    dice niente di OCPI.
+    """
+    stato, _ = prova(f"https://{dominio}/questo-indirizzo-non-esiste-gdanav-7f3a1c", 10)
+    return stato
+
+
 def sembra_ocpi(stato: int, corpo: bytes) -> str | None:
     """Cosa dice questa risposta: è una porta OCPI, e di che tipo?"""
     testo = corpo.decode("utf-8", "replace").strip()
@@ -95,7 +107,7 @@ def sembra_ocpi(stato: int, corpo: bytes) -> str | None:
     except Exception:  # noqa: BLE001
         # 401 senza JSON è comunque una porta che chiede le credenziali.
         if stato in (401, 403):
-            return f"HTTP {stato}: chiede le credenziali (la porta c'è)"
+            return f"HTTP {stato}: chiede le credenziali, e non risponde così a tutto"
         return None
     if not isinstance(j, dict):
         return None
@@ -110,7 +122,7 @@ def sembra_ocpi(stato: int, corpo: bytes) -> str | None:
         )
         return f"OCPI! status_code {codice}{f' — versioni {versioni}' if versioni else ''}"
     if stato in (401, 403):
-        return f"HTTP {stato}: chiede le credenziali (la porta c'è)"
+        return f"HTTP {stato}: chiede le credenziali, e non risponde così a tutto"
     return None
 
 
@@ -118,16 +130,26 @@ trovati = 0
 for nome, party, domini in OPERATORI:
     esiti = []
     for dominio in domini:
+        # Prima il controllo: cosa risponde questo sito a un indirizzo
+        # inventato. Se risponde come agli indirizzi OCPI, sta rispondendo
+        # a tutto allo stesso modo e non ci dice niente.
+        finto = controllo(dominio)
         for percorso in PERCORSI:
             stato, corpo = prova(f"https://{dominio}{percorso}")
             if stato == 0:
+                continue
+            if stato == finto and finto != 0:
+                esiti.append(f"https://{dominio}{percorso} → HTTP {stato}, ma anche a un indirizzo inventato: non dice niente")
                 continue
             quale = sembra_ocpi(stato, corpo)
             if quale:
                 esiti.append(f"https://{dominio}{percorso} → {quale}")
                 trovati += 1
-    if esiti:
-        avviso(f"OCPI {nome} ({party})", " | ".join(esiti[:4]))
+    veri = [e for e in esiti if "non dice niente" not in e]
+    if veri:
+        avviso(f"OCPI {nome} ({party})", " | ".join(veri[:4]))
+    elif esiti:
+        avviso(f"OCPI {nome} ({party})", f"niente: {esiti[0]}")
     else:
         avviso(f"OCPI {nome} ({party})", "nessuna porta di scoperta risponde")
 
