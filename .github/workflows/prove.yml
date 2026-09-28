@@ -213,6 +213,11 @@ jobs:
           done
           true
       - name: Cosa ci dà TomTom — traffico e tessere di mappa
+        # Le sonde sono diagnostica: devono girare anche quando le prove di
+        # rete falliscono, che è proprio quando servono di più. Senza questo,
+        # un server altrui che risponde male ci lascia anche senza le misure
+        # per capire perché.
+        if: always()
         working-directory: .
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
@@ -239,6 +244,7 @@ jobs:
       # Anche nella release «lavoro», accanto agli altri dati per le
       # anteprime: da lì si aprono con un indirizzo, senza scaricare uno zip.
       - name: Le anteprime della mappa anche nella release
+        if: always()
         if: always()
         working-directory: .
         env:

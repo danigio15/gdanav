@@ -19,11 +19,17 @@ import 'colonnina.dart';
 /// La [riserva] si chiede solo se non ha risposto nessuno: serve per
 /// Overpass, che è lento (in CI arriva a scadere dopo cinquanta secondi) e
 /// non deve rallentare ogni viaggio.
+///
+/// [attesa] era venti secondi, e tagliava: il relay di solito risponde in un
+/// decimo di secondo, ma in una giornata storta ci mette un minuto — e
+/// l'unione tornava vuota proprio quando la sua unica fonte buona stava per
+/// rispondere. Adesso è sessanta, quanto il relay si dà da solo: chi è
+/// davvero appeso viene tagliato lo stesso, chi è solo lento no.
 class FonteColonnineUnite implements FonteColonnine {
   const FonteColonnineUnite(
     this.fonti, {
     this.riserva,
-    this.attesa = const Duration(seconds: 20),
+    this.attesa = const Duration(seconds: 60),
     this.raggioM = 60,
   });
 

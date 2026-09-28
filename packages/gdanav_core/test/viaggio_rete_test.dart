@@ -391,8 +391,14 @@ void main() {
     final insieme = await quante('unite', FonteColonnineUnite(fonti));
 
     // L'unione non può conoscerne meno della più ricca delle sue fonti.
+    // Se però nessuna fonte ha risposto — succede: il relay dà 502, Open
+    // Charge Map 503 — non è un difetto nostro e non si fa fallire la prova.
     final piuRicca = math.max(daRelay.length, daOcm.length);
-    expect(insieme.length, greaterThanOrEqualTo(piuRicca));
+    if (piuRicca == 0) {
+      avviso('Colonnine', 'nessuna fonte ha risposto: non c\'è niente da confrontare');
+    } else {
+      expect(insieme.length, greaterThanOrEqualTo(piuRicca));
+    }
 
     if (Platform.environment['GDANAV_ANTEPRIME'] case final cartella?) {
       final doppie = insieme.where((c) => c.fonte.contains('+')).length;
