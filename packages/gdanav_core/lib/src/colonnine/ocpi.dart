@@ -89,6 +89,7 @@ List<Colonnina> unisciColonnine(List<Colonnina> anagrafica, List<Colonnina> temp
         connettori: vicina.connettori,
         operatore: vicina.operatore ?? a.operatore,
         fonte: '${a.fonte}+${vicina.fonte}',
+        evse: a.evse.isNotEmpty ? a.evse : vicina.evse,
       ));
     } else {
       risultato.add(a);

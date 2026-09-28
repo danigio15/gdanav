@@ -66,6 +66,23 @@ void main() {
       expect(fuse.single.fonte, 'ocm+osm');
     });
 
+    test('gli EVSE ID della PUN restano anche se vince OpenStreetMap', () {
+      const pun = Colonnina(
+        id: 'pun:1',
+        nome: 'Isola A3',
+        posizione: Punto(45.0002, 9.0000),
+        connettori: [Connettore(tipo: TipoConnettore.tipo2, potenzaKw: 22)],
+        fonte: 'pun',
+        evse: ['IT*BEC*EW001*1'],
+      );
+      final fuse = fondiColonnine([
+        [col('osm:1', 45.0000, 9.0000, prese: 3, fonte: 'osm')],
+        [pun],
+      ]);
+      expect(fuse.single.id, 'osm:1');
+      expect(fuse.single.evse, ['IT*BEC*EW001*1']);
+    });
+
     test('l\'operatore si prende da chi ce l\'ha', () {
       final fuse = fondiColonnine([
         [col('ocm:1', 45.0000, 9.0000, prese: 4, fonte: 'ocm')],

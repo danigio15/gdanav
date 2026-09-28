@@ -98,6 +98,7 @@ abstract final class Pun {
       luogo.lat.add(lat);
       luogo.lon.add(lon);
       luogo.prese.add(presa);
+      if (r[cEvse].trim() case final e when e.isNotEmpty) luogo.evse.add(e);
     }
 
     return [
@@ -111,6 +112,7 @@ abstract final class Pun {
           posizione: Punto(_media(l.lat), _media(l.lon)),
           connettori: l.prese,
           fonte: 'pun',
+          evse: l.evse,
         ),
     ];
   }
@@ -267,4 +269,5 @@ class _Luogo {
   final lat = <double>[];
   final lon = <double>[];
   final prese = <Connettore>[];
+  final evse = <String>[];
 }

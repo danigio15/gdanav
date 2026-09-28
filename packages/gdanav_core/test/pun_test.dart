@@ -31,6 +31,9 @@ void main() {
       final c = esempio();
       final isola = chiamata(c, 'Isola A3');
       expect(isola.connettori, hasLength(5));
+      // Gli EVSE ID dei suoi punti, per chiederne lo stato di adesso.
+      expect(isola.evse, hasLength(5));
+      expect(isola.evse, everyElement(startsWith('IT*BEC*')));
       expect(isola.id, startsWith('pun:'));
       expect(isola.fonte, 'pun');
     });

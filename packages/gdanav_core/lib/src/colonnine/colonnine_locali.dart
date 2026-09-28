@@ -93,6 +93,8 @@ class ArchivioColonnine {
   // tipo: 0 CCS2, 1 CHAdeMO, 2 Tipo 2, 3 Tesla.
   // Un settimo campo, se c'è, è la fonte («pun», «osm+pun»): senza, è
   // OpenStreetMap, che è quasi tutto l'archivio e così non paga niente.
+  // Un ottavo, se c'è, sono gli EVSE ID dei punti di ricarica (dalla PUN),
+  // per chiederne lo stato.
 
   static const _tipi = [TipoConnettore.ccs2, TipoConnettore.chademo, TipoConnettore.tipo2, TipoConnettore.tesla];
 
@@ -106,7 +108,8 @@ class ArchivioColonnine {
           c.nome,
           c.operatore ?? '',
           _prese(c.connettori),
-          if (c.fonte.isNotEmpty && c.fonte != 'osm') c.fonte,
+          if ((c.fonte.isNotEmpty && c.fonte != 'osm') || c.evse.isNotEmpty) c.fonte.isEmpty ? 'osm' : c.fonte,
+          if (c.evse.isNotEmpty) c.evse,
         ],
     ];
     return jsonEncode({
@@ -149,6 +152,7 @@ class ArchivioColonnine {
                 Connettore(tipo: _tipi[(p[0] as num).toInt()], potenzaKw: (p[1] as num).toDouble()),
           ],
           fonte: r.length > 6 ? r[6] as String : 'osm',
+          evse: r.length > 7 ? (r[7] as List).cast<String>() : const [],
         ),
       );
     }

@@ -132,6 +132,9 @@ Colonnina _lameglio(Colonnina a, Colonnina b) {
     operatore: ricca.operatore ?? altra.operatore,
     // «ocm+osm»: da dove viene quello che si vede, per le segnalazioni.
     fonte: _fonti(a.fonte, b.fonte),
+    // Gli EVSE ID li ha solo la PUN: si tengono da chi li ha, qualunque
+    // delle due abbia vinto le prese.
+    evse: ricca.evse.isNotEmpty ? ricca.evse : altra.evse,
   );
 }
 

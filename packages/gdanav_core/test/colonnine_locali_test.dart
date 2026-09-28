@@ -46,6 +46,29 @@ void main() {
     expect({for (final c in a.tutte) c.id: c.fonte}, {'osm-node-1': 'osm', 'pun:1': 'pun', 'pun:2': 'osm+pun'});
   });
 
+  test('gli EVSE ID vanno e tornano, e senza non si scrive niente', () {
+    const pun = Colonnina(
+      id: 'pun:1',
+      nome: 'Isola A3',
+      posizione: Punto(40.8548, 14.2855),
+      connettori: [Connettore(tipo: TipoConnettore.tipo2, potenzaKw: 22)],
+      fonte: 'pun',
+      evse: ['IT*BEC*EW001*1', 'IT*BEC*EW001*2'],
+    );
+    const osm = Colonnina(
+      id: 'osm-node-1',
+      nome: 'Enel X',
+      posizione: Punto(40.85, 14.28),
+      connettori: [Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 50)],
+      fonte: 'osm',
+    );
+    final testo = ArchivioColonnine.scrivi([pun, osm]);
+    expect(((jsonDecode(testo) as Map)['c'] as List).map((r) => (r as List).length), [8, 6]);
+    final letti = {for (final c in ArchivioColonnine.leggi(testo).tutte) c.id: c};
+    expect(letti['pun:1']!.evse, ['IT*BEC*EW001*1', 'IT*BEC*EW001*2']);
+    expect(letti['osm-node-1']!.evse, isEmpty);
+  });
+
   test("un archivio di prima, senza il settimo campo, e' tutto OpenStreetMap", () {
     const testo = '{"v":1,"generato":"2026-09-01T00:00:00Z","c":[[44.5,11.3,"osm-node-9","A","",[[0,150,2]]]]}';
     expect(ArchivioColonnine.leggi(testo).tutte.single.fonte, 'osm');

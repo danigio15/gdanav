@@ -91,6 +91,7 @@ class Colonnina {
     required this.connettori,
     this.operatore,
     this.fonte = '',
+    this.evse = const [],
   });
 
   final String id;
@@ -101,6 +102,11 @@ class Colonnina {
 
   /// `ocm`, `ocpi`…: per citare la fonte, come chiedono le licenze.
   final String fonte;
+
+  /// Gli identificativi dei suoi punti di ricarica (EVSE ID,
+  /// `IT*BEC*EW003907*1`), quando la fonte li dà — la PUN sì: servono a
+  /// chiederne lo stato di adesso, che la PUN dà punto per punto.
+  final List<String> evse;
 
   /// La potenza massima fra le prese che l'auto può usare, anche guaste:
   /// quella di targa.
