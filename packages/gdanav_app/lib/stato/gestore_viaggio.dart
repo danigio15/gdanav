@@ -641,7 +641,7 @@ Future<List<Colonnina>> colonnineVicineComeSiVuole(
     km: km,
     quante: quante,
     operatoriEsclusi: p.operatoriEsclusi,
-    potenzaMinimaKw: p.potenzaMinimaKw,
+    potenzaMinimaKw: p.minimaIntorno,
   );
 }
 
