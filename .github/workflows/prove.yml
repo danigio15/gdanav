@@ -242,6 +242,7 @@ jobs:
         working-directory: tools/pun
         env:
           USCITA: ${{ github.workspace }}/pun_api.txt
+          USCITA_OPERATORI: ${{ github.workspace }}/pun_operatori.json
         run: |
           npm init -y > /dev/null
           if ! npm install puppeteer@23 --no-audit --no-fund > /dev/null 2>&1; then
@@ -272,6 +273,7 @@ jobs:
           [ -s ocpi_sonda.txt ] && gh release upload lavoro ocpi_sonda.txt --clobber
           [ -s pun_sonda.txt ] && gh release upload lavoro pun_sonda.txt --clobber
           [ -s pun_api.txt ] && gh release upload lavoro pun_api.txt --clobber
+          [ -s pun_operatori.json ] && gh release upload lavoro pun_operatori.json --clobber
           true
 
   # Le foto vere delle auto, da Wikimedia Commons: solo quando il commit lo
