@@ -110,15 +110,26 @@ PianificatoreViaggio pianificatoreVero(
   PreferenzeRicarica preferenze,
   OpzioniPercorso opzioni,
 ) {
-  final valhalla = ClienteValhalla(
-    Uri.parse(i.valhalla.endsWith('/') ? i.valhalla : '${i.valhalla}/'),
-    chiave: i.chiaveValhalla.isEmpty ? null : i.chiaveValhalla,
-  );
-  final traffico = _traffico;
+  // TomTom se c'è la chiave: i suoi tempi sono già quelli del traffico di
+  // adesso, e le code arrivano nella stessa risposta. Valhalla resta la
+  // riserva, sul server pubblico di FOSSGIS.
+  final tomtom = i.percorsiDaTomTom ? ClienteTomTom(i.chiaveTomTom) : null;
+  final valhalla = tomtom != null
+      ? null
+      : ClienteValhalla(
+          Uri.parse(i.valhalla.endsWith('/') ? i.valhalla : '${i.valhalla}/'),
+          chiave: i.chiaveValhalla.isEmpty ? null : i.chiaveValhalla,
+        );
+  // Il traffico si va a prendere a parte solo per Valhalla, che non lo
+  // conosce: chiederlo due volte a TomTom sarebbe sprecare il piano e
+  // sommare due volte le stesse code.
+  final traffico = tomtom != null ? null : _traffico;
   return PianificatoreViaggio(
-    percorsi: (tappe) => valhalla.calcola(tappe, opzioni: opzioni),
-    alternative: (da, a) => valhalla.alternative(da, a, opzioni: opzioni),
-    seguendo: (p) => valhalla.seguendo(p, opzioni: opzioni),
+    percorsi: (tappe) =>
+        tomtom?.calcola(tappe, opzioni: opzioni) ?? valhalla!.calcola(tappe, opzioni: opzioni),
+    alternative: (da, a) =>
+        tomtom?.alternative(da, a, opzioni: opzioni) ?? valhalla!.alternative(da, a, opzioni: opzioni),
+    seguendo: (p) => tomtom?.seguendo(p, opzioni: opzioni) ?? valhalla!.seguendo(p, opzioni: opzioni),
     // Il traffico di adesso sul percorso (per tutti, se c'è la chiave
     // TomTom): arrivo e soste lo mettono in conto.
     traffico: traffico?.applica,
@@ -436,7 +447,7 @@ class GestoreViaggio extends ChangeNotifier {
           }, destinazione: destinazione),
         );
       }
-    } on ErroreValhalla catch (e) {
+    } on ErrorePercorso catch (e) {
       if (identical(stato, calcolo)) _imposta(ErroreViaggio(_spiega(e), destinazione: destinazione));
     } catch (e) {
       if (identical(stato, calcolo)) {
@@ -500,7 +511,7 @@ class GestoreViaggio extends ChangeNotifier {
           ),
         );
       }
-    } on ErroreValhalla catch (e) {
+    } on ErrorePercorso catch (e) {
       if (identical(stato, calcolo)) _imposta(ErroreViaggio(_spiega(e), destinazione: destinazione));
     } catch (e) {
       if (identical(stato, calcolo)) {
@@ -548,12 +559,16 @@ class GestoreViaggio extends ChangeNotifier {
     _imposta(const NessunViaggio());
   }
 
-  static String _spiega(ErroreValhalla e) => switch (e.stato) {
+  static String _spiega(ErrorePercorso e) => switch (e.stato) {
     401 || 403 => 'Il server dei percorsi non ci fa entrare in questo momento. Riprova tra poco.',
     429 => 'Il server dei percorsi è molto carico. Riprova tra un minuto.',
-    400 when e.messaggio.contains('No path') => 'Non esiste una strada fra qui e la destinazione.',
+    400 when _senzaStrada(e.messaggio) => 'Non esiste una strada fra qui e la destinazione.',
     _ => 'Il server dei percorsi ha risposto: ${e.messaggio}',
   };
+
+  /// «Non c'è strada»: Valhalla lo dice «No path», TomTom «NO_ROUTE_FOUND».
+  static bool _senzaStrada(String m) =>
+      m.contains('No path') || m.toUpperCase().contains('NO_ROUTE') || m.contains('ROUTE_NOT_FOUND');
 
   void _imposta(StatoViaggio s) {
     stato = s;

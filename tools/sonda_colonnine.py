@@ -15,10 +15,21 @@ Non manda credenziali e non ne ha: cerca solo quello che è pubblico.
 """
 
 import json
+import os
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
+
+# I nomi dei servizi hanno trattini lunghi e accenti, e l'uscita della CI
+# e' ASCII: senza questo la sonda muore a meta' invece di dire quello che
+# ha trovato.
+for flusso in (sys.stdout, sys.stderr):
+    try:
+        flusso.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:  # noqa: BLE001
+        pass
 
 TESTA = {"User-Agent": "gdanav-sonda/1 (+https://github.com/danigio15/gdanav)"}
 PORTALE = "https://www.piattaformaunicanazionale.it/"
@@ -118,5 +129,68 @@ for url in (trovati[:10] + NOTI):
             campi = [str(c.get("name")) for c in (strato.get("fields") or [])]
             avviso("Colonnine campi", f"{nome}/0: " + " · ".join(campi[:40]))
 
-if not trovati:
-    sys.exit(0)
+
+
+# 4. La domanda vera, adesso che si sa che la PUN non espone OCPI: senza
+#    TomTom Search, quanto stato riusciamo a mostrare lo stesso? Open Charge
+#    Map dichiara uno stato per presa (`StatusType`), e la chiave ce l'abbiamo
+#    gia'. Non e' il tempo reale, ma e' gratis e senza contatore stretto: se
+#    copre abbastanza colonnine, la mappa smette di essere tutta grigia.
+def quanto_stato_da_ocm() -> None:
+    chiave = os.environ.get("OCM", "")
+    q = {
+        "output": "json",
+        "countrycode": "IT",
+        "maxresults": "300",
+        "compact": "true",
+        "verbose": "false",
+        "latitude": "40.8518",
+        "longitude": "14.2681",
+        "distance": "50",
+        "distanceunit": "KM",
+    }
+    if chiave:
+        q["key"] = chiave
+    st, b = prendi("https://api.openchargemap.io/v3/poi/?" + urllib.parse.urlencode(q), 30)
+    if st != 200 or not b:
+        avviso("Colonnine OCM", f"HTTP {st}{' (senza chiave)' if not chiave else ''}")
+        return
+    try:
+        elenco = json.loads(b)
+    except Exception as e:  # noqa: BLE001
+        avviso("Colonnine OCM", f"risposta non leggibile: {e}")
+        return
+    if not isinstance(elenco, list):
+        avviso("Colonnine OCM", f"risposta inattesa: {type(elenco).__name__}")
+        return
+
+    # StatusTypeID: 50 in servizio, 75 fuori servizio, 100 operativa,
+    # 0/None non dichiarato. Conta quante colonnine dicono qualcosa.
+    conStato = conPrese = prese = 0
+    stati: dict[str, int] = {}
+    for c in elenco:
+        if not isinstance(c, dict):
+            continue
+        suoi = [x for x in (c.get("Connections") or []) if isinstance(x, dict)]
+        prese += len(suoi)
+        dichiarati = [x.get("StatusTypeID") for x in suoi if x.get("StatusTypeID")]
+        conPrese += 1 if suoi else 0
+        if dichiarati:
+            conStato += 1
+        for d in dichiarati:
+            stati[str(d)] = stati.get(str(d), 0) + 1
+        s = c.get("StatusType")
+        if isinstance(s, dict) and s.get("Title"):
+            stati[str(s["Title"])] = stati.get(str(s["Title"]), 0) + 1
+
+    avviso(
+        "Colonnine OCM",
+        f"{len(elenco)} colonnine intorno a Napoli, {prese} prese; "
+        f"con uno stato dichiarato: {conStato} su {conPrese or len(elenco)}"
+        f"{' (senza chiave)' if not chiave else ''}",
+    )
+    avviso("Colonnine OCM stati", str(dict(sorted(stati.items(), key=lambda x: -x[1])[:12])) or "nessuno")
+
+
+quanto_stato_da_ocm()
+

@@ -49,7 +49,9 @@ COMUNI = {
     "instructionsType": "tagged",
     "routeRepresentation": "polyline",
     "computeTravelTimeFor": "all",
-    "sectionType": "traffic",
+    # Tutte insieme: quello che TomTom non sa dare semplicemente non torna
+    # indietro, e dalla risposta si vede quali ci sono davvero.
+    "sectionType": "traffic,tollRoad,motorway,ferry,carTrain,tunnel,urban,speedLimit,country",
     "language": "it-IT",
     "maxAlternatives": "2",
 }
@@ -97,9 +99,21 @@ for nome, (a_lat, a_lon), (b_lat, b_lon) in VIAGGI:
         if corsie:
             avviso(f"{eti} corsie esempio", json.dumps(corsie[0], ensure_ascii=False))
 
+        # Quali sezioni risponde davvero, e con che campi: i limiti di
+        # velocita' sono l'altra cosa che Valhalla dava (da `/locate`) e che
+        # bisogna sapere se si perde.
+        sezioni = r0.get("sections", [])
+        tipi = collections.Counter(x.get("sectionType") for x in sezioni)
+        avviso(f"{eti} sezioni", str(dict(tipi)) if tipi else "NESSUNA sezione")
+        limiti = [x for x in sezioni if x.get("sectionType") == "SPEED_LIMIT" or "speedLimit" in x]
+        avviso(
+            f"{eti} limiti",
+            json.dumps(limiti[0], ensure_ascii=False) if limiti else "NESSUN limite di velocita' nelle sezioni",
+        )
+
         with open(f"percorso-{nome}-{motore}.json", "w", encoding="utf-8") as f:
             json.dump(
-                {"summary": s, "chiavi_rotta": sorted(r0), "sezioni": r0.get("sections", [])[:20], "guida": guida},
+                {"summary": s, "chiavi_rotta": sorted(r0), "sezioni": r0.get("sections", [])[:60], "guida": guida},
                 f,
                 ensure_ascii=False,
                 indent=1,

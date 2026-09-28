@@ -215,6 +215,10 @@ jobs:
         working-directory: .
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
+          OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
+          # I nomi dei servizi hanno trattini lunghi e accenti: senza questo
+          # una sonda muore a metà invece di dire quello che ha trovato.
+          PYTHONIOENCODING: utf-8
         run: |
           # Ognuna per conto suo: sono sonde, servono a guardare. Se una
           # inciampa — o se pip non trova PyPI, che è già successo — le altre

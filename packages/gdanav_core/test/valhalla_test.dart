@@ -128,7 +128,7 @@ void main() {
       final v = ClienteValhalla(Uri.parse('https://valhalla.esempio.dev/'), client: client);
       expect(
         v.calcola(const [Punto(0, 0), Punto(1, 1)]),
-        throwsA(isA<ErroreValhalla>().having((e) => e.messaggio, 'messaggio', 'No path could be found')),
+        throwsA(isA<ErrorePercorso>().having((e) => e.messaggio, 'messaggio', 'No path could be found')),
       );
     });
 
@@ -137,7 +137,7 @@ void main() {
       final v = ClienteValhalla(Uri.parse('https://valhalla.esempio.dev/'), client: client);
       expect(
         v.calcola(const [Punto(0, 0), Punto(1, 1)]),
-        throwsA(isA<ErroreValhalla>()
+        throwsA(isA<ErrorePercorso>()
             .having((e) => e.stato, 'stato', 401)
             .having((e) => e.messaggio, 'messaggio', 'Non autorizzato')),
       );

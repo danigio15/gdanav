@@ -287,4 +287,51 @@ void main() {
   },
       timeout: const Timeout(Duration(minutes: 2)),
       skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  /// Il motore nuovo contro quello vecchio, sullo stesso percorso e nello
+  /// stesso momento: quanto ci mettono, quanto misurano, e soprattutto se
+  /// TomTom vede le code che Valhalla non può vedere.
+  test('Napoli → Milano: TomTom contro Valhalla', () async {
+    final chiave = Platform.environment['GDANAV_TOMTOM'] ?? '';
+    if (chiave.isEmpty) {
+      avviso('Percorso TomTom', 'senza chiave non si prova');
+      return;
+    }
+    final tomtom = ClienteTomTom(chiave);
+    final orologio = Stopwatch()..start();
+    final suo = await tomtom.calcola([napoli, milano]);
+    final suoMs = orologio.elapsedMilliseconds;
+    orologio.reset();
+    final nostro = await valhalla.calcola([napoli, milano]);
+    final nostroMs = orologio.elapsedMilliseconds;
+
+    avviso(
+      'Percorso TomTom',
+      '$suoMs ms, ${(suo.lunghezzaM / 1000).toStringAsFixed(1)} km, '
+          '${suo.durata.inMinutes} min, ${suo.punti.length} punti, ${suo.manovre.length} manovre, '
+          '${suo.code.length} code, ritardo ${suo.ritardoTraffico.inMinutes} min',
+    );
+    avviso(
+      'Percorso Valhalla',
+      '$nostroMs ms, ${(nostro.lunghezzaM / 1000).toStringAsFixed(1)} km, '
+          '${nostro.durata.inMinutes} min, ${nostro.punti.length} punti, ${nostro.manovre.length} manovre',
+    );
+
+    // Le manovre devono avere le parole giuste: se TomTom ce le manda con
+    // le etichette, sullo schermo si leggerebbe «<street>».
+    final conEtichette = suo.manovre.where((m) => m.istruzione.contains('<')).length;
+    final conCartello = suo.manovre.where((m) => m.verso.isNotEmpty).length;
+    avviso('Manovre TomTom',
+        'con etichette rimaste: $conEtichette, col cartello: $conCartello, senza tipo: ${suo.manovre.where((m) => m.tipo == 0).length}');
+
+    expect(suo.punti.length, greaterThan(100));
+    expect(suo.manovre, isNotEmpty);
+    expect(conEtichette, 0, reason: 'le etichette di TomTom non devono finire sullo schermo');
+    expect(suo.trafficoVero, isTrue);
+    // Due motori sulla stessa strada: non identici, ma nemmeno un altro viaggio.
+    expect((suo.lunghezzaM - nostro.lunghezzaM).abs() / nostro.lunghezzaM, lessThan(0.25));
+    expect(suo.manovre.every((m) => m.inizio >= 0 && m.inizio < suo.punti.length), isTrue);
+  },
+      timeout: const Timeout(Duration(minutes: 2)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 }
