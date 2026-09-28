@@ -6,8 +6,10 @@ import 'package:gdanav_core/gdanav_core.dart';
 import '../componenti/icone_punti.dart';
 import '../componenti/stato_colonnina.dart';
 import '../mappa/categorie_poi.dart';
+import '../mappa/dati_viaggio.dart';
 import '../stato/distributori.dart';
 import '../stato/gestore_vicini.dart';
+import '../tema.dart';
 import 'dettaglio_colonnina.dart' show nomeConnettore;
 
 /// Un punto toccato sulla mappa: un distributore, una colonnina vicina o
@@ -131,9 +133,22 @@ class _Scheda extends StatelessWidget {
         ? '${(distanza / 10).round() * 10} m'
         : '${(distanza / 1000).toStringAsFixed(1).replaceAll('.', ',')} km';
 
+    final d = punto.tipo == 'distributore' ? vicini?.distributore(punto.id ?? '') : null;
+    final col = punto.tipo == 'colonnina' ? vicini?.colonnina(punto.id ?? '') : null;
+
+    /* La colonnina prende il colore del suo stato, lo stesso del bollino
+     * sulla mappa. Era verde fissa, e si leggeva un tondo verde sopra la
+     * pastiglia «Stato non comunicato»: due cose diverse per la stessa
+     * colonnina, nella stessa schermata. */
     final (colore, icona, sopra) = switch (punto.tipo) {
       'distributore' => (const Color(0xFFF08A24), Icons.local_gas_station, 'DISTRIBUTORE'),
-      'colonnina' => (const Color(0xFF16A34A), Icons.ev_station, 'COLONNINA DI RICARICA'),
+      'colonnina' => (
+        col == null
+            ? ColoriGdanav.di(context).ignota
+            : coloreStato(context, statoDi(col.disponibilitaPer(vicini!.auto.veicolo.connettori))),
+        Icons.ev_station,
+        'COLONNINA DI RICARICA',
+      ),
       _ => () {
         final c = categoriaPoi(punto.proprieta['subclass'] as String?, punto.proprieta['class'] as String?);
         return (coloreHex(c.colore), iconaCategoria(c), c.etichetta.toUpperCase());
@@ -141,9 +156,6 @@ class _Scheda extends StatelessWidget {
     };
     final dettagli = <Widget>[];
     var descrizione = '';
-
-    final d = punto.tipo == 'distributore' ? vicini?.distributore(punto.id ?? '') : null;
-    final col = punto.tipo == 'colonnina' ? vicini?.colonnina(punto.id ?? '') : null;
     if (d != null) {
       descrizione = descriviDistributore(d, qui ?? d.posizione, carburante: carburante);
       if (d.indirizzo != null || (d.marca != null && d.marca != d.nome)) {
