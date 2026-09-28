@@ -55,23 +55,34 @@ class FonteColonnineUnite implements FonteColonnine {
 
 /// Più elenchi di colonnine in uno solo, senza doppioni.
 ///
-/// Due voci a meno di [raggioM] sono lo stesso posto visto da due fonti: si
-/// tiene quella che ha più prese, prendendo dall'altra il nome e l'operatore
-/// se lì mancano. Tutto quello che non si accoppia resta, perché il difetto
-/// da togliere è la colonnina che manca, non il doppione.
+/// Due voci di **fonti diverse** a meno di [raggioM] sono lo stesso posto
+/// visto due volte: si tiene quella che ha più prese, prendendo dall'altra il
+/// nome e l'operatore se lì mancano. Tutto quello che non si accoppia resta,
+/// perché il difetto da togliere è la colonnina che manca, non il doppione.
 ///
-/// L'accoppiamento è uno a uno: in un'area di servizio con tre stazioni
-/// vicine, se una fonte le vede come una sola e l'altra come tre, restano
-/// tre. Meglio una in più che una in meno, per chi deve caricare.
+/// Dentro una fonte non si accorpa niente, mai. Una fonte è già in ordine con
+/// sé stessa: se elenca tre stazioni a quaranta metri l'una dall'altra — un'area
+/// di servizio, un parcheggio grande, il Centro Direzionale di Napoli — sono
+/// tre, e accorparle vuol dire farle sparire. La prima versione lo faceva, e
+/// si vedeva: 717 colonnine dal relay diventavano 606 passando dalla fusione.
+///
+/// L'accoppiamento è uno a uno: se una fonte vede un posto come una stazione
+/// sola e l'altra come tre, restano tre. Meglio una in più che una in meno,
+/// per chi deve caricare.
 List<Colonnina> fondiColonnine(List<List<Colonnina>> elenchi, {double raggioM = 60}) {
   final risultato = <Colonnina>[];
+  // Da quale elenco viene ogni voce del risultato: serve a non accorpare mai
+  // due voci della stessa fonte.
+  final origine = <int>[];
   // Una griglia grossolana (un centesimo di grado, circa un chilometro) per
   // non confrontare ogni colonnina con tutte le altre: con settecento per
   // fonte sarebbero mezzo milione di distanze a ogni viaggio.
   final griglia = <(int, int), List<int>>{};
   (int, int) cella(Punto p) => ((p.lat * 100).floor(), (p.lon * 100).floor());
+  // Le voci gia' accoppiate non si riusano: l'accoppiamento e' uno a uno.
+  final prese = <int>{};
 
-  for (final elenco in elenchi) {
+  for (final (quale, elenco) in elenchi.indexed) {
     for (final nuova in elenco) {
       final (r, c) = cella(nuova.posizione);
       var vicina = -1;
@@ -79,6 +90,7 @@ List<Colonnina> fondiColonnine(List<List<Colonnina>> elenchi, {double raggioM = 
       for (var dr = -1; dr <= 1; dr++) {
         for (var dc = -1; dc <= 1; dc++) {
           for (final i in griglia[(r + dr, c + dc)] ?? const <int>[]) {
+            if (origine[i] == quale || prese.contains(i)) continue;
             final d = distanzaM(risultato[i].posizione, nuova.posizione);
             if (d <= migliore) {
               migliore = d;
@@ -89,9 +101,11 @@ List<Colonnina> fondiColonnine(List<List<Colonnina>> elenchi, {double raggioM = 
       }
       if (vicina < 0) {
         griglia.putIfAbsent((r, c), () => []).add(risultato.length);
+        origine.add(quale);
         risultato.add(nuova);
         continue;
       }
+      prese.add(vicina);
       risultato[vicina] = _lameglio(risultato[vicina], nuova);
     }
   }

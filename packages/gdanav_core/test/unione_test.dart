@@ -74,6 +74,26 @@ void main() {
       expect(fuse.single.operatore, 'Enel X');
     });
 
+    /* Il difetto che la CI ha trovato: fondendo, 717 colonnine dal relay
+     * diventavano 606. Accorpavo anche dentro la stessa fonte — e al Centro
+     * Direzionale di Napoli, dove le stazioni stanno a pochi metri, vuol dire
+     * farle sparire. Una fonte è già in ordine con sé stessa. */
+    test('dentro una fonte non si accorpa niente, per quanto vicine', () {
+      // Quattro stazioni a venti metri l'una dall'altra, dalla stessa fonte.
+      final vicine = [for (var i = 0; i < 4; i++) col('osm:$i', 45 + i * 0.0002, 9, fonte: 'osm')];
+      expect(fondiColonnine([vicine]), hasLength(4));
+      expect(fondiColonnine([vicine, []]), hasLength(4));
+    });
+
+    test('un posto visto come uno da una fonte e come tre dall\'altra resta tre', () {
+      final tre = [for (var i = 0; i < 3; i++) col('osm:$i', 45 + i * 0.0002, 9, prese: 2, fonte: 'osm')];
+      final uno = [col('ocm:1', 45.0002, 9, prese: 1, fonte: 'ocm')];
+      final fuse = fondiColonnine([tre, uno]);
+      expect(fuse, hasLength(3));
+      // Una sola si accoppia: l'accoppiamento è uno a uno.
+      expect(fuse.where((c) => c.fonte.contains('+')), hasLength(1));
+    });
+
     test('due colonnine lontane restano due, anche se si somigliano', () {
       // ~330 m.
       final fuse = fondiColonnine([
