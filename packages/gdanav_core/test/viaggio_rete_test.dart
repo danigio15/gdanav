@@ -336,7 +336,8 @@ void main() {
         '',
         'Manovre TomTom: con etichette rimaste $conEtichette, col cartello $conCartello, '
             'senza tipo ${suo.manovre.where((m) => m.tipo == 0).length}',
-        'Limiti di velocità da TomTom: ${suo.limiti.isEmpty ? 'nessuno' : '${suo.limiti.length}'}',
+        'Limiti di velocità da TomTom: ${suo.limiti.where((l) => l != null).length} segmenti su ${suo.limiti.length}'
+            ' — valori ${suo.limiti.whereType<int>().toSet().toList()..sort()}',
         'Corsie da TomTom: ${suo.manovre.where((m) => m.corsie.isNotEmpty).length} manovre',
         '',
         'Le prime venti manovre come le vede l\'app:',
@@ -350,6 +351,9 @@ void main() {
     expect(suo.manovre, isNotEmpty);
     expect(conEtichette, 0, reason: 'le etichette di TomTom non devono finire sullo schermo');
     expect(suo.trafficoVero, isTrue);
+    // I limiti li dà, ma solo se glieli si chiede: se un giorno smettesse di
+    // rispondere, il disco del tachimetro si spegnerebbe in silenzio.
+    expect(suo.limiti.whereType<int>(), isNotEmpty, reason: 'TomTom deve dare i limiti di velocità');
     // Due motori sulla stessa strada: non identici, ma nemmeno un altro viaggio.
     expect((suo.lunghezzaM - nostro.lunghezzaM).abs() / nostro.lunghezzaM, lessThan(0.25));
     expect(suo.manovre.every((m) => m.inizio >= 0 && m.inizio < suo.punti.length), isTrue);

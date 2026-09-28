@@ -36,8 +36,10 @@ TESTA = {"User-Agent": "gdanav-sonda/1 (+https://github.com/danigio15/gdanav)"}
 PORTALE = "https://www.piattaformaunicanazionale.it/"
 
 # Indirizzi da provare comunque, oltre a quelli che si trovano nel portale.
+# L'ArcGIS `services9.../Iko2iF79CuZQnhht` non si prova piu': la CI ha
+# elencato i suoi 51 servizi e sono Route 66, le Crociate, la Valle dei
+# Templi. E' un inquilino ArcGIS del turismo, non le ricariche.
 NOTI = [
-    "https://services9.arcgis.com/Iko2iF79CuZQnhht/ArcGIS/rest/services?f=pjson",
     "https://www.piattaformaunicanazionale.it/ocpi/versions",
     "https://www.piattaformaunicanazionale.it/api/ocpi/versions",
 ]

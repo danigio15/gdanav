@@ -24,13 +24,16 @@ import 'valhalla.dart';
 ///  * le manovre hanno l'angolo vero (`turnAngleInDecimalDegrees`) e il
 ///    cartello (`roadNumbers`, `signpostText`), così lo svincolo disegnato
 ///    somiglia a quello che si ha davanti;
+///  * i limiti di velocità arrivano nella stessa risposta
+///    (`sectionType=speedLimit`), dove Valhalla voleva una chiamata a parte;
 ///  * una sola chiamata dà anche le alternative complete: non serve più
 ///    rifare il percorso scelto.
 ///
 /// Cosa si perde, e va detto: **le corsie**. Valhalla (dal formato OSRM)
 /// diceva quali corsie sono buone per la manovra; TomTom su questo piano
 /// no. Le manovre escono con [Manovra.corsie] vuota e il cartellone delle
-/// corsie non compare.
+/// corsie non compare. Anche l'altimetria non c'è: i tratti escono piatti
+/// e il dislivello lo recupera il consumo vero misurato dall'auto.
 class ClienteTomTom {
   ClienteTomTom(this.chiave, {http.Client? client, Uri? indirizzo})
       : _http = client ?? http.Client(),
@@ -45,18 +48,24 @@ class ClienteTomTom {
   /// già calcolato: il corpo della richiesta non deve diventare enorme.
   static const puntiDiAppoggio = 500;
 
-  Map<String, String> _parametri(String lingua, OpzioniPercorso opzioni, {int alternative = 0}) => {
-        'key': chiave,
-        'routeType': 'fastest',
-        'traffic': 'true',
-        'travelMode': 'car',
-        'instructionsType': 'tagged',
-        'language': lingua,
-        'computeTravelTimeFor': 'all',
-        'sectionType': 'traffic',
-        if (alternative > 0) 'maxAlternatives': '$alternative',
-        if (opzioni.modo.velocitaMassima case final v?) 'vehicleMaxSpeed': '$v',
-        if (_daEvitare(opzioni) case final a when a.isNotEmpty) 'avoid': a.join(','),
+  /// Le sezioni che si chiedono a TomTom. `speedLimit` è quella che ridà il
+  /// disco del limite in guida, che con Valhalla arrivava da una chiamata a
+  /// parte (`/locate`); le altre dicono com'è la strada, per scegliere fra i
+  /// percorsi. Vanno ripetute: separate da virgole TomTom risponde 400.
+  static const sezioniChieste = ['traffic', 'speedLimit', 'tollRoad', 'motorway', 'ferry', 'carTrain'];
+
+  Map<String, List<String>> _parametri(String lingua, OpzioniPercorso opzioni, {int alternative = 0}) => {
+        'key': [chiave],
+        'routeType': const ['fastest'],
+        'traffic': const ['true'],
+        'travelMode': const ['car'],
+        'instructionsType': const ['tagged'],
+        'language': [lingua],
+        'computeTravelTimeFor': const ['all'],
+        'sectionType': sezioniChieste,
+        if (alternative > 0) 'maxAlternatives': ['$alternative'],
+        if (opzioni.modo.velocitaMassima case final v?) 'vehicleMaxSpeed': ['$v'],
+        if (_daEvitare(opzioni) case final a when a.isNotEmpty) 'avoid': [a.join(',')],
       };
 
   static List<String> _daEvitare(OpzioniPercorso o) => [
@@ -70,7 +79,7 @@ class ClienteTomTom {
   /// Le coordinate hanno i due punti in mezzo («lat,lon:lat,lon»), e
   /// `Uri.resolve` li scambierebbe per uno schema: l'indirizzo si scrive e
   /// si rilegge intero.
-  Uri _via(List<Punto> tappe, Map<String, String> parametri) {
+  Uri _via(List<Punto> tappe, Map<String, List<String>> parametri) {
     final radice = indirizzo.toString().endsWith('/') ? '$indirizzo' : '$indirizzo/';
     return Uri.parse('$radice${tappe.map(_luogo).join(':')}/json').replace(queryParameters: parametri);
   }
@@ -228,6 +237,7 @@ class ClienteTomTom {
       punti: punti,
       tratti: tratti,
       manovre: manovre,
+      limiti: _limiti(sezioni, punti.length),
       conPedaggi: _haSezione(sezioni, 'TOLL_ROAD') || _haSezione(sezioni, 'TOLL_VIGNETTE'),
       conAutostrade: _haSezione(sezioni, 'MOTORWAY') || manovre.any((m) => m.tipo == 25),
       conTraghetti: _haSezione(sezioni, 'FERRY') || _haSezione(sezioni, 'CAR_TRAIN'),
@@ -248,6 +258,27 @@ class ClienteTomTom {
     final dichiarato = _num(sommario['trafficDelayInSeconds']);
     final dalleCode = code.fold(0.0, (s, c) => s + c.ritardo.inSeconds);
     return math.max(differenza, math.max(dichiarato, dalleCode)).round();
+  }
+
+  /// Il limite di velocità di ogni segmento del tracciato, `null` dove non
+  /// si sa. TomTom lo dà a pezzi di strada (`SPEED_LIMIT`, da un punto a un
+  /// altro); qui diventa la stessa lista che dava Valhalla, così il disco
+  /// del tachimetro non si accorge del cambio di motore.
+  static List<int?> _limiti(List<Map> sezioni, int quantiPunti) {
+    if (quantiPunti < 2) return const [];
+    final trovati = sezioni.where((s) => '${s['sectionType']}'.toUpperCase() == 'SPEED_LIMIT');
+    if (trovati.isEmpty) return const [];
+    final limiti = List<int?>.filled(quantiPunti - 1, null);
+    for (final s in trovati) {
+      final kmh = (s['maxSpeedLimitInKmh'] as num?)?.round();
+      final da = (s['startPointIndex'] as num?)?.toInt();
+      final a = (s['endPointIndex'] as num?)?.toInt();
+      if (kmh == null || kmh <= 0 || da == null || a == null) continue;
+      for (var i = math.max(0, da); i < math.min(a, limiti.length); i++) {
+        limiti[i] = kmh;
+      }
+    }
+    return limiti;
   }
 
   static bool _haSezione(List<Map> sezioni, String tipo) =>

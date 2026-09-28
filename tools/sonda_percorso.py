@@ -136,7 +136,7 @@ for nome, (a_lat, a_lon), (b_lat, b_lon) in VIAGGI:
 
         with open(f"percorso-{nome}-{motore}.json", "w", encoding="utf-8") as f:
             json.dump(
-                {"summary": s, "chiavi_rotta": sorted(r0), "sezioni": r0.get("sections", [])[:60], "guida": guida},
+                {"summary": s, "chiavi_rotta": sorted(r0), "sezioni": r0.get("sections", []), "guida": guida},
                 f,
                 ensure_ascii=False,
                 indent=1,

@@ -102,6 +102,25 @@ void main() {
       expect(c.aM, greaterThan(c.daM));
     });
 
+    test('i limiti di velocità sono quelli di TomTom, segmento per segmento', () {
+      final p = ClienteTomTom.leggi(primaRotta());
+      expect(p.limiti, hasLength(p.punti.length - 1));
+      // 50 in città fino al punto 60, poi 80 sulla tangenziale.
+      expect(p.limiteSul(0), 50);
+      expect(p.limiteSul(59), 50);
+      expect(p.limiteSul(60), 80);
+      expect(p.limiteSul(202), 80);
+      // Oltre l'ultima sezione TomTom non dice niente, e non si inventa.
+      expect(p.limiteSul(203), isNull);
+    });
+
+    test('senza sezioni dei limiti la lista resta vuota, non piena di zeri', () {
+      final rotta = primaRotta();
+      rotta['sections'] =
+          (rotta['sections']! as List).where((s) => (s! as Map)['sectionType'] != 'SPEED_LIMIT').toList();
+      expect(ClienteTomTom.leggi(rotta).limiti, isEmpty);
+    });
+
     test('pedaggi, autostrade e traghetti dalle sezioni', () {
       final p = ClienteTomTom.leggi(primaRotta());
       expect(p.conPedaggi, isTrue);
@@ -128,9 +147,12 @@ void main() {
       final via = f.chieste.single.url;
       expect(via.path, contains('40.85561,14.27407:40.86395,14.29052'));
       expect(via.queryParameters['traffic'], 'true');
-      expect(via.queryParameters['sectionType'], 'traffic');
       expect(via.queryParameters['language'], 'it-IT');
       expect(via.queryParameters.containsKey('maxAlternatives'), isFalse);
+      // Le sezioni vanno ripetute una per una: separate da virgole TomTom
+      // risponde 400 (provato in CI).
+      expect(via.queryParametersAll['sectionType'], ClienteTomTom.sezioniChieste);
+      expect(via.queryParametersAll['sectionType'], contains('speedLimit'));
     });
 
     test('le scelte del percorso diventano gli «avoid» di TomTom', () async {

@@ -1186,6 +1186,18 @@
      "startPointIndex": 21,
      "endPointIndex": 60,
      "sectionType": "TOLL_ROAD"
+    },
+    {
+     "startPointIndex": 0,
+     "endPointIndex": 60,
+     "sectionType": "SPEED_LIMIT",
+     "maxSpeedLimitInKmh": 50
+    },
+    {
+     "startPointIndex": 60,
+     "endPointIndex": 203,
+     "sectionType": "SPEED_LIMIT",
+     "maxSpeedLimitInKmh": 80
     }
    ],
    "guidance": {
