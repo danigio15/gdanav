@@ -153,12 +153,18 @@ PianificatoreViaggio pianificatoreVero(
     ),
     profilo: profilo,
     preferenze: preferenze,
-    // Libere e occupate in tempo reale (Premium), se c'è la chiave TomTom.
+    // Libere e occupate in tempo reale (Premium).
     disponibilita: GestorePremium.attivo.value ? _disponibilita : null,
   );
 }
 
-final _disponibilita = Servizi.chiaveTomTom.isEmpty ? null : DisponibilitaTomTom(Servizi.chiaveTomTom);
+/// Libere e occupate adesso: dalla PUN per le colonnine che ne hanno gli EVSE
+/// ID — gratis, punto per punto, chiesto da questo telefono —, da TomTom per
+/// le altre, se c'è la chiave.
+final FonteDisponibilita _disponibilita = DisponibilitaConPun(
+  DisponibilitaPun(),
+  altra: Servizi.chiaveTomTom.isEmpty ? null : DisponibilitaTomTom(Servizi.chiaveTomTom),
+);
 final _traffico = Servizi.chiaveTomTom.isEmpty ? null : TrafficoTomTom(Servizi.chiaveTomTom);
 
 class GestoreViaggio extends ChangeNotifier {

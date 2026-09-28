@@ -82,7 +82,7 @@ abstract final class Pun {
       if (stato == 'PLANNED' || stato == 'REMOVED') continue;
       final lat = double.tryParse(r[cLat]), lon = double.tryParse(r[cLon]);
       if (lat == null || lon == null || lat == 0 || lon == 0) continue;
-      final presa = _presa(r[cStandard], r[cPotenza]);
+      final presa = Pun.presa(r[cStandard], r[cPotenza]);
       if (presa == null) continue;
       final id = r[cLuogo].trim();
       if (id.isEmpty) continue;
@@ -118,7 +118,9 @@ abstract final class Pun {
   }
 
   /// La presa di un punto di ricarica: la migliore fra quelle che ha.
-  static Connettore? _presa(String standard, String watt) {
+  /// [standard] e [watt] come nel CSV: liste separate da virgole. La usa
+  /// anche lo stato di adesso ([DisponibilitaPun]).
+  static Connettore? presa(String standard, String watt) {
     final tipi = standard.split(',').map((s) => s.trim().toUpperCase()).where((s) => s.isNotEmpty);
     TipoConnettore? migliore;
     for (final t in tipi) {

@@ -4,6 +4,7 @@ library;
 export 'src/colonnine/colonnina.dart';
 export 'src/colonnine/lungo_percorso.dart';
 export 'src/colonnine/pun.dart';
+export 'src/colonnine/stato_pun.dart';
 export 'src/colonnine/unione.dart';
 export 'src/colonnine/ocpi.dart';
 export 'src/colonnine/open_charge_map.dart';
