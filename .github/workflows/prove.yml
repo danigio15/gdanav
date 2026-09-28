@@ -211,13 +211,14 @@ jobs:
             [ -s "$f" ] && gh release upload lavoro "$f" --clobber
           done
           true
-      - name: Com'è fatto il traffico TomTom
+      - name: Cosa ci dà TomTom — traffico e tessere di mappa
         working-directory: .
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
         run: |
           pip install mapbox-vector-tile
           python3 tools/sonda_traffico.py
+          python3 tools/sonda_mappa.py
 
   # Le foto vere delle auto, da Wikimedia Commons: solo quando il commit lo
   # chiede con «[foto-auto]». Il JSON va nella release «anteprima», da

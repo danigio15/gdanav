@@ -114,16 +114,28 @@ void main() {
       ]..sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
       final chiave = Platform.environment['GDANAV_TOMTOM'] ?? '';
       final stato = chiave.isEmpty ? null : DisponibilitaTomTom(chiave);
-      // Tutte insieme: una alla volta non si sta nel tempo.
+      /* Tutte insieme: una alla volta non si sta nel tempo. Gli errori si
+       * contano e si dicono: ingoiarli faceva sembrare «nessuno stato
+       * disponibile» quello che invece era «TomTom ci risponde di no», e in
+       * app si legge «stato non comunicato» su ogni colonnina. */
+      final guai = <String, int>{};
       final elenco = await Future.wait([
         for (final c in rapide.take(25))
           if (stato == null)
             Future.value(c)
           else
-            stato.aggiorna(c).timeout(const Duration(seconds: 10)).catchError((Object _) => c),
+            stato.aggiorna(c).timeout(const Duration(seconds: 10)).catchError((Object e) {
+              final quale = e.toString().split('\n').first;
+              guai[quale] = (guai[quale] ?? 0) + 1;
+              return c;
+            }),
       ]);
       final note = elenco.where((c) => c.connettori.any((x) => x.stato != StatoPresa.sconosciuto)).length;
-      avviso('Colonnine Utrecht', '${tutte.length} in tutto, ${rapide.length} rapide, con stato TomTom: $note');
+      avviso(
+        'Colonnine Utrecht',
+        '${tutte.length} in tutto, ${rapide.length} rapide, con stato TomTom: $note'
+            '${guai.isEmpty ? '' : ' | errori: ${guai.entries.map((g) => '${g.key} ×${g.value}').join(', ')}'}',
+      );
       if (Platform.environment['GDANAV_COLONNINE'] case final file?) {
         File(file).writeAsStringSync(
           jsonEncode([
@@ -161,14 +173,20 @@ void main() {
           if (c.connettori.any((x) => x.potenzaKw >= 40)) c,
       ]..sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
       final stato = DisponibilitaTomTom(chiave);
+      final guai = <String, int>{};
       final elenco = await Future.wait([
         for (final c in rapide.take(15))
-          stato.aggiorna(c).timeout(const Duration(seconds: 60)).catchError((Object _) => c),
+          stato.aggiorna(c).timeout(const Duration(seconds: 60)).catchError((Object e) {
+            final quale = e.toString().split('\n').first;
+            guai[quale] = (guai[quale] ?? 0) + 1;
+            return c;
+          }),
       ]);
       avviso(
           'Colonnine Napoli',
           [
             '${tutte.length} in tutto, ${rapide.length} rapide',
+            if (guai.isNotEmpty) 'errori: ${guai.entries.map((g) => '${g.key} ×${g.value}').join(', ')}',
             for (final c in elenco)
               '${c.nome} (${c.operatore}): ${c.connettori.map((x) => '${x.tipo.name}=${x.stato.name}').join(' ')}',
           ].join(' | '));
