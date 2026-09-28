@@ -29,6 +29,12 @@ for nome, url in [
             chiavi = collections.Counter(k for x in f for k in x["properties"])
             esempi = {k: sorted({str(x["properties"].get(k)) for x in f if k in x["properties"]})[:8] for k in chiavi}
             geometrie = collections.Counter(x["geometry"]["type"] for x in f)
-            print(f"::notice title=Traffico {nome} / {strato}::{len(f)} elementi {dict(geometrie)}; {esempi}"[:3900])
+            # Il nome dello strato va anche nel testo: nei log grezzi di GitHub
+            # il titolo della notifica non si vede, e `source-layer` nello stile
+            # deve combaciare con quel nome esatto o non si disegna niente.
+            print(
+                f"::notice title=Traffico {nome} / {strato}::"
+                f"source-layer «{strato}»: {len(f)} elementi {dict(geometrie)}; {esempi}"[:3900]
+            )
     except Exception as e:  # noqa: BLE001
         print(f"::warning title=Traffico {nome}::{str(e).replace(CHIAVE, '***')}")
