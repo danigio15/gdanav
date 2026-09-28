@@ -239,6 +239,7 @@ jobs:
           ls tomtom-*.png > /dev/null 2>&1 || exit 0
           gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "gdanav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app è nella release «anteprima»."
           gh release upload lavoro tomtom-*.png --clobber
+          ls percorso-*.json > /dev/null 2>&1 && gh release upload lavoro percorso-*.json --clobber
           true
 
   # Le foto vere delle auto, da Wikimedia Commons: solo quando il commit lo
