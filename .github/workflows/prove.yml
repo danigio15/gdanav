@@ -220,6 +220,7 @@ jobs:
           python3 tools/sonda_traffico.py
           python3 tools/sonda_mappa.py
           python3 tools/anteprima_tomtom.py
+          python3 tools/sonda_percorso.py
       - name: Le anteprime della mappa TomTom, da guardare
         if: always()
         uses: actions/upload-artifact@v4
