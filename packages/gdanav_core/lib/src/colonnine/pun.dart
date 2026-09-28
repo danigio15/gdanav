@@ -39,6 +39,14 @@ abstract final class Pun {
     // Confermati dai nomi dei posti: «Atlante - ToDream…», «Powy Metropark…».
     'ATE': 'Atlante',
     'PWY': 'Powy',
+    // Scritti nei nomi dei posti stessi: «IONITY Brenner», «Edison Next -
+    // Borgo Virgilio», «Powerstop - Ambrosi», «EUROSPIN - Palermo»,
+    // «R220 - Comune di Marcaria».
+    'IOY': 'Ionity',
+    'EDN': 'Edison Next',
+    'VCC': 'Powerstop',
+    'ESP': 'Eurospin',
+    '220': 'R220',
   };
 
   /// Le colonnine del CSV di onData (`pdr_latest_ready.csv`), una per posto

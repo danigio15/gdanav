@@ -13,6 +13,20 @@ Colonnina chiamata(List<Colonnina> c, String nome) => c.firstWhere((x) => x.nome
 
 void main() {
   group('la PUN come la pubblica onData', () {
+    test("le sigle che i nomi dei posti spiegano hanno un nome, le altre restano sigle", () {
+      const intestazione = 'id_location,nome_location,indirizzo,id_evse,stato,standard_del_connettore,'
+          'potenza_erogabile,latitudine_evse,longitudine_evse';
+      String riga(String luogo, String evse) =>
+          '$luogo,$luogo,Via Roma 1,$evse,AVAILABLE,IEC_62196_T2_COMBO,300000,45.0,11.0';
+      final c = Pun.leggiCsv([
+        intestazione,
+        riga('IONITY Affi', 'IT*IOY*E1*1'),
+        riga('Edison Next - Curtatone', 'IT*EDN*E1*1'),
+        riga('Via Roma', 'IT*GES*E1*1'),
+      ].join('\n'));
+      expect(c.map((x) => x.operatore), ['Ionity', 'Edison Next', 'GES']);
+    });
+
     test('una colonnina per posto, non una per presa', () {
       final c = esempio();
       final isola = chiamata(c, 'Isola A3');
