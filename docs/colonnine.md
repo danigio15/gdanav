@@ -40,15 +40,37 @@ costa più tempo capire:
 
 ```
 Centro Direzionale, entro 1200 m
-  OpenStreetMap        4   (con la vecchia regola ne passavano 4 lo stesso)
-  Open Charge Map      2
-  archivio gdanav      6 → 7
+  OpenStreetMap        4 stazioni   (con la vecchia regola ne passavano 4 lo stesso)
+                       0 spine mappate a parte (man_made=charge_point)
+                       8 prese dai soli socket:*
+                       9 prese contando anche capacity
+  Open Charge Map      2 stazioni, 4 prese
+  archivio gdanav      6 → 7 stazioni, 12 prese
   EVDC / ABRP         ~12 stazioni, 442 prese
 ```
 
 Lì il filtro non toglieva niente. **Le fonti gratuite quelle colonnine non
 ce le hanno.** La Plenitude di Via Domenico Aulisio, con le sue 202 prese,
 su OpenStreetMap non esiste.
+
+### Contare le spine invece delle stazioni
+
+Domanda giusta, e misurata: nell'archivio le 20.832 stazioni fanno **39.120
+prese**, di cui 16.898 da 40 kW in su. Contare le spine raddoppia il numero
+in generale — ma al Centro Direzionale porta da 8 a 9, contro 442. Lì non è
+un problema di conteggio.
+
+Cercando lì però sono usciti **due difetti veri**, che altrove contano:
+
+* `_prese` tagliava a **venti** qualunque numero (`clamp(1, 20)`): una
+  stazione grande veniva mutilata. Il tetto adesso è 400;
+* **`capacity` era ignorato**. Quando le prese non sono scritte una per una
+  si creava un connettore solo, e per una colonnina da otto stalli era una
+  bugia. Al Centro Direzionale **2 stazioni su 4** hanno `capacity` scritto.
+
+E una strada chiusa con la misura: **`man_made=charge_point`**, il tag con
+cui in OpenStreetMap si mappano le singole spine dentro un impianto, lì non
+lo usa nessuno — **zero**. Non lo stavamo buttando via: non c'è.
 
 ## Perché le altre app le hanno
 
@@ -108,3 +130,22 @@ non si sa.
 Open Charge Map, con la chiave, **non dà lo stato di adesso in Italia**:
 degli stati che manda, 165 sono «50 = funziona» e 15 «150 = pianificata».
 Quelli che direbbero libera o occupata (10 e 20) sono **zero**.
+
+## Trappole, per chi ci torna
+
+Quattro giri di sonda persi per queste, che sono tutte nostre:
+
+* **Overpass e `around:`** — un raggio gli costa molto più di un rettangolo,
+  e due tag in una richiesta raddoppiano. Chiedere `around:` con due tag ha
+  prodotto 504 e timeout; un rettangolo per tag risponde subito.
+* **Le sonde saltate** — il passo delle sonde girava solo se le prove di
+  rete passavano, cioè si spegneva proprio quando serviva. Adesso ha
+  `if: always()`.
+* **`yaml.safe_load` tollera le chiavi doppie**, GitHub Actions no: un
+  `if: always()` scritto due volte ha fatto fallire tutta la corsa con zero
+  lavori e il nome sbagliato. Per controllare un workflow serve un lettore
+  severo, non quello tollerante.
+* **L'attesa dell'unione** era venti secondi: il relay di solito risponde in
+  un decimo di secondo, ma in una giornata storta ci mette un minuto, e
+  l'unione tornava vuota. Adesso aspetta sessanta, quanto il relay si dà da
+  solo.
