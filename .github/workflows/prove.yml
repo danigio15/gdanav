@@ -227,6 +227,18 @@ jobs:
           name: mappa-tomtom
           path: tomtom-*.png
           if-no-files-found: ignore
+      # Anche nella release «lavoro», accanto agli altri dati per le
+      # anteprime: da lì si aprono con un indirizzo, senza scaricare uno zip.
+      - name: Le anteprime della mappa anche nella release
+        if: always()
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls tomtom-*.png > /dev/null 2>&1 || exit 0
+          gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "gdanav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app è nella release «anteprima»."
+          gh release upload lavoro tomtom-*.png --clobber
+          true
 
   # Le foto vere delle auto, da Wikimedia Commons: solo quando il commit lo
   # chiede con «[foto-auto]». Il JSON va nella release «anteprima», da
