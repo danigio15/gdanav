@@ -207,7 +207,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "gdanav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app è nella release «anteprima»."
-          for f in anteprima.json anteprima_tappa.json; do
+          for f in anteprima.json anteprima_tappa.json percorso_motori.txt; do
             [ -s "$f" ] && gh release upload lavoro "$f" --clobber
           done
           true
@@ -246,6 +246,7 @@ jobs:
           gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "gdanav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app è nella release «anteprima»."
           gh release upload lavoro tomtom-*.png --clobber
           ls percorso-*.json > /dev/null 2>&1 && gh release upload lavoro percorso-*.json --clobber
+          [ -s colonnine_sonda.txt ] && gh release upload lavoro colonnine_sonda.txt --clobber
           true
 
   # Le foto vere delle auto, da Wikimedia Commons: solo quando il commit lo

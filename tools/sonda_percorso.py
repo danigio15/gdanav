@@ -49,9 +49,20 @@ COMUNI = {
     "instructionsType": "tagged",
     "routeRepresentation": "polyline",
     "computeTravelTimeFor": "all",
-    # Tutte insieme: quello che TomTom non sa dare semplicemente non torna
-    # indietro, e dalla risposta si vede quali ci sono davvero.
-    "sectionType": "traffic,tollRoad,motorway,ferry,carTrain,tunnel,urban,speedLimit,country",
+    # `sectionType` ripetuto, non separato da virgole: la virgola TomTom la
+    # rifiuta con 400 (provato). Quello che non sa dare semplicemente non
+    # torna indietro, e dalla risposta si vede quali sezioni ci sono davvero.
+    "sectionType": [
+        "traffic",
+        "tollRoad",
+        "motorway",
+        "ferry",
+        "carTrain",
+        "tunnel",
+        "urban",
+        "speedLimit",
+        "country",
+    ],
     "language": "it-IT",
     "maxAlternatives": "2",
 }
@@ -64,14 +75,26 @@ def avviso(titolo: str, testo: str) -> None:
 for nome, (a_lat, a_lon), (b_lat, b_lon) in VIAGGI:
     for motore, base, extra in MOTORI:
         eti = f"Percorso {nome} {motore}"
-        q = urllib.parse.urlencode({**COMUNI, **extra, "key": CHIAVE})
+        q = urllib.parse.urlencode({**COMUNI, **extra, "key": CHIAVE}, doseq=True)
         try:
             with urllib.request.urlopen(f"{base}/{a_lat},{a_lon}:{b_lat},{b_lon}/json?{q}", timeout=40) as r:
                 j = json.load(r)
         except urllib.error.HTTPError as e:
-            quale = {403: "il prodotto non e' acceso su questa chiave", 400: "richiesta non accettata"}.get(e.code, "")
-            avviso(eti, f"HTTP {e.code}{f' — {quale}' if quale else ''}")
-            continue
+            if e.code != 400:
+                quale = {403: "il prodotto non e' acceso su questa chiave"}.get(e.code, "")
+                avviso(eti, f"HTTP {e.code}{f' — {quale}' if quale else ''}")
+                continue
+            # 400: qualcuna delle sezioni chieste non esiste. Si riprova con
+            # la sola «traffic», che e' quella che usa l'app, cosi' almeno il
+            # resto della sonda dice qualcosa.
+            avviso(eti, "HTTP 400 con tutte le sezioni: TomTom non le conosce tutte, riprovo con la sola traffic")
+            q = urllib.parse.urlencode({**COMUNI, **extra, "sectionType": "traffic", "key": CHIAVE}, doseq=True)
+            try:
+                with urllib.request.urlopen(f"{base}/{a_lat},{a_lon}:{b_lat},{b_lon}/json?{q}", timeout=40) as r:
+                    j = json.load(r)
+            except Exception as e2:  # noqa: BLE001
+                avviso(eti, f"anche con la sola traffic: {str(e2).replace(CHIAVE, '***')}")
+                continue
         except Exception as e:  # noqa: BLE001
             print(f"::warning title={eti}::{str(e).replace(CHIAVE, '***')}")
             continue

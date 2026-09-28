@@ -22,9 +22,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-# I nomi dei servizi hanno trattini lunghi e accenti, e l'uscita della CI
-# e' ASCII: senza questo la sonda muore a meta' invece di dire quello che
-# ha trovato.
+# I nomi dei servizi ArcGIS hanno trattini lunghi e accenti. Due conseguenze,
+# tutte e due viste in CI: un indirizzo con un carattere non ASCII non entra
+# nella riga di richiesta HTTP (e la richiesta muore prima di partire), e
+# l'uscita della CI e' ASCII di suo.
 for flusso in (sys.stdout, sys.stderr):
     try:
         flusso.reconfigure(encoding="utf-8", errors="replace")
@@ -42,11 +43,31 @@ NOTI = [
 ]
 
 
+# GitHub mostra una decina di avvisi per passo e butta gli altri: quello che
+# questa sonda trova si scrive anche in un file, che va nella release e si
+# legge intero.
+QUADERNO = os.path.join(os.environ.get("GDANAV_ANTEPRIME", "."), "colonnine_sonda.txt")
+_righe: list[str] = []
+
+
 def avviso(titolo: str, testo: str) -> None:
     print(f"::notice title={titolo}::{testo}"[:3900])
+    _righe.append(f"{titolo}: {testo}")
+
+
+def scrivi_quaderno() -> None:
+    try:
+        with open(QUADERNO, "w", encoding="utf-8") as f:
+            f.write("\n".join(_righe) + "\n")
+        print(f"::notice title=Colonnine::tutto quanto in {os.path.basename(QUADERNO)}, {len(_righe)} righe")
+    except Exception as e:  # noqa: BLE001
+        print(f"::warning title=Colonnine::non ho potuto scrivere il file: {e}")
 
 
 def prendi(url: str, secondi: int = 25) -> tuple[int, bytes]:
+    # Gli indirizzi arrivano da un elenco di servizi altrui: dentro ci sono
+    # trattini lunghi e accenti, che vanno percentati o la richiesta non parte.
+    url = urllib.parse.quote(url, safe=":/?#[]@!$&'()*+,;=%~")
     try:
         with urllib.request.urlopen(urllib.request.Request(url, headers=TESTA), timeout=secondi) as r:
             return r.status, r.read()
@@ -193,4 +214,4 @@ def quanto_stato_da_ocm() -> None:
 
 
 quanto_stato_da_ocm()
-
+scrivi_quaderno()

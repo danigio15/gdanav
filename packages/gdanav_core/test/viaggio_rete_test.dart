@@ -324,6 +324,28 @@ void main() {
     avviso('Manovre TomTom',
         'con etichette rimaste: $conEtichette, col cartello: $conCartello, senza tipo: ${suo.manovre.where((m) => m.tipo == 0).length}');
 
+    // GitHub mostra una decina di avvisi per passo e butta gli altri: il
+    // confronto per intero va in un file, che finisce nella release.
+    if (Platform.environment['GDANAV_ANTEPRIME'] case final cartella?) {
+      File('$cartella/percorso_motori.txt').writeAsStringSync([
+        'TomTom   $suoMs ms · ${(suo.lunghezzaM / 1000).toStringAsFixed(1)} km · '
+            '${suo.durata.inMinutes} min · ${suo.punti.length} punti · ${suo.manovre.length} manovre · '
+            '${suo.code.length} code · ritardo ${suo.ritardoTraffico.inMinutes} min',
+        'Valhalla $nostroMs ms · ${(nostro.lunghezzaM / 1000).toStringAsFixed(1)} km · '
+            '${nostro.durata.inMinutes} min · ${nostro.punti.length} punti · ${nostro.manovre.length} manovre',
+        '',
+        'Manovre TomTom: con etichette rimaste $conEtichette, col cartello $conCartello, '
+            'senza tipo ${suo.manovre.where((m) => m.tipo == 0).length}',
+        'Limiti di velocità da TomTom: ${suo.limiti.isEmpty ? 'nessuno' : '${suo.limiti.length}'}',
+        'Corsie da TomTom: ${suo.manovre.where((m) => m.corsie.isNotEmpty).length} manovre',
+        '',
+        'Le prime venti manovre come le vede l\'app:',
+        for (final m in suo.manovre.take(20))
+          '  tipo ${m.tipo.toString().padLeft(2)} · ${(m.lunghezzaM / 1000).toStringAsFixed(1)} km · '
+              '${m.strada.isEmpty ? '—' : m.strada}${m.verso.isEmpty ? '' : ' → ${m.verso}'} · ${m.istruzione}',
+      ].join('\n'));
+    }
+
     expect(suo.punti.length, greaterThan(100));
     expect(suo.manovre, isNotEmpty);
     expect(conEtichette, 0, reason: 'le etichette di TomTom non devono finire sullo schermo');
