@@ -245,7 +245,6 @@ jobs:
       # anteprime: da lì si aprono con un indirizzo, senza scaricare uno zip.
       - name: Le anteprime della mappa anche nella release
         if: always()
-        if: always()
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
