@@ -234,6 +234,21 @@ jobs:
           for sonda in sonda_traffico sonda_mappa anteprima_tomtom sonda_percorso sonda_colonnine sonda_ocpi sonda_pun; do
             python3 "tools/$sonda.py" || echo "::warning title=Sonde::$sonda non ha finito"
           done
+      # Cosa chiama davvero la mappa pubblica della PUN, aperta con un browser
+      # come la apre chiunque: il contratto della sua API di oggi, letto dal
+      # suo stesso cliente. Diagnostica come le sonde: gira sempre.
+      - name: Cosa chiama la mappa della PUN
+        if: always()
+        working-directory: tools/pun
+        env:
+          USCITA: ${{ github.workspace }}/pun_api.txt
+        run: |
+          npm init -y > /dev/null
+          if ! npm install puppeteer@23 --no-audit --no-fund > /dev/null 2>&1; then
+            echo "::warning title=PUN API::puppeteer non si installa"
+            exit 0
+          fi
+          node cattura.mjs || echo "::warning title=PUN API::la cattura non ha finito"
       - name: Le anteprime della mappa TomTom, da guardare
         if: always()
         uses: actions/upload-artifact@v4
@@ -256,6 +271,7 @@ jobs:
           [ -s colonnine_sonda.txt ] && gh release upload lavoro colonnine_sonda.txt --clobber
           [ -s ocpi_sonda.txt ] && gh release upload lavoro ocpi_sonda.txt --clobber
           [ -s pun_sonda.txt ] && gh release upload lavoro pun_sonda.txt --clobber
+          [ -s pun_api.txt ] && gh release upload lavoro pun_api.txt --clobber
           true
 
   # Le foto vere delle auto, da Wikimedia Commons: solo quando il commit lo
