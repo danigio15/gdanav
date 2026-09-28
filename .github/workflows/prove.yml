@@ -216,12 +216,13 @@ jobs:
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
         run: |
-          pip install mapbox-vector-tile pillow
-          python3 tools/sonda_traffico.py
-          python3 tools/sonda_mappa.py
-          python3 tools/anteprima_tomtom.py
-          python3 tools/sonda_percorso.py
-          python3 tools/sonda_colonnine.py
+          # Ognuna per conto suo: sono sonde, servono a guardare. Se una
+          # inciampa — o se pip non trova PyPI, che è già successo — le altre
+          # devono andare avanti lo stesso.
+          pip install mapbox-vector-tile pillow || echo "::warning title=Sonde::pip non ha risposto: le sonde che vogliono le librerie non girano"
+          for sonda in sonda_traffico sonda_mappa anteprima_tomtom sonda_percorso sonda_colonnine; do
+            python3 "tools/$sonda.py" || echo "::warning title=Sonde::$sonda non ha finito"
+          done
       - name: Le anteprime della mappa TomTom, da guardare
         if: always()
         uses: actions/upload-artifact@v4
