@@ -159,6 +159,62 @@ void main() {
     expect(disponibilita.chieste, contains(prima));
     expect(con.piano!.soste.map((s) => s.colonnina.id), isNot(contains(prima)));
   });
+
+  /* ── «Stato non comunicato» su tutte le colonnine ────────────────────────
+   *
+   * Dal cruscotto di TomTom: Search API 2 500 / 2 500, quota finita, e il
+   * 12,9% di tutte le richieste rifiutate. Lo stato di una colonnina costa
+   * due richieste di ricerca: quindici colonnine sullo schermo sono trenta
+   * richieste, e duemilacinquecento al mese finiscono in giorni. Da lì in poi
+   * ogni richiesta è un rifiuto che costa tempo, batteria e dati, e lascia la
+   * colonnina «sconosciuta» esattamente come se non l'avessimo chiesta. */
+  group('quando il fornitore dice di no per la quota', () {
+    // Un finto orologio, per non aspettare sei ore dentro una prova.
+    var quando = DateTime(2026, 9, 28, 10);
+
+    DisponibilitaTomTom conRisposta(int codice, List<Uri> chiesti) => DisponibilitaTomTom(
+          'chiave',
+          validita: Duration.zero,
+          adesso: () => quando,
+          client: MockClient((r) async {
+            chiesti.add(r.url);
+            return http.Response('', codice);
+          }),
+        );
+
+    test('col 403 si smette di chiedere, e la colonnina resta com\'era', () async {
+      final chiesti = <Uri>[];
+      final t = conRisposta(403, chiesti);
+      expect(t.inPausa, isFalse);
+      await t.aggiorna(area).catchError((Object _) => area);
+      expect(t.inPausa, isTrue, reason: 'il no si ricorda');
+      final quante = chiesti.length;
+      for (var i = 0; i < 20; i++) {
+        expect(await t.aggiorna(area), same(area));
+      }
+      expect(chiesti, hasLength(quante), reason: 'venti colonnine, zero richieste in piu\'');
+    });
+
+    test('dopo la pausa si riprova: la quota e\' mensile', () async {
+      final t = conRisposta(403, <Uri>[]);
+      await t.aggiorna(area).catchError((Object _) => area);
+      expect(t.inPausa, isTrue);
+      quando = quando.add(const Duration(hours: 7));
+      expect(t.inPausa, isFalse, reason: 'passate sei ore si torna a chiedere');
+    });
+
+    test('anche il 429 che non passa coi tentativi ferma tutto', () async {
+      final t = conRisposta(429, <Uri>[]);
+      await t.aggiorna(area).catchError((Object _) => area);
+      expect(t.inPausa, isTrue);
+    });
+
+    test('un errore qualunque no: quello puo\' essere la rete', () async {
+      final t = conRisposta(500, <Uri>[]);
+      await t.aggiorna(area).catchError((Object _) => area);
+      expect(t.inPausa, isFalse);
+    });
+  });
 }
 
 class _Fisse implements FonteColonnine {
