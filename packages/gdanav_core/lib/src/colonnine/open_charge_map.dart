@@ -22,8 +22,40 @@ class ClienteOpenChargeMap implements FonteColonnine {
   /// semplificano a un punto ogni qualche chilometro.
   static const _massimoCaratteri = 6000;
 
+  /// Quanti chilometri di percorso per richiesta. Un Napoli–Milano in una
+  /// volta sola Open Charge Map lo rifiuta (503 due volte su due in CI), e
+  /// anche quando risponde il tetto di mille risultati taglia via il resto
+  /// senza dirlo: su 770 km le colonnine entro tre chilometri sono molte di
+  /// più. A pezzi ogni richiesta è piccola e niente si perde.
+  static const kmPerRichiesta = 150.0;
+
   @override
   Future<List<Colonnina>> lungo(List<Punto> percorso, {double distanzaKm = 3}) async {
+    final pezzi = _aPezzi(percorso, kmPerRichiesta * 1000);
+    final risposte = await Future.wait(pezzi.map((p) => _unPezzo(p, distanzaKm)));
+    // Lo stesso posto può stare in due pezzi che si toccano: l'id lo dice.
+    return {for (final c in risposte.expand((x) => x)) c.id: c}.values.toList();
+  }
+
+  /// Il percorso spezzato in tratti di [metri], con un punto di sovrapposizione
+  /// perché fra un pezzo e l'altro non resti un buco.
+  static List<List<Punto>> _aPezzi(List<Punto> percorso, double metri) {
+    if (percorso.length < 2) return [percorso];
+    final linea = Linea(percorso);
+    if (linea.lunghezzaM <= metri) return [percorso];
+    final pezzi = <List<Punto>>[];
+    var da = 0;
+    for (var i = 1; i < percorso.length; i++) {
+      if (linea.cumulate[i] - linea.cumulate[da] >= metri) {
+        pezzi.add(percorso.sublist(da, i + 1));
+        da = i;
+      }
+    }
+    if (da < percorso.length - 1) pezzi.add(percorso.sublist(da));
+    return pezzi;
+  }
+
+  Future<List<Colonnina>> _unPezzo(List<Punto> percorso, double distanzaKm) async {
     var passo = 500.0;
     var polyline = codificaPolyline(semplifica(percorso, passo));
     while (polyline.length > _massimoCaratteri) {
