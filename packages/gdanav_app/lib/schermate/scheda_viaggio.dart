@@ -426,7 +426,10 @@ class _Pronta extends StatelessWidget {
             ],
             const SizedBox(height: 16),
             Text(
-              pronto.soloPercorso ? 'Mappa: © OpenFreeMap © OpenStreetMap contributors' : 'Colonnine: © Open Charge Map contributors, PUN · Mappa: © OpenFreeMap © OpenStreetMap contributors',
+              pronto.soloPercorso
+                  ? 'Mappa: © OpenFreeMap © OpenStreetMap contributors'
+                  : 'Colonnine: © OpenStreetMap contributors, © Open Charge Map contributors, ${Pun.attribuzione} · '
+                        'Mappa: © OpenFreeMap © OpenStreetMap contributors',
               style: t.bodySmall?.copyWith(color: muto),
             ),
           ],

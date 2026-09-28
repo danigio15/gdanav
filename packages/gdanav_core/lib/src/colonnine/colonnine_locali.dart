@@ -4,10 +4,11 @@ import '../geo/geo.dart';
 import 'colonnina.dart';
 import 'colonnine_relay.dart';
 
-/// Le colonnine rapide di mezza Europa dentro l'app: preparate in CI da
-/// OpenStreetMap (`tool/colonnine_europa.dart`), si cercano in un attimo e
-/// anche senza rete. Dove l'archivio non arriva, si chiede al relay solo
-/// quei riquadri.
+/// Le colonnine dell'Italia e dintorni dentro l'app: preparate in CI da
+/// OpenStreetMap (`tool/colonnine_osm.dart`) e dalla Piattaforma Unica
+/// Nazionale (`tool/colonnine_pun.dart`), si cercano in un attimo e anche
+/// senza rete. Dove l'archivio non arriva, si chiede al relay solo quei
+/// riquadri.
 class ColonnineLocali implements FonteColonnine {
   ColonnineLocali(Future<ArchivioColonnine> archivio, {this.riserva}) : _archivio = archivio;
 
@@ -75,6 +76,10 @@ class ArchivioColonnine {
   Iterable<Colonnina> get tutte => _perRiquadro.values.expand((l) => l);
 
   bool copre((int, int) q) => _coperti.contains(q);
+
+  /// I riquadri cercati, per riscriverli quando all'archivio si aggiunge
+  /// un'altra fonte.
+  Set<(int, int)> get coperti => Set.unmodifiable(_coperti);
   List<Colonnina> nel((int, int) q) => _perRiquadro[q] ?? const [];
 
   static (int, int) _riquadro(Punto p) =>
@@ -86,6 +91,8 @@ class ArchivioColonnine {
   //  "c":[[lat,lon,"osm-node-1","nome","operatore",[[tipo,kw,quante],…]],…]}
   // q: i riquadri di mezzo grado cercati (anche vuoti).
   // tipo: 0 CCS2, 1 CHAdeMO, 2 Tipo 2, 3 Tesla.
+  // Un settimo campo, se c'è, è la fonte («pun», «osm+pun»): senza, è
+  // OpenStreetMap, che è quasi tutto l'archivio e così non paga niente.
 
   static const _tipi = [TipoConnettore.ccs2, TipoConnettore.chademo, TipoConnettore.tipo2, TipoConnettore.tesla];
 
@@ -99,6 +106,7 @@ class ArchivioColonnine {
           c.nome,
           c.operatore ?? '',
           _prese(c.connettori),
+          if (c.fonte.isNotEmpty && c.fonte != 'osm') c.fonte,
         ],
     ];
     return jsonEncode({
@@ -140,7 +148,7 @@ class ArchivioColonnine {
               for (var i = 0; i < (p[2] as num).toInt(); i++)
                 Connettore(tipo: _tipi[(p[0] as num).toInt()], potenzaKw: (p[1] as num).toDouble()),
           ],
-          fonte: 'osm',
+          fonte: r.length > 6 ? r[6] as String : 'osm',
         ),
       );
     }

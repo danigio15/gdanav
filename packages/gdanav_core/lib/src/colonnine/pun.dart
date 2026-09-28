@@ -19,6 +19,10 @@ import 'colonnina.dart';
 /// onData è del 2024): una presa guasta allora oggi può andare, e dirla
 /// guasta sarebbe una bugia peggio di «non si sa».
 abstract final class Pun {
+  /// Come la vuole citata la licenza CC BY 4.0: da dove vengono i dati, chi
+  /// li ha messi in forma, con che licenza.
+  static const attribuzione = 'PUN (MASE), elaborazione onData, CC BY 4.0';
+
   /// I codici operatore (party ID) di cui si è sicuri. Gli altri restano
   /// il codice: meglio «GES» che un nome indovinato.
   static const operatori = {

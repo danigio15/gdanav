@@ -31,6 +31,32 @@ void main() {
     expect(a.generato, isNotNull);
   });
 
+  test('la fonte va e torna, e OpenStreetMap non la scrive', () {
+    Colonnina da(String id, String fonte) => Colonnina(
+          id: id,
+          nome: id,
+          posizione: const Punto(40.8548, 14.2855),
+          connettori: const [Connettore(tipo: TipoConnettore.tipo2, potenzaKw: 22)],
+          fonte: fonte,
+        );
+    final testo = ArchivioColonnine.scrivi([da('osm-node-1', 'osm'), da('pun:1', 'pun'), da('pun:2', 'osm+pun')]);
+    final righe = (jsonDecode(testo) as Map)['c'] as List;
+    expect(righe.map((r) => (r as List).length), [6, 7, 7]);
+    final a = ArchivioColonnine.leggi(testo);
+    expect({for (final c in a.tutte) c.id: c.fonte}, {'osm-node-1': 'osm', 'pun:1': 'pun', 'pun:2': 'osm+pun'});
+  });
+
+  test("un archivio di prima, senza il settimo campo, e' tutto OpenStreetMap", () {
+    const testo = '{"v":1,"generato":"2026-09-01T00:00:00Z","c":[[44.5,11.3,"osm-node-9","A","",[[0,150,2]]]]}';
+    expect(ArchivioColonnine.leggi(testo).tutte.single.fonte, 'osm');
+  });
+
+  test('i riquadri cercati si rileggono, per riscriverli', () {
+    final a =
+        ArchivioColonnine.leggi(ArchivioColonnine.scrivi([colonnina('a', 44.5, 11.3)], coperti: {(89, 22), (70, 30)}));
+    expect(a.coperti, {(89, 22), (70, 30)});
+  });
+
   test('coperti: quelli scritti nell\'archivio, anche vuoti', () {
     final testo = ArchivioColonnine.scrivi([colonnina('a', 44.5, 11.3)], coperti: {(89, 22), (70, 30)});
     final a = ArchivioColonnine.leggi(testo);

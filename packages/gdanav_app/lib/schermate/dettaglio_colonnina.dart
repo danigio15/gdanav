@@ -13,6 +13,19 @@ Future<void> mostraColonnina(BuildContext context, GestoreViaggio gestore, Strin
   );
 }
 
+/// Da dove vengono i dati di una colonnina, detto come lo chiedono le
+/// licenze: OpenStreetMap e Open Charge Map coi loro «contributors», la PUN
+/// con chi l'ha pubblicata e la licenza. `null` se la fonte non va citata.
+String? creditoColonnina(String fonte) {
+  final f = fonte.split('+');
+  final parti = [
+    if (f.contains('osm')) '© OpenStreetMap contributors',
+    if (f.contains('ocm')) '© Open Charge Map contributors',
+    if (f.contains('pun')) Pun.attribuzione,
+  ];
+  return parti.isEmpty ? null : 'Dati: ${parti.join(' · ')}';
+}
+
 String nomeConnettore(TipoConnettore t) => switch (t) {
   TipoConnettore.ccs2 => 'CCS',
   TipoConnettore.chademo => 'CHAdeMO',
@@ -135,6 +148,8 @@ class DettaglioColonnina extends StatelessWidget {
               'Stato delle prese: PUN e operatori, quando lo pubblicano.',
               style: t.bodySmall?.copyWith(color: muto),
             ),
+            if (creditoColonnina(c.dettaglio?.fonte ?? '') case final credito?)
+              Text(credito, style: t.bodySmall?.copyWith(color: muto)),
           ],
         ),
       ),
