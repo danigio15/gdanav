@@ -11,7 +11,7 @@ lo rifanno quando serve, e scrivono i risultati nella release «lavoro».
 
 | fonte | cosa dà | dove |
 |---|---|---|
-| archivio nell'APK | anagrafica, offline | `packages/gdanav_app/assets/colonnine.json` |
+| archivio nell'APK | anagrafica, offline: OpenStreetMap + PUN | `packages/gdanav_app/assets/colonnine.json` |
 | relay di gdanav | anagrafica, fuori archivio | `ClienteColonnineRelay` |
 | Open Charge Map | anagrafica, con la chiave | `ClienteOpenChargeMap` |
 | Overpass | anagrafica, riserva lenta | `ClienteOverpass` |
@@ -21,8 +21,9 @@ Le prime quattro **si sommano** (`FonteColonnineUnite`): prima era una
 catena che si fermava alla prima che rispondeva, e bastava che Open Charge
 Map rispondesse per perdere tutto il resto.
 
-L'archivio e il relay nascono tutti e due da **OpenStreetMap**, quindi
-sanno le stesse cose.
+Il relay nasce da **OpenStreetMap**. L'archivio anche, e in più ha i posti
+della **Piattaforma Unica Nazionale** (vedi «La PUN, dentro l'archivio»):
+è lì che ci sono le colonnine che OpenStreetMap non ha.
 
 ## Il difetto del filtro, e quanto valeva
 
@@ -72,6 +73,58 @@ E una strada chiusa con la misura: **`man_made=charge_point`**, il tag con
 cui in OpenStreetMap si mappano le singole spine dentro un impianto, lì non
 lo usa nessuno — **zero**. Non lo stavamo buttando via: non c'è.
 
+## La PUN, dentro l'archivio
+
+La Piattaforma Unica Nazionale dei punti di ricarica (MASE) raccoglie per
+legge i punti di ricarica pubblici. **onData** ne ha pubblicato
+un'estrazione in CSV, con licenza **CC BY 4.0**, nel repository
+[`ondata/rete_ricarica_veicoli_elettrici`](https://github.com/ondata/rete_ricarica_veicoli_elettrici)
+(`data/pdr_latest_ready.csv`). È ferma all'ottobre 2024: poi la PUN ha
+cambiato il modo di pubblicare e la loro estrazione si è rotta.
+
+`Pun.leggiCsv` (nel nucleo) la legge; `tool/colonnine_pun.dart` la fonde
+con l'archivio di OpenStreetMap usando `fondiColonnine`, e il lavoro
+`[colonnine]` in CI lo fa da solo dopo gli estratti di Geofabrik.
+
+```
+OpenStreetMap     20.832 stazioni   39.120 prese
+PUN (onData)      20.158 posti      44.874 punti di ricarica
+  nella stessa posizione in tutte e due   4.541
+  solo nella PUN                         15.617
+archivio          36.449 stazioni   78.393 prese   1,6 → 3,6 MB
+
+Centro Direzionale, entro 1200 m
+  prima            4 stazioni     9 prese
+  dopo            14 stazioni   841 prese
+    Isola A3 202 · P5 Via Domenico Aulisio 194 · L1 144 · L2 135 · L3 112
+    · Volta-Brin 41 (Plenitude/Be Charge, tutte a 22 kW) · le Enel X
+```
+
+Sono gli stessi numeri di ABRP ed EVDC: il «189/202» di ABRP ha il totale
+dell'Isola A3, i 194 di EVDC sono il P5.
+
+Le regole, tutte con una prova in `test/pun_test.dart`:
+
+* **Una riga è un punto di ricarica**, cioè un'auto alla volta: se ha più
+  spine (CCS e CHAdeMO) se ne tiene la migliore, perché contarle tutte
+  direbbe due auto dove se ne carica una.
+* **PLANNED e REMOVED si saltano**; le prese da scooter (Tipo 3A), Schuko e
+  Tipo 1 non sono per queste auto.
+* **Lo stato non si usa**: è una fotografia del 2024, e una presa guasta
+  allora oggi può andare.
+* **Il nome è spesso una matricola** (`18XM32T77B3W000013`, `LOC69618`):
+  lì si mostra l'indirizzo.
+* **L'operatore** è il codice in mezzo all'EVSE ID (`IT*BEC*EW003907*1` →
+  BEC, Be Charge), ma solo se è di tre caratteri come vuole lo standard.
+* **La licenza chiede di citarla**: «PUN (MASE), elaborazione onData,
+  CC BY 4.0» compare nella scheda della colonnina, nel dettaglio e nella
+  scheda del viaggio (`creditoColonnina`).
+
+Con i 22 kW del Centro Direzionale è venuto fuori anche un difetto della
+scelta della potenza: **«Tutte» valeva 22 kW**, e 5.758 posti dell'archivio
+(le 11, 15, 20 kW, le Enel X da 21) non si vedevano mai. Adesso «Tutte»
+intorno a te vuol dire tutte; per le soste del viaggio il minimo resta 22.
+
 ## Perché le altre app le hanno
 
 Dalla scheda di EVDC esce l'identificativo `IT*PLN*EW002913*1`: paese,
@@ -90,7 +143,7 @@ percorsi di scoperta standard sui domini di dodici operatori italiani:
 risponde 403 anche a un indirizzo inventato: è il suo firewall. Gli
 endpoint OCPI stanno su host separati e si ricevono in accreditamento.
 
-**La PUN non espone niente di pubblico.** `tools/sonda_pun.py`:
+**La PUN, cercandola a mano, sembrava non esporre niente.** `tools/sonda_pun.py`:
 
 * `/ocpi/versions` e fratelli → HTTP 200 di 1371 byte, la pagina del sito
   (il server risponde così a **qualunque** percorso sconosciuto: attenzione,
@@ -107,11 +160,44 @@ L'ArcGIS `services9.arcgis.com/Iko2iF79CuZQnhht` incontrato per strada non
 c'entra: i suoi 51 servizi sono la Route 66, le Crociate e la Valle dei
 Templi. È un inquilino del turismo.
 
+**Poi l'ha trovata un browser.** L'API non è sullo stesso dominio del sito,
+e per questo cercarla lì non dava niente: è su
+`api.pun.piattaformaunicanazionale.it`. `tools/pun/cattura.mjs` apre la
+mappa pubblica con un browser automatico, come la apre chiunque, e scrive le
+chiamate che la pagina fa (`pun_api.txt` nella release «lavoro»):
+
+```
+GET  /v1/chargepoints/public/count          → {"Idrs":75765}
+POST /v1/chargepoints/public/map/search     {"page":0,"size":12000} … fino a page 6
+     → content: [{status, coordinates:{latitude,longitude}, evse_id}, …]
+       status: AVAILABLE, CHARGING, UNKNOWN, …  ← lo stato di adesso
+POST /v1/chargepoints/group                 ["IT*ENX*E24…*2", …]
+     → [{location:{address, city, coordinates, party_id, parking_type,
+                    opening_times, …}, …}]
+GET  /v1/companies/list?status=APPROVED     → {"BEC": "…", "ENX": "…", …}
+GET  /v1/tariffs/price-range                → {"min":0.0,"max":0.85}
+```
+
+Ogni richiesta è **firmata AWS** (`authorization`, `x-amz-date`,
+`x-amz-security-token`, cioè credenziali provvisorie che la pagina si
+procura da sola). Oggi i punti sono **75.765**, contro i 48.916 della
+fotografia di onData: ne manca più di un terzo, e ogni punto ha lo stato di
+adesso.
+
+**Non la usiamo dall'app.** È un'API interna del sito, non documentata: si
+è già rotta una volta (è quello che ha fermato onData), e cablarla in ogni
+telefono vorrebbe dire dipendere da qualcosa che nessuno ci ha dato. Serve a sapere **cosa
+chiedere**: vedi sotto.
+
 ## Cosa resta da fare, e non è codice
 
-1. **MASE / GSE** — chiedere un accesso in lettura ai dati della PUN (oltre
-   32.000 punti, raccolti per obbligo di legge). Gratis se lo concedono,
-   e risolve l'Italia intera.
+1. **MASE / GSE** — chiedere un accesso in lettura ai dati della PUN
+   (75.765 punti oggi, con lo stato di ognuno). L'argomento c'è: dal 14
+   aprile 2025 il regolamento AFIR (UE 2023/1804, art. 20) vuole che i dati
+   statici e dinamici dei punti di ricarica siano **aperti e gratuiti**
+   attraverso il punto di accesso nazionale, e dal 14 aprile 2026 in
+   DATEX II. Basta un accesso per il relay: risolve l'Italia intera, stato
+   compreso.
 2. **Un operatore alla volta** — chiedere credenziali OCPI come eMSP, solo
    `Locations` e `Tariffs`. Gratis, e il codice per leggerle c'è già.
 3. **Eco-Movement** — a contratto, copertura come ABRP.
@@ -121,7 +207,7 @@ tutti gli utenti, e niente segreti dentro l'applicazione.
 
 ## Lo stato in tempo reale
 
-TomTom Search dà 2.500 chiamate al mese e ne bruciavamo due per colonnina:
+TomTom Search dà 2.500 chiamate al giorno e ne bruciavamo due per colonnina:
 il contatore era a zero e rispondeva 403, che in app diventava «Stato non
 comunicato» su ogni colonnina. Adesso dopo un rifiuto si smette di chiedere
 per sei ore, e la pastiglia dice quante prese ci sono invece di dire che
@@ -149,3 +235,16 @@ Quattro giri di sonda persi per queste, che sono tutte nostre:
   un decimo di secondo, ma in una giornata storta ci mette un minuto, e
   l'unione tornava vuota. Adesso aspetta sessanta, quanto il relay si dà da
   solo.
+
+E tre dai dati veri della PUN, che un CSV di prova inventato non avrebbe
+avuto:
+
+* **La potenza può essere una lista** — `150000,62500` per una colonnina
+  con CCS e CHAdeMO. Letta come un numero solo diventava zero, e si
+  perdevano proprio le rapide doppie.
+* **Il codice operatore non è sempre di tre caratteri** — c'è anche
+  `IT*REVEPGS564*1*2`. Prenderlo com'è vorrebbe dire inventare un operatore.
+* **Il sito della PUN risponde 200 a qualunque indirizzo** — con la sua
+  pagina: fa sembrare che esista quello che non esiste. E la sua API sta
+  su un altro dominio, `api.pun.…`: cercarla sul dominio del sito non
+  poteva trovarla.
