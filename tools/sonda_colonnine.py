@@ -228,11 +228,16 @@ RAGGIO_M = 1200
 def quante_al_centro_direzionale() -> None:
     lat, lon = CENTRO_DIREZIONALE
 
-    # OpenStreetMap, senza nessun filtro: è la fonte che alimenta l'archivio.
+    # OpenStreetMap, senza nessun filtro. Due tag, non uno: gdanav raccoglie
+    # solo `amenity=charging_station`, ma in OpenStreetMap le singole spine
+    # dentro un impianto si mappano anche come `man_made=charge_point`, e
+    # quelle non le chiediamo proprio. Qui si contano tutte e due, per sapere
+    # quanto vale aggiungere il secondo.
     overpass = (
-        f"[out:json][timeout:60];"
+        f"[out:json][timeout:60];("
         f'nwr["amenity"="charging_station"](around:{RAGGIO_M},{lat},{lon});'
-        f"out center tags;"
+        f'nwr["man_made"="charge_point"](around:{RAGGIO_M},{lat},{lon});'
+        f");out center tags;"
     )
     for server in ("https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"):
         try:
@@ -244,7 +249,33 @@ def quante_al_centro_direzionale() -> None:
         except Exception as e:  # noqa: BLE001
             avviso("Centro Direzionale OSM", f"{server.split('/')[2]}: {e}")
             continue
-        elementi = j.get("elements", [])
+        tutti = j.get("elements", [])
+        stazioni = [e for e in tutti if e.get("tags", {}).get("amenity") == "charging_station"]
+        spine = [e for e in tutti if e.get("tags", {}).get("man_made") == "charge_point"]
+        # Quante prese si contano oggi (solo `socket:*`), e quante se ne
+        # conterebbero usando anche `capacity` e le spine mappate a parte.
+        def prese(e: dict) -> int:
+            tag = e.get("tags", {})
+            n = 0
+            for k, v in tag.items():
+                if k.startswith("socket:") and ":" not in k[7:] and str(v).isdigit():
+                    n += int(v)
+            return n
+
+        conSocket = sum(prese(e) for e in stazioni)
+        conCapacity = sum(
+            prese(e) or int(str(e.get("tags", {}).get("capacity", "")) or 0) or 1 for e in stazioni
+        )
+        avviso(
+            "Centro Direzionale prese",
+            f"{len(stazioni)} stazioni + {len(spine)} spine mappate a parte (man_made=charge_point); "
+            f"prese dai soli socket: {conSocket}; contando anche capacity: {conCapacity}; "
+            f"con le spine: {conCapacity + len(spine)}",
+        )
+        quanteCapacity = sum(1 for e in stazioni if e.get("tags", {}).get("capacity"))
+        avviso("Centro Direzionale capacity", f"{quanteCapacity} stazioni su {len(stazioni)} hanno capacity scritto")
+
+        elementi = stazioni
         potenze = []
         operatori: dict[str, int] = {}
         for e in elementi:

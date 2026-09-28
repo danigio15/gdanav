@@ -147,16 +147,22 @@ class ClienteOverpass implements FonteColonnine {
       ..._prese(tag, 'tesla_supercharger_ccs', TipoConnettore.ccs2, 150),
     ];
     final operatore = (tag['operator'] ?? tag['brand'] ?? tag['network']) as String?;
-    // Senza prese scritte: una rapida CCS se è di una rete rapida, altrimenti
-    // una Tipo 2, la più comune; con la potenza se c'è.
+    /* Senza prese scritte: una rapida CCS se è di una rete rapida, altrimenti
+     * una Tipo 2, la più comune; con la potenza se c'è.
+     *
+     * E quante? Finora sempre una, e per una colonnina da otto stalli era
+     * una bugia. `capacity` in OpenStreetMap dice quante auto si caricano
+     * insieme: è il numero giusto, e quando c'è si usa. */
     if (connettori.isEmpty) {
       final rapida = RegExp(retiRapide, caseSensitive: false).hasMatch('${tag['operator']} ${tag['brand']}');
-      connettori.add(
-        Connettore(
-          tipo: rapida ? TipoConnettore.ccs2 : TipoConnettore.tipo2,
-          potenzaKw: _kw(tag['charging_station:output']) ?? (rapida ? 150 : 22),
-        ),
+      final quante = (int.tryParse('${tag['capacity'] ?? ''}') ?? 1).clamp(1, massimoPrese);
+      final presa = Connettore(
+        tipo: rapida ? TipoConnettore.ccs2 : TipoConnettore.tipo2,
+        potenzaKw: _kw(tag['charging_station:output']) ?? (rapida ? 150 : 22),
       );
+      for (var i = 0; i < quante; i++) {
+        connettori.add(presa);
+      }
     }
     return Colonnina(
       id: 'osm-${e['type']}-${e['id']}',
@@ -168,12 +174,20 @@ class ClienteOverpass implements FonteColonnine {
     );
   }
 
+  /// Quante prese al massimo si tengono da una sola voce.
+  ///
+  /// Era venti, e tagliava: al Centro Direzionale di Napoli una sola
+  /// installazione ne ha oltre duecento. Un tetto serve lo stesso, perché
+  /// un numero scritto male in OpenStreetMap non deve far esplodere niente,
+  /// ma va messo dove sta la realtà, non dove stava comodo.
+  static const massimoPrese = 400;
+
   static List<Connettore> _prese(Map<String, Object?> tag, String chiave, TipoConnettore tipo, double potenza) {
     final valore = tag['socket:$chiave'];
     if (valore == null || valore == 'no' || valore == '0') return const [];
     final quante = int.tryParse('$valore') ?? 1;
     final kw = _kw(tag['socket:$chiave:output']) ?? potenza;
-    return [for (var i = 0; i < quante.clamp(1, 20); i++) Connettore(tipo: tipo, potenzaKw: kw)];
+    return [for (var i = 0; i < quante.clamp(1, massimoPrese); i++) Connettore(tipo: tipo, potenzaKw: kw)];
   }
 
   /// «150 kW», «22kW», «50000 W», «11 kVA», «50;150 kW» (il più alto).
