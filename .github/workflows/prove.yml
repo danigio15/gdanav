@@ -226,7 +226,7 @@ jobs:
           # inciampa — o se pip non trova PyPI, che è già successo — le altre
           # devono andare avanti lo stesso.
           pip install mapbox-vector-tile pillow || echo "::warning title=Sonde::pip non ha risposto: le sonde che vogliono le librerie non girano"
-          for sonda in sonda_traffico sonda_mappa anteprima_tomtom sonda_percorso sonda_colonnine sonda_ocpi; do
+          for sonda in sonda_traffico sonda_mappa anteprima_tomtom sonda_percorso sonda_colonnine sonda_ocpi sonda_pun; do
             python3 "tools/$sonda.py" || echo "::warning title=Sonde::$sonda non ha finito"
           done
       - name: Le anteprime della mappa TomTom, da guardare
@@ -250,6 +250,7 @@ jobs:
           ls percorso-*.json > /dev/null 2>&1 && gh release upload lavoro percorso-*.json --clobber
           [ -s colonnine_sonda.txt ] && gh release upload lavoro colonnine_sonda.txt --clobber
           [ -s ocpi_sonda.txt ] && gh release upload lavoro ocpi_sonda.txt --clobber
+          [ -s pun_sonda.txt ] && gh release upload lavoro pun_sonda.txt --clobber
           true
 
   # Le foto vere delle auto, da Wikimedia Commons: solo quando il commit lo
