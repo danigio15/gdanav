@@ -70,6 +70,9 @@ abstract final class Pun {
     final cPotenza = colonna('potenza_erogabile');
     final cLat = colonna('latitudine_evse');
     final cLon = colonna('longitudine_evse');
+    // Solo nell'estrazione di oggi dall'API (tools/pun/estrai.py): il nome
+    // dell'azienda. Nel CSV di onData non c'è.
+    final cAzienda = intestazione.indexOf('operatore');
 
     final perLuogo = <String, _Luogo>{};
     for (final r in righe.skip(1)) {
@@ -85,7 +88,12 @@ abstract final class Pun {
       if (id.isEmpty) continue;
       final luogo = perLuogo.putIfAbsent(
         id,
-        () => _Luogo(id, r[cNome].trim(), r[cIndirizzo].trim(), _operatore(r[cEvse])),
+        () => _Luogo(
+          id,
+          r[cNome].trim(),
+          r[cIndirizzo].trim(),
+          _operatore(r[cEvse], azienda: cAzienda >= 0 ? r[cAzienda] : ''),
+        ),
       );
       luogo.lat.add(lat);
       luogo.lon.add(lon);
@@ -130,17 +138,62 @@ abstract final class Pun {
     return Connettore(tipo: migliore, potenzaKw: double.parse(kw.toStringAsFixed(1)));
   }
 
-  /// Dall'EVSE ID `IT*BEC*EW003907*1` il codice dell'operatore, `BEC`.
+  /// Chi gestisce il punto di ricarica. Prima il nome con cui lo si chiama
+  /// ([operatori], dal codice dentro l'EVSE ID), poi quello dell'azienda
+  /// scritto nella PUN ([nomeAzienda]), e solo alla fine il codice.
+  static String? _operatore(String evse, {String azienda = ''}) {
+    final codice = codiceOperatore(evse);
+    if (operatori[codice] case final noto?) return noto;
+    final nome = nomeAzienda(azienda);
+    if (nome.isNotEmpty) return nome;
+    return codice;
+  }
+
+  /// Dall'EVSE ID `IT*BEC*EW003907*1` il codice dell'operatore, `BEC`; anche
+  /// dalla forma senza asterischi, `ITGESE822979393` → `GES`.
   ///
   /// Il codice (party ID) è di tre caratteri per definizione: nei dati c'è
   /// anche `IT*REVEPGS564*1*2`, e prendere «REVEPGS564» per un operatore
   /// vorrebbe dire inventarne uno.
-  static String? _operatore(String evse) {
-    final pezzi = evse.split('*');
+  static String? codiceOperatore(String evse) {
+    final e = evse.trim().toUpperCase();
+    if (!e.contains('*')) return RegExp(r'^[A-Z]{2}([A-Z0-9]{3})E').firstMatch(e)?.group(1);
+    final pezzi = e.split('*');
     if (pezzi.length < 3) return null;
-    final codice = pezzi[1].trim().toUpperCase();
-    if (!RegExp(r'^[A-Z0-9]{3}$').hasMatch(codice)) return null;
-    return operatori[codice] ?? codice;
+    final codice = pezzi[1].trim();
+    return RegExp(r'^[A-Z0-9]{3}$').hasMatch(codice) ? codice : null;
+  }
+
+  static final _formaGiuridica = RegExp(
+    r"[\s,]+(unipersonale|in liquidazione|s\.?\s?r\.?\s?l\.?(\s?s\.?)?|s\.?\s?p\.?\s?a\.?|s\.?\s?n\.?\s?c\.?|"
+    r"s\.?\s?a\.?\s?s\.?|s\.?\s?c\.?\s?a\.?\s?r\.?\s?l\.?|soc(\.|ietà|ieta')?\s?coop(\.|erativa)?[^,]*|"
+    r"societ(à|a') (a responsabilit(à|a') limitata( semplificata)?|per azioni|cooperativa[^,]*|consortile[^,]*)|"
+    r"gmbh|ag|b\.?\s?v\.?|ltd\.?)\.?$",
+    caseSensitive: false,
+  );
+  static const _minuscole = {'di', 'da', 'del', 'della', 'dei', 'e', 'ed', 'la', 'il', 'lo', 'per', 'in', 'con', 'su'};
+
+  /// Il nome di un'azienda come lo si dice: senza la forma giuridica, e non
+  /// tutto in maiuscolo. «A2A E.MOBILITY S.R.L.» → «A2A E.Mobility»,
+  /// «ACEA ENERGIA SPA» → «Acea Energia». Le parole di tre lettere o meno
+  /// restano come sono: sono quasi sempre sigle (ASM, ACE, A2A).
+  static String nomeAzienda(String azienda) {
+    var n = azienda.trim().replaceAll(RegExp(r'\s+'), ' ');
+    for (var prima = ''; prima != n;) {
+      prima = n;
+      n = n.replaceFirst(_formaGiuridica, '').trim();
+    }
+    if (n.isNotEmpty && n == n.toUpperCase()) {
+      n = n.split(' ').indexed.map((x) {
+        final (i, p) = x;
+        if (i > 0 && _minuscole.contains(p.toLowerCase())) return p.toLowerCase();
+        return p.replaceAllMapped(
+          RegExp(r'[A-ZÀ-Ý]{4,}'),
+          (m) => m[0]![0] + m[0]!.substring(1).toLowerCase(),
+        );
+      }).join(' ');
+    }
+    return n;
   }
 
   /// Il nome da mostrare. Molti posti hanno per nome un codice di macchina
