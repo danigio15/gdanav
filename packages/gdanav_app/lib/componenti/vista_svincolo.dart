@@ -111,7 +111,10 @@ class PopupSvincolo extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      mappa?.call(viaggio, manovra) ?? CustomPaint(painter: ScenaSvincolo(manovra)),
+                      mappa?.call(viaggio, manovra) ??
+                          CustomPaint(
+                            painter: ScenaSvincolo(manovra, gradi: quantoGiraLaManovra(viaggio.percorso, manovra)),
+                          ),
                       Positioned(
                         left: 0,
                         right: 0,

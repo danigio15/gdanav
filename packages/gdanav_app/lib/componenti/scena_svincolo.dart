@@ -11,16 +11,37 @@ import 'package:gdanav_core/gdanav_core.dart';
 /// giuste sono blu con le frecce bianche dipinte sull'asfalto. Intorno cielo
 /// con le nuvole, colline, alberi e qualche edificio lontano.
 class ScenaSvincolo extends CustomPainter {
-  ScenaSvincolo(this.manovra);
+  ScenaSvincolo(this.manovra, {this.gradi});
 
   final Manovra manovra;
+
+  /* Di quanto gira lo svincolo davvero, col segno (negativo a sinistra):
+   * lo dice `quantoGiraLaManovra` guardando i punti del percorso.
+   *
+   * Senza, il ramo si disegnava sempre uguale — una curva che si chiudeva a
+   * sessantatre gradi — qualunque cosa fosse: un raccordo che si stacca di
+   * venti gradi e una rampa che torna indietro venivano lo stesso disegno, e
+   * una semplice deviazione sembrava un tornante. */
+  final double? gradi;
 
   static const _corsia = 3.6;
   static const _altezzaCamera = 8.5;
   static const _separazione = 20.0;
   static const _vicino = 4.0;
 
-  bool get _destra => const {18, 20, 23}.contains(manovra.tipo);
+  /* Quanto gira il ramo nel disegno, in gradi, e da che parte.
+   *
+   * Sotto i dodici gradi non si vedrebbe che è un'uscita; sopra gli ottanta
+   * il ramo esce dall'inquadratura. Senza i gradi veri restano i sessantatré
+   * di prima, che erano gli unici che sapeva disegnare. */
+  static const minimoGradi = 12.0, massimoGradi = 80.0, senzaGradi = 63.0;
+
+  /// Quanto gira il ramo nel disegno, in radianti.
+  double get _curva => (gradi ?? senzaGradi).abs().clamp(minimoGradi, massimoGradi) * math.pi / 180;
+
+  /* Da che parte si esce. I gradi veri battono il tipo della manovra: il tipo
+   * dice «tieni la sinistra» anche dove la strada piega a destra. */
+  bool get _destra => gradi != null && gradi!.abs() >= 8 ? gradi! > 0 : const {18, 20, 23}.contains(manovra.tipo);
 
   @override
   void paint(Canvas canvas, Size s) {
@@ -38,12 +59,16 @@ class ScenaSvincolo extends CustomPainter {
     Offset p(Offset mondo, [double quota = 0]) =>
         Offset(w / 2 + f * (mondo.dx - camX) / mondo.dy, orizzonte + f * (_altezzaCamera - quota) / mondo.dy);
 
-    // Il ramo: dritto fino alla separazione, poi curva sempre di più
-    // (come una clotoide) fino a 70°. Si integra una volta sola, ogni metro.
+    /* Il ramo: dritto fino alla separazione, poi curva sempre di più (come
+     * una clotoide) fino ai gradi che gira davvero, e poi dritto. La curva si
+     * chiude sempre nella stessa novantina di metri, così una deviazione
+     * larga si stacca dolcemente e una rampa stretta si avvita: è il rapporto
+     * fra le due che si vede. Si integra una volta sola, ogni metro. */
+    const chiudeIn = 92.0;
     final base = <Offset>[const Offset(0, 0)], rotte = <double>[0];
     for (var t = 1; t <= 600; t++) {
       final d = math.max(0.0, t - _separazione);
-      final rotta = math.min(1.1, 0.5 * 2.6e-4 * d * d);
+      final rotta = math.min(_curva, _curva * (d / chiudeIn) * (d / chiudeIn));
       rotte.add(rotta);
       base.add(base.last + Offset(math.sin(rotta), math.cos(rotta)));
     }
@@ -406,9 +431,9 @@ class ScenaSvincolo extends CustomPainter {
 }
 
 /// La scena in PNG, per lo schermo di Android Auto.
-Future<Uint8List> scenaSvincoloPng(Manovra m, {double larghezza = 800, double altezza = 480}) async {
+Future<Uint8List> scenaSvincoloPng(Manovra m, {double larghezza = 800, double altezza = 480, double? gradi}) async {
   final registro = ui.PictureRecorder();
-  ScenaSvincolo(m).paint(Canvas(registro), Size(larghezza, altezza));
+  ScenaSvincolo(m, gradi: gradi).paint(Canvas(registro), Size(larghezza, altezza));
   final immagine = await registro.endRecording().toImage(larghezza.round(), altezza.round());
   return (await immagine.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
 }

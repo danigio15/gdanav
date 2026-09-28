@@ -81,6 +81,39 @@ void main() {
     }
   });
 
+  /* «Non è che mi propone un tornante quando è una semplice deviazione»: il
+   * ramo si disegnava sempre uguale, una curva che si chiudeva a sessantatre
+   * gradi, per qualunque uscita. Adesso segue i gradi veri. */
+  test('lo svincolo si disegna di quanto gira davvero', () async {
+    /* I PNG si confrontano a mano: `expect` su due liste da mezzo megabyte
+     * stampa mezzo megabyte quando fallisce, e non si legge. */
+    bool uguali(List<int> a, List<int> b) {
+      if (a.length != b.length) return false;
+      for (var i = 0; i < a.length; i++) {
+        if (a[i] != b[i]) return false;
+      }
+      return true;
+    }
+
+    Future<List<int>> scena(double? gradi) =>
+        scenaSvincoloPng(manovraSvincolo, larghezza: 300, altezza: 180, gradi: gradi);
+
+    expect(
+      uguali(await scena(-18), await scena(-85)),
+      isFalse,
+      reason: 'una deviazione di diciotto gradi e una rampa di ottantacinque non possono venire uguali',
+    );
+    /* Senza i gradi resta il disegno di prima: sessantatré, e dalla parte che
+     * dice il tipo della manovra — qui 20, uscita a destra. */
+    expect(uguali(await scena(null), await scena(ScenaSvincolo.senzaGradi)), isTrue);
+    // Il segno dice da che parte, e batte il tipo della manovra.
+    expect(uguali(await scena(40), await scena(-40)), isFalse);
+    expect(uguali(await scena(null), await scena(-ScenaSvincolo.senzaGradi)), isFalse);
+    // Oltre i limiti non si va: una rampa da centoquaranta gradi si disegna
+    // come una da ottanta, che è già il massimo che entra nell'inquadratura.
+    expect(uguali(await scena(140), await scena(ScenaSvincolo.massimoGradi)), isTrue);
+  });
+
   testWidgets('allo svincolo il popup: la mappa 3D, cartello, corsie, metri; e si chiude', (tester) async {
     var chiuso = false;
     expect(haSvincolo(manovraSvincolo), isTrue);
