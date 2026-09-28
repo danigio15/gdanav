@@ -28,6 +28,18 @@ void main() {
       expect(c.connettori.firstWhere((p) => p.tipo == TipoConnettore.chademo).stato, StatoPresa.fuoriServizio);
     });
 
+    /* Su una colonnina che funziona può esserci una presa «pianificata»: non
+     * c'è ancora, e contarla fa dire «4 prese» dove ce ne sono due. Intorno a
+     * Napoli sono 15 su 237. Lo stesso per il doppione rimosso (210). */
+    test('le prese pianificate e i doppioni rimossi non si contano', () {
+      final c = colonnine[1];
+      expect(c.connettori, hasLength(2));
+      expect(c.connettori.every((p) => p.tipo == TipoConnettore.tipo2), isTrue);
+      // E non deve credere che lì si carichi a 150 kW.
+      expect(c.potenzaPer(ccs), 0);
+      expect(c.potenzaPer({TipoConnettore.tipo2}), 22);
+    });
+
     test('la potenza utile dipende dalle prese dell\'auto', () {
       expect(colonnine.first.potenzaPer(ccs), 350);
       expect(colonnine.first.potenzaPer({TipoConnettore.chademo}), 0); // guasta

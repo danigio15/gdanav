@@ -52,20 +52,27 @@ class ClienteOpenChargeMap implements FonteColonnine {
 
   static Colonnina? _colonnina(Map<String, Object?> p) {
     final stato = p['StatusTypeID'] as int?;
-    // Pianificate e rimosse non esistono per chi guida.
-    if (stato == 150 || stato == 200) return null;
+    // Pianificate e rimosse non esistono per chi guida. La 210 è il doppione
+    // rimosso, che mancava.
+    if (_nonEsiste(stato)) return null;
     final indirizzo = p['AddressInfo'] as Map<String, Object?>?;
     final lat = (indirizzo?['Latitude'] as num?)?.toDouble();
     final lon = (indirizzo?['Longitude'] as num?)?.toDouble();
     if (lat == null || lon == null) return null;
     final connettori = <Connettore>[
       for (final c in ((p['Connections'] as List?) ?? const []).cast<Map<String, Object?>>())
-        for (var i = 0; i < ((c['Quantity'] as int?) ?? 1).clamp(1, 20); i++)
-          Connettore(
-            tipo: _tipo(c['ConnectionTypeID'] as int?),
-            potenzaKw: (c['PowerKW'] as num?)?.toDouble() ?? 0,
-            stato: _stato(c['StatusTypeID'] as int? ?? stato),
-          ),
+        /* Anche la singola presa può essere «pianificata»: una colonnina in
+         * funzione con una presa in più che verrà, un giorno. Contarla
+         * gonfia le prese che si dicono a chi guida — «4 prese» quando ce ne
+         * sono tre — e in Italia capita: sulle 237 prese intorno a Napoli, 15
+         * sono di queste. */
+        if (!_nonEsiste(c['StatusTypeID'] as int?))
+          for (var i = 0; i < ((c['Quantity'] as int?) ?? 1).clamp(1, 20); i++)
+            Connettore(
+              tipo: _tipo(c['ConnectionTypeID'] as int?),
+              potenzaKw: (c['PowerKW'] as num?)?.toDouble() ?? 0,
+              stato: _stato(c['StatusTypeID'] as int? ?? stato),
+            ),
     ];
     return Colonnina(
       id: 'ocm:${p['ID']}',
@@ -86,7 +93,15 @@ class ClienteOpenChargeMap implements FonteColonnine {
         _ => TipoConnettore.altro,
       };
 
+  /// Quello che non c'è: 150 pianificata, 200 rimossa, 210 doppione rimosso.
+  static bool _nonEsiste(int? id) => id == 150 || id == 200 || id == 210;
+
   /// Gli ID di `StatusType`.
+  ///
+  /// Solo 10 e 20 sono lo stato di adesso, e in Italia non li manda quasi
+  /// nessuno: sulle colonnine intorno a Napoli sono zero. Quello che arriva è
+  /// 50 («funziona», in generale), che non dice se la presa è libera adesso —
+  /// e infatti resta `sconosciuto`, che è la verità.
   static StatoPresa _stato(int? id) => switch (id) {
         10 => StatoPresa.disponibile,
         20 => StatoPresa.occupata,
