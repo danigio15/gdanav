@@ -81,17 +81,39 @@ class Avanzamento {
 class Guida {
   Guida(
     this.percorso, {
-    this.sogliaFuoriM = 45,
+    this.sogliaFuoriM = 35,
     this.lettureFuori = 3,
     this.sogliaAggancioM = 20,
     this.sogliaSgancioM = 32,
+    this.sogliaControManoGradi = 75,
+    this.lettureContromano = 3,
+    this.movimentoCheContaM = 8,
   }) : _linea = Linea(percorso.punti) {
     _secondi = _secondiCumulati();
   }
 
   final PercorsoCalcolato percorso;
+
+  /* Quanto lontani dalla linea per dire «non sei su questa strada».
+   *
+   * Erano quarantacinque metri, ed erano troppi: in un paese italiano due
+   * strade parallele stanno a trenta, e da quarantacinque la plancia disegnava
+   * la linea sulla via accanto a quella dove si era davvero senza avere niente
+   * da ridire. Trentacinque sta sopra l'errore del GPS in mezzo alla strada e
+   * sotto la larghezza di un isolato. Sotto non si scende: fra i palazzi alti
+   * il telefono sbaglia di quanto basta a gridare al lupo. */
   final double sogliaFuoriM;
   final int lettureFuori;
+
+  /* Di quanto la direzione in cui si va può discostarsi da quella della strada
+   * prima di dire che non è quella strada. Settantacinque gradi: una traversa
+   * la si prende a novanta, un'inversione a centottanta, e una curva presa
+   * larga non ci arriva mai. */
+  final double sogliaControManoGradi;
+  final int lettureContromano;
+
+  /// Sotto questo passo fra due letture la direzione è rumore del GPS.
+  final double movimentoCheContaM;
 
   /* Quanto vicini alla linea per posare il segnaposto sulla strada, e quanto
    * lontani per toglierlo.
@@ -115,7 +137,9 @@ class Guida {
 
   var _segmento = 0;
   var _fuori = 0;
+  var _controMano = 0;
   var _agganciato = false;
+  Punto? _precedente;
   final _annunciate = <String>{};
 
   /// Le distanze a cui si annuncia una manovra: da lontano e all'ultimo.
@@ -126,24 +150,45 @@ class Guida {
   /// La stessa strada con tempi nuovi (il traffico aggiornato): si resta a
   /// che punto si era, e le manovre già dette non si ripetono.
   Guida conTempi(PercorsoCalcolato nuovo) {
-    final g = Guida(nuovo, sogliaFuoriM: sogliaFuoriM, lettureFuori: lettureFuori);
+    final g = Guida(
+      nuovo,
+      sogliaFuoriM: sogliaFuoriM,
+      lettureFuori: lettureFuori,
+      sogliaControManoGradi: sogliaControManoGradi,
+      lettureContromano: lettureContromano,
+      movimentoCheContaM: movimentoCheContaM,
+    );
     if (nuovo.punti.length != percorso.punti.length) return g;
     g._segmento = _segmento;
     g._agganciato = _agganciato;
+    /* Anche l'ultima posizione: senza, la prima lettura dopo un traffico
+     * aggiornato non avrebbe da che parte si sta andando, e il controllo della
+     * direzione si prenderebbe un secondo di pausa a ogni giro. */
+    g._precedente = _precedente;
     g._annunciate.addAll(_annunciate);
     return g;
   }
 
   Avanzamento aggiorna(Punto qui) {
-    // Si cerca poco indietro e un bel po' avanti: su una strada che torna su
-    // se stessa si resta dalla parte giusta.
-    final p = _linea.proiettaTra(qui, math.max(0, _segmento - 3), _segmento + 400);
+    /* Si cerca poco indietro e solo fin dove si poteva davvero arrivare: su
+     * una strada che torna su se stessa si resta dalla parte giusta, e non ci
+     * si aggancia a un pezzo di percorso che sta chilometri più avanti.
+     *
+     * Prima la finestra era di quattrocento segmenti fissi, che su un percorso
+     * cittadino sono chilometri. In città il percorso ripassa vicino di
+     * continuo, e bastava girare in una traversa per proiettarsi su un tratto
+     * lontanissimo: la distanza restava piccola, il cursore saltava in avanti,
+     * e il navigatore diceva che quella strada l'avevi già fatta. */
+    final p = _linea.proiettaTra(qui, math.max(0, _segmento - 3), _segmento + _quantiAvanti(qui));
+    final passo = _precedente == null ? null : distanzaM(_precedente!, qui);
     if (p.lontanoM <= sogliaFuoriM) {
       _segmento = p.segmento;
       _fuori = 0;
     } else {
       _fuori++;
     }
+    _guardaDoveSiVa(qui, p, passo);
+    _precedente = qui;
     final percorsi = p.lungoM;
     final restanti = math.max(0.0, _linea.lunghezzaM - percorsi);
     final i = p.segmento;
@@ -169,7 +214,7 @@ class Guida {
       prossima: prossima,
       allaProssimaM: alla,
       dopo: dopo,
-      fuoriPercorso: _fuori >= lettureFuori,
+      fuoriPercorso: _fuori >= lettureFuori || _controMano >= lettureContromano,
       arrivato: arrivato,
       posizioneSulPercorso: sulla,
       rotta: _agganciato ? _rotta(i) : null,
@@ -202,6 +247,71 @@ class Guida {
   }
 
   /// La direzione del segmento [i]; se è cortissimo, quella dei successivi.
+  /* Fin dove ha senso cercarsi sul percorso.
+   *
+   * Fra due letture GPS passa un secondo: anche a duecento all'ora sono
+   * cinquantacinque metri. Si guarda quanto ci si è spostati davvero e si
+   * lascia larghezza — il triplo, e mai meno di duecento metri, per i buchi di
+   * segnale sotto un cavalcavia — poi si contano i segmenti che ci stanno.
+   * Oltre non si può essere arrivati, e cercarsi oltre vuol dire trovarsi. */
+  int _quantiAvanti(Punto qui) {
+    /* Alla prima lettura non si sa da dove si arriva, e allora non si sa
+     * nemmeno quanto lontano si possa essere: si guarda tutto il percorso.
+     * Senza questa riga, chi riapre il navigatore a metà viaggio — o chi si
+     * mette in strada dopo un ricalcolo — non riuscirebbe a trovarsi, perché
+     * si cercherebbe solo nei primi duecento metri. */
+    if (_precedente == null) return _linea.punti.length;
+    final passo = distanzaM(_precedente!, qui);
+    final quanti = math.max(200.0, passo * 3);
+    final da = _linea.cumulate[math.min(_segmento, _linea.cumulate.length - 1)];
+    var j = _segmento;
+    while (j + 1 < _linea.cumulate.length && _linea.cumulate[j + 1] - da <= quanti) {
+      j++;
+    }
+    /* Almeno una manciata: su un percorso coi vertici radi, contare i metri
+     * potrebbe non farne entrare nemmeno uno. */
+    return math.max(8, j - _segmento + 1);
+  }
+
+  /* Andare in una direzione che quella strada non ha è fuori percorso, anche
+   * standoci sopra.
+   *
+   * «Sto andando in direzione opposta e non ricalcola.» Ed era vero, sempre:
+   * il giudizio guardava solo QUANTO SI È LONTANI dalla linea, e facendo
+   * inversione sulla stessa carreggiata da quella linea non ci si allontana di
+   * un metro. Provato a tavolino: un chilometro all'indietro sulla stessa
+   * strada, distanza zero a ogni lettura, mai una volta «fuori percorso» — e i
+   * metri percorsi che tornavano indietro come se fosse previsto.
+   *
+   * La direzione però ce l'abbiamo già, e non serve la bussola: due posizioni
+   * di fila dicono da che parte si sta andando. Se quella direzione litiga con
+   * la strada su cui ci si è proiettati, non si è su quella strada — si è su
+   * un'altra che le passa vicino, o sulla stessa al contrario.
+   *
+   * ── Le tre prudenze ─────────────────────────────────────────────────────
+   *
+   * · **fermi non si decide.** Sotto i passi brevi la direzione fra due letture
+   *   è il rumore del GPS, che gira su se stesso: al semaforo si inventerebbe
+   *   un'inversione a ogni secondo;
+   * · **lontani dalla linea non si decide.** Se si è già oltre la soglia se ne
+   *   occupa il conto della distanza, che è il giudice giusto per quel caso;
+   * · **e si aspetta comunque.** Tre letture come per la distanza: una curva
+   *   stretta presa larga, o un vertice raro del percorso, fanno litigare le
+   *   due direzioni per un attimo senza che nessuno abbia sbagliato strada. */
+  void _guardaDoveSiVa(Punto qui, Proiezione p, double? passo) {
+    if (passo == null || passo < movimentoCheContaM || p.lontanoM > sogliaFuoriM) {
+      _controMano = 0;
+      return;
+    }
+    final siVa = rottaGradi(_precedente!, qui);
+    final laStrada = _rotta(p.segmento);
+    if (diQuantoSiGira(laStrada, siVa).abs() >= sogliaControManoGradi) {
+      _controMano++;
+    } else {
+      _controMano = 0;
+    }
+  }
+
   double _rotta(int i) {
     final n = _linea.punti.length;
     var j = math.min(i + 1, n - 1);

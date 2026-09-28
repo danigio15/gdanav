@@ -197,4 +197,118 @@ void main() {
     expect(gira, lessThan(-15));
     expect(gira, greaterThan(-90));
   });
+
+  /* ── Fuori percorso non e' solo «lontano» ────────────────────────────────
+   *
+   * Tre foto dal campo, nello stesso viaggio, e una causa sola: il giudizio
+   * guardava soltanto la distanza dalla linea. */
+
+  /// Una strada dritta verso nord, un vertice ogni venti metri.
+  PercorsoCalcolato dritta({int quanti = 100}) => PercorsoCalcolato(
+        punti: [for (var i = 0; i < quanti; i++) Punto(45.0 + i * 0.00018, 9.0)],
+        tratti: const [],
+        manovre: const [Manovra(istruzione: 'Parti', lunghezzaM: 2000, secondi: 120, inizio: 0, tipo: 1)],
+      );
+
+  test('«sto andando in direzione opposta e non ricalcola»', () {
+    final percorso = dritta();
+    final g = Guida(percorso);
+    for (var i = 0; i <= 50; i++) {
+      g.aggiorna(percorso.punti[i]);
+    }
+    /* Inversione a U: si torna indietro sulla stessa carreggiata. La distanza
+     * dalla linea resta ZERO — e' per questo che prima non se ne accorgeva
+     * nessuno, nemmeno dopo un chilometro. */
+    var quando = -1;
+    for (var i = 49; i >= 0 && quando < 0; i--) {
+      final a = g.aggiorna(percorso.punti[i]);
+      expect(a.lontanoM, lessThan(1), reason: 'sulla linea ci si sta, e' ' e' ' il punto');
+      if (a.fuoriPercorso) quando = (50 - i) * 20;
+    }
+    expect(quando, greaterThan(0), reason: 'un chilometro all\'indietro senza dire niente');
+    expect(quando, lessThan(120), reason: 'e va detto subito, non dopo mezzo paese');
+  });
+
+  test('una traversa a novanta gradi si vede prima di essersene andati', () {
+    final percorso = dritta();
+    final g = Guida(percorso);
+    for (var i = 0; i <= 50; i++) {
+      g.aggiorna(percorso.punti[i]);
+    }
+    /* Si gira a destra: venti metri per lettura, verso est. */
+    final da = percorso.punti[50];
+    var quando = -1;
+    for (var k = 1; k <= 6 && quando < 0; k++) {
+      final a = g.aggiorna(Punto(da.lat, da.lon + k * 0.00026));
+      if (a.fuoriPercorso) quando = k * 20;
+    }
+    expect(quando, greaterThan(0));
+    expect(quando, lessThan(100), reason: 'in una traversa lo si sa in pochi metri');
+  });
+
+  test('fermi al semaforo non si ricalcola: il GPS balla e basta', () {
+    final percorso = dritta();
+    final g = Guida(percorso);
+    for (var i = 0; i <= 50; i++) {
+      g.aggiorna(percorso.punti[i]);
+    }
+    /* Fermi, con letture che saltellano di qualche metro in ogni direzione:
+     * la direzione fra due letture e' rumore, e non deve decidere niente. */
+    final da = percorso.punti[50];
+    const balla = [
+      [1.0, 1.0],
+      [-1.0, 1.0],
+      [-1.0, -1.0],
+      [1.0, -1.0],
+      [0.5, -1.0],
+      [-0.5, 1.0],
+    ];
+    for (final d in balla) {
+      final a = g.aggiorna(Punto(da.lat + d[0] * 0.000018, da.lon + d[1] * 0.000026));
+      expect(a.fuoriPercorso, isFalse);
+    }
+  });
+
+  test('la strada parallela non e\' questa strada', () {
+    /* «Anche qua mi da\' la linea nella strada parallela a dove sono.» In un
+     * paese italiano due vie parallele stanno a trenta metri: la soglia di
+     * prima, quarantacinque, le metteva tutte e due sulla stessa linea. */
+    final percorso = dritta();
+    final g = Guida(percorso);
+    for (var i = 0; i <= 50; i++) {
+      g.aggiorna(percorso.punti[i]);
+    }
+    /* Si prosegue nella stessa direzione ma su una via quaranta metri a lato. */
+    var detto = false;
+    for (var i = 51; i <= 60 && !detto; i++) {
+      final p = percorso.punti[i];
+      if (g.aggiorna(Punto(p.lat, p.lon + 0.00051)).fuoriPercorso) detto = true;
+    }
+    expect(detto, isTrue, reason: 'quaranta metri sono un isolato, non un errore del GPS');
+  });
+
+  test('non ci si aggancia a un pezzo di percorso che sta chilometri avanti', () {
+    /* Il percorso fa un giro e torna a passare vicino al punto di partenza.
+     * Girando in una traversa non ci si deve proiettare sul ritorno: quello
+     * faceva saltare il cursore in avanti e diceva che quella strada era gia'
+     * stata fatta. */
+    final andata = [for (var i = 0; i < 60; i++) Punto(45.0 + i * 0.00018, 9.0)];
+    final ritorno = [for (var i = 59; i >= 0; i--) Punto(45.0 + i * 0.00018, 9.00051)];
+    final percorso = PercorsoCalcolato(
+      punti: [...andata, ...ritorno],
+      tratti: const [],
+      manovre: const [Manovra(istruzione: 'Parti', lunghezzaM: 4000, secondi: 240, inizio: 0, tipo: 1)],
+    );
+    final g = Guida(percorso);
+    Avanzamento? ultimo;
+    for (var i = 0; i <= 20; i++) {
+      ultimo = g.aggiorna(andata[i]);
+    }
+    final primaM = ultimo!.percorsiM;
+    /* Ci si sposta sulla corsia del ritorno, che sta a quaranta metri: e' il
+     * pezzo di percorso piu' vicino in linea d'aria, ma sta piu' di due
+     * chilometri avanti e non ci si puo' essere arrivati in un secondo. */
+    final a = g.aggiorna(Punto(andata[20].lat, andata[20].lon + 0.00051));
+    expect(a.percorsiM, lessThan(primaM + 200), reason: 'il cursore non salta di due chilometri');
+  });
 }
