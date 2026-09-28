@@ -103,6 +103,29 @@ Centro Direzionale, entro 1200 m
 Sono gli stessi numeri di ABRP ed EVDC: il «189/202» di ABRP ha il totale
 dell'Isola A3, i 194 di EVDC sono il P5.
 
+**Poi la PUN di oggi.** Il 28 settembre 2026 il lavoro `[colonnine]` l'ha
+letta dall'API del portale (`tools/pun/estrai.py`, vedi più sotto), in 765
+richieste, e da allora l'archivio è questo:
+
+```
+PUN (API, oggi)   75.761 punti sulla mappa
+                  29.975 posti      71.432 punti di ricarica (tolti i
+                                    pianificati, i rimossi e le prese da scooter)
+OpenStreetMap     20.832 stazioni   59.055 prese
+  nella stessa posizione in tutte e due   5.403
+  solo nella PUN                         24.572
+archivio          45.404 stazioni  120.758 prese   6,4 MB (con gli EVSE ID)
+
+Centro Direzionale, entro 1200 m: 855 punti in 14 posti
+  Isola A3 202 · Via Domenico Aulisio 20 194 · Viale della Costituzione 12
+  144 · Isola G8 135 · Via Giovanni Porzio 4 112 · Volta-Brin 40 · …
+```
+
+Gli operatori hanno il nome dell'azienda (Enel X, Plenitude, Repower, A2A
+E.Mobility, Hera Comm, Acea Energia…), e ogni posto ha gli EVSE ID dei suoi
+punti: servono a chiedere alla PUN lo stato di adesso. La citazione è
+«PUN (GSE), CC BY 4.0».
+
 Le regole, tutte con una prova in `test/pun_test.dart`:
 
 * **Una riga è un punto di ricarica**, cioè un'auto alla volta: se ha più
@@ -116,9 +139,11 @@ Le regole, tutte con una prova in `test/pun_test.dart`:
   lì si mostra l'indirizzo.
 * **L'operatore** è il codice in mezzo all'EVSE ID (`IT*BEC*EW003907*1` →
   BEC, Be Charge), ma solo se è di tre caratteri come vuole lo standard.
-* **La licenza chiede di citarla**: «PUN (MASE), elaborazione onData,
-  CC BY 4.0» compare nella scheda della colonnina, nel dettaglio e nella
-  scheda del viaggio (`creditoColonnina`).
+* **La licenza chiede di citarla**: «PUN (GSE), CC BY 4.0» compare nella
+  scheda della colonnina, nel dettaglio e nella scheda del viaggio
+  (`creditoColonnina`). Con la fotografia di onData era «PUN (MASE),
+  elaborazione onData, CC BY 4.0»: se il lavoro torna a onData perché
+  l'API non risponde, va rimessa quella.
 
 Con i 22 kW del Centro Direzionale è venuto fuori anche un difetto della
 scelta della potenza: **«Tutte» valeva 22 kW**, e 5.758 posti dell'archivio
@@ -234,7 +259,28 @@ tutti gli utenti, e niente segreti dentro l'applicazione.
 
 ## Lo stato in tempo reale
 
-TomTom Search dà 2.500 chiamate al giorno e ne bruciavamo due per colonnina:
+**Dalla PUN, per le colonnine che ne hanno gli EVSE ID** (`DisponibilitaPun`,
+nel nucleo). La PUN dà lo stato punto per punto, quindi l'archivio tiene gli
+EVSE ID di ogni posto (l'ottavo campo), e l'app li chiede alla PUN come la
+sua mappa pubblica: credenziali ospite di Cognito (nessun login) e una
+richiesta firmata SigV4 a `/v1/chargepoints/group`, al massimo cento punti
+per volta. Lo chiede il telefono, solo per le colonnine che si guardano;
+uno stato letto vale un minuto. Giovanni ha scelto l'app e non il relay:
+costo zero, e il relay si pubblica solo da `main`.
+
+* La firma è fatta in casa (`firmaSigV4`) e provata sull'esempio ufficiale
+  della documentazione di AWS: il primo giro dava un'altra firma, perché
+  con il percorso «/» usava un percorso vuoto.
+* **`realTime: false` non è «libera»**: per i gestori che non aggiornano
+  lo stato, la PUN ripete uno stato fisso. Lì si dice «non si sa».
+* `BLOCKED` è occupata: un'auto ferma davanti.
+* Se la PUN non risponde, o non conosce più nessuno dei punti, si prova
+  TomTom (`DisponibilitaConPun`).
+
+Il 28 settembre 2026 al Centro Direzionale la mappa della PUN diceva 724
+libere, 5 in carica, 75 fuori servizio e 51 bloccate su 855.
+
+**TomTom, per le altre.** TomTom Search dà 2.500 chiamate al giorno e ne bruciavamo due per colonnina:
 il contatore era a zero e rispondeva 403, che in app diventava «Stato non
 comunicato» su ogni colonnina. Adesso dopo un rifiuto si smette di chiedere
 per sei ore, e la pastiglia dice quante prese ci sono invece di dire che

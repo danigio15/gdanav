@@ -1,9 +1,11 @@
 import '../geo/geo.dart';
 import 'colonnina.dart';
 
-/// La Piattaforma Unica Nazionale dei punti di ricarica (MASE), nella forma
-/// in cui la pubblica onData: una riga per punto di ricarica, licenza
-/// CC BY 4.0 — «Dati: PUN (MASE), elaborazione onData».
+/// La Piattaforma Unica Nazionale dei punti di ricarica (GSE/MASE), in CSV:
+/// una riga per punto di ricarica. Nell'archivio c'è l'estrazione di oggi
+/// dall'API del portale (`tools/pun/estrai.py`, come la legge AgID), con
+/// licenza CC BY 4.0; il lettore legge anche la fotografia del 2024 di
+/// onData, che ha le stesse colonne.
 ///
 /// È la fonte che ha quello che OpenStreetMap non ha. Al Centro
 /// Direzionale di Napoli OpenStreetMap conosce quattro stazioni e nove
@@ -19,9 +21,10 @@ import 'colonnina.dart';
 /// onData è del 2024): una presa guasta allora oggi può andare, e dirla
 /// guasta sarebbe una bugia peggio di «non si sa».
 abstract final class Pun {
-  /// Come la vuole citata la licenza CC BY 4.0: da dove vengono i dati, chi
-  /// li ha messi in forma, con che licenza.
-  static const attribuzione = 'PUN (MASE), elaborazione onData, CC BY 4.0';
+  /// Come la vuole citata la licenza CC BY 4.0: di chi sono i dati e con che
+  /// licenza. L'archivio viene dall'API del portale, non più da onData: il
+  /// titolare è il GSE, come lo cita AgID nel Cruscotto Italia.
+  static const attribuzione = 'PUN (GSE), CC BY 4.0';
 
   /// I codici operatore (party ID) di cui si è sicuri. Gli altri restano
   /// il codice: meglio «GES» che un nome indovinato.
