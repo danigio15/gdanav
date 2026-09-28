@@ -16,6 +16,7 @@ const sorgenteSegnalazioni = 'gdanav-segnalazioni';
 const sorgenteManovra = 'gdanav-manovra';
 const sorgenteDistributori = 'gdanav-distributori';
 const sorgenteVicine = 'gdanav-vicine';
+const sorgenteTutte = 'gdanav-tutte';
 const sorgenteCode = 'gdanav-code';
 const sorgenteAlternative = 'gdanav-alternative';
 const sorgenteTappe = 'gdanav-tappe';
@@ -28,6 +29,8 @@ const stratiToccabili = [
   'gdanav-colonnine',
   'gdanav-distributori',
   'gdanav-vicine',
+  'gdanav-tutte-gruppi',
+  'gdanav-tutte',
   'nomi-poi',
 ];
 
@@ -273,6 +276,9 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
       sorgenteManovra: {'type': 'geojson', 'data': _vuota},
       sorgenteDistributori: {'type': 'geojson', 'data': _vuota},
       sorgenteVicine: {'type': 'geojson', 'data': _vuota},
+      // Raggruppate da MapLibre: da lontano un cerchio col numero, da vicino
+      // una per una.
+      sorgenteTutte: {'type': 'geojson', 'data': _vuota, 'cluster': true, 'clusterRadius': 50, 'clusterMaxZoom': 12},
       if (traffico.isNotEmpty)
         'traffico': {
           'type': 'vector',
@@ -660,6 +666,77 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'Polygon',
         ],
         'paint': {'fill-color': '#FFFFFF', 'fill-antialias': true},
+      },
+      // Tutte le colonnine d'Italia, dall'archivio: da lontano in gruppi col
+      // numero, avvicinandosi una per una. Sotto quelle intorno a te, che
+      // hanno il colore dello stato di adesso.
+      {
+        'id': 'gdanav-tutte-gruppi',
+        'type': 'circle',
+        'source': sorgenteTutte,
+        'filter': ['has', 'point_count'],
+        'paint': {
+          'circle-color': '#4F46E5',
+          'circle-opacity': 0.92,
+          'circle-radius': [
+            'step',
+            ['get', 'point_count'],
+            14,
+            50,
+            18,
+            500,
+            23,
+            5000,
+            28,
+          ],
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#FFFFFF',
+        },
+      },
+      {
+        'id': 'gdanav-tutte-numeri',
+        'type': 'symbol',
+        'source': sorgenteTutte,
+        'filter': ['has', 'point_count'],
+        'layout': {
+          'text-field': ['get', 'point_count_abbreviated'],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 12,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        'paint': {'text-color': '#FFFFFF'},
+      },
+      {
+        'id': 'gdanav-tutte',
+        'type': 'symbol',
+        'source': sorgenteTutte,
+        'filter': [
+          '!',
+          ['has', 'point_count'],
+        ],
+        'layout': {
+          'icon-image': 'punto-colonnina-ignota',
+          'icon-size': 0.8,
+          'icon-allow-overlap': true,
+          'text-field': [
+            'step',
+            ['zoom'],
+            '',
+            13,
+            [
+              'concat',
+              ['to-string', ['get', 'kw']],
+              ' kW',
+            ],
+          ],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 11,
+          'text-anchor': 'top',
+          'text-offset': [0, 1.1],
+          'text-optional': true,
+        },
+        'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 1.6},
       },
       // Intorno a te: i distributori col prezzo (auto termica) o le
       // colonnine rapide col colore dello stato (auto elettrica).

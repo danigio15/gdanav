@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -93,7 +95,15 @@ class Archivio {
     }
   }
 
-  Future<void> salvaPreferenze(PreferenzeRicarica p) => _p.write(key: _preferenze, value: jsonEncode(p.toJson()));
+  Future<void> salvaPreferenze(PreferenzeRicarica p) async {
+    await _p.write(key: _preferenze, value: jsonEncode(p.toJson()));
+    preferenzeCambiate.value++;
+  }
+
+  /// Cresce a ogni scelta salvata in «Ricarica». Chi mostra colonnine
+  /// filtrate (la mappa, quelle intorno a te) la ascolta e rifà l'elenco
+  /// subito, invece di aspettare il prossimo spostamento.
+  static final preferenzeCambiate = ValueNotifier<int>(0);
 
   /// Veloce o risparmio, pedaggi, autostrade, traghetti.
   Future<OpzioniPercorso> opzioniPercorso() async {

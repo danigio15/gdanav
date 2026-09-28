@@ -1,0 +1,107 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:gdanav_app/mappa/stile.dart';
+import 'package:gdanav_app/stato/archivio.dart';
+import 'package:gdanav_app/stato/gestore_viaggio.dart';
+import 'package:gdanav_app/stato/gestore_vicini.dart';
+import 'package:gdanav_core/gdanav_core.dart';
+
+import 'aiuti.dart';
+
+Colonnina posto(String id, String operatore, TipoConnettore tipo, double kw, {double lat = 40.85}) => Colonnina(
+  id: id,
+  nome: 'Posto $id',
+  operatore: operatore,
+  posizione: Punto(lat, 14.28),
+  connettori: [Connettore(tipo: tipo, potenzaKw: kw)],
+  fonte: 'pun',
+);
+
+/// Una lenta sotto casa, una Plenitude da 22 kW del Centro Direzionale e una
+/// rapida a Milano: tre posti che la mappa di tutta Italia deve saper
+/// mostrare o nascondere secondo le scelte di «Ricarica».
+final archivioProva = ArchivioColonnine([
+  posto('lenta', 'Enel X', TipoConnettore.tipo2, 11),
+  posto('plenitude', 'Plenitude (Be Charge)', TipoConnettore.tipo2, 22.1),
+  posto('rapida', 'Ionity', TipoConnettore.ccs2, 350, lat: 45.5),
+]);
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('sulla mappa di tutta Italia valgono le scelte di «Ricarica»', () async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final archivio = Archivio();
+    Future<List<String>> ids() async => [
+      for (final c in await colonnineDellArchivioComeSiVuole(
+        ProfiloVeicolo.esempio,
+        archivio,
+        da: Future.value(archivioProva),
+      ))
+        c.id,
+    ];
+
+    // Di base da 50 kW in su: solo la rapida.
+    expect(await ids(), ['rapida']);
+    // «Tutte» vuol dire tutte, anche la lenta da 11 kW.
+    await archivio.salvaPreferenze(const PreferenzeRicarica(potenzaMinimaKw: PreferenzeRicarica.tutte));
+    expect(await ids(), ['lenta', 'plenitude', 'rapida']);
+    // Un operatore che non si vuole vedere non si vede nemmeno qui.
+    await archivio.salvaPreferenze(
+      PreferenzeRicarica(potenzaMinimaKw: PreferenzeRicarica.tutte, operatoriEsclusi: {operatoreNormale('Ionity')}),
+    );
+    expect(await ids(), ['lenta', 'plenitude']);
+  });
+
+  testWidgets('tutte le colonnine: partono quando le chiede la mappa, e si rifanno se cambia la scelta', (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final a = await ambiente(tester);
+    var giri = 0;
+    final vicini = GestoreVicini(
+      auto: a.auto,
+      posizione: a.posizione,
+      distributori: (_) async => const [],
+      colonnine: (_, _) async => const [],
+      tutte: (_) async {
+        giri++;
+        return archivioProva.tutte.toList();
+      },
+    );
+    addTearDown(vicini.dispose);
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    expect(giri, 0, reason: 'senza la mappa non si caricano');
+
+    vicini.avviaTutte();
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    expect(giri, 1);
+    expect(vicini.versioneTutte, 1);
+    expect(vicini.tutte.map((c) => c.id), ['lenta', 'plenitude', 'rapida']);
+    // Una qualunque si trova anche se non è fra quelle intorno: è quella
+    // che si tocca sulla mappa.
+    expect(vicini.colonnina('rapida')?.nome, 'Posto rapida');
+    // Sulla mappa solo dove, quale e quanti kW: sono decine di migliaia.
+    final elementi = vicini.datiTutte()['features']! as List;
+    expect(elementi, hasLength(3));
+    expect((elementi[1] as Map)['properties'], {'id': 'plenitude', 'kw': 22});
+
+    // Chiamarla due volte non la rifà.
+    vicini.avviaTutte();
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    expect(giri, 1);
+
+    // Cambiata una scelta in «Ricarica»: si rifà subito.
+    await tester.runAsync(() => a.archivio.salvaPreferenze(const PreferenzeRicarica(potenzaMinimaKw: 100)));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    expect(giri, 2);
+    expect(vicini.versioneTutte, 2);
+  });
+
+  test('lo stile: tutte le colonnine raggruppate, sotto quelle intorno a te, e si toccano', () {
+    final stile = stileMappa(scuro: false);
+    final sorgente = (stile['sources']! as Map)[sorgenteTutte] as Map;
+    expect(sorgente['cluster'], isTrue);
+    final strati = [for (final l in (stile['layers']! as List).cast<Map>()) l['id']];
+    expect(strati.indexOf('gdanav-tutte-gruppi'), lessThan(strati.indexOf('gdanav-vicine')));
+    expect(strati.indexOf('gdanav-tutte'), lessThan(strati.indexOf('gdanav-vicine')));
+    expect(stratiToccabili, containsAll(['gdanav-tutte', 'gdanav-tutte-gruppi']));
+  });
+}

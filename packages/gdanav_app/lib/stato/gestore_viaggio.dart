@@ -645,6 +645,23 @@ Future<List<Colonnina>> colonnineVicineComeSiVuole(
   );
 }
 
+/// Tutte le colonnine dell'archivio adatte a [veicolo], filtrate come si è
+/// scelto in «Ricarica»: per la mappa di tutta Italia. Con «Tutte» nessun
+/// minimo di potenza, come intorno a te.
+Future<List<Colonnina>> colonnineDellArchivioComeSiVuole(
+  ProfiloVeicolo veicolo,
+  Archivio archivio, {
+  Future<ArchivioColonnine>? da,
+}) async {
+  final p = await archivio.preferenze();
+  final a = await (da ?? archivioColonnine());
+  final minima = p.minimaIntorno > 0 ? p.minimaIntorno : 0.1;
+  return [
+    for (final c in a.tutte)
+      if (c.potenzaNominalePer(veicolo.connettori) >= minima && !operatoreEscluso(c, p.operatoriEsclusi)) c,
+  ];
+}
+
 /// Lo stato di adesso di una colonnina (con Premium); senza, com'era.
 Future<Colonnina> statoColonninaAdesso(Colonnina c) async {
   final d = GestorePremium.attivo.value ? _disponibilita : null;

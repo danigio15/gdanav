@@ -269,6 +269,19 @@ Map<String, Object?> datiColonnineVicine(List<Colonnina> elenco, Set<TipoConnett
     ),
 ]);
 
+/// Tutte le colonnine dell'archivio sulla mappa. Sono decine di migliaia,
+/// quindi solo quello che serve a disegnarle e a riconoscerle al tocco:
+/// dove, quale, quanti kW. Il nome e il resto si prendono dall'archivio
+/// quando se ne tocca una — con anche quelli i dati passavano da quattro a
+/// otto megabyte.
+Map<String, Object?> datiColonnineTutte(List<Colonnina> elenco, Set<TipoConnettore> connettori) => _collezione([
+  for (final c in elenco)
+    _elemento(
+      {'type': 'Point', 'coordinates': _xy(c.posizione)},
+      {'id': c.id, 'kw': c.potenzaNominalePer(connettori).round()},
+    ),
+]);
+
 /// Il riquadro che contiene tutto il percorso: sud-ovest e nord-est.
 (Punto, Punto)? confini(Viaggio v, {List<PercorsoCalcolato> anche = const []}) {
   final p = [...v.percorso.punti, for (final a in anche) ...a.punti];
