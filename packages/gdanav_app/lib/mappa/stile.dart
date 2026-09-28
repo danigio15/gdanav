@@ -114,7 +114,7 @@ const _chiaro = _Tavolozza(
   libera: '#16A34A',
   piena: '#D97706',
   guasta: '#DC2626',
-  ignota: '#64748B',
+  ignota: '#4F46E5',
   arrivo: '#E5484D',
 );
 
@@ -149,7 +149,7 @@ const _scuro = _Tavolozza(
   libera: '#4ADE80',
   piena: '#FBBF24',
   guasta: '#F87171',
-  ignota: '#94A3B8',
+  ignota: '#818CF8',
   arrivo: '#F87171',
 );
 
@@ -906,10 +906,40 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
   };
 }
 
-/// Le strade dove TomTom misura una coda. `traffic_level` è la velocità
-/// rispetto a quella libera: sotto 0,6 si rallenta, sotto 0,3 si è fermi.
+/* Quanto si va piano, rispetto a strada libera: 1 libera, 0 fermi.
+ *
+ * Un campo che non c'e' vale 1 — strada libera — e quindi non si disegna
+ * niente: un nome di campo sbagliato si vede identico a «non c'e' traffico».
+ * Per questo si accettano tutte e due le forme che TomTom ha usato, e per
+ * questo la prova di rete `tomtom_tessera_test.dart` va a leggere un riquadro
+ * vero e dice in chiaro come si chiamano i campi. */
+List<Object> _quantoSiVaPiano() => [
+  'to-number',
+  [
+    'coalesce',
+    ['get', 'traffic_level'],
+    ['get', 'trafficLevel'],
+  ],
+  1,
+];
+
+/* Che famiglia di strada. TomTom la dice in `road_category`, un numero:
+ * 0 autostrada, 1 internazionale, 2 principale, 3 secondaria, e giu' fino a 8.
+ *
+ * Se il campo non c'e' — o cambia nome — si ripiega su 0, cioe' autostrada:
+ * cosi' tutto finisce nello strato delle grandi, che si accende da zoom 7.
+ * Sbagliare da quella parte vuol dire vedere una coda di paese da lontano;
+ * sbagliare dall'altra vuol dire non vedere una coda in autostrada, che e'
+ * esattamente il difetto che stiamo togliendo. */
+List<Object> _famigliaDellaStrada() => [
+  'to-number',
+  ['get', 'road_category'],
+  0,
+];
+
+/// Le strade dove TomTom misura una coda: sotto 0,6 si rallenta, sotto 0,3 si
+/// è fermi.
 Map<String, Object> _coda(String id, {required bool principali, required double minzoom}) {
-  const grandi = ['Motorway', 'International road', 'Major road', 'Secondary road'];
   return {
     'id': id,
     'type': 'line',
@@ -918,43 +948,12 @@ Map<String, Object> _coda(String id, {required bool principali, required double 
     'minzoom': minzoom,
     'filter': [
       'all',
-      [
-        '<',
-        [
-          'to-number',
-          ['get', 'traffic_level'],
-          1,
-        ],
-        0.6,
-      ],
-      principali
-          ? [
-              'in',
-              ['get', 'road_type'],
-              ['literal', grandi],
-            ]
-          : [
-              '!',
-              [
-                'in',
-                ['get', 'road_type'],
-                ['literal', grandi],
-              ],
-            ],
+      ['<', _quantoSiVaPiano(), 0.6],
+      principali ? ['<=', _famigliaDellaStrada(), 3] : ['>', _famigliaDellaStrada(), 3],
     ],
     'layout': {'line-cap': 'round', 'line-join': 'round'},
     'paint': {
-      'line-color': [
-        'step',
-        [
-          'to-number',
-          ['get', 'traffic_level'],
-          1,
-        ],
-        '#E5302A',
-        0.3,
-        '#F5A623',
-      ],
+      'line-color': ['step', _quantoSiVaPiano(), '#E5302A', 0.3, '#F5A623'],
       'line-width': [
         'interpolate',
         ['linear'],

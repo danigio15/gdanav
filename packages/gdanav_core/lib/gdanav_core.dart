@@ -16,6 +16,7 @@ export 'src/luoghi/google.dart';
 export 'src/luoghi/luoghi.dart';
 export 'src/mappe/zone.dart';
 export 'src/meteo/meteo.dart';
+export 'src/motore/batteria_arrivo.dart';
 export 'src/motore/consumo_imparato.dart';
 export 'src/motore/modello_consumo.dart';
 export 'src/motore/pianificatore_soste.dart';

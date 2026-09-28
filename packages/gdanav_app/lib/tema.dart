@@ -29,7 +29,7 @@ class ColoriGdanav extends ThemeExtension<ColoriGdanav> {
     libera: Color(0xFF16A34A),
     piena: Color(0xFFD97706),
     guasta: Color(0xFFDC2626),
-    ignota: Color(0xFF64748B),
+    ignota: Color(0xFF4F46E5),
     arrivo: Color(0xFFDC2626),
     vetro: Color(0xFFFFFFFF),
   );
@@ -39,7 +39,7 @@ class ColoriGdanav extends ThemeExtension<ColoriGdanav> {
     libera: Color(0xFF4ADE80),
     piena: Color(0xFFFBBF24),
     guasta: Color(0xFFF87171),
-    ignota: Color(0xFF94A3B8),
+    ignota: Color(0xFF818CF8),
     arrivo: Color(0xFFF87171),
     vetro: Color(0xFF232A38),
   );

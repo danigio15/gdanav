@@ -88,6 +88,9 @@ class Guida {
     this.sogliaControManoGradi = 75,
     this.lettureContromano = 3,
     this.movimentoCheContaM = 8,
+    this.guardaAvantiM = 80,
+    this.anticipaDaM = 60,
+    this.anticipoGradi = 25,
   }) : _linea = Linea(percorso.punti) {
     _secondi = _secondiCumulati();
   }
@@ -114,6 +117,30 @@ class Guida {
 
   /// Sotto questo passo fra due letture la direzione è rumore del GPS.
   final double movimentoCheContaM;
+
+  /* Come guarda avanti la telecamera.
+   *
+   * Tre foto dal campo, una richiesta sola: «se la strada è dritta la mappa
+   * deve seguire la vettura», e «non è che mi propone un tornante quando è
+   * una semplice deviazione».
+   *
+   * [guardaAvantiM] è fin dove si guarda sul dritto. Erano centocinquanta
+   * metri: una curva a centocinquanta metri faceva girare la mappa mentre si
+   * era ancora sul rettilineo. A ottanta, su una strada dritta il punto che
+   * si guarda sta sul dritto, e la mappa non gira.
+   *
+   * [anticipaDaM] è da quanto vicino si sbircia oltre la manovra, per far
+   * vedere da che parte si va. Prima si sbirciava da centocinquanta metri:
+   * quaranta metri oltre l'uscita si è già sull'altra strada, e la mappa
+   * girava come per un tornante mentre l'auto era ancora sul dritto.
+   *
+   * [anticipoGradi] è il tetto: comunque vada, la mappa non può guardare più
+   * di venticinque gradi fuori dalla strada che si sta percorrendo. Il resto
+   * lo recupera girando, insieme all'auto — che è quello che fa una
+   * telecamera che segue, invece di indovinare. */
+  final double guardaAvantiM;
+  final double anticipaDaM;
+  final double anticipoGradi;
 
   /* Quanto vicini alla linea per posare il segnaposto sulla strada, e quanto
    * lontani per toglierlo.
@@ -157,6 +184,9 @@ class Guida {
       sogliaControManoGradi: sogliaControManoGradi,
       lettureContromano: lettureContromano,
       movimentoCheContaM: movimentoCheContaM,
+      guardaAvantiM: guardaAvantiM,
+      anticipaDaM: anticipaDaM,
+      anticipoGradi: anticipoGradi,
     );
     if (nuovo.punti.length != percorso.punti.length) return g;
     g._segmento = _segmento;
@@ -218,10 +248,10 @@ class Guida {
       arrivato: arrivato,
       posizioneSulPercorso: sulla,
       rotta: _agganciato ? _rotta(i) : null,
-      /* La telecamera invece guarda avanti comunque: e' il suo mestiere
-       * mostrare dove porta la strada, e da fuori percorso serve ancora di
-       * piu' — e' da li' che si vede dove si sarebbe dovuti andare. */
-      rottaMappa: _rottaAvanti(_punto(i, p.t), percorsi, prossima == null ? null : alla),
+      /* La telecamera guarda avanti anche da fuori percorso — e' da li' che
+       * si vede dove si sarebbe dovuti andare — ma sempre restando appesa
+       * alla strada che si sta percorrendo: vedi _rottaAvanti. */
+      rottaMappa: _rottaAvanti(_punto(i, p.t), percorsi, prossima == null ? null : alla, _rotta(i)),
       // In fondo a un segmento si è già all'inizio del prossimo.
       limiteKmh: percorso.limiteSul(p.t > 0.999 ? i + 1 : i),
       daDire: arrivato ? _una('arrivo', 'Sei arrivato.') : _annuncio(prossima, alla),
@@ -323,8 +353,18 @@ class Guida {
 
   /// La direzione verso un punto più avanti sul percorso: di solito 150 m;
   /// vicino a una manovra, poco oltre la manovra, per vederne l'uscita.
-  double? _rottaAvanti(Punto qui, double percorsi, double? alla) {
-    final avanti = math.max(40.0, alla != null && alla < 150 ? alla + 40 : 150.0);
+  /* Dove guarda la telecamera: avanti, ma appesa alla strada che si percorre.
+   *
+   * Si sceglie un punto piu' avanti sul percorso e si guarda quello. Fin dove
+   * lo si sceglie lo dicono [guardaAvantiM] e [anticipaDaM]; di quanto la
+   * mappa puo' allontanarsi dalla strada sotto le ruote lo dice
+   * [anticipoGradi]. Il tetto e' la parte che conta: senza, su un'uscita che
+   * si stacca e curva bastava un punto quaranta metri oltre lo svincolo — gia'
+   * sull'altra strada — per far ruotare la mappa di sessanta gradi mentre
+   * l'auto era ancora sul rettilineo, e sembrava di dover fare un tornante. */
+  double? _rottaAvanti(Punto qui, double percorsi, double? alla, double strada) {
+    final vicina = alla != null && alla <= anticipaDaM;
+    final avanti = vicina ? math.max(40.0, alla + 40) : guardaAvantiM;
     final meta = math.min(percorsi + avanti, _linea.lunghezzaM);
     if (meta - percorsi < 20) return null;
     final punti = _linea.punti, c = _linea.cumulate;
@@ -332,7 +372,10 @@ class Guida {
       if (c[j] >= meta) {
         final f = c[j] == c[j - 1] ? 0.0 : (meta - c[j - 1]) / (c[j] - c[j - 1]);
         final a = punti[j - 1], b = punti[j];
-        return rottaGradi(qui, Punto(a.lat + f * (b.lat - a.lat), a.lon + f * (b.lon - a.lon)));
+        final verso = rottaGradi(qui, Punto(a.lat + f * (b.lat - a.lat), a.lon + f * (b.lon - a.lon)));
+        final scarto = diQuantoSiGira(strada, verso);
+        if (scarto.abs() <= anticipoGradi) return verso;
+        return versoDiLa(strada, verso, anticipoGradi / scarto.abs());
       }
     }
     return null;
