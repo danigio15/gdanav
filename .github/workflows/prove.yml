@@ -217,6 +217,7 @@ jobs:
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
+          GDANAV_ANTEPRIME: ${{ github.workspace }}
           # I nomi dei servizi hanno trattini lunghi e accenti: senza questo
           # una sonda muore a metà invece di dire quello che ha trovato.
           PYTHONIOENCODING: utf-8
@@ -225,7 +226,7 @@ jobs:
           # inciampa — o se pip non trova PyPI, che è già successo — le altre
           # devono andare avanti lo stesso.
           pip install mapbox-vector-tile pillow || echo "::warning title=Sonde::pip non ha risposto: le sonde che vogliono le librerie non girano"
-          for sonda in sonda_traffico sonda_mappa anteprima_tomtom sonda_percorso sonda_colonnine; do
+          for sonda in sonda_traffico sonda_mappa anteprima_tomtom sonda_percorso sonda_colonnine sonda_ocpi; do
             python3 "tools/$sonda.py" || echo "::warning title=Sonde::$sonda non ha finito"
           done
       - name: Le anteprime della mappa TomTom, da guardare
@@ -248,6 +249,7 @@ jobs:
           gh release upload lavoro tomtom-*.png --clobber
           ls percorso-*.json > /dev/null 2>&1 && gh release upload lavoro percorso-*.json --clobber
           [ -s colonnine_sonda.txt ] && gh release upload lavoro colonnine_sonda.txt --clobber
+          [ -s ocpi_sonda.txt ] && gh release upload lavoro ocpi_sonda.txt --clobber
           true
 
   # Le foto vere delle auto, da Wikimedia Commons: solo quando il commit lo
@@ -364,6 +366,7 @@ jobs:
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
+          GDANAV_ANTEPRIME: ${{ github.workspace }}
       - run: cp build/app/outputs/flutter-apk/app-release.apk gdanav.apk
       # Il pacchetto per il Play Store (test interno): da lì Android Auto
       # mostra l'app senza «Origini sconosciute». Premium come nell'APK qui
@@ -377,6 +380,7 @@ jobs:
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
+          GDANAV_ANTEPRIME: ${{ github.workspace }}
       - run: cp build/app/outputs/bundle/release/app-release.aab gdanav.aab
       - uses: actions/upload-artifact@v4
         with:
@@ -434,6 +438,7 @@ jobs:
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
+          GDANAV_ANTEPRIME: ${{ github.workspace }}
       - name: Ci sono le chiavi di Apple?
         id: chiavi
         env:
