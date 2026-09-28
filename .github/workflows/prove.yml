@@ -184,6 +184,7 @@ jobs:
           GDANAV_PREZZI: ${{ github.workspace }}/prezzi_napoli.json
           GDANAV_COLONNINE: ${{ github.workspace }}/colonnine_utrecht.json
           GDANAV_TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
+          GDANAV_OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
           GDANAV_ANTEPRIME: ${{ github.workspace }}
       # Prezzi veri di Napoli e colonnine vere di Utrecht nella release, per
       # le anteprime dell'app.
@@ -207,7 +208,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "gdanav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app è nella release «anteprima»."
-          for f in anteprima.json anteprima_tappa.json percorso_motori.txt; do
+          for f in anteprima.json anteprima_tappa.json percorso_motori.txt colonnine_fonti.txt; do
             [ -s "$f" ] && gh release upload lavoro "$f" --clobber
           done
           true

@@ -5,6 +5,7 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:gdanav_core/gdanav_core.dart';
 import 'package:http/http.dart' as http;
@@ -359,5 +360,59 @@ void main() {
     expect(suo.manovre.every((m) => m.inizio >= 0 && m.inizio < suo.punti.length), isTrue);
   },
       timeout: const Timeout(Duration(minutes: 2)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  /// Quante colonnine conosce ogni fonte sullo stesso percorso, e quante ne
+  /// conosce l'unione: la domanda dal campo era «ma non ci sono tutte le
+  /// colonnine», e la catena a riserva si fermava alla prima che rispondeva.
+  test('le colonnine: ogni fonte da sola, e tutte insieme', () async {
+    final percorso = await valhalla.calcola([napoli, milano]);
+    final relay = ClienteColonnineRelay(Uri.parse('https://gdanav.gdahome.org/'));
+    final chiave = Platform.environment['GDANAV_OCM'] ?? '';
+
+    Future<List<Colonnina>> quante(String nome, FonteColonnine f) async {
+      final orologio = Stopwatch()..start();
+      try {
+        final c = await f.lungo(percorso.punti);
+        avviso('Colonnine $nome', '${orologio.elapsedMilliseconds} ms, ${c.length} colonnine');
+        return c;
+      } catch (e) {
+        avviso('Colonnine $nome', 'errore dopo ${orologio.elapsedMilliseconds} ms: $e');
+        return const [];
+      }
+    }
+
+    final daRelay = await quante('relay', relay);
+    final daOcm = chiave.isEmpty ? <Colonnina>[] : await quante('OCM', ClienteOpenChargeMap(chiave: chiave));
+    final fonti = <FonteColonnine>[
+      if (chiave.isNotEmpty) ClienteOpenChargeMap(chiave: chiave),
+      relay,
+    ];
+    final insieme = await quante('unite', FonteColonnineUnite(fonti));
+
+    // L'unione non può conoscerne meno della più ricca delle sue fonti.
+    final piuRicca = math.max(daRelay.length, daOcm.length);
+    expect(insieme.length, greaterThanOrEqualTo(piuRicca));
+
+    if (Platform.environment['GDANAV_ANTEPRIME'] case final cartella?) {
+      final doppie = insieme.where((c) => c.fonte.contains('+')).length;
+      File('$cartella/colonnine_fonti.txt').writeAsStringSync([
+        'Napoli → Milano, ${(percorso.lunghezzaM / 1000).round()} km',
+        '',
+        'relay (OpenStreetMap + archivio gdanav): ${daRelay.length}',
+        'Open Charge Map: ${chiave.isEmpty ? 'senza chiave' : '${daOcm.length}'}',
+        'tutte insieme: ${insieme.length}',
+        'di cui riconosciute da due fonti: $doppie',
+        '',
+        'guadagno rispetto alla fonte più ricca da sola: '
+            '+${insieme.length - piuRicca} (${piuRicca == 0 ? 0 : ((insieme.length - piuRicca) / piuRicca * 100).round()}%)',
+        '',
+        'le prime venti:',
+        for (final c in insieme.take(20))
+          '  ${c.fonte.padRight(12)} ${c.connettori.length} prese · ${c.operatore ?? '—'} · ${c.nome}',
+      ].join('\n'));
+    }
+  },
+      timeout: const Timeout(Duration(minutes: 3)),
       skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 }

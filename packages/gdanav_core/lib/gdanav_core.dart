@@ -3,6 +3,7 @@ library;
 
 export 'src/colonnine/colonnina.dart';
 export 'src/colonnine/lungo_percorso.dart';
+export 'src/colonnine/unione.dart';
 export 'src/colonnine/ocpi.dart';
 export 'src/colonnine/open_charge_map.dart';
 export 'src/colonnine/colonnine_locali.dart';

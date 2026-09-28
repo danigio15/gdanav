@@ -133,14 +133,24 @@ PianificatoreViaggio pianificatoreVero(
     // Il traffico di adesso sul percorso (per tutti, se c'è la chiave
     // TomTom): arrivo e soste lo mettono in conto.
     traffico: traffico?.applica,
-    // Open Charge Map se c'è la chiave (ha anche lo stato delle prese), e
-    // comunque OpenStreetMap: dall'archivio dentro l'app, fuori archivio dal
-    // relay di gdanav, e se tutto manca direttamente da Overpass.
-    colonnine: FonteColonnineConRiserva([
-      if (i.chiaveOcm.isNotEmpty) ClienteOpenChargeMap(chiave: i.chiaveOcm),
-      ColonnineLocali(archivioColonnine(), riserva: ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni))),
-      ClienteOverpass(),
-    ]),
+    /* Tutte le fonti insieme, non la prima che risponde.
+     *
+     * Era una catena: Open Charge Map, e se rispondeva ci si fermava lì.
+     * Ma le fonti non dicono la stessa cosa — intorno a Napoli Open Charge
+     * Map conosce 143 colonnine, e da sola diventava tutto quello che l'app
+     * sapeva, mentre l'archivio di OpenStreetMap ne ha molte di più. Adesso
+     * si chiedono insieme e si fondono: quelle a meno di sessanta metri sono
+     * la stessa, e resta quella che conosce più prese.
+     *
+     * Overpass resta solo come riserva: è lento (in CI scade anche dopo
+     * cinquanta secondi) e non deve rallentare ogni viaggio. */
+    colonnine: FonteColonnineUnite(
+      [
+        if (i.chiaveOcm.isNotEmpty) ClienteOpenChargeMap(chiave: i.chiaveOcm),
+        ColonnineLocali(archivioColonnine(), riserva: ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni))),
+      ],
+      riserva: ClienteOverpass(),
+    ),
     profilo: profilo,
     preferenze: preferenze,
     // Libere e occupate in tempo reale (Premium), se c'è la chiave TomTom.
