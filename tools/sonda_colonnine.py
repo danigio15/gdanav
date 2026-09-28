@@ -78,11 +78,9 @@ for url in (trovati[:10] + NOTI):
     except Exception:  # noqa: BLE001
         inizio = b[:90].decode("utf-8", "replace").replace("\n", " ").strip()
         html = b.lstrip()[:15].lower().startswith((b"<!doctype", b"<html"))
-        avviso(
-            "Colonnine prova",
-            f"{url[:110]} → HTTP 200, {len(b)} byte, non JSON"
-            f"{' (è la pagina del sito, non un\'API)' if html else f': {inizio}'}",
-        )
+        # Una pagina web che risponde a qualunque indirizzo non è un'API.
+        coda = " (è la pagina del sito, non un servizio)" if html else f": {inizio}"
+        avviso("Colonnine prova", f"{url[:110]} → HTTP 200, {len(b)} byte, non JSON{coda}")
         continue
     # Com'è fatto: le chiavi di primo livello bastano a riconoscere OCPI
     # (`data`/`status_code`) da ArcGIS (`services`/`layers`/`features`).
