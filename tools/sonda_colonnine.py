@@ -233,22 +233,46 @@ def quante_al_centro_direzionale() -> None:
     # dentro un impianto si mappano anche come `man_made=charge_point`, e
     # quelle non le chiediamo proprio. Qui si contano tutte e due, per sapere
     # quanto vale aggiungere il secondo.
-    overpass = (
-        f"[out:json][timeout:60];("
-        f'nwr["amenity"="charging_station"](around:{RAGGIO_M},{lat},{lon});'
-        f'nwr["man_made"="charge_point"](around:{RAGGIO_M},{lat},{lon});'
-        f");out center tags;"
+    #
+    # Un riquadro, non `around:`. Il primo giro chiedeva i due tag insieme
+    # con `around:` e Overpass ha ceduto — 504 da uno, timeout dall'altro:
+    # `around:` gli costa molto più di un rettangolo, e due tag insieme
+    # raddoppiano. Adesso si chiede una cosa per volta, nel modo che a lui
+    # costa meno.
+    gradi = RAGGIO_M / 111_000
+    riquadro = (
+        f"{lat - gradi:.5f},{lon - gradi / 0.757:.5f},{lat + gradi:.5f},{lon + gradi / 0.757:.5f}"
     )
-    for server in ("https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"):
-        try:
-            richiesta = urllib.request.Request(
-                server, data=urllib.parse.urlencode({"data": overpass}).encode(), headers=TESTA
-            )
-            with urllib.request.urlopen(richiesta, timeout=60) as r:
-                j = json.load(r)
-        except Exception as e:  # noqa: BLE001
-            avviso("Centro Direzionale OSM", f"{server.split('/')[2]}: {e}")
-            continue
+    SERVER = (
+        "https://overpass-api.de/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter",
+        "https://overpass.private.coffee/api/interpreter",
+    )
+
+    def chiedi(filtro: str) -> list | None:
+        corpo = f'[out:json][timeout:45];nwr{filtro}({riquadro});out center tags;'
+        for server in SERVER:
+            try:
+                richiesta = urllib.request.Request(
+                    server, data=urllib.parse.urlencode({"data": corpo}).encode(), headers=TESTA
+                )
+                with urllib.request.urlopen(richiesta, timeout=50) as r:
+                    return json.load(r).get("elements", [])
+            except Exception as e:  # noqa: BLE001
+                avviso("Centro Direzionale OSM", f"{filtro} da {server.split('/')[2]}: {e}")
+        return None
+
+    letteStazioni = chiedi('["amenity"="charging_station"]')
+    letteSpine = chiedi('["man_made"="charge_point"]')
+    if letteStazioni is None and letteSpine is None:
+        avviso("Centro Direzionale OSM", "nessun server di Overpass ha risposto")
+    else:
+        j = {"elements": (letteStazioni or []) + (letteSpine or [])}
+        avviso(
+            "Centro Direzionale OSM sorgenti",
+            f"stazioni: {'—' if letteStazioni is None else len(letteStazioni)}; "
+            f"spine (man_made=charge_point): {'—' if letteSpine is None else len(letteSpine)}",
+        )
         tutti = j.get("elements", [])
         stazioni = [e for e in tutti if e.get("tags", {}).get("amenity") == "charging_station"]
         spine = [e for e in tutti if e.get("tags", {}).get("man_made") == "charge_point"]
@@ -301,7 +325,6 @@ def quante_al_centro_direzionale() -> None:
         avviso("Centro Direzionale operatori", str(dict(sorted(operatori.items(), key=lambda x: -x[1])[:15])))
         if potenze:
             avviso("Centro Direzionale potenze", " · ".join(sorted(set(potenze))[:20]))
-        break
 
     # Open Charge Map, la fonte che usa anche ABRP come rinforzo.
     chiave = os.environ.get("OCM", "")
