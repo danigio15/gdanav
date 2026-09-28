@@ -125,8 +125,13 @@ Future<Map<String, Uint8List>> iconePunti() async => {
 /// e la manichetta è staccata sulla destra: tre pieni grossi invece di tanti
 /// dettagli, e si legge anche piccola. Le coordinate stanno in un riquadro
 /// 24×24 come le icone di Material, così si confrontano a occhio.
-Path pompaColFulmine(double lato) {
+///
+/// [grasso] allarga il fulmine tenendolo centrato. A 1 è quello di Material, e
+/// non si vedeva; a 1,5 sì — provato disegnando il PNG vero alla grandezza che
+/// ha in auto, sopra una mappa chiara. Oltre 1,75 esce dal corpo della pompa.
+Path pompaColFulmine(double lato, {double grasso = 1.5}) {
   final u = lato / 24;
+  double f(double x) => 9.6 + (x - 9.6) * grasso;
   Path p(List<List<double>> mosse) {
     final path = Path();
     for (final m in mosse) {
@@ -167,11 +172,11 @@ Path pompaColFulmine(double lato) {
   ]);
   final fulmine = p([
     [11.3, 4.6, 0],
-    [6.6, 12.1],
-    [9.5, 12.1],
+    [f(6.6), 12.1],
+    [f(9.5), 12.1],
     [8.7, 19.4],
-    [13.4, 11.5],
-    [10.4, 11.5],
+    [f(13.4), 11.5],
+    [f(10.4), 11.5],
   ]);
   return Path.combine(PathOperation.union, manichetta, Path.combine(PathOperation.difference, corpo, fulmine));
 }

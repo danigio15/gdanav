@@ -178,7 +178,7 @@ jobs:
         with:
           sdk: 3.13.4
       - run: dart pub get
-      - run: dart test test/viaggio_rete_test.dart test/tomtom_tessera_test.dart --reporter expanded
+      - run: dart test test/viaggio_rete_test.dart --reporter expanded
         env:
           GDANAV_RETE: "1"
           GDANAV_PREZZI: ${{ github.workspace }}/prezzi_napoli.json

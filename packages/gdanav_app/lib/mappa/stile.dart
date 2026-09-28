@@ -923,18 +923,31 @@ List<Object> _quantoSiVaPiano() => [
   1,
 ];
 
-/* Che famiglia di strada. TomTom la dice in `road_category`, un numero:
- * 0 autostrada, 1 internazionale, 2 principale, 3 secondaria, e giu' fino a 8.
+/* E' una strada grande, di quelle che si disegnano anche da lontano?
  *
- * Se il campo non c'e' — o cambia nome — si ripiega su 0, cioe' autostrada:
- * cosi' tutto finisce nello strato delle grandi, che si accende da zoom 7.
+ * TomTom la famiglia della strada la dice in `road_type`, a parole. Non si
+ * tira a indovinare: `tools/sonda_traffico.py` scarica un riquadro vero in CI
+ * e stampa i nomi che ci trova — «Major road», «Secondary road»,
+ * «Connecting road», «Major local road».
+ *
+ * Si sceglie con `match` e non con `in`: `match` e' nel formato da sempre e
+ * lo capiscono tutte le versioni di MapLibre, mentre un'espressione che una
+ * versione non conosce le fa buttare via lo strato intero — senza dire
+ * niente, e sullo schermo si vede una citta' che scorre.
+ *
+ * Si elencano le strade piccole, non le grandi: cosi' una parola nuova, o un
+ * campo che un domani cambia nome, finisce fra le grandi e si vede da zoom 7.
  * Sbagliare da quella parte vuol dire vedere una coda di paese da lontano;
- * sbagliare dall'altra vuol dire non vedere una coda in autostrada, che e'
- * esattamente il difetto che stiamo togliendo. */
-List<Object> _famigliaDellaStrada() => [
-  'to-number',
-  ['get', 'road_category'],
-  0,
+ * sbagliare dall'altra vuol dire non vedere una coda in tangenziale. */
+List<Object> _eUnaGrande() => [
+  'match',
+  [
+    'to-string',
+    ['get', 'road_type'],
+  ],
+  ['Connecting road', 'Major local road', 'Local road', 'Minor local road', 'Other'],
+  false,
+  true,
 ];
 
 /// Le strade dove TomTom misura una coda: sotto 0,6 si rallenta, sotto 0,3 si
@@ -949,7 +962,7 @@ Map<String, Object> _coda(String id, {required bool principali, required double 
     'filter': [
       'all',
       ['<', _quantoSiVaPiano(), 0.6],
-      principali ? ['<=', _famigliaDellaStrada(), 3] : ['>', _famigliaDellaStrada(), 3],
+      principali ? _eUnaGrande() : ['!', _eUnaGrande()],
     ],
     'layout': {'line-cap': 'round', 'line-join': 'round'},
     'paint': {
