@@ -216,4 +216,102 @@ def quanto_stato_da_ocm() -> None:
 
 
 quanto_stato_da_ocm()
+# 5. Il caso dal campo: il Centro Direzionale di Napoli. «Non te le porta le
+#    colonnine e ci sono.» Quante ce ne sono davvero, secondo ogni fonte che
+#    si può interrogare? Senza filtri: tutte, con la potenza scritta accanto,
+#    così si vede anche quante sono lente (che era il motivo per cui non
+#    entravano nei dati di gdanav).
+CENTRO_DIREZIONALE = (40.8548, 14.2855)
+RAGGIO_M = 1200
+
+
+def quante_al_centro_direzionale() -> None:
+    lat, lon = CENTRO_DIREZIONALE
+
+    # OpenStreetMap, senza nessun filtro: è la fonte che alimenta l'archivio.
+    overpass = (
+        f"[out:json][timeout:60];"
+        f'nwr["amenity"="charging_station"](around:{RAGGIO_M},{lat},{lon});'
+        f"out center tags;"
+    )
+    for server in ("https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"):
+        try:
+            richiesta = urllib.request.Request(
+                server, data=urllib.parse.urlencode({"data": overpass}).encode(), headers=TESTA
+            )
+            with urllib.request.urlopen(richiesta, timeout=60) as r:
+                j = json.load(r)
+        except Exception as e:  # noqa: BLE001
+            avviso("Centro Direzionale OSM", f"{server.split('/')[2]}: {e}")
+            continue
+        elementi = j.get("elements", [])
+        potenze = []
+        operatori: dict[str, int] = {}
+        for e in elementi:
+            tag = e.get("tags", {})
+            nome = str(tag.get("operator") or tag.get("brand") or tag.get("network") or "senza operatore")
+            operatori[nome] = operatori.get(nome, 0) + 1
+            for k, v in tag.items():
+                if k.endswith(":output") or k == "charging_station:output":
+                    potenze.append(f"{k.split(':')[-2] if ':' in k else k}={v}")
+        # Quante sarebbero passate con la vecchia regola di gdanav.
+        rapide = [
+            e
+            for e in elementi
+            if any(k.startswith(("socket:type2_combo", "socket:chademo", "socket:tesla_supercharger")) for k in e.get("tags", {}))
+            or re.search(RETI_RAPIDE, str(e.get("tags", {}).get("operator", "")), re.I)
+            or re.search(RETI_RAPIDE, str(e.get("tags", {}).get("brand", "")), re.I)
+        ]
+        avviso(
+            "Centro Direzionale OSM",
+            f"{len(elementi)} colonnine entro {RAGGIO_M} m; con la vecchia regola «solo rapide» ne passavano "
+            f"{len(rapide)}",
+        )
+        avviso("Centro Direzionale operatori", str(dict(sorted(operatori.items(), key=lambda x: -x[1])[:15])))
+        if potenze:
+            avviso("Centro Direzionale potenze", " · ".join(sorted(set(potenze))[:20]))
+        break
+
+    # Open Charge Map, la fonte che usa anche ABRP come rinforzo.
+    chiave = os.environ.get("OCM", "")
+    q = {
+        "output": "json",
+        "compact": "true",
+        "verbose": "false",
+        "latitude": str(lat),
+        "longitude": str(lon),
+        "distance": "1.2",
+        "distanceunit": "KM",
+        "maxresults": "200",
+    }
+    if chiave:
+        q["key"] = chiave
+    st, b = prendi("https://api.openchargemap.io/v3/poi/?" + urllib.parse.urlencode(q), 30)
+    if st != 200:
+        avviso("Centro Direzionale OCM", f"HTTP {st}")
+        return
+    try:
+        elenco = json.loads(b)
+    except Exception as e:  # noqa: BLE001
+        avviso("Centro Direzionale OCM", f"risposta non leggibile: {e}")
+        return
+    kw = []
+    for c in elenco if isinstance(elenco, list) else []:
+        for x in c.get("Connections") or []:
+            if isinstance(x, dict) and x.get("PowerKW"):
+                kw.append(float(x["PowerKW"]))
+    rapide = [p for p in kw if p >= 40]
+    avviso(
+        "Centro Direzionale OCM",
+        f"{len(elenco) if isinstance(elenco, list) else 0} colonnine, {len(kw)} prese; "
+        f"da 40 kW in su: {len(rapide)}; potenze {sorted(set(kw))[:14]}",
+    )
+
+
+RETI_RAPIDE = (
+    r"Ionity|Tesla|Free To X|Electra|Fastned|Ewiva|Atlante|Allego|"
+    r"Plenitude|Be Charge|Enel X|A2A|Neogy|Zunder|Powerdot|Duferco"
+)
+
+quante_al_centro_direzionale()
 scrivi_quaderno()
