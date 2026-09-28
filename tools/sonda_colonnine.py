@@ -76,13 +76,49 @@ for url in (trovati[:10] + NOTI):
     try:
         j = json.loads(b)
     except Exception:  # noqa: BLE001
-        avviso("Colonnine prova", f"{url[:110]} → HTTP 200, {len(b)} byte, non JSON")
+        inizio = b[:90].decode("utf-8", "replace").replace("\n", " ").strip()
+        html = b.lstrip()[:15].lower().startswith((b"<!doctype", b"<html"))
+        avviso(
+            "Colonnine prova",
+            f"{url[:110]} → HTTP 200, {len(b)} byte, non JSON"
+            f"{' (è la pagina del sito, non un\'API)' if html else f': {inizio}'}",
+        )
         continue
     # Com'è fatto: le chiavi di primo livello bastano a riconoscere OCPI
     # (`data`/`status_code`) da ArcGIS (`services`/`layers`/`features`).
     forma = sorted(j)[:12] if isinstance(j, dict) else f"lista di {len(j)}"
     ocpi = isinstance(j, dict) and ("status_code" in j or "versions" in j)
     avviso("Colonnine prova", f"{url[:110]} → HTTP 200, {len(b)} byte, chiavi {forma}{' ← sembra OCPI' if ocpi else ''}")
+
+    # Un elenco di servizi ArcGIS: i nomi sono la cosa che serve.
+    if isinstance(j, dict) and isinstance(j.get("services"), list):
+        nomi = [f"{x.get('name')}({x.get('type')})" for x in j["services"]]
+        avviso("Colonnine servizi", f"{len(nomi)}: " + " · ".join(nomi[:40]))
+        base = url.split("?")[0].rstrip("/")
+        cerca = ("ricaric", "charg", "colonnin", "elettric", "_ev", "ev_", "pun", "mobilit")
+        for x in j["services"]:
+            nome = str(x.get("name", ""))
+            if not any(k in nome.lower() for k in cerca):
+                continue
+            # Dentro il servizio: gli strati e, del primo, i campi. Se c'è
+            # uno stato in tempo reale, è lì che si vede.
+            st2, b2 = prendi(f"{base}/{nome.split('/')[-1]}/{x.get('type')}?f=pjson", 20)
+            try:
+                dentro = json.loads(b2)
+            except Exception:  # noqa: BLE001
+                avviso("Colonnine servizio", f"{nome} → HTTP {st2}, non leggibile")
+                continue
+            strati = [f"{l.get('id')}:{l.get('name')}" for l in (dentro.get("layers") or [])]
+            avviso("Colonnine servizio", f"{nome} → strati {strati[:10]}")
+            if not strati:
+                continue
+            st3, b3 = prendi(f"{base}/{nome.split('/')[-1]}/{x.get('type')}/0?f=pjson", 20)
+            try:
+                strato = json.loads(b3)
+            except Exception:  # noqa: BLE001
+                continue
+            campi = [str(c.get("name")) for c in (strato.get("fields") or [])]
+            avviso("Colonnine campi", f"{nome}/0: " + " · ".join(campi[:40]))
 
 if not trovati:
     sys.exit(0)
