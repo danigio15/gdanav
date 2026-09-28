@@ -184,10 +184,37 @@ procura da sola). Oggi i punti sono **75.765**, contro i 48.916 della
 fotografia di onData: ne manca più di un terzo, e ogni punto ha lo stato di
 adesso.
 
-**Non la usiamo dall'app.** È un'API interna del sito, non documentata: si
-è già rotta una volta (è quello che ha fermato onData), e cablarla in ogni
-telefono vorrebbe dire dipendere da qualcosa che nessuno ci ha dato. Serve a sapere **cosa
-chiedere**: vedi sotto.
+**Nel lavoro di CI sì, nell'app no.** AgID — l'Agenzia per l'Italia
+Digitale — nel suo Cruscotto Italia
+([`AgID/cruscotto-italia`](https://github.com/AgID/cruscotto-italia),
+`etl/sources/pun.py`) legge l'intera PUN ogni giorno da questa API, con le
+credenziali ospite che il sito pubblica in `/config.json`, e la pubblica
+come **CC BY 4.0** per l'art. 52 c. 2 del CAD («open data by default») e
+le Linee Guida Open Data AgID, citando «GSE — Piattaforma Unica Nazionale».
+Da giugno 2026 il bottone «Esporta dati» non c'è più: l'API è l'unica
+strada. Giovanni ha scelto di fare lo stesso per l'archivio.
+
+`tools/pun/estrai.py` lo fa quando si rifà l'archivio (commit con
+«[colonnine]»): le pagine della mappa come le chiede il sito, i dettagli a
+blocchi di cento con una pausa, un CSV nel formato di `Pun.leggiCsv` con in
+più il nome dell'azienda. Se l'API non risponde si torna alla fotografia di
+onData, con un avviso: in quel caso la citazione nell'app va cambiata.
+
+Nell'app invece no: ogni telefono che chiede a un'API interna del sito è un
+carico che il GSE non ha previsto, e una cosa che si può rompere da un
+giorno all'altro (è quello che ha fermato onData). Per lo stato in tempo
+reale la strada giusta è una sola chiamata dal relay per tutti, o l'accesso
+ufficiale: vedi sotto.
+
+La cattura del 28 settembre 2026, contando le risposte della mappa:
+
+```
+75.759 punti di ricarica
+  liberi 56.742 · fuori servizio 9.097 · in carica 4.630 · senza stato 2.045
+  rimossi 1.317 · bloccati 1.214 · non operativi 670 · prenotati 27 · pianificati 17
+Centro Direzionale, entro 1200 m: 855
+  liberi 724 · fuori servizio 75 · bloccati 51 · in carica 5
+```
 
 ## Cosa resta da fare, e non è codice
 

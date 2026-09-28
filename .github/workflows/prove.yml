@@ -327,6 +327,9 @@ jobs:
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: 3.13.4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - run: sudo apt-get update && sudo apt-get install -y osmium-tool
       - name: Estratti e colonnine
         working-directory: ${{ runner.temp }}
@@ -349,12 +352,21 @@ jobs:
         working-directory: packages/gdanav_core
       # La PUN: dove OpenStreetMap non arriva. Al Centro Direzionale di Napoli
       # le stazioni passano da quattro a quattordici, le prese da 9 a 841.
+      # Quella di oggi dall'API del portale, come la legge AgID nel Cruscotto
+      # Italia (tools/pun/estrai.py); se non risponde, la fotografia di onData
+      # del 2024 — e allora la citazione nell'app va cambiata a mano.
       - name: La PUN nell'archivio
         working-directory: packages/gdanav_core
         run: |
           set -eo pipefail
-          curl -sSfL --retry 5 -o ${{ runner.temp }}/pun.csv \
-            https://raw.githubusercontent.com/ondata/rete_ricarica_veicoli_elettrici/main/data/pdr_latest_ready.csv
+          pip install --quiet requests requests-aws4auth
+          if python3 ../../tools/pun/estrai.py ${{ runner.temp }}/pun.csv | tee -a $GITHUB_STEP_SUMMARY; then
+            echo "PUN: l'estrazione di oggi, dall'API del portale" | tee -a $GITHUB_STEP_SUMMARY
+          else
+            echo "::warning title=PUN::l'API non ha risposto: si usa la fotografia di onData (2024), e la citazione nell'app va cambiata"
+            curl -sSfL --retry 5 -o ${{ runner.temp }}/pun.csv \
+              https://raw.githubusercontent.com/ondata/rete_ricarica_veicoli_elettrici/main/data/pdr_latest_ready.csv
+          fi
           dart run tool/colonnine_pun.dart colonnine.json ${{ runner.temp }}/pun.csv colonnine.json | tee -a $GITHUB_STEP_SUMMARY
       - run: dart run tool/autovelox_osm.dart autovelox.json ${{ runner.temp }}/*.autovelox.geojsonseq
         working-directory: packages/gdanav_core
