@@ -44,7 +44,8 @@ class ColonnineLocali implements FonteColonnine {
 
 /// Le colonnine divise per riquadri di mezzo grado.
 class ArchivioColonnine {
-  ArchivioColonnine(Iterable<Colonnina> colonnine, {this.generato, Set<(int, int)>? coperti}) {
+  ArchivioColonnine(Iterable<Colonnina> colonnine,
+      {this.generato, Set<(int, int)>? coperti, this.evseInOrdine = false}) {
     for (final c in colonnine) {
       (_perRiquadro[_riquadro(c.posizione)] ??= []).add(c);
     }
@@ -66,6 +67,12 @@ class ArchivioColonnine {
   static final vuoto = ArchivioColonnine(const []);
 
   final DateTime? generato;
+
+  /// Se gli EVSE ID di ogni colonnina sono scritti nell'ordine delle sue
+  /// prese: allora il punto i-esimo è la presa i-esima anche dove le prese
+  /// non sono tutte uguali, e lo stato di tutta Italia si può dare presa per
+  /// presa (`DisponibilitaPun.conStati`). Gli archivi di prima non lo sono.
+  final bool evseInOrdine;
   final _perRiquadro = <(int, int), List<Colonnina>>{};
   final _coperti = <(int, int)>{};
 
@@ -109,18 +116,32 @@ class ArchivioColonnine {
           c.operatore ?? '',
           _prese(c.connettori),
           if ((c.fonte.isNotEmpty && c.fonte != 'osm') || c.evse.isNotEmpty) c.fonte.isEmpty ? 'osm' : c.fonte,
-          if (c.evse.isNotEmpty) c.evse,
+          if (c.evse.isNotEmpty) _evseInOrdine(c),
         ],
     ];
     return jsonEncode({
       'v': 1,
       'generato': (generato ?? DateTime.now().toUtc()).toIso8601String(),
+      'evseInOrdine': true,
       if (coperti != null)
         'q': [
           for (final (r, c) in coperti) [r, c]
         ],
       'c': righe,
     });
+  }
+
+  /// Gli EVSE ID nell'ordine in cui [_prese] scrive le prese — raggruppate
+  /// per tipo e potenza, nell'ordine in cui compaiono —: così, riletti, il
+  /// punto i-esimo è la presa i-esima. Se i punti non sono uno per presa
+  /// restano com'erano, e nessuno ci conta.
+  static List<String> _evseInOrdine(Colonnina c) {
+    if (c.evse.length != c.connettori.length || c.connettori.any((p) => !_tipi.contains(p.tipo))) return c.evse;
+    final gruppi = <(int, double), List<String>>{};
+    for (final (i, p) in c.connettori.indexed) {
+      (gruppi[(_tipi.indexOf(p.tipo), p.potenzaKw)] ??= []).add(c.evse[i]);
+    }
+    return [for (final l in gruppi.values) ...l];
   }
 
   static List<List<num>> _prese(List<Connettore> connettori) {
@@ -160,6 +181,7 @@ class ArchivioColonnine {
     return ArchivioColonnine(
       colonnine,
       generato: DateTime.tryParse('${j['generato']}'),
+      evseInOrdine: j['evseInOrdine'] == true,
       coperti: q == null ? null : {for (final x in q.cast<List>()) ((x[0] as num).toInt(), (x[1] as num).toInt())},
     );
   }

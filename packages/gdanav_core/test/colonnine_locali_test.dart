@@ -134,4 +134,28 @@ void main() {
     final locali = ColonnineLocali(Future.value(ArchivioColonnine([colonnina('bo', 44.6, 11.35)])), riserva: relay);
     expect((await locali.lungo(percorso)).single.id, 'bo');
   });
+
+  /* Lo stato di tutta Italia si dà presa per presa: il punto i-esimo deve
+   * essere la presa i-esima anche dove le prese non sono tutte uguali. */
+  test('gli EVSE ID si scrivono nell\'ordine delle prese', () {
+    final area = Colonnina(
+      id: 'pun:area',
+      nome: 'Area di servizio',
+      posizione: const Punto(41.9, 12.5),
+      connettori: const [
+        Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150),
+        Connettore(tipo: TipoConnettore.tipo2, potenzaKw: 22),
+        Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150),
+      ],
+      fonte: 'pun',
+      evse: const ['A', 'B', 'C'],
+    );
+    final letto = ArchivioColonnine.leggi(ArchivioColonnine.scrivi([area]));
+    expect(letto.evseInOrdine, isTrue);
+    final c = letto.tutte.single;
+    expect(c.connettori.map((p) => p.tipo), [TipoConnettore.ccs2, TipoConnettore.ccs2, TipoConnettore.tipo2]);
+    expect(c.evse, ['A', 'C', 'B']);
+    // Gli archivi di prima non lo dicono, e non ci si conta.
+    expect(ArchivioColonnine.leggi('{"v":1,"c":[]}').evseInOrdine, isFalse);
+  });
 }

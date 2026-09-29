@@ -239,6 +239,147 @@ void main() {
       expect(identical(await d.aggiorna(osm), osm), isTrue);
     });
   });
+
+  /* «Voglio lo stato di tutte sempre»: quello che la mappa pubblica della
+   * PUN disegna quando si apre, sette pagine da dodicimila punti. */
+  group('lo stato di tutta Italia', () {
+    final mista = Colonnina(
+      id: 'pun:area',
+      nome: 'Area di servizio',
+      posizione: const Punto(41.9, 12.5),
+      connettori: const [
+        Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150),
+        Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150),
+        Connettore(tipo: TipoConnettore.tipo2, potenzaKw: 22),
+      ],
+      fonte: 'pun',
+      evse: const ['IT*X*E1', 'IT*X*E2', 'IT*X*E3'],
+    );
+
+    test('le prese prendono lo stato dei loro punti', () {
+      final c = DisponibilitaPun.conStati(isola(4), {
+        'IT*BEC*EW001*0': 'AVAILABLE',
+        'IT*BEC*EW001*1': 'CHARGING',
+        'IT*BEC*EW001*2': 'OUTOFORDER',
+        // Il quarto la mappa non lo ha: resta «non si sa».
+      });
+      expect(c.connettori.map((p) => p.stato), [
+        StatoPresa.disponibile,
+        StatoPresa.occupata,
+        StatoPresa.fuoriServizio,
+        StatoPresa.sconosciuto,
+      ]);
+      final d = c.disponibilitaPer({TipoConnettore.tipo2});
+      expect((d.libere, d.occupate, d.guaste, d.totali), (1, 1, 1, 4));
+    });
+
+    test('con prese diverse si dà lo stato solo se i punti sono nell\'ordine delle prese', () {
+      final stati = {'IT*X*E1': 'CHARGING', 'IT*X*E2': 'CHARGING', 'IT*X*E3': 'AVAILABLE'};
+      // Senza sapere quale punto è quale presa, non si indovina.
+      expect(identical(DisponibilitaPun.conStati(mista, stati), mista), isTrue);
+      final c = DisponibilitaPun.conStati(mista, stati, inOrdine: true);
+      expect(c.connettori.map((p) => p.stato), [StatoPresa.occupata, StatoPresa.occupata, StatoPresa.disponibile]);
+      expect(c.disponibilitaPer({TipoConnettore.ccs2}).piena, isTrue);
+    });
+
+    test('punti e prese che non tornano: resta com\'era', () {
+      final storta = Colonnina(
+        id: 'osm+pun:x',
+        nome: 'x',
+        posizione: const Punto(45, 9),
+        connettori: const [Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 50)],
+        evse: const ['A', 'B'],
+      );
+      expect(identical(DisponibilitaPun.conStati(storta, {'A': 'AVAILABLE', 'B': 'AVAILABLE'}), storta), isTrue);
+      expect(identical(DisponibilitaPun.conStati(isola(2), const {}), isola(2)), isFalse);
+      final senza = isola(2);
+      expect(identical(DisponibilitaPun.conStati(senza, const {}), senza), isTrue);
+    });
+
+    MockClient mappa(List<List<Map<String, Object?>>> pagine, List<int> chieste, {bool dichiaraUltima = true}) =>
+        MockClient((r) async {
+          if (r.url.host.startsWith('cognito-identity.')) return cognitoFinto(r);
+          expect(r.url.toString(), '${DisponibilitaPun.api}/v1/chargepoints/public/map/search');
+          final corpo = jsonDecode(r.body) as Map;
+          expect(corpo['size'], DisponibilitaPun.pagina);
+          final n = corpo['page'] as int;
+          chieste.add(n);
+          final contenuto = n < pagine.length ? pagine[n] : const <Map<String, Object?>>[];
+          return http.Response(
+              jsonEncode({'content': contenuto, if (dichiaraUltima) 'last': n >= pagine.length - 1}), 200);
+        });
+    Map<String, Object?> sullaMappa(String evse, String stato) => {
+          'status': stato,
+          'coordinates': {'latitude': 40.85, 'longitude': 14.28},
+          'evse_id': evse,
+        };
+
+    test('pagina dopo pagina fino all\'ultima', () async {
+      final chieste = <int>[];
+      final pun = DisponibilitaPun(
+        client: mappa([
+          [sullaMappa('A', 'AVAILABLE'), sullaMappa('B', 'CHARGING')],
+          [sullaMappa('C', 'OUTOFORDER')],
+        ], chieste),
+        adesso: () => adesso,
+      );
+      expect(await pun.statiDiTutti(), {'A': 'AVAILABLE', 'B': 'CHARGING', 'C': 'OUTOFORDER'});
+      expect(chieste, [0, 1]);
+      expect(pun.ultimaLettura!.pagine, 2);
+      expect(pun.ultimaLettura!.punti, 3);
+    });
+
+    test('senza «last» ci si ferma alla prima pagina vuota', () async {
+      final chieste = <int>[];
+      final pun = DisponibilitaPun(
+        client: mappa([
+          [sullaMappa('A', 'AVAILABLE')],
+        ], chieste, dichiaraUltima: false),
+        adesso: () => adesso,
+      );
+      expect((await pun.statiDiTutti()).keys, ['A']);
+      expect(chieste, [0, 1]);
+    });
+
+    test('vale tre minuti, e chi la chiede mentre arriva aspetta la stessa', () async {
+      final chieste = <int>[];
+      var ora = adesso;
+      final pun = DisponibilitaPun(
+        client: mappa([
+          [sullaMappa('A', 'AVAILABLE')],
+        ], chieste),
+        adesso: () => ora,
+      );
+      final insieme = await Future.wait([pun.statiDiTutti(), pun.statiDiTutti()]);
+      expect(identical(insieme[0], insieme[1]), isTrue);
+      expect(chieste, [0]);
+      ora = adesso.add(const Duration(minutes: 2));
+      await pun.statiDiTutti();
+      expect(chieste, [0]);
+      ora = adesso.add(const Duration(minutes: 4));
+      await pun.statiDiTutti();
+      expect(chieste, [0, 0]);
+    });
+  });
+}
+
+/// Le credenziali ospite di Cognito, finte.
+http.Response cognitoFinto(http.Request r) {
+  if (r.headers['x-amz-target'] == 'AWSCognitoIdentityService.GetId') {
+    return http.Response(jsonEncode({'IdentityId': 'eu-south-1:ospite'}), 200);
+  }
+  return http.Response(
+    jsonEncode({
+      'IdentityId': 'eu-south-1:ospite',
+      'Credentials': {
+        'AccessKeyId': 'ASIAPROVA',
+        'SecretKey': 'segreto',
+        'SessionToken': 'gettone',
+        'Expiration': DateTime.utc(2026, 9, 28, 18).millisecondsSinceEpoch / 1000,
+      },
+    }),
+    200,
+  );
 }
 
 /// TomTom finta: dice occupato a tutto, e si ricorda chi ha visto.

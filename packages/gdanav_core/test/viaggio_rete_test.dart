@@ -468,58 +468,113 @@ void main() {
       timeout: const Timeout(Duration(minutes: 3)),
       skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 
-  // Cosa c'è dentro un punto di ricarica della PUN, oltre allo stato: la
-  // mappa pubblica ha un filtro per prezzo (`/v1/tariffs/price-range`), e
-  // se le tariffe stanno nella stessa risposta dello stato l'app le ha senza
-  // chiedere niente di più. Un punto per ognuno dei gestori più diffusi
-  // nell'archivio; si stampa la forma, e i campi che parlano di prezzi.
-  test('la PUN: cosa dice di un punto, prezzi compresi', () async {
+  // Quello che la PUN sa oltre allo stato, gestore per gestore: i prezzi
+  // (`punTariffsDetails`: energia, sosta, attivazione, tempo; per AC, DC e
+  // HPC) e se lo stato è in tempo reale. Fino a 30 punti per ognuno dei 40
+  // gestori più diffusi nell'archivio. E poi lo stato di tutta Italia in
+  // blocco, come lo legge la mappa pubblica: quante pagine, quanti punti,
+  // quanto pesa, quanto ci mette. Il resoconto va in `pun_prezzi.txt`.
+  test('la PUN: prezzi e tempo reale per gestore, e lo stato di tutta Italia', () async {
     final archivio = ArchivioColonnine.leggi(File('../gdanav_app/assets/colonnine.json').readAsStringSync());
     // Il gestore sta nell'EVSE ID: `IT*PLN*…` è Plenitude, `IT*ENX*…` Enel X.
-    final primo = <String, String>{};
-    final quanti = <String, int>{};
+    String gestoreDi(String e) =>
+        e.contains('*') ? e.split('*').take(2).join('*') : e.substring(0, math.min(5, e.length));
+    final perGestore = <String, List<String>>{};
+    final nomi = <String, String>{};
     for (final c in archivio.tutte) {
-      if (c.evse.isEmpty) continue;
-      final e = c.evse.first;
-      final gestore = e.contains('*') ? e.split('*').take(2).join('*') : e.substring(0, math.min(5, e.length));
-      primo.putIfAbsent(gestore, () => e);
-      quanti[gestore] = (quanti[gestore] ?? 0) + 1;
-    }
-    final piuDiffusi = (quanti.keys.toList()..sort((a, b) => quanti[b]!.compareTo(quanti[a]!))).take(20);
-    final chiesti = [for (final g in piuDiffusi) primo[g]!];
-    final punti = await DisponibilitaPun().punti(chiesti);
-    stdout.writeln('PUN struttura: ${punti.length} punti su ${chiesti.length} chiesti');
-    if (punti.isNotEmpty) {
-      final testo = jsonEncode(punti.first);
-      stdout.writeln('PUN struttura, il primo: ${testo.substring(0, math.min(6000, testo.length))}');
-    }
-    final prezzo = RegExp('tariff|price|prezz|cost|euro|currency|fee', caseSensitive: false);
-    void cerca(Object? v, String dove, List<String> trovati) {
-      if (v is Map) {
-        for (final MapEntry(:key, :value) in v.entries) {
-          final qui = '$dove.$key';
-          if (prezzo.hasMatch('$key')) {
-            final t = jsonEncode(value);
-            trovati.add('$qui = ${t.substring(0, math.min(400, t.length))}');
-          }
-          cerca(value, qui, trovati);
-        }
-      } else if (v is List) {
-        for (final (i, x) in v.indexed) {
-          cerca(x, '$dove[$i]', trovati);
-        }
+      for (final e in c.evse) {
+        final g = gestoreDi(e);
+        (perGestore[g] ??= []).add(e);
+        nomi.putIfAbsent(g, () => c.operatore ?? '');
       }
     }
-
-    var conPrezzi = 0;
-    for (final r in punti) {
-      final trovati = <String>[];
-      cerca(r, '', trovati);
-      if (trovati.isNotEmpty) conPrezzi++;
-      stdout.writeln('PUN prezzi ${r['evse_id']}: ${trovati.isEmpty ? 'niente' : trovati.join(' | ')}');
+    final gestori = (perGestore.keys.toList()..sort((a, b) => perGestore[b]!.length.compareTo(perGestore[a]!.length)))
+        .take(40)
+        .toList();
+    final chiesti = [for (final g in gestori) ...perGestore[g]!.take(30)];
+    final pun = DisponibilitaPun();
+    final risposte = <Map>[];
+    for (var i = 0; i < chiesti.length; i += DisponibilitaPun.blocco) {
+      risposte.addAll(await pun.punti(chiesti.sublist(i, math.min(i + DisponibilitaPun.blocco, chiesti.length))));
     }
-    avviso('PUN prezzi', '$conPrezzi punti su ${punti.length} hanno campi di prezzo');
+    final righe = <String>['gestore  punti  tempo-reale(sì/no/?)  con-prezzi  energia €/kWh (min–max)  altro'];
+    var conPrezzo = 0;
+    for (final g in gestori) {
+      final suoi = [
+        for (final r in risposte)
+          if (gestoreDi('${r['evse_id']}') == g) r
+      ];
+      var si = 0, no = 0, boh = 0, prezzi = 0;
+      final energia = <double>[];
+      final altro = <String>{};
+      for (final r in suoi) {
+        switch (r['realTime']) {
+          case true:
+            si++;
+          case false:
+            no++;
+          default:
+            boh++;
+        }
+        var ha = false;
+        if (r['punTariffsDetails'] case final Map t) {
+          for (final (tipo, v) in [('AC', t['acTariff']), ('DC', t['dcTariff']), ('HPC', t['hpcTariff'])]) {
+            if (v is! Map) continue;
+            if (v['energy'] case final num e) {
+              energia.add(e.toDouble());
+              ha = true;
+            }
+            for (final voce in ['parking', 'activation', 'time']) {
+              if (v[voce] is num) {
+                altro.add('$tipo $voce ${v[voce]}');
+                ha = true;
+              }
+            }
+          }
+        }
+        if (ha) prezzi++;
+      }
+      conPrezzo += prezzi;
+      energia.sort();
+      righe.add([
+        '$g (${nomi[g]})',
+        '${suoi.length}',
+        '$si/$no/$boh',
+        '$prezzi',
+        energia.isEmpty ? '—' : '${energia.first}–${energia.last}',
+        altro.take(4).join(', '),
+      ].join('  '));
+    }
+    righe.add('');
+    righe.add('con un prezzo: $conPrezzo punti su ${risposte.length}');
+
+    final orologio = Stopwatch()..start();
+    final stati = await pun.statiDiTutti();
+    final l = pun.ultimaLettura!;
+    final conta = <String, int>{};
+    for (final s in stati.values) {
+      conta[s] = (conta[s] ?? 0) + 1;
+    }
+    righe.add('');
+    righe.add('tutta Italia: ${l.punti} punti in ${l.pagine} pagine, ${(l.byte / 1e6).toStringAsFixed(1)} MB '
+        '(compressione: ${l.compressione.isEmpty ? 'nessuna dichiarata' : l.compressione}), '
+        '${orologio.elapsedMilliseconds} ms');
+    righe.add(
+        '  ${(conta.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).map((e) => '${e.key} ${e.value}').join(' · ')}');
+    // Quanti dei punti dell'archivio hanno uno stato nella lettura di tutta Italia.
+    final nellArchivio = [for (final c in archivio.tutte) ...c.evse];
+    righe.add(
+        '  dei ${nellArchivio.length} punti dell\'archivio, ${nellArchivio.where(stati.containsKey).length} hanno uno stato');
+
+    for (final r in righe) {
+      stdout.writeln('PUN resoconto: $r');
+    }
+    if (Platform.environment['GDANAV_ANTEPRIME'] case final cartella?) {
+      File('$cartella/pun_prezzi.txt').writeAsStringSync('${righe.join('\n')}\n');
+    }
+    avviso('PUN prezzi', 'con un prezzo: $conPrezzo punti su ${risposte.length}; tutta Italia ${l.punti} punti');
+    expect(stati.length, greaterThan(50000));
   },
-      timeout: const Timeout(Duration(minutes: 2)),
+      timeout: const Timeout(Duration(minutes: 4)),
       skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 }

@@ -25,6 +25,7 @@ class DisponibilitaPun implements FonteDisponibilita {
   DisponibilitaPun({
     http.Client? client,
     this.validita = const Duration(minutes: 1),
+    this.validitaTutti = const Duration(minutes: 3),
     DateTime Function()? adesso,
   })  : _http = client ?? http.Client(),
         _adesso = adesso ?? DateTime.now;
@@ -118,23 +119,119 @@ class DisponibilitaPun implements FonteDisponibilita {
   /// «libera» su quello sarebbe una bugia.
   static StatoPresa statoDi(Map r) {
     if (r['realTime'] == false) return StatoPresa.sconosciuto;
-    return switch ('${r['status'] ?? ''}'.toUpperCase()) {
-      'AVAILABLE' => StatoPresa.disponibile,
-      // Bloccata: c'è un'auto ferma davanti, per chi arriva è occupata.
-      'CHARGING' || 'RESERVED' || 'BLOCKED' => StatoPresa.occupata,
-      'OUTOFORDER' || 'INOPERATIVE' => StatoPresa.fuoriServizio,
-      _ => StatoPresa.sconosciuto,
-    };
+    return statoDaParola('${r['status'] ?? ''}');
   }
+
+  /// La colonnina con lo stato di adesso dei suoi punti di ricarica, preso
+  /// da [stati] (quello di tutta Italia, [statiDiTutti]).
+  ///
+  /// Un punto è una presa, come nell'archivio: la presa i-esima prende lo
+  /// stato del punto i-esimo. Vale quando i punti sono tanti quante le prese
+  /// e sono tutte uguali — 26.000 colonnine su 30.000: allora l'ordine non
+  /// conta —, oppure quando l'archivio ha scritto i punti nello stesso ordine
+  /// delle prese ([inOrdine]). Altrimenti non si indovina quale presa è
+  /// libera: la colonnina resta com'era, e lo stato si chiede quando la si
+  /// tocca ([aggiorna]).
+  static Colonnina conStati(Colonnina c, Map<String, String> stati, {bool inOrdine = false}) {
+    if (c.evse.isEmpty || c.evse.length != c.connettori.length) return c;
+    final prima = c.connettori.first;
+    final uguali = c.connettori.every((p) => p.tipo == prima.tipo && p.potenzaKw == prima.potenzaKw);
+    if (!uguali && !inOrdine) return c;
+    var letti = 0;
+    final prese = <Connettore>[];
+    for (final (i, p) in c.connettori.indexed) {
+      final parola = stati[c.evse[i]];
+      if (parola != null) letti++;
+      prese.add(parola == null ? p : p.conStato(statoDaParola(parola)));
+    }
+    if (letti == 0) return c;
+    return Colonnina(
+      id: c.id,
+      nome: c.nome,
+      posizione: c.posizione,
+      operatore: c.operatore,
+      fonte: c.fonte,
+      evse: c.evse,
+      connettori: prese,
+    );
+  }
+
+  /// La parola della PUN (`AVAILABLE`, `CHARGING`…) come stato di una presa.
+  static StatoPresa statoDaParola(String? parola) => switch ((parola ?? '').toUpperCase()) {
+        'AVAILABLE' => StatoPresa.disponibile,
+        // Bloccata: c'è un'auto ferma davanti, per chi arriva è occupata.
+        'CHARGING' || 'RESERVED' || 'BLOCKED' => StatoPresa.occupata,
+        'OUTOFORDER' || 'INOPERATIVE' => StatoPresa.fuoriServizio,
+        _ => StatoPresa.sconosciuto,
+      };
 
   /// I punti di ricarica [evse] come li dà la PUN (al massimo [blocco] per
   /// volta): lo stato, le prese, il posto. È la stessa risposta da cui
   /// [aggiorna] legge libere e occupate.
-  Future<List<Map>> punti(List<String> evse) async {
+  Future<List<Map>> punti(List<String> evse) async =>
+      ((await _chiedi('/v1/chargepoints/group', evse)).dati as List).whereType<Map>().toList();
+
+  /// Lo stato di ogni punto di ricarica d'Italia, come lo disegna la mappa
+  /// pubblica della PUN: EVSE ID → parola dello stato (`AVAILABLE`,
+  /// `CHARGING`…).
+  ///
+  /// Sono le pagine di `/v1/chargepoints/public/map/search`, [pagina] punti
+  /// per volta, quante ne chiede il sito quando si apre: sette richieste per
+  /// tutta Italia. Valgono [validitaTutti]; chi le chiede mentre stanno
+  /// arrivando aspetta le stesse, invece di rifarle.
+  Future<Map<String, String>> statiDiTutti() {
+    if (_tutti case (final quando, final stati) when _adesso().difference(quando) < validitaTutti) {
+      return Future.value(stati);
+    }
+    return _tuttiInArrivo ??= _leggiTutti().whenComplete(() => _tuttiInArrivo = null);
+  }
+
+  /// Quanti punti chiede ogni pagina: come il sito.
+  static const pagina = 12000;
+
+  /// Quanto vale lo stato di tutta Italia letto.
+  final Duration validitaTutti;
+
+  (DateTime, Map<String, String>)? _tutti;
+  Future<Map<String, String>>? _tuttiInArrivo;
+
+  /// Com'è andata l'ultima lettura di tutta Italia: per la diagnosi.
+  ({int pagine, int punti, int byte, Duration tempo, String compressione})? ultimaLettura;
+
+  Future<Map<String, String>> _leggiTutti() async {
+    final orologio = Stopwatch()..start();
+    final stati = <String, String>{};
+    var byte = 0, pagine = 0;
+    var compressione = '';
+    for (var n = 0; n < 40; n++) {
+      final r = await _chiedi('/v1/chargepoints/public/map/search', {'page': n, 'size': pagina});
+      pagine++;
+      byte += r.byte;
+      compressione = r.compressione;
+      final d = r.dati;
+      final contenuto = d is Map ? (d['content'] as List? ?? const []) : const [];
+      for (final p in contenuto.whereType<Map>()) {
+        if (p['evse_id'] case final String id when id.isNotEmpty) stati[id] = '${p['status'] ?? ''}';
+      }
+      if (contenuto.isEmpty || (d is Map && d['last'] == true)) break;
+    }
+    ultimaLettura = (
+      pagine: pagine,
+      punti: stati.length,
+      byte: byte,
+      tempo: orologio.elapsed,
+      compressione: compressione,
+    );
+    _tutti = (_adesso(), stati);
+    return stati;
+  }
+
+  /// Una richiesta firmata alla PUN: il JSON della risposta, e quanto pesava.
+  Future<({Object? dati, int byte, String compressione})> _chiedi(String percorso, Object corpoJson) async {
     for (var tentativo = 0;; tentativo++) {
       final c = await _credenzialiValide();
-      final corpo = utf8.encode(jsonEncode(evse));
-      final uri = Uri.parse('$api/v1/chargepoints/group');
+      final corpo = utf8.encode(jsonEncode(corpoJson));
+      final uri = Uri.parse('$api$percorso');
       final data = _adesso().toUtc();
       final firmate = {
         'content-type': 'application/json',
@@ -165,14 +262,18 @@ class DisponibilitaPun implements FonteDisponibilita {
             // «; charset=utf-8» al content-type, e la firma non torna più.
             body: corpo,
           )
-          .timeout(const Duration(seconds: 12));
+          .timeout(const Duration(seconds: 30));
       // Credenziali scadute o rifiutate: se ne prendono di nuove, una volta.
       if ((r.statusCode == 401 || r.statusCode == 403) && tentativo == 0) {
         _credenziali = null;
         continue;
       }
       if (r.statusCode != 200) throw Exception('PUN: ${r.statusCode}');
-      return (jsonDecode(utf8.decode(r.bodyBytes)) as List).whereType<Map>().toList();
+      return (
+        dati: jsonDecode(utf8.decode(r.bodyBytes)),
+        byte: r.bodyBytes.length,
+        compressione: r.headers['content-encoding'] ?? '',
+      );
     }
   }
 
