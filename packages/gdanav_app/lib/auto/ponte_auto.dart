@@ -23,6 +23,7 @@ import '../stato/gestore_guida.dart';
 import '../stato/gestore_luoghi.dart';
 import '../stato/gestore_meteo.dart';
 import '../stato/gestore_posizione.dart';
+import '../stato/gestore_risparmio.dart' show sintesiProposta;
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/prova_di_guida.dart';
@@ -104,6 +105,7 @@ class PonteAuto {
       z.addListener(_zoneDaCapo);
       _avvisiZtl = AvvisiZtl.di(guida, z)..addListener(_avviso);
     }
+    guida.risparmio?.addListener(_strada);
     _viaggio();
     _luoghi();
     _opzioni();
@@ -205,6 +207,15 @@ class PonteAuto {
       case 'ancora':
         final s = _avvisi?.passata;
         if (s != null && s.id == a['id']) _avvisi!.rispondi(s, a['si'] == true);
+      // «Prendila» o «Resto qui» sulla strada proposta: vale solo per quella
+      // che l'auto ha davanti.
+      case 'strada':
+        if (a['id'] != _idStrada || _stradaMandata == null) return null;
+        if (a['si'] == true) {
+          await guida.prendiStrada();
+        } else {
+          guida.restaQui();
+        }
       // Auto termica: i distributori intorno; in guida si passa da lì.
       case 'distributori':
         final qui = guida.avanzamento?.posizioneSulPercorso ?? posizione.qui ?? viaggio.ultimaPosizione;
@@ -336,6 +347,44 @@ class PonteAuto {
     _avvisi?.removeListener(_avviso);
     ztl?.removeListener(_zoneDaCapo);
     _avvisiZtl?.removeListener(_avviso);
+    guida.risparmio?.removeListener(_strada);
+  }
+
+  /// La strada proposta mandata all'auto, e il suo numero: la risposta
+  /// dell'auto vale solo per quella.
+  PropostaStrada? _stradaMandata;
+  var _numeroStrada = 0;
+  String get _idStrada => 'strada-$_numeroStrada';
+
+  /// La strada a risparmio (o più rapida) proposta in guida: all'auto il
+  /// titolo e le cifre, coi due tasti; sulla mappa la strada verde col
+  /// fumetto. Presa, rifiutata o scaduta: via da tutt'e due.
+  void _strada() {
+    final r = guida.risparmio;
+    final p = r?.proposta;
+    if (identical(p, _stradaMandata)) return;
+    _stradaMandata = p;
+    if (r == null || p == null) {
+      _manda('strada', const {});
+      _manda('sorgenti', {
+        'dati': {sorgenteRisparmio: jsonEncode(datiRisparmio(null, null, ''))},
+      });
+      return;
+    }
+    _numeroStrada++;
+    final arrivo = guida.batteriaArrivoCon(p);
+    _manda('strada', {
+      'id': _idStrada,
+      'titolo': p.motivo == MotivoProposta.rapida ? 'Strada più rapida' : 'Strada a risparmio',
+      'testo': [sintesiProposta(p, r.unita), if (arrivo != null) 'arrivi con il ${arrivo.round()}%'].join(' · '),
+    });
+    _manda('sorgenti', {
+      'dati': {
+        sorgenteRisparmio: jsonEncode(
+          datiRisparmio(p, guida.pronto?.viaggio.percorso, sintesiProposta(p, r.unita, meno: '-')),
+        ),
+      },
+    });
   }
 
   void _viaggio() {

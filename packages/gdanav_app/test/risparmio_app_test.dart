@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gdanav_app/auto/ponte_auto.dart';
 import 'package:gdanav_app/mappa/dati_viaggio.dart';
 import 'package:gdanav_app/schermate/strade_risparmio.dart';
 import 'package:gdanav_app/stato/archivio.dart';
@@ -197,6 +201,45 @@ void main() {
     await confronta(tester, a);
     expect(chieste, [true]);
     expect(a.risparmio!.proposta, isNull);
+  });
+
+  testWidgets('sull\'auto: la proposta coi due tasti e la strada verde; «Resto qui» dall\'auto', (tester) async {
+    const canale = MethodChannel('gdanav/schermo_auto');
+    final chiamate = <MethodCall>[];
+    final messaggero = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messaggero.setMockMethodCallHandler(canale, (c) async {
+      chiamate.add(c);
+      return null;
+    });
+    addTearDown(() => messaggero.setMockMethodCallHandler(canale, null));
+    final a = await inGuida(tester);
+    final ponte = PonteAuto(viaggio: a.viaggio, guida: a.guida, posizione: a.posizione, canale: canale)..avvia();
+    addTearDown(ponte.ferma);
+    await confronta(tester, a);
+    final strada = chiamate.lastWhere((c) => c.method == 'strada').arguments as Map;
+    expect(strada['titolo'], 'Strada a risparmio');
+    expect(strada['testo'], startsWith('−0,6 kWh · +3 min · arrivi con il '));
+    final sorgenti = chiamate.lastWhere(
+      (c) => c.method == 'sorgenti' && ((c.arguments as Map)['dati'] as Map).containsKey('gdanav-risparmio'),
+    );
+    final verde = jsonDecode(((sorgenti.arguments as Map)['dati'] as Map)['gdanav-risparmio'] as String) as Map;
+    expect((verde['features'] as List), hasLength(2));
+
+    // Una risposta per un'altra proposta non vale; quella giusta sì.
+    Future<void> dallAuto(Map<String, Object?> argomenti) => tester.runAsync(
+      () => messaggero.handlePlatformMessage(
+        'gdanav/schermo_auto',
+        const StandardMethodCodec().encodeMethodCall(MethodCall('strada', argomenti)),
+        (_) {},
+      ),
+    );
+    await dallAuto({'id': 'strada-99', 'si': false});
+    expect(a.risparmio!.proposta, isNotNull);
+    await dallAuto({'id': strada['id'], 'si': false});
+    await tester.pump();
+    expect(a.risparmio!.proposta, isNull);
+    // E all'auto: via l'avviso e la strada verde.
+    expect((chiamate.lastWhere((c) => c.method == 'strada').arguments as Map), isEmpty);
   });
 
   testWidgets('spente nelle impostazioni, non si chiede niente a TomTom', (tester) async {

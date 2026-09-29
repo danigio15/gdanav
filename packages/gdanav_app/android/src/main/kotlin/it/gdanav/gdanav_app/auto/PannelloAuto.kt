@@ -318,7 +318,16 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
     private fun avviso(canvas: Canvas, sinistra: Float, destra: Float, alto: Float, prova: Boolean = false): Boolean {
         val av = PonteAuto.avviso
         val titoloAvviso = av.titolo
+        // La strada a risparmio, sulle auto senza gli avvisi di Android Auto:
+        // qui il testo, i due tasti in alto. Viene prima: ha venti secondi.
+        val strada = PonteAuto.strada
+        val perStrada = strada.id != null && !PonteAuto.conAvvisi
         val (riga1, riga2, colore) = when {
+            perStrada -> Triple(
+                strada.titolo ?: "Strada a risparmio",
+                listOfNotNull(strada.testo, "rispondi coi tasti in alto").joinToString(" · "),
+                Color.argb(245, 22, 101, 52),
+            )
             titoloAvviso != null -> Triple(
                 titoloAvviso,
                 av.testo ?: av.metri?.let { "tra ${distanza(it)}" },
@@ -335,9 +344,10 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
             else -> Triple(null, null, 0)
         }
         if (riga1 == null) return false
-        val icona = av.tipo?.let { PonteAuto.immagini["segnala-$it"] }
+        val icona = if (perStrada) null else av.tipo?.let { PonteAuto.immagini["segnala-$it"] }
+        val limite = if (perStrada) null else av.limite
         val spazioIcona = if (icona != null) dp(48f) else 0f
-        val spazioLimite = if (av.limite != null) dp(52f) else 0f
+        val spazioLimite = if (limite != null) dp(52f) else 0f
         val larghezza = max(testo.measureText(riga1), riga2?.let { testoPiccolo.measureText(it) } ?: 0f) +
             dp(30f) + spazioIcona + spazioLimite
         if (prova) return larghezza > destra - sinistra
@@ -353,7 +363,7 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val x = box.left + dp(15f) + spazioIcona
         canvas.drawText(riga1, x, box.top + dp(28f), testo)
         riga2?.let { canvas.drawText(it, x, box.top + dp(50f), testoPiccolo) }
-        av.limite?.let { l -> cartello(canvas, box.right - dp(32f), box.centerY(), dp(23f), l) }
+        limite?.let { l -> cartello(canvas, box.right - dp(32f), box.centerY(), dp(23f), l) }
         return false
     }
 

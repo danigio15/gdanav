@@ -88,6 +88,15 @@ struct AvvisoAuto {
     var ancoraTesto: String?
 }
 
+/// La strada a risparmio (o più rapida) proposta dal telefono: il titolo,
+/// «−1,8 kWh · +4 min · arrivi con il 31%», e l'id per la risposta. Senza
+/// id, nessuna.
+struct StradaAuto {
+    var id: String?
+    var titolo: String?
+    var testo: String?
+}
+
 func numero(_ v: Any?) -> Double? { (v as? NSNumber)?.doubleValue }
 
 /// Quello che il telefono sa e CarPlay mostra: la copia di `PonteAuto.kt`.
@@ -114,6 +123,7 @@ final class PonteAuto {
     private(set) var luoghi: [LuogoAuto] = []
     private(set) var cruscotto = CruscottoAuto()
     private(set) var avviso = AvvisoAuto()
+    private(set) var strada = StradaAuto()
 
     /// Le opzioni del percorso e la voce, per il menu.
     private(set) var opzioni: [String: Any] = [:]
@@ -227,6 +237,8 @@ final class PonteAuto {
             // CarPlay lo mostra come avviso di navigazione.
             avvisoInArrivo = prossimo.titolo != nil && (prossimo.tipo != avviso.tipo || avviso.titolo == nil)
             avviso = prossimo
+        case "strada":
+            strada = StradaAuto(id: a["id"] as? String, titolo: a["titolo"] as? String, testo: a["testo"] as? String)
         case "opzioni":
             opzioni = a
         case "svincolo":
@@ -365,6 +377,11 @@ final class PonteAuto {
 
     func ancora(_ id: String, si: Bool) {
         chiedi("ancora", ["id": id, "si": si])
+    }
+
+    /// «Prendila» (o «Resto qui») sulla strada proposta.
+    func rispondiStrada(_ id: String, si: Bool) {
+        chiedi("strada", ["id": id, "si": si])
     }
 
     /// Le colonnine rapide vicine, come luoghi da raggiungere.

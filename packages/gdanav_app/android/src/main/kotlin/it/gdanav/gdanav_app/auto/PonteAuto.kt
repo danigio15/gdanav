@@ -109,6 +109,21 @@ object PonteAuto {
 
     @Volatile var avviso = Avviso()
 
+    /**
+     * La strada a risparmio (o più rapida) proposta dal telefono: il titolo,
+     * «−1,8 kWh · +4 min · arrivi con il 31%», e l'id per la risposta.
+     * Senza id, nessuna.
+     */
+    data class Strada(val id: String? = null, val titolo: String? = null, val testo: String? = null)
+
+    @Volatile var strada = Strada()
+
+    /**
+     * L'auto mostra gli avvisi di Android Auto (API 5): la strada proposta va
+     * lì, coi due tasti, e non nel pannello sulla mappa.
+     */
+    @Volatile var conAvvisi = false
+
     /** Le opzioni del percorso e la voce, per il menu. */
     @Volatile var opzioni: Map<String, Any?> = emptyMap()
 
@@ -217,6 +232,11 @@ object PonteAuto {
                 ancoraId = call.argument<String>("ancora_id"),
                 ancoraTesto = call.argument<String>("ancora_testo"),
             )
+            "strada" -> strada = Strada(
+                id = call.argument<String>("id"),
+                titolo = call.argument<String>("titolo"),
+                testo = call.argument<String>("testo"),
+            )
             "opzioni" -> opzioni = (call.arguments as? Map<*, *>)?.entries?.associate { "${it.key}" to it.value } ?: emptyMap()
             "svincolo" -> {
                 val id = numero(call, "id")?.toInt()
@@ -319,6 +339,9 @@ object PonteAuto {
         chiedi("segnala", mapOf("tipo" to tipo)) { risposta(it as? String ?: "Non è partita.") }
 
     fun ancora(id: String, si: Boolean) = chiedi("ancora", mapOf("id" to id, "si" to si))
+
+    /** «Prendila» (o «Resto qui») sulla strada proposta. */
+    fun rispondiStrada(id: String, si: Boolean) = chiedi("strada", mapOf("id" to id, "si" to si))
 
     /** Le colonnine rapide vicine, come luoghi da raggiungere. */
     /** Un punto toccato sulla mappa: il telefono dice cosa è e cosa sapere. */
