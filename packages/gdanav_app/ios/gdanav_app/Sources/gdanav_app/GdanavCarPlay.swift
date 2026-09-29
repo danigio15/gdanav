@@ -435,7 +435,9 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
             )
         } else {
             var sotto: [String] = []
-            if let metri = a.metri {
+            if let testo = a.testo {
+                sotto.append(testo)
+            } else if let metri = a.metri {
                 let d = ManovreCarPlay.distanza(metri)
                 sotto.append("Fra \(Int(d.value)) \(d.unit == .kilometers ? "km" : "m")")
             }

@@ -256,6 +256,9 @@ class GestoreGuida extends ChangeNotifier {
   /// L'ultima posizione vista in guida.
   Punto? _ultimaPosizione;
 
+  /// Dove si è, anche fuori dal percorso (lì il segnaposto non si aggancia).
+  Punto? get ultimaPosizione => _ultimaPosizione;
+
   Future<void> _posizione(Punto qui) async {
     _ultimaPosizione = qui;
     _forseChiediDati();

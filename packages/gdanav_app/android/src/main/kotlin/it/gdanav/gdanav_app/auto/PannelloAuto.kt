@@ -321,11 +321,13 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val (riga1, riga2, colore) = when {
             titoloAvviso != null -> Triple(
                 titoloAvviso,
-                av.metri?.let { "tra ${distanza(it)}" },
+                av.testo ?: av.metri?.let { "tra ${distanza(it)}" },
                 when (av.tipo) {
                     "autovelox" -> Color.rgb(245, 124, 0)
                     "polizia" -> Color.rgb(30, 136, 229)
                     "incidente", "chiusura" -> Color.rgb(229, 57, 53)
+                    // La ZTL: scura, col cartello rosso che si vede da solo.
+                    "ztl" -> Color.argb(245, 32, 33, 36)
                     else -> Color.rgb(251, 140, 0)
                 },
             )

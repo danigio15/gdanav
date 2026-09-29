@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:gdanav_core/gdanav_core.dart';
 
+import '../stato/gestore_ztl.dart' show statoBreve;
 import 'stile.dart';
 
 /// Come si chiama lo stato di una colonnina sulla mappa e nelle schede.
@@ -17,12 +18,14 @@ StatoColonnina statoDi(Disponibilita d) {
 /// I dati delle sorgenti del viaggio, in GeoJSON: vuote se non c'è un
 /// viaggio. Con le [scelte] anche le strade alternative (tranne la
 /// [scelta]), con quanto fanno guadagnare o perdere; con le [tappe] i loro
-/// numeri.
+/// numeri; con [passandoci] la strada dentro la ZTL di cui si chiede il
+/// permesso.
 Map<String, Map<String, Object?>> datiViaggio(
   Viaggio? v, {
   List<PercorsoCalcolato> scelte = const [],
   int scelta = 0,
   List<Luogo> tappe = const [],
+  bool passandoci = false,
 }) {
   if (v == null) {
     return {
@@ -32,6 +35,7 @@ Map<String, Map<String, Object?>> datiViaggio(
       sorgenteCode: _collezione([]),
       sorgenteAlternative: _collezione([]),
       sorgenteTappe: _collezione([]),
+      sorgentePassandoci: _collezione([]),
     };
   }
   final soste = {for (final (i, s) in (v.piano?.soste ?? const <Sosta>[]).indexed) s.colonnina.id: i + 1};
@@ -72,8 +76,64 @@ Map<String, Map<String, Object?>> datiViaggio(
       for (final (i, t) in tappe.indexed)
         _elemento({'type': 'Point', 'coordinates': _xy(t.posizione)}, {'numero': i + 1, 'nome': t.nome}),
     ]),
+    sorgentePassandoci: passandoci ? datiPassandoci(v.percorso) : _collezione([]),
   };
 }
+
+/// La strada che passerebbe dentro la ZTL di cui si chiede il permesso, con
+/// quanto si guadagnerebbe: «-3 min» dove si stacca di più dal percorso.
+Map<String, Object?> datiPassandoci(PercorsoCalcolato p) {
+  final z = p.ztl;
+  final dentro = z?.puntiPassandoci ?? const <Punto>[];
+  if (z?.daChiedere == null || dentro.length < 2) return _collezione([]);
+  final durata = z!.durataPassandoci;
+  final diff = durata == null ? null : ((durata.inSeconds - p.durata.inSeconds) / 60).round();
+  final linea = Linea(p.punti);
+  var lontano = dentro[dentro.length ~/ 2];
+  var massimo = -1.0;
+  for (var k = 0; k < dentro.length; k += math.max(1, dentro.length ~/ 60)) {
+    final d = linea.proietta(dentro[k]).lontanoM;
+    if (d > massimo) {
+      massimo = d;
+      lontano = dentro[k];
+    }
+  }
+  return _collezione([
+    _elemento({
+      'type': 'LineString',
+      'coordinates': [for (final q in dentro) _xy(q)],
+    }, const {}),
+    if (diff != null)
+      _elemento(
+        {'type': 'Point', 'coordinates': _xy(lontano)},
+        // Il trattino normale: il segno meno non c'è in tutti i caratteri della mappa.
+        {'etichetta': diff == 0 ? 'Uguale' : '${diff > 0 ? '+' : '-'}${diff.abs()} min'},
+      ),
+  ]);
+}
+
+/// Le ZTL e le aree pedonali di [zone] sulla mappa, com'erano a [ora]: ogni
+/// contorno un poligono (la ZTL col suo «attiva»), e per ogni zona il punto
+/// dove scriverne il nome: «ZTL · attiva fino alle 18», «Area pedonale».
+Map<String, Object?> datiZtl(Iterable<ZonaLimitata> zone, DateTime ora) => _collezione([
+  for (final z in zone) ...[
+    for (final a in z.anelli)
+      if (a.length >= 3)
+        _elemento(
+          {
+            'type': 'Polygon',
+            'coordinates': [
+              [for (final p in [...a, a.first]) _xy(p)],
+            ],
+          },
+          {'tipo': z.tipo.name, 'attiva': z.attivaAlle(ora)},
+        ),
+    _elemento(
+      {'type': 'Point', 'coordinates': _xy(z.puntoDentro)},
+      {'tipo': z.tipo.name, 'etichetta': z.tipo == TipoZona.ztl ? 'ZTL · ${statoBreve(z, ora)}' : 'Area pedonale'},
+    ),
+  ],
+]);
 
 /// Le code sul percorso, per colorarlo: gialle i rallentamenti, arancioni
 /// le code, rosse le code ferme, bordeaux le strade chiuse.

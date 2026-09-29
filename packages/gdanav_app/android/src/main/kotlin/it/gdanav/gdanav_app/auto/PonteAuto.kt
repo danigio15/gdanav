@@ -99,6 +99,8 @@ object PonteAuto {
     data class Avviso(
         val titolo: String? = null,
         val tipo: String? = null,
+        /** La seconda riga, quando non è «tra 300 m»: la ZTL («Il percorso la evita»). */
+        val testo: String? = null,
         val metri: Double? = null,
         val limite: Int? = null,
         val ancoraId: String? = null,
@@ -209,6 +211,7 @@ object PonteAuto {
             "avviso" -> avviso = Avviso(
                 titolo = call.argument<String>("titolo"),
                 tipo = call.argument<String>("tipo"),
+                testo = call.argument<String>("testo"),
                 metri = numero(call, "metri"),
                 limite = numero(call, "limite")?.toInt(),
                 ancoraId = call.argument<String>("ancora_id"),

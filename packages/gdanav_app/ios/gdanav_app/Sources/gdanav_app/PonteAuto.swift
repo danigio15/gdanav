@@ -80,6 +80,8 @@ struct CruscottoAuto {
 struct AvvisoAuto {
     var titolo: String?
     var tipo: String?
+    /// La seconda riga, quando non è «tra 300 m»: la ZTL («Il percorso la evita»).
+    var testo: String? = nil
     var metri: Double?
     var limite: Int?
     var ancoraId: String?
@@ -215,6 +217,7 @@ final class PonteAuto {
             let prossimo = AvvisoAuto(
                 titolo: a["titolo"] as? String,
                 tipo: a["tipo"] as? String,
+                testo: a["testo"] as? String,
                 metri: numero(a["metri"]),
                 limite: numero(a["limite"]).map { Int($0) },
                 ancoraId: a["ancora_id"] as? String,

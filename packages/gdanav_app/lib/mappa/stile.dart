@@ -21,6 +21,17 @@ const sorgenteCode = 'gdanav-code';
 const sorgenteAlternative = 'gdanav-alternative';
 const sorgenteTappe = 'gdanav-tappe';
 
+/// Le ZTL e le aree pedonali intorno (i contorni e, come punti, dove
+/// scriverne il nome), e la strada che passerebbe dentro la ZTL di cui si
+/// chiede il permesso.
+const sorgenteZtl = 'gdanav-ztl';
+const sorgentePassandoci = 'gdanav-passandoci';
+
+/// I disegni che riempiono le zone: le righe rosse della ZTL e i puntini
+/// grigi dell'area pedonale (vedi `iconePunti`).
+const motivoZtl = 'ztl-righe';
+const motivoPedonale = 'pedonale-puntini';
+
 /// Solo sull'auto: il punto della scheda aperta sopra la mappa. I dati li
 /// mette lo schermo dell'auto (`RendererMappa.mostra`), non il telefono.
 const sorgenteEvidenza = 'gdanav-evidenza';
@@ -196,6 +207,21 @@ Map<String, Object> _strada(String id, List<Object> filtro, String colore, List<
 
 const _vuota = {'type': 'FeatureCollection', 'features': <Object>[]};
 
+/// I contorni di un tipo di zona («ztl», «pedonale») nella [sorgenteZtl].
+List<Object> _zona(String tipo) => [
+  'all',
+  [
+    '==',
+    ['geometry-type'],
+    'Polygon',
+  ],
+  [
+    '==',
+    ['get', 'tipo'],
+    tipo,
+  ],
+];
+
 /// Lo stile completo. [scuro] per la sera; le sorgenti del viaggio partono
 /// vuote.
 ///
@@ -273,6 +299,8 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
       sorgenteCode: {'type': 'geojson', 'data': _vuota},
       sorgenteAlternative: {'type': 'geojson', 'data': _vuota},
       sorgenteTappe: {'type': 'geojson', 'data': _vuota},
+      sorgenteZtl: {'type': 'geojson', 'data': _vuota},
+      sorgentePassandoci: {'type': 'geojson', 'data': _vuota},
       sorgenteColonnine: {'type': 'geojson', 'data': _vuota},
       sorgenteArrivo: {'type': 'geojson', 'data': _vuota},
       sorgenteIo: {'type': 'geojson', 'data': _vuota},
@@ -450,6 +478,61 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'fill-extrusion-opacity': 0.94,
         },
       },
+      // Le ZTL e le aree pedonali (OpenStreetMap), sopra le strade e sotto i
+      // loro nomi: la ZTL tratteggiata di rosso, più tenue quando è spenta;
+      // l'area pedonale a puntini grigi.
+      {
+        'id': 'pedonali',
+        'type': 'fill',
+        'source': sorgenteZtl,
+        'minzoom': 13,
+        'filter': _zona('pedonale'),
+        'paint': {'fill-pattern': motivoPedonale},
+      },
+      {
+        'id': 'pedonali-bordo',
+        'type': 'line',
+        'source': sorgenteZtl,
+        'minzoom': 13,
+        'filter': _zona('pedonale'),
+        'layout': {'line-join': 'round'},
+        'paint': {'line-color': '#6B7280', 'line-width': 1.5, 'line-opacity': 0.8},
+      },
+      {
+        'id': 'ztl',
+        'type': 'fill',
+        'source': sorgenteZtl,
+        'minzoom': 10,
+        'filter': _zona('ztl'),
+        'paint': {
+          'fill-pattern': motivoZtl,
+          'fill-opacity': [
+            'case',
+            ['get', 'attiva'],
+            1.0,
+            0.4,
+          ],
+        },
+      },
+      {
+        'id': 'ztl-bordo',
+        'type': 'line',
+        'source': sorgenteZtl,
+        'minzoom': 10,
+        'filter': _zona('ztl'),
+        'layout': {'line-join': 'round'},
+        'paint': {
+          'line-color': '#DC2626',
+          'line-width': perAuto ? 3.5 : 2.5,
+          'line-dasharray': [3, 1.7],
+          'line-opacity': [
+            'case',
+            ['get', 'attiva'],
+            1.0,
+            0.45,
+          ],
+        },
+      },
       {
         'id': 'nomi-strade',
         'type': 'symbol',
@@ -561,6 +644,24 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         ],
         'layout': {'line-cap': 'round', 'line-join': 'round'},
         'paint': {'line-color': t.alternativa, 'line-width': _largo(5, 15)},
+      },
+      // La strada che passa dentro la ZTL di cui si chiede il permesso: a
+      // puntini grigi, sotto il percorso.
+      {
+        'id': 'passandoci',
+        'type': 'line',
+        'source': sorgentePassandoci,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'LineString',
+        ],
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {
+          'line-color': '#94A3B8',
+          'line-width': _largo(5, 12),
+          'line-dasharray': [0.1, 1.8],
+        },
       },
       // Il percorso: un alone morbido, il bordo blu scuro, la linea blu e le
       // frecce della direzione. Sempre blu: nessuna strada ha quel colore.
@@ -910,6 +1011,72 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'text-ignore-placement': true,
         },
         'paint': {'text-color': t.percorsoBordo},
+      },
+      // Il nome della ZTL col suo stato, «ZTL · attiva fino alle 18»; più
+      // da vicino anche «Area pedonale».
+      {
+        'id': 'ztl-etichetta',
+        'type': 'symbol',
+        'source': sorgenteZtl,
+        'minzoom': 12,
+        'filter': [
+          'all',
+          [
+            '==',
+            ['geometry-type'],
+            'Point',
+          ],
+          [
+            'any',
+            [
+              '==',
+              ['get', 'tipo'],
+              'ztl',
+            ],
+            [
+              '>=',
+              ['zoom'],
+              16,
+            ],
+          ],
+        ],
+        'layout': {
+          'text-field': ['get', 'etichetta'],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': perAuto ? 14 : 12,
+          'text-max-width': 12,
+          'text-padding': 4,
+        },
+        'paint': {
+          'text-color': [
+            'match',
+            ['get', 'tipo'],
+            'ztl',
+            '#991B1B',
+            '#374151',
+          ],
+          'text-halo-color': '#FFFFFF',
+          'text-halo-width': 3,
+        },
+      },
+      // Quanto si guadagnerebbe passandoci: «−3 min», sulla strada a puntini.
+      {
+        'id': 'passandoci-etichetta',
+        'type': 'symbol',
+        'source': sorgentePassandoci,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'Point',
+        ],
+        'layout': {
+          'text-field': ['get', 'etichetta'],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 12,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        'paint': {'text-color': '#FFFFFF', 'text-halo-color': '#475569', 'text-halo-width': 6},
       },
       // Quanto fa guadagnare o perdere ogni alternativa: il fumetto sulla
       // strada, da toccare per sceglierla.

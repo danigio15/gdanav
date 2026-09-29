@@ -14,6 +14,7 @@ import 'package:gdanav_app/stato/gestore_guida.dart';
 import 'package:gdanav_app/stato/gestore_posizione.dart';
 import 'package:gdanav_app/stato/gestore_segnalazioni.dart';
 import 'package:gdanav_app/stato/gestore_viaggio.dart';
+import 'package:gdanav_app/stato/gestore_ztl.dart';
 import 'package:gdanav_app/stato/prova_di_guida.dart';
 import 'package:gdanav_app/stato/voce.dart';
 import 'package:gdanav_core/gdanav_core.dart';
@@ -104,8 +105,9 @@ class Ambiente {
     this.posizione,
     this.gps,
     this.segnalazioni,
-    this.relay,
-  );
+    this.relay, {
+    this.ztl,
+  });
   final Archivio archivio;
   final GestoreAuto auto;
   final GestoreViaggio viaggio;
@@ -123,6 +125,9 @@ class Ambiente {
   final GestoreSegnalazioni segnalazioni;
   final RelayFinto relay;
 
+  /// Le ZTL, nelle prove che le guardano.
+  final GestoreZtl? ztl;
+
   /// L'ultimo controllo passato alla mappa finta (in guida, quello della guida).
   ControlloMappa? controllo;
 
@@ -133,6 +138,7 @@ class Ambiente {
     viaggio: viaggio,
     guida: guida,
     segnalazioni: segnalazioni,
+    ztl: ztl,
     mappa: (_, c) {
       controllo = c;
       return const ColoredBox(color: Colors.grey);
@@ -147,6 +153,7 @@ Future<Ambiente> ambiente(
   ArchivioAutovelox? autovelox,
   CostruisciPianificatore? costruisci,
   ProvaDiGuida? prova,
+  GestoreZtl? ztl,
 }) async {
   // Uno schermo da telefono, non gli 800×600 delle prove.
   tester.view.physicalSize = const Size(1170, 2532);
@@ -165,6 +172,7 @@ Future<Ambiente> ambiente(
     posizione: () async => posizione,
     costruisci: costruisci ?? pianificatoreFinto(km),
     luoghi: LuoghiFinti(),
+    ztl: ztl,
   );
   final posizioni = StreamController<Punto>.broadcast();
   addTearDown(posizioni.close);
@@ -192,7 +200,7 @@ Future<Ambiente> ambiente(
     autovelox: autovelox == null ? null : Future.value(autovelox),
   );
   addTearDown(segnalazioni.dispose);
-  return Ambiente(archivio, auto, viaggio, guida, posizioni, voce, segnaposto, gps, segnalazioni, relay);
+  return Ambiente(archivio, auto, viaggio, guida, posizioni, voce, segnaposto, gps, segnalazioni, relay, ztl: ztl);
 }
 
 const impostazioniComplete = {

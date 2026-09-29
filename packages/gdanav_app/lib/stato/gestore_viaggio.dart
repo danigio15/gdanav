@@ -11,6 +11,7 @@ import 'gestore_auto.dart';
 import 'gestore_consumo.dart';
 import '../risorse.dart';
 import 'gestore_premium.dart';
+import 'gestore_ztl.dart';
 
 /// A che punto è il viaggio.
 sealed class StatoViaggio {
@@ -124,11 +125,19 @@ PianificatoreViaggio pianificatoreVero(
   // conosce: chiederlo due volte a TomTom sarebbe sprecare il piano e
   // sommare due volte le stesse code.
   final traffico = tomtom != null ? null : _traffico;
+  // Le ZTL: TomTom non le conosce. Le gira al largo chi chiede il percorso,
+  // con le «aree da evitare», quando sono attive e non si ha il permesso.
+  final ztl = tomtom == null
+      ? null
+      : PercorsiConZtl(
+          zone: archivioZtl,
+          permessi: () async => GestoreZtl.attuale?.permessi ?? const {},
+          calcola: (tappe, evita) => tomtom.calcola(tappe, opzioni: opzioni, evita: evita),
+          alternative: (da, a, evita) => tomtom.alternative(da, a, opzioni: opzioni, evita: evita),
+        );
   return PianificatoreViaggio(
-    percorsi: (tappe) =>
-        tomtom?.calcola(tappe, opzioni: opzioni) ?? valhalla!.calcola(tappe, opzioni: opzioni),
-    alternative: (da, a) =>
-        tomtom?.alternative(da, a, opzioni: opzioni) ?? valhalla!.alternative(da, a, opzioni: opzioni),
+    percorsi: (tappe) => ztl?.percorso(tappe) ?? valhalla!.calcola(tappe, opzioni: opzioni),
+    alternative: (da, a) => ztl?.scelte(da, a) ?? valhalla!.alternative(da, a, opzioni: opzioni),
     seguendo: (p) => tomtom?.seguendo(p, opzioni: opzioni) ?? valhalla!.seguendo(p, opzioni: opzioni),
     // Il traffico di adesso sul percorso (per tutti, se c'è la chiave
     // TomTom): arrivo e soste lo mettono in conto.
@@ -195,10 +204,15 @@ class GestoreViaggio extends ChangeNotifier {
     required this.posizione,
     this.costruisci = pianificatoreVero,
     this.consumo,
+    this.ztl,
     FonteLuoghi? luoghi,
     DateTime Function()? orologio,
   }) : luoghi = luoghi ?? ClientePhoton(),
        _ora = orologio ?? DateTime.now;
+
+  /// I permessi delle ZTL: la risposta alla domanda del percorso si ricorda
+  /// lì. `null` nelle prove che non le guardano.
+  final GestoreZtl? ztl;
 
   final Archivio archivio;
   final GestoreAuto auto;
@@ -335,6 +349,34 @@ class GestoreViaggio extends ChangeNotifier {
     _scelta = i;
     obbligate.clear();
     await pianifica(d);
+  }
+
+  /// La risposta a «Hai il permesso per entrare?» di una ZTL sul percorso:
+  /// si ricorda per quella ZTL. Col permesso si rifà il percorso, che ci
+  /// passa; senza, il percorso è già quello giusto e la domanda sparisce.
+  Future<void> rispondiZtl(ZonaLimitata zona, bool permesso) async {
+    await ztl?.rispondi(zona, permesso);
+    final d = destinazione;
+    if (d == null) return;
+    if (permesso) return pianifica(d, conScelte: _daPassare.isEmpty);
+    final s = stato;
+    if (s is! ViaggioPronto) return;
+    PercorsoCalcolato senza(PercorsoCalcolato p) =>
+        p.ztl?.daChiedere?.chiave == zona.chiave ? p.conZtl(p.ztl!.senzaDomanda()) : p;
+    _scelte = [for (final p in _scelte) senza(p)];
+    _imposta(
+      ViaggioPronto(
+        s.destinazione,
+        Viaggio(percorso: senza(s.viaggio.percorso), colonnine: s.viaggio.colonnine, piano: s.viaggio.piano),
+        s.batteriaPartenza,
+        calcolatoAlle: s.calcolatoAlle,
+        termica: s.termica,
+        senzaSoste: s.senzaSoste,
+        scelte: _scelte,
+        scelta: s.scelta,
+        tappe: s.tappe,
+      ),
+    );
   }
 
   /// Una tappa in più, prima della meta (in fondo, o in [posizione]).
