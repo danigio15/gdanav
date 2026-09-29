@@ -408,7 +408,8 @@ class _Pronta extends StatelessWidget {
                   Expanded(
                     child: _Dato(
                       icona: Icon(Icons.bolt, color: tema.colorScheme.primary),
-                      valore: '${piano.energiaKwh.toStringAsFixed(piano.energiaKwh < 10 ? 1 : 0)} kWh',
+                      // Con la virgola, come i kWh delle strade qui sopra.
+                      valore: '${piano.energiaKwh.toStringAsFixed(piano.energiaKwh < 10 ? 1 : 0).replaceAll('.', ',')} kWh',
                       etichetta: 'consumo',
                     ),
                   ),
