@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../geo/geo.dart';
 import '../motore/modello_consumo.dart';
+import '../ztl/ztl.dart';
 
 /// Dove porta una corsia: le frecce dipinte sull'asfalto.
 enum DirezioneCorsia {
@@ -150,6 +151,7 @@ class PercorsoCalcolato {
     this.ritardoTraffico = Duration.zero,
     this.trafficoVero = false,
     this.senzaTraffico,
+    this.ztl,
   });
 
   final List<Punto> punti;
@@ -179,8 +181,16 @@ class PercorsoCalcolato {
   /// aggiornato (le code sparite non devono restare).
   final PercorsoCalcolato? senzaTraffico;
 
+  /// Cosa fa con le ZTL: quali evita, da quali passa, di quale chiedere il
+  /// permesso. `null` dove le ZTL non si guardano (Valhalla, le prove).
+  final ZtlDelViaggio? ztl;
+
   /// Il percorso da cui partire per applicare il traffico.
   PercorsoCalcolato get base => senzaTraffico ?? this;
+
+  /// Con quello che fa con le ZTL, anche sotto il traffico: un traffico
+  /// rifatto non deve farlo dimenticare.
+  PercorsoCalcolato conZtl(ZtlDelViaggio? ztl) => _copia(ztl: ztl, senzaTraffico: senzaTraffico?.conZtl(ztl));
 
   /// Il limite sul segmento [i], se si conosce.
   int? limiteSul(int i) => i >= 0 && i < limiti.length ? limiti[i] : null;
@@ -193,6 +203,7 @@ class PercorsoCalcolato {
     Duration? ritardoTraffico,
     bool? trafficoVero,
     PercorsoCalcolato? senzaTraffico,
+    ZtlDelViaggio? ztl,
   }) =>
       PercorsoCalcolato(
         punti: punti,
@@ -206,6 +217,7 @@ class PercorsoCalcolato {
         ritardoTraffico: ritardoTraffico ?? this.ritardoTraffico,
         trafficoVero: trafficoVero ?? this.trafficoVero,
         senzaTraffico: senzaTraffico ?? this.senzaTraffico,
+        ztl: ztl ?? this.ztl,
       );
 
   PercorsoCalcolato conLimiti(List<int?> limiti) => _copia(limiti: limiti);

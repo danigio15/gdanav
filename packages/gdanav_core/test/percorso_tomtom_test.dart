@@ -192,6 +192,26 @@ void main() {
       expect(q['vehicleMaxSpeed'], '100');
     });
 
+    test('le ZTL da evitare vanno nel corpo, come «avoidAreas»: allora è un POST', () async {
+      final f = finto(corsoMalta());
+      final c = ClienteTomTom('CHIAVE', client: f.client);
+      await c.calcola(const [Punto(40.84, 14.25), Punto(40.86, 14.25)]);
+      expect(f.chieste.last.method, 'GET', reason: 'senza aree da evitare resta com\'era');
+      await c.alternative(
+        const Punto(40.84, 14.25),
+        const Punto(40.86, 14.25),
+        evita: const [Rettangolo(40.845, 14.245, 40.855, 14.255), Rettangolo(40.83, 14.23, 40.84, 14.24)],
+      );
+      final r = f.chieste.last as http.Request;
+      expect(r.method, 'POST');
+      expect(r.url.queryParameters['maxAlternatives'], '2');
+      final corpo = jsonDecode(r.body) as Map<String, Object?>;
+      final rettangoli = ((corpo['avoidAreas'] as Map)['rectangles'] as List).cast<Map>();
+      expect(rettangoli, hasLength(2));
+      expect(rettangoli.first['southWestCorner'], {'latitude': 40.845, 'longitude': 14.245});
+      expect(rettangoli.first['northEastCorner'], {'latitude': 40.855, 'longitude': 14.255});
+    });
+
     test('le alternative arrivano già complete: seguendo non chiede niente', () async {
       final due = corsoMalta();
       (due['routes'] as List).add((due['routes'] as List).first);

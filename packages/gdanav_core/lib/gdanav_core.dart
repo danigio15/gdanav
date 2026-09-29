@@ -46,4 +46,5 @@ export 'src/veicolo/sorgente_home_assistant.dart';
 export 'src/veicolo/sorgente_dati_auto.dart';
 export 'src/veicolo/stato_auto.dart';
 export 'src/viaggio/pianificatore_viaggio.dart';
+export 'src/ztl/percorsi_ztl.dart';
 export 'src/ztl/ztl.dart';

@@ -202,6 +202,70 @@ class ZonaLimitata {
   }
 }
 
+/// Cosa fa un percorso con le ZTL: quali gira al largo, da quali passa col
+/// permesso, di quale chiedere, e se la meta è dentro. Viaggia col percorso
+/// (`PercorsoCalcolato.ztl`), fino al foglio del viaggio.
+class ZtlDelViaggio {
+  const ZtlDelViaggio({
+    this.evitate = const [],
+    this.attraversate = const [],
+    this.daChiedere,
+    this.puntiPassandoci = const [],
+    this.durataPassandoci,
+    this.metaDentro,
+    this.varco,
+    this.nonEvitate = const [],
+    this.pedonali = const [],
+  });
+
+  /// Attive e senza permesso (o senza risposta): il percorso le gira al
+  /// largo. Non c'è quella della meta, che ha [metaDentro].
+  final List<ZonaLimitata> evitate;
+
+  /// Col permesso: il percorso ci passa.
+  final List<ZonaLimitata> attraversate;
+
+  /// La prima attiva di cui non si sa se c'è il permesso: la domanda.
+  final ZonaLimitata? daChiedere;
+
+  /// Il percorso che ci passa, per la domanda: la linea tratteggiata sulla
+  /// mappa, e quanto ci si mette.
+  final List<Punto> puntiPassandoci;
+  final Duration? durataPassandoci;
+
+  /// La meta è dentro questa ZTL, attiva e senza permesso: il percorso
+  /// arriva al [varco], l'ultimo punto fuori sulla strada che ci entra.
+  final ZonaLimitata? metaDentro;
+  final Punto? varco;
+
+  /// Quelle da cui non si è riusciti a stare fuori: non c'era un'altra
+  /// strada, o TomTom non l'ha trovata.
+  final List<ZonaLimitata> nonEvitate;
+
+  /// Le aree pedonali che il percorso gira intorno.
+  final List<ZonaLimitata> pedonali;
+
+  static const nessuna = ZtlDelViaggio();
+
+  bool get vuota =>
+      evitate.isEmpty &&
+      attraversate.isEmpty &&
+      daChiedere == null &&
+      metaDentro == null &&
+      nonEvitate.isEmpty &&
+      pedonali.isEmpty;
+
+  /// Lo stesso, senza più la domanda: la risposta è arrivata.
+  ZtlDelViaggio senzaDomanda() => ZtlDelViaggio(
+        evitate: evitate,
+        attraversate: attraversate,
+        metaDentro: metaDentro,
+        varco: varco,
+        nonEvitate: nonEvitate,
+        pedonali: pedonali,
+      );
+}
+
 /// Dove un percorso entra in una ZTL.
 class IngressoZtl {
   const IngressoZtl(this.zona, this.indice);

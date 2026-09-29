@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../geo/geo.dart';
 import '../motore/modello_consumo.dart';
+import '../ztl/ztl.dart';
 import 'valhalla.dart';
 
 /// I percorsi da TomTom, al posto di Valhalla.
@@ -119,14 +120,29 @@ class ClienteTomTom {
     return letto;
   }
 
-  /// Il percorso fra le [tappe] (partenza, tappe intermedie, arrivo).
+  /// Le aree da evitare, nel corpo della richiesta: TomTom le vuole lì, e
+  /// allora la richiesta diventa un POST. Senza, `null`: resta un GET.
+  static Map<String, Object?>? _corpo(List<Rettangolo> evita, [Map<String, Object?> altro = const {}]) =>
+      evita.isEmpty && altro.isEmpty
+          ? null
+          : {
+              ...altro,
+              if (evita.isNotEmpty)
+                'avoidAreas': {
+                  'rectangles': [for (final r in evita) r.perTomTom()]
+                },
+            };
+
+  /// Il percorso fra le [tappe] (partenza, tappe intermedie, arrivo), lontano
+  /// dai rettangoli di [evita] (le ZTL senza permesso).
   Future<PercorsoCalcolato> calcola(
     List<Punto> tappe, {
     String lingua = 'it-IT',
     OpzioniPercorso opzioni = const OpzioniPercorso(),
+    List<Rettangolo> evita = const [],
   }) async {
     if (tappe.length < 2) throw const ErrorePercorso('servono almeno partenza e arrivo');
-    final j = await _chiedi(_via(tappe, _parametri(lingua, opzioni)));
+    final j = await _chiedi(_via(tappe, _parametri(lingua, opzioni)), corpo: _corpo(evita));
     final rotte = leggiTutte(j);
     if (rotte.isEmpty) throw const ErrorePercorso('nessun percorso fra questi punti');
     return rotte.first;
@@ -142,8 +158,9 @@ class ClienteTomTom {
     int quante = 2,
     String lingua = 'it-IT',
     OpzioniPercorso opzioni = const OpzioniPercorso(),
+    List<Rettangolo> evita = const [],
   }) async {
-    final j = await _chiedi(_via([da, a], _parametri(lingua, opzioni, alternative: quante)));
+    final j = await _chiedi(_via([da, a], _parametri(lingua, opzioni, alternative: quante)), corpo: _corpo(evita));
     final rotte = leggiTutte(j);
     if (rotte.isEmpty) throw const ErrorePercorso('nessun percorso fra questi punti');
     return rotte;
@@ -172,7 +189,9 @@ class ClienteTomTom {
       },
     );
     final rotte = leggiTutte(j);
-    return rotte.isEmpty ? scelto : rotte.first;
+    // Rifatto dai suoi punti, è la stessa strada: quello che fa con le ZTL
+    // resta vero.
+    return rotte.isEmpty ? scelto : rotte.first.conZtl(scelto.ztl);
   }
 
   /// [punti] ridotti ad al massimo [quanti], tenendoli distanziati uguale e
