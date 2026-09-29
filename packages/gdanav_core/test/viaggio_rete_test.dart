@@ -467,4 +467,59 @@ void main() {
   },
       timeout: const Timeout(Duration(minutes: 3)),
       skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  // Cosa c'è dentro un punto di ricarica della PUN, oltre allo stato: la
+  // mappa pubblica ha un filtro per prezzo (`/v1/tariffs/price-range`), e
+  // se le tariffe stanno nella stessa risposta dello stato l'app le ha senza
+  // chiedere niente di più. Un punto per ognuno dei gestori più diffusi
+  // nell'archivio; si stampa la forma, e i campi che parlano di prezzi.
+  test('la PUN: cosa dice di un punto, prezzi compresi', () async {
+    final archivio = ArchivioColonnine.leggi(File('../gdanav_app/assets/colonnine.json').readAsStringSync());
+    // Il gestore sta nell'EVSE ID: `IT*PLN*…` è Plenitude, `IT*ENX*…` Enel X.
+    final primo = <String, String>{};
+    final quanti = <String, int>{};
+    for (final c in archivio.tutte) {
+      if (c.evse.isEmpty) continue;
+      final e = c.evse.first;
+      final gestore = e.contains('*') ? e.split('*').take(2).join('*') : e.substring(0, math.min(5, e.length));
+      primo.putIfAbsent(gestore, () => e);
+      quanti[gestore] = (quanti[gestore] ?? 0) + 1;
+    }
+    final piuDiffusi = (quanti.keys.toList()..sort((a, b) => quanti[b]!.compareTo(quanti[a]!))).take(20);
+    final chiesti = [for (final g in piuDiffusi) primo[g]!];
+    final punti = await DisponibilitaPun().punti(chiesti);
+    stdout.writeln('PUN struttura: ${punti.length} punti su ${chiesti.length} chiesti');
+    if (punti.isNotEmpty) {
+      final testo = jsonEncode(punti.first);
+      stdout.writeln('PUN struttura, il primo: ${testo.substring(0, math.min(6000, testo.length))}');
+    }
+    final prezzo = RegExp('tariff|price|prezz|cost|euro|currency|fee', caseSensitive: false);
+    void cerca(Object? v, String dove, List<String> trovati) {
+      if (v is Map) {
+        for (final MapEntry(:key, :value) in v.entries) {
+          final qui = '$dove.$key';
+          if (prezzo.hasMatch('$key')) {
+            final t = jsonEncode(value);
+            trovati.add('$qui = ${t.substring(0, math.min(400, t.length))}');
+          }
+          cerca(value, qui, trovati);
+        }
+      } else if (v is List) {
+        for (final (i, x) in v.indexed) {
+          cerca(x, '$dove[$i]', trovati);
+        }
+      }
+    }
+
+    var conPrezzi = 0;
+    for (final r in punti) {
+      final trovati = <String>[];
+      cerca(r, '', trovati);
+      if (trovati.isNotEmpty) conPrezzi++;
+      stdout.writeln('PUN prezzi ${r['evse_id']}: ${trovati.isEmpty ? 'niente' : trovati.join(' | ')}');
+    }
+    avviso('PUN prezzi', '$conPrezzi punti su ${punti.length} hanno campi di prezzo');
+  },
+      timeout: const Timeout(Duration(minutes: 2)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 }

@@ -79,7 +79,7 @@ class DisponibilitaPun implements FonteDisponibilita {
     final letti = <String, Map>{};
     for (var i = 0; i < evse.length; i += blocco) {
       final parte = evse.sublist(i, math.min(i + blocco, evse.length));
-      for (final r in await _gruppo(parte)) {
+      for (final r in await punti(parte)) {
         if (r['evse_id'] case final String id) letti[id] = r;
       }
     }
@@ -127,7 +127,10 @@ class DisponibilitaPun implements FonteDisponibilita {
     };
   }
 
-  Future<List<Map>> _gruppo(List<String> evse) async {
+  /// I punti di ricarica [evse] come li dà la PUN (al massimo [blocco] per
+  /// volta): lo stato, le prese, il posto. È la stessa risposta da cui
+  /// [aggiorna] legge libere e occupate.
+  Future<List<Map>> punti(List<String> evse) async {
     for (var tentativo = 0;; tentativo++) {
       final c = await _credenzialiValide();
       final corpo = utf8.encode(jsonEncode(evse));
