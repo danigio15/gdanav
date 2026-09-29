@@ -1198,6 +1198,119 @@
      "endPointIndex": 203,
      "sectionType": "SPEED_LIMIT",
      "maxSpeedLimitInKmh": 80
+    },
+    {
+     "lanes": [
+      {
+       "directions": [
+        "SLIGHT_LEFT"
+       ],
+       "follow": "SLIGHT_LEFT"
+      },
+      {
+       "directions": [
+        "STRAIGHT"
+       ]
+      }
+     ],
+     "laneSeparators": [
+      "SINGLE_SOLID",
+      "LONG_DASHED",
+      "SINGLE_SOLID"
+     ],
+     "startPointIndex": 20,
+     "endPointIndex": 21,
+     "sectionType": "LANES"
+    },
+    {
+     "lanes": [
+      {
+       "directions": [
+        "SLIGHT_LEFT"
+       ],
+       "follow": "SLIGHT_LEFT"
+      },
+      {
+       "directions": [
+        "SLIGHT_LEFT"
+       ],
+       "follow": "SLIGHT_LEFT"
+      },
+      {
+       "directions": [
+        "STRAIGHT"
+       ]
+      }
+     ],
+     "laneSeparators": [
+      "SINGLE_SOLID",
+      "LONG_DASHED",
+      "SHORT_DASHED",
+      "SINGLE_SOLID"
+     ],
+     "startPointIndex": 34,
+     "endPointIndex": 35,
+     "sectionType": "LANES"
+    },
+    {
+     "lanes": [
+      {
+       "directions": [
+        "STRAIGHT"
+       ]
+      },
+      {
+       "directions": [
+        "SLIGHT_RIGHT"
+       ],
+       "follow": "SLIGHT_RIGHT"
+      }
+     ],
+     "laneSeparators": [
+      "SINGLE_SOLID",
+      "SHORT_DASHED",
+      "SINGLE_SOLID"
+     ],
+     "startPointIndex": 59,
+     "endPointIndex": 60,
+     "sectionType": "LANES"
+    },
+    {
+     "lanes": [
+      {
+       "directions": [
+        "STRAIGHT"
+       ],
+       "follow": "STRAIGHT"
+      },
+      {
+       "directions": [
+        "STRAIGHT"
+       ],
+       "follow": "STRAIGHT"
+      },
+      {
+       "directions": [
+        "STRAIGHT"
+       ],
+       "follow": "STRAIGHT"
+      },
+      {
+       "directions": [
+        "SLIGHT_RIGHT"
+       ]
+      }
+     ],
+     "laneSeparators": [
+      "SINGLE_SOLID",
+      "LONG_DASHED",
+      "LONG_DASHED",
+      "SHORT_DASHED",
+      "SINGLE_SOLID"
+     ],
+     "startPointIndex": 95,
+     "endPointIndex": 97,
+     "sectionType": "LANES"
     }
    ],
    "guidance": {

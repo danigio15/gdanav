@@ -58,6 +58,27 @@ void main() {
       expect(tieniLaSinistra.tipo, 16);
     });
 
+    /* Le corsie non stanno nelle istruzioni: arrivano come sezioni «LANES»,
+     * e queste sono quelle vere di TomTom per lo stesso percorso. Al
+     * Sottopasso Malta tre corsie, le due di sinistra da seguire. */
+    test('le corsie tornano: al Sottopasso Malta le due di sinistra', () {
+      final p = ClienteTomTom.leggi(primaRotta());
+      final tieniLaSinistra = p.manovre[3];
+      expect(tieniLaSinistra.corsie.map((c) => c.giusta), [true, true, false]);
+      expect(tieniLaSinistra.corsie.first.consigliata, DirezioneCorsia.leggeraSinistra);
+      expect(tieniLaSinistra.corsie.last.direzioni, [DirezioneCorsia.dritto]);
+      expect(tieniLaSinistra.corsieUtili, isTrue);
+      // Gira a sinistra in Corso Malta: la corsia di sinistra.
+      expect(p.manovre[2].corsie.map((c) => c.giusta), [true, false]);
+      // Tieni la destra per la Tangenziale: quella di destra.
+      expect(p.manovre[4].corsie.map((c) => c.giusta), [false, true]);
+      // Partenza, rotonda e arrivo non ne hanno; il tratto a metà strada,
+      // senza una manovra dentro, non si attacca a nessuna.
+      for (final i in [0, 1, 5]) {
+        expect(p.manovre[i].corsie, isEmpty, reason: 'manovra $i');
+      }
+    });
+
     test('il cartello: numeri della strada e direzione', () {
       final p = ClienteTomTom.leggi(primaRotta());
       final versoTangenziale = p.manovre[4];

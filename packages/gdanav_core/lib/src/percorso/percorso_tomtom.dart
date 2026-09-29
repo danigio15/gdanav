@@ -29,11 +29,14 @@ import 'valhalla.dart';
 ///  * una sola chiamata dà anche le alternative complete: non serve più
 ///    rifare il percorso scelto.
 ///
-/// Cosa si perde, e va detto: **le corsie**. Valhalla (dal formato OSRM)
-/// diceva quali corsie sono buone per la manovra; TomTom su questo piano
-/// no. Le manovre escono con [Manovra.corsie] vuota e il cartellone delle
-/// corsie non compare. Anche l'altimetria non c'è: i tratti escono piatti
-/// e il dislivello lo recupera il consumo vero misurato dall'auto.
+/// Le corsie non stanno nelle istruzioni: TomTom le dà come sezioni a parte
+/// (`sectionType=lanes`), da sinistra a destra, con la freccia di ognuna e
+/// quella da seguire, e ogni tratto finisce sul punto della manovra. Al
+/// Sottopasso Malta dice tre corsie, le due di sinistra da seguire: il
+/// «tieni la sinistra» del popup dello svincolo.
+///
+/// Cosa si perde, e va detto: l'altimetria. I tratti escono piatti e il
+/// dislivello lo recupera il consumo vero misurato dall'auto.
 class ClienteTomTom {
   ClienteTomTom(this.chiave, {http.Client? client, Uri? indirizzo})
       : _http = client ?? http.Client(),
@@ -52,7 +55,7 @@ class ClienteTomTom {
   /// disco del limite in guida, che con Valhalla arrivava da una chiamata a
   /// parte (`/locate`); le altre dicono com'è la strada, per scegliere fra i
   /// percorsi. Vanno ripetute: separate da virgole TomTom risponde 400.
-  static const sezioniChieste = ['traffic', 'speedLimit', 'tollRoad', 'motorway', 'ferry', 'carTrain'];
+  static const sezioniChieste = ['traffic', 'speedLimit', 'tollRoad', 'motorway', 'ferry', 'carTrain', 'lanes'];
 
   Map<String, List<String>> _parametri(String lingua, OpzioniPercorso opzioni, {int alternative = 0}) => {
         'key': [chiave],
@@ -216,7 +219,7 @@ class ClienteTomTom {
       final a = (dopo?['pointIndex'] as num?)?.toInt() ?? (punti.isEmpty ? 0 : punti.length - 1);
       final metri = _num(dopo?['routeOffsetInMeters']) - _num(i['routeOffsetInMeters']);
       final secondi = _num(dopo?['travelTimeInSeconds']) - _num(i['travelTimeInSeconds']);
-      manovre.add(_manovra(i, lunghezzaM: metri, secondi: secondi, inizio: da));
+      manovre.add(_manovra(i, lunghezzaM: metri, secondi: secondi, inizio: da, corsie: _corsie(sezioni, da)));
       if (linea == null || a <= da || metri <= 0 || secondi <= 0) continue;
       final kmh = metri / secondi * 3.6;
       // Le distanze di TomTom non tornano al metro con quelle fra i punti:
@@ -281,6 +284,52 @@ class ClienteTomTom {
     return limiti;
   }
 
+  /// Le corsie arrivando alla manovra che parte dal punto [punto], da
+  /// sinistra a destra. Il tratto `LANES` che le descrive finisce sul punto
+  /// della manovra; se sono più d'uno, vale quello che finisce più vicino.
+  /// Un tratto senza manovra dentro — resta in corsia passando un'uscita —
+  /// non si attacca a niente.
+  static List<Corsia> _corsie(List<Map> sezioni, int punto) {
+    Map? scelto;
+    var distanza = 1 << 30;
+    for (final s in sezioni) {
+      if ('${s['sectionType']}'.toUpperCase() != 'LANES') continue;
+      final da = (s['startPointIndex'] as num?)?.toInt();
+      final a = (s['endPointIndex'] as num?)?.toInt();
+      if (da == null || a == null || punto < da || punto > a) continue;
+      if (a - punto < distanza) {
+        scelto = s;
+        distanza = a - punto;
+      }
+    }
+    if (scelto == null) return const [];
+    return [
+      for (final l in ((scelto['lanes'] as List?) ?? const []).whereType<Map>())
+        () {
+          final frecce = [
+            for (final d in ((l['directions'] as List?) ?? const []))
+              if (_freccia('$d') case final f?) f,
+          ];
+          final segui = l['follow'] == null ? null : _freccia('${l['follow']}');
+          return Corsia(frecce.isEmpty ? const [DirezioneCorsia.dritto] : frecce,
+              giusta: segui != null, consigliata: segui);
+        }(),
+    ];
+  }
+
+  static DirezioneCorsia? _freccia(String d) => switch (d.toUpperCase()) {
+        'STRAIGHT' => DirezioneCorsia.dritto,
+        'SLIGHT_RIGHT' => DirezioneCorsia.leggeraDestra,
+        'RIGHT' => DirezioneCorsia.destra,
+        'SHARP_RIGHT' => DirezioneCorsia.destraStretta,
+        'RIGHT_U_TURN' => DirezioneCorsia.inversioneDestra,
+        'SLIGHT_LEFT' => DirezioneCorsia.leggeraSinistra,
+        'LEFT' => DirezioneCorsia.sinistra,
+        'SHARP_LEFT' => DirezioneCorsia.sinistraStretta,
+        'LEFT_U_TURN' => DirezioneCorsia.inversioneSinistra,
+        _ => null,
+      };
+
   static bool _haSezione(List<Map> sezioni, String tipo) =>
       sezioni.any((s) => '${s['sectionType']}'.toUpperCase() == tipo);
 
@@ -328,6 +377,7 @@ class ClienteTomTom {
     required double lunghezzaM,
     required double secondi,
     required int inizio,
+    List<Corsia> corsie = const [],
   }) {
     final unisci = i['possibleCombineWithNext'] == true && i['combinedMessage'] != null;
     final frase = _senzaEtichette('${(unisci ? i['combinedMessage'] : null) ?? i['message'] ?? ''}');
@@ -347,6 +397,7 @@ class ClienteTomTom {
         if ('${i['signpostText'] ?? ''}'.isNotEmpty) '${i['signpostText']}',
       ].join(' · '),
       uscitaRotonda: rotonda != null && rotonda > 0 ? rotonda : null,
+      corsie: corsie,
     );
   }
 
