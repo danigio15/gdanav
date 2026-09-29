@@ -296,6 +296,21 @@ void main() {
       expect(identical(DisponibilitaPun.conStati(senza, const {}), senza), isTrue);
     });
 
+    test('le colonnine del percorso arrivano con lo stato di tutta Italia', () async {
+      final fonte = _FonteFissa([isola(2), mista]);
+      final stati = {'IT*BEC*EW001*0': 'AVAILABLE', 'IT*BEC*EW001*1': 'CHARGING', 'IT*X*E3': 'OUTOFORDER'};
+      final lungo = await ColonnineConStato(fonte, stati: () async => stati).lungo(const [Punto(40.85, 14.28)]);
+      expect(lungo.first.connettori.map((p) => p.stato), [StatoPresa.disponibile, StatoPresa.occupata]);
+      // Prese diverse e archivio di prima: non si indovina.
+      expect(identical(lungo.last, mista), isTrue);
+      final inOrdine =
+          await ColonnineConStato(fonte, stati: () async => stati, inOrdine: () async => true).lungo(const []);
+      expect(inOrdine.last.connettori.last.stato, StatoPresa.fuoriServizio);
+      // La PUN non risponde: il viaggio si calcola lo stesso, com'era.
+      final senza = await ColonnineConStato(fonte, stati: () async => throw Exception('giù')).lungo(const []);
+      expect(senza.first.connettori.map((p) => p.stato), everyElement(StatoPresa.sconosciuto));
+    });
+
     MockClient mappa(List<List<Map<String, Object?>>> pagine, List<int> chieste, {bool dichiaraUltima = true}) =>
         MockClient((r) async {
           if (r.url.host.startsWith('cognito-identity.')) return cognitoFinto(r);
@@ -400,4 +415,14 @@ class _Finta implements FonteDisponibilita {
       ],
     );
   }
+}
+
+/// Una fonte che dà sempre le stesse colonnine.
+class _FonteFissa implements FonteColonnine {
+  _FonteFissa(this.colonnine);
+
+  final List<Colonnina> colonnine;
+
+  @override
+  Future<List<Colonnina>> lungo(List<Punto> percorso, {double distanzaKm = 3}) async => colonnine;
 }

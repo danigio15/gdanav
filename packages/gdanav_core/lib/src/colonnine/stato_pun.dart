@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:cryptography/cryptography.dart';
 import 'package:http/http.dart' as http;
 
+import '../geo/geo.dart';
 import 'colonnina.dart';
 import 'disponibilita_tomtom.dart' show FonteDisponibilita;
 import 'pun.dart';
@@ -307,6 +308,50 @@ class DisponibilitaPun implements FonteDisponibilita {
       throw Exception('PUN, credenziali: ${r.statusCode}');
     }
     return jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>;
+  }
+}
+
+/// Le colonnine di [fonte] con lo stato di adesso di tutta Italia già dentro
+/// ([DisponibilitaPun.statiDiTutti]): il percorso sceglie le soste sapendo
+/// quali sono libere e quali guaste, invece di scoprirlo dopo sulle sole
+/// soste scelte.
+///
+/// Se lo stato non arriva — la PUN giù, niente rete — le colonnine passano
+/// com'erano: il viaggio si calcola lo stesso.
+class ColonnineConStato implements FonteColonnine {
+  ColonnineConStato(this.fonte, {required this.stati, this.inOrdine});
+
+  final FonteColonnine fonte;
+  final Future<Map<String, String>> Function() stati;
+
+  /// Se l'archivio ha scritto i punti nell'ordine delle prese
+  /// (`ArchivioColonnine.evseInOrdine`).
+  final Future<bool> Function()? inOrdine;
+
+  @override
+  Future<List<Colonnina>> lungo(List<Punto> percorso, {double distanzaKm = 3}) async {
+    final (trovate, adesso, ordinati) =
+        await (fonte.lungo(percorso, distanzaKm: distanzaKm), _stati(), _inOrdine()).wait;
+    if (adesso.isEmpty) return trovate;
+    return [for (final c in trovate) DisponibilitaPun.conStati(c, adesso, inOrdine: ordinati)];
+  }
+
+  /* Con try e non con catchError: una funzione che lancia e basta è un
+   * Future<Never>, e il suo catchError non accetta nessun valore di ripiego. */
+  Future<Map<String, String>> _stati() async {
+    try {
+      return await stati();
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  Future<bool> _inOrdine() async {
+    try {
+      return await inOrdine?.call() ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 }
 

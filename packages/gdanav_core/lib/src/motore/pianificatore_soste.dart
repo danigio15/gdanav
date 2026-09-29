@@ -233,7 +233,15 @@ class PianificatoreSoste {
   }
 
   static bool _meglio(ColonninaSulPercorso a, ColonninaSulPercorso b) {
-    int punti(ColonninaSulPercorso c) => c.disponibilita.guasta ? 0 : (c.disponibilita.piena ? 1 : 2);
+    // Fra due vicine vince quella che si sa libera; poi quella di cui non si
+    // sa niente; poi la piena; la guasta per ultima.
+    int punti(ColonninaSulPercorso c) {
+      final d = c.disponibilita;
+      if (d.guasta) return 0;
+      if (d.piena) return 1;
+      return d.nota && d.libere > 0 ? 3 : 2;
+    }
+
     if (punti(a) != punti(b)) return punti(a) > punti(b);
     if (a.potenzaKw != b.potenzaKw) return a.potenzaKw > b.potenzaKw;
     return a.deviazioneM < b.deviazioneM;
