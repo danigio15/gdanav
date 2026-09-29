@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import '../geo/geo.dart';
 import 'colonnina.dart';
 import 'disponibilita_tomtom.dart' show FonteDisponibilita;
+import 'prezzi.dart';
 import 'pun.dart';
 
 /// Libere e occupate adesso, dalla Piattaforma Unica Nazionale.
@@ -100,6 +101,8 @@ class DisponibilitaPun implements FonteDisponibilita {
       fonte: c.fonte,
       evse: c.evse,
       tempoReale: c.tempoReale,
+      // Nella stessa risposta, i prezzi che il gestore comunica alla PUN.
+      prezzi: Prezzi.daiPunti(letti.values),
       connettori: prese,
     );
   }
@@ -159,6 +162,7 @@ class DisponibilitaPun implements FonteDisponibilita {
       fonte: c.fonte,
       evse: c.evse,
       tempoReale: c.tempoReale,
+      prezzi: c.prezzi,
       connettori: prese,
     );
   }

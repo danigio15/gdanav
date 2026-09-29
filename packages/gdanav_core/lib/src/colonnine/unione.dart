@@ -137,6 +137,7 @@ Colonnina _lameglio(Colonnina a, Colonnina b) {
     evse: ricca.evse.isNotEmpty ? ricca.evse : altra.evse,
     // E con gli EVSE ID, se la PUN ne ha lo stato vero.
     tempoReale: ricca.evse.isNotEmpty ? ricca.tempoReale : altra.tempoReale,
+    prezzi: ricca.prezzi ?? altra.prezzi,
   );
 }
 

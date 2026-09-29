@@ -1,4 +1,5 @@
 import '../geo/geo.dart';
+import 'prezzi.dart';
 
 enum TipoConnettore { ccs2, chademo, tipo2, tesla, altro }
 
@@ -93,6 +94,7 @@ class Colonnina {
     this.fonte = '',
     this.evse = const [],
     this.tempoReale = true,
+    this.prezzi,
   });
 
   final String id;
@@ -113,6 +115,10 @@ class Colonnina {
   /// punti ([evse]): la PUN ripete uno stato fisso, e dire «libera» su quello
   /// sarebbe una bugia. Lo sa l'archivio, da quando l'ha letto.
   final bool tempoReale;
+
+  /// Quanto costa, come il gestore lo comunica alla PUN: arriva con lo
+  /// stato di adesso, quando la si tocca. `null` se non si è chiesto.
+  final Prezzi? prezzi;
 
   /// La potenza massima fra le prese che l'auto può usare, anche guaste:
   /// quella di targa.

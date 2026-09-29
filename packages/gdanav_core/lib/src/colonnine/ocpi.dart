@@ -91,6 +91,7 @@ List<Colonnina> unisciColonnine(List<Colonnina> anagrafica, List<Colonnina> temp
         fonte: '${a.fonte}+${vicina.fonte}',
         evse: a.evse.isNotEmpty ? a.evse : vicina.evse,
         tempoReale: a.evse.isNotEmpty ? a.tempoReale : vicina.tempoReale,
+        prezzi: a.prezzi ?? vicina.prezzi,
       ));
     } else {
       risultato.add(a);

@@ -34,6 +34,56 @@ String nomeConnettore(TipoConnettore t) => switch (t) {
   TipoConnettore.altro => 'Altra presa',
 };
 
+/// Il prezzo di una colonnina in righe da leggere, una per tipo di corrente:
+/// «AC: 0,63 €/kWh · sosta 0,08 €/min». Dove i punti costano diverso, da…
+/// a…: «0,63–0,69 €/kWh».
+List<String> righePrezzi(Prezzi p) {
+  String cifra(double v) => v.toStringAsFixed(2).replaceAll('.', ',');
+  String quanto(Forchetta f) => f.da == f.a ? cifra(f.da) : '${cifra(f.da)}–${cifra(f.a)}';
+  return [
+    for (final c in Corrente.values)
+      if (p.perCorrente[c] case final t?)
+        '${switch (c) {
+          Corrente.ac => 'AC',
+          Corrente.dc => 'DC',
+          Corrente.hpc => 'DC ad alta potenza',
+        }}: ${[
+          if (t.energia case final f?) '${quanto(f)} €/kWh',
+          if (t.tempo case final f?) '${quanto(f)} €/min di ricarica',
+          if (t.avvio case final f?) 'avvio ${quanto(f)} €',
+          if (t.sosta case final f?) 'sosta ${quanto(f)} €/min',
+        ].join(' · ')}',
+  ];
+}
+
+/// Il prezzo nella scheda di una colonnina: le righe, oppure — se la PUN
+/// l'ha detto — che il gestore non lo comunica. Niente se non si è chiesto.
+List<Widget> sezionePrezzo(BuildContext context, Prezzi? prezzi) {
+  if (prezzi == null) return const [];
+  final t = Theme.of(context).textTheme;
+  final muto = Theme.of(context).colorScheme.onSurfaceVariant;
+  if (prezzi.vuoti) {
+    return [
+      const SizedBox(height: 12),
+      Text(
+        'Prezzo: il gestore non lo comunica alla PUN',
+        key: const Key('prezzo-assente'),
+        style: t.bodyMedium?.copyWith(color: muto),
+      ),
+    ];
+  }
+  return [
+    const SizedBox(height: 12),
+    Text('Prezzo', style: t.titleSmall),
+    for (final riga in righePrezzi(prezzi))
+      Padding(padding: const EdgeInsets.only(top: 4), child: Text(riga, key: const Key('prezzo'))),
+    Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Text('Come il gestore lo comunica alla PUN', style: t.bodySmall?.copyWith(color: muto)),
+    ),
+  ];
+}
+
 /// Tutto di una colonnina: prese, potenza, quante libere, e «fermati qui».
 class DettaglioColonnina extends StatelessWidget {
   const DettaglioColonnina({super.key, required this.gestore, required this.id});
@@ -116,6 +166,7 @@ class DettaglioColonnina extends StatelessWidget {
                   ),
                 ),
             ],
+            ...sezionePrezzo(context, c.dettaglio?.prezzi),
             const SizedBox(height: 20),
             if (c.obbligata)
               SizedBox(

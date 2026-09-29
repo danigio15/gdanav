@@ -3,6 +3,7 @@ library;
 
 export 'src/colonnine/colonnina.dart';
 export 'src/colonnine/lungo_percorso.dart';
+export 'src/colonnine/prezzi.dart';
 export 'src/colonnine/pun.dart';
 export 'src/colonnine/stato_pun.dart';
 export 'src/colonnine/unione.dart';

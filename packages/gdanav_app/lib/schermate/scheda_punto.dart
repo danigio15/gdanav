@@ -10,7 +10,7 @@ import '../mappa/dati_viaggio.dart';
 import '../stato/distributori.dart';
 import '../stato/gestore_vicini.dart';
 import '../tema.dart';
-import 'dettaglio_colonnina.dart' show creditoColonnina, nomeConnettore;
+import 'dettaglio_colonnina.dart' show creditoColonnina, nomeConnettore, sezionePrezzo;
 
 /// Un punto toccato sulla mappa: un distributore, una colonnina vicina o
 /// un punto di interesse (ristorante, negozio, museo…).
@@ -260,6 +260,7 @@ class _Scheda extends StatelessWidget {
           dettagli.add(Padding(padding: const EdgeInsets.only(top: 4), child: Text('$value × $key')));
         }
       }
+      dettagli.addAll(sezionePrezzo(context, c.prezzi));
     }
 
     return Column(
