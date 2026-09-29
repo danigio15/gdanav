@@ -54,6 +54,7 @@ class RendererMappa(
     private var immaginiCaricate = 0
     private var larghezza = 0
     private var altezza = 0
+    private var densita = 1f
     private val principale = Handler(Looper.getMainLooper())
 
     /** Spostata col dito: non segue l'auto finché non si torna. */
@@ -89,6 +90,7 @@ class RendererMappa(
         display = d
         larghezza = contenitore.width
         altezza = contenitore.height
+        densita = contenitore.dpi / 160f
         MapLibre.getInstance(carContext)
         val p = Presentation(carContext, d.display)
         val contenuto = FrameLayout(p.context)
@@ -134,7 +136,18 @@ class RendererMappa(
 
     override fun onSurfaceDestroyed(contenitore: SurfaceContainer) {
         principale.removeCallbacks(torna)
+        principale.removeCallbacks(chiudi)
         principale.removeCallbacks(contaTraffico)
+        /* La mappa rifatta segue l'auto: ferma dov'era, ripartirebbe dal
+         * mezzo del mondo, e senza più il tempo che la riporta sull'auto. Il
+         * punto della scheda, se è ancora aperta, resta acceso. */
+        chiudendo = false
+        liberaPrima = false
+        if (libera) {
+            libera = false
+            eraLibera = false
+            alCambio()
+        }
         if (!soloMappa) DiagnosiTraffico.salva()
         animazione?.cancel()
         animazione = null
@@ -166,6 +179,8 @@ class RendererMappa(
         areaVisibile = Rect(area)
         pannello?.area = areaVisibile
         aggiorna()
+        // La scheda di un punto s'è appena aperta, e magari lo copre.
+        tieniInVista()
     }
 
     override fun onStableAreaChanged(area: Rect) {
@@ -262,6 +277,8 @@ class RendererMappa(
     /** «Centra»: di nuovo sull'auto. */
     fun segui() {
         principale.removeCallbacks(torna)
+        // Chiesto con la scheda di un punto aperta: chiusa, resta sull'auto.
+        liberaPrima = false
         if (libera) {
             libera = false
             alCambio()
@@ -271,11 +288,96 @@ class RendererMappa(
 
     private fun liberaPerUnPo() {
         principale.removeCallbacks(torna)
-        principale.postDelayed(torna, 20_000)
+        // Con la scheda di un punto aperta la mappa aspetta che la si chiuda.
+        if (evidenziato == null) principale.postDelayed(torna, 20_000)
         if (!libera) {
             libera = true
             alCambio()
         }
+    }
+
+    // --- il punto della scheda aperta -------------------------------------
+
+    /** Il punto della scheda aperta sopra la mappa, e il suo stato (colonnine). */
+    private var evidenziato: LatLng? = null
+    private var statoEvidenziato: String? = null
+
+    /** Com'era la mappa prima della scheda: già spostata col dito, o sull'auto. */
+    private var liberaPrima = false
+    private var chiudendo = false
+    private val chiudi = Runnable {
+        chiudendo = false
+        if (liberaPrima) liberaPerUnPo() else segui()
+    }
+
+    /**
+     * La scheda di un punto s'apre sopra la mappa: il punto s'accende col
+     * colore del suo stato, e la mappa smette di seguire l'auto finché la
+     * scheda è aperta. Resta dov'è; se la scheda copre il punto, lo porta nel
+     * mezzo di quello che si vede.
+     */
+    fun mostra(lat: Double, lon: Double, stato: String?) {
+        if (evidenziato == null && !chiudendo) liberaPrima = libera
+        principale.removeCallbacks(chiudi)
+        chiudendo = false
+        principale.removeCallbacks(torna)
+        evidenziato = LatLng(lat, lon)
+        statoEvidenziato = stato
+        if (!libera) {
+            libera = true
+            alCambio()
+        }
+        stile?.let { accendi(it) }
+        tieniInVista()
+    }
+
+    /** La scheda si chiude: il punto si spegne, e la mappa torna com'era. */
+    fun nascondi() {
+        if (evidenziato == null) return
+        evidenziato = null
+        statoEvidenziato = null
+        stile?.let { accendi(it) }
+        // Un giro dopo: se al posto di questa scheda se ne apre un'altra (un
+        // altro punto toccato), la mappa non va sull'auto per poi tornare.
+        chiudendo = true
+        principale.post(chiudi)
+    }
+
+    private fun accendi(s: Style) {
+        val p = evidenziato
+        val stato = statoEvidenziato?.replace("\"", "")
+        s.getSourceAs<GeoJsonSource>(SORGENTE_EVIDENZA)?.setGeoJson(
+            if (p == null) {
+                VUOTA
+            } else {
+                "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\"," +
+                    "\"geometry\":{\"type\":\"Point\",\"coordinates\":[${p.longitude},${p.latitude}]}," +
+                    "\"properties\":{${if (stato == null) "" else "\"stato\":\"$stato\""}}}]}"
+            },
+        )
+    }
+
+    /** Se la scheda copre il punto, la mappa lo porta nel mezzo di quello che resta. */
+    private fun tieniInVista() {
+        val m = mappa ?: return
+        val p = evidenziato ?: return
+        if (!libera) return
+        val a = areaVisibile ?: Rect(0, 0, larghezza, altezza)
+        val margine = 32 * densita
+        val s = m.projection.toScreenLocation(p)
+        if (s.x >= a.left + margine && s.x <= a.right - margine && s.y >= a.top + margine && s.y <= a.bottom - margine) {
+            return
+        }
+        val posizione = CameraPosition.Builder(m.cameraPosition)
+            .target(p)
+            .padding(
+                a.left.toDouble(),
+                a.top.toDouble(),
+                (larghezza - a.right).toDouble().coerceAtLeast(0.0),
+                (altezza - a.bottom).toDouble().coerceAtLeast(0.0),
+            )
+            .build()
+        m.animateCamera(CameraUpdateFactory.newCameraPosition(posizione), 500)
     }
 
     // --- i dati dal telefono --------------------------------------------
@@ -299,6 +401,7 @@ class RendererMappa(
                 }
                 caricaSegnaposto(s)
                 aggiornaDati(m, s)
+                accendi(s)
             }
             return
         }
@@ -467,6 +570,9 @@ class RendererMappa(
 
     private companion object {
         const val VUOTA = "{\"type\":\"FeatureCollection\",\"features\":[]}"
+
+        /** Il cerchio intorno al punto della scheda aperta (`stile.dart`). */
+        const val SORGENTE_EVIDENZA = "gdanav-evidenza"
         val CARTELLE_SEGNAPOSTO = listOf(
             "flutter_assets/packages/gdanav_app/assets/segnaposto",
             "flutter_assets/assets/segnaposto",

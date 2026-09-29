@@ -87,9 +87,14 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         carContext.getCarService(AppManager::class.java).setSurfaceCallback(renderer)
         renderer.alCambio = { invalidate() }
         // Tocco su un distributore, una colonnina o un ristorante: la scheda.
+        // Toccandone un altro con la scheda aperta sopra la mappa, la scheda
+        // cambia: non se ne impilano due.
         renderer.alPunto = { proprieta, lat, lon ->
             PonteAuto.punto(proprieta, lat, lon) { info ->
-                if (info != null) screenManager.push(SchermoPunto(carContext, info))
+                if (info != null) {
+                    if (screenManager.top is SchermoPunto) screenManager.pop()
+                    screenManager.push(SchermoPunto(carContext, info, renderer, lat, lon))
+                }
             }
         }
         navigazione.setNavigationManagerCallback(object : NavigationManagerCallback {

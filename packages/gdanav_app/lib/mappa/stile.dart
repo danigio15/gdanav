@@ -20,6 +20,10 @@ const sorgenteTutte = 'gdanav-tutte';
 const sorgenteCode = 'gdanav-code';
 const sorgenteAlternative = 'gdanav-alternative';
 const sorgenteTappe = 'gdanav-tappe';
+
+/// Solo sull'auto: il punto della scheda aperta sopra la mappa. I dati li
+/// mette lo schermo dell'auto (`RendererMappa.mostra`), non il telefono.
+const sorgenteEvidenza = 'gdanav-evidenza';
 const stratoTraffico = 'traffico';
 const stratoTrafficoLocale = 'traffico-locale';
 const stratiToccabili = [
@@ -276,6 +280,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
       sorgenteManovra: {'type': 'geojson', 'data': _vuota},
       sorgenteDistributori: {'type': 'geojson', 'data': _vuota},
       sorgenteVicine: {'type': 'geojson', 'data': _vuota},
+      if (perAuto) sorgenteEvidenza: {'type': 'geojson', 'data': _vuota},
       // Raggruppate da MapLibre: da lontano un cerchio col numero, da vicino
       // una per una. Il numero del cerchio sono le prese, sommate dentro il
       // gruppo, non le colonnine.
@@ -682,6 +687,27 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         ],
         'paint': {'fill-color': '#FFFFFF', 'fill-antialias': true},
       },
+      // Sull'auto, il punto della scheda aperta: un alone e un anello del
+      // colore del suo stato, sotto la sua icona.
+      if (perAuto) ...[
+        {
+          'id': 'evidenza-alone',
+          'type': 'circle',
+          'source': sorgenteEvidenza,
+          'paint': {'circle-radius': 34, 'circle-color': _coloreEvidenza(t), 'circle-opacity': 0.2},
+        },
+        {
+          'id': 'evidenza',
+          'type': 'circle',
+          'source': sorgenteEvidenza,
+          'paint': {
+            'circle-radius': 23,
+            'circle-opacity': 0,
+            'circle-stroke-color': _coloreEvidenza(t),
+            'circle-stroke-width': 4,
+          },
+        },
+      ],
       // Tutte le colonnine d'Italia, dall'archivio: da lontano in gruppi col
       // numero, avvicinandosi una per una. Sotto quelle intorno a te, che
       // hanno il colore dello stato di adesso.
@@ -1106,6 +1132,19 @@ List<Object> _statoOIgnota() => [
   'coalesce',
   ['get', 'stato'],
   'ignota',
+];
+
+/// L'evidenza del punto toccato sull'auto: il colore dello stato per una
+/// colonnina, quello del percorso per il resto (distributori, ristoranti…).
+List<Object> _coloreEvidenza(_Tavolozza t) => [
+  'match',
+  [
+    'coalesce',
+    ['get', 'stato'],
+    '',
+  ],
+  for (final MapEntry(:key, :value) in _coloriIcona.entries) ...[key, value],
+  t.percorsoBordo,
 ];
 
 /// Il colore dell'icona per lo stato: lo stesso del bollino delle prese.

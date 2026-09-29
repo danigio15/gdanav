@@ -235,7 +235,7 @@ class PonteAuto {
           await vicini?.statoAdesso(p.id!).timeout(const Duration(seconds: 5), onTimeout: () => null);
         }
         final qui = guida.avanzamento?.posizioneSulPercorso ?? posizione.qui;
-        final (:sopra, :righe) = righePunto(
+        final (:righe, :stato) = schedaInAuto(
           p,
           vicini: vicini,
           qui: qui,
@@ -243,12 +243,14 @@ class PonteAuto {
         );
         return {
           'titolo': p.nome,
-          'sopra': sopra,
-          'righe': righe,
+          'voci': [
+            for (final r in righe) {'icona': r.icona, 'colore': r.colore, 'titolo': r.titolo, 'testo': r.testo},
+          ],
+          'stato': stato,
           'vai': guida.attiva && (guida.pronto?.termica ?? false) ? 'Passa di qui' : 'Vai',
           'luogo': {
             'nome': p.nome,
-            'descrizione': righe.firstOrNull ?? sopra,
+            'descrizione': righe.first.titolo,
             'lat': p.posizione.lat,
             'lon': p.posizione.lon,
           },

@@ -10,7 +10,7 @@ import '../mappa/dati_viaggio.dart';
 import '../stato/distributori.dart';
 import '../stato/gestore_vicini.dart';
 import '../tema.dart';
-import 'dettaglio_colonnina.dart' show creditoColonnina, nomeConnettore, sezionePrezzo;
+import 'dettaglio_colonnina.dart' show creditoColonnina, nomeConnettore, prezzoInAuto, sezionePrezzo;
 
 /// Un punto toccato sulla mappa: un distributore, una colonnina vicina o
 /// un punto di interesse (ristorante, negozio, museo…).
@@ -317,14 +317,24 @@ class _Scheda extends StatelessWidget {
   static double? _min(double? m, double e) => m == null || e < m ? e : m;
 }
 
-/// Il punto in poche righe, per la scheda sullo schermo dell'auto.
-({String sopra, List<String> righe}) righePunto(
+/// Una riga della scheda sullo schermo dell'auto: il disegno a sinistra col
+/// suo colore, la riga, e la linea sotto.
+///
+/// Android Auto il colore lo lascia al disegno e alla linea sotto, non alla
+/// riga — un colore lì fa rifiutare tutta la scheda. Per questo lo stato di
+/// una colonnina si legge in bianco, e si vede verde, rosso o grigio nella
+/// presa accanto.
+typedef RigaInAuto = ({String icona, String? colore, String titolo, String? testo});
+
+/// Il punto per la scheda sullo schermo dell'auto: al massimo quattro righe,
+/// che è il limite delle auto, e per una colonnina il suo stato, che colora
+/// il cerchio con cui la mappa la evidenzia.
+({List<RigaInAuto> righe, String? stato}) schedaInAuto(
   PuntoToccato p, {
   GestoreVicini? vicini,
   Punto? qui,
   Carburante carburante = Carburante.benzina,
 }) {
-  final righe = <String>[];
   String? distanzaTesto;
   if (qui != null) {
     final m = distanzaM(qui, p.posizione);
@@ -335,7 +345,8 @@ class _Scheda extends StatelessWidget {
   switch (p.tipo) {
     case 'distributore':
       final d = vicini?.distributore(p.id ?? '');
-      righe.add([?distanzaTesto, ?d?.marca == d?.nome ? null : d?.marca, ?d?.indirizzo].join(' · '));
+      final dove = [?distanzaTesto, ?d?.marca == d?.nome ? null : d?.marca, ?d?.indirizzo].join(' · ');
+      final carburanti = <String>[];
       if (d != null) {
         for (final c in Carburante.values) {
           final self = d.prezzi
@@ -347,27 +358,65 @@ class _Scheda extends StatelessWidget {
               .map((x) => x.euro)
               .fold<double?>(null, _minimo);
           if (self == null && servito == null) continue;
-          righe.add(
+          carburanti.add(
             '${c.nome}: ${[if (self != null) '${euro(self)} self', if (servito != null) '${euro(servito)} servito'].join(' · ')}',
           );
         }
-        if (quandoAggiornato(d.aggiornato) case final q?) righe.add('Prezzi comunicati $q');
       }
-      return (sopra: 'Distributore', righe: righe.where((r) => r.isNotEmpty).toList());
+      // I carburanti che ci stanno; il quando, sotto l'ultimo.
+      final mostrati = carburanti.take(3).toList();
+      final quando = d == null ? null : quandoAggiornato(d.aggiornato);
+      return (
+        righe: [
+          (icona: 'distributore', colore: 'verde', titolo: 'Distributore', testo: dove.isEmpty ? null : dove),
+          for (final (i, r) in mostrati.indexed)
+            (
+              icona: 'prezzo',
+              colore: 'giallo',
+              titolo: r,
+              testo: i == mostrati.length - 1 && quando != null ? 'prezzi comunicati $quando' : null,
+            ),
+        ],
+        stato: null,
+      );
     case 'colonnina':
       final c = vicini?.colonnina(p.id ?? '');
-      if (c != null) {
-        final connettori = vicini!.auto.veicolo.connettori;
-        righe.add([?distanzaTesto, '${c.potenzaNominalePer(connettori).round()} kW', ?c.operatore].join(' · '));
-        righe.add(testoDisponibilita(c.disponibilitaPer(connettori)));
-      } else if (distanzaTesto != null) {
-        righe.add(distanzaTesto);
+      if (c == null) {
+        return (
+          righe: [(icona: 'potenza', colore: 'verde', titolo: 'Colonnina di ricarica', testo: distanzaTesto)],
+          stato: null,
+        );
       }
-      return (sopra: 'Colonnina di ricarica', righe: righe);
+      final connettori = vicini!.auto.veicolo.connettori;
+      final d = c.disponibilitaPer(connettori);
+      final stato = statoDi(d);
+      final prezzo = prezzoInAuto(c, connettori);
+      return (
+        righe: [
+          (
+            icona: 'potenza',
+            colore: 'verde',
+            titolo: ['${c.potenzaNominalePer(connettori).round()} kW', ?c.operatore].join(' · '),
+            testo: [?distanzaTesto, 'colonnina di ricarica'].join(' · '),
+          ),
+          (
+            icona: 'presa',
+            colore: switch (stato) {
+              StatoColonnina.libera => 'verde',
+              StatoColonnina.piena || StatoColonnina.guasta => 'rosso',
+              StatoColonnina.ignota => null,
+            },
+            titolo: testoDisponibilita(d),
+            testo: d.nota ? 'stato di adesso' : null,
+          ),
+          if (prezzo != null)
+            (icona: 'prezzo', colore: prezzo.comunicato ? 'giallo' : null, titolo: prezzo.titolo, testo: prezzo.testo),
+        ],
+        stato: stato.name,
+      );
     default:
       final cat = categoriaPoi(p.proprieta['subclass'] as String?, p.proprieta['class'] as String?);
-      righe.add([cat.etichetta, ?distanzaTesto].join(' · '));
-      return (sopra: cat.etichetta, righe: righe);
+      return (righe: [(icona: 'luogo', colore: 'blu', titolo: cat.etichetta, testo: distanzaTesto)], stato: null);
   }
 }
 
