@@ -198,6 +198,43 @@ void main() {
       timeout: const Timeout(Duration(minutes: 4)),
       skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 
+  // Le ZTL: TomTom accetta le «aree da evitare» (in POST) e il percorso ci
+  // gira intorno. Dalla stazione a piazza Dante, col centro antico di Napoli
+  // in mezzo, prima com'è e poi coi rettangoli della zona.
+  test('ZTL: TomTom gira al largo delle aree da evitare', () async {
+    final chiave = Platform.environment['GDANAV_TOMTOM'] ?? '';
+    if (chiave.isEmpty) {
+      avviso('ZTL TomTom', 'senza chiave TomTom: non provata');
+      return;
+    }
+    final tomtom = ClienteTomTom(chiave);
+    final anello = [
+      const Punto(40.8475, 14.2535),
+      const Punto(40.8475, 14.2640),
+      const Punto(40.8545, 14.2640),
+      const Punto(40.8545, 14.2535),
+    ];
+    final zona =
+        ZonaLimitata(id: 'prova', tipo: TipoZona.ztl, nome: 'Centro antico', citta: 'Napoli', anelli: [anello]);
+    final bordo = Linea([...anello, anello.first]);
+    // Dentro davvero: più di cinquanta metri oltre il bordo, non una strada
+    // che lo costeggia.
+    bool dentro(PercorsoCalcolato p) => p.punti.any((q) => zona.contiene(q) && bordo.proietta(q).lontanoM > 50);
+    const da = Punto(40.8527, 14.2724), a = Punto(40.8490, 14.2502);
+    final libero = await tomtom.calcola([da, a]);
+    final rettangoli = zona.copertura();
+    final evitando = await tomtom.calcola([da, a], evita: rettangoli);
+    avviso(
+      'ZTL TomTom',
+      'com\'è: ${libero.durata.inMinutes} min, ${dentro(libero) ? 'dentro' : 'fuori'} · '
+          'con ${rettangoli.length} rettangoli: ${evitando.durata.inMinutes} min, '
+          '${dentro(evitando) ? 'DENTRO' : 'fuori'}',
+    );
+    expect(dentro(evitando), isFalse, reason: 'coi rettangoli il percorso deve stare fuori');
+  },
+      timeout: const Timeout(Duration(minutes: 2)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
   // Le alternative e il traffico di adesso, coi server veri.
   test('alternative Napoli → Milano col traffico TomTom', () async {
     try {
