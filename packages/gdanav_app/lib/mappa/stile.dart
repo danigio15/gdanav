@@ -185,6 +185,19 @@ List<Object> _metri(double metri) => [
   metri / 7 * 128,
 ];
 
+/// [verde] per la strada che risparmia energia (`eco` nelle proprietà),
+/// [altro] per le altre.
+List<Object> _seEco(String verde, String altro) => [
+  'case',
+  [
+    '==',
+    ['get', 'eco'],
+    true,
+  ],
+  verde,
+  altro,
+];
+
 /// Larghezza che cresce con lo zoom, come fanno le strade vere.
 List<Object> _largo(double a12, double a18) => [
   'interpolate',
@@ -624,7 +637,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         },
       },
       // Le strade alternative, sotto il percorso: grigio-azzurre, toccandole
-      // si sceglie quella.
+      // si sceglie quella. Quella che risparmia energia è verde.
       {
         'id': 'alternative-bordo',
         'type': 'line',
@@ -635,7 +648,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'LineString',
         ],
         'layout': {'line-cap': 'round', 'line-join': 'round'},
-        'paint': {'line-color': t.alternativaBordo, 'line-width': _largo(7.5, 20)},
+        'paint': {'line-color': _seEco('#166534', t.alternativaBordo), 'line-width': _largo(7.5, 20)},
       },
       {
         'id': 'alternative',
@@ -647,7 +660,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'LineString',
         ],
         'layout': {'line-cap': 'round', 'line-join': 'round'},
-        'paint': {'line-color': t.alternativa, 'line-width': _largo(5, 15)},
+        'paint': {'line-color': _seEco('#4ADE80', t.alternativa), 'line-width': _largo(5, 15)},
       },
       // La strada che passa dentro la ZTL di cui si chiede il permesso: a
       // puntini grigi, sotto il percorso.
@@ -1146,7 +1159,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'text-allow-overlap': true,
           'text-ignore-placement': true,
         },
-        'paint': {'text-color': '#FFFFFF', 'text-halo-color': t.alternativaBordo, 'text-halo-width': 6},
+        'paint': {'text-color': '#FFFFFF', 'text-halo-color': _seEco('#15803D', t.alternativaBordo), 'text-halo-width': 6},
       },
       {
         'id': 'arrivo',

@@ -242,6 +242,62 @@ void main() {
     expect((chiamate.lastWhere((c) => c.method == 'strada').arguments as Map), isEmpty);
   });
 
+  testWidgets('prima di partire: ogni strada col suo nome, i kWh e la batteria all\'arrivo', (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    // La più rapida per l'autostrada, una che risparmia per la statale, una
+    // di tempo simile.
+    const da = Punto(42, 12), a = Punto(42.18, 12);
+    final rapida = strada(dritto(da, a), 72, 14.2);
+    final risparmia = strada(
+      [...dritto(da, const Punto(42.09, 11.97)), ...dritto(const Punto(42.09, 11.97), a).skip(1)],
+      76,
+      12.4,
+    );
+    final simile = strada(
+      [...dritto(da, const Punto(42.09, 12.03)), ...dritto(const Punto(42.09, 12.03), a).skip(1)],
+      73,
+      13.9,
+    );
+    final a0 = await ambiente(
+      tester,
+      strade: strade,
+      costruisci: (_, profilo, preferenze, _) => PianificatoreViaggio(
+        percorsi: (_) async => rapida,
+        alternative: (_, _) async => [rapida, risparmia, simile],
+        colonnine: ColonnineFinte(),
+        profilo: profilo,
+        preferenze: preferenze,
+      ),
+    );
+    await tester.pumpWidget(a0.app());
+    a0.auto.manuale.imposta(80);
+    await tester.pump();
+    await tester.runAsync(() => a0.viaggio.vaiA(nord));
+    await tester.pumpAndSettle();
+    await scorriScheda(tester, volte: 1);
+    final pronto = a0.viaggio.stato as ViaggioPronto;
+    expect(pronto.scelte, hasLength(3));
+    expect(find.text('PIÙ RAPIDA'), findsOneWidget);
+    expect(find.text('RISPARMIA ENERGIA'), findsOneWidget);
+    expect(find.text('TEMPO SIMILE'), findsOneWidget);
+    expect(find.text('14,2 kWh'), findsOneWidget);
+    expect(find.text('12,4 kWh'), findsOneWidget);
+    expect(find.text('−1,8 kWh'), findsOneWidget);
+    // La batteria all'arrivo: quella del piano per la strada scelta, di più
+    // per quella che consuma meno.
+    final arrivo = pronto.viaggio.piano!.batteriaArrivo;
+    final capacita = a0.auto.veicolo.capacitaUtileKwh;
+    expect(find.textContaining('arrivi con il ${arrivo.round()}%'), findsOneWidget);
+    expect(find.textContaining('arrivi con il ${(arrivo + 1.8 / capacita * 100).round()}%'), findsOneWidget);
+    // Sulla mappa quella che risparmia è verde.
+    expect(stradaCheRisparmia(pronto.scelte, a0.risparmio), pronto.scelte.indexOf(risparmia));
+    final verde =
+        (datiAlternative(pronto.scelte, pronto.scelta, eco: pronto.scelte.indexOf(risparmia))['features']! as List)
+            .cast<Map<String, Object?>>()
+            .where((f) => (f['properties']! as Map)['eco'] == true);
+    expect(verde, hasLength(2), reason: 'la strada e il suo fumetto');
+  });
+
   testWidgets('spente nelle impostazioni, non si chiede niente a TomTom', (tester) async {
     final a = await inGuida(tester);
     await tester.runAsync(() => a.risparmio!.cambia(copiaSoglie(a.risparmio!.soglie, proponi: false)));

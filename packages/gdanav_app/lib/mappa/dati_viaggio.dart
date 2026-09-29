@@ -26,6 +26,7 @@ Map<String, Map<String, Object?>> datiViaggio(
   int scelta = 0,
   List<Luogo> tappe = const [],
   bool passandoci = false,
+  int? eco,
 }) {
   if (v == null) {
     return {
@@ -71,7 +72,7 @@ Map<String, Map<String, Object?>> datiViaggio(
         _elemento({'type': 'Point', 'coordinates': _xy(v.percorso.punti.last)}, const {}),
     ]),
     sorgenteCode: datiCode(v.percorso),
-    sorgenteAlternative: datiAlternative(scelte, scelta),
+    sorgenteAlternative: datiAlternative(scelte, scelta, eco: eco),
     sorgenteTappe: _collezione([
       for (final (i, t) in tappe.indexed)
         _elemento({'type': 'Point', 'coordinates': _xy(t.posizione)}, {'numero': i + 1, 'nome': t.nome}),
@@ -181,8 +182,9 @@ Map<String, Object?> datiCode(PercorsoCalcolato p) {
 }
 
 /// Le strade alternative (tutte tranne la [scelta]), ognuna con un'etichetta
-/// dove si separa di più: «+6 min», «−3 min», «uguale».
-Map<String, Object?> datiAlternative(List<PercorsoCalcolato> scelte, int scelta) {
+/// dove si separa di più: «+6 min», «−3 min», «uguale». Quella [eco], che
+/// risparmia energia, si disegna verde.
+Map<String, Object?> datiAlternative(List<PercorsoCalcolato> scelte, int scelta, {int? eco}) {
   if (scelte.length < 2) return _collezione([]);
   final base = scelte[scelta.clamp(0, scelte.length - 1)];
   final lineaBase = Linea(base.punti);
@@ -198,7 +200,7 @@ Map<String, Object?> datiAlternative(List<PercorsoCalcolato> scelte, int scelta)
           'type': 'LineString',
           'coordinates': [for (final q in a.punti) _xy(q)],
         },
-        {'alternativa': i},
+        {'alternativa': i, if (i == eco) 'eco': true},
       ),
     );
     // L'etichetta dove l'alternativa è più lontana dal percorso scelto.
@@ -214,7 +216,7 @@ Map<String, Object?> datiAlternative(List<PercorsoCalcolato> scelte, int scelta)
     elementi.add(
       _elemento(
         {'type': 'Point', 'coordinates': _xy(lontano)},
-        {'alternativa': i, 'etichetta': '${durataBreve(a.durata)}\n$etichetta'},
+        {'alternativa': i, 'etichetta': '${durataBreve(a.durata)}\n$etichetta', if (i == eco) 'eco': true},
       ),
     );
   }

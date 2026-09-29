@@ -237,6 +237,19 @@ class GestoreRisparmio extends ChangeNotifier {
   }
 }
 
+/// Il nome di ognuna delle [scelte], come in ABRP, col consumo che dice
+/// TomTom (o, se non l'ha detto, il profilo dell'auto).
+List<EtichettaStrada> etichetteDi(List<PercorsoCalcolato> scelte, GestoreRisparmio r) =>
+    etichetteStrade(scelte, (p) => consumoStrada(p, r.stima), minimoPercento: r.soglie.minimoPercento);
+
+/// Quale delle [scelte] risparmia energia, per disegnarla verde; `null` se
+/// nessuna.
+int? stradaCheRisparmia(List<PercorsoCalcolato> scelte, GestoreRisparmio? r) {
+  if (r == null || scelte.length < 2) return null;
+  final i = etichetteDi(scelte, r).indexOf(EtichettaStrada.risparmia);
+  return i < 0 ? null : i;
+}
+
 /// «1,8 kWh», «0,6 l»: con la virgola, come si scrive in Italia.
 String quantita(double v, String unita) => '${v.abs().toStringAsFixed(1).replaceAll('.', ',')} $unita';
 

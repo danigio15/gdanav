@@ -164,6 +164,11 @@ void main() {
         EtichettaStrada.piuRapida,
         EtichettaStrada.tempoSimile,
       ]);
+      // E nemmeno senza consumi (tutti zero), anche con la soglia a zero.
+      expect(etichetteStrade([adesso, statale], (_) => 0, minimoPercento: 0), [
+        EtichettaStrada.piuRapida,
+        EtichettaStrada.tempoSimile,
+      ]);
     });
 
     test('la strada eco si aggiunge solo se è davvero un\'altra', () {

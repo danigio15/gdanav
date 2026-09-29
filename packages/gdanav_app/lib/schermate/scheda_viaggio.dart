@@ -9,6 +9,7 @@ import '../componenti/stato_colonnina.dart';
 import '../componenti/ztl.dart';
 import '../mappa/dati_viaggio.dart';
 import '../stato/gestore_meteo.dart';
+import '../stato/gestore_risparmio.dart';
 import '../stato/gestore_viaggio.dart';
 import '../tema.dart';
 import 'dettaglio_colonnina.dart';
@@ -33,9 +34,13 @@ class SchedaViaggio extends StatelessWidget {
     this.meteo,
     this.onCercaTappa,
     this.onPremium,
+    this.risparmio,
   });
 
   final GestoreViaggio gestore;
+
+  /// I consumi delle strade fra cui scegliere, e quale risparmia energia.
+  final GestoreRisparmio? risparmio;
 
   /// Apre la schermata Premium (le soste di ricarica); `null`: niente tasto.
   final VoidCallback? onPremium;
@@ -109,6 +114,7 @@ class SchedaViaggio extends StatelessWidget {
           meteo: meteo,
           onCercaTappa: onCercaTappa,
           onPremium: onPremium,
+          risparmio: risparmio,
         ),
       },
     );
@@ -170,10 +176,12 @@ class _Pronta extends StatelessWidget {
     this.meteo,
     this.onCercaTappa,
     this.onPremium,
+    this.risparmio,
   });
 
   final Future<Luogo?> Function()? onCercaTappa;
   final VoidCallback? onPremium;
+  final GestoreRisparmio? risparmio;
 
   final GestoreMeteo? meteo;
   final ViaggioPronto pronto;
@@ -211,7 +219,21 @@ class _Pronta extends StatelessWidget {
         const SizedBox(height: 18),
         Text('Strade', style: t.titleSmall),
         const SizedBox(height: 8),
-        ScelteStrada(scelte: pronto.scelte, scelta: pronto.scelta, onScegli: gestore.scegli),
+        ScelteStrada(
+          scelte: pronto.scelte,
+          scelta: pronto.scelta,
+          onScegli: gestore.scegli,
+          consumo: switch (risparmio) {
+            final r? => (p) => consumoStrada(p, r.stima),
+            null => null,
+          },
+          unita: risparmio?.unita ?? 'kWh',
+          // La batteria all'arrivo solo senza soste: con una sosta la strada
+          // che consuma meno fa caricare di meno, non arrivare più carichi.
+          arrivo: pronto.soloPercorso || (piano?.soste.isNotEmpty ?? true) ? null : piano?.batteriaArrivo,
+          capacitaKwh: gestore.auto.veicolo.capacitaUtileKwh,
+          minimoPercento: risparmio?.soglie.minimoPercento ?? 5,
+        ),
       ],
       if (pronto.tappe.isNotEmpty) ...[
         const SizedBox(height: 18),

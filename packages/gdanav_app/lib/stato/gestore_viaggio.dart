@@ -11,6 +11,7 @@ import 'gestore_auto.dart';
 import 'gestore_consumo.dart';
 import '../risorse.dart';
 import 'gestore_premium.dart';
+import 'gestore_risparmio.dart';
 import 'gestore_ztl.dart';
 
 /// A che punto è il viaggio.
@@ -125,6 +126,21 @@ PianificatoreViaggio pianificatoreVero(
   // conosce: chiederlo due volte a TomTom sarebbe sprecare il piano e
   // sommare due volte le stesse code.
   final traffico = tomtom != null ? null : _traffico;
+  // Le strade fra cui scegliere col consumo di ognuna (il modello dell'auto),
+  // e in più la strada «eco» se è davvero un'altra: come in ABRP, ognuna col
+  // suo nome — più rapida, risparmia energia, tempo simile.
+  final consumo = GestoreRisparmio.attuale?.modello();
+  Future<List<PercorsoCalcolato>> strade(Punto da, Punto a, List<Rettangolo> evita) async {
+    final eco = consumo == null
+        ? null
+        : tomtom!
+              .calcola([da, a], opzioni: opzioni, evita: evita, eco: true, consumo: consumo)
+              .then<PercorsoCalcolato?>((p) => p, onError: (Object _) => null);
+    final rapide = await tomtom!.alternative(da, a, opzioni: opzioni, evita: evita, consumo: consumo);
+    final e = await eco;
+    return e == null ? rapide : conStradaEco(rapide, e);
+  }
+
   // Le ZTL: TomTom non le conosce. Le gira al largo chi chiede il percorso,
   // con le «aree da evitare», quando sono attive e non si ha il permesso.
   final ztl = tomtom == null
@@ -133,7 +149,7 @@ PianificatoreViaggio pianificatoreVero(
           zone: archivioZtl,
           permessi: () async => GestoreZtl.attuale?.permessi ?? const {},
           calcola: (tappe, evita) => tomtom.calcola(tappe, opzioni: opzioni, evita: evita),
-          alternative: (da, a, evita) => tomtom.alternative(da, a, opzioni: opzioni, evita: evita),
+          alternative: strade,
         );
   return PianificatoreViaggio(
     percorsi: (tappe) => ztl?.percorso(tappe) ?? valhalla!.calcola(tappe, opzioni: opzioni),

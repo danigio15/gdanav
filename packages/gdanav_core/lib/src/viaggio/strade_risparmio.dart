@@ -128,7 +128,7 @@ PropostaStrada? scegliProposta({
   if (base > 0) {
     for (final p in eco) {
       final c = consumo(p);
-      if (base - c < base * soglie.minimoPercento / 100) continue;
+      if (base - c <= 0 || base - c < base * soglie.minimoPercento / 100) continue;
       if (p.durata - adesso.durata > soglie.massimoInPiu) continue;
       final pr = proposta(p, MotivoProposta.risparmio);
       if (pr != null && (migliore == null || pr.consumo < migliore.consumo)) migliore = pr;
@@ -190,7 +190,10 @@ List<EtichettaStrada> etichetteStrade(
   int? risparmia;
   for (var i = 0; i < scelte.length; i++) {
     if (i == rapida) continue;
-    if (consumi[rapida] - consumi[i] < consumi[rapida] * minimoPercento / 100) continue;
+    // Senza consumi (tutti zero) nessuna risparmia: bisogna risparmiare
+    // qualcosa, e almeno la soglia.
+    final meno = consumi[rapida] - consumi[i];
+    if (meno <= 0 || meno < consumi[rapida] * minimoPercento / 100) continue;
     if (risparmia == null || consumi[i] < consumi[risparmia]) risparmia = i;
   }
   return [

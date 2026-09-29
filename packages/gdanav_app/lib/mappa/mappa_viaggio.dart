@@ -13,7 +13,7 @@ import '../schermate/scheda_punto.dart';
 import '../servizi.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_posizione.dart';
-import '../stato/gestore_risparmio.dart' show sintesiProposta;
+import '../stato/gestore_risparmio.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/gestore_vicini.dart';
@@ -37,6 +37,7 @@ class MappaViaggio extends StatefulWidget {
     this.segnalazioni,
     this.vicini,
     this.ztl,
+    this.risparmio,
     this.onPunto,
   });
 
@@ -65,6 +66,10 @@ class MappaViaggio extends StatefulWidget {
   /// Le ZTL e le aree pedonali: si disegnano quelle che si vedono, se si
   /// vogliono sulla mappa.
   final GestoreZtl? ztl;
+
+  /// Le strade a risparmio: prima di partire quella che risparmia energia è
+  /// verde; in guida la strada proposta. Senza, quelle della [guida].
+  final GestoreRisparmio? risparmio;
 
   /// Tocco su un distributore, una colonnina vicina o un punto di interesse.
   final ValueChanged<PuntoToccato>? onPunto;
@@ -98,7 +103,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.segnalazioni?.addListener(_segnalazioni);
     widget.vicini?.addListener(_vicini);
     widget.ztl?.addListener(_zoneDaCapo);
-    widget.guida?.risparmio?.addListener(_risparmio);
+    _gestoreRisparmio?.addListener(_risparmio);
     // Le ZTL cambiano stato nel corso della giornata: «attiva fino alle 18».
     _orologioZone = Timer.periodic(const Duration(minutes: 5), (_) => _zoneDaCapo());
     // In guida no: lì contano le soste del percorso e quelle vicine, e
@@ -115,7 +120,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.segnalazioni?.removeListener(_segnalazioni);
     widget.vicini?.removeListener(_vicini);
     widget.ztl?.removeListener(_zoneDaCapo);
-    widget.guida?.risparmio?.removeListener(_risparmio);
+    _gestoreRisparmio?.removeListener(_risparmio);
     _orologioZone?.cancel();
     super.dispose();
   }
@@ -303,9 +308,12 @@ class _MappaViaggioState extends State<MappaViaggio> {
     await m.setGeoJsonSource(sorgenteSegnalazioni, datiSegnalazioni(g.vicine).cast<String, dynamic>());
   }
 
+  GestoreRisparmio? get _gestoreRisparmio => widget.risparmio ?? widget.guida?.risparmio;
+
   /// La strada proposta in guida, verde col suo fumetto; o più niente.
   Future<void> _risparmio() async {
-    final m = _mappa, r = widget.guida?.risparmio;
+    final m = _mappa, r = _gestoreRisparmio;
+    if (widget.guida == null) return;
     if (m == null || !_stileCaricato || r == null) return;
     final p = r.proposta;
     await m.setGeoJsonSource(
@@ -332,7 +340,15 @@ class _MappaViaggioState extends State<MappaViaggio> {
     final basso = MediaQuery.sizeOf(context).height * 0.45;
     final viaggio = stato is ViaggioPronto ? stato.viaggio : null;
     final dati = stato is ViaggioPronto && widget.guida == null
-        ? datiViaggio(viaggio, scelte: stato.scelte, scelta: stato.scelta, tappe: stato.tappe, passandoci: true)
+        ? datiViaggio(
+            viaggio,
+            scelte: stato.scelte,
+            scelta: stato.scelta,
+            tappe: stato.tappe,
+            passandoci: true,
+            // Quella che risparmia energia, verde come nelle schede.
+            eco: stradaCheRisparmia(stato.scelte, _gestoreRisparmio),
+          )
         : datiViaggio(viaggio, tappe: stato is ViaggioPronto ? stato.tappe : const []);
     for (final MapEntry(key: id, value: dati) in dati.entries) {
       await m.setGeoJsonSource(id, dati.cast<String, dynamic>());

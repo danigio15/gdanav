@@ -582,6 +582,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                   onColonnina: (id) => mostraColonnina(context, viaggio, id),
                   vicini: widget.vicini,
                   ztl: widget.ztl,
+                  risparmio: widget.guida.risparmio,
                   onPunto: (p) => mostraPunto(
                     context,
                     p,
@@ -706,6 +707,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                             onPremium: widget.premium == null
                                 ? null
                                 : () => _apri(SchermataPremium(premium: widget.premium!, perche: 'Le soste di ricarica')),
+                            risparmio: widget.guida.risparmio,
                           ),
                   ),
                 ],
