@@ -81,6 +81,23 @@ void main() {
       ]);
       expect(fuse.single.id, 'osm:1');
       expect(fuse.single.evse, ['IT*BEC*EW001*1']);
+      expect(fuse.single.tempoReale, isTrue);
+      // E con loro, se il gestore non manda lo stato di adesso.
+      final fisso = fondiColonnine([
+        [col('osm:1', 45.0000, 9.0000, prese: 3, fonte: 'osm')],
+        [
+          Colonnina(
+            id: pun.id,
+            nome: pun.nome,
+            posizione: pun.posizione,
+            connettori: pun.connettori,
+            fonte: pun.fonte,
+            evse: pun.evse,
+            tempoReale: false,
+          ),
+        ],
+      ]);
+      expect(fisso.single.tempoReale, isFalse);
     });
 
     test('l\'operatore si prende da chi ce l\'ha', () {

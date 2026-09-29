@@ -27,6 +27,30 @@ void main() {
       expect(c.map((x) => x.operatore), ['Ionity', 'Edison Next', 'GES']);
     });
 
+    /* Tredici gestori su quaranta non mandano alla PUN lo stato di adesso: la
+     * mappa pubblica ne ripete uno fisso. L'estrazione di oggi lo scrive in
+     * `tempo_reale`, e basta un punto così perché la colonnina non si dica
+     * libera sullo stato di tutta Italia. */
+    test('lo stato fisso di un gestore si ricorda, e il CSV di onData non lo sa', () {
+      const intestazione = 'id_location,nome_location,indirizzo,id_evse,stato,standard_del_connettore,'
+          'potenza_erogabile,latitudine_evse,longitudine_evse,operatore,tempo_reale';
+      String riga(String luogo, String evse, String tempoReale) =>
+          '$luogo,$luogo,Via Roma 1,$evse,AVAILABLE,IEC_62196_T2_COMBO,150000,45.0,11.0,,$tempoReale';
+      final c = {
+        for (final x in Pun.leggiCsv([
+          intestazione,
+          riga('Plenitude', 'IT*PLN*E1*1', 'si'),
+          riga('Neogy', 'IT*ASM*E1*1', 'no'),
+          riga('Mista', 'IT*EDN*E1*1', 'si'),
+          riga('Mista', 'IT*EDN*E1*2', 'no'),
+          riga('Chissà', 'IT*XYZ*E1*1', ''),
+        ].join('\n')))
+          x.nome: x.tempoReale,
+      };
+      expect(c, {'Plenitude': true, 'Neogy': false, 'Mista': false, 'Chissà': true});
+      expect(esempio().every((x) => x.tempoReale), isTrue);
+    });
+
     test('una colonnina per posto, non una per presa', () {
       final c = esempio();
       final isola = chiamata(c, 'Isola A3');

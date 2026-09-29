@@ -76,6 +76,9 @@ abstract final class Pun {
     // Solo nell'estrazione di oggi dall'API (tools/pun/estrai.py): il nome
     // dell'azienda. Nel CSV di onData non c'è.
     final cAzienda = intestazione.indexOf('operatore');
+    // Anche questa solo nell'estrazione di oggi: «no» se il gestore non manda
+    // alla PUN lo stato di adesso di quel punto.
+    final cTempoReale = intestazione.indexOf('tempo_reale');
 
     final perLuogo = <String, _Luogo>{};
     for (final r in righe.skip(1)) {
@@ -102,6 +105,7 @@ abstract final class Pun {
       luogo.lon.add(lon);
       luogo.prese.add(presa);
       if (r[cEvse].trim() case final e when e.isNotEmpty) luogo.evse.add(e);
+      if (cTempoReale >= 0 && r[cTempoReale].trim().toLowerCase() == 'no') luogo.statoFisso = true;
     }
 
     return [
@@ -116,6 +120,9 @@ abstract final class Pun {
           connettori: l.prese,
           fonte: 'pun',
           evse: l.evse,
+          // Basta un punto con lo stato fisso: la colonnina intera non si
+          // dice libera sullo stato di tutta Italia.
+          tempoReale: !l.statoFisso,
         ),
     ];
   }
@@ -275,4 +282,5 @@ class _Luogo {
   final lon = <double>[];
   final prese = <Connettore>[];
   final evse = <String>[];
+  var statoFisso = false;
 }

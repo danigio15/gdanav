@@ -99,6 +99,7 @@ class DisponibilitaPun implements FonteDisponibilita {
       operatore: c.operatore,
       fonte: c.fonte,
       evse: c.evse,
+      tempoReale: c.tempoReale,
       connettori: prese,
     );
   }
@@ -133,8 +134,12 @@ class DisponibilitaPun implements FonteDisponibilita {
   /// delle prese ([inOrdine]). Altrimenti non si indovina quale presa è
   /// libera: la colonnina resta com'era, e lo stato si chiede quando la si
   /// tocca ([aggiorna]).
+  ///
+  /// La mappa pubblica non dice se uno stato è in tempo reale: lo dice
+  /// l'archivio ([Colonnina.tempoReale]). Quelle con lo stato fisso restano
+  /// com'erano, «non si sa», invece di dirsi libere per sempre.
   static Colonnina conStati(Colonnina c, Map<String, String> stati, {bool inOrdine = false}) {
-    if (c.evse.isEmpty || c.evse.length != c.connettori.length) return c;
+    if (!c.tempoReale || c.evse.isEmpty || c.evse.length != c.connettori.length) return c;
     final prima = c.connettori.first;
     final uguali = c.connettori.every((p) => p.tipo == prima.tipo && p.potenzaKw == prima.potenzaKw);
     if (!uguali && !inOrdine) return c;
@@ -153,6 +158,7 @@ class DisponibilitaPun implements FonteDisponibilita {
       operatore: c.operatore,
       fonte: c.fonte,
       evse: c.evse,
+      tempoReale: c.tempoReale,
       connettori: prese,
     );
   }

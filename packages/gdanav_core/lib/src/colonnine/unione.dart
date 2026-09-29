@@ -135,6 +135,8 @@ Colonnina _lameglio(Colonnina a, Colonnina b) {
     // Gli EVSE ID li ha solo la PUN: si tengono da chi li ha, qualunque
     // delle due abbia vinto le prese.
     evse: ricca.evse.isNotEmpty ? ricca.evse : altra.evse,
+    // E con gli EVSE ID, se la PUN ne ha lo stato vero.
+    tempoReale: ricca.evse.isNotEmpty ? ricca.tempoReale : altra.tempoReale,
   );
 }
 

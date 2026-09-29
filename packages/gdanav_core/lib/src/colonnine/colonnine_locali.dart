@@ -101,7 +101,8 @@ class ArchivioColonnine {
   // Un settimo campo, se c'è, è la fonte («pun», «osm+pun»): senza, è
   // OpenStreetMap, che è quasi tutto l'archivio e così non paga niente.
   // Un ottavo, se c'è, sono gli EVSE ID dei punti di ricarica (dalla PUN),
-  // per chiederne lo stato.
+  // per chiederne lo stato. Un nono, 0, se lo stato che la PUN ne dà è fisso
+  // ([Colonnina.tempoReale]).
 
   static const _tipi = [TipoConnettore.ccs2, TipoConnettore.chademo, TipoConnettore.tipo2, TipoConnettore.tesla];
 
@@ -117,6 +118,7 @@ class ArchivioColonnine {
           _prese(c.connettori),
           if ((c.fonte.isNotEmpty && c.fonte != 'osm') || c.evse.isNotEmpty) c.fonte.isEmpty ? 'osm' : c.fonte,
           if (c.evse.isNotEmpty) _evseInOrdine(c),
+          if (c.evse.isNotEmpty && !c.tempoReale) 0,
         ],
     ];
     return jsonEncode({
@@ -174,6 +176,7 @@ class ArchivioColonnine {
           ],
           fonte: r.length > 6 ? r[6] as String : 'osm',
           evse: r.length > 7 ? (r[7] as List).cast<String>() : const [],
+          tempoReale: !(r.length > 8 && r[8] == 0),
         ),
       );
     }

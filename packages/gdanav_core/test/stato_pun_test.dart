@@ -296,6 +296,28 @@ void main() {
       expect(identical(DisponibilitaPun.conStati(senza, const {}), senza), isTrue);
     });
 
+    /* Tredici gestori su quaranta non mandano alla PUN lo stato di adesso, e
+     * la mappa pubblica ne ripete uno fisso — quasi sempre AVAILABLE. Preso
+     * per vero, il percorso andrebbe a cercare una colonnina «libera» che
+     * nessuno sa com'è. */
+    test('lo stato fisso di chi non lo manda non si prende per vero', () {
+      final a = isola(2);
+      final fissa = Colonnina(
+        id: a.id,
+        nome: a.nome,
+        posizione: a.posizione,
+        connettori: a.connettori,
+        fonte: a.fonte,
+        evse: a.evse,
+        tempoReale: false,
+      );
+      final stati = {'IT*BEC*EW001*0': 'AVAILABLE', 'IT*BEC*EW001*1': 'AVAILABLE'};
+      expect(identical(DisponibilitaPun.conStati(fissa, stati), fissa), isTrue);
+      final vera = DisponibilitaPun.conStati(a, stati);
+      expect(vera.connettori.map((p) => p.stato), everyElement(StatoPresa.disponibile));
+      expect(vera.tempoReale, isTrue);
+    });
+
     test('le colonnine del percorso arrivano con lo stato di tutta Italia', () async {
       final fonte = _FonteFissa([isola(2), mista]);
       final stati = {'IT*BEC*EW001*0': 'AVAILABLE', 'IT*BEC*EW001*1': 'CHARGING', 'IT*X*E3': 'OUTOFORDER'};

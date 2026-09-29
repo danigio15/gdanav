@@ -171,6 +171,7 @@ class DisponibilitaTomTom implements FonteDisponibilita {
       posizione: c.posizione,
       fonte: c.fonte,
       evse: c.evse,
+      tempoReale: c.tempoReale,
       connettori: [...prese, ...c.connettori.where((x) => !tipi.contains(x.tipo))],
     );
   }

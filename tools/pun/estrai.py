@@ -19,7 +19,8 @@ della mappa da 12.000 punti come le chiede lui, i dettagli a blocchi di
 solo quando si rifà l'archivio (commit con «[colonnine]»), non nell'app.
 
 Scrive un CSV con le colonne che legge `Pun.leggiCsv` nel nucleo, più
-`operatore` (il nome dell'azienda), e un riassunto sullo standard output.
+`operatore` (il nome dell'azienda) e `tempo_reale` (se il gestore manda lo
+stato di adesso), e un riassunto sullo standard output.
 Le credenziali non si stampano mai.
 
     pip install requests requests-aws4auth
@@ -66,6 +67,7 @@ COLONNE = [
     "latitudine_evse",
     "longitudine_evse",
     "operatore",
+    "tempo_reale",
 ]
 
 
@@ -212,6 +214,9 @@ def riga(rec: dict) -> dict | None:
         "latitudine_evse": lat,
         "longitudine_evse": lon,
         "operatore": str(rec.get("businessName") or "").strip(),
+        # «no» se il gestore non manda lo stato di adesso: la PUN ne ripete
+        # uno fisso, e l'app non lo deve prendere per vero.
+        "tempo_reale": {True: "si", False: "no"}.get(rec.get("realTime"), ""),
     }
 
 
@@ -236,11 +241,13 @@ def main() -> int:
         w.writerows(righe)
 
     stati = Counter(r["stato"] or "?" for r in righe)
+    tempo_reale = Counter(r["tempo_reale"] or "?" for r in righe)
     operatori = Counter(r["operatore"] for r in righe if r["operatore"])
     vicine = [r for r in righe if distanza_m(CENTRO_DIREZIONALE, (r["latitudine_evse"], r["longitudine_evse"])) <= RAGGIO_M]
     luoghi = Counter(r["nome_location"] or r["indirizzo"] for r in vicine)
     print(f"dettagli: {len(record)} record, {len(righe)} righe scritte, {pun.richieste} richieste")
     print(f"stato: {dict(stati.most_common())}")
+    print(f"stato in tempo reale: {dict(tempo_reale.most_common())}")
     print(f"operatori: {len(operatori)} — {dict(operatori.most_common(12))}")
     print(f"Centro Direzionale, entro {RAGGIO_M} m: {len(vicine)} punti in {len(luoghi)} posti")
     for nome, n in luoghi.most_common(16):

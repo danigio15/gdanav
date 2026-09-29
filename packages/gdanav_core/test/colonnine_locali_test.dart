@@ -69,6 +69,22 @@ void main() {
     expect(letti['osm-node-1']!.evse, isEmpty);
   });
 
+  test('lo stato fisso va e torna, nel nono campo, solo quando c\'è', () {
+    Colonnina pun(String id, {required bool tempoReale}) => Colonnina(
+          id: id,
+          nome: id,
+          posizione: const Punto(45, 9),
+          connettori: const [Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150)],
+          fonte: 'pun',
+          evse: ['IT*X*$id'],
+          tempoReale: tempoReale,
+        );
+    final testo = ArchivioColonnine.scrivi([pun('vero', tempoReale: true), pun('fisso', tempoReale: false)]);
+    expect(((jsonDecode(testo) as Map)['c'] as List).map((r) => (r as List).length), [8, 9]);
+    final letti = {for (final c in ArchivioColonnine.leggi(testo).tutte) c.id: c.tempoReale};
+    expect(letti, {'vero': true, 'fisso': false});
+  });
+
   test("un archivio di prima, senza il settimo campo, e' tutto OpenStreetMap", () {
     const testo = '{"v":1,"generato":"2026-09-01T00:00:00Z","c":[[44.5,11.3,"osm-node-9","A","",[[0,150,2]]]]}';
     expect(ArchivioColonnine.leggi(testo).tutte.single.fonte, 'osm');

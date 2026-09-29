@@ -58,11 +58,13 @@ Future<void> main(List<String> argomenti) async {
   int prese(Iterable<Colonnina> l) => l.fold(0, (n, c) => n + c.connettori.length);
   final soloPun = unite.where((c) => c.fonte == 'pun').length;
   final insieme = unite.where((c) => c.fonte == 'osm+pun').length;
+  final fisse = unite.where((c) => c.evse.isNotEmpty && !c.tempoReale).length;
   stdout
     ..writeln('OpenStreetMap: ${osm.length} stazioni, ${prese(osm)} prese')
     ..writeln('PUN: ${lette.length} posti letti, ${lette.length - pun.length} fuori dall\'Italia e lasciati, '
         '${prese(pun)} punti di ricarica')
     ..writeln('Nella stessa posizione in tutte e due: $insieme; solo nella PUN: $soloPun')
+    ..writeln('Con lo stato fisso (il gestore non manda quello di adesso): $fisse')
     ..writeln('Archivio: ${unite.length} stazioni, ${prese(unite)} prese, '
         '${coperti.length} riquadri (${coperti.length - archivio.coperti.length} nuovi), '
         '${testo.length} byte');

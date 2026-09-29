@@ -92,6 +92,7 @@ class Colonnina {
     this.operatore,
     this.fonte = '',
     this.evse = const [],
+    this.tempoReale = true,
   });
 
   final String id;
@@ -107,6 +108,11 @@ class Colonnina {
   /// `IT*BEC*EW003907*1`), quando la fonte li dà — la PUN sì: servono a
   /// chiederne lo stato di adesso, che la PUN dà punto per punto.
   final List<String> evse;
+
+  /// false quando il gestore non manda alla PUN lo stato di adesso dei suoi
+  /// punti ([evse]): la PUN ripete uno stato fisso, e dire «libera» su quello
+  /// sarebbe una bugia. Lo sa l'archivio, da quando l'ha letto.
+  final bool tempoReale;
 
   /// La potenza massima fra le prese che l'auto può usare, anche guaste:
   /// quella di targa.
