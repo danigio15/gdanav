@@ -1,10 +1,11 @@
 /// Le ZTL e le aree pedonali per l'archivio dentro l'app
 /// (`packages/gdanav_app/assets/ztl.json`), dall'estratto d'Italia di
-/// OpenStreetMap (Geofabrik) filtrato con osmium:
+/// OpenStreetMap (Geofabrik) filtrato con osmium. I comuni (`admin_level=8`)
+/// servono a dire di che città è ogni ZTL:
 ///
 ///     osmium tags-filter italy.osm.pbf wr/boundary=limited_traffic_zone \
 ///         wr/highway=pedestrian wr/area:highway=pedestrian \
-///         n/place=city,town,village -o zone.osm.pbf
+///         n/place=city,town,village r/admin_level=8 -o zone.osm.pbf
 ///     osmium export zone.osm.pbf -f geojsonseq --add-unique-id=type_id \
 ///         --geometry-types=point,polygon -o zone.geojsonseq
 ///     dart run tool/ztl_osm.dart ztl.json zone.geojsonseq
@@ -23,14 +24,39 @@ import 'package:gdanav_core/gdanav_core.dart';
 const superficieMinimaM2 = 300.0;
 
 /// «ZTL Centro Storico», «Z.T.L. - Centro», «Zona a traffico limitato
-/// Chiaia»: il nome senza la sigla. Vuoto se resta solo quella.
-String nomeZtl(String? nome) {
-  final n = (nome ?? '').trim().replaceFirst(
-        RegExp(r'^(?:z\s*\.?\s*t\s*\.?\s*l\s*\.?|zona\s+a\s+traffico\s+limitato)(?=$|[\s\-–:,.])[\s\-–:,.]*',
-            caseSensitive: false),
-        '',
-      );
-  return n.trim();
+/// Chiaia»: il nome senza la sigla, e senza la città se c'è anche lei
+/// («Bologna - Centro Storico», «Via Matteotti Lerici»). Vuoto se non
+/// resta altro.
+String nomeZtl(String? nome, [String? citta]) {
+  const separatori = r'[\s\-–:,.·/]';
+  const sigla = r'(?:z\s*\.?\s*t\s*\.?\s*l\s*\.?|zona\s+(?:a\s+|di\s+)?traffico\s+limitato)';
+  var n = (nome ?? '').trim().replaceFirst(RegExp('^$sigla(?=\$|$separatori)$separatori*', caseSensitive: false), '');
+  final c = (citta ?? '').trim();
+  if (c.isNotEmpty) {
+    // La città come parola intera: «Lancianovecchia» resta com'è.
+    final parola = RegExp('(?<![\\p{L}\\d])${RegExp.escape(c)}(?![\\p{L}\\d])', caseSensitive: false, unicode: true);
+    n = n.replaceAll(parola, ' ');
+  }
+  return n.replaceAll(RegExp(r'\s+'), ' ').replaceAll(RegExp('^$separatori+|$separatori+\$'), '').trim();
+}
+
+/// Il nome italiano, se c'è: «Casteddu/Cagliari» è «Cagliari».
+String? nomeItaliano(Map<String, Object?> tag) {
+  for (final chiave in const ['name:it', 'name']) {
+    final v = tag[chiave];
+    if (v is String && v.trim().isNotEmpty) return v.trim();
+  }
+  return null;
+}
+
+/// Il comune in cui cade [p]: il più piccolo, se più d'uno la contiene (un
+/// comune dentro l'altro). I comuni sono zone col nome del comune.
+String? comuneDi(Punto p, List<ZonaLimitata> comuni) {
+  final dentro = comuni.where((c) => c.contiene(p)).toList();
+  if (dentro.isEmpty) return null;
+  double area(ZonaLimitata c) => c.anelli.map(superficieM2).fold(0.0, (a, b) => a + b);
+  dentro.sort((a, b) => area(a).compareTo(area(b)));
+  return dentro.first.nome;
 }
 
 /// L'id di OpenStreetMap che non cambia: «w123», «r456». osmium scrive le
@@ -107,8 +133,10 @@ List<Punto> semplificato(List<Punto> punti, double tolleranzaM) {
   return fuori.length >= 3 ? fuori : punti;
 }
 
-/// La città di una ZTL: dai suoi tag se c'è, se no il paese più vicino.
-String? citta(Map<String, Object?> tag, Punto centro, List<(Punto, String, int)> luoghi) {
+/// La città di una ZTL: dai suoi tag se c'è, se no il comune in cui cade,
+/// se no il paese più vicino.
+String? citta(Map<String, Object?> tag, Punto centro, List<(Punto, String, int)> luoghi,
+    [List<ZonaLimitata> comuni = const []]) {
   for (final chiave in const ['addr:city', 'is_in:city']) {
     final v = tag[chiave];
     if (v is String && v.trim().isNotEmpty) return v.trim();
@@ -116,6 +144,8 @@ String? citta(Map<String, Object?> tag, Punto centro, List<(Punto, String, int)>
   final operatore = '${tag['operator'] ?? ''}';
   final comune = RegExp(r'^Comune di\s+(.+)$', caseSensitive: false).firstMatch(operatore.trim());
   if (comune != null) return comune.group(1)!.trim();
+  final dentro = comuneDi(centro, comuni);
+  if (dentro != null) return dentro;
   (String, double)? migliore;
   for (final (p, nome, _) in luoghi) {
     if ((p.lat - centro.lat).abs() > 0.15 || (p.lon - centro.lon).abs() > 0.2) continue;
@@ -142,6 +172,8 @@ Future<void> main(List<String> argomenti) async {
   final ztl = <(String, Map<String, Object?>, List<List<Punto>>)>[];
   final pedonali = <(String, Map<String, Object?>, List<List<Punto>>)>[];
   final luoghi = <(Punto, String, int)>[];
+  final comuni = <ZonaLimitata>[];
+  final comuniVisti = <String>{};
   for (final percorso in argomenti.skip(1)) {
     await for (final riga in File(percorso).openRead().transform(utf8.decoder).transform(const LineSplitter())) {
       final testo = riga.replaceAll('\u001e', '').trim();
@@ -152,8 +184,8 @@ Future<void> main(List<String> argomenti) async {
       final id = idOsm(f['id'] ?? tag['@id']);
       if (g['type'] == 'Point') {
         final rango = const {'city': 3, 'town': 2, 'village': 1}[tag['place']];
-        final nome = tag['name'];
-        if (rango != null && nome is String && nome.isNotEmpty) {
+        final nome = nomeItaliano(tag);
+        if (rango != null && nome != null) {
           final c = (g['coordinates'] as List).cast<num>();
           luoghi.add((Punto(c[1].toDouble(), c[0].toDouble()), nome, rango));
         }
@@ -161,6 +193,17 @@ Future<void> main(List<String> argomenti) async {
       }
       final anelli = contorni(g);
       if (anelli.isEmpty) continue;
+      if (tag['boundary'] == 'administrative' && '${tag['admin_level']}' == '8') {
+        final nome = nomeItaliano(tag);
+        if (nome == null || !comuniVisti.add(id)) continue;
+        final semplici = [
+          for (final a in anelli)
+            if (semplificato(a, 20) case final s when s.length >= 3) s
+        ];
+        if (semplici.isEmpty) continue;
+        comuni.add(ZonaLimitata(id: id, tipo: TipoZona.ztl, nome: nome, anelli: semplici));
+        continue;
+      }
       if (tag['boundary'] == 'limited_traffic_zone') {
         ztl.add((id, tag, anelli));
       } else if (tag['area:highway'] == 'pedestrian' ||
@@ -172,6 +215,7 @@ Future<void> main(List<String> argomenti) async {
 
   final zone = <ZonaLimitata>[];
   var conOrari = 0, orariCapiti = 0;
+  final nonCapiti = <String>[];
   final citta0 = <String, int>{};
   final visti = <String>{};
   for (final (id, tag, anelli) in ztl) {
@@ -183,20 +227,27 @@ Future<void> main(List<String> argomenti) async {
         .whereType<String>()
         .where((v) => v.trim().isNotEmpty)
         .firstOrNull;
-    if (testoOrari != null) conOrari++;
-    if (orari != null) orariCapiti++;
-    final dove = citta(tag, centroDi(semplici), luoghi);
+    final dove = citta(tag, centroDi(semplici), luoghi, comuni);
     citta0[dove ?? '(senza città)'] = (citta0[dove ?? '(senza città)'] ?? 0) + 1;
-    final nome = nomeZtl(tag['name'] as String?);
-    zone.add(ZonaLimitata(
+    final nome = nomeZtl(nomeItaliano(tag), dove);
+    final zona = ZonaLimitata(
       id: id,
       tipo: TipoZona.ztl,
-      nome: nome.isEmpty ? 'ZTL' : nome,
+      nome: nome,
       citta: dove,
       orari: orari,
       orariTesto: testoOrari?.trim(),
       anelli: semplici,
-    ));
+    );
+    if (testoOrari != null) {
+      conOrari++;
+      if (orari != null || OrariZtl.sempre(testoOrari)) {
+        orariCapiti++;
+      } else {
+        nonCapiti.add('| ${zona.etichetta} | `${testoOrari.trim()}` |');
+      }
+    }
+    zone.add(zona);
   }
   var piccole = 0;
   for (final (id, tag, anelli) in pedonali) {
@@ -224,7 +275,7 @@ Future<void> main(List<String> argomenti) async {
   stdout
     ..writeln('::notice title=ZTL::$quanteZtl ZTL ($conOrari con gli orari scritti, $orariCapiti che si capiscono), '
         '${zone.length - quanteZtl} aree pedonali ($piccole troppo piccole lasciate fuori), '
-        '${luoghi.length} luoghi per i nomi, ${testo.length ~/ 1024} kB')
+        '${comuni.length} comuni e ${luoghi.length} luoghi per i nomi, ${testo.length ~/ 1024} kB')
     ..writeln('')
     ..writeln('| Città | ZTL |')
     ..writeln('|---|---|');
@@ -232,13 +283,26 @@ Future<void> main(List<String> argomenti) async {
   for (final e in classifica.take(40)) {
     stdout.writeln('| ${e.key} | ${e.value} |');
   }
+  // Le ZTL col permesso da chiedere: una riga per nome, con quanti pezzi.
+  final gruppi = <String, (String, int)>{};
+  for (final z in zone.where((z) => z.tipo == TipoZona.ztl)) {
+    final g = gruppi[z.chiave];
+    gruppi[z.chiave] = (z.etichetta, (g?.$2 ?? 0) + 1);
+  }
   stdout
     ..writeln('')
-    ..writeln('| ZTL | Orari scritti | Si capiscono |')
-    ..writeln('|---|---|---|');
-  for (final z in zone.where((z) => z.tipo == TipoZona.ztl && z.orariTesto != null).take(60)) {
-    stdout.writeln('| ${z.etichetta} | `${z.orariTesto}` | ${z.orari == null ? 'no' : 'sì'} |');
+    ..writeln('${gruppi.length} permessi da chiedere, uno per nome:')
+    ..writeln('')
+    ..writeln('| ZTL | Pezzi |')
+    ..writeln('|---|---|');
+  for (final g in gruppi.values.toList()..sort((a, b) => a.$1.compareTo(b.$1))) {
+    stdout.writeln('| ${g.$1} | ${g.$2} |');
   }
+  stdout
+    ..writeln('')
+    ..writeln('| Orari che non si capiscono (valgono come sempre attiva) |  |')
+    ..writeln('|---|---|');
+  nonCapiti.forEach(stdout.writeln);
   if (quanteZtl < 30) {
     stdout.writeln('::error title=ZTL::troppo poche, qualcosa non va');
     exitCode = 1;

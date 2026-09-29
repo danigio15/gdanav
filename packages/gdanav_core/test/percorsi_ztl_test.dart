@@ -92,7 +92,7 @@ void main() {
   });
 
   test('col permesso ci passa, e non chiede niente a TomTom in più', () async {
-    final p = await calcolo(const {'r1': true}).percorso([sud, nord]);
+    final p = await calcolo({ztl.chiave: true}).percorso([sud, nord]);
     expect(p.durata, const Duration(minutes: 11));
     expect(p.ztl!.attraversate.single.id, 'r1');
     expect(p.ztl!.daChiedere, isNull);
@@ -100,7 +100,7 @@ void main() {
   });
 
   test('senza permesso la gira al largo e non chiede', () async {
-    final p = await calcolo(const {'r1': false}).percorso([sud, nord]);
+    final p = await calcolo({ztl.chiave: false}).percorso([sud, nord]);
     expect(p.durata, const Duration(minutes: 14));
     expect(p.ztl!.evitate.single.id, 'r1');
     expect(p.ztl!.daChiedere, isNull);
@@ -133,7 +133,7 @@ void main() {
   });
 
   test('la meta è dentro: si arriva al varco, fuori, sulla strada che ci entra', () async {
-    final p = await calcolo(const {'r1': false}).percorso([sud, centro]);
+    final p = await calcolo({ztl.chiave: false}).percorso([sud, centro]);
     final z = p.ztl!;
     expect(z.metaDentro?.id, 'r1');
     expect(z.evitate, isEmpty);
@@ -157,7 +157,7 @@ void main() {
       return tomtom(tappe, evita);
     }
 
-    final p = await calcolo(const {'r1': false}, calcola: capriccioso).percorso([sud, nord]);
+    final p = await calcolo({ztl.chiave: false}, calcola: capriccioso).percorso([sud, nord]);
     expect(p.durata, const Duration(minutes: 11));
     expect(p.ztl!.nonEvitate.single.id, 'r1');
     expect(p.ztl!.evitate, isEmpty);
@@ -179,6 +179,39 @@ void main() {
       expect(archivio.ztlSulPercorso(s.punti), isEmpty);
       expect(s.ztl!.daChiedere?.id, 'r1');
     }
+  });
+
+  test('due pezzi della stessa ZTL: un permesso solo li apre tutti e due', () async {
+    // Un secondo pezzo, più a nord sulla stessa strada, con lo stesso nome.
+    final pezzo = ZonaLimitata(
+      id: 'w2',
+      tipo: TipoZona.ztl,
+      nome: 'Centro storico',
+      citta: 'Napoli',
+      anelli: [
+        [
+          const Punto(40.8555, 14.245),
+          const Punto(40.8555, 14.255),
+          const Punto(40.8585, 14.255),
+          const Punto(40.8585, 14.245),
+        ],
+      ],
+    );
+    final dueArchivio = ArchivioZtl([ztl, pezzo]);
+    PercorsiConZtl con(Map<String, bool> permessi) => PercorsiConZtl(
+          zone: () async => dueArchivio,
+          permessi: () async => permessi,
+          calcola: tomtom,
+          adesso: () => martedi,
+        );
+    final chiede = await con(const {}).percorso([sud, nord]);
+    expect(chiede.ztl!.daChiedere?.chiave, ztl.chiave);
+    expect(chiede.ztl!.evitate.map((z) => z.id), unorderedEquals(['r1', 'w2']));
+    chieste.clear();
+    final passa = await con({ztl.chiave: true}).percorso([sud, nord]);
+    expect(passa.durata, const Duration(minutes: 11));
+    expect(passa.ztl!.attraversate.map((z) => z.id), unorderedEquals(['r1', 'w2']));
+    expect(chieste, hasLength(1));
   });
 
   test('il traffico rifatto non fa dimenticare le ZTL', () async {

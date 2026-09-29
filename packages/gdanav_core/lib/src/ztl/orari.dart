@@ -3,21 +3,27 @@
 /// Gli orari arrivano in due forme: `opening_hours=Mo-Fr 07:30-19:30` sul
 /// contorno della zona, oppure un divieto a tempo come
 /// `motor_vehicle:conditional=no @ (Mo-Fr 07:30-19:30)`. Tutt'e due dicono
-/// quando la ZTL è attiva.
+/// quando la ZTL è attiva. C'è anche il contrario, `yes @ (20:00-07:00)`:
+/// sono le ore in cui si passa, e la ZTL è attiva nelle altre.
 ///
-/// Si legge solo quello che si sa leggere bene: giorni della settimana, i
-/// festivi nazionali (`PH`), fasce orarie anche a cavallo della mezzanotte,
-/// mesi e intervalli di date. Il resto non si indovina. Un orario che non si
-/// capisce vale come «sempre attiva», che è l'errore che non costa una
-/// multa.
+/// Si legge solo quello che si sa leggere bene: giorni della settimana (anche
+/// scritti all'italiana, `Lu-Ve`), i festivi nazionali (`PH`), fasce orarie
+/// anche a cavallo della mezzanotte, mesi e intervalli di date. Il resto non
+/// si indovina. Un orario che non si capisce vale come «sempre attiva», che è
+/// l'errore che non costa una multa.
 library;
 
 /// Gli orari di una ZTL, letti. Dove non ci sono, o non si capiscono, la ZTL
 /// è sempre attiva, e un [OrariZtl] non c'è proprio (`leggi` torna `null`).
 class OrariZtl {
-  OrariZtl._(this._regole, this.testo);
+  OrariZtl._(this._regole, this.testo, [this._aperture = const []]);
 
+  /// Quando è attiva.
   final List<_Regola> _regole;
+
+  /// Quando si passa (`yes @ …`), una lista per condizione: fuori da
+  /// tutte queste ore la ZTL è attiva.
+  final List<List<_Regola>> _aperture;
 
   /// Com'è scritto in OpenStreetMap.
   final String testo;
@@ -34,29 +40,70 @@ class OrariZtl {
     return o is String ? leggi(o) : null;
   }
 
+  static const _chiudono = {'no', 'private', 'permit', 'destination', 'delivery', 'customers', 'permissive_no'};
+  static const _aprono = {'yes', 'permissive', 'designated'};
+  static final _condizione = RegExp(r'([a-z_]+)\s*@\s*\(([^)]*)\)|([a-z_]+)\s*@\s*([^;()]+)');
+
   /// Un divieto a tempo: `no @ (Mo-Fr 07:30-19:30); destination @ (Sa)`.
   /// Contano le condizioni che chiudono (`no`, `private`, `permit`,
   /// `destination`, `delivery`, `customers`): la ZTL è attiva quando ne vale
-  /// una. Condizioni con altre cose (peso, durata) non si capiscono.
+  /// una. E quelle che aprono (`yes @ (20:00-07:00)`): la ZTL è attiva fuori
+  /// da quelle ore. Condizioni con altre cose (peso, durata) non si
+  /// capiscono.
   static OrariZtl? daCondizione(String testo) {
-    const chiudono = {'no', 'private', 'permit', 'destination', 'delivery', 'customers', 'permissive_no'};
     final regole = <_Regola>[];
-    for (final m in RegExp(r'([a-z_]+)\s*@\s*\(([^)]*)\)|([a-z_]+)\s*@\s*([^;()]+)').allMatches(testo)) {
+    final aperture = <List<_Regola>>[];
+    for (final m in _condizione.allMatches(testo)) {
       final valore = (m.group(1) ?? m.group(3) ?? '').trim();
       final quando = (m.group(2) ?? m.group(4) ?? '').trim();
-      if (!chiudono.contains(valore)) continue;
-      final o = leggi(quando);
-      if (o == null) return null;
-      // Le condizioni si sommano: attiva quando ne vale almeno una.
-      regole.addAll(o._regole.map((r) => r.aggiunta()));
+      if (_chiudono.contains(valore)) {
+        final r = _regoleDi(quando);
+        // Chiusa sempre (`permit @ (24/7)`), o non si capisce: sempre attiva.
+        if (r == null || r.any((x) => x.sempre)) return null;
+        // Le condizioni si sommano: attiva quando ne vale almeno una. Si
+        // sommano anche le regole dentro la stessa condizione, anche se per
+        // `opening_hours` una prenderebbe il posto dell'altra: chi le scrive
+        // intende quasi sempre «queste e anche queste», e così la ZTL è
+        // attiva almeno quando lo è davvero.
+        regole.addAll(r.map((x) => x.aggiunta()));
+      } else if (_aprono.contains(valore)) {
+        final r = _regoleDi(quando);
+        if (r == null) return null;
+        // Qui invece come in `opening_hours`, una regola al posto dell'altra:
+        // meno ore aperte, la ZTL attiva un po' di più. Aperta sempre
+        // (`yes @ (24/7)`) vuol dire mai attiva.
+        aperture.add(r);
+      }
     }
-    return regole.isEmpty ? null : OrariZtl._(regole, testo.trim());
+    if (regole.isEmpty && aperture.isEmpty) return null;
+    return OrariZtl._(regole, testo.trim(), aperture);
+  }
+
+  /// Se il testo dice proprio «sempre»: `24/7`, `permit @ (24/7)`, o un
+  /// divieto senza orario (`permit`). Anche lì [daiTag] torna `null`, ma
+  /// perché è scritto così, non perché non si capisce.
+  static bool sempre(String testo) {
+    final t = testo.trim();
+    if (t == '24/7' || _chiudono.contains(t)) return true;
+    final m = _condizione.allMatches(t).toList();
+    return m.isNotEmpty &&
+        m.every((c) =>
+            _chiudono.contains((c.group(1) ?? c.group(3) ?? '').trim()) &&
+            (c.group(2) ?? c.group(4) ?? '').trim() == '24/7');
   }
 
   /// Legge un orario nel formato di `opening_hours`. `null` se c'è qualcosa
   /// che non si sa leggere, o se dice «sempre» (`24/7`): la ZTL allora vale
   /// come sempre attiva.
   static OrariZtl? leggi(String testo) {
+    final regole = _regoleDi(testo);
+    if (regole == null || regole.any((r) => r.sempre)) return null;
+    return OrariZtl._(regole, testo.trim());
+  }
+
+  /// Le regole di un orario, o `null` se c'è qualcosa che non si sa
+  /// leggere.
+  static List<_Regola>? _regoleDi(String testo) {
     final pulito = testo.replaceAll(RegExp(r'"[^"]*"'), '').replaceAll('||', ';').trim();
     if (pulito.isEmpty) return null;
     final regole = <_Regola>[];
@@ -65,20 +112,24 @@ class OrariZtl {
       if (r.isEmpty) continue;
       final regola = _Regola.leggi(r);
       if (regola == null) return null;
-      if (regola.sempre) return null;
       regole.add(regola);
     }
-    if (regole.isEmpty) return null;
-    return OrariZtl._(regole, testo.trim());
+    return regole.isEmpty ? null : regole;
   }
 
   /// Se la ZTL è attiva a [quando].
   bool attivaAlle(DateTime quando) {
+    if (_dentro(_regole, quando)) return true;
+    return _aperture.isNotEmpty && !_aperture.any((a) => _dentro(a, quando));
+  }
+
+  /// Se [quando] cade in una fascia di [regole].
+  static bool _dentro(List<_Regola> regole, DateTime quando) {
     final minuto = quando.hour * 60 + quando.minute;
     final oggi = _Giorno(quando.year, quando.month, quando.day);
-    if (_fasce(oggi).any((f) => f.$1 <= minuto && minuto < f.$2)) return true;
+    if (_fasce(regole, oggi).any((f) => f.$1 <= minuto && minuto < f.$2)) return true;
     // Una fascia di ieri che passa la mezzanotte (20:00-02:00).
-    return _fasce(oggi.prima()).any((f) => f.$2 > 1440 && minuto < f.$2 - 1440);
+    return _fasce(regole, oggi.prima()).any((f) => f.$2 > 1440 && minuto < f.$2 - 1440);
   }
 
   /// Fino a quando resta attiva, se lo è a [quando]: il primo minuto in cui
@@ -113,12 +164,15 @@ class OrariZtl {
   DateTime? _prossimoCambio(DateTime t) {
     final minuto = t.hour * 60 + t.minute;
     final oggi = _Giorno(t.year, t.month, t.day);
+    final tutte = [_regole, ..._aperture];
     for (var giorni = 0; giorni < 9; giorni++) {
       final g = oggi.dopo(giorni);
       final bordi = <int>{
-        for (final f in _fasce(g)) ...[f.$1, f.$2],
-        for (final f in _fasce(g.prima()))
-          if (f.$2 > 1440) f.$2 - 1440,
+        for (final regole in tutte) ...[
+          for (final f in _fasce(regole, g)) ...[f.$1, f.$2],
+          for (final f in _fasce(regole, g.prima()))
+            if (f.$2 > 1440) f.$2 - 1440,
+        ],
         0,
       }.where((b) => b <= 1440).toList()
         ..sort();
@@ -135,9 +189,9 @@ class OrariZtl {
   /// Le fasce di [g], in minuti dalla mezzanotte (la fine può passare 1440).
   /// Come in OpenStreetMap: una regola che vale per quel giorno prende il
   /// posto di quelle prima, a meno che si sommi (le condizioni).
-  List<(int, int)> _fasce(_Giorno g) {
+  static List<(int, int)> _fasce(List<_Regola> regole, _Giorno g) {
     var fasce = <(int, int)>[];
-    for (final r in _regole) {
+    for (final r in regole) {
       if (!r.valePer(g)) continue;
       fasce = r.somma ? [...fasce, ...r.fasce] : r.fasce;
     }
@@ -241,22 +295,31 @@ class _Regola {
     return s.contains(g.settimana) || (festivi && g.festivo);
   }
 
-  static const _giorni = {'Mo': 1, 'Tu': 2, 'We': 3, 'Th': 4, 'Fr': 5, 'Sa': 6, 'Su': 7};
+  /// Anche all'italiana, come capita di trovarli: `Lu-Ve`, `Do`.
+  static const _giorni = {
+    'Mo': 1, 'Tu': 2, 'We': 3, 'Th': 4, 'Fr': 5, 'Sa': 6, 'Su': 7,
+    'Lu': 1, 'Ma': 2, 'Me': 3, 'Gi': 4, 'Ve': 5, 'Do': 7, //
+  };
   static const _mesi = {
     'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
     'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12, //
   };
 
+  /// Per le espressioni: un giorno della settimana, un mese.
+  static final _giorno = _giorni.keys.join('|');
+  static final _mese = _mesi.keys.join('|');
+
   static _Regola? leggi(String testo) {
     var resto = testo.trim();
     if (resto == '24/7') return _Regola(fasce: const [(0, 1440)], sempre: true);
 
-    // Mesi e date: «Jun-Sep», «Apr 01-Oct 31», «Dec 24-Jan 06».
+    // Mesi e date: «Jun-Sep», «Apr 01-Oct 31», «Dec 24-Jan 06», anche coi
+    // due punti dopo («Jul 15-Sep 15: Mo-Su …»). Il giorno non è l'ora che
+    // viene dopo: «Jun 20:00-…» è giugno, dalle venti.
     List<(int, int)>? mesi;
-    final perMesi = RegExp(r'^((?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(?:\s*\d{1,2}(?![\d:]))?'
-        r'(?:\s*-\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?(?:\s*\d{1,2}(?![\d:]))?)?)'
-        r'(?:\s*,\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(?:\s*\d{1,2}(?![\d:]))?'
-        r'(?:\s*-\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?(?:\s*\d{1,2}(?![\d:]))?)?)*)(?:\s*:)?\s*');
+    const giornoDelMese = r'(?:\s*\d{1,2}(?!\d|:\d))?';
+    final perMesi = RegExp('^((?:(?:$_mese)$giornoDelMese(?:\\s*-\\s*(?:$_mese)?$giornoDelMese)?)'
+        '(?:\\s*,\\s*(?:$_mese)$giornoDelMese(?:\\s*-\\s*(?:$_mese)?$giornoDelMese)?)*)(?:\\s*:)?\\s*');
     final mm = perMesi.firstMatch(resto);
     if (mm != null && mm.group(1)!.isNotEmpty) {
       mesi = [];
@@ -268,12 +331,12 @@ class _Regola {
       resto = resto.substring(mm.end).trim();
     }
 
-    // Giorni: «Mo-Fr», «Mo,We,Fr», «Sa,Su,PH», «PH».
+    // Giorni: «Mo-Fr», «Mo,We,Fr», «Sa,Su,PH», «PH», «Lu-Ve».
     Set<int>? settimana;
     var festivi = false;
     var soloFestivi = false;
-    final perGiorni = RegExp(r'^((?:Mo|Tu|We|Th|Fr|Sa|Su|PH|SH)(?:\s*-\s*(?:Mo|Tu|We|Th|Fr|Sa|Su))?'
-        r'(?:\s*,\s*(?:Mo|Tu|We|Th|Fr|Sa|Su|PH|SH)(?:\s*-\s*(?:Mo|Tu|We|Th|Fr|Sa|Su))?)*)(?:\s*:)?\s*');
+    final perGiorni = RegExp('^((?:$_giorno|PH|SH)(?:\\s*-\\s*(?:$_giorno))?'
+        '(?:\\s*,\\s*(?:$_giorno|PH|SH)(?:\\s*-\\s*(?:$_giorno))?)*)(?:\\s*:)?\\s*');
     final mg = perGiorni.firstMatch(resto);
     if (mg != null && mg.group(1)!.isNotEmpty) {
       final giorni = <int>{};

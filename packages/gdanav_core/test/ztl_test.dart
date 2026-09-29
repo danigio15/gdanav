@@ -73,6 +73,52 @@ void main() {
       expect(daiTag!.attivaAlle(DateTime(2026, 10, 4, 3)), isTrue, reason: 'vince il divieto');
     });
 
+    test('«yes @»: le ore in cui si passa, e la ZTL è attiva nelle altre', () {
+      // Torino, ZTL Centrale: si passa sempre, tranne i feriali 7:30-10:30.
+      final torino = OrariZtl.daCondizione('yes @ (Mo-Fr 00:00-07:30,10:30-24:00; Sa-Su,PH 00:00-24:00)')!;
+      expect(torino.attivaAlle(DateTime(2026, 9, 29, 9)), isTrue); // martedì
+      expect(torino.attivaAlle(DateTime(2026, 9, 29, 11)), isFalse);
+      expect(torino.attivaAlle(DateTime(2026, 9, 29, 7, 29)), isFalse);
+      expect(torino.attivaAlle(DateTime(2026, 10, 3, 9)), isFalse); // sabato
+      expect(torino.attivaAlle(DateTime(2026, 4, 6, 9)), isFalse); // Pasquetta, lunedì
+      expect(torino.finoAlle(DateTime(2026, 9, 29, 9)), DateTime(2026, 9, 29, 10, 30));
+      expect(torino.dalle(DateTime(2026, 9, 29, 11)), DateTime(2026, 9, 30, 7, 30));
+      expect(torino.dalle(DateTime(2026, 10, 2, 11)), DateTime(2026, 10, 5, 7, 30));
+
+      // Bologna: si passa dalle 20 alle 7, attiva di giorno tutti i giorni.
+      final bologna = OrariZtl.daCondizione('yes @ 20:00-07:00')!;
+      expect(bologna.attivaAlle(DateTime(2026, 10, 4, 12)), isTrue);
+      expect(bologna.attivaAlle(DateTime(2026, 10, 4, 22)), isFalse);
+      expect(bologna.attivaAlle(DateTime(2026, 10, 4, 6, 59)), isFalse);
+      expect(bologna.attivaAlle(DateTime(2026, 10, 4, 7)), isTrue);
+      expect(bologna.finoAlle(DateTime(2026, 10, 4, 12)), DateTime(2026, 10, 4, 20));
+
+      // Aperta sempre: mai attiva.
+      expect(OrariZtl.daCondizione('yes @ (24/7)')!.attivaAlle(DateTime(2026, 9, 29, 9)), isFalse);
+    });
+
+    test('i giorni all\'italiana, e i due punti dopo le date', () {
+      // Si passa Lu-Ve dalle 6 alle 9: attiva il resto.
+      final o = OrariZtl.daCondizione('yes @ (Lu-Fr 06:00-09:00)')!;
+      expect(o.attivaAlle(DateTime(2026, 9, 28, 7)), isFalse); // lunedì
+      expect(o.attivaAlle(DateTime(2026, 9, 28, 10)), isTrue);
+      expect(o.attivaAlle(DateTime(2026, 10, 3, 7)), isTrue); // sabato
+      final erice = OrariZtl.daCondizione('permit @ (Jul 15-Sep 15: Mo-Su 02:00-11:00)')!;
+      expect(erice.attivaAlle(DateTime(2026, 8, 1, 3)), isTrue);
+      expect(erice.attivaAlle(DateTime(2026, 8, 1, 12)), isFalse);
+      expect(erice.attivaAlle(DateTime(2026, 10, 1, 3)), isFalse);
+      expect(OrariZtl.leggi('Jun 20:00-23:00')!.attivaAlle(DateTime(2026, 6, 5, 21)), isTrue);
+    });
+
+    test('«sempre» scritto apposta', () {
+      expect(OrariZtl.sempre('permit @ (24/7)'), isTrue);
+      expect(OrariZtl.sempre('permit'), isTrue);
+      expect(OrariZtl.sempre('24/7'), isTrue);
+      expect(OrariZtl.sempre('no @ (Mo 10:00-11:00)'), isFalse);
+      expect(OrariZtl.sempre('sunrise-sunset'), isFalse);
+      expect(OrariZtl.daCondizione('permit @ (24/7)'), isNull);
+    });
+
     test('quello che non si capisce vale come sempre', () {
       expect(OrariZtl.leggi('24/7'), isNull);
       expect(OrariZtl.leggi('sunrise-sunset'), isNull);
@@ -108,6 +154,19 @@ void main() {
       expect(ztl.contiene(centro), isTrue);
       expect(ztl.contiene(const Punto(40.86, 14.25)), isFalse);
       expect(ztl.etichetta, 'Napoli · Centro storico');
+      expect(ztl.titolo, 'ZTL Centro storico');
+      final senzaNome = ZonaLimitata(id: 'w9', tipo: TipoZona.ztl, nome: '', citta: 'Brescia', anelli: [
+        quadrato(centro),
+      ]);
+      expect(senzaNome.etichetta, 'Brescia');
+      expect(senzaNome.titolo, 'ZTL di Brescia');
+      // Due pezzi con lo stesso nome nello stesso comune: un permesso solo.
+      final altroPezzo = ZonaLimitata(id: 'w10', tipo: TipoZona.ztl, nome: '', citta: 'Brescia', anelli: [
+        quadrato(const Punto(40.9, 14.3)),
+      ]);
+      expect(altroPezzo.chiave, senzaNome.chiave);
+      expect(ztl.chiave, isNot(senzaNome.chiave));
+      expect(ZonaLimitata(id: 'w11', tipo: TipoZona.ztl, nome: '', anelli: [quadrato(centro)]).chiave, 'w11');
       expect(ztl.attivaAlle(DateTime(2026, 9, 28, 10)), isTrue);
       expect(ztl.attivaAlle(DateTime(2026, 10, 4, 10)), isFalse);
     });

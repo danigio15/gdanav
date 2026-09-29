@@ -37,8 +37,8 @@ class PercorsiConZtl {
   /// L'archivio delle ZTL (si legge una volta, dall'app).
   final Future<ArchivioZtl> Function() zone;
 
-  /// I permessi risposti: id della ZTL → `true` ce l'ho, `false` no. Chi
-  /// manca non ha ancora risposto.
+  /// I permessi risposti: [ZonaLimitata.chiave] → `true` ce l'ho, `false`
+  /// no. Chi manca non ha ancora risposto.
   final Future<Map<String, bool>> Function() permessi;
 
   final PercorsoEvitando calcola;
@@ -104,7 +104,7 @@ class PercorsiConZtl {
       if (nuove.isEmpty) break;
       for (final i in nuove) {
         daEvitare[i.zona.id] = i.zona;
-        if (n == 0 && daChiedere == null && !permesso.containsKey(i.zona.id)) daChiedere = i.zona;
+        if (n == 0 && daChiedere == null && !permesso.containsKey(i.zona.chiave)) daChiedere = i.zona;
         if (metaDentro == null && i.zona.contiene(tappeOra.last)) {
           metaDentro = i.zona;
           varco = _varco(giro, i.indice);
@@ -132,7 +132,7 @@ class PercorsiConZtl {
     final nonEvitate = <ZonaLimitata>[];
     for (final i in archivio.ztlSulPercorso(giro.punti)) {
       if (!i.zona.attivaAlle(_quando(giro, i.indice, ora))) continue;
-      if (permesso[i.zona.id] == true) {
+      if (permesso[i.zona.chiave] == true) {
         attraversate.add(i.zona);
       } else if (i.zona != metaDentro) {
         nonEvitate.add(i.zona);
@@ -160,7 +160,7 @@ class PercorsiConZtl {
           ArchivioZtl archivio, PercorsoCalcolato p, DateTime ora, Map<String, bool> permesso) =>
       [
         for (final i in archivio.ztlSulPercorso(p.punti))
-          if (permesso[i.zona.id] != true && i.zona.attivaAlle(_quando(p, i.indice, ora))) i,
+          if (permesso[i.zona.chiave] != true && i.zona.attivaAlle(_quando(p, i.indice, ora))) i,
       ];
 
   /// Quando si arriva al punto [indice] di [p], partendo a [ora]: la ZTL deve

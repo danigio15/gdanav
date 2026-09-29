@@ -399,8 +399,9 @@ jobs:
         run: |
           set -e
           curl -sSfL --retry 5 -o italy.osm.pbf https://download.geofabrik.de/europe/italy-latest.osm.pbf
+          # I comuni (admin_level=8) servono a dire di che città è ogni ZTL.
           osmium tags-filter italy.osm.pbf wr/boundary=limited_traffic_zone wr/highway=pedestrian \
-            wr/area:highway=pedestrian n/place=city,town,village -o zone.osm.pbf
+            wr/area:highway=pedestrian n/place=city,town,village r/admin_level=8 -o zone.osm.pbf
           osmium export zone.osm.pbf -f geojsonseq --add-unique-id=type_id --geometry-types=point,polygon \
             -o zone.geojsonseq
           echo "Righe esportate: $(wc -l < zone.geojsonseq)"

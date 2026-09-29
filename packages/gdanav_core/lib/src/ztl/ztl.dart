@@ -68,14 +68,15 @@ class ZonaLimitata {
   }) : riquadro = Rettangolo.di(anelli.expand((a) => a));
 
   /// L'oggetto di OpenStreetMap: «w123» o «r456». Resta lo stesso da un
-  /// archivio all'altro, ed è quello a cui si lega il permesso.
+  /// archivio all'altro.
   final String id;
   final TipoZona tipo;
 
-  /// «Centro storico», senza «ZTL» davanti.
+  /// «Centro storico», senza «ZTL» davanti e senza la città. Vuoto quando in
+  /// OpenStreetMap si chiama solo «ZTL».
   final String nome;
 
-  /// La città, quando si sa: «Napoli».
+  /// Il comune, quando si sa: «Napoli».
   final String? citta;
 
   /// Quando è attiva. `null`: sempre (o l'orario scritto non si capisce).
@@ -90,8 +91,27 @@ class ZonaLimitata {
 
   final Rettangolo riquadro;
 
-  /// «Napoli · Centro storico», o il nome solo.
-  String get etichetta => citta == null || citta!.isEmpty ? nome : '$citta · $nome';
+  /// «Napoli · Centro storico»; «Brescia» se non ha un nome suo.
+  String get etichetta {
+    final c = citta ?? '';
+    if (c.isEmpty) return nome.isEmpty ? 'ZTL' : nome;
+    return nome.isEmpty ? c : '$c · $nome';
+  }
+
+  /// Per le frasi: «ZTL Centro storico», «ZTL di Brescia».
+  String get titolo {
+    if (nome.isNotEmpty) return 'ZTL $nome';
+    final c = citta ?? '';
+    return c.isEmpty ? 'ZTL' : 'ZTL di $c';
+  }
+
+  /// A cosa si lega il permesso. Una ZTL in OpenStreetMap è spesso fatta di
+  /// più pezzi con lo stesso nome (a Brescia diciotto): il permesso è uno,
+  /// e la domanda si fa una volta. Senza comune, il pezzo da solo.
+  String get chiave {
+    final c = citta ?? '';
+    return c.isEmpty ? id : '${c.toLowerCase()}|${nome.toLowerCase()}';
+  }
 
   /// Se è attiva a [quando]. Le aree pedonali lo sono sempre.
   bool attivaAlle(DateTime quando) => tipo == TipoZona.pedonale || (orari?.attivaAlle(quando) ?? true);
@@ -303,6 +323,9 @@ class ArchivioZtl {
   int get quantePedonali => zone.where((z) => z.tipo == TipoZona.pedonale).length;
 
   ZonaLimitata? perId(String id) => zone.where((z) => z.id == id).firstOrNull;
+
+  /// Un pezzo della ZTL col permesso [chiave], per il nome.
+  ZonaLimitata? perChiave(String chiave) => zone.where((z) => z.tipo == TipoZona.ztl && z.chiave == chiave).firstOrNull;
 
   /// Le zone che toccano [r].
   List<ZonaLimitata> nel(Rettangolo r) {
