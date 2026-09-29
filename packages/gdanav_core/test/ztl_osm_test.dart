@@ -21,6 +21,13 @@ void main() {
     expect(nomeZtl('ZTL Gravina in Puglia', 'Gravina in Puglia'), '');
     expect(nomeZtl('Lancianovecchia', 'Lanciano'), 'Lancianovecchia');
     expect(nomeZtl('Settore A', 'Firenze'), 'Settore A');
+    expect(nomeZtl('ZTL di Verona', 'Verona'), '');
+    expect(nomeZtl('ZTL di Polpet', 'Ponte nelle Alpi'), 'Polpet');
+    expect(nomeZtl('ZTL del Centro Storico', 'Modugno'), 'Centro Storico');
+    expect(nomeZtl("ZTL d'Alba", 'Alba Adriatica'), 'Alba');
+    expect(nomeZtl('Pitigliano ZTL zona A', 'Pitigliano'), 'zona A');
+    // Senza la sigla davanti, «di» fa parte del nome.
+    expect(nomeZtl('Via di Porta Romana', 'Firenze'), 'Via di Porta Romana');
   });
 
   test('il nome italiano, e il comune in cui cade', () {

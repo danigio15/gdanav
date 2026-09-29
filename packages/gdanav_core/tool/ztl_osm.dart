@@ -25,19 +25,27 @@ const superficieMinimaM2 = 300.0;
 
 /// «ZTL Centro Storico», «Z.T.L. - Centro», «Zona a traffico limitato
 /// Chiaia»: il nome senza la sigla, e senza la città se c'è anche lei
-/// («Bologna - Centro Storico», «Via Matteotti Lerici»). Vuoto se non
-/// resta altro.
+/// («Bologna - Centro Storico», «Via Matteotti Lerici», «ZTL di Verona»).
+/// Vuoto se non resta altro.
 String nomeZtl(String? nome, [String? citta]) {
   const separatori = r'[\s\-–:,.·/]';
   const sigla = r'(?:z\s*\.?\s*t\s*\.?\s*l\s*\.?|zona\s+(?:a\s+|di\s+)?traffico\s+limitato)';
-  var n = (nome ?? '').trim().replaceFirst(RegExp('^$sigla(?=\$|$separatori)$separatori*', caseSensitive: false), '');
+  // «di», «del», «della»… dopo la sigla: «ZTL del Centro Storico».
+  const di = r"(?:di|del|dello|della|dei|degli|delle|d['’])";
+  String pulito(String n) =>
+      n.replaceAll(RegExp(r'\s+'), ' ').replaceAll(RegExp('^$separatori+|$separatori+\$'), '').trim();
+  var n = (nome ?? '').trim();
   final c = (citta ?? '').trim();
   if (c.isNotEmpty) {
     // La città come parola intera: «Lancianovecchia» resta com'è.
     final parola = RegExp('(?<![\\p{L}\\d])${RegExp.escape(c)}(?![\\p{L}\\d])', caseSensitive: false, unicode: true);
-    n = n.replaceAll(parola, ' ');
+    n = pulito(n.replaceAll(parola, ' '));
   }
-  return n.replaceAll(RegExp(r'\s+'), ' ').replaceAll(RegExp('^$separatori+|$separatori+\$'), '').trim();
+  final senzaSigla = n.replaceFirst(RegExp('^$sigla(?=\$|$separatori)$separatori*', caseSensitive: false), '');
+  if (senzaSigla != n) n = senzaSigla.replaceFirst(RegExp('^$di(?:\\s+|(?<=[\'’]))', caseSensitive: false), '');
+  n = pulito(n);
+  // Restava solo «di»: era «ZTL di Verona».
+  return RegExp('^$di\$', caseSensitive: false).hasMatch(n) ? '' : n;
 }
 
 /// Il nome italiano, se c'è: «Casteddu/Cagliari» è «Cagliari».

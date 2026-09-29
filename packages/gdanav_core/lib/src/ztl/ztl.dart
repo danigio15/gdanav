@@ -18,6 +18,9 @@ class Rettangolo {
 
   bool contiene(Punto p) => p.lat >= sud && p.lat <= nord && p.lon >= ovest && p.lon <= est;
 
+  /// In gradi quadrati: solo per confrontare.
+  double get area => (nord - sud) * (est - ovest);
+
   bool tocca(Rettangolo r) => r.sud <= nord && r.nord >= sud && r.ovest <= est && r.est >= ovest;
 
   /// Allargato (o stretto, se negativo) di [metri] per lato.
@@ -115,6 +118,42 @@ class ZonaLimitata {
 
   /// Se è attiva a [quando]. Le aree pedonali lo sono sempre.
   bool attivaAlle(DateTime quando) => tipo == TipoZona.pedonale || (orari?.attivaAlle(quando) ?? true);
+
+  /// Com'è a [quando], e quando cambia: attiva fino a [cambia], o spenta
+  /// fino a [cambia]. `cambia` è `null` se non cambia nella settimana che
+  /// viene (sempre attiva, o gli orari non si sanno).
+  ({bool attiva, DateTime? cambia}) statoAlle(DateTime quando) {
+    final o = tipo == TipoZona.ztl ? orari : null;
+    if (o == null) return (attiva: true, cambia: null);
+    final attiva = o.attivaAlle(quando);
+    return (attiva: attiva, cambia: attiva ? o.finoAlle(quando) : o.dalle(quando));
+  }
+
+  /// Un punto dentro la zona, per il nome sulla mappa: il centro del
+  /// contorno più grande se ci cade, se no il mezzo del pezzo più largo
+  /// della riga che la taglia a metà altezza.
+  late final Punto puntoDentro = () {
+    final anello = anelli.reduce((a, b) => Rettangolo.di(a).area >= Rettangolo.di(b).area ? a : b);
+    final r = Rettangolo.di(anello);
+    final centro = Punto((r.sud + r.nord) / 2, (r.ovest + r.est) / 2);
+    if (_nellAnello(anello, centro)) return centro;
+    final lat = centro.lat;
+    final incroci = <double>[];
+    for (var i = 0, j = anello.length - 1; i < anello.length; j = i++) {
+      final a = anello[j], b = anello[i];
+      if ((a.lat > lat) != (b.lat > lat)) incroci.add(a.lon + (b.lon - a.lon) * (lat - a.lat) / (b.lat - a.lat));
+    }
+    incroci.sort();
+    var migliore = centro;
+    var largo = -1.0;
+    for (var k = 0; k + 1 < incroci.length; k += 2) {
+      if (incroci[k + 1] - incroci[k] > largo) {
+        largo = incroci[k + 1] - incroci[k];
+        migliore = Punto(lat, (incroci[k] + incroci[k + 1]) / 2);
+      }
+    }
+    return migliore;
+  }();
 
   /// Se [p] sta dentro (pari e dispari, su tutti i contorni).
   bool contiene(Punto p) {
