@@ -41,6 +41,7 @@ import 'distributori.dart';
 import 'scheda_punto.dart';
 import 'segnala.dart';
 import 'schermata_guida.dart';
+import 'strade_risparmio.dart';
 import 'zone_ztl.dart';
 
 typedef CostruisciMappa = Widget Function(BuildContext context, ControlloMappa controllo);
@@ -429,6 +430,15 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                           final n => '$n ZTL a cui hai risposto',
                         },
                         onTap: () => vai(ZoneZtlSchermata(ztl: z)),
+                      ),
+                    if (widget.guida.risparmio case final r?)
+                      _VoceMenu(
+                        key: const Key('menu-risparmio'),
+                        icona: Icons.eco_rounded,
+                        colore: const Color(0xFF16A34A),
+                        titolo: 'Strade a risparmio',
+                        sotto: riassuntoRisparmio(r.soglie),
+                        onTap: () => vai(StradeRisparmioSchermata(risparmio: r)),
                       ),
                     // Ricarica e fonte della batteria servono solo all'elettrica.
                     if (widget.auto.elettrica)

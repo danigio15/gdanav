@@ -6,6 +6,7 @@ import 'package:gdanav_core/gdanav_core.dart';
 import '../componenti/icona_manovra.dart';
 import '../componenti/indicatore_batteria.dart' show eta;
 import '../componenti/icone_segnalazioni.dart';
+import '../componenti/risparmio.dart';
 import '../componenti/tachimetro.dart';
 import '../componenti/vista_svincolo.dart';
 import '../componenti/vetro.dart';
@@ -161,9 +162,11 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                   ),
             ),
             ListenableBuilder(
-              listenable: Listenable.merge([g, widget.posizione, ?_avvisi, ?_ztl]),
+              listenable: Listenable.merge([g, widget.posizione, ?_avvisi, ?_ztl, ?g.risparmio]),
               builder: (context, _) {
                 _copri(context, g);
+                final risparmio = g.risparmio;
+                final strada = risparmio?.proposta;
                 return Column(
                   children: [
                     // In alto la manovra; avvicinandosi a un'uscita o a un
@@ -257,6 +260,26 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                         ),
                       ),
                     ),
+                    // Una strada a risparmio (o più rapida): sopra la barra
+                    // in basso, e la strada verde sulla mappa.
+                    if (risparmio != null && strada != null)
+                      PropostaRisparmio(
+                        proposta: strada,
+                        unita: risparmio.unita,
+                        elettrica: g.auto.elettrica,
+                        arrivo: g.batteriaArrivo,
+                        arrivoCon: g.batteriaArrivoCon(strada),
+                        arrivoAlle: g.arrivoAlle,
+                        rimasto: switch (risparmio.propostaAlle) {
+                          final alle? =>
+                            1 -
+                                DateTime.now().difference(alle).inMilliseconds /
+                                    risparmio.durataProposta.inMilliseconds,
+                          null => 1.0,
+                        },
+                        onPrendi: g.prendiStrada,
+                        onResta: g.restaQui,
+                      ),
                     _Fondo(guida: g, onFine: _fine),
                   ],
                 );

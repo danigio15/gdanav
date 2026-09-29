@@ -155,6 +155,24 @@ class PercorsiConZtl {
     return [for (final p in risultato) p.conZtl(info)];
   }
 
+  /// Le ZTL in cui [p] entra, attive quando ci arriva e senza permesso: per
+  /// scartare una strada proposta in guida che ci passerebbe. Quella dove
+  /// arriva non conta: lì si ferma al varco.
+  static List<ZonaLimitata> vietate(
+    ArchivioZtl archivio,
+    PercorsoCalcolato p,
+    DateTime ora,
+    Map<String, bool> permesso,
+  ) =>
+      [
+        for (final i in _daEvitare(archivio, p, ora, permesso))
+          if (p.punti.isEmpty || !i.zona.contiene(p.punti.last)) i.zona,
+      ];
+
+  /// I rettangoli da evitare per [zone], come per il percorso: per chiedere
+  /// a TomTom le strade migliori senza che ci rientrino.
+  static List<Rettangolo> rettangoli(List<ZonaLimitata> zone, List<Punto> tappe) => _copertura(zone, tappe);
+
   /// Le ZTL in cui entra [p], attive quando ci si arriva e senza permesso.
   static List<IngressoZtl> _daEvitare(
           ArchivioZtl archivio, PercorsoCalcolato p, DateTime ora, Map<String, bool> permesso) =>

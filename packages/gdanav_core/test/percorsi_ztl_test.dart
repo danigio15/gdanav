@@ -220,4 +220,20 @@ void main() {
     expect(conCode.ztl?.daChiedere?.id, 'r1');
     expect(conCode.base.ztl?.daChiedere?.id, 'r1');
   });
+
+  test('una strada proposta in guida: in quali ZTL entrerebbe, e i rettangoli per non rientrarci', () {
+    final dritta = percorso(dritto(sud, nord), const Duration(minutes: 11));
+    expect(PercorsiConZtl.vietate(archivio, dritta, martedi, const {}).single.id, 'r1');
+    expect(PercorsiConZtl.vietate(archivio, dritta, martedi, {ztl.chiave: true}), isEmpty, reason: 'col permesso sì');
+    expect(PercorsiConZtl.vietate(archivio, dritta, DateTime(2026, 9, 27, 10), const {}), isEmpty,
+        reason: 'la domenica non è attiva');
+    // Chi va dentro, a quella dove arriva ci entra per forza: si ferma al varco.
+    final finoAlCentro = percorso(dritto(sud, centro), const Duration(minutes: 6));
+    expect(PercorsiConZtl.vietate(archivio, finoAlCentro, martedi, const {}), isEmpty);
+    final r = PercorsiConZtl.rettangoli([ztl], [sud, nord]);
+    expect(r, isNotEmpty);
+    // Dentro una delle strisce (fra una e l'altra restano i venti metri dei margini).
+    expect(r.any((x) => x.contiene(Punto(centro.lat + 0.001, centro.lon))), isTrue);
+    expect(r.any((x) => x.contiene(sud) || x.contiene(nord)), isFalse);
+  });
 }

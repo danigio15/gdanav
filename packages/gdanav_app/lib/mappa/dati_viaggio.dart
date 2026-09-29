@@ -112,6 +112,33 @@ Map<String, Object?> datiPassandoci(PercorsoCalcolato p) {
   ]);
 }
 
+/// La strada proposta in guida, [p]: verde sotto il percorso [adesso], così
+/// si vede dove se ne stacca, col fumetto dove ne è più lontana — «-1,8 kWh
+/// · +4 min». Senza proposta, niente.
+Map<String, Object?> datiRisparmio(PropostaStrada? p, PercorsoCalcolato? adesso, String etichetta) {
+  final punti = p?.percorso.punti ?? const <Punto>[];
+  if (punti.length < 2) return _collezione([]);
+  var lontano = punti[punti.length ~/ 2];
+  if (adesso != null && adesso.punti.length > 1) {
+    final linea = Linea(adesso.punti);
+    var massimo = -1.0;
+    for (var k = 0; k < punti.length; k += math.max(1, punti.length ~/ 80)) {
+      final d = linea.proietta(punti[k]).lontanoM;
+      if (d > massimo) {
+        massimo = d;
+        lontano = punti[k];
+      }
+    }
+  }
+  return _collezione([
+    _elemento({
+      'type': 'LineString',
+      'coordinates': [for (final q in punti) _xy(q)],
+    }, const {}),
+    if (etichetta.isNotEmpty) _elemento({'type': 'Point', 'coordinates': _xy(lontano)}, {'etichetta': etichetta}),
+  ]);
+}
+
 /// Le ZTL e le aree pedonali di [zone] sulla mappa, com'erano a [ora]: ogni
 /// contorno un poligono (la ZTL col suo «attiva»), e per ogni zona il punto
 /// dove scriverne il nome: «ZTL · attiva fino alle 18», «Area pedonale».

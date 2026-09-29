@@ -12,6 +12,7 @@ import 'package:gdanav_app/stato/gestore_auto.dart';
 import 'package:gdanav_app/stato/gestore_consumo.dart';
 import 'package:gdanav_app/stato/gestore_guida.dart';
 import 'package:gdanav_app/stato/gestore_posizione.dart';
+import 'package:gdanav_app/stato/gestore_risparmio.dart';
 import 'package:gdanav_app/stato/gestore_segnalazioni.dart';
 import 'package:gdanav_app/stato/gestore_viaggio.dart';
 import 'package:gdanav_app/stato/gestore_ztl.dart';
@@ -107,6 +108,7 @@ class Ambiente {
     this.segnalazioni,
     this.relay, {
     this.ztl,
+    this.risparmio,
   });
   final Archivio archivio;
   final GestoreAuto auto;
@@ -127,6 +129,9 @@ class Ambiente {
 
   /// Le ZTL, nelle prove che le guardano.
   final GestoreZtl? ztl;
+
+  /// Le strade a risparmio, nelle prove che le guardano.
+  final GestoreRisparmio? risparmio;
 
   /// L'ultimo controllo passato alla mappa finta (in guida, quello della guida).
   ControlloMappa? controllo;
@@ -154,6 +159,8 @@ Future<Ambiente> ambiente(
   CostruisciPianificatore? costruisci,
   ProvaDiGuida? prova,
   GestoreZtl? ztl,
+  CercaStrade? strade,
+  Duration durataProposta = const Duration(seconds: 20),
 }) async {
   // Uno schermo da telefono, non gli 800×600 delle prove.
   tester.view.physicalSize = const Size(1170, 2532);
@@ -177,12 +184,18 @@ Future<Ambiente> ambiente(
   final posizioni = StreamController<Punto>.broadcast();
   addTearDown(posizioni.close);
   final voce = VoceFinta();
+  // Le strade a risparmio solo se la prova le cerca.
+  final risparmio = strade == null
+      ? null
+      : GestoreRisparmio(archivio: archivio, auto: auto, cerca: strade, ztl: ztl, durataProposta: durataProposta);
+  if (risparmio != null) addTearDown(risparmio.dispose);
   final guida = GestoreGuida(
     viaggio: viaggio,
     auto: auto,
     posizioni: prova?.posizioni(() => posizioni.stream) ?? () => posizioni.stream,
     voce: voce,
     consumo: consumo,
+    risparmio: risparmio,
   );
   addTearDown(guida.dispose);
   final gps = StreamController<Lettura>.broadcast();
@@ -200,7 +213,20 @@ Future<Ambiente> ambiente(
     autovelox: autovelox == null ? null : Future.value(autovelox),
   );
   addTearDown(segnalazioni.dispose);
-  return Ambiente(archivio, auto, viaggio, guida, posizioni, voce, segnaposto, gps, segnalazioni, relay, ztl: ztl);
+  return Ambiente(
+    archivio,
+    auto,
+    viaggio,
+    guida,
+    posizioni,
+    voce,
+    segnaposto,
+    gps,
+    segnalazioni,
+    relay,
+    ztl: ztl,
+    risparmio: risparmio,
+  );
 }
 
 const impostazioniComplete = {

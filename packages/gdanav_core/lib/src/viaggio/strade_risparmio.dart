@@ -74,6 +74,24 @@ class PropostaStrada {
 /// Quanto consuma un percorso: da TomTom se l'ha detto, se no con [stima].
 double consumoStrada(PercorsoCalcolato p, double Function(PercorsoCalcolato p) stima) => p.consumoTomTom ?? stima(p);
 
+/// Il pezzo di [p] che resta da fare, da [daM] metri fino alla meta: il primo
+/// punto è dove si è sul percorso. È quello che si rimanda a TomTom per
+/// confrontarlo con le altre strade.
+List<Punto> restoDelPercorso(PercorsoCalcolato p, double daM) {
+  if (p.punti.length < 2) return p.punti;
+  final l = Linea(p.punti);
+  final m = daM.clamp(0.0, l.lunghezzaM);
+  var i = 1;
+  while (i < p.punti.length - 1 && l.cumulate[i] <= m) {
+    i++;
+  }
+  final a = p.punti[i - 1], b = p.punti[i];
+  final tratto = l.cumulate[i] - l.cumulate[i - 1];
+  final t = tratto <= 0 ? 0.0 : ((m - l.cumulate[i - 1]) / tratto).clamp(0.0, 1.0);
+  final qui = Punto(a.lat + (b.lat - a.lat) * t, a.lon + (b.lon - a.lon) * t);
+  return [qui, ...p.punti.sublist(t >= 1 ? i + 1 : i)];
+}
+
 /// La proposta, se ce n'è una che vale. [adesso] è la strada che si fa, da
 /// dove si è alla meta; [eco] le strade che consumano meno, [rapide] quelle
 /// che arrivano prima. Si sceglie la più risparmiosa fra quelle che

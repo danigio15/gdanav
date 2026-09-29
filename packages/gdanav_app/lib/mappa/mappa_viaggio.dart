@@ -13,6 +13,7 @@ import '../schermate/scheda_punto.dart';
 import '../servizi.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_posizione.dart';
+import '../stato/gestore_risparmio.dart' show sintesiProposta;
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/gestore_vicini.dart';
@@ -97,6 +98,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.segnalazioni?.addListener(_segnalazioni);
     widget.vicini?.addListener(_vicini);
     widget.ztl?.addListener(_zoneDaCapo);
+    widget.guida?.risparmio?.addListener(_risparmio);
     // Le ZTL cambiano stato nel corso della giornata: «attiva fino alle 18».
     _orologioZone = Timer.periodic(const Duration(minutes: 5), (_) => _zoneDaCapo());
     // In guida no: lì contano le soste del percorso e quelle vicine, e
@@ -113,6 +115,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.segnalazioni?.removeListener(_segnalazioni);
     widget.vicini?.removeListener(_vicini);
     widget.ztl?.removeListener(_zoneDaCapo);
+    widget.guida?.risparmio?.removeListener(_risparmio);
     _orologioZone?.cancel();
     super.dispose();
   }
@@ -300,6 +303,21 @@ class _MappaViaggioState extends State<MappaViaggio> {
     await m.setGeoJsonSource(sorgenteSegnalazioni, datiSegnalazioni(g.vicine).cast<String, dynamic>());
   }
 
+  /// La strada proposta in guida, verde col suo fumetto; o più niente.
+  Future<void> _risparmio() async {
+    final m = _mappa, r = widget.guida?.risparmio;
+    if (m == null || !_stileCaricato || r == null) return;
+    final p = r.proposta;
+    await m.setGeoJsonSource(
+      sorgenteRisparmio,
+      datiRisparmio(
+        p,
+        widget.guida?.pronto?.viaggio.percorso,
+        p == null ? '' : sintesiProposta(p, r.unita, meno: '-'),
+      ).cast<String, dynamic>(),
+    );
+  }
+
   Future<void> _edifici(MapLibreMapController m) async {
     if (!_stileCaricato) return;
     await m.setLayerVisibility(stratoEdifici2d, !_inclinata);
@@ -400,6 +418,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
             _segnalazioni();
             _vicini();
             _zone();
+            _risparmio();
           });
         }
         _ridisegna();

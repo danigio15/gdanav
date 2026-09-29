@@ -7,6 +7,7 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import '../mappa/segnaposto.dart';
 import '../servizi.dart';
+import 'gestore_risparmio.dart';
 import 'gestore_ztl.dart';
 import 'licenza.dart';
 
@@ -29,6 +30,7 @@ class Archivio {
   static const _telefono = 'licenza_telefono';
   static const _gettone = 'licenza_gettone';
   static const _ztl = 'ztl';
+  static const _risparmio = 'risparmio';
 
   Future<Abbinamento?> abbinamento() async {
     final uri = await _p.read(key: _abbinamento);
@@ -160,6 +162,19 @@ class Archivio {
   }
 
   Future<void> salvaScelteZtl(ScelteZtl s) => _p.write(key: _ztl, value: jsonEncode(s.toJson()));
+
+  /// Le strade a risparmio: se proporle in guida, e quando valgono.
+  Future<SoglieRisparmio> soglieRisparmio() async {
+    final testo = await _p.read(key: _risparmio);
+    if (testo == null) return const SoglieRisparmio();
+    try {
+      return soglieDaJson(jsonDecode(testo) as Map<String, Object?>);
+    } catch (_) {
+      return const SoglieRisparmio();
+    }
+  }
+
+  Future<void> salvaSoglieRisparmio(SoglieRisparmio s) => _p.write(key: _risparmio, value: jsonEncode(soglieJson(s)));
 
   Future<Segnaposto> segnaposto() async => Segnaposto.perNome(await _p.read(key: _segnaposto));
 

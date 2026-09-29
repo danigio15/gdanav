@@ -443,20 +443,29 @@ class GestoreViaggio extends ChangeNotifier {
     await pianifica(d);
   }
 
+  /// La strada proposta in guida, e presa: il viaggio si rifà su quella da
+  /// dove si è, soste comprese.
+  Future<void> seguiStrada(PercorsoCalcolato strada) async {
+    final d = destinazione;
+    if (d == null) return;
+    await pianifica(d, strada: strada);
+  }
+
   /// [conScelte]: si cercano anche le strade alternative (una meta nuova,
-  /// opzioni cambiate); in guida no, si ricalcola e basta.
-  Future<void> pianifica(Luogo destinazione, {bool conScelte = false}) async {
+  /// opzioni cambiate); in guida no, si ricalcola e basta. [strada]: il
+  /// percorso c'è già (una strada a risparmio presa in guida).
+  Future<void> pianifica(Luogo destinazione, {bool conScelte = false, PercorsoCalcolato? strada}) async {
     final impostazioni = await archivio.impostazioni();
     if (impostazioni.mancante case final m?) return _imposta(ErroreViaggio(m, destinazione: destinazione));
     if (conScelte) {
       _scelte = const [];
       _scelta = 0;
     }
-    if (!auto.elettrica) return _percorsoSolo(destinazione, impostazioni, conScelte: conScelte);
+    if (!auto.elettrica) return _percorsoSolo(destinazione, impostazioni, conScelte: conScelte, strada: strada);
     // Le soste di ricarica sono Premium: senza, l'elettrica ha il percorso
     // come la termica (e la scheda dice che le soste sono con Premium).
     if (!GestorePremium.attivo.value) {
-      return _percorsoSolo(destinazione, impostazioni, conScelte: conScelte, senzaSoste: true);
+      return _percorsoSolo(destinazione, impostazioni, conScelte: conScelte, senzaSoste: true, strada: strada);
     }
     final batteria = auto.stato?.batteria;
     if (batteria == null) {
@@ -486,7 +495,7 @@ class GestoreViaggio extends ChangeNotifier {
       }
       this.condizioni = condizioni;
       final pianificatore = costruisci(impostazioni, auto.veicolo, preferenze, opzioni);
-      final scelto = await _scegli(pianificatore, partenza, destinazione, conScelte);
+      final scelto = strada ?? await _scegli(pianificatore, partenza, destinazione, conScelte);
       final viaggio = await pianificatore
           .pianifica(
             partenza: partenza,
@@ -545,6 +554,7 @@ class GestoreViaggio extends ChangeNotifier {
     Impostazioni impostazioni, {
     bool conScelte = false,
     bool senzaSoste = false,
+    PercorsoCalcolato? strada,
   }) async {
     final partenza = await posizione();
     if (partenza == null) {
@@ -557,7 +567,7 @@ class GestoreViaggio extends ChangeNotifier {
     condizioni = null;
     try {
       final pianificatore = costruisci(impostazioni, auto.veicolo, await archivio.preferenze(), opzioni);
-      final scelto = await _scegli(pianificatore, partenza, destinazione, conScelte);
+      final scelto = strada ?? await _scegli(pianificatore, partenza, destinazione, conScelte);
       final percorso = await pianificatore
           .percorso(
             partenza: partenza,

@@ -124,6 +124,18 @@ void main() {
       );
     });
 
+    test('quello che resta della strada di adesso, da dove si è', () {
+      final l = Linea(adesso.punti);
+      final resto = restoDelPercorso(adesso, 10500);
+      final qui = l.proietta(resto.first);
+      expect(qui.lungoM, closeTo(10500, 1));
+      expect(qui.lontanoM, lessThan(1));
+      expect(resto.last, adesso.punti.last);
+      expect(Linea(resto).lunghezzaM, closeTo(l.lunghezzaM - 10500, 1));
+      expect(restoDelPercorso(adesso, 0), adesso.punti);
+      expect(restoDelPercorso(adesso, l.lunghezzaM + 50), [adesso.punti.last]);
+    });
+
     test('la stessa strada di adesso non è una proposta', () {
       expect(
         scegliProposta(

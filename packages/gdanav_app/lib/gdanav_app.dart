@@ -14,6 +14,7 @@ import 'stato/foto_auto.dart';
 import 'stato/gestore_consumo.dart';
 import 'stato/gestore_premium.dart';
 import 'stato/gestore_guida.dart';
+import 'stato/gestore_risparmio.dart';
 import 'stato/gestore_luoghi.dart';
 import 'stato/gestore_meteo.dart';
 import 'stato/gestore_posizione.dart';
@@ -113,6 +114,11 @@ Future<GdanavApp> preparaGdanav({
     eraPremium = premium.sbloccato;
     if (viaggio.stato is ViaggioPronto && viaggio.destinazione != null) unawaited(viaggio.pianifica(viaggio.destinazione!));
   });
+  // Le strade a risparmio: in guida la strada si confronta con le altre, col
+  // modello di consumo dell'auto (TomTom).
+  final risparmio = GestoreRisparmio(archivio: archivio, auto: auto, cerca: cercaConTomTom(archivio), ztl: ztl);
+  await risparmio.carica();
+  GestoreRisparmio.attuale = risparmio;
   // La prova di guida di Android Auto: posizioni finte al posto del GPS.
   final prova = ProvaDiGuida();
   final guida = GestoreGuida(
@@ -121,6 +127,7 @@ Future<GdanavApp> preparaGdanav({
     posizioni: prova.posizioni(posizioniGuida),
     voce: VoceTelefono(),
     consumo: consumo,
+    risparmio: risparmio,
   );
   // La velocità dell'auto entra anche qui: serve a sapere se si è fermi, e da
   // fermi il segnaposto non deve girare dietro al ballonzolamento del GPS.

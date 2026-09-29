@@ -27,6 +27,9 @@ const sorgenteTappe = 'gdanav-tappe';
 const sorgenteZtl = 'gdanav-ztl';
 const sorgentePassandoci = 'gdanav-passandoci';
 
+/// La strada a risparmio (o più rapida) proposta in guida, col suo fumetto.
+const sorgenteRisparmio = 'gdanav-risparmio';
+
 /// I disegni che riempiono le zone: le righe rosse della ZTL e i puntini
 /// grigi dell'area pedonale (vedi `iconePunti`).
 const motivoZtl = 'ztl-righe';
@@ -301,6 +304,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
       sorgenteTappe: {'type': 'geojson', 'data': _vuota},
       sorgenteZtl: {'type': 'geojson', 'data': _vuota},
       sorgentePassandoci: {'type': 'geojson', 'data': _vuota},
+      sorgenteRisparmio: {'type': 'geojson', 'data': _vuota},
       sorgenteColonnine: {'type': 'geojson', 'data': _vuota},
       sorgenteArrivo: {'type': 'geojson', 'data': _vuota},
       sorgenteIo: {'type': 'geojson', 'data': _vuota},
@@ -662,6 +666,32 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'line-width': _largo(5, 12),
           'line-dasharray': [0.1, 1.8],
         },
+      },
+      // La strada a risparmio proposta in guida: verde, sotto il percorso,
+      // così si vede dove se ne stacca.
+      {
+        'id': 'risparmio-bordo',
+        'type': 'line',
+        'source': sorgenteRisparmio,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'LineString',
+        ],
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {'line-color': '#166534', 'line-width': _largo(8.5, 24)},
+      },
+      {
+        'id': 'risparmio',
+        'type': 'line',
+        'source': sorgenteRisparmio,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'LineString',
+        ],
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {'line-color': '#4ADE80', 'line-width': _largo(5.5, 18)},
       },
       // Il percorso: un alone morbido, il bordo blu scuro, la linea blu e le
       // frecce della direzione. Sempre blu: nessuna strada ha quel colore.
@@ -1077,6 +1107,25 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'text-ignore-placement': true,
         },
         'paint': {'text-color': '#FFFFFF', 'text-halo-color': '#475569', 'text-halo-width': 6},
+      },
+      // Quanto fa risparmiare la strada proposta: il fumetto verde.
+      {
+        'id': 'risparmio-etichetta',
+        'type': 'symbol',
+        'source': sorgenteRisparmio,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'Point',
+        ],
+        'layout': {
+          'text-field': ['get', 'etichetta'],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': perAuto ? 15 : 13,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        'paint': {'text-color': '#FFFFFF', 'text-halo-color': '#15803D', 'text-halo-width': 6},
       },
       // Quanto fa guadagnare o perdere ogni alternativa: il fumetto sulla
       // strada, da toccare per sceglierla.
