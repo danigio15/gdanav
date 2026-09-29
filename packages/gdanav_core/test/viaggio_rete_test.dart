@@ -427,14 +427,18 @@ void main() {
     ];
     final insieme = await quante('unite', FonteColonnineUnite(fonti));
 
-    // L'unione non può conoscerne meno della più ricca delle sue fonti.
+    // L'unione non può conoscerne meno della più ricca delle sue fonti, sulle
+    // stesse risposte: la fusione si prova su quelle già arrivate, perché due
+    // chiamate al relay a un minuto l'una dall'altra non danno lo stesso
+    // numero (685 e poi 680, il 29 settembre: dietro c'è Overpass). L'unione
+    // chiesta dal vivo resta per i tempi e per il resoconto.
     // Se però nessuna fonte ha risposto — succede: il relay dà 502, Open
     // Charge Map 503 — non è un difetto nostro e non si fa fallire la prova.
     final piuRicca = math.max(daRelay.length, daOcm.length);
     if (piuRicca == 0) {
       avviso('Colonnine', 'nessuna fonte ha risposto: non c\'è niente da confrontare');
     } else {
-      expect(insieme.length, greaterThanOrEqualTo(piuRicca));
+      expect(fondiColonnine([daOcm, daRelay]).length, greaterThanOrEqualTo(piuRicca));
     }
 
     if (Platform.environment['GDANAV_ANTEPRIME'] case final cartella?) {
