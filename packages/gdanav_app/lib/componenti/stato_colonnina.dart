@@ -15,8 +15,15 @@ Color coloreStato(BuildContext context, StatoColonnina s) {
   };
 }
 
-/// «2 libere su 4», «Piena», «Guasta»; se il gestore non lo comunica, lo
-/// dice (e senza Premium dice che lo stato di adesso è con Premium).
+/// «2 libere su 4», «Piena», «Guasta»; e quando libere e occupate non si
+/// sanno, quello che si sa davvero.
+///
+/// Prima diceva «Stato non comunicato» su ogni colonnina che non risponde in
+/// tempo reale — e sono quasi tutte. Su una mappa piena, venti pastiglie che
+/// dicono di non sapere sembrano un guasto dell'app, e non aggiungono niente:
+/// meglio dire quante prese ci sono, che è un fatto, e lasciare il colore a
+/// fare la sua parte. Senza Premium la pastiglia resta quella di prima,
+/// perché lì la frase serve: lo stato di adesso c'è, ma non è acceso.
 String testoDisponibilita(Disponibilita d) {
   final funzionanti = d.totali - d.guaste;
   return switch (statoDi(d)) {
@@ -24,7 +31,9 @@ String testoDisponibilita(Disponibilita d) {
       funzionanti == 1 ? 'Libera' : '${d.libere} ${d.libere == 1 ? 'libera' : 'libere'} su $funzionanti',
     StatoColonnina.piena => funzionanti == 1 ? 'Occupata' : 'Piena · $funzionanti occupate',
     StatoColonnina.guasta => 'Fuori servizio',
-    StatoColonnina.ignota => GestorePremium.attivo.value ? 'Stato non comunicato' : 'Libere/occupate con Premium',
+    StatoColonnina.ignota when !GestorePremium.attivo.value => 'Libere/occupate con Premium',
+    StatoColonnina.ignota =>
+      d.totali > 0 ? '${d.totali} ${d.totali == 1 ? 'presa' : 'prese'}' : 'Stato non comunicato',
   };
 }
 

@@ -110,14 +110,43 @@ class GestoreGuida extends ChangeNotifier {
     return (valore: _prevista(p, (avanzamento?.percorsiM ?? 0) / 1000), misurata: false);
   }
 
-  /// La batteria all'arrivo: quella del piano, spostata di quanto la vera
-  /// si discosta da quella prevista.
+  /// La batteria all'arrivo: il piano, con la pendenza corretta da quanto la
+  /// macchina beve davvero. Il conto è in [batteriaAllArrivo].
   double? get batteriaArrivo {
     final p = pronto, ora = batteriaOra, piano = p?.viaggio.piano;
     if (p == null || piano == null || ora == null) return null;
     if (!ora.misurata) return piano.batteriaArrivo;
-    final scarto = ora.valore - _prevista(p, (avanzamento?.percorsiM ?? 0) / 1000);
-    return (piano.batteriaArrivo + scarto).clamp(0, 100).toDouble();
+    final km = (avanzamento?.percorsiM ?? 0) / 1000;
+    return batteriaAllArrivo(
+      adesso: ora.valore,
+      pianoAdesso: _prevista(p, km),
+      pianoArrivo: piano.batteriaArrivo,
+      fattore: _fattoreDelConsumo,
+      dopoLUltimaSosta: _dopoLUltimaSosta(piano, km),
+    );
+  }
+
+  /// Quanto la macchina beve davvero rispetto al piano, o niente se non si è
+  /// ancora guidato abbastanza per dirlo.
+  double? get _fattoreDelConsumo {
+    final p = pronto, piano = p?.viaggio.piano;
+    final totale = (p?.viaggio.percorso.lunghezzaM ?? 0) / 1000;
+    if (piano == null || totale <= 0) return null;
+    return fattoreDelConsumo(
+      kmMisurati: _kmMisurati,
+      whMisurati: _whMisurati,
+      kwh100DelPiano: piano.energiaKwh / totale * 100,
+    );
+  }
+
+  /// La batteria con cui il piano riparte dall'ultima sosta ancora davanti:
+  /// da lì in poi quello che si è consumato prima non conta più.
+  static double? _dopoLUltimaSosta(PianoViaggio piano, double km) {
+    double? batteria;
+    for (final s in piano.soste) {
+      if (s.colonnina.distanzaM / 1000 > km) batteria = s.batteriaPartenza;
+    }
+    return batteria;
   }
 
   /// L'autonomia adesso: quella dell'auto se la dice (Home Assistant,

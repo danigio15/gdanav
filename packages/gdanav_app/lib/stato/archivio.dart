@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -93,7 +95,15 @@ class Archivio {
     }
   }
 
-  Future<void> salvaPreferenze(PreferenzeRicarica p) => _p.write(key: _preferenze, value: jsonEncode(p.toJson()));
+  Future<void> salvaPreferenze(PreferenzeRicarica p) async {
+    await _p.write(key: _preferenze, value: jsonEncode(p.toJson()));
+    preferenzeCambiate.value++;
+  }
+
+  /// Cresce a ogni scelta salvata in «Ricarica». Chi mostra colonnine
+  /// filtrate (la mappa, quelle intorno a te) la ascolta e rifà l'elenco
+  /// subito, invece di aspettare il prossimo spostamento.
+  static final preferenzeCambiate = ValueNotifier<int>(0);
 
   /// Veloce o risparmio, pedaggi, autostrade, traghetti.
   Future<OpzioniPercorso> opzioniPercorso() async {
@@ -198,31 +208,52 @@ class Archivio {
 
 /// Dove stanno i servizi: vedi [Servizi].
 class Impostazioni {
-  const Impostazioni({this.valhalla = '', this.chiaveValhalla = '', this.chiaveOcm = ''});
+  const Impostazioni({this.valhalla = '', this.chiaveValhalla = '', this.chiaveOcm = '', this.chiaveTomTom = ''});
 
   factory Impostazioni.predefinite() => const Impostazioni(
     valhalla: Servizi.valhalla,
     chiaveValhalla: Servizi.chiaveValhalla,
     chiaveOcm: Servizi.chiaveOcm,
+    chiaveTomTom: Servizi.chiaveTomTom,
   );
 
   factory Impostazioni.daJson(Map<String, Object?> j) => Impostazioni(
     valhalla: j['valhalla'] as String? ?? '',
     chiaveValhalla: j['chiave_valhalla'] as String? ?? '',
     chiaveOcm: j['chiave_ocm'] as String? ?? '',
+    chiaveTomTom: j['chiave_tomtom'] as String? ?? Servizi.chiaveTomTom,
   );
 
   final String valhalla;
   final String chiaveValhalla;
   final String chiaveOcm;
 
+  /// La chiave TomTom: con quella i percorsi li calcola TomTom, che conosce
+  /// il traffico. Senza, si torna al server pubblico di Valhalla.
+  final String chiaveTomTom;
+
+  /// Chi calcola i percorsi. Si può forzare alla compilazione con
+  /// `--dart-define=GDANAV_MOTORE_PERCORSI=valhalla`, per confrontarli.
+  bool get percorsiDaTomTom => switch (Servizi.motorePercorsi) {
+    'valhalla' => false,
+    'tomtom' => chiaveTomTom.isNotEmpty,
+    _ => chiaveTomTom.isNotEmpty,
+  };
+
   /// Cosa manca per pianificare un viaggio, in parole. `null` se c'è tutto.
   String? get mancante {
-    if (valhalla.isEmpty) return 'Il calcolo dei percorsi non è disponibile in questa versione.';
+    if (!percorsiDaTomTom && valhalla.isEmpty) {
+      return 'Il calcolo dei percorsi non è disponibile in questa versione.';
+    }
     // La chiave di Open Charge Map non blocca: senza, le colonnine si provano
     // a chiedere lo stesso.
     return null;
   }
 
-  Map<String, Object?> toJson() => {'valhalla': valhalla, 'chiave_valhalla': chiaveValhalla, 'chiave_ocm': chiaveOcm};
+  Map<String, Object?> toJson() => {
+    'valhalla': valhalla,
+    'chiave_valhalla': chiaveValhalla,
+    'chiave_ocm': chiaveOcm,
+    'chiave_tomtom': chiaveTomTom,
+  };
 }

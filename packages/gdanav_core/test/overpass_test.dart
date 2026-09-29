@@ -66,15 +66,22 @@ void main() {
     expect(c[1].potenzaPer({TipoConnettore.tipo2}), 22);
   });
 
-  test('la richiesta: riquadri da una cinquantina di chilometri, solo colonnine rapide', () {
+  /* Si chiedono tutte le colonnine, non solo le rapide.
+   *
+   * Prima la richiesta aveva tre filtri per riquadro — prese CCS/CHAdeMO/
+   * Tesla, operatore fra sedici nomi, marchio fra gli stessi — e una Type 2
+   * da 22 kW in città non entrava proprio nei dati. A togliere le troppo
+   * lente ci pensa la potenza minima, dove la sceglie chi guida. */
+  test('la richiesta: riquadri da una cinquantina di chilometri, tutte le colonnine', () {
     final lungo = [for (var i = 0; i <= 800; i++) Punto(40.8 + i * 0.009, 14.2)]; // ~800 km
     final q = ClienteOverpass.richiesta(lungo, 3);
     expect(q, startsWith('[out:json][timeout:60];('));
-    expect(q, contains('socket:(type2_combo|chademo'));
-    expect(q, contains('["operator"~"Ionity|Tesla'));
+    expect(q, contains('["amenity"="charging_station"]'));
+    expect(q, isNot(contains('socket:')), reason: 'niente filtro sulle prese');
+    expect(q, isNot(contains('operator')), reason: 'niente elenco di operatori');
     expect(q, isNot(contains('around')));
-    // 800 km a riquadri da 50: 16 riquadri più quello dell'arrivo, tre filtri ciascuno.
-    expect('nwr['.allMatches(q).length, 17 * 3);
+    // 800 km a riquadri da 50: 16 riquadri più quello dell'arrivo, uno a testa.
+    expect('nwr['.allMatches(q).length, 17);
     // Il primo riquadro copre la partenza, con il margine.
     expect(q, contains('(40.7630,'));
   });
@@ -161,5 +168,48 @@ void main() {
     expect(c.map((x) => x.fonte).toSet(), {'osm'});
     final giu = FonteColonnineConRiserva([ocm]);
     expect(giu.lungo(const [Punto(44.5, 11.3)]), throwsA(predicate((e) => '$e'.contains('colonnine'))));
+  });
+
+  group('quante prese ha davvero una colonnina', () {
+    List<Colonnina> leggi(Map<String, Object?> tag) => ClienteOverpass.leggi({
+          'elements': [
+            {'type': 'node', 'id': 1, 'lat': 40.85, 'lon': 14.28, 'tags': tag},
+          ],
+        });
+
+    /* Il tetto era venti, e tagliava: al Centro Direzionale di Napoli una
+     * sola installazione ne ha oltre duecento. */
+    test('una stazione grande non si taglia a venti prese', () {
+      final c = leggi({'amenity': 'charging_station', 'socket:type2': '202', 'socket:type2:output': '22 kW'});
+      expect(c.single.connettori, hasLength(202));
+      expect(c.single.connettori.first.potenzaKw, 22);
+    });
+
+    test('ma un numero scritto male non fa esplodere niente', () {
+      final c = leggi({'amenity': 'charging_station', 'socket:type2': '99999'});
+      expect(c.single.connettori, hasLength(ClienteOverpass.massimoPrese));
+    });
+
+    /* `capacity` dice quante auto si caricano insieme. Senza le prese
+     * scritte era sempre una sola, e per una colonnina da otto stalli era
+     * una bugia. */
+    test('senza le prese scritte, le auto le dice capacity', () {
+      final c = leggi({'amenity': 'charging_station', 'capacity': '8', 'operator': 'Ionity'});
+      expect(c.single.connettori, hasLength(8));
+      expect(c.single.connettori.first.tipo, TipoConnettore.ccs2);
+    });
+
+    test('capacity non si intromette dove le prese sono scritte', () {
+      final c = leggi({'amenity': 'charging_station', 'capacity': '8', 'socket:type2_combo': '2'});
+      expect(c.single.connettori, hasLength(2));
+    });
+
+    test('senza capacity e senza prese, resta una: non si inventa', () {
+      expect(leggi({'amenity': 'charging_station'}).single.connettori, hasLength(1));
+    });
+
+    test('un capacity scritto male non conta', () {
+      expect(leggi({'amenity': 'charging_station', 'capacity': 'molte'}).single.connettori, hasLength(1));
+    });
   });
 }

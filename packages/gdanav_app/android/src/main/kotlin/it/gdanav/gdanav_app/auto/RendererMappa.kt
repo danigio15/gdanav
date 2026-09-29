@@ -99,6 +99,14 @@ class RendererMappa(
         contenuto.addView(vista, FrameLayout.LayoutParams(tutto, tutto))
         sopra?.let { contenuto.addView(it, FrameLayout.LayoutParams(tutto, tutto)) }
         p.setContentView(contenuto)
+        // Il traffico che arriva sull'auto, da leggere poi sul telefono. Solo
+        // sulla mappa grande: quella del quadro strumenti conterebbe due volte.
+        if (!soloMappa) {
+            DiagnosiTraffico.inizia(carContext)
+            vista.addOnTileActionListener { operazione, _, _, _, _, _, sorgente ->
+                DiagnosiTraffico.riquadro(operazione, sorgente)
+            }
+        }
         vista.onCreate(null)
         vista.onStart()
         vista.onResume()
@@ -112,10 +120,22 @@ class RendererMappa(
         presentazione = p
         mappaView = vista
         pannello = sopra
+        if (!soloMappa) principale.postDelayed(contaTraffico, 10_000)
+    }
+
+    /** Ogni dieci secondi, quanti tratti di coda ci sono sullo schermo. */
+    private val contaTraffico: Runnable = object : Runnable {
+        override fun run() {
+            val m = mappa
+            if (m != null && stile != null) DiagnosiTraffico.contaTratti(m, larghezza, altezza)
+            if (mappaView != null) principale.postDelayed(this, 10_000)
+        }
     }
 
     override fun onSurfaceDestroyed(contenitore: SurfaceContainer) {
         principale.removeCallbacks(torna)
+        principale.removeCallbacks(contaTraffico)
+        if (!soloMappa) DiagnosiTraffico.salva()
         animazione?.cancel()
         animazione = null
         mostrata = null
@@ -273,6 +293,10 @@ class RendererMappa(
             sorgentiCaricate.clear()
             m.setStyle(Style.Builder().fromJson(json)) { s ->
                 stile = s
+                if (!soloMappa) {
+                    DiagnosiTraffico.strato = s.getSource(DiagnosiTraffico.SORGENTE) != null &&
+                        s.getLayer(DiagnosiTraffico.SORGENTE) != null
+                }
                 caricaSegnaposto(s)
                 aggiornaDati(m, s)
             }

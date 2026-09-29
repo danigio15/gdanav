@@ -31,6 +31,71 @@ void main() {
     expect(a.generato, isNotNull);
   });
 
+  test('la fonte va e torna, e OpenStreetMap non la scrive', () {
+    Colonnina da(String id, String fonte) => Colonnina(
+          id: id,
+          nome: id,
+          posizione: const Punto(40.8548, 14.2855),
+          connettori: const [Connettore(tipo: TipoConnettore.tipo2, potenzaKw: 22)],
+          fonte: fonte,
+        );
+    final testo = ArchivioColonnine.scrivi([da('osm-node-1', 'osm'), da('pun:1', 'pun'), da('pun:2', 'osm+pun')]);
+    final righe = (jsonDecode(testo) as Map)['c'] as List;
+    expect(righe.map((r) => (r as List).length), [6, 7, 7]);
+    final a = ArchivioColonnine.leggi(testo);
+    expect({for (final c in a.tutte) c.id: c.fonte}, {'osm-node-1': 'osm', 'pun:1': 'pun', 'pun:2': 'osm+pun'});
+  });
+
+  test('gli EVSE ID vanno e tornano, e senza non si scrive niente', () {
+    const pun = Colonnina(
+      id: 'pun:1',
+      nome: 'Isola A3',
+      posizione: Punto(40.8548, 14.2855),
+      connettori: [Connettore(tipo: TipoConnettore.tipo2, potenzaKw: 22)],
+      fonte: 'pun',
+      evse: ['IT*BEC*EW001*1', 'IT*BEC*EW001*2'],
+    );
+    const osm = Colonnina(
+      id: 'osm-node-1',
+      nome: 'Enel X',
+      posizione: Punto(40.85, 14.28),
+      connettori: [Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 50)],
+      fonte: 'osm',
+    );
+    final testo = ArchivioColonnine.scrivi([pun, osm]);
+    expect(((jsonDecode(testo) as Map)['c'] as List).map((r) => (r as List).length), [8, 6]);
+    final letti = {for (final c in ArchivioColonnine.leggi(testo).tutte) c.id: c};
+    expect(letti['pun:1']!.evse, ['IT*BEC*EW001*1', 'IT*BEC*EW001*2']);
+    expect(letti['osm-node-1']!.evse, isEmpty);
+  });
+
+  test('lo stato fisso va e torna, nel nono campo, solo quando c\'è', () {
+    Colonnina pun(String id, {required bool tempoReale}) => Colonnina(
+          id: id,
+          nome: id,
+          posizione: const Punto(45, 9),
+          connettori: const [Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150)],
+          fonte: 'pun',
+          evse: ['IT*X*$id'],
+          tempoReale: tempoReale,
+        );
+    final testo = ArchivioColonnine.scrivi([pun('vero', tempoReale: true), pun('fisso', tempoReale: false)]);
+    expect(((jsonDecode(testo) as Map)['c'] as List).map((r) => (r as List).length), [8, 9]);
+    final letti = {for (final c in ArchivioColonnine.leggi(testo).tutte) c.id: c.tempoReale};
+    expect(letti, {'vero': true, 'fisso': false});
+  });
+
+  test("un archivio di prima, senza il settimo campo, e' tutto OpenStreetMap", () {
+    const testo = '{"v":1,"generato":"2026-09-01T00:00:00Z","c":[[44.5,11.3,"osm-node-9","A","",[[0,150,2]]]]}';
+    expect(ArchivioColonnine.leggi(testo).tutte.single.fonte, 'osm');
+  });
+
+  test('i riquadri cercati si rileggono, per riscriverli', () {
+    final a =
+        ArchivioColonnine.leggi(ArchivioColonnine.scrivi([colonnina('a', 44.5, 11.3)], coperti: {(89, 22), (70, 30)}));
+    expect(a.coperti, {(89, 22), (70, 30)});
+  });
+
   test('coperti: quelli scritti nell\'archivio, anche vuoti', () {
     final testo = ArchivioColonnine.scrivi([colonnina('a', 44.5, 11.3)], coperti: {(89, 22), (70, 30)});
     final a = ArchivioColonnine.leggi(testo);
@@ -84,5 +149,29 @@ void main() {
     );
     final locali = ColonnineLocali(Future.value(ArchivioColonnine([colonnina('bo', 44.6, 11.35)])), riserva: relay);
     expect((await locali.lungo(percorso)).single.id, 'bo');
+  });
+
+  /* Lo stato di tutta Italia si dà presa per presa: il punto i-esimo deve
+   * essere la presa i-esima anche dove le prese non sono tutte uguali. */
+  test('gli EVSE ID si scrivono nell\'ordine delle prese', () {
+    final area = Colonnina(
+      id: 'pun:area',
+      nome: 'Area di servizio',
+      posizione: const Punto(41.9, 12.5),
+      connettori: const [
+        Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150),
+        Connettore(tipo: TipoConnettore.tipo2, potenzaKw: 22),
+        Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150),
+      ],
+      fonte: 'pun',
+      evse: const ['A', 'B', 'C'],
+    );
+    final letto = ArchivioColonnine.leggi(ArchivioColonnine.scrivi([area]));
+    expect(letto.evseInOrdine, isTrue);
+    final c = letto.tutte.single;
+    expect(c.connettori.map((p) => p.tipo), [TipoConnettore.ccs2, TipoConnettore.ccs2, TipoConnettore.tipo2]);
+    expect(c.evse, ['A', 'C', 'B']);
+    // Gli archivi di prima non lo dicono, e non ci si conta.
+    expect(ArchivioColonnine.leggi('{"v":1,"c":[]}').evseInOrdine, isFalse);
   });
 }

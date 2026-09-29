@@ -4,10 +4,11 @@ import '../geo/geo.dart';
 import 'colonnina.dart';
 import 'colonnine_relay.dart';
 
-/// Le colonnine rapide di mezza Europa dentro l'app: preparate in CI da
-/// OpenStreetMap (`tool/colonnine_europa.dart`), si cercano in un attimo e
-/// anche senza rete. Dove l'archivio non arriva, si chiede al relay solo
-/// quei riquadri.
+/// Le colonnine dell'Italia e dintorni dentro l'app: preparate in CI da
+/// OpenStreetMap (`tool/colonnine_osm.dart`) e dalla Piattaforma Unica
+/// Nazionale (`tool/colonnine_pun.dart`), si cercano in un attimo e anche
+/// senza rete. Dove l'archivio non arriva, si chiede al relay solo quei
+/// riquadri.
 class ColonnineLocali implements FonteColonnine {
   ColonnineLocali(Future<ArchivioColonnine> archivio, {this.riserva}) : _archivio = archivio;
 
@@ -43,7 +44,8 @@ class ColonnineLocali implements FonteColonnine {
 
 /// Le colonnine divise per riquadri di mezzo grado.
 class ArchivioColonnine {
-  ArchivioColonnine(Iterable<Colonnina> colonnine, {this.generato, Set<(int, int)>? coperti}) {
+  ArchivioColonnine(Iterable<Colonnina> colonnine,
+      {this.generato, Set<(int, int)>? coperti, this.evseInOrdine = false}) {
     for (final c in colonnine) {
       (_perRiquadro[_riquadro(c.posizione)] ??= []).add(c);
     }
@@ -65,6 +67,12 @@ class ArchivioColonnine {
   static final vuoto = ArchivioColonnine(const []);
 
   final DateTime? generato;
+
+  /// Se gli EVSE ID di ogni colonnina sono scritti nell'ordine delle sue
+  /// prese: allora il punto i-esimo è la presa i-esima anche dove le prese
+  /// non sono tutte uguali, e lo stato di tutta Italia si può dare presa per
+  /// presa (`DisponibilitaPun.conStati`). Gli archivi di prima non lo sono.
+  final bool evseInOrdine;
   final _perRiquadro = <(int, int), List<Colonnina>>{};
   final _coperti = <(int, int)>{};
 
@@ -75,6 +83,10 @@ class ArchivioColonnine {
   Iterable<Colonnina> get tutte => _perRiquadro.values.expand((l) => l);
 
   bool copre((int, int) q) => _coperti.contains(q);
+
+  /// I riquadri cercati, per riscriverli quando all'archivio si aggiunge
+  /// un'altra fonte.
+  Set<(int, int)> get coperti => Set.unmodifiable(_coperti);
   List<Colonnina> nel((int, int) q) => _perRiquadro[q] ?? const [];
 
   static (int, int) _riquadro(Punto p) =>
@@ -86,6 +98,11 @@ class ArchivioColonnine {
   //  "c":[[lat,lon,"osm-node-1","nome","operatore",[[tipo,kw,quante],…]],…]}
   // q: i riquadri di mezzo grado cercati (anche vuoti).
   // tipo: 0 CCS2, 1 CHAdeMO, 2 Tipo 2, 3 Tesla.
+  // Un settimo campo, se c'è, è la fonte («pun», «osm+pun»): senza, è
+  // OpenStreetMap, che è quasi tutto l'archivio e così non paga niente.
+  // Un ottavo, se c'è, sono gli EVSE ID dei punti di ricarica (dalla PUN),
+  // per chiederne lo stato. Un nono, 0, se lo stato che la PUN ne dà è fisso
+  // ([Colonnina.tempoReale]).
 
   static const _tipi = [TipoConnettore.ccs2, TipoConnettore.chademo, TipoConnettore.tipo2, TipoConnettore.tesla];
 
@@ -99,17 +116,34 @@ class ArchivioColonnine {
           c.nome,
           c.operatore ?? '',
           _prese(c.connettori),
+          if ((c.fonte.isNotEmpty && c.fonte != 'osm') || c.evse.isNotEmpty) c.fonte.isEmpty ? 'osm' : c.fonte,
+          if (c.evse.isNotEmpty) _evseInOrdine(c),
+          if (c.evse.isNotEmpty && !c.tempoReale) 0,
         ],
     ];
     return jsonEncode({
       'v': 1,
       'generato': (generato ?? DateTime.now().toUtc()).toIso8601String(),
+      'evseInOrdine': true,
       if (coperti != null)
         'q': [
           for (final (r, c) in coperti) [r, c]
         ],
       'c': righe,
     });
+  }
+
+  /// Gli EVSE ID nell'ordine in cui [_prese] scrive le prese — raggruppate
+  /// per tipo e potenza, nell'ordine in cui compaiono —: così, riletti, il
+  /// punto i-esimo è la presa i-esima. Se i punti non sono uno per presa
+  /// restano com'erano, e nessuno ci conta.
+  static List<String> _evseInOrdine(Colonnina c) {
+    if (c.evse.length != c.connettori.length || c.connettori.any((p) => !_tipi.contains(p.tipo))) return c.evse;
+    final gruppi = <(int, double), List<String>>{};
+    for (final (i, p) in c.connettori.indexed) {
+      (gruppi[(_tipi.indexOf(p.tipo), p.potenzaKw)] ??= []).add(c.evse[i]);
+    }
+    return [for (final l in gruppi.values) ...l];
   }
 
   static List<List<num>> _prese(List<Connettore> connettori) {
@@ -140,7 +174,9 @@ class ArchivioColonnine {
               for (var i = 0; i < (p[2] as num).toInt(); i++)
                 Connettore(tipo: _tipi[(p[0] as num).toInt()], potenzaKw: (p[1] as num).toDouble()),
           ],
-          fonte: 'osm',
+          fonte: r.length > 6 ? r[6] as String : 'osm',
+          evse: r.length > 7 ? (r[7] as List).cast<String>() : const [],
+          tempoReale: !(r.length > 8 && r[8] == 0),
         ),
       );
     }
@@ -148,6 +184,7 @@ class ArchivioColonnine {
     return ArchivioColonnine(
       colonnine,
       generato: DateTime.tryParse('${j['generato']}'),
+      evseInOrdine: j['evseInOrdine'] == true,
       coperti: q == null ? null : {for (final x in q.cast<List>()) ((x[0] as num).toInt(), (x[1] as num).toInt())},
     );
   }

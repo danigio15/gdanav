@@ -28,6 +28,18 @@ void main() {
       expect(c.connettori.firstWhere((p) => p.tipo == TipoConnettore.chademo).stato, StatoPresa.fuoriServizio);
     });
 
+    /* Su una colonnina che funziona può esserci una presa «pianificata»: non
+     * c'è ancora, e contarla fa dire «4 prese» dove ce ne sono due. Intorno a
+     * Napoli sono 15 su 237. Lo stesso per il doppione rimosso (210). */
+    test('le prese pianificate e i doppioni rimossi non si contano', () {
+      final c = colonnine[1];
+      expect(c.connettori, hasLength(2));
+      expect(c.connettori.every((p) => p.tipo == TipoConnettore.tipo2), isTrue);
+      // E non deve credere che lì si carichi a 150 kW.
+      expect(c.potenzaPer(ccs), 0);
+      expect(c.potenzaPer({TipoConnettore.tipo2}), 22);
+    });
+
     test('la potenza utile dipende dalle prese dell\'auto', () {
       expect(colonnine.first.potenzaPer(ccs), 350);
       expect(colonnine.first.potenzaPer({TipoConnettore.chademo}), 0); // guasta
@@ -35,10 +47,39 @@ void main() {
       expect(colonnine[1].potenzaPer({TipoConnettore.tipo2}), 22);
     });
 
-    test('chiede per polyline, con la chiave nell\'intestazione', () async {
-      late Uri chiesto;
+    /* Un Napoli–Milano in una richiesta sola Open Charge Map lo rifiuta — 503
+     * due volte su due in CI — e anche quando risponde il tetto di mille
+     * risultati taglia via il resto in silenzio. */
+    test('un percorso lungo si chiede a pezzi, e i doppioni si tolgono', () async {
+      final chieste = <Uri>[];
       final client = MockClient((r) async {
-        chiesto = r.url;
+        chieste.add(r.url);
+        return http.Response(jsonEncode(dati('ocm_esempio.json')), 200);
+      });
+      // ~800 km lungo un meridiano.
+      final lungo = [for (var i = 0; i <= 800; i++) Punto(40.8 + i * 0.009, 14.2)];
+      final trovate = await ClienteOpenChargeMap(chiave: '', client: client).lungo(lungo);
+      // 800 km a pezzi da 150: sei richieste.
+      expect(chieste, hasLength(6));
+      expect(chieste.every((u) => (u.queryParameters['polyline'] ?? '').isNotEmpty), isTrue);
+      // Ogni pezzo risponde le stesse due colonnine: restano due, non dodici.
+      expect(trovate.map((c) => c.id), ['ocm:101', 'ocm:102']);
+    });
+
+    test('un percorso corto resta una richiesta sola', () async {
+      final chieste = <Uri>[];
+      final client = MockClient((r) async {
+        chieste.add(r.url);
+        return http.Response(jsonEncode(dati('ocm_esempio.json')), 200);
+      });
+      await ClienteOpenChargeMap(chiave: '', client: client).lungo(const [Punto(44.5, 11.3), Punto(44.8, 11.6)]);
+      expect(chieste, hasLength(1));
+    });
+
+    test('chiede per polyline, con la chiave nell\'intestazione', () async {
+      final chieste = <Uri>[];
+      final client = MockClient((r) async {
+        chieste.add(r.url);
         expect(r.headers['X-API-Key'], 'chiave-ocm');
         return http.Response(jsonEncode(dati('ocm_esempio.json')), 200);
       });
@@ -46,12 +87,18 @@ void main() {
       final percorso = [for (var i = 0; i <= 2000; i++) Punto(44 + i * 0.001, 10 + i * 0.0005)];
       final trovate = await ocm.lungo(percorso, distanzaKm: 2);
       expect(trovate, hasLength(2));
-      expect(chiesto.queryParameters['distance'], '2.0');
-      expect(chiesto.queryParameters['compact'], 'true');
-      final inviato = decodificaPolyline(chiesto.queryParameters['polyline']!, precisione: 5);
-      expect(inviato.first, percorso.first);
-      expect(inviato.last.lat, closeTo(percorso.last.lat, 1e-5));
-      expect(chiesto.queryParameters['polyline']!.length, lessThanOrEqualTo(6000));
+      expect(chieste.first.queryParameters['distance'], '2.0');
+      expect(chieste.first.queryParameters['compact'], 'true');
+      // I pezzi coprono il percorso da capo a fondo, e nessuna polyline è
+      // troppo lunga per un indirizzo.
+      final primo = decodificaPolyline(chieste.first.queryParameters['polyline']!, precisione: 5);
+      final ultimo = decodificaPolyline(chieste.last.queryParameters['polyline']!, precisione: 5);
+      expect(primo.first, percorso.first);
+      expect(ultimo.last.lat, closeTo(percorso.last.lat, 1e-5));
+      expect(
+        chieste.every((u) => u.queryParameters['polyline']!.length <= 6000),
+        isTrue,
+      );
     });
   });
 

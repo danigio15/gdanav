@@ -62,7 +62,9 @@ Future<void> main(List<String> argomenti) async {
       if (c == null) continue;
       tutte++;
       coperti.add(((c.$1 / ClienteColonnineRelay.lato).floor(), (c.$2 / ClienteColonnineRelay.lato).floor()));
-      if (!rapida(tag)) continue;
+      // Si tiene tutto: a togliere le troppo lente ci pensa la potenza
+      // minima, dove la sceglie chi guida. Prima qui passavano solo le
+      // rapide, e al Centro Direzionale di Napoli restavano sette colonnine.
       final id = '${f['id'] ?? tag['@id'] ?? ''}';
       final tipo = switch (id.isEmpty ? '' : id[0]) {
         'w' => 'way',
@@ -86,8 +88,9 @@ Future<void> main(List<String> argomenti) async {
   }.values.toList();
   final testo = ArchivioColonnine.scrivi(colonnine, coperti: coperti);
   await File(argomenti.first).writeAsString(testo);
-  stdout.writeln('::notice title=Archivio colonnine::${colonnine.length} rapide su $tutte colonnine, '
-      '${coperti.length} riquadri coperti, ${testo.length ~/ 1024} kB');
+  final rapide = colonnine.where((c) => c.connettori.any((p) => p.potenzaKw >= 40)).length;
+  stdout.writeln('::notice title=Archivio colonnine::${colonnine.length} colonnine su $tutte trovate '
+      '($rapide da 40 kW in su), ${coperti.length} riquadri coperti, ${testo.length ~/ 1024} kB');
   if (colonnine.length < 1000) {
     stdout.writeln('::error title=Archivio colonnine::troppo poche, qualcosa non va');
     exitCode = 1;

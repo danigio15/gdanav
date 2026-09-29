@@ -16,11 +16,35 @@ abstract interface class FonteDisponibilita {
 /// 2.500 richieste al giorno, due per colonnina). La colonnina di
 /// OpenStreetMap si ritrova fra quelle di TomTom per posizione.
 class DisponibilitaTomTom implements FonteDisponibilita {
-  DisponibilitaTomTom(this.chiave, {http.Client? client, this.validita = const Duration(minutes: 2)})
-      : _http = client ?? http.Client();
+  DisponibilitaTomTom(
+    this.chiave, {
+    http.Client? client,
+    this.validita = const Duration(minutes: 2),
+    this.pausaDopoIlNo = const Duration(hours: 6),
+    DateTime Function()? adesso,
+  })  : _http = client ?? http.Client(),
+        _adesso = adesso ?? DateTime.now;
 
   final String chiave;
   final http.Client _http;
+  final DateTime Function() _adesso;
+
+  /* Quando il fornitore dice di no per la quota, si smette di chiedere.
+   *
+   * Il piano gratuito di TomTom dà duemilacinquecento richieste di ricerca al
+   * mese, e lo stato di una colonnina ne consuma due: quindici colonnine sullo
+   * schermo sono trenta richieste. Finita la quota, ogni richiesta dopo è un
+   * rifiuto — costa tempo, batteria e dati, e la colonnina resta «sconosciuta»
+   * esattamente come se non l'avessimo chiesta. Nel cruscotto di TomTom si
+   * vedeva il tredici per cento di richieste rifiutate.
+   *
+   * Al primo no si smette per [pausaDopoIlNo], poi si riprova: la quota è
+   * mensile, e un'app aperta per giorni deve accorgersi che è tornata. */
+  final Duration pausaDopoIlNo;
+  DateTime? _dettoDiNo;
+
+  /// Vero finché si sta aspettando dopo un rifiuto per quota.
+  bool get inPausa => _dettoDiNo != null && _adesso().difference(_dettoDiNo!) < pausaDopoIlNo;
 
   /// L'id di disponibilità TomTom per ogni colonnina già cercata (anche
   /// `null`: non c'è).
@@ -55,6 +79,9 @@ class DisponibilitaTomTom implements FonteDisponibilita {
         await Future<void>.delayed(Duration(milliseconds: 800 * (tentativo + 1)));
         continue;
       }
+      // 403 è «quota finita» o «prodotto spento»: in tutti e due i casi
+      // insistere non serve. 429 dopo i tentativi è lo stesso discorso.
+      if (r.statusCode == 403 || r.statusCode == 429) _dettoDiNo = _adesso();
       if (r.statusCode != 200) throw Exception('TomTom: ${r.statusCode}');
       return jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>;
     }
@@ -103,9 +130,10 @@ class DisponibilitaTomTom implements FonteDisponibilita {
 
   @override
   Future<Colonnina> aggiorna(Colonnina c) async {
-    if (_recenti[c.id] case (final quando, final gia) when DateTime.now().difference(quando) < validita) return gia;
+    if (inPausa) return c;
+    if (_recenti[c.id] case (final quando, final gia) when _adesso().difference(quando) < validita) return gia;
     final nuova = await _aggiorna(c);
-    _recenti[c.id] = (DateTime.now(), nuova);
+    _recenti[c.id] = (_adesso(), nuova);
     return nuova;
   }
 
@@ -142,6 +170,9 @@ class DisponibilitaTomTom implements FonteDisponibilita {
       operatore: c.operatore,
       posizione: c.posizione,
       fonte: c.fonte,
+      evse: c.evse,
+      tempoReale: c.tempoReale,
+      prezzi: c.prezzi,
       connettori: [...prese, ...c.connettori.where((x) => !tipi.contains(x.tipo))],
     );
   }

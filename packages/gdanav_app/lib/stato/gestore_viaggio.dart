@@ -110,34 +110,82 @@ PianificatoreViaggio pianificatoreVero(
   PreferenzeRicarica preferenze,
   OpzioniPercorso opzioni,
 ) {
-  final valhalla = ClienteValhalla(
-    Uri.parse(i.valhalla.endsWith('/') ? i.valhalla : '${i.valhalla}/'),
-    chiave: i.chiaveValhalla.isEmpty ? null : i.chiaveValhalla,
-  );
-  final traffico = _traffico;
+  // TomTom se c'è la chiave: i suoi tempi sono già quelli del traffico di
+  // adesso, e le code arrivano nella stessa risposta. Valhalla resta la
+  // riserva, sul server pubblico di FOSSGIS.
+  final tomtom = i.percorsiDaTomTom ? ClienteTomTom(i.chiaveTomTom) : null;
+  final valhalla = tomtom != null
+      ? null
+      : ClienteValhalla(
+          Uri.parse(i.valhalla.endsWith('/') ? i.valhalla : '${i.valhalla}/'),
+          chiave: i.chiaveValhalla.isEmpty ? null : i.chiaveValhalla,
+        );
+  // Il traffico si va a prendere a parte solo per Valhalla, che non lo
+  // conosce: chiederlo due volte a TomTom sarebbe sprecare il piano e
+  // sommare due volte le stesse code.
+  final traffico = tomtom != null ? null : _traffico;
   return PianificatoreViaggio(
-    percorsi: (tappe) => valhalla.calcola(tappe, opzioni: opzioni),
-    alternative: (da, a) => valhalla.alternative(da, a, opzioni: opzioni),
-    seguendo: (p) => valhalla.seguendo(p, opzioni: opzioni),
+    percorsi: (tappe) =>
+        tomtom?.calcola(tappe, opzioni: opzioni) ?? valhalla!.calcola(tappe, opzioni: opzioni),
+    alternative: (da, a) =>
+        tomtom?.alternative(da, a, opzioni: opzioni) ?? valhalla!.alternative(da, a, opzioni: opzioni),
+    seguendo: (p) => tomtom?.seguendo(p, opzioni: opzioni) ?? valhalla!.seguendo(p, opzioni: opzioni),
     // Il traffico di adesso sul percorso (per tutti, se c'è la chiave
     // TomTom): arrivo e soste lo mettono in conto.
     traffico: traffico?.applica,
-    // Open Charge Map se c'è la chiave (ha anche lo stato delle prese), e
-    // comunque OpenStreetMap: dall'archivio dentro l'app, fuori archivio dal
-    // relay di gdanav, e se tutto manca direttamente da Overpass.
-    colonnine: FonteColonnineConRiserva([
-      if (i.chiaveOcm.isNotEmpty) ClienteOpenChargeMap(chiave: i.chiaveOcm),
-      ColonnineLocali(archivioColonnine(), riserva: ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni))),
-      ClienteOverpass(),
-    ]),
+    /* Tutte le fonti insieme, non la prima che risponde.
+     *
+     * Era una catena: Open Charge Map, e se rispondeva ci si fermava lì.
+     * Ma le fonti non dicono la stessa cosa — intorno a Napoli Open Charge
+     * Map conosce 143 colonnine, e da sola diventava tutto quello che l'app
+     * sapeva, mentre l'archivio di OpenStreetMap ne ha molte di più. Adesso
+     * si chiedono insieme e si fondono: quelle a meno di sessanta metri sono
+     * la stessa, e resta quella che conosce più prese.
+     *
+     * Overpass resta solo come riserva: è lento (in CI scade anche dopo
+     * cinquanta secondi) e non deve rallentare ogni viaggio. */
+    colonnine: _conLoStato(
+      FonteColonnineUnite(
+        [
+          if (i.chiaveOcm.isNotEmpty) ClienteOpenChargeMap(chiave: i.chiaveOcm),
+          ColonnineLocali(archivioColonnine(), riserva: ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni))),
+        ],
+        riserva: ClienteOverpass(),
+      ),
+    ),
     profilo: profilo,
     preferenze: preferenze,
-    // Libere e occupate in tempo reale (Premium), se c'è la chiave TomTom.
+    // Libere e occupate in tempo reale (Premium).
     disponibilita: GestorePremium.attivo.value ? _disponibilita : null,
   );
 }
 
-final _disponibilita = Servizi.chiaveTomTom.isEmpty ? null : DisponibilitaTomTom(Servizi.chiaveTomTom);
+/// «Nel calcolo del percorso devi vedere quelle libere e in servizio»: con
+/// Premium le colonnine lungo la strada arrivano al pianificatore con lo
+/// stato di tutta Italia già dentro, e le soste si scelgono sapendolo.
+FonteColonnine _conLoStato(FonteColonnine fonte) => GestorePremium.attivo.value
+    ? ColonnineConStato(fonte, stati: statiDiTuttaItalia, inOrdine: () async => (await archivioColonnine()).evseInOrdine)
+    : fonte;
+
+/// La PUN, una per tutta l'app: le credenziali ospite, lo stato di tutta
+/// Italia letto e quello di ogni colonnina toccata. Lo stato di tutta Italia
+/// sono sette richieste e quasi nove megabyte: vale otto minuti, e chi lo
+/// chiede mentre arriva — la mappa, il percorso — aspetta la stessa lettura.
+final _pun = DisponibilitaPun(validitaTutti: const Duration(minutes: 8));
+
+/// Lo stato di adesso di ogni punto di ricarica d'Italia (con Premium),
+/// EVSE ID → `AVAILABLE`, `CHARGING`…: la mappa ne colora le colonnine, il
+/// percorso ne sceglie le soste. Senza Premium, niente.
+Future<Map<String, String>> statiDiTuttaItalia() =>
+    GestorePremium.attivo.value ? _pun.statiDiTutti() : Future.value(const <String, String>{});
+
+/// Libere e occupate adesso: dalla PUN per le colonnine che ne hanno gli EVSE
+/// ID — gratis, punto per punto, chiesto da questo telefono —, da TomTom per
+/// le altre, se c'è la chiave.
+final FonteDisponibilita _disponibilita = DisponibilitaConPun(
+  _pun,
+  altra: Servizi.chiaveTomTom.isEmpty ? null : DisponibilitaTomTom(Servizi.chiaveTomTom),
+);
 final _traffico = Servizi.chiaveTomTom.isEmpty ? null : TrafficoTomTom(Servizi.chiaveTomTom);
 
 class GestoreViaggio extends ChangeNotifier {
@@ -436,7 +484,7 @@ class GestoreViaggio extends ChangeNotifier {
           }, destinazione: destinazione),
         );
       }
-    } on ErroreValhalla catch (e) {
+    } on ErrorePercorso catch (e) {
       if (identical(stato, calcolo)) _imposta(ErroreViaggio(_spiega(e), destinazione: destinazione));
     } catch (e) {
       if (identical(stato, calcolo)) {
@@ -500,7 +548,7 @@ class GestoreViaggio extends ChangeNotifier {
           ),
         );
       }
-    } on ErroreValhalla catch (e) {
+    } on ErrorePercorso catch (e) {
       if (identical(stato, calcolo)) _imposta(ErroreViaggio(_spiega(e), destinazione: destinazione));
     } catch (e) {
       if (identical(stato, calcolo)) {
@@ -548,12 +596,16 @@ class GestoreViaggio extends ChangeNotifier {
     _imposta(const NessunViaggio());
   }
 
-  static String _spiega(ErroreValhalla e) => switch (e.stato) {
+  static String _spiega(ErrorePercorso e) => switch (e.stato) {
     401 || 403 => 'Il server dei percorsi non ci fa entrare in questo momento. Riprova tra poco.',
     429 => 'Il server dei percorsi è molto carico. Riprova tra un minuto.',
-    400 when e.messaggio.contains('No path') => 'Non esiste una strada fra qui e la destinazione.',
+    400 when _senzaStrada(e.messaggio) => 'Non esiste una strada fra qui e la destinazione.',
     _ => 'Il server dei percorsi ha risposto: ${e.messaggio}',
   };
+
+  /// «Non c'è strada»: Valhalla lo dice «No path», TomTom «NO_ROUTE_FOUND».
+  static bool _senzaStrada(String m) =>
+      m.contains('No path') || m.toUpperCase().contains('NO_ROUTE') || m.contains('ROUTE_NOT_FOUND');
 
   void _imposta(StatoViaggio s) {
     stato = s;
@@ -616,8 +668,25 @@ Future<List<Colonnina>> colonnineVicineComeSiVuole(
     km: km,
     quante: quante,
     operatoriEsclusi: p.operatoriEsclusi,
-    potenzaMinimaKw: p.potenzaMinimaKw,
+    potenzaMinimaKw: p.minimaIntorno,
   );
+}
+
+/// Tutte le colonnine dell'archivio adatte a [veicolo], filtrate come si è
+/// scelto in «Ricarica»: per la mappa di tutta Italia. Con «Tutte» nessun
+/// minimo di potenza, come intorno a te.
+Future<List<Colonnina>> colonnineDellArchivioComeSiVuole(
+  ProfiloVeicolo veicolo,
+  Archivio archivio, {
+  Future<ArchivioColonnine>? da,
+}) async {
+  final p = await archivio.preferenze();
+  final a = await (da ?? archivioColonnine());
+  final minima = p.minimaIntorno > 0 ? p.minimaIntorno : 0.1;
+  return [
+    for (final c in a.tutte)
+      if (c.potenzaNominalePer(veicolo.connettori) >= minima && !operatoreEscluso(c, p.operatoriEsclusi)) c,
+  ];
 }
 
 /// Lo stato di adesso di una colonnina (con Premium); senza, com'era.

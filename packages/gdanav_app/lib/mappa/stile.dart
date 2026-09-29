@@ -16,6 +16,7 @@ const sorgenteSegnalazioni = 'gdanav-segnalazioni';
 const sorgenteManovra = 'gdanav-manovra';
 const sorgenteDistributori = 'gdanav-distributori';
 const sorgenteVicine = 'gdanav-vicine';
+const sorgenteTutte = 'gdanav-tutte';
 const sorgenteCode = 'gdanav-code';
 const sorgenteAlternative = 'gdanav-alternative';
 const sorgenteTappe = 'gdanav-tappe';
@@ -28,6 +29,8 @@ const stratiToccabili = [
   'gdanav-colonnine',
   'gdanav-distributori',
   'gdanav-vicine',
+  'gdanav-tutte-gruppi',
+  'gdanav-tutte',
   'nomi-poi',
 ];
 
@@ -114,7 +117,7 @@ const _chiaro = _Tavolozza(
   libera: '#16A34A',
   piena: '#D97706',
   guasta: '#DC2626',
-  ignota: '#64748B',
+  ignota: '#4F46E5',
   arrivo: '#E5484D',
 );
 
@@ -149,7 +152,7 @@ const _scuro = _Tavolozza(
   libera: '#4ADE80',
   piena: '#FBBF24',
   guasta: '#F87171',
-  ignota: '#94A3B8',
+  ignota: '#818CF8',
   arrivo: '#F87171',
 );
 
@@ -273,6 +276,22 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
       sorgenteManovra: {'type': 'geojson', 'data': _vuota},
       sorgenteDistributori: {'type': 'geojson', 'data': _vuota},
       sorgenteVicine: {'type': 'geojson', 'data': _vuota},
+      // Raggruppate da MapLibre: da lontano un cerchio col numero, da vicino
+      // una per una. Il numero del cerchio sono le prese, sommate dentro il
+      // gruppo, non le colonnine.
+      sorgenteTutte: {
+        'type': 'geojson',
+        'data': _vuota,
+        'cluster': true,
+        'clusterRadius': 50,
+        'clusterMaxZoom': 12,
+        'clusterProperties': {
+          'prese': [
+            '+',
+            ['get', 'prese'],
+          ],
+        },
+      },
       if (traffico.isNotEmpty)
         'traffico': {
           'type': 'vector',
@@ -378,9 +397,11 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
       _strada('autostrade', classi['autostrada']!, t.autostrada, _largo(3.4, 32)),
       // Il traffico come in Waze: solo dove si rallenta, arancio se lento e
       // rosso se quasi fermi; da lontano solo sulle strade principali.
+      // Sull'auto più spesse: lo schermo si guarda da un braccio di
+      // distanza, di sfuggita, e la mappa è sempre vicina.
       if (traffico.isNotEmpty) ...[
-        _coda(stratoTraffico, principali: true, minzoom: 7),
-        _coda(stratoTrafficoLocale, principali: false, minzoom: 13),
+        _coda(stratoTraffico, principali: true, minzoom: 7, spessore: perAuto ? 1.6 : 1),
+        _coda(stratoTrafficoLocale, principali: false, minzoom: 13, spessore: perAuto ? 1.6 : 1),
       ],
       {
         'id': stratoEdifici2d,
@@ -661,6 +682,83 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         ],
         'paint': {'fill-color': '#FFFFFF', 'fill-antialias': true},
       },
+      // Tutte le colonnine d'Italia, dall'archivio: da lontano in gruppi col
+      // numero, avvicinandosi una per una. Sotto quelle intorno a te, che
+      // hanno il colore dello stato di adesso.
+      {
+        'id': 'gdanav-tutte-gruppi',
+        'type': 'circle',
+        'source': sorgenteTutte,
+        'filter': ['has', 'point_count'],
+        'paint': {
+          'circle-color': '#4F46E5',
+          'circle-opacity': 0.92,
+          'circle-radius': [
+            'step',
+            ['get', 'prese'],
+            14,
+            100,
+            18,
+            1000,
+            23,
+            10000,
+            28,
+          ],
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#FFFFFF',
+        },
+      },
+      {
+        'id': 'gdanav-tutte-numeri',
+        'type': 'symbol',
+        'source': sorgenteTutte,
+        'filter': ['has', 'point_count'],
+        'layout': {
+          'text-field': _numeroCorto(['get', 'prese']),
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 12,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        'paint': {'text-color': '#FFFFFF'},
+      },
+      {
+        'id': 'gdanav-tutte',
+        'type': 'symbol',
+        'source': sorgenteTutte,
+        'filter': [
+          '!',
+          ['has', 'point_count'],
+        ],
+        'layout': {
+          // Col colore dello stato di tutta Italia, quando si sa.
+          'icon-image': [
+            'concat',
+            'punto-colonnina-',
+            _statoOIgnota(),
+          ],
+          'icon-size': 0.8,
+          'icon-allow-overlap': true,
+          'text-field': [
+            'step',
+            ['zoom'],
+            '',
+            13,
+            [
+              'concat',
+              ['to-string', ['get', 'kw']],
+              ' kW',
+            ],
+          ],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 11,
+          'text-anchor': 'top',
+          'text-offset': [0, 1.1],
+          'text-optional': true,
+        },
+        'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 1.6},
+      },
+      ..._bollinoPrese('gdanav-tutte', sorgenteTutte, _coloreDelloStato(_statoOIgnota()), sfusa: true),
       // Intorno a te: i distributori col prezzo (auto termica) o le
       // colonnine rapide col colore dello stato (auto elettrica).
       {
@@ -691,6 +789,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         },
         'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 1.6},
       },
+      ..._bollinoPrese('gdanav-vicine', sorgenteVicine, _coloreDelloStato(['get', 'stato']), minzoom: 10),
       {
         'id': 'gdanav-distributori',
         'type': 'symbol',
@@ -906,10 +1005,53 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
   };
 }
 
-/// Le strade dove TomTom misura una coda. `traffic_level` è la velocità
-/// rispetto a quella libera: sotto 0,6 si rallenta, sotto 0,3 si è fermi.
-Map<String, Object> _coda(String id, {required bool principali, required double minzoom}) {
-  const grandi = ['Motorway', 'International road', 'Major road', 'Secondary road'];
+/* Quanto si va piano, rispetto a strada libera: 1 libera, 0 fermi.
+ *
+ * Un campo che non c'e' vale 1 — strada libera — e quindi non si disegna
+ * niente: un nome di campo sbagliato si vede identico a «non c'e' traffico».
+ * Per questo si accettano tutte e due le forme che TomTom ha usato, e per
+ * questo la prova di rete `tomtom_tessera_test.dart` va a leggere un riquadro
+ * vero e dice in chiaro come si chiamano i campi. */
+List<Object> _quantoSiVaPiano() => [
+  'to-number',
+  [
+    'coalesce',
+    ['get', 'traffic_level'],
+    ['get', 'trafficLevel'],
+  ],
+  1,
+];
+
+/* E' una strada grande, di quelle che si disegnano anche da lontano?
+ *
+ * TomTom la famiglia della strada la dice in `road_type`, a parole. Non si
+ * tira a indovinare: `tools/sonda_traffico.py` scarica un riquadro vero in CI
+ * e stampa i nomi che ci trova — «Major road», «Secondary road»,
+ * «Connecting road», «Major local road».
+ *
+ * Si sceglie con `match` e non con `in`: `match` e' nel formato da sempre e
+ * lo capiscono tutte le versioni di MapLibre, mentre un'espressione che una
+ * versione non conosce le fa buttare via lo strato intero — senza dire
+ * niente, e sullo schermo si vede una citta' che scorre.
+ *
+ * Si elencano le strade piccole, non le grandi: cosi' una parola nuova, o un
+ * campo che un domani cambia nome, finisce fra le grandi e si vede da zoom 7.
+ * Sbagliare da quella parte vuol dire vedere una coda di paese da lontano;
+ * sbagliare dall'altra vuol dire non vedere una coda in tangenziale. */
+List<Object> _eUnaGrande() => [
+  'match',
+  [
+    'to-string',
+    ['get', 'road_type'],
+  ],
+  ['Connecting road', 'Major local road', 'Local road', 'Minor local road', 'Other'],
+  false,
+  true,
+];
+
+/// Le strade dove TomTom misura una coda: sotto 0,6 si rallenta, sotto 0,3 si
+/// è fermi.
+Map<String, Object> _coda(String id, {required bool principali, required double minzoom, double spessore = 1}) {
   return {
     'id': id,
     'type': 'line',
@@ -918,55 +1060,143 @@ Map<String, Object> _coda(String id, {required bool principali, required double 
     'minzoom': minzoom,
     'filter': [
       'all',
-      [
-        '<',
-        [
-          'to-number',
-          ['get', 'traffic_level'],
-          1,
-        ],
-        0.6,
-      ],
-      principali
-          ? [
-              'in',
-              ['get', 'road_type'],
-              ['literal', grandi],
-            ]
-          : [
-              '!',
-              [
-                'in',
-                ['get', 'road_type'],
-                ['literal', grandi],
-              ],
-            ],
+      ['<', _quantoSiVaPiano(), 0.6],
+      principali ? _eUnaGrande() : ['!', _eUnaGrande()],
     ],
     'layout': {'line-cap': 'round', 'line-join': 'round'},
     'paint': {
-      'line-color': [
-        'step',
-        [
-          'to-number',
-          ['get', 'traffic_level'],
-          1,
-        ],
-        '#E5302A',
-        0.3,
-        '#F5A623',
-      ],
+      'line-color': ['step', _quantoSiVaPiano(), '#E5302A', 0.3, '#F5A623'],
       'line-width': [
         'interpolate',
         ['linear'],
         ['zoom'],
         7,
-        1.2,
+        1.2 * spessore,
         12,
-        2.5,
+        2.5 * spessore,
         16,
-        5,
+        5 * spessore,
       ],
       'line-opacity': 0.9,
     },
   };
 }
+
+/// I colori delle icone delle colonnine, uno per stato: gli stessi di
+/// `coloriColonnina` (componenti/icone_punti.dart), che le disegna. Qui e
+/// non dal tema, perché il bollino deve avere il colore dell'icona su cui
+/// sta, che è uguale col chiaro e con lo scuro.
+const _coloriIcona = {
+  'libera': '#16A34A',
+  'piena': '#D97706',
+  'guasta': '#DC2626',
+  'ignota': '#4F46E5',
+};
+
+/// Il numero delle prese in un bollino bianco, fuori dall'icona in alto a
+/// destra: «fai vedere il numero all'esterno». Solo dove le prese sono più
+/// di una — una presa sola è l'icona stessa.
+///
+/// Un cerchio e un testo spostati di qualche punto sullo schermo
+/// (`translate` sulla vista, non sulla mappa: il bollino resta in alto a
+/// destra anche girando la mappa). Il cerchio cresce con le cifre.
+/// Lo stato scritto sulla colonnina, o «ignota» se non c'è: sulla mappa di
+/// tutta Italia lo stato che non si sa non si scrive, per non pesare.
+List<Object> _statoOIgnota() => [
+  'coalesce',
+  ['get', 'stato'],
+  'ignota',
+];
+
+/// Il colore dell'icona per lo stato: lo stesso del bollino delle prese.
+List<Object> _coloreDelloStato(List<Object> stato) => [
+  'match',
+  stato,
+  for (final MapEntry(:key, :value) in _coloriIcona.entries)
+    if (key != 'ignota') ...[key, value],
+  _coloriIcona['ignota']!,
+];
+
+List<Map<String, Object>> _bollinoPrese(
+  String strato,
+  String sorgente,
+  Object colore, {
+  bool sfusa = false,
+  double? minzoom,
+}) {
+  const spostamento = [15, -15];
+  final filtro = [
+    'all',
+    if (sfusa) [
+      '!',
+      ['has', 'point_count'],
+    ],
+    [
+      '>',
+      ['get', 'prese'],
+      1,
+    ],
+  ];
+  return [
+    {
+      'id': '$strato-prese-fondo',
+      'type': 'circle',
+      'source': sorgente,
+      'minzoom': ?minzoom,
+      'filter': filtro,
+      'paint': {
+        'circle-radius': [
+          'step',
+          ['get', 'prese'],
+          8,
+          10,
+          9.5,
+          100,
+          11.5,
+          1000,
+          13,
+        ],
+        'circle-color': '#FFFFFF',
+        'circle-stroke-color': colore,
+        'circle-stroke-width': 1.6,
+        'circle-translate': spostamento,
+        'circle-translate-anchor': 'viewport',
+        'circle-pitch-alignment': 'viewport',
+      },
+    },
+    {
+      'id': '$strato-prese',
+      'type': 'symbol',
+      'source': sorgente,
+      'minzoom': ?minzoom,
+      'filter': filtro,
+      'layout': {
+        'text-field': _numeroCorto(['get', 'prese']),
+        'text-font': ['Noto Sans Bold'],
+        'text-size': 9.5,
+        'text-allow-overlap': true,
+        'text-ignore-placement': true,
+      },
+      'paint': {'text-color': colore, 'text-translate': spostamento, 'text-translate-anchor': 'viewport'},
+    },
+  ];
+}
+
+/// Un numero da scrivere in un cerchio: intero fino a 9999, poi in migliaia
+/// («12k»).
+List<Object> _numeroCorto(List<Object> numero) => [
+  'case',
+  ['>=', numero, 10000],
+  [
+    'concat',
+    [
+      'to-string',
+      [
+        'round',
+        ['/', numero, 1000],
+      ],
+    ],
+    'k',
+  ],
+  ['to-string', numero],
+];

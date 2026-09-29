@@ -33,7 +33,18 @@ Color coloreHex(String hex) => Color(int.parse('FF${hex.substring(1)}', radix: 1
 
 /// Un bollino tondo colorato col simbolo bianco e il bordo bianco, come i
 /// punti di Google Maps. PNG a [scala]× di [lato] punti.
-Future<Uint8List> bollinoPng(Color colore, IconData icona, {double lato = 26, double scala = 3}) async {
+///
+/// [glifo] è quanta parte del lato occupa il simbolo, [bordo] quanto è spesso
+/// l'anello bianco: un simbolo semplice regge di più, e su un bollino grande
+/// l'anello va cresciuto con lui, o sparisce.
+Future<Uint8List> bollinoPng(
+  Color colore,
+  IconData icona, {
+  double lato = 26,
+  double scala = 3,
+  double glifo = 0.58,
+  double bordo = 1.6,
+}) async {
   final registro = ui.PictureRecorder();
   final c = Canvas(registro)..scale(scala);
   final centro = Offset(lato / 2, lato / 2);
@@ -46,14 +57,14 @@ Future<Uint8List> bollinoPng(Color colore, IconData icona, {double lato = 26, do
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2),
   );
   c.drawCircle(centro, r, Paint()..color = Colors.white);
-  c.drawCircle(centro, r - 1.6, Paint()..color = colore);
+  c.drawCircle(centro, r - bordo, Paint()..color = colore);
   final testo = TextPainter(
     text: TextSpan(
       text: String.fromCharCode(icona.codePoint),
       style: TextStyle(
         fontFamily: icona.fontFamily,
         package: icona.fontPackage,
-        fontSize: lato * 0.58,
+        fontSize: lato * glifo,
         color: Colors.white,
       ),
     ),
@@ -65,17 +76,29 @@ Future<Uint8List> bollinoPng(Color colore, IconData icona, {double lato = 26, do
 }
 
 /// I colori delle colonnine per stato, come nel resto dell'app.
+///
+/// «Ignota» è blu, non grigia: Open Charge Map quasi mai dice se le prese
+/// sono occupate, e un bollino grigio su mappa chiara si legge «spenta,
+/// non ci andare» — che è il contrario di quello che vogliamo dire.
 const coloriColonnina = {
   'libera': Color(0xFF16A34A),
-  'piena': Color(0xFFF59E0B),
+  'piena': Color(0xFFD97706),
   'guasta': Color(0xFFDC2626),
-  'ignota': Color(0xFF64748B),
+  'ignota': Color(0xFF4F46E5),
 };
 
 /// Tutte le icone dei punti sulla mappa: categorie, distributori e colonnine.
 Future<Map<String, Uint8List>> iconePunti() async => {
   for (final c in [...categoriePoi, poiAltro]) c.immagine: await bollinoPng(coloreHex(c.colore), iconaCategoria(c)),
   'punto-distributore': await bollinoPng(const Color(0xFFF08A24), Icons.local_gas_station, lato: 32),
+  /* La stessa pompa col fulmine della scheda del punto — `Icons.ev_station` —
+   * ma su un bollino da 44 invece che da 32, e col glifo che ne occupa i tre
+   * quarti: sulla mappa in auto quello da 32 era una macchia.
+   *
+   * Disegnarne una nostra è stato peggio: un corpo largo, un fulmine grasso e
+   * una manichetta staccata fanno tre pezzi che a quella grandezza non si
+   * ricompongono in una pompa. Quella di Material è sottile ma è una sagoma
+   * sola, e ingrandita si legge. */
   for (final MapEntry(:key, :value) in coloriColonnina.entries)
-    'punto-colonnina-$key': await bollinoPng(value, Icons.ev_station, lato: 32),
+    'punto-colonnina-$key': await bollinoPng(value, Icons.ev_station, lato: 44, glifo: 0.76, bordo: 2.2),
 };

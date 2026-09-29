@@ -36,15 +36,27 @@ class ClienteOverpass implements FonteColonnine {
   final Duration attesa;
   final http.Client _http;
 
-  /// Le reti di ricarica rapida: le loro colonnine valgono anche se i
-  /// mappatori non hanno scritto le prese.
+  /// Le reti di ricarica rapida. Non servono più a scegliere cosa
+  /// raccogliere — si raccoglie tutto — ma a capire che una colonnina è
+  /// rapida anche dove i mappatori non hanno scritto le prese.
   static const retiRapide =
       'Ionity|Tesla|Free To X|Electra|Fastned|Ewiva|Atlante|Allego|Plenitude|Be Charge|Enel X|A2A|Neogy|Zunder|Powerdot|Duferco';
 
   /// La richiesta: il percorso a riquadri di una cinquantina di chilometri
   /// (Overpass li cerca in un attimo; la linea intera lo manda in tempo
-  /// scaduto), solo le colonnine rapide. La distanza vera dalla strada la
+  /// scaduto), **tutte** le colonnine. La distanza vera dalla strada la
   /// misura poi colonnineSulPercorso.
+  ///
+  /// Prima si chiedevano solo le rapide: prese CCS/CHAdeMO/Tesla scritte, o
+  /// uno di sedici operatori in elenco. Il risultato era che una Type 2 da
+  /// 22 kW in città — che in Italia è la maggioranza — non entrava nei dati,
+  /// e nemmeno una rapida di un operatore fuori da quell'elenco. Al Centro
+  /// Direzionale di Napoli restavano sette colonnine.
+  ///
+  /// A togliere quelle troppo lente ci pensa chi le usa, dove è giusto:
+  /// `colonnineSulPercorso` con `potenzaMinimaKw` (40 di suo) e il
+  /// pianificatore con la potenza minima delle preferenze (50). Chi guarda
+  /// «colonnine vicine» le vede tutte, ed è quello che serve in città.
   static String richiesta(List<Punto> percorso, double distanzaKm) {
     final margine = distanzaKm / 111.0 + 0.01;
     final riquadri = <String>[];
@@ -61,15 +73,8 @@ class ClienteOverpass implements FonteColonnine {
         (lon.reduce(math.max) + margine / coseno).toStringAsFixed(4),
       ].join(','));
     }
-    const rapide = '[~"^socket:(type2_combo|chademo|tesla_supercharger.*)\$"~"."]';
-    final filtri = [
-      '["amenity"="charging_station"]$rapide',
-      '["amenity"="charging_station"]["operator"~"$retiRapide",i]',
-      '["amenity"="charging_station"]["brand"~"$retiRapide",i]',
-    ];
     final corpo = [
-      for (final r in riquadri)
-        for (final f in filtri) 'nwr$f($r);',
+      for (final r in riquadri) 'nwr["amenity"="charging_station"]($r);',
     ].join();
     return '[out:json][timeout:60];($corpo);out center tags;';
   }
@@ -142,16 +147,22 @@ class ClienteOverpass implements FonteColonnine {
       ..._prese(tag, 'tesla_supercharger_ccs', TipoConnettore.ccs2, 150),
     ];
     final operatore = (tag['operator'] ?? tag['brand'] ?? tag['network']) as String?;
-    // Senza prese scritte: una rapida CCS se è di una rete rapida, altrimenti
-    // una Tipo 2, la più comune; con la potenza se c'è.
+    /* Senza prese scritte: una rapida CCS se è di una rete rapida, altrimenti
+     * una Tipo 2, la più comune; con la potenza se c'è.
+     *
+     * E quante? Finora sempre una, e per una colonnina da otto stalli era
+     * una bugia. `capacity` in OpenStreetMap dice quante auto si caricano
+     * insieme: è il numero giusto, e quando c'è si usa. */
     if (connettori.isEmpty) {
       final rapida = RegExp(retiRapide, caseSensitive: false).hasMatch('${tag['operator']} ${tag['brand']}');
-      connettori.add(
-        Connettore(
-          tipo: rapida ? TipoConnettore.ccs2 : TipoConnettore.tipo2,
-          potenzaKw: _kw(tag['charging_station:output']) ?? (rapida ? 150 : 22),
-        ),
+      final quante = (int.tryParse('${tag['capacity'] ?? ''}') ?? 1).clamp(1, massimoPrese);
+      final presa = Connettore(
+        tipo: rapida ? TipoConnettore.ccs2 : TipoConnettore.tipo2,
+        potenzaKw: _kw(tag['charging_station:output']) ?? (rapida ? 150 : 22),
       );
+      for (var i = 0; i < quante; i++) {
+        connettori.add(presa);
+      }
     }
     return Colonnina(
       id: 'osm-${e['type']}-${e['id']}',
@@ -163,12 +174,20 @@ class ClienteOverpass implements FonteColonnine {
     );
   }
 
+  /// Quante prese al massimo si tengono da una sola voce.
+  ///
+  /// Era venti, e tagliava: al Centro Direzionale di Napoli una sola
+  /// installazione ne ha oltre duecento. Un tetto serve lo stesso, perché
+  /// un numero scritto male in OpenStreetMap non deve far esplodere niente,
+  /// ma va messo dove sta la realtà, non dove stava comodo.
+  static const massimoPrese = 400;
+
   static List<Connettore> _prese(Map<String, Object?> tag, String chiave, TipoConnettore tipo, double potenza) {
     final valore = tag['socket:$chiave'];
     if (valore == null || valore == 'no' || valore == '0') return const [];
     final quante = int.tryParse('$valore') ?? 1;
     final kw = _kw(tag['socket:$chiave:output']) ?? potenza;
-    return [for (var i = 0; i < quante.clamp(1, 20); i++) Connettore(tipo: tipo, potenzaKw: kw)];
+    return [for (var i = 0; i < quante.clamp(1, massimoPrese); i++) Connettore(tipo: tipo, potenzaKw: kw)];
   }
 
   /// «150 kW», «22kW», «50000 W», «11 kVA», «50;150 kW» (il più alto).

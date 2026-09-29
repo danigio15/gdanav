@@ -74,6 +74,10 @@ class _MappaViaggioState extends State<MappaViaggio> {
   var _centrate = 0;
   var _coperto = 0.0;
 
+  /// Quale elenco di tutte le colonnine ha già la mappa: sono megabyte, e
+  /// si rimandano solo quando cambiano.
+  var _versioneTutte = -1;
+
   static const _inclinazione = 58.0;
 
   @override
@@ -85,6 +89,9 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.guida?.addListener(_io);
     widget.segnalazioni?.addListener(_segnalazioni);
     widget.vicini?.addListener(_vicini);
+    // In guida no: lì contano le soste del percorso e quelle vicine, e
+    // tutta Italia sulla strada sarebbe solo confusione.
+    if (widget.guida == null) widget.vicini?.avviaTutte();
   }
 
   @override
@@ -203,6 +210,12 @@ class _MappaViaggioState extends State<MappaViaggio> {
     for (final MapEntry(:key, :value) in v.dati().entries) {
       await m.setGeoJsonSource(key, value.cast<String, dynamic>());
     }
+    if (widget.guida == null && v.versioneTutte != _versioneTutte) {
+      // Segnata prima di mandarla: una seconda chiamata nel frattempo non
+      // rimanda gli stessi megabyte.
+      _versioneTutte = v.versioneTutte;
+      await m.setGeoJsonSource(sorgenteTutte, v.datiTutte().cast<String, dynamic>());
+    }
   }
 
   Future<void> _segnalazioni() async {
@@ -252,6 +265,22 @@ class _MappaViaggioState extends State<MappaViaggio> {
       // A seconda della piattaforma arriva già decodificata o come JSON.
       final mappa = f is String ? jsonDecode(f) : f;
       if (mappa is! Map) continue;
+      // Un gruppo di colonnine: ci si avvicina, e si separano.
+      if (mappa case {
+        'properties': {'point_count': _},
+        'geometry': {'coordinates': [final num lon, final num lat, ...]},
+      }) {
+        final zoom = (await m.queryCameraPosition())?.zoom ?? 5;
+        await m.animateCamera(CameraUpdate.newLatLngZoom(LatLng(lat.toDouble(), lon.toDouble()), zoom + 2));
+        return;
+      }
+      // Una colonnina di tutta la mappa: sulla mappa c'è solo dove e quanti
+      // kW, il nome e il resto sono nell'archivio.
+      if (mappa case {'properties': {'id': final String id, 'kw': _}} when widget.onPunto != null) {
+        if (widget.vicini?.colonnina(id) case final c?) {
+          return widget.onPunto!(PuntoToccato(tipo: 'colonnina', id: c.id, nome: c.nome, posizione: c.posizione));
+        }
+      }
       // Prima i punti che sappiamo raccontare (distributori, colonnine
       // vicine, ristoranti…), poi le colonnine del viaggio.
       // Una strada alternativa: si sceglie quella.
@@ -282,6 +311,8 @@ class _MappaViaggioState extends State<MappaViaggio> {
       onStyleLoadedCallback: () {
         _stileCaricato = true;
         _disegnato = null;
+        // Uno stile nuovo (il tema, il traffico) nasce con le sorgenti vuote.
+        _versioneTutte = -1;
         if (_mappa case final m?) {
           _inclinata = widget.controllo.inclinata;
           _edifici(m);

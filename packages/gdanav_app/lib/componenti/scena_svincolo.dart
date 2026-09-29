@@ -11,16 +11,49 @@ import 'package:gdanav_core/gdanav_core.dart';
 /// giuste sono blu con le frecce bianche dipinte sull'asfalto. Intorno cielo
 /// con le nuvole, colline, alberi e qualche edificio lontano.
 class ScenaSvincolo extends CustomPainter {
-  ScenaSvincolo(this.manovra);
+  ScenaSvincolo(this.manovra, {this.gradi});
 
   final Manovra manovra;
+
+  /* Di quanto gira lo svincolo davvero, col segno (negativo a sinistra):
+   * lo dice `quantoGiraLaManovra` guardando i punti del percorso.
+   *
+   * Senza, il ramo si disegnava sempre uguale — una curva che si chiudeva a
+   * sessantatre gradi — qualunque cosa fosse: un raccordo che si stacca di
+   * venti gradi e una rampa che torna indietro venivano lo stesso disegno, e
+   * una semplice deviazione sembrava un tornante. */
+  final double? gradi;
 
   static const _corsia = 3.6;
   static const _altezzaCamera = 8.5;
   static const _separazione = 20.0;
   static const _vicino = 4.0;
 
-  bool get _destra => const {18, 20, 23}.contains(manovra.tipo);
+  /* Sotto [staccaDaGradi] le carreggiate non si dividono: le corsie restano
+   * quelle della stessa strada e il disegno deve dire «tieni la sinistra»,
+   * non «esci».
+   *
+   * E' la segnalazione dal campo, e non era solo l'angolo: «a me doveva dire
+   * semplicemente di mantenere la corsia di sinistra, non svoltare» — e il
+   * disegno faceva vedere una rampa che se ne andava in mezzo ai campi, con
+   * lo spartitraffico, il guardrail in mezzo e la freccia che piegava. Per un
+   * sottopasso in città, dove le corsie si dividono e basta, tutto questo è
+   * una bugia.
+   *
+   * Sopra gli ottanta gradi il ramo esce dall'inquadratura. Senza i gradi
+   * veri restano i sessantatré di prima, che erano gli unici che sapeva
+   * disegnare. */
+  static const staccaDaGradi = 10.0, massimoGradi = 80.0, senzaGradi = 63.0;
+
+  /// Le carreggiate si dividono davvero, o si tratta solo di tenere la corsia?
+  bool get _siStacca => (gradi ?? senzaGradi).abs() >= staccaDaGradi;
+
+  /// Quanto gira il ramo nel disegno, in radianti. Zero: resta la stessa strada.
+  double get _curva => _siStacca ? (gradi ?? senzaGradi).abs().clamp(staccaDaGradi, massimoGradi) * math.pi / 180 : 0;
+
+  /* Da che parte si esce. I gradi veri battono il tipo della manovra: il tipo
+   * dice «tieni la sinistra» anche dove la strada piega a destra. */
+  bool get _destra => gradi != null && gradi!.abs() >= 8 ? gradi! > 0 : const {18, 20, 23}.contains(manovra.tipo);
 
   @override
   void paint(Canvas canvas, Size s) {
@@ -38,12 +71,16 @@ class ScenaSvincolo extends CustomPainter {
     Offset p(Offset mondo, [double quota = 0]) =>
         Offset(w / 2 + f * (mondo.dx - camX) / mondo.dy, orizzonte + f * (_altezzaCamera - quota) / mondo.dy);
 
-    // Il ramo: dritto fino alla separazione, poi curva sempre di più
-    // (come una clotoide) fino a 70°. Si integra una volta sola, ogni metro.
+    /* Il ramo: dritto fino alla separazione, poi curva sempre di più (come
+     * una clotoide) fino ai gradi che gira davvero, e poi dritto. La curva si
+     * chiude sempre nella stessa novantina di metri, così una deviazione
+     * larga si stacca dolcemente e una rampa stretta si avvita: è il rapporto
+     * fra le due che si vede. Si integra una volta sola, ogni metro. */
+    const chiudeIn = 92.0;
     final base = <Offset>[const Offset(0, 0)], rotte = <double>[0];
     for (var t = 1; t <= 600; t++) {
       final d = math.max(0.0, t - _separazione);
-      final rotta = math.min(1.1, 0.5 * 2.6e-4 * d * d);
+      final rotta = math.min(_curva, _curva * (d / chiudeIn) * (d / chiudeIn));
       rotte.add(rotta);
       base.add(base.last + Offset(math.sin(rotta), math.cos(rotta)));
     }
@@ -116,38 +153,41 @@ class ScenaSvincolo extends CustomPainter {
       }
     }
 
-    // Fra le carreggiate, dove si separano, la cuspide: asfalto con le
-    // strisce bianche oblique, finché lo spazio non diventa prato.
+    /* Fra le carreggiate, dove si separano, la cuspide: asfalto con le
+     * strisce bianche oblique, finché lo spazio non diventa prato. Se non si
+     * separano non c'è niente da riempire: è una strada sola. */
     const cuspide = 58.0;
-    canvas.drawPath(
-      fascia((t) => principale(k.toDouble(), t), (t) => ramo(k.toDouble(), t), _separazione, _separazione + cuspide),
-      asfalto,
-    );
-    final zebra = Paint()..color = const Color(0xF2F4F6F8);
-    for (var t = _separazione + 7; t < _separazione + cuspide - 2; t += 4.5) {
-      final a = principale(k.toDouble(), t), b = ramo(k.toDouble(), t + 3.5);
-      if ((b.dx - a.dx) < 0.9) continue;
-      final a2 = principale(k.toDouble(), t + 1.1), b2 = ramo(k.toDouble(), t + 4.6);
+    if (_siStacca) {
       canvas.drawPath(
-        Path()
-          ..moveTo(p(a).dx, p(a).dy)
-          ..lineTo(p(b).dx, p(b).dy)
-          ..lineTo(p(b2).dx, p(b2).dy)
-          ..lineTo(p(a2).dx, p(a2).dy)
-          ..close(),
-        zebra,
+        fascia((t) => principale(k.toDouble(), t), (t) => ramo(k.toDouble(), t), _separazione, _separazione + cuspide),
+        asfalto,
+      );
+      final zebra = Paint()..color = const Color(0xF2F4F6F8);
+      for (var t = _separazione + 7; t < _separazione + cuspide - 2; t += 4.5) {
+        final a = principale(k.toDouble(), t), b = ramo(k.toDouble(), t + 3.5);
+        if ((b.dx - a.dx) < 0.9) continue;
+        final a2 = principale(k.toDouble(), t + 1.1), b2 = ramo(k.toDouble(), t + 4.6);
+        canvas.drawPath(
+          Path()
+            ..moveTo(p(a).dx, p(a).dy)
+            ..lineTo(p(b).dx, p(b).dy)
+            ..lineTo(p(b2).dx, p(b2).dy)
+            ..lineTo(p(a2).dx, p(a2).dy)
+            ..close(),
+          zebra,
+        );
+      }
+      // Chiude la cuspide un cordolo chiaro, poi comincia il prato.
+      canvas.drawPath(
+        fascia(
+          (t) => principale(k.toDouble(), _separazione + cuspide + t),
+          (t) => ramo(k.toDouble(), _separazione + cuspide + t),
+          0,
+          1.2,
+        ),
+        banchina,
       );
     }
-    // Chiude la cuspide un cordolo chiaro, poi comincia il prato.
-    canvas.drawPath(
-      fascia(
-        (t) => principale(k.toDouble(), _separazione + cuspide + t),
-        (t) => ramo(k.toDouble(), _separazione + cuspide + t),
-        0,
-        1.2,
-      ),
-      banchina,
-    );
 
     // Le righe: bordi pieni, fra le corsie tratteggiate (6 m pieni e 9
     // vuoti), larghe 15 cm come sulle strade vere.
@@ -183,11 +223,16 @@ class ScenaSvincolo extends CustomPainter {
     }
 
     riga((z) => principale(0.07, z), _vicino, 3000, larga: 0.25);
-    riga((z) => principale(k - 0.07, z), _separazione, 3000, larga: 0.25);
-    riga((t) => ramo(k + 0.07, t), _separazione, 600, larga: 0.25);
+    /* Le due righe continue che chiudono le carreggiate: ci sono solo se le
+     * carreggiate si dividono. Su una strada sola fra le corsie ci va il
+     * tratteggio, che è quello che dice «puoi ancora spostarti». */
+    if (_siStacca) {
+      riga((z) => principale(k - 0.07, z), _separazione, 3000, larga: 0.25);
+      riga((t) => ramo(k + 0.07, t), _separazione, 600, larga: 0.25);
+    }
     riga((t) => ramo(n - 0.07, t), _vicino, 600, larga: 0.25);
     for (var i = 1; i < n; i++) {
-      if (i == k) {
+      if (i == k && _siStacca) {
         // Il tratteggio che separa il ramo finisce giusto dove si divide.
         riga((z) => principale(k.toDouble(), z), _separazione - 6 - 15 * 3, _separazione, tratteggio: true, larga: 0.4);
       } else if (i < k) {
@@ -220,7 +265,7 @@ class ScenaSvincolo extends CustomPainter {
     }
 
     guardrail((z) => principale(-0.4, z), _vicino, 900);
-    guardrail((t) => ramo(n + 0.4, t), _vicino, 300);
+    guardrail((t) => ramo(n + 0.4, t), _vicino, _siStacca ? 300 : 900);
 
     // Le frecce dipinte sulle corsie giuste: ogni punto della freccia segue
     // la corsia, così in curva piega con lei. Prima della rampa, sulle
@@ -231,7 +276,8 @@ class ScenaSvincolo extends CustomPainter {
       for (final t0 in [19.0, 40.0, 68.0, 104.0]) {
         Offset mondo(double u, double v) =>
             i >= k ? ramo(i + 0.5 + u / _corsia, t0 + v) : principale(i + 0.5 + u / _corsia, t0 + v);
-        final forma = i >= k && t0 < _separazione + 5 ? _formaPiegata : _forma;
+        // La freccia piega solo se si piega davvero: se no, va dritta.
+        final forma = _siStacca && i >= k && t0 < _separazione + 5 ? _formaPiegata : _forma;
         final path = Path();
         for (final (j, q) in forma.indexed) {
           final o = p(mondo(q.dx, q.dy));
@@ -406,9 +452,9 @@ class ScenaSvincolo extends CustomPainter {
 }
 
 /// La scena in PNG, per lo schermo di Android Auto.
-Future<Uint8List> scenaSvincoloPng(Manovra m, {double larghezza = 800, double altezza = 480}) async {
+Future<Uint8List> scenaSvincoloPng(Manovra m, {double larghezza = 800, double altezza = 480, double? gradi}) async {
   final registro = ui.PictureRecorder();
-  ScenaSvincolo(m).paint(Canvas(registro), Size(larghezza, altezza));
+  ScenaSvincolo(m, gradi: gradi).paint(Canvas(registro), Size(larghezza, altezza));
   final immagine = await registro.endRecording().toImage(larghezza.round(), altezza.round());
   return (await immagine.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
 }

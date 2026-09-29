@@ -5,6 +5,7 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:gdanav_core/gdanav_core.dart';
 import 'package:http/http.dart' as http;
@@ -114,16 +115,28 @@ void main() {
       ]..sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
       final chiave = Platform.environment['GDANAV_TOMTOM'] ?? '';
       final stato = chiave.isEmpty ? null : DisponibilitaTomTom(chiave);
-      // Tutte insieme: una alla volta non si sta nel tempo.
+      /* Tutte insieme: una alla volta non si sta nel tempo. Gli errori si
+       * contano e si dicono: ingoiarli faceva sembrare «nessuno stato
+       * disponibile» quello che invece era «TomTom ci risponde di no», e in
+       * app si legge «stato non comunicato» su ogni colonnina. */
+      final guai = <String, int>{};
       final elenco = await Future.wait([
         for (final c in rapide.take(25))
           if (stato == null)
             Future.value(c)
           else
-            stato.aggiorna(c).timeout(const Duration(seconds: 10)).catchError((Object _) => c),
+            stato.aggiorna(c).timeout(const Duration(seconds: 10)).catchError((Object e) {
+              final quale = e.toString().split('\n').first;
+              guai[quale] = (guai[quale] ?? 0) + 1;
+              return c;
+            }),
       ]);
       final note = elenco.where((c) => c.connettori.any((x) => x.stato != StatoPresa.sconosciuto)).length;
-      avviso('Colonnine Utrecht', '${tutte.length} in tutto, ${rapide.length} rapide, con stato TomTom: $note');
+      avviso(
+        'Colonnine Utrecht',
+        '${tutte.length} in tutto, ${rapide.length} rapide, con stato TomTom: $note'
+            '${guai.isEmpty ? '' : ' | errori: ${guai.entries.map((g) => '${g.key} ×${g.value}').join(', ')}'}',
+      );
       if (Platform.environment['GDANAV_COLONNINE'] case final file?) {
         File(file).writeAsStringSync(
           jsonEncode([
@@ -161,14 +174,20 @@ void main() {
           if (c.connettori.any((x) => x.potenzaKw >= 40)) c,
       ]..sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
       final stato = DisponibilitaTomTom(chiave);
+      final guai = <String, int>{};
       final elenco = await Future.wait([
         for (final c in rapide.take(15))
-          stato.aggiorna(c).timeout(const Duration(seconds: 60)).catchError((Object _) => c),
+          stato.aggiorna(c).timeout(const Duration(seconds: 60)).catchError((Object e) {
+            final quale = e.toString().split('\n').first;
+            guai[quale] = (guai[quale] ?? 0) + 1;
+            return c;
+          }),
       ]);
       avviso(
           'Colonnine Napoli',
           [
             '${tutte.length} in tutto, ${rapide.length} rapide',
+            if (guai.isNotEmpty) 'errori: ${guai.entries.map((g) => '${g.key} ×${g.value}').join(', ')}',
             for (final c in elenco)
               '${c.nome} (${c.operatore}): ${c.connettori.map((x) => '${x.tipo.name}=${x.stato.name}').join(' ')}',
           ].join(' | '));
@@ -268,5 +287,294 @@ void main() {
     }
   },
       timeout: const Timeout(Duration(minutes: 2)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  /// Il motore nuovo contro quello vecchio, sullo stesso percorso e nello
+  /// stesso momento: quanto ci mettono, quanto misurano, e soprattutto se
+  /// TomTom vede le code che Valhalla non può vedere.
+  test('Napoli → Milano: TomTom contro Valhalla', () async {
+    final chiave = Platform.environment['GDANAV_TOMTOM'] ?? '';
+    if (chiave.isEmpty) {
+      avviso('Percorso TomTom', 'senza chiave non si prova');
+      return;
+    }
+    final tomtom = ClienteTomTom(chiave);
+    final orologio = Stopwatch()..start();
+    final suo = await tomtom.calcola([napoli, milano]);
+    final suoMs = orologio.elapsedMilliseconds;
+    orologio.reset();
+    final nostro = await valhalla.calcola([napoli, milano]);
+    final nostroMs = orologio.elapsedMilliseconds;
+
+    avviso(
+      'Percorso TomTom',
+      '$suoMs ms, ${(suo.lunghezzaM / 1000).toStringAsFixed(1)} km, '
+          '${suo.durata.inMinutes} min, ${suo.punti.length} punti, ${suo.manovre.length} manovre, '
+          '${suo.code.length} code, ritardo ${suo.ritardoTraffico.inMinutes} min',
+    );
+    avviso(
+      'Percorso Valhalla',
+      '$nostroMs ms, ${(nostro.lunghezzaM / 1000).toStringAsFixed(1)} km, '
+          '${nostro.durata.inMinutes} min, ${nostro.punti.length} punti, ${nostro.manovre.length} manovre',
+    );
+
+    // Le manovre devono avere le parole giuste: se TomTom ce le manda con
+    // le etichette, sullo schermo si leggerebbe «<street>».
+    final conEtichette = suo.manovre.where((m) => m.istruzione.contains('<')).length;
+    final conCartello = suo.manovre.where((m) => m.verso.isNotEmpty).length;
+    avviso('Manovre TomTom',
+        'con etichette rimaste: $conEtichette, col cartello: $conCartello, senza tipo: ${suo.manovre.where((m) => m.tipo == 0).length}');
+
+    // GitHub mostra una decina di avvisi per passo e butta gli altri: il
+    // confronto per intero va in un file, che finisce nella release.
+    if (Platform.environment['GDANAV_ANTEPRIME'] case final cartella?) {
+      File('$cartella/percorso_motori.txt').writeAsStringSync([
+        'TomTom   $suoMs ms · ${(suo.lunghezzaM / 1000).toStringAsFixed(1)} km · '
+            '${suo.durata.inMinutes} min · ${suo.punti.length} punti · ${suo.manovre.length} manovre · '
+            '${suo.code.length} code · ritardo ${suo.ritardoTraffico.inMinutes} min',
+        'Valhalla $nostroMs ms · ${(nostro.lunghezzaM / 1000).toStringAsFixed(1)} km · '
+            '${nostro.durata.inMinutes} min · ${nostro.punti.length} punti · ${nostro.manovre.length} manovre',
+        '',
+        'Manovre TomTom: con etichette rimaste $conEtichette, col cartello $conCartello, '
+            'senza tipo ${suo.manovre.where((m) => m.tipo == 0).length}',
+        'Limiti di velocità da TomTom: ${suo.limiti.where((l) => l != null).length} segmenti su ${suo.limiti.length}'
+            ' — valori ${suo.limiti.whereType<int>().toSet().toList()..sort()}',
+        'Corsie da TomTom: ${suo.manovre.where((m) => m.corsie.isNotEmpty).length} manovre',
+        '',
+        'Le prime venti manovre come le vede l\'app:',
+        for (final m in suo.manovre.take(20))
+          '  tipo ${m.tipo.toString().padLeft(2)} · ${(m.lunghezzaM / 1000).toStringAsFixed(1)} km · '
+              '${m.strada.isEmpty ? '—' : m.strada}${m.verso.isEmpty ? '' : ' → ${m.verso}'} · ${m.istruzione}',
+      ].join('\n'));
+    }
+
+    expect(suo.punti.length, greaterThan(100));
+    expect(suo.manovre, isNotEmpty);
+    expect(conEtichette, 0, reason: 'le etichette di TomTom non devono finire sullo schermo');
+    expect(suo.trafficoVero, isTrue);
+    // I limiti li dà, ma solo se glieli si chiede: se un giorno smettesse di
+    // rispondere, il disco del tachimetro si spegnerebbe in silenzio.
+    expect(suo.limiti.whereType<int>(), isNotEmpty, reason: 'TomTom deve dare i limiti di velocità');
+    // Due motori sulla stessa strada: non identici, ma nemmeno un altro viaggio.
+    expect((suo.lunghezzaM - nostro.lunghezzaM).abs() / nostro.lunghezzaM, lessThan(0.25));
+    expect(suo.manovre.every((m) => m.inizio >= 0 && m.inizio < suo.punti.length), isTrue);
+  },
+      timeout: const Timeout(Duration(minutes: 2)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  /// Quante colonnine conosce ogni fonte sullo stesso percorso, e quante ne
+  /// conosce l'unione: la domanda dal campo era «ma non ci sono tutte le
+  /// colonnine», e la catena a riserva si fermava alla prima che rispondeva.
+  test('le colonnine: ogni fonte da sola, e tutte insieme', () async {
+    final percorso = await valhalla.calcola([napoli, milano]);
+    final relay = ClienteColonnineRelay(Uri.parse('https://gdanav.gdahome.org/'));
+    final chiave = Platform.environment['GDANAV_OCM'] ?? '';
+
+    Future<List<Colonnina>> quante(String nome, FonteColonnine f) async {
+      final orologio = Stopwatch()..start();
+      try {
+        final c = await f.lungo(percorso.punti);
+        avviso('Colonnine $nome', '${orologio.elapsedMilliseconds} ms, ${c.length} colonnine');
+        return c;
+      } catch (e) {
+        avviso('Colonnine $nome', 'errore dopo ${orologio.elapsedMilliseconds} ms: $e');
+        return const [];
+      }
+    }
+
+    final daRelay = await quante('relay', relay);
+    final daOcm = chiave.isEmpty ? <Colonnina>[] : await quante('OCM', ClienteOpenChargeMap(chiave: chiave));
+    final fonti = <FonteColonnine>[
+      if (chiave.isNotEmpty) ClienteOpenChargeMap(chiave: chiave),
+      relay,
+    ];
+    final insieme = await quante('unite', FonteColonnineUnite(fonti));
+
+    // L'unione non può conoscerne meno della più ricca delle sue fonti.
+    // Se però nessuna fonte ha risposto — succede: il relay dà 502, Open
+    // Charge Map 503 — non è un difetto nostro e non si fa fallire la prova.
+    final piuRicca = math.max(daRelay.length, daOcm.length);
+    if (piuRicca == 0) {
+      avviso('Colonnine', 'nessuna fonte ha risposto: non c\'è niente da confrontare');
+    } else {
+      expect(insieme.length, greaterThanOrEqualTo(piuRicca));
+    }
+
+    if (Platform.environment['GDANAV_ANTEPRIME'] case final cartella?) {
+      final doppie = insieme.where((c) => c.fonte.contains('+')).length;
+      File('$cartella/colonnine_fonti.txt').writeAsStringSync([
+        'Napoli → Milano, ${(percorso.lunghezzaM / 1000).round()} km',
+        '',
+        'relay (OpenStreetMap + archivio gdanav): ${daRelay.length}',
+        'Open Charge Map: ${chiave.isEmpty ? 'senza chiave' : '${daOcm.length}'}',
+        'tutte insieme: ${insieme.length}',
+        'di cui riconosciute da due fonti: $doppie',
+        '',
+        'guadagno rispetto alla fonte più ricca da sola: '
+            '+${insieme.length - piuRicca} (${piuRicca == 0 ? 0 : ((insieme.length - piuRicca) / piuRicca * 100).round()}%)',
+        '',
+        'le prime venti:',
+        for (final c in insieme.take(20))
+          '  ${c.fonte.padRight(12)} ${c.connettori.length} prese · ${c.operatore ?? '—'} · ${c.nome}',
+      ].join('\n'));
+    }
+  },
+      timeout: const Timeout(Duration(minutes: 3)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  // Libere e occupate dalla PUN col codice dell'app, sul server vero: le
+  // credenziali ospite di Cognito, la firma di AWS e la risposta com'è oggi —
+  // le prove del motore la simulano. Le colonnine sono quelle dell'archivio
+  // che l'app ha dentro: le cinque più grandi del Centro Direzionale di
+  // Napoli, e una per ognuno degli altri gestori lì intorno.
+  test('libere e occupate dalla PUN, al Centro Direzionale', () async {
+    final archivio = ArchivioColonnine.leggi(File('../gdanav_app/assets/colonnine.json').readAsStringSync());
+    const centro = Punto(40.8575, 14.2815);
+    final vicine = [
+      for (final c in archivio.tutte)
+        if (c.evse.isNotEmpty && distanzaM(centro, c.posizione) < 1200) c,
+    ]..sort((a, b) => b.evse.length.compareTo(a.evse.length));
+    expect(vicine, isNotEmpty, reason: "l'archivio dell'app deve avere gli EVSE ID della PUN");
+    final gestori = <String>{};
+    final scelte = [
+      ...vicine.take(5),
+      for (final c in vicine.skip(5))
+        if (gestori.add(c.operatore ?? '')) c,
+    ];
+    final pun = DisponibilitaPun();
+    var risposte = 0;
+    for (final c in scelte) {
+      final orologio = Stopwatch()..start();
+      try {
+        final adesso = await pun.aggiorna(c);
+        if (!identical(adesso, c)) risposte++;
+        final quante = <StatoPresa, int>{};
+        for (final p in adesso.connettori) {
+          quante[p.stato] = (quante[p.stato] ?? 0) + 1;
+        }
+        int n(StatoPresa s) => quante[s] ?? 0;
+        final cosa = identical(adesso, c)
+            ? 'nessuna risposta per i suoi punti'
+            : 'libere ${n(StatoPresa.disponibile)}, occupate ${n(StatoPresa.occupata)}, '
+                'guaste ${n(StatoPresa.fuoriServizio)}, non si sa ${n(StatoPresa.sconosciuto)}';
+        avviso('PUN dal vivo',
+            '${c.nome} (${c.operatore}): ${c.evse.length} punti — $cosa (${orologio.elapsedMilliseconds} ms)');
+      } catch (e) {
+        avviso('PUN dal vivo', '${c.nome}: errore dopo ${orologio.elapsedMilliseconds} ms: $e');
+      }
+    }
+    expect(risposte, greaterThan(0), reason: 'la PUN deve rispondere almeno per una colonnina');
+  },
+      timeout: const Timeout(Duration(minutes: 3)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  // Quello che la PUN sa oltre allo stato, gestore per gestore: i prezzi
+  // (`punTariffsDetails`: energia, sosta, attivazione, tempo; per AC, DC e
+  // HPC) e se lo stato è in tempo reale. Fino a 30 punti per ognuno dei 40
+  // gestori più diffusi nell'archivio. E poi lo stato di tutta Italia in
+  // blocco, come lo legge la mappa pubblica: quante pagine, quanti punti,
+  // quanto pesa, quanto ci mette. Il resoconto va in `pun_prezzi.txt`.
+  test('la PUN: prezzi e tempo reale per gestore, e lo stato di tutta Italia', () async {
+    final archivio = ArchivioColonnine.leggi(File('../gdanav_app/assets/colonnine.json').readAsStringSync());
+    // Il gestore sta nell'EVSE ID: `IT*PLN*…` è Plenitude, `IT*ENX*…` Enel X.
+    String gestoreDi(String e) =>
+        e.contains('*') ? e.split('*').take(2).join('*') : e.substring(0, math.min(5, e.length));
+    final perGestore = <String, List<String>>{};
+    final nomi = <String, String>{};
+    for (final c in archivio.tutte) {
+      for (final e in c.evse) {
+        final g = gestoreDi(e);
+        (perGestore[g] ??= []).add(e);
+        nomi.putIfAbsent(g, () => c.operatore ?? '');
+      }
+    }
+    final gestori = (perGestore.keys.toList()..sort((a, b) => perGestore[b]!.length.compareTo(perGestore[a]!.length)))
+        .take(40)
+        .toList();
+    final chiesti = [for (final g in gestori) ...perGestore[g]!.take(30)];
+    final pun = DisponibilitaPun();
+    final risposte = <Map>[];
+    for (var i = 0; i < chiesti.length; i += DisponibilitaPun.blocco) {
+      risposte.addAll(await pun.punti(chiesti.sublist(i, math.min(i + DisponibilitaPun.blocco, chiesti.length))));
+    }
+    final righe = <String>['gestore  punti  tempo-reale(sì/no/?)  con-prezzi  energia €/kWh (min–max)  altro'];
+    var conPrezzo = 0;
+    for (final g in gestori) {
+      final suoi = [
+        for (final r in risposte)
+          if (gestoreDi('${r['evse_id']}') == g) r
+      ];
+      var si = 0, no = 0, boh = 0, prezzi = 0;
+      final energia = <double>[];
+      final altro = <String>{};
+      for (final r in suoi) {
+        switch (r['realTime']) {
+          case true:
+            si++;
+          case false:
+            no++;
+          default:
+            boh++;
+        }
+        var ha = false;
+        if (r['punTariffsDetails'] case final Map t) {
+          for (final (tipo, v) in [('AC', t['acTariff']), ('DC', t['dcTariff']), ('HPC', t['hpcTariff'])]) {
+            if (v is! Map) continue;
+            if (v['energy'] case final num e) {
+              energia.add(e.toDouble());
+              ha = true;
+            }
+            for (final voce in ['parking', 'activation', 'time']) {
+              if (v[voce] is num) {
+                altro.add('$tipo $voce ${v[voce]}');
+                ha = true;
+              }
+            }
+          }
+        }
+        if (ha) prezzi++;
+      }
+      conPrezzo += prezzi;
+      energia.sort();
+      righe.add([
+        '$g (${nomi[g]})',
+        '${suoi.length}',
+        '$si/$no/$boh',
+        '$prezzi',
+        energia.isEmpty ? '—' : '${energia.first}–${energia.last}',
+        altro.take(4).join(', '),
+      ].join('  '));
+    }
+    righe.add('');
+    righe.add('con un prezzo: $conPrezzo punti su ${risposte.length}');
+
+    final orologio = Stopwatch()..start();
+    final stati = await pun.statiDiTutti();
+    final l = pun.ultimaLettura!;
+    final conta = <String, int>{};
+    for (final s in stati.values) {
+      conta[s] = (conta[s] ?? 0) + 1;
+    }
+    righe.add('');
+    righe.add('tutta Italia: ${l.punti} punti in ${l.pagine} pagine, ${(l.byte / 1e6).toStringAsFixed(1)} MB '
+        '(compressione: ${l.compressione.isEmpty ? 'nessuna dichiarata' : l.compressione}), '
+        '${orologio.elapsedMilliseconds} ms');
+    righe.add(
+        '  ${(conta.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).map((e) => '${e.key} ${e.value}').join(' · ')}');
+    // Quanti dei punti dell'archivio hanno uno stato nella lettura di tutta Italia.
+    final nellArchivio = [for (final c in archivio.tutte) ...c.evse];
+    righe.add(
+        '  dei ${nellArchivio.length} punti dell\'archivio, ${nellArchivio.where(stati.containsKey).length} hanno uno stato');
+
+    for (final r in righe) {
+      stdout.writeln('PUN resoconto: $r');
+    }
+    if (Platform.environment['GDANAV_ANTEPRIME'] case final cartella?) {
+      File('$cartella/pun_prezzi.txt').writeAsStringSync('${righe.join('\n')}\n');
+    }
+    avviso('PUN prezzi', 'con un prezzo: $conPrezzo punti su ${risposte.length}; tutta Italia ${l.punti} punti');
+    expect(stati.length, greaterThan(50000));
+  },
+      timeout: const Timeout(Duration(minutes: 4)),
       skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 }

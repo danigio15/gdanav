@@ -1,4 +1,5 @@
 import '../geo/geo.dart';
+import 'prezzi.dart';
 
 enum TipoConnettore { ccs2, chademo, tipo2, tesla, altro }
 
@@ -91,6 +92,9 @@ class Colonnina {
     required this.connettori,
     this.operatore,
     this.fonte = '',
+    this.evse = const [],
+    this.tempoReale = true,
+    this.prezzi,
   });
 
   final String id;
@@ -101,6 +105,20 @@ class Colonnina {
 
   /// `ocm`, `ocpi`…: per citare la fonte, come chiedono le licenze.
   final String fonte;
+
+  /// Gli identificativi dei suoi punti di ricarica (EVSE ID,
+  /// `IT*BEC*EW003907*1`), quando la fonte li dà — la PUN sì: servono a
+  /// chiederne lo stato di adesso, che la PUN dà punto per punto.
+  final List<String> evse;
+
+  /// false quando il gestore non manda alla PUN lo stato di adesso dei suoi
+  /// punti ([evse]): la PUN ripete uno stato fisso, e dire «libera» su quello
+  /// sarebbe una bugia. Lo sa l'archivio, da quando l'ha letto.
+  final bool tempoReale;
+
+  /// Quanto costa, come il gestore lo comunica alla PUN: arriva con lo
+  /// stato di adesso, quando la si tocca. `null` se non si è chiesto.
+  final Prezzi? prezzi;
 
   /// La potenza massima fra le prese che l'auto può usare, anche guaste:
   /// quella di targa.

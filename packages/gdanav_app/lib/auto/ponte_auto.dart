@@ -513,7 +513,7 @@ class PonteAuto {
         (a?.allaProssimaM ?? m.lunghezzaM) <= PopupSvincolo.daMetri + 400 &&
         _svincoloChiesto != m.inizio) {
       _svincoloChiesto = m.inizio;
-      unawaited(_disegnaSvincolo(m));
+      unawaited(_disegnaSvincolo(p.viaggio.percorso, m));
     }
     _posizione();
   }
@@ -525,10 +525,13 @@ class PonteAuto {
   int? _svincoloPronto;
 
   /// Lo svincolo in 3D per l'auto: la stessa scena del telefono, in PNG.
-  Future<void> _disegnaSvincolo(Manovra m) async {
+  Future<void> _disegnaSvincolo(PercorsoCalcolato percorso, Manovra m) async {
     if (!_attivo) return;
     try {
-      _manda('svincolo', {'id': m.inizio, 'png': await scenaSvincoloPng(m, larghezza: 960, altezza: 380)});
+      _manda('svincolo', {
+        'id': m.inizio,
+        'png': await scenaSvincoloPng(m, larghezza: 960, altezza: 380, gradi: quantoGiraLaManovra(percorso, m)),
+      });
       _svincoloPronto = m.inizio;
       _guida();
     } catch (_) {

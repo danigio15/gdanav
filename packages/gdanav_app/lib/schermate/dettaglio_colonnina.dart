@@ -13,6 +13,19 @@ Future<void> mostraColonnina(BuildContext context, GestoreViaggio gestore, Strin
   );
 }
 
+/// Da dove vengono i dati di una colonnina, detto come lo chiedono le
+/// licenze: OpenStreetMap e Open Charge Map coi loro «contributors», la PUN
+/// con chi l'ha pubblicata e la licenza. `null` se la fonte non va citata.
+String? creditoColonnina(String fonte) {
+  final f = fonte.split('+');
+  final parti = [
+    if (f.contains('osm')) '© OpenStreetMap contributors',
+    if (f.contains('ocm')) '© Open Charge Map contributors',
+    if (f.contains('pun')) Pun.attribuzione,
+  ];
+  return parti.isEmpty ? null : 'Dati: ${parti.join(' · ')}';
+}
+
 String nomeConnettore(TipoConnettore t) => switch (t) {
   TipoConnettore.ccs2 => 'CCS',
   TipoConnettore.chademo => 'CHAdeMO',
@@ -20,6 +33,56 @@ String nomeConnettore(TipoConnettore t) => switch (t) {
   TipoConnettore.tesla => 'Tesla',
   TipoConnettore.altro => 'Altra presa',
 };
+
+/// Il prezzo di una colonnina in righe da leggere, una per tipo di corrente:
+/// «AC: 0,63 €/kWh · sosta 0,08 €/min». Dove i punti costano diverso, da…
+/// a…: «0,63–0,69 €/kWh».
+List<String> righePrezzi(Prezzi p) {
+  String cifra(double v) => v.toStringAsFixed(2).replaceAll('.', ',');
+  String quanto(Forchetta f) => f.da == f.a ? cifra(f.da) : '${cifra(f.da)}–${cifra(f.a)}';
+  return [
+    for (final c in Corrente.values)
+      if (p.perCorrente[c] case final t?)
+        '${switch (c) {
+          Corrente.ac => 'AC',
+          Corrente.dc => 'DC',
+          Corrente.hpc => 'DC ad alta potenza',
+        }}: ${[
+          if (t.energia case final f?) '${quanto(f)} €/kWh',
+          if (t.tempo case final f?) '${quanto(f)} €/min di ricarica',
+          if (t.avvio case final f?) 'avvio ${quanto(f)} €',
+          if (t.sosta case final f?) 'sosta ${quanto(f)} €/min',
+        ].join(' · ')}',
+  ];
+}
+
+/// Il prezzo nella scheda di una colonnina: le righe, oppure — se la PUN
+/// l'ha detto — che il gestore non lo comunica. Niente se non si è chiesto.
+List<Widget> sezionePrezzo(BuildContext context, Prezzi? prezzi) {
+  if (prezzi == null) return const [];
+  final t = Theme.of(context).textTheme;
+  final muto = Theme.of(context).colorScheme.onSurfaceVariant;
+  if (prezzi.vuoti) {
+    return [
+      const SizedBox(height: 12),
+      Text(
+        'Prezzo: il gestore non lo comunica alla PUN',
+        key: const Key('prezzo-assente'),
+        style: t.bodyMedium?.copyWith(color: muto),
+      ),
+    ];
+  }
+  return [
+    const SizedBox(height: 12),
+    Text('Prezzo', style: t.titleSmall),
+    for (final riga in righePrezzi(prezzi))
+      Padding(padding: const EdgeInsets.only(top: 4), child: Text(riga, key: const Key('prezzo'))),
+    Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Text('Come il gestore lo comunica alla PUN', style: t.bodySmall?.copyWith(color: muto)),
+    ),
+  ];
+}
 
 /// Tutto di una colonnina: prese, potenza, quante libere, e «fermati qui».
 class DettaglioColonnina extends StatelessWidget {
@@ -103,6 +166,7 @@ class DettaglioColonnina extends StatelessWidget {
                   ),
                 ),
             ],
+            ...sezionePrezzo(context, c.dettaglio?.prezzi),
             const SizedBox(height: 20),
             if (c.obbligata)
               SizedBox(
@@ -135,6 +199,8 @@ class DettaglioColonnina extends StatelessWidget {
               'Stato delle prese: PUN e operatori, quando lo pubblicano.',
               style: t.bodySmall?.copyWith(color: muto),
             ),
+            if (creditoColonnina(c.dettaglio?.fonte ?? '') case final credito?)
+              Text(credito, style: t.bodySmall?.copyWith(color: muto)),
           ],
         ),
       ),

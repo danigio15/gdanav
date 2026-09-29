@@ -2,7 +2,17 @@
 /// scrivere indirizzi o chiavi. Per una build diversa si possono cambiare
 /// alla compilazione con `--dart-define=NOME=valore`.
 abstract final class Servizi {
-  /// I percorsi: il server pubblico di FOSSGIS (OpenStreetMap Germania).
+  /// Chi calcola i percorsi: `tomtom` (se c'è la chiave) o `valhalla`.
+  ///
+  /// TomTom perché il suo piano gratuito dà 20.000 percorsi al mese e
+  /// soprattutto conosce il traffico: il tempo di arrivo è quello di adesso.
+  /// Valhalla resta la riserva, e serve a confrontare:
+  /// `--dart-define=GDANAV_MOTORE_PERCORSI=valhalla`.
+  static const motorePercorsi = String.fromEnvironment('GDANAV_MOTORE_PERCORSI', defaultValue: 'tomtom');
+
+  /// La riserva dei percorsi: il server pubblico di FOSSGIS (OpenStreetMap
+  /// Germania). È tenuto in piedi per prova, senza nessuna promessa verso
+  /// chi ci appoggia sopra un'app: si usa solo se manca la chiave TomTom.
   static const valhalla = String.fromEnvironment(
     'GDANAV_VALHALLA',
     defaultValue: 'https://valhalla1.openstreetmap.de/',
@@ -13,8 +23,9 @@ abstract final class Servizi {
   /// meno richieste al minuto.
   static const chiaveOcm = String.fromEnvironment('GDANAV_OCM_CHIAVE', defaultValue: _chiaveOcm);
 
-  /// Il traffico: TomTom, piano gratuito (50.000 riquadri di mappa al
-  /// giorno). Senza chiave la mappa resta senza traffico.
+  /// Il traffico sulla mappa e i percorsi: TomTom, piano gratuito (200.000
+  /// riquadri di traffico e 20.000 percorsi al mese). Senza chiave la mappa
+  /// resta senza traffico e i percorsi tornano a Valhalla.
   static const chiaveTomTom = String.fromEnvironment('GDANAV_TOMTOM_CHIAVE', defaultValue: _chiaveTomTom);
 
   /// Le segnalazioni della comunità (incidenti, polizia, pericoli): il relay

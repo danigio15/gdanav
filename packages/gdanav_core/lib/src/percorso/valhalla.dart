@@ -411,13 +411,15 @@ class _Profilo {
   }
 }
 
-class ErroreValhalla implements Exception {
-  const ErroreValhalla(this.messaggio, {this.stato});
+/// Il motore dei percorsi non ha risposto, o ha risposto di no: vale per
+/// Valhalla e per TomTom, che sopra devono essere la stessa cosa.
+class ErrorePercorso implements Exception {
+  const ErrorePercorso(this.messaggio, {this.stato});
   final String messaggio;
   final int? stato;
 
   @override
-  String toString() => 'Valhalla: $messaggio';
+  String toString() => 'percorso: $messaggio';
 }
 
 /// Come guidare: più veloce, o più piano per consumare meno. Come la
@@ -532,7 +534,7 @@ class ClienteValhalla {
   Future<Map<String, Object?>> _route(Map<String, Object?> corpo) async {
     final r = await _http.post(indirizzo.resolve('route'), headers: _intestazioni, body: jsonEncode(corpo)).timeout(
         const Duration(seconds: 60),
-        onTimeout: () => throw const ErroreValhalla('il server dei percorsi non risponde'));
+        onTimeout: () => throw const ErrorePercorso('il server dei percorsi non risponde'));
     final testo = utf8.decode(r.bodyBytes);
     if (r.statusCode != 200) {
       // Valhalla risponde in JSON; Caddy davanti (chiave sbagliata) no.
@@ -542,7 +544,7 @@ class ClienteValhalla {
       } on FormatException {
         messaggio = testo.trim().isEmpty ? null : testo.trim();
       }
-      throw ErroreValhalla(messaggio ?? 'errore ${r.statusCode}', stato: r.statusCode);
+      throw ErrorePercorso(messaggio ?? 'errore ${r.statusCode}', stato: r.statusCode);
     }
     return jsonDecode(testo) as Map<String, Object?>;
   }
@@ -681,7 +683,7 @@ class ClienteValhalla {
       errore = 'limiti ($modo): ${r.statusCode} ${utf8.decode(r.bodyBytes)}';
     }
     ultimoErroreLimiti = '$errore';
-    throw ErroreValhalla('$errore');
+    throw ErrorePercorso('$errore');
   }
 
   /// Perché gli ultimi limiti non sono arrivati (per le prove).

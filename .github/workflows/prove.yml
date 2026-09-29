@@ -162,11 +162,20 @@ jobs:
   # blocca niente: i server degli altri possono essere lenti.
   # Gira anche sui rami di lavoro (dove il relay non si pubblica), per
   # provare coi dati veri prima di pubblicare l'APK.
+  #
+  # TomTom solo quando lo si chiede: a mano («Run workflow») o con «[tomtom]»
+  # nel messaggio del commit. La chiave è la stessa dell'app, e le 2.500
+  # richieste gratuite al giorno sono di tutti e due: il 28 settembre, a
+  # forza di push, le prove le hanno finite, e l'app riceveva 403 sullo
+  # stato delle colonnine. Senza chiave le prove e le sonde di TomTom si
+  # fermano da sole e tutto il resto gira lo stesso.
   rete:
     needs: [pubblica-relay]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      CHIAVE_TOMTOM_PROVE: ${{ (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[tomtom]')) && secrets.GDANAV_TOMTOM_CHIAVE || '' }}
     permissions:
       contents: write
     defaults:
@@ -183,7 +192,8 @@ jobs:
           GDANAV_RETE: "1"
           GDANAV_PREZZI: ${{ github.workspace }}/prezzi_napoli.json
           GDANAV_COLONNINE: ${{ github.workspace }}/colonnine_utrecht.json
-          GDANAV_TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
+          GDANAV_TOMTOM: ${{ env.CHIAVE_TOMTOM_PROVE }}
+          GDANAV_OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
           GDANAV_ANTEPRIME: ${{ github.workspace }}
       # Prezzi veri di Napoli e colonnine vere di Utrecht nella release, per
       # le anteprime dell'app.
@@ -207,17 +217,73 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "gdanav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app è nella release «anteprima»."
-          for f in anteprima.json anteprima_tappa.json; do
+          for f in anteprima.json anteprima_tappa.json percorso_motori.txt colonnine_fonti.txt pun_prezzi.txt; do
             [ -s "$f" ] && gh release upload lavoro "$f" --clobber
           done
           true
-      - name: Com'è fatto il traffico TomTom
+      - name: Cosa ci dà TomTom — traffico e tessere di mappa
+        # Le sonde sono diagnostica: devono girare anche quando le prove di
+        # rete falliscono, che è proprio quando servono di più. Senza questo,
+        # un server altrui che risponde male ci lascia anche senza le misure
+        # per capire perché.
+        if: always()
         working-directory: .
         env:
-          TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
+          TOMTOM: ${{ env.CHIAVE_TOMTOM_PROVE }}
+          OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
+          GDANAV_ANTEPRIME: ${{ github.workspace }}
+          # I nomi dei servizi hanno trattini lunghi e accenti: senza questo
+          # una sonda muore a metà invece di dire quello che ha trovato.
+          PYTHONIOENCODING: utf-8
         run: |
-          pip install mapbox-vector-tile
-          python3 tools/sonda_traffico.py
+          # Ognuna per conto suo: sono sonde, servono a guardare. Se una
+          # inciampa — o se pip non trova PyPI, che è già successo — le altre
+          # devono andare avanti lo stesso.
+          pip install mapbox-vector-tile pillow || echo "::warning title=Sonde::pip non ha risposto: le sonde che vogliono le librerie non girano"
+          for sonda in sonda_traffico sonda_mappa anteprima_tomtom sonda_percorso sonda_colonnine sonda_ocpi sonda_pun; do
+            python3 "tools/$sonda.py" || echo "::warning title=Sonde::$sonda non ha finito"
+          done
+      # Cosa chiama davvero la mappa pubblica della PUN, aperta con un browser
+      # come la apre chiunque: il contratto della sua API di oggi, letto dal
+      # suo stesso cliente. Diagnostica come le sonde: gira sempre.
+      - name: Cosa chiama la mappa della PUN
+        if: always()
+        working-directory: tools/pun
+        env:
+          USCITA: ${{ github.workspace }}/pun_api.txt
+          USCITA_OPERATORI: ${{ github.workspace }}/pun_operatori.json
+        run: |
+          npm init -y > /dev/null
+          if ! npm install puppeteer@23 --no-audit --no-fund > /dev/null 2>&1; then
+            echo "::warning title=PUN API::puppeteer non si installa"
+            exit 0
+          fi
+          node cattura.mjs || echo "::warning title=PUN API::la cattura non ha finito"
+      - name: Le anteprime della mappa TomTom, da guardare
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mappa-tomtom
+          path: tomtom-*.png
+          if-no-files-found: ignore
+      # Anche nella release «lavoro», accanto agli altri dati per le
+      # anteprime: da lì si aprono con un indirizzo, senza scaricare uno zip.
+      - name: Le anteprime della mappa anche nella release
+        if: always()
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls tomtom-*.png > /dev/null 2>&1 || exit 0
+          gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "gdanav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app è nella release «anteprima»."
+          gh release upload lavoro tomtom-*.png --clobber
+          ls percorso-*.json > /dev/null 2>&1 && gh release upload lavoro percorso-*.json --clobber
+          [ -s colonnine_sonda.txt ] && gh release upload lavoro colonnine_sonda.txt --clobber
+          [ -s ocpi_sonda.txt ] && gh release upload lavoro ocpi_sonda.txt --clobber
+          [ -s pun_sonda.txt ] && gh release upload lavoro pun_sonda.txt --clobber
+          [ -s pun_api.txt ] && gh release upload lavoro pun_api.txt --clobber
+          [ -s pun_operatori.json ] && gh release upload lavoro pun_operatori.json --clobber
+          true
 
   # Le foto vere delle auto, da Wikimedia Commons: solo quando il commit lo
   # chiede con «[foto-auto]». Il JSON va nella release «anteprima», da
@@ -244,10 +310,12 @@ jobs:
           gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
           gh release upload anteprima foto_auto.json foto_auto.tsv --clobber
 
-  # Le colonnine rapide per l'archivio dentro l'app, dagli estratti completi
-  # di OpenStreetMap (Geofabrik) filtrati con osmium: niente Overpass, che è
-  # spesso sovraccarico. Solo quando il commit lo chiede con «[colonnine]»;
-  # il JSON va nella release «anteprima», da mettere in packages/gdanav_app/assets.
+  # Le colonnine per l'archivio dentro l'app, dagli estratti completi di
+  # OpenStreetMap (Geofabrik) filtrati con osmium — niente Overpass, che è
+  # spesso sovraccarico — più i posti della Piattaforma Unica Nazionale nel
+  # CSV di onData (CC BY 4.0). Solo quando il commit lo chiede con
+  # «[colonnine]»; il JSON va nella release «anteprima», da mettere in
+  # packages/gdanav_app/assets.
   colonnine-dati:
     if: contains(github.event.head_commit.message, '[colonnine]')
     runs-on: ubuntu-latest
@@ -259,6 +327,9 @@ jobs:
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: 3.13.4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - run: sudo apt-get update && sudo apt-get install -y osmium-tool
       - name: Estratti e colonnine
         working-directory: ${{ runner.temp }}
@@ -279,6 +350,24 @@ jobs:
         working-directory: packages/gdanav_core
       - run: dart run tool/colonnine_osm.dart colonnine.json ${{ runner.temp }}/*.colonnine.geojsonseq
         working-directory: packages/gdanav_core
+      # La PUN: dove OpenStreetMap non arriva. Al Centro Direzionale di Napoli
+      # le stazioni passano da quattro a quattordici, le prese da 9 a 841.
+      # Quella di oggi dall'API del portale, come la legge AgID nel Cruscotto
+      # Italia (tools/pun/estrai.py); se non risponde, la fotografia di onData
+      # del 2024 — e allora la citazione nell'app va cambiata a mano.
+      - name: La PUN nell'archivio
+        working-directory: packages/gdanav_core
+        run: |
+          set -eo pipefail
+          pip install --quiet requests requests-aws4auth
+          if python3 ../../tools/pun/estrai.py ${{ runner.temp }}/pun.csv | tee -a $GITHUB_STEP_SUMMARY; then
+            echo "PUN: l'estrazione di oggi, dall'API del portale" | tee -a $GITHUB_STEP_SUMMARY
+          else
+            echo "::warning title=PUN::l'API non ha risposto: si usa la fotografia di onData (2024), e la citazione nell'app va cambiata"
+            curl -sSfL --retry 5 -o ${{ runner.temp }}/pun.csv \
+              https://raw.githubusercontent.com/ondata/rete_ricarica_veicoli_elettrici/main/data/pdr_latest_ready.csv
+          fi
+          dart run tool/colonnine_pun.dart colonnine.json ${{ runner.temp }}/pun.csv colonnine.json | tee -a $GITHUB_STEP_SUMMARY
       - run: dart run tool/autovelox_osm.dart autovelox.json ${{ runner.temp }}/*.autovelox.geojsonseq
         working-directory: packages/gdanav_core
       - name: Nella release
@@ -333,6 +422,7 @@ jobs:
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
+          GDANAV_ANTEPRIME: ${{ github.workspace }}
       - run: cp build/app/outputs/flutter-apk/app-release.apk gdanav.apk
       # Il pacchetto per il Play Store (test interno): da lì Android Auto
       # mostra l'app senza «Origini sconosciute». Premium come nell'APK qui
@@ -346,6 +436,7 @@ jobs:
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
+          GDANAV_ANTEPRIME: ${{ github.workspace }}
       - run: cp build/app/outputs/bundle/release/app-release.aab gdanav.aab
       - uses: actions/upload-artifact@v4
         with:
@@ -403,6 +494,7 @@ jobs:
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
+          GDANAV_ANTEPRIME: ${{ github.workspace }}
       - name: Ci sono le chiavi di Apple?
         id: chiavi
         env:
