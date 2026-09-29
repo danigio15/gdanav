@@ -277,8 +277,21 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
       sorgenteDistributori: {'type': 'geojson', 'data': _vuota},
       sorgenteVicine: {'type': 'geojson', 'data': _vuota},
       // Raggruppate da MapLibre: da lontano un cerchio col numero, da vicino
-      // una per una.
-      sorgenteTutte: {'type': 'geojson', 'data': _vuota, 'cluster': true, 'clusterRadius': 50, 'clusterMaxZoom': 12},
+      // una per una. Il numero del cerchio sono le prese, sommate dentro il
+      // gruppo, non le colonnine.
+      sorgenteTutte: {
+        'type': 'geojson',
+        'data': _vuota,
+        'cluster': true,
+        'clusterRadius': 50,
+        'clusterMaxZoom': 12,
+        'clusterProperties': {
+          'prese': [
+            '+',
+            ['get', 'prese'],
+          ],
+        },
+      },
       if (traffico.isNotEmpty)
         'traffico': {
           'type': 'vector',
@@ -680,13 +693,13 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'circle-opacity': 0.92,
           'circle-radius': [
             'step',
-            ['get', 'point_count'],
+            ['get', 'prese'],
             14,
-            50,
+            100,
             18,
-            500,
+            1000,
             23,
-            5000,
+            10000,
             28,
           ],
           'circle-stroke-width': 2,
@@ -699,7 +712,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         'source': sorgenteTutte,
         'filter': ['has', 'point_count'],
         'layout': {
-          'text-field': ['get', 'point_count_abbreviated'],
+          'text-field': _numeroCorto(['get', 'prese']),
           'text-font': ['Noto Sans Bold'],
           'text-size': 12,
           'text-allow-overlap': true,
@@ -738,6 +751,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         },
         'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 1.6},
       },
+      ..._bollinoPrese('gdanav-tutte', sorgenteTutte, _coloriIcona['ignota']!, sfusa: true),
       // Intorno a te: i distributori col prezzo (auto termica) o le
       // colonnine rapide col colore dello stato (auto elettrica).
       {
@@ -768,6 +782,13 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         },
         'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 1.6},
       },
+      ..._bollinoPrese('gdanav-vicine', sorgenteVicine, [
+        'match',
+        ['get', 'stato'],
+        for (final MapEntry(:key, :value) in _coloriIcona.entries)
+          if (key != 'ignota') ...[key, value],
+        _coloriIcona['ignota']!,
+      ], minzoom: 10),
       {
         'id': 'gdanav-distributori',
         'type': 'symbol',
@@ -1059,3 +1080,105 @@ Map<String, Object> _coda(String id, {required bool principali, required double 
     },
   };
 }
+
+/// I colori delle icone delle colonnine, uno per stato: gli stessi di
+/// `coloriColonnina` (componenti/icone_punti.dart), che le disegna. Qui e
+/// non dal tema, perché il bollino deve avere il colore dell'icona su cui
+/// sta, che è uguale col chiaro e con lo scuro.
+const _coloriIcona = {
+  'libera': '#16A34A',
+  'piena': '#D97706',
+  'guasta': '#DC2626',
+  'ignota': '#4F46E5',
+};
+
+/// Il numero delle prese in un bollino bianco, fuori dall'icona in alto a
+/// destra: «fai vedere il numero all'esterno». Solo dove le prese sono più
+/// di una — una presa sola è l'icona stessa.
+///
+/// Un cerchio e un testo spostati di qualche punto sullo schermo
+/// (`translate` sulla vista, non sulla mappa: il bollino resta in alto a
+/// destra anche girando la mappa). Il cerchio cresce con le cifre.
+List<Map<String, Object>> _bollinoPrese(
+  String strato,
+  String sorgente,
+  Object colore, {
+  bool sfusa = false,
+  double? minzoom,
+}) {
+  const spostamento = [15, -15];
+  final filtro = [
+    'all',
+    if (sfusa) [
+      '!',
+      ['has', 'point_count'],
+    ],
+    [
+      '>',
+      ['get', 'prese'],
+      1,
+    ],
+  ];
+  return [
+    {
+      'id': '$strato-prese-fondo',
+      'type': 'circle',
+      'source': sorgente,
+      'minzoom': ?minzoom,
+      'filter': filtro,
+      'paint': {
+        'circle-radius': [
+          'step',
+          ['get', 'prese'],
+          8,
+          10,
+          9.5,
+          100,
+          11.5,
+          1000,
+          13,
+        ],
+        'circle-color': '#FFFFFF',
+        'circle-stroke-color': colore,
+        'circle-stroke-width': 1.6,
+        'circle-translate': spostamento,
+        'circle-translate-anchor': 'viewport',
+        'circle-pitch-alignment': 'viewport',
+      },
+    },
+    {
+      'id': '$strato-prese',
+      'type': 'symbol',
+      'source': sorgente,
+      'minzoom': ?minzoom,
+      'filter': filtro,
+      'layout': {
+        'text-field': _numeroCorto(['get', 'prese']),
+        'text-font': ['Noto Sans Bold'],
+        'text-size': 9.5,
+        'text-allow-overlap': true,
+        'text-ignore-placement': true,
+      },
+      'paint': {'text-color': colore, 'text-translate': spostamento, 'text-translate-anchor': 'viewport'},
+    },
+  ];
+}
+
+/// Un numero da scrivere in un cerchio: intero fino a 9999, poi in migliaia
+/// («12k»).
+List<Object> _numeroCorto(List<Object> numero) => [
+  'case',
+  ['>=', numero, 10000],
+  [
+    'concat',
+    [
+      'to-string',
+      [
+        'round',
+        ['/', numero, 1000],
+      ],
+    ],
+    'k',
+  ],
+  ['to-string', numero],
+];

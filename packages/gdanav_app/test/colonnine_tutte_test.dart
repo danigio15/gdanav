@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gdanav_app/mappa/dati_viaggio.dart';
 import 'package:gdanav_app/mappa/stile.dart';
 import 'package:gdanav_app/stato/archivio.dart';
 import 'package:gdanav_app/stato/gestore_viaggio.dart';
@@ -81,7 +82,7 @@ void main() {
     // Sulla mappa solo dove, quale e quanti kW: sono decine di migliaia.
     final elementi = vicini.datiTutte()['features']! as List;
     expect(elementi, hasLength(3));
-    expect((elementi[1] as Map)['properties'], {'id': 'plenitude', 'kw': 22});
+    expect((elementi[1] as Map)['properties'], {'id': 'plenitude', 'kw': 22, 'prese': 1});
 
     // Chiamarla due volte non la rifà.
     vicini.avviaTutte();
@@ -133,5 +134,65 @@ void main() {
     expect(strati.indexOf('gdanav-tutte-gruppi'), lessThan(strati.indexOf('gdanav-vicine')));
     expect(strati.indexOf('gdanav-tutte'), lessThan(strati.indexOf('gdanav-vicine')));
     expect(stratiToccabili, containsAll(['gdanav-tutte', 'gdanav-tutte-gruppi']));
+  });
+
+  /* «Al Centro Direzionale è 1 ma sono 200 prese», e «fai vedere il numero
+   * all'esterno»: un'icona è un posto, e il numero che conta sono le prese. */
+  test('il numero delle prese: nel bollino fuori dall\'icona, e sommato nei gruppi', () {
+    final isolaA3 = Colonnina(
+      id: 'pun:a3',
+      nome: 'Centro Direzionale Isola A3',
+      operatore: 'Plenitude',
+      posizione: const Punto(40.858, 14.279),
+      connettori: [for (var i = 0; i < 202; i++) const Connettore(tipo: TipoConnettore.tipo2, potenzaKw: 22)],
+      fonte: 'pun',
+    );
+    final mista = Colonnina(
+      id: 'mista',
+      nome: 'Area di servizio',
+      posizione: const Punto(41.9, 12.5),
+      connettori: const [
+        Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150),
+        Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150),
+        Connettore(tipo: TipoConnettore.chademo, potenzaKw: 50),
+      ],
+    );
+    // Si contano le prese che l'auto può usare.
+    expect(preseAdatte(isolaA3, {TipoConnettore.ccs2, TipoConnettore.tipo2}), 202);
+    expect(preseAdatte(mista, {TipoConnettore.ccs2, TipoConnettore.tipo2}), 2);
+    final dati = datiColonnineTutte([isolaA3, mista], {TipoConnettore.ccs2, TipoConnettore.tipo2});
+    expect([for (final e in (dati['features']! as List).cast<Map>()) (e['properties'] as Map)['prese']], [202, 2]);
+    expect(
+      ((datiColonnineVicine([isolaA3], {TipoConnettore.tipo2})['features']! as List).single as Map)['properties'],
+      containsPair('prese', 202),
+    );
+
+    final stile = stileMappa(scuro: true);
+    // I gruppi sommano le prese, e il numero nel cerchio è quella somma.
+    final sorgente = (stile['sources']! as Map)[sorgenteTutte] as Map;
+    expect(sorgente['clusterProperties'], {
+      'prese': [
+        '+',
+        ['get', 'prese'],
+      ],
+    });
+    final strati = (stile['layers']! as List).cast<Map>();
+    Map strato(String id) => strati.singleWhere((l) => l['id'] == id);
+    expect('${(strato('gdanav-tutte-numeri')['layout'] as Map)['text-field']}', contains('prese'));
+    expect('${(strato('gdanav-tutte-numeri')['layout'] as Map)['text-field']}', isNot(contains('point_count')));
+    // Il bollino: un cerchio bianco e il numero, spostati in alto a destra
+    // sullo schermo, subito sopra l'icona a cui appartengono.
+    final ordine = [for (final l in strati) l['id']];
+    for (final icona in ['gdanav-tutte', 'gdanav-vicine']) {
+      final fondo = strato('$icona-prese-fondo'), numero = strato('$icona-prese');
+      expect(ordine.indexOf('$icona-prese-fondo'), ordine.indexOf(icona) + 1);
+      expect(ordine.indexOf('$icona-prese'), ordine.indexOf(icona) + 2);
+      expect((fondo['paint'] as Map)['circle-translate-anchor'], 'viewport');
+      expect((numero['paint'] as Map)['text-translate'], (fondo['paint'] as Map)['circle-translate']);
+      // Una presa sola non ha bollino: l'icona basta.
+      expect('${fondo['filter']}', contains('[>, [get, prese], 1]'));
+    }
+    // Sui gruppi niente bollino: il numero ce l'hanno dentro.
+    expect('${strato('gdanav-tutte-prese-fondo')['filter']}', contains('point_count'));
   });
 }

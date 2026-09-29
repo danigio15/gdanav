@@ -265,22 +265,31 @@ Map<String, Object?> datiColonnineVicine(List<Colonnina> elenco, Set<TipoConnett
         'nome': c.nome,
         'stato': statoDi(c.disponibilitaPer(connettori)).name,
         'etichetta': '${c.potenzaNominalePer(connettori).round()} kW',
+        'prese': preseAdatte(c, connettori),
       },
     ),
 ]);
 
 /// Tutte le colonnine dell'archivio sulla mappa. Sono decine di migliaia,
 /// quindi solo quello che serve a disegnarle e a riconoscerle al tocco:
-/// dove, quale, quanti kW. Il nome e il resto si prendono dall'archivio
-/// quando se ne tocca una — con anche quelli i dati passavano da quattro a
-/// otto megabyte.
+/// dove, quale, quanti kW e quante prese. Il nome e il resto si prendono
+/// dall'archivio quando se ne tocca una — con anche quelli i dati passavano
+/// da quattro a otto megabyte.
 Map<String, Object?> datiColonnineTutte(List<Colonnina> elenco, Set<TipoConnettore> connettori) => _collezione([
   for (final c in elenco)
     _elemento(
       {'type': 'Point', 'coordinates': _xy(c.posizione)},
-      {'id': c.id, 'kw': c.potenzaNominalePer(connettori).round()},
+      {'id': c.id, 'kw': c.potenzaNominalePer(connettori).round(), 'prese': preseAdatte(c, connettori)},
     ),
 ]);
+
+/// Quante prese di questa colonnina può usare l'auto: il numero nel bollino
+/// fuori dall'icona, e quello che sommano i cerchi dei gruppi.
+///
+/// «Al Centro Direzionale è 1, ma sono 200 prese.» Un'icona è un posto, e un
+/// posto può avere una presa o duecento: contare le icone diceva quanti
+/// posti, non quante auto ci si possono attaccare.
+int preseAdatte(Colonnina c, Set<TipoConnettore> connettori) => c.connettori.where((p) => connettori.contains(p.tipo)).length;
 
 /// Il riquadro che contiene tutto il percorso: sud-ovest e nord-est.
 (Punto, Punto)? confini(Viaggio v, {List<PercorsoCalcolato> anche = const []}) {
