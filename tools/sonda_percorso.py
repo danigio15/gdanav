@@ -35,6 +35,14 @@ VIAGGI = [
 
 MOTORI = [
     ("classico", "https://api.tomtom.com/routing/1/calculateRoute", {}),
+    # Le corsie non stanno nelle istruzioni: TomTom le dà come sezioni a
+    # parte, «LANES», solo se si chiedono. Qui si chiedono, con tutte le
+    # altre che usa l'app.
+    (
+        "corsie",
+        "https://api.tomtom.com/routing/1/calculateRoute",
+        {"sectionType": ["traffic", "speedLimit", "tollRoad", "motorway", "ferry", "carTrain", "lanes"]},
+    ),
     (
         "orbis",
         "https://api.tomtom.com/maps/orbis/routing/calculateRoute",
@@ -132,6 +140,15 @@ for nome, (a_lat, a_lon), (b_lat, b_lon) in VIAGGI:
         avviso(
             f"{eti} limiti",
             json.dumps(limiti[0], ensure_ascii=False) if limiti else "NESSUN limite di velocita' nelle sezioni",
+        )
+
+        # Le corsie come sezioni: dove cominciano, che frecce hanno, quale seguire.
+        sez_corsie = [x for x in sezioni if x.get("sectionType") == "LANES"]
+        avviso(
+            f"{eti} sezioni LANES",
+            f"{len(sez_corsie)} tratti con le corsie; esempio {json.dumps(sez_corsie[0], ensure_ascii=False)}"
+            if sez_corsie
+            else "NESSUNA sezione LANES",
         )
 
         with open(f"percorso-{nome}-{motore}.json", "w", encoding="utf-8") as f:

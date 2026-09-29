@@ -10,7 +10,8 @@ import io.flutter.plugin.common.MethodChannel
 /**
  * Cosa vede il telefono di gdanav per Android Auto: se il servizio per
  * l'auto è registrato, che versione di Android Auto c'è e chi ha installato
- * l'app. Serve a capire perché l'app non compare sull'auto.
+ * l'app. Serve a capire perché l'app non compare sull'auto. E il traffico
+ * che la mappa dell'auto ha ricevuto nell'ultimo viaggio ([DiagnosiTraffico]).
  */
 object Diagnosi {
     private const val ANDROID_AUTO = "com.google.android.projection.gearhead"
@@ -49,7 +50,10 @@ object Diagnosi {
             null
         }
         val meta = pm.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA).metaData
+        DiagnosiTraffico.leggi(context)
         return mapOf(
+            // Il traffico visto dalla mappa dell'auto nell'ultimo viaggio.
+            "traffico" to DiagnosiTraffico.comeMappa(),
             "servizio" to servizi.isNotEmpty(),
             "navigazione" to navigazione.isNotEmpty(),
             "descrittore" to (meta?.getInt("com.google.android.gms.car.application", 0) != 0),

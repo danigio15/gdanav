@@ -397,9 +397,11 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
       _strada('autostrade', classi['autostrada']!, t.autostrada, _largo(3.4, 32)),
       // Il traffico come in Waze: solo dove si rallenta, arancio se lento e
       // rosso se quasi fermi; da lontano solo sulle strade principali.
+      // Sull'auto più spesse: lo schermo si guarda da un braccio di
+      // distanza, di sfuggita, e la mappa è sempre vicina.
       if (traffico.isNotEmpty) ...[
-        _coda(stratoTraffico, principali: true, minzoom: 7),
-        _coda(stratoTrafficoLocale, principali: false, minzoom: 13),
+        _coda(stratoTraffico, principali: true, minzoom: 7, spessore: perAuto ? 1.6 : 1),
+        _coda(stratoTrafficoLocale, principali: false, minzoom: 13, spessore: perAuto ? 1.6 : 1),
       ],
       {
         'id': stratoEdifici2d,
@@ -1050,7 +1052,7 @@ List<Object> _eUnaGrande() => [
 
 /// Le strade dove TomTom misura una coda: sotto 0,6 si rallenta, sotto 0,3 si
 /// è fermi.
-Map<String, Object> _coda(String id, {required bool principali, required double minzoom}) {
+Map<String, Object> _coda(String id, {required bool principali, required double minzoom, double spessore = 1}) {
   return {
     'id': id,
     'type': 'line',
@@ -1070,11 +1072,11 @@ Map<String, Object> _coda(String id, {required bool principali, required double 
         ['linear'],
         ['zoom'],
         7,
-        1.2,
+        1.2 * spessore,
         12,
-        2.5,
+        2.5 * spessore,
         16,
-        5,
+        5 * spessore,
       ],
       'line-opacity': 0.9,
     },
