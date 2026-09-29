@@ -421,4 +421,50 @@ void main() {
   },
       timeout: const Timeout(Duration(minutes: 3)),
       skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  // Libere e occupate dalla PUN col codice dell'app, sul server vero: le
+  // credenziali ospite di Cognito, la firma di AWS e la risposta com'è oggi —
+  // le prove del motore la simulano. Le colonnine sono quelle dell'archivio
+  // che l'app ha dentro: le cinque più grandi del Centro Direzionale di
+  // Napoli, e una per ognuno degli altri gestori lì intorno.
+  test('libere e occupate dalla PUN, al Centro Direzionale', () async {
+    final archivio = ArchivioColonnine.leggi(File('../gdanav_app/assets/colonnine.json').readAsStringSync());
+    const centro = Punto(40.8575, 14.2815);
+    final vicine = [
+      for (final c in archivio.tutte)
+        if (c.evse.isNotEmpty && distanzaM(centro, c.posizione) < 1200) c,
+    ]..sort((a, b) => b.evse.length.compareTo(a.evse.length));
+    expect(vicine, isNotEmpty, reason: "l'archivio dell'app deve avere gli EVSE ID della PUN");
+    final gestori = <String>{};
+    final scelte = [
+      ...vicine.take(5),
+      for (final c in vicine.skip(5))
+        if (gestori.add(c.operatore ?? '')) c,
+    ];
+    final pun = DisponibilitaPun();
+    var risposte = 0;
+    for (final c in scelte) {
+      final orologio = Stopwatch()..start();
+      try {
+        final adesso = await pun.aggiorna(c);
+        if (!identical(adesso, c)) risposte++;
+        final quante = <StatoPresa, int>{};
+        for (final p in adesso.connettori) {
+          quante[p.stato] = (quante[p.stato] ?? 0) + 1;
+        }
+        int n(StatoPresa s) => quante[s] ?? 0;
+        final cosa = identical(adesso, c)
+            ? 'nessuna risposta per i suoi punti'
+            : 'libere ${n(StatoPresa.disponibile)}, occupate ${n(StatoPresa.occupata)}, '
+                'guaste ${n(StatoPresa.fuoriServizio)}, non si sa ${n(StatoPresa.sconosciuto)}';
+        avviso('PUN dal vivo',
+            '${c.nome} (${c.operatore}): ${c.evse.length} punti — $cosa (${orologio.elapsedMilliseconds} ms)');
+      } catch (e) {
+        avviso('PUN dal vivo', '${c.nome}: errore dopo ${orologio.elapsedMilliseconds} ms: $e');
+      }
+    }
+    expect(risposte, greaterThan(0), reason: 'la PUN deve rispondere almeno per una colonnina');
+  },
+      timeout: const Timeout(Duration(minutes: 3)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 }
