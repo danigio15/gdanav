@@ -144,6 +144,11 @@ class GestoreVicini extends ChangeNotifier {
     try {
       final nuova = await _statoAdesso(c);
       colonnine = [for (final x in colonnine) x.id == id ? nuova : x];
+      /* Una toccata sulla mappa di tutta Italia, lontana da qui, non è fra
+       * quelle intorno: lo stato si metteva solo lì, e la scheda — che la
+       * ritrova in [colonnina] — continuava a leggere quella dell'archivio,
+       * senza libere e occupate. */
+      if (_perId.containsKey(id)) _perId[id] = nuova;
       notifyListeners();
       return nuova;
     } catch (e) {

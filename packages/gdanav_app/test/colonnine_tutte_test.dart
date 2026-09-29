@@ -95,6 +95,36 @@ void main() {
     expect(vicini.versioneTutte, 2);
   });
 
+  testWidgets('una colonnina lontana toccata sulla mappa tiene lo stato di adesso', (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final a = await ambiente(tester);
+    final vicini = GestoreVicini(
+      auto: a.auto,
+      posizione: a.posizione,
+      distributori: (_) async => const [],
+      // Intorno a te nessuna: la rapida di Milano si tocca sulla mappa di
+      // tutta Italia.
+      colonnine: (_, _) async => const [],
+      tutte: (_) async => archivioProva.tutte.toList(),
+      statoAdesso: (c) async => Colonnina(
+        id: c.id,
+        nome: c.nome,
+        posizione: c.posizione,
+        operatore: c.operatore,
+        fonte: c.fonte,
+        connettori: [for (final p in c.connettori) p.conStato(StatoPresa.disponibile)],
+      ),
+    );
+    addTearDown(vicini.dispose);
+    vicini.avviaTutte();
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    expect(vicini.colonnina('rapida')!.connettori.single.stato, StatoPresa.sconosciuto);
+
+    await tester.runAsync(() => vicini.statoAdesso('rapida'));
+    // La scheda la ritrova con [colonnina]: lì deve esserci lo stato nuovo.
+    expect(vicini.colonnina('rapida')!.connettori.single.stato, StatoPresa.disponibile);
+  });
+
   test('lo stile: tutte le colonnine raggruppate, sotto quelle intorno a te, e si toccano', () {
     final stile = stileMappa(scuro: false);
     final sorgente = (stile['sources']! as Map)[sorgenteTutte] as Map;
