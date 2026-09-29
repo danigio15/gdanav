@@ -125,6 +125,9 @@ risponde di sì:
 2. Su GitHub, Settings → Secrets and variables → Actions → **Variables** →
    `GDANAV_CARPLAY` = `si`. Da lì in poi la build usa
    `RunnerCarPlay.entitlements`.
+3. Si lancia una build per TestFlight. Il passo «Il permesso di CarPlay
+   nell'archivio» mostra i permessi dell'app: se `com.apple.developer.carplay-maps`
+   non c'è, si ferma lì e su TestFlight non va niente.
 
 Per provarlo prima, su un Mac: Xcode → Open Developer Tool → Simulator, poi
 nel simulatore I/O → External Displays → CarPlay. Nel simulatore il permesso
