@@ -446,6 +446,19 @@ jobs:
             -archivePath build/gdanav.xcarchive archive \
             DEVELOPMENT_TEAM="$SQUADRA" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+      # L'archivio è senza firma, e l'esportazione firma coi permessi che
+      # trova già scritti nell'app: senza questo passo il permesso di CarPlay
+      # resterebbe fuori. Qui l'app si firma «per finta» (ad hoc) col
+      # permesso dentro; la firma vera la rimette l'esportazione, che lo
+      # tiene perché il profilo di Apple ce l'ha.
+      - name: Il permesso di CarPlay nell'archivio
+        if: steps.chiavi.outputs.ci-sono == 'si' && vars.GDANAV_CARPLAY == 'si'
+        run: |
+          app=$(echo build/gdanav.xcarchive/Products/Applications/*.app)
+          codesign --force --deep --sign - "$app"
+          codesign --force --sign - --entitlements ios/Runner/Runner.entitlements "$app"
+          codesign -d --entitlements - "$app" | tee build/permessi.txt
+          grep -q com.apple.developer.carplay-maps build/permessi.txt
       # Su TestFlight solo da main (o a mano): le richieste di unione si
       # fermano all'archivio firmato.
       - name: Su TestFlight
