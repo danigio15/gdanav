@@ -38,8 +38,6 @@ String nomeConnettore(TipoConnettore t) => switch (t) {
 /// «AC: 0,63 €/kWh · sosta 0,08 €/min». Dove i punti costano diverso, da…
 /// a…: «0,63–0,69 €/kWh».
 List<String> righePrezzi(Prezzi p) {
-  String cifra(double v) => v.toStringAsFixed(2).replaceAll('.', ',');
-  String quanto(Forchetta f) => f.da == f.a ? cifra(f.da) : '${cifra(f.da)}–${cifra(f.a)}';
   return [
     for (final c in Corrente.values)
       if (p.perCorrente[c] case final t?)
@@ -48,12 +46,61 @@ List<String> righePrezzi(Prezzi p) {
           Corrente.dc => 'DC',
           Corrente.hpc => 'DC ad alta potenza',
         }}: ${[
-          if (t.energia case final f?) '${quanto(f)} €/kWh',
-          if (t.tempo case final f?) '${quanto(f)} €/min di ricarica',
-          if (t.avvio case final f?) 'avvio ${quanto(f)} €',
-          if (t.sosta case final f?) 'sosta ${quanto(f)} €/min',
+          if (t.energia case final f?) '${_quanto(f)} €/kWh',
+          if (t.tempo case final f?) '${_quanto(f)} €/min di ricarica',
+          if (t.avvio case final f?) 'avvio ${_quanto(f)} €',
+          if (t.sosta case final f?) 'sosta ${_quanto(f)} €/min',
         ].join(' · ')}',
   ];
+}
+
+String _cifra(double v) => v.toStringAsFixed(2).replaceAll('.', ',');
+String _quanto(Forchetta f) => f.da == f.a ? _cifra(f.da) : '${_cifra(f.da)}–${_cifra(f.a)}';
+
+/// Il prezzo per la scheda sullo schermo dell'auto, che ha posto per una
+/// riga sola: la tariffa della corrente con cui quell'auto caricherebbe lì —
+/// ad alta potenza se la colonnina ne ha, poi continua, poi alternata — e
+/// sotto quello che si paga oltre l'energia. Se il gestore comunica solo
+/// un'altra corrente, quella: meglio un prezzo vero che niente.
+///
+/// `null` se il prezzo non si è chiesto; «Prezzo non comunicato» se la PUN
+/// ha risposto che il gestore non lo manda.
+({String titolo, String? testo, bool comunicato})? prezzoInAuto(Colonnina c, Set<TipoConnettore> compatibili) {
+  final p = c.prezzi;
+  if (p == null) return null;
+  if (p.vuoti) return (titolo: 'Prezzo non comunicato', testo: 'il gestore non lo manda alla PUN', comunicato: false);
+  final adatte = c.connettori.where((k) => compatibili.contains(k.tipo));
+  final continua = [
+    for (final k in adatte)
+      if (k.tipo != TipoConnettore.tipo2 && k.tipo != TipoConnettore.altro) k.potenzaKw,
+  ];
+  final ordine = [
+    if (continua.isNotEmpty)
+      ...(continua.reduce((a, b) => a > b ? a : b) >= 150 ? [Corrente.hpc, Corrente.dc] : [Corrente.dc, Corrente.hpc]),
+    if (adatte.any((k) => k.tipo == TipoConnettore.tipo2)) Corrente.ac,
+    ...Corrente.values.reversed,
+  ];
+  bool dice(Tariffa? t) => t != null && (t.energia ?? t.tempo ?? t.sosta ?? t.avvio) != null;
+  final corrente = ordine.where((x) => dice(p.perCorrente[x])).firstOrNull;
+  if (corrente == null) return null;
+  final t = p.perCorrente[corrente]!;
+  final quale = switch (corrente) {
+    Corrente.ac => 'in alternata',
+    Corrente.dc => 'in continua',
+    Corrente.hpc => 'ad alta potenza',
+  };
+  final voci = [
+    if (t.energia case final f?) '${_quanto(f)} €/kWh $quale',
+    if (t.tempo case final f?) t.energia == null ? '${_quanto(f)} €/min $quale' : '${_quanto(f)} €/min di ricarica',
+    if (t.sosta case final f?) 'sosta ${_quanto(f)} €/min',
+    if (t.avvio case final f?) 'avvio ${_quanto(f)} €',
+  ];
+  final prima = voci.first;
+  return (
+    titolo: prima[0].toUpperCase() + prima.substring(1),
+    testo: voci.length > 1 ? voci.skip(1).join(' · ') : null,
+    comunicato: true,
+  );
 }
 
 /// Il prezzo nella scheda di una colonnina: le righe, oppure — se la PUN

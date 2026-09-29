@@ -54,6 +54,14 @@ void main() {
     final p = await tester.runAsync(() => Archivio().preferenze());
     expect(p!.potenzaMinimaKw, 150);
     expect(p.evitaOccupate, isFalse);
+
+    // La potenza è quella delle soste: la scelta più bassa è 22 kW, non «Tutte».
+    expect(find.text('Soste del viaggio (kW)'), findsOneWidget);
+    expect(find.text('Tutte'), findsNothing);
+    await tester.tap(find.text('≥ 22'));
+    await aspetta(tester);
+    final bassa = await tester.runAsync(() => Archivio().preferenze());
+    expect(bassa!.potenzaMinimaKw, PreferenzeRicarica.minimaSoste);
   });
 
   testWidgets('le soste dicono se la colonnina è libera o piena, e si evita la piena', (tester) async {

@@ -1,9 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' show Point;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:gdanav_core/gdanav_core.dart' show TipoSegnalazione;
+import 'package:gdanav_core/gdanav_core.dart' show Punto, Rettangolo, TipoSegnalazione, TipoZona;
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../componenti/icone_punti.dart';
@@ -12,9 +13,11 @@ import '../schermate/scheda_punto.dart';
 import '../servizi.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_posizione.dart';
+import '../stato/gestore_risparmio.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/gestore_vicini.dart';
+import '../stato/gestore_ztl.dart';
 import 'controllo_mappa.dart';
 import 'dati_viaggio.dart';
 import 'segnaposto.dart';
@@ -33,6 +36,8 @@ class MappaViaggio extends StatefulWidget {
     this.guida,
     this.segnalazioni,
     this.vicini,
+    this.ztl,
+    this.risparmio,
     this.onPunto,
   });
 
@@ -57,6 +62,14 @@ class MappaViaggio extends StatefulWidget {
 
   /// Distributori o colonnine intorno, sulla mappa.
   final GestoreVicini? vicini;
+
+  /// Le ZTL e le aree pedonali: si disegnano quelle che si vedono, se si
+  /// vogliono sulla mappa.
+  final GestoreZtl? ztl;
+
+  /// Le strade a risparmio: prima di partire quella che risparmia energia è
+  /// verde; in guida la strada proposta. Senza, quelle della [guida].
+  final GestoreRisparmio? risparmio;
 
   /// Tocco su un distributore, una colonnina vicina o un punto di interesse.
   final ValueChanged<PuntoToccato>? onPunto;
@@ -89,6 +102,10 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.guida?.addListener(_io);
     widget.segnalazioni?.addListener(_segnalazioni);
     widget.vicini?.addListener(_vicini);
+    widget.ztl?.addListener(_zoneDaCapo);
+    _gestoreRisparmio?.addListener(_risparmio);
+    // Le ZTL cambiano stato nel corso della giornata: «attiva fino alle 18».
+    _orologioZone = Timer.periodic(const Duration(minutes: 5), (_) => _zoneDaCapo());
     // In guida no: lì contano le soste del percorso e quelle vicine, e
     // tutta Italia sulla strada sarebbe solo confusione.
     if (widget.guida == null) widget.vicini?.avviaTutte();
@@ -102,7 +119,74 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.guida?.removeListener(_io);
     widget.segnalazioni?.removeListener(_segnalazioni);
     widget.vicini?.removeListener(_vicini);
+    widget.ztl?.removeListener(_zoneDaCapo);
+    _gestoreRisparmio?.removeListener(_risparmio);
+    _orologioZone?.cancel();
     super.dispose();
+  }
+
+  Timer? _orologioZone;
+
+  /// Il riquadro di cui la mappa ha già le zone (più largo di quello che si
+  /// vede, per non rimandarle a ogni spostamento), se c'erano i puntini, e se
+  /// sulla mappa ce n'è qualcuna.
+  Rettangolo? _zoneDisegnate;
+  var _zoneConPedonali = false;
+  var _zoneSullaMappa = false;
+
+  /// Sotto questo zoom le ZTL non si disegnano: sono troppo piccole.
+  static const _zoomZone = 10.0;
+
+  /// Da qui in su anche le aree pedonali (sono migliaia).
+  static const _zoomPedonali = 13.0;
+
+  void _zoneDaCapo() {
+    _zoneDisegnate = null;
+    unawaited(_zone());
+  }
+
+  /// Le ZTL e le aree pedonali che si vedono, a mappa ferma.
+  Future<void> _zone() async {
+    final m = _mappa, g = widget.ztl;
+    if (m == null || !_stileCaricato || g == null) return;
+    final zoom = (await m.queryCameraPosition())?.zoom ?? 0;
+    final vuote = !g.scelte.sullaMappa || zoom < _zoomZone;
+    if (vuote) {
+      _zoneDisegnate = null;
+      if (_zoneSullaMappa) {
+        _zoneSullaMappa = false;
+        await m.setGeoJsonSource(sorgenteZtl, datiZtl(const [], DateTime.now()).cast<String, dynamic>());
+      }
+      return;
+    }
+    final b = await m.getVisibleRegion();
+    final visto = Rettangolo(
+      b.southwest.latitude,
+      b.southwest.longitude,
+      b.northeast.latitude,
+      b.northeast.longitude,
+    );
+    final pedonali = zoom >= _zoomPedonali;
+    final gia = _zoneDisegnate;
+    if (gia != null &&
+        pedonali == _zoneConPedonali &&
+        gia.contiene(Punto(visto.sud, visto.ovest)) &&
+        gia.contiene(Punto(visto.nord, visto.est))) {
+      return;
+    }
+    // Mezzo schermo in più per lato: spostandosi un poco non si rimanda niente.
+    final alto = visto.nord - visto.sud, largo = visto.est - visto.ovest;
+    final dove = Rettangolo(visto.sud - alto / 2, visto.ovest - largo / 2, visto.nord + alto / 2, visto.est + largo / 2);
+    _zoneDisegnate = dove;
+    _zoneConPedonali = pedonali;
+    final archivio = await g.zone();
+    final zone = [
+      for (final z in archivio.nel(dove))
+        if (pedonali || z.tipo == TipoZona.ztl) z,
+    ];
+    if (!mounted || !identical(_zoneDisegnate, dove)) return;
+    _zoneSullaMappa = true;
+    await m.setGeoJsonSource(sorgenteZtl, datiZtl(zone.take(2500), DateTime.now()).cast<String, dynamic>());
   }
 
   Future<void> _comandi() async {
@@ -224,6 +308,24 @@ class _MappaViaggioState extends State<MappaViaggio> {
     await m.setGeoJsonSource(sorgenteSegnalazioni, datiSegnalazioni(g.vicine).cast<String, dynamic>());
   }
 
+  GestoreRisparmio? get _gestoreRisparmio => widget.risparmio ?? widget.guida?.risparmio;
+
+  /// La strada proposta in guida, verde col suo fumetto; o più niente.
+  Future<void> _risparmio() async {
+    final m = _mappa, r = _gestoreRisparmio;
+    if (widget.guida == null) return;
+    if (m == null || !_stileCaricato || r == null) return;
+    final p = r.proposta;
+    await m.setGeoJsonSource(
+      sorgenteRisparmio,
+      datiRisparmio(
+        p,
+        widget.guida?.pronto?.viaggio.percorso,
+        p == null ? '' : sintesiProposta(p, r.unita, meno: '-'),
+      ).cast<String, dynamic>(),
+    );
+  }
+
   Future<void> _edifici(MapLibreMapController m) async {
     if (!_stileCaricato) return;
     await m.setLayerVisibility(stratoEdifici2d, !_inclinata);
@@ -238,7 +340,15 @@ class _MappaViaggioState extends State<MappaViaggio> {
     final basso = MediaQuery.sizeOf(context).height * 0.45;
     final viaggio = stato is ViaggioPronto ? stato.viaggio : null;
     final dati = stato is ViaggioPronto && widget.guida == null
-        ? datiViaggio(viaggio, scelte: stato.scelte, scelta: stato.scelta, tappe: stato.tappe)
+        ? datiViaggio(
+            viaggio,
+            scelte: stato.scelte,
+            scelta: stato.scelta,
+            tappe: stato.tappe,
+            passandoci: true,
+            // Quella che risparmia energia, verde come nelle schede.
+            eco: stradaCheRisparmia(stato.scelte, _gestoreRisparmio),
+          )
         : datiViaggio(viaggio, tappe: stato is ViaggioPronto ? stato.tappe : const []);
     for (final MapEntry(key: id, value: dati) in dati.entries) {
       await m.setGeoJsonSource(id, dati.cast<String, dynamic>());
@@ -313,6 +423,9 @@ class _MappaViaggioState extends State<MappaViaggio> {
         _disegnato = null;
         // Uno stile nuovo (il tema, il traffico) nasce con le sorgenti vuote.
         _versioneTutte = -1;
+        _zoneDisegnate = null;
+        _zoneConPedonali = false;
+        _zoneSullaMappa = false;
         if (_mappa case final m?) {
           _inclinata = widget.controllo.inclinata;
           _edifici(m);
@@ -320,10 +433,13 @@ class _MappaViaggioState extends State<MappaViaggio> {
             _io();
             _segnalazioni();
             _vicini();
+            _zone();
+            _risparmio();
           });
         }
         _ridisegna();
       },
+      onCameraIdle: () => unawaited(_zone()),
       onMapClick: (p, _) => _tocco(p),
       onMapLongClick: (_, p) => widget.onPuntoScelto(p),
     );

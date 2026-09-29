@@ -223,11 +223,13 @@ final class PannelloCarPlay: UIView {
         let colore: UIColor
         if let titolo = av.titolo {
             riga1 = titolo
-            riga2 = av.metri.map { "tra \(distanza($0))" }
+            riga2 = av.testo ?? av.metri.map { "tra \(distanza($0))" }
             switch av.tipo {
             case "autovelox": colore = UIColor(red: 245 / 255, green: 124 / 255, blue: 0, alpha: 1)
             case "polizia": colore = UIColor(red: 30 / 255, green: 136 / 255, blue: 229 / 255, alpha: 1)
             case "incidente", "chiusura": colore = UIColor(red: 229 / 255, green: 57 / 255, blue: 53 / 255, alpha: 1)
+            // La ZTL: scura, col cartello rosso che si vede da solo.
+            case "ztl": colore = UIColor(red: 32 / 255, green: 33 / 255, blue: 36 / 255, alpha: 0.96)
             default: colore = UIColor(red: 251 / 255, green: 140 / 255, blue: 0, alpha: 1)
             }
         } else if let ancora = av.ancoraTesto {

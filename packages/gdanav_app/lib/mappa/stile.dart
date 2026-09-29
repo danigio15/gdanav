@@ -20,6 +20,24 @@ const sorgenteTutte = 'gdanav-tutte';
 const sorgenteCode = 'gdanav-code';
 const sorgenteAlternative = 'gdanav-alternative';
 const sorgenteTappe = 'gdanav-tappe';
+
+/// Le ZTL e le aree pedonali intorno (i contorni e, come punti, dove
+/// scriverne il nome), e la strada che passerebbe dentro la ZTL di cui si
+/// chiede il permesso.
+const sorgenteZtl = 'gdanav-ztl';
+const sorgentePassandoci = 'gdanav-passandoci';
+
+/// La strada a risparmio (o più rapida) proposta in guida, col suo fumetto.
+const sorgenteRisparmio = 'gdanav-risparmio';
+
+/// I disegni che riempiono le zone: le righe rosse della ZTL e i puntini
+/// grigi dell'area pedonale (vedi `iconePunti`).
+const motivoZtl = 'ztl-righe';
+const motivoPedonale = 'pedonale-puntini';
+
+/// Solo sull'auto: il punto della scheda aperta sopra la mappa. I dati li
+/// mette lo schermo dell'auto (`RendererMappa.mostra`), non il telefono.
+const sorgenteEvidenza = 'gdanav-evidenza';
 const stratoTraffico = 'traffico';
 const stratoTrafficoLocale = 'traffico-locale';
 const stratiToccabili = [
@@ -167,6 +185,19 @@ List<Object> _metri(double metri) => [
   metri / 7 * 128,
 ];
 
+/// [verde] per la strada che risparmia energia (`eco` nelle proprietà),
+/// [altro] per le altre.
+List<Object> _seEco(String verde, String altro) => [
+  'case',
+  [
+    '==',
+    ['get', 'eco'],
+    true,
+  ],
+  verde,
+  altro,
+];
+
 /// Larghezza che cresce con lo zoom, come fanno le strade vere.
 List<Object> _largo(double a12, double a18) => [
   'interpolate',
@@ -191,6 +222,21 @@ Map<String, Object> _strada(String id, List<Object> filtro, String colore, List<
     };
 
 const _vuota = {'type': 'FeatureCollection', 'features': <Object>[]};
+
+/// I contorni di un tipo di zona («ztl», «pedonale») nella [sorgenteZtl].
+List<Object> _zona(String tipo) => [
+  'all',
+  [
+    '==',
+    ['geometry-type'],
+    'Polygon',
+  ],
+  [
+    '==',
+    ['get', 'tipo'],
+    tipo,
+  ],
+];
 
 /// Lo stile completo. [scuro] per la sera; le sorgenti del viaggio partono
 /// vuote.
@@ -269,6 +315,9 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
       sorgenteCode: {'type': 'geojson', 'data': _vuota},
       sorgenteAlternative: {'type': 'geojson', 'data': _vuota},
       sorgenteTappe: {'type': 'geojson', 'data': _vuota},
+      sorgenteZtl: {'type': 'geojson', 'data': _vuota},
+      sorgentePassandoci: {'type': 'geojson', 'data': _vuota},
+      sorgenteRisparmio: {'type': 'geojson', 'data': _vuota},
       sorgenteColonnine: {'type': 'geojson', 'data': _vuota},
       sorgenteArrivo: {'type': 'geojson', 'data': _vuota},
       sorgenteIo: {'type': 'geojson', 'data': _vuota},
@@ -276,6 +325,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
       sorgenteManovra: {'type': 'geojson', 'data': _vuota},
       sorgenteDistributori: {'type': 'geojson', 'data': _vuota},
       sorgenteVicine: {'type': 'geojson', 'data': _vuota},
+      if (perAuto) sorgenteEvidenza: {'type': 'geojson', 'data': _vuota},
       // Raggruppate da MapLibre: da lontano un cerchio col numero, da vicino
       // una per una. Il numero del cerchio sono le prese, sommate dentro il
       // gruppo, non le colonnine.
@@ -445,6 +495,61 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'fill-extrusion-opacity': 0.94,
         },
       },
+      // Le ZTL e le aree pedonali (OpenStreetMap), sopra le strade e sotto i
+      // loro nomi: la ZTL tratteggiata di rosso, più tenue quando è spenta;
+      // l'area pedonale a puntini grigi.
+      {
+        'id': 'pedonali',
+        'type': 'fill',
+        'source': sorgenteZtl,
+        'minzoom': 13,
+        'filter': _zona('pedonale'),
+        'paint': {'fill-pattern': motivoPedonale},
+      },
+      {
+        'id': 'pedonali-bordo',
+        'type': 'line',
+        'source': sorgenteZtl,
+        'minzoom': 13,
+        'filter': _zona('pedonale'),
+        'layout': {'line-join': 'round'},
+        'paint': {'line-color': '#6B7280', 'line-width': 1.5, 'line-opacity': 0.8},
+      },
+      {
+        'id': 'ztl',
+        'type': 'fill',
+        'source': sorgenteZtl,
+        'minzoom': 10,
+        'filter': _zona('ztl'),
+        'paint': {
+          'fill-pattern': motivoZtl,
+          'fill-opacity': [
+            'case',
+            ['get', 'attiva'],
+            1.0,
+            0.4,
+          ],
+        },
+      },
+      {
+        'id': 'ztl-bordo',
+        'type': 'line',
+        'source': sorgenteZtl,
+        'minzoom': 10,
+        'filter': _zona('ztl'),
+        'layout': {'line-join': 'round'},
+        'paint': {
+          'line-color': '#DC2626',
+          'line-width': perAuto ? 3.5 : 2.5,
+          'line-dasharray': [3, 1.7],
+          'line-opacity': [
+            'case',
+            ['get', 'attiva'],
+            1.0,
+            0.45,
+          ],
+        },
+      },
       {
         'id': 'nomi-strade',
         'type': 'symbol',
@@ -532,7 +637,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         },
       },
       // Le strade alternative, sotto il percorso: grigio-azzurre, toccandole
-      // si sceglie quella.
+      // si sceglie quella. Quella che risparmia energia è verde.
       {
         'id': 'alternative-bordo',
         'type': 'line',
@@ -543,7 +648,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'LineString',
         ],
         'layout': {'line-cap': 'round', 'line-join': 'round'},
-        'paint': {'line-color': t.alternativaBordo, 'line-width': _largo(7.5, 20)},
+        'paint': {'line-color': _seEco('#166534', t.alternativaBordo), 'line-width': _largo(7.5, 20)},
       },
       {
         'id': 'alternative',
@@ -555,7 +660,51 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'LineString',
         ],
         'layout': {'line-cap': 'round', 'line-join': 'round'},
-        'paint': {'line-color': t.alternativa, 'line-width': _largo(5, 15)},
+        'paint': {'line-color': _seEco('#4ADE80', t.alternativa), 'line-width': _largo(5, 15)},
+      },
+      // La strada che passa dentro la ZTL di cui si chiede il permesso: a
+      // puntini grigi, sotto il percorso.
+      {
+        'id': 'passandoci',
+        'type': 'line',
+        'source': sorgentePassandoci,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'LineString',
+        ],
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {
+          'line-color': '#94A3B8',
+          'line-width': _largo(5, 12),
+          'line-dasharray': [0.1, 1.8],
+        },
+      },
+      // La strada a risparmio proposta in guida: verde, sotto il percorso,
+      // così si vede dove se ne stacca.
+      {
+        'id': 'risparmio-bordo',
+        'type': 'line',
+        'source': sorgenteRisparmio,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'LineString',
+        ],
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {'line-color': '#166534', 'line-width': _largo(8.5, 24)},
+      },
+      {
+        'id': 'risparmio',
+        'type': 'line',
+        'source': sorgenteRisparmio,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'LineString',
+        ],
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {'line-color': '#4ADE80', 'line-width': _largo(5.5, 18)},
       },
       // Il percorso: un alone morbido, il bordo blu scuro, la linea blu e le
       // frecce della direzione. Sempre blu: nessuna strada ha quel colore.
@@ -682,6 +831,27 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         ],
         'paint': {'fill-color': '#FFFFFF', 'fill-antialias': true},
       },
+      // Sull'auto, il punto della scheda aperta: un alone e un anello del
+      // colore del suo stato, sotto la sua icona.
+      if (perAuto) ...[
+        {
+          'id': 'evidenza-alone',
+          'type': 'circle',
+          'source': sorgenteEvidenza,
+          'paint': {'circle-radius': 34, 'circle-color': _coloreEvidenza(t), 'circle-opacity': 0.2},
+        },
+        {
+          'id': 'evidenza',
+          'type': 'circle',
+          'source': sorgenteEvidenza,
+          'paint': {
+            'circle-radius': 23,
+            'circle-opacity': 0,
+            'circle-stroke-color': _coloreEvidenza(t),
+            'circle-stroke-width': 4,
+          },
+        },
+      ],
       // Tutte le colonnine d'Italia, dall'archivio: da lontano in gruppi col
       // numero, avvicinandosi una per una. Sotto quelle intorno a te, che
       // hanno il colore dello stato di adesso.
@@ -760,7 +930,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
       },
       ..._bollinoPrese('gdanav-tutte', sorgenteTutte, _coloreDelloStato(_statoOIgnota()), sfusa: true),
       // Intorno a te: i distributori col prezzo (auto termica) o le
-      // colonnine rapide col colore dello stato (auto elettrica).
+      // colonnine col colore dello stato (auto elettrica).
       {
         'id': 'gdanav-vicine',
         'type': 'symbol',
@@ -885,6 +1055,91 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         },
         'paint': {'text-color': t.percorsoBordo},
       },
+      // Il nome della ZTL col suo stato, «ZTL · attiva fino alle 18»; più
+      // da vicino anche «Area pedonale».
+      {
+        'id': 'ztl-etichetta',
+        'type': 'symbol',
+        'source': sorgenteZtl,
+        'minzoom': 12,
+        'filter': [
+          'all',
+          [
+            '==',
+            ['geometry-type'],
+            'Point',
+          ],
+          [
+            'any',
+            [
+              '==',
+              ['get', 'tipo'],
+              'ztl',
+            ],
+            [
+              '>=',
+              ['zoom'],
+              16,
+            ],
+          ],
+        ],
+        'layout': {
+          'text-field': ['get', 'etichetta'],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': perAuto ? 14 : 12,
+          'text-max-width': 12,
+          'text-padding': 4,
+        },
+        'paint': {
+          'text-color': [
+            'match',
+            ['get', 'tipo'],
+            'ztl',
+            '#991B1B',
+            '#374151',
+          ],
+          'text-halo-color': '#FFFFFF',
+          'text-halo-width': 3,
+        },
+      },
+      // Quanto si guadagnerebbe passandoci: «−3 min», sulla strada a puntini.
+      {
+        'id': 'passandoci-etichetta',
+        'type': 'symbol',
+        'source': sorgentePassandoci,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'Point',
+        ],
+        'layout': {
+          'text-field': ['get', 'etichetta'],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 12,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        'paint': {'text-color': '#FFFFFF', 'text-halo-color': '#475569', 'text-halo-width': 6},
+      },
+      // Quanto fa risparmiare la strada proposta: il fumetto verde.
+      {
+        'id': 'risparmio-etichetta',
+        'type': 'symbol',
+        'source': sorgenteRisparmio,
+        'filter': [
+          '==',
+          ['geometry-type'],
+          'Point',
+        ],
+        'layout': {
+          'text-field': ['get', 'etichetta'],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': perAuto ? 15 : 13,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        'paint': {'text-color': '#FFFFFF', 'text-halo-color': '#15803D', 'text-halo-width': 6},
+      },
       // Quanto fa guadagnare o perdere ogni alternativa: il fumetto sulla
       // strada, da toccare per sceglierla.
       {
@@ -904,7 +1159,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'text-allow-overlap': true,
           'text-ignore-placement': true,
         },
-        'paint': {'text-color': '#FFFFFF', 'text-halo-color': t.alternativaBordo, 'text-halo-width': 6},
+        'paint': {'text-color': '#FFFFFF', 'text-halo-color': _seEco('#15803D', t.alternativaBordo), 'text-halo-width': 6},
       },
       {
         'id': 'arrivo',
@@ -1106,6 +1361,19 @@ List<Object> _statoOIgnota() => [
   'coalesce',
   ['get', 'stato'],
   'ignota',
+];
+
+/// L'evidenza del punto toccato sull'auto: il colore dello stato per una
+/// colonnina, quello del percorso per il resto (distributori, ristoranti…).
+List<Object> _coloreEvidenza(_Tavolozza t) => [
+  'match',
+  [
+    'coalesce',
+    ['get', 'stato'],
+    '',
+  ],
+  for (final MapEntry(:key, :value) in _coloriIcona.entries) ...[key, value],
+  t.percorsoBordo,
 ];
 
 /// Il colore dell'icona per lo stato: lo stesso del bollino delle prese.

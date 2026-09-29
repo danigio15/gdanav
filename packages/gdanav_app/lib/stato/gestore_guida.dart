@@ -5,6 +5,7 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import 'gestore_auto.dart';
 import 'gestore_consumo.dart';
+import 'gestore_risparmio.dart';
 import 'gestore_viaggio.dart';
 import 'voce.dart';
 
@@ -17,11 +18,23 @@ class GestoreGuida extends ChangeNotifier {
     required this.posizioni,
     required this.voce,
     this.consumo,
+    this.risparmio,
     DateTime Function()? orologio,
   }) : _ora = orologio ?? DateTime.now;
 
   /// Il consumo imparato: in guida lo si misura e lo si corregge.
   final GestoreConsumo? consumo;
+
+  /// Le strade a risparmio: ogni tanto la strada che si fa si confronta con
+  /// le altre, e se una vale la pena la si propone.
+  final GestoreRisparmio? risparmio;
+
+  /// Ogni quanto si confrontano le strade.
+  static const intervalloStrade = Duration(minutes: 5);
+  DateTime? _ultimoControlloStrade;
+
+  /// Cambia a ogni ricalcolo: una proposta arrivata dopo non vale più.
+  var _giroStrade = 0;
 
   /// Di quanti punti la batteria vera può scostarsi dal piano prima di
   /// ricalcolare le soste.
@@ -218,6 +231,10 @@ class GestoreGuida extends ChangeNotifier {
     _guida = Guida(p.viaggio.percorso);
     // Partiti: i ricalcoli partono da dove si è, non dalle strade proposte.
     viaggio.dimenticaScelte();
+    // Un viaggio nuovo: le strade rifiutate nell'altro si possono riproporre,
+    // e il primo confronto è fra cinque minuti.
+    risparmio?.dimentica();
+    _ultimoControlloStrade = _ora();
     _batteriaInizio = p.batteriaPartenza;
     _kmMisurati = 0;
     _whMisurati = 0;
@@ -233,6 +250,8 @@ class GestoreGuida extends ChangeNotifier {
 
   Future<void> ferma() async {
     attiva = false;
+    _giroStrade++;
+    risparmio?.lascia();
     auto.removeListener(_datiAuto);
     _misuratore = null;
     await _iscrizione?.cancel();
@@ -255,6 +274,9 @@ class GestoreGuida extends ChangeNotifier {
 
   /// L'ultima posizione vista in guida.
   Punto? _ultimaPosizione;
+
+  /// Dove si è, anche fuori dal percorso (lì il segnaposto non si aggancia).
+  Punto? get ultimaPosizione => _ultimaPosizione;
 
   Future<void> _posizione(Punto qui) async {
     _ultimaPosizione = qui;
@@ -282,6 +304,11 @@ class GestoreGuida extends ChangeNotifier {
     if (!ricalcolando && _ora().difference(ultimo) >= intervalloTraffico) {
       _ultimoTraffico = _ora();
       unawaited(aggiornaTraffico());
+    }
+    final ultimoConfronto = _ultimoControlloStrade ??= _ora();
+    if (risparmio != null && !ricalcolando && _ora().difference(ultimoConfronto) >= intervalloStrade) {
+      _ultimoControlloStrade = _ora();
+      unawaited(controllaStrade());
     }
     if (_ultimoRacconto == null || _ora().difference(_ultimoRacconto!) > const Duration(minutes: 1)) _racconta();
     notifyListeners();
@@ -346,6 +373,8 @@ class GestoreGuida extends ChangeNotifier {
     final d = viaggio.destinazione;
     if (d == null) return;
     viaggio.tappa = l;
+    _giroStrade++;
+    risparmio?.lascia();
     ricalcolando = true;
     _ultimoRicalcolo = _ora();
     notifyListeners();
@@ -388,9 +417,82 @@ class GestoreGuida extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Le strade a risparmio: la strada da qui alla meta si confronta con le
+  /// altre, col traffico di adesso; se una vale la proposta, la si dice.
+  /// Non con le tappe (le strade migliori vanno dritte alla meta), né quando
+  /// manca poco.
+  Future<void> controllaStrade() async {
+    final r = risparmio, p = pronto, a = avanzamento;
+    if (r == null || p == null || a == null || !attiva || ricalcolando) return;
+    if (viaggio.tappe.isNotEmpty || viaggio.tappa != null) return;
+    if (a.restantiM < 5000 || a.restante < const Duration(minutes: 8)) return;
+    final giro = _giroStrade;
+    final percorso = p.viaggio.percorso;
+    final davanti = restoDelPercorso(percorso, a.percorsiM);
+    if (davanti.length < 2) return;
+    // Le code ancora davanti: se ce ne sono, magari un'altra strada è più rapida.
+    final code = percorso.code.where((c) => c.aM > a.percorsiM).fold(Duration.zero, (t, c) => t + c.ritardo);
+    final pr = await r.controlla(
+      davanti: davanti,
+      evita: PercorsiConZtl.rettangoli(percorso.ztl?.evitate ?? const [], [davanti.first, davanti.last]),
+      opzioni: viaggio.opzioni,
+      condizioni: viaggio.condizioni ?? const Condizioni(),
+      conCode: code >= r.soglie.rapidaDi,
+    );
+    if (pr == null) return;
+    // Mentre si chiedeva si è ricalcolato, o si è finito: non vale più.
+    if (giro != _giroStrade || !attiva) {
+      r.lascia();
+      return;
+    }
+    if (!muto) unawaited(voce.parla(frasePropostaVoce(pr, elettrica: auto.elettrica)));
+    notifyListeners();
+  }
+
+  /// «Prendila»: il viaggio si rifà sulla strada proposta, da dove si è.
+  Future<void> prendiStrada() async {
+    final p = pronto;
+    final pr = risparmio?.prendi();
+    if (pr == null || p == null || !attiva) return;
+    _giroStrade++;
+    ricalcolando = true;
+    _ultimoRicalcolo = _ora();
+    notifyListeners();
+    if (!muto) {
+      unawaited(
+        voce.parla(pr.motivo == MotivoProposta.rapida ? 'Prendo la strada più rapida.' : 'Prendo la strada a risparmio.'),
+      );
+    }
+    // Le ZTL restano quelle di prima: la strada nuova le gira al largo uguale.
+    final z = p.viaggio.percorso.ztl;
+    await viaggio.seguiStrada(z == null ? pr.percorso : pr.percorso.conZtl(z.senzaDomanda()));
+    ricalcolando = false;
+    if (pronto case final nuovo?) {
+      _guida = Guida(nuovo.viaggio.percorso);
+      _nuovoPiano(nuovo);
+    }
+    notifyListeners();
+  }
+
+  /// «Resto qui»: quella strada non si ripropone.
+  void restaQui() => risparmio?.resta();
+
+  /// La batteria all'arrivo prendendo la strada [pr]: quella di adesso più
+  /// quello che si risparmia. Solo senza soste davanti: con una sosta si
+  /// risparmia ricarica, non batteria all'arrivo.
+  double? batteriaArrivoCon(PropostaStrada pr) {
+    final arrivo = batteriaArrivo;
+    final capacita = auto.veicolo.capacitaUtileKwh;
+    if (arrivo == null || !auto.elettrica || prossimaSosta != null || capacita <= 0) return null;
+    return (arrivo + pr.risparmio / capacita * 100).clamp(0.0, 100.0);
+  }
+
   Future<void> _ricalcola({bool perConsumo = false, bool detto = false}) async {
     final d = viaggio.destinazione;
     if (d == null) return;
+    // La strada proposta partiva dalla strada di prima: non vale più.
+    _giroStrade++;
+    risparmio?.lascia();
     ricalcolando = true;
     _ultimoRicalcolo = _ora();
     final prima = pronto?.viaggio.piano?.soste.map((s) => s.colonnina.id).toList();

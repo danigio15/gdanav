@@ -9,8 +9,6 @@ import androidx.car.app.model.CarIcon
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.SectionedItemList
 import androidx.car.app.model.ListTemplate
-import androidx.car.app.model.Pane
-import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.car.app.model.Toggle
@@ -162,7 +160,7 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
                     if (PonteAuto.cruscotto.elettrica) {
                         riga(
                             "Colonnine vicine",
-                            "Le rapide intorno a te",
+                            "Intorno a te, dalla più vicina",
                             sfoglia = true,
                             icona = icona(R.drawable.icona_colonnina, CarColor.GREEN),
                         ) { screenManager.push(SchermoColonnine(carContext)) }
@@ -312,7 +310,7 @@ class SchermoOpzioni(carContext: CarContext) : SchermoAggiornato(carContext) {
     }
 }
 
-/** Le colonnine rapide vicine, adatte alla tua auto; con Premium libere e occupate. */
+/** Le colonnine vicine adatte alla tua auto, anche le lente; con Premium libere e occupate. */
 class SchermoColonnine(carContext: CarContext) : SchermoAggiornato(carContext) {
     private var colonnine: List<PonteAuto.Luogo>? = null
 
@@ -339,7 +337,7 @@ class SchermoColonnine(carContext: CarContext) : SchermoAggiornato(carContext) {
                     screenManager.popToRoot()
                 }
             },
-            "Nessuna colonnina rapida qui intorno",
+            "Nessuna colonnina qui intorno",
         )
     }
 
@@ -411,32 +409,4 @@ class SchermoSegnala(carContext: CarContext) : SchermoAggiornato(carContext) {
             }
         },
     )
-}
-
-/** La scheda di un punto toccato sulla mappa: cosa è, le informazioni, e «Vai». */
-class SchermoPunto(carContext: CarContext, private val info: Map<String, Any?>) : Screen(carContext) {
-    override fun onGetTemplate(): Template {
-        val righe = (info["righe"] as? List<*>)?.mapNotNull { it as? String }?.filter { it.isNotBlank() } ?: emptyList()
-        val pannello = Pane.Builder()
-        // Quattro righe al massimo: è il limite delle auto.
-        val testi = listOfNotNull(info["sopra"] as? String) + righe
-        testi.take(4).forEach { pannello.addRow(Row.Builder().setTitle(it).build()) }
-        @Suppress("UNCHECKED_CAST")
-        val luogo = (info["luogo"] as? Map<String, Any?>)?.let { PonteAuto.luogoDa(it) }
-        if (luogo != null) {
-            pannello.addAction(
-                Action.Builder()
-                    .setTitle(info["vai"] as? String ?: "Vai")
-                    .setOnClickListener {
-                        PonteAuto.passa(luogo)
-                        screenManager.popToRoot()
-                    }
-                    .build(),
-            )
-        }
-        return PaneTemplate.Builder(pannello.build())
-            .setTitle(info["titolo"] as? String ?: "Punto")
-            .setHeaderAction(Action.BACK)
-            .build()
-    }
 }

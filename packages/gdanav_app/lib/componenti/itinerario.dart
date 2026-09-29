@@ -47,111 +47,178 @@ class RigaTraffico extends StatelessWidget {
   }
 }
 
-/// Le strade fra cui scegliere, affiancate: durata (col traffico), km, da
-/// dove passa, pedaggi, traffico. Quella scelta è evidenziata.
+/// Le strade fra cui scegliere, una sotto l'altra, ognuna col suo nome come
+/// in ABRP — più rapida, risparmia energia, tempo simile, più lenta — la
+/// durata col traffico, da dove passa, la batteria all'arrivo e quanto
+/// consuma. Quella scelta è evidenziata.
 class ScelteStrada extends StatelessWidget {
-  const ScelteStrada({super.key, required this.scelte, required this.scelta, required this.onScegli});
+  const ScelteStrada({
+    super.key,
+    required this.scelte,
+    required this.scelta,
+    required this.onScegli,
+    this.consumo,
+    this.unita = 'kWh',
+    this.arrivo,
+    this.capacitaKwh,
+    this.minimoPercento = 5,
+  });
 
   final List<PercorsoCalcolato> scelte;
   final int scelta;
   final ValueChanged<int> onScegli;
 
+  /// Quanto consuma ogni strada (kWh, o litri con la termica); senza, niente
+  /// consumi e nessuna «risparmia energia».
+  final double Function(PercorsoCalcolato p)? consumo;
+  final String unita;
+
+  /// La batteria all'arrivo con la strada scelta (il piano), e la capacità:
+  /// per le altre si sposta di quello che consumano in meno o in più.
+  /// `null` con le soste, dove si risparmia ricarica e non batteria.
+  final double? arrivo;
+  final double? capacitaKwh;
+
+  /// Da quanto in su una strada «risparmia energia».
+  final double minimoPercento;
+
   @override
   Widget build(BuildContext context) {
-    final migliore = scelte.map((s) => s.durata).reduce((a, b) => a < b ? a : b);
-    // Una riga che scorre (non una ListView: dentro la scheda che scorre in
-    // verticale).
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (final (i, s) in scelte.indexed) ...[
-            if (i > 0) const SizedBox(width: 10),
-            _carta(context, i, s, migliore),
-          ],
+    final f = consumo;
+    final consumi = [for (final s in scelte) f?.call(s)];
+    final etichette = etichetteStrade(scelte, (p) => f?.call(p) ?? 0, minimoPercento: minimoPercento);
+    final rapida = etichette.indexOf(EtichettaStrada.piuRapida);
+    return Column(
+      children: [
+        for (final (i, s) in scelte.indexed) ...[
+          if (i > 0) const SizedBox(height: 8),
+          _carta(context, i, s, etichette[i], consumi[i], rapida < 0 ? null : consumi[rapida], consumi[scelta]),
         ],
-      ),
+      ],
     );
   }
 
-  Widget _carta(BuildContext context, int i, PercorsoCalcolato s, Duration migliore) {
+  Widget _carta(
+    BuildContext context,
+    int i,
+    PercorsoCalcolato s,
+    EtichettaStrada etichetta,
+    double? consumoQui,
+    double? consumoRapida,
+    double? consumoScelta,
+  ) {
     final tema = Theme.of(context);
     final t = tema.textTheme;
     final c = ColoriGdanav.di(context);
     final muto = tema.colorScheme.onSurfaceVariant;
+    final verde = tema.brightness == Brightness.dark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A);
     final attiva = i == scelta;
-    final piu = Duration(minutes: ((s.durata.inSeconds - migliore.inSeconds) / 60).round());
+    final risparmia = etichetta == EtichettaStrada.risparmia;
     final via = s.stradaDistintiva([
       for (final (j, a) in scelte.indexed)
         if (j != i) a,
     ]);
+    // La batteria all'arrivo: quella del piano per la scelta, spostata per le
+    // altre di quello che consumano in meno o in più.
+    final a = arrivo, cap = capacitaKwh;
+    final conArrivo = a == null || cap == null || cap <= 0 || consumoQui == null || consumoScelta == null
+        ? null
+        : (a + (consumoScelta - consumoQui) / cap * 100).clamp(0.0, 100.0);
+    final (nome, colore) = switch (etichetta) {
+      EtichettaStrada.piuRapida => ('PIÙ RAPIDA', tema.colorScheme.primary),
+      EtichettaStrada.risparmia => (unita == 'kWh' ? 'RISPARMIA ENERGIA' : 'RISPARMIA CARBURANTE', verde),
+      EtichettaStrada.tempoSimile => ('TEMPO SIMILE', muto),
+      EtichettaStrada.piuLenta => ('PIÙ LENTA', muto),
+    };
+    String numero(double v) => v.toStringAsFixed(1).replaceAll('.', ',');
+    final traffico = !s.trafficoVero
+        ? null
+        : s.ritardoTraffico.inMinutes >= 1
+        ? '+${durataBreve(s.ritardoTraffico)} traffico'
+        : 'scorrevole';
     return Material(
-      color: attiva ? tema.colorScheme.primaryContainer : tema.colorScheme.surfaceContainerHigh,
+      color: attiva ? tema.colorScheme.primaryContainer.withValues(alpha: 0.55) : tema.colorScheme.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: attiva ? tema.colorScheme.primary : Colors.transparent, width: 2),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: attiva ? tema.colorScheme.primary : tema.colorScheme.outlineVariant,
+          width: attiva ? 1.6 : 1,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         key: Key('strada-$i'),
         onTap: () => onScegli(i),
-        child: Container(
-          width: 168,
-          height: 118,
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-          child: Column(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 11, 14, 11),
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(durataBreve(s.durata), style: t.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        if (risparmia) ...[Icon(Icons.eco_rounded, size: 14, color: verde), const SizedBox(width: 4)],
+                        Flexible(
+                          child: Text(
+                            nome,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: t.labelSmall?.copyWith(color: colore, fontWeight: FontWeight.w800, letterSpacing: 0.6),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  if (attiva) Icon(Icons.check_circle, size: 20, color: tema.colorScheme.primary),
-                ],
-              ),
-              Text(
-                piu.inMinutes == 0 ? 'La più veloce' : '+${durataBreve(piu)}',
-                style: t.labelMedium?.copyWith(color: piu.inMinutes == 0 ? c.libera : muto),
-              ),
-              const Spacer(),
-              Text(
-                ['${(s.lunghezzaM / 1000).round()} km', if (via.isNotEmpty) 'via $via'].join(' · '),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: t.bodySmall,
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  if (s.conPedaggi) ...[
-                    Icon(Icons.toll_rounded, size: 15, color: muto),
-                    const SizedBox(width: 3),
-                    Text('Pedaggi', style: t.labelSmall?.copyWith(color: muto)),
-                    const SizedBox(width: 8),
-                  ],
-                  if (s.trafficoVero)
-                    Flexible(
-                      child: Text(
-                        s.ritardoTraffico.inMinutes >= 1 ? '+${durataBreve(s.ritardoTraffico)} traffico' : 'Scorrevole',
+                    const SizedBox(height: 2),
+                    Text(durataBreve(s.durata), style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 1),
+                    Text(
+                      [
+                        if (via.isNotEmpty) via,
+                        '${(s.lunghezzaM / 1000).round()} km',
+                        if (conArrivo != null) 'arrivi con il ${conArrivo.round()}%',
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: t.bodySmall?.copyWith(color: muto),
+                    ),
+                    if (s.conPedaggi || traffico != null)
+                      Text(
+                        [if (s.conPedaggi) 'pedaggi', ?traffico].join(' · '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: t.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: s.ritardoTraffico.inMinutes >= 10
+                          color: !s.trafficoVero || s.ritardoTraffico.inMinutes < 1
+                              ? muto
+                              : s.ritardoTraffico.inMinutes >= 10
                               ? c.guasta
-                              : s.ritardoTraffico.inMinutes >= 1
-                              ? c.piena
-                              : c.libera,
+                              : c.piena,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
+              if (consumoQui != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 10, top: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${numero(consumoQui)} $unita',
+                        style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800, color: risparmia ? verde : null),
+                      ),
+                      if (risparmia && consumoRapida != null)
+                        Text(
+                          '−${numero(consumoRapida - consumoQui)} $unita',
+                          style: t.labelSmall?.copyWith(color: muto, fontWeight: FontWeight.w700),
+                        ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../geo/geo.dart';
 import '../motore/modello_consumo.dart';
+import '../ztl/ztl.dart';
 
 /// Dove porta una corsia: le frecce dipinte sull'asfalto.
 enum DirezioneCorsia {
@@ -150,6 +151,8 @@ class PercorsoCalcolato {
     this.ritardoTraffico = Duration.zero,
     this.trafficoVero = false,
     this.senzaTraffico,
+    this.ztl,
+    this.consumoTomTom,
   });
 
   final List<Punto> punti;
@@ -179,8 +182,21 @@ class PercorsoCalcolato {
   /// aggiornato (le code sparite non devono restare).
   final PercorsoCalcolato? senzaTraffico;
 
+  /// Cosa fa con le ZTL: quali evita, da quali passa, di quale chiedere il
+  /// permesso. `null` dove le ZTL non si guardano (Valhalla, le prove).
+  final ZtlDelViaggio? ztl;
+
+  /// Il consumo stimato da TomTom col modello dell'auto, salite e discese
+  /// comprese: kWh per l'elettrica, litri per la termica. `null` se non
+  /// gliel'abbiamo chiesto (o non l'ha detto).
+  final double? consumoTomTom;
+
   /// Il percorso da cui partire per applicare il traffico.
   PercorsoCalcolato get base => senzaTraffico ?? this;
+
+  /// Con quello che fa con le ZTL, anche sotto il traffico: un traffico
+  /// rifatto non deve farlo dimenticare.
+  PercorsoCalcolato conZtl(ZtlDelViaggio? ztl) => _copia(ztl: ztl, senzaTraffico: senzaTraffico?.conZtl(ztl));
 
   /// Il limite sul segmento [i], se si conosce.
   int? limiteSul(int i) => i >= 0 && i < limiti.length ? limiti[i] : null;
@@ -193,6 +209,7 @@ class PercorsoCalcolato {
     Duration? ritardoTraffico,
     bool? trafficoVero,
     PercorsoCalcolato? senzaTraffico,
+    ZtlDelViaggio? ztl,
   }) =>
       PercorsoCalcolato(
         punti: punti,
@@ -206,6 +223,8 @@ class PercorsoCalcolato {
         ritardoTraffico: ritardoTraffico ?? this.ritardoTraffico,
         trafficoVero: trafficoVero ?? this.trafficoVero,
         senzaTraffico: senzaTraffico ?? this.senzaTraffico,
+        ztl: ztl ?? this.ztl,
+        consumoTomTom: consumoTomTom,
       );
 
   PercorsoCalcolato conLimiti(List<int?> limiti) => _copia(limiti: limiti);
@@ -417,6 +436,12 @@ class ErrorePercorso implements Exception {
   const ErrorePercorso(this.messaggio, {this.stato});
   final String messaggio;
   final int? stato;
+
+  /// Troppe richieste in questo secondo, non la quota finita: fra un attimo
+  /// la stessa richiesta passa. TomTom lo dice col 429 («You have exceeded
+  /// the permitted rate limit»), o col 403 «Developer Over Qps».
+  bool get troppeInUnSecondo =>
+      stato == 429 || (stato == 403 && RegExp('over qps|rate limit', caseSensitive: false).hasMatch(messaggio));
 
   @override
   String toString() => 'percorso: $messaggio';

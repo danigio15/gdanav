@@ -378,6 +378,53 @@ jobs:
           gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
           gh release upload anteprima colonnine.json autovelox.json --clobber
 
+  # Le ZTL e le aree pedonali per l'archivio dentro l'app, dall'estratto
+  # d'Italia di OpenStreetMap (Geofabrik) filtrato con osmium, coi paesi per
+  # dare un nome alla città. Solo quando il commit lo chiede con «[ztl]»; il
+  # JSON va nella release «anteprima», da mettere in packages/gdanav_app/assets.
+  ztl-dati:
+    if: contains(github.event.head_commit.message, '[ztl]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.13.4
+      - run: sudo apt-get update && sudo apt-get install -y osmium-tool
+      - name: L'estratto e le zone
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -e
+          curl -sSfL --retry 5 -o italy.osm.pbf https://download.geofabrik.de/europe/italy-latest.osm.pbf
+          # I comuni (admin_level=8) servono a dire di che città è ogni ZTL.
+          osmium tags-filter italy.osm.pbf wr/boundary=limited_traffic_zone wr/highway=pedestrian \
+            wr/area:highway=pedestrian n/place=city,town,village r/admin_level=8 -o zone.osm.pbf
+          osmium export zone.osm.pbf -f geojsonseq --add-unique-id=type_id --geometry-types=point,polygon \
+            -o zone.geojsonseq
+          echo "Righe esportate: $(wc -l < zone.geojsonseq)"
+          # Quante zone a basse emissioni ci sono, per sapere se servono anche quelle.
+          osmium tags-filter italy.osm.pbf wr/boundary=low_emission_zone -o lez.osm.pbf
+          osmium export lez.osm.pbf -f geojsonseq --geometry-types=polygon -o lez.geojsonseq
+          echo "Zone a basse emissioni: $(wc -l < lez.geojsonseq)" | tee -a $GITHUB_STEP_SUMMARY
+          rm italy.osm.pbf
+      - run: dart pub get
+        working-directory: packages/gdanav_core
+      - name: L'archivio
+        working-directory: packages/gdanav_core
+        run: |
+          set -eo pipefail
+          dart run tool/ztl_osm.dart ztl.json ${{ runner.temp }}/zone.geojsonseq | tee -a $GITHUB_STEP_SUMMARY
+      - name: Nella release
+        working-directory: packages/gdanav_core
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
+          gh release upload anteprima ztl.json --clobber
+
   # L'APK da provare: a ogni push su main finisce nella release «anteprima»,
   # da scaricare dal telefono.
   apk:

@@ -11,6 +11,8 @@ import 'gestore_auto.dart';
 import 'gestore_consumo.dart';
 import '../risorse.dart';
 import 'gestore_premium.dart';
+import 'gestore_risparmio.dart';
+import 'gestore_ztl.dart';
 
 /// A che punto è il viaggio.
 sealed class StatoViaggio {
@@ -124,11 +126,40 @@ PianificatoreViaggio pianificatoreVero(
   // conosce: chiederlo due volte a TomTom sarebbe sprecare il piano e
   // sommare due volte le stesse code.
   final traffico = tomtom != null ? null : _traffico;
+  // Le strade fra cui scegliere col consumo di ognuna (il modello dell'auto),
+  // e in più la strada «eco» se è davvero un'altra: come in ABRP, ognuna col
+  // suo nome — più rapida, risparmia energia, tempo simile.
+  final consumo = GestoreRisparmio.attuale?.modello();
+  Future<List<PercorsoCalcolato>> strade(Punto da, Punto a, List<Rettangolo> evita) async {
+    final eco = consumo == null
+        ? null
+        : tomtom!
+              .calcola([da, a], opzioni: opzioni, evita: evita, eco: true, consumo: consumo)
+              .then<PercorsoCalcolato?>((p) => p, onError: (Object _) => null);
+    final rapide = await tomtom!.alternative(da, a, opzioni: opzioni, evita: evita, consumo: consumo);
+    final e = await eco;
+    if (e == null) return rapide;
+    // La strada eco non deve entrare in una ZTL attiva senza permesso: le
+    // ZTL da girare al largo si decidono sulla strada principale.
+    final zone = await archivioZtl();
+    final permessi = GestoreZtl.attuale?.permessi ?? const <String, bool>{};
+    if (PercorsiConZtl.vietate(zone, e, DateTime.now(), permessi).isNotEmpty) return rapide;
+    return conStradaEco(rapide, e);
+  }
+
+  // Le ZTL: TomTom non le conosce. Le gira al largo chi chiede il percorso,
+  // con le «aree da evitare», quando sono attive e non si ha il permesso.
+  final ztl = tomtom == null
+      ? null
+      : PercorsiConZtl(
+          zone: archivioZtl,
+          permessi: () async => GestoreZtl.attuale?.permessi ?? const {},
+          calcola: (tappe, evita) => tomtom.calcola(tappe, opzioni: opzioni, evita: evita),
+          alternative: strade,
+        );
   return PianificatoreViaggio(
-    percorsi: (tappe) =>
-        tomtom?.calcola(tappe, opzioni: opzioni) ?? valhalla!.calcola(tappe, opzioni: opzioni),
-    alternative: (da, a) =>
-        tomtom?.alternative(da, a, opzioni: opzioni) ?? valhalla!.alternative(da, a, opzioni: opzioni),
+    percorsi: (tappe) => ztl?.percorso(tappe) ?? valhalla!.calcola(tappe, opzioni: opzioni),
+    alternative: (da, a) => ztl?.scelte(da, a) ?? valhalla!.alternative(da, a, opzioni: opzioni),
     seguendo: (p) => tomtom?.seguendo(p, opzioni: opzioni) ?? valhalla!.seguendo(p, opzioni: opzioni),
     // Il traffico di adesso sul percorso (per tutti, se c'è la chiave
     // TomTom): arrivo e soste lo mettono in conto.
@@ -195,10 +226,15 @@ class GestoreViaggio extends ChangeNotifier {
     required this.posizione,
     this.costruisci = pianificatoreVero,
     this.consumo,
+    this.ztl,
     FonteLuoghi? luoghi,
     DateTime Function()? orologio,
   }) : luoghi = luoghi ?? ClientePhoton(),
        _ora = orologio ?? DateTime.now;
+
+  /// I permessi delle ZTL: la risposta alla domanda del percorso si ricorda
+  /// lì. `null` nelle prove che non le guardano.
+  final GestoreZtl? ztl;
 
   final Archivio archivio;
   final GestoreAuto auto;
@@ -337,6 +373,34 @@ class GestoreViaggio extends ChangeNotifier {
     await pianifica(d);
   }
 
+  /// La risposta a «Hai il permesso per entrare?» di una ZTL sul percorso:
+  /// si ricorda per quella ZTL. Col permesso si rifà il percorso, che ci
+  /// passa; senza, il percorso è già quello giusto e la domanda sparisce.
+  Future<void> rispondiZtl(ZonaLimitata zona, bool permesso) async {
+    await ztl?.rispondi(zona, permesso);
+    final d = destinazione;
+    if (d == null) return;
+    if (permesso) return pianifica(d, conScelte: _daPassare.isEmpty);
+    final s = stato;
+    if (s is! ViaggioPronto) return;
+    PercorsoCalcolato senza(PercorsoCalcolato p) =>
+        p.ztl?.daChiedere?.chiave == zona.chiave ? p.conZtl(p.ztl!.senzaDomanda()) : p;
+    _scelte = [for (final p in _scelte) senza(p)];
+    _imposta(
+      ViaggioPronto(
+        s.destinazione,
+        Viaggio(percorso: senza(s.viaggio.percorso), colonnine: s.viaggio.colonnine, piano: s.viaggio.piano),
+        s.batteriaPartenza,
+        calcolatoAlle: s.calcolatoAlle,
+        termica: s.termica,
+        senzaSoste: s.senzaSoste,
+        scelte: _scelte,
+        scelta: s.scelta,
+        tappe: s.tappe,
+      ),
+    );
+  }
+
   /// Una tappa in più, prima della meta (in fondo, o in [posizione]).
   Future<void> aggiungiTappa(Luogo l, {int? posizione}) async {
     tappe.insert((posizione ?? tappe.length).clamp(0, tappe.length), l);
@@ -401,20 +465,29 @@ class GestoreViaggio extends ChangeNotifier {
     await pianifica(d);
   }
 
+  /// La strada proposta in guida, e presa: il viaggio si rifà su quella da
+  /// dove si è, soste comprese.
+  Future<void> seguiStrada(PercorsoCalcolato strada) async {
+    final d = destinazione;
+    if (d == null) return;
+    await pianifica(d, strada: strada);
+  }
+
   /// [conScelte]: si cercano anche le strade alternative (una meta nuova,
-  /// opzioni cambiate); in guida no, si ricalcola e basta.
-  Future<void> pianifica(Luogo destinazione, {bool conScelte = false}) async {
+  /// opzioni cambiate); in guida no, si ricalcola e basta. [strada]: il
+  /// percorso c'è già (una strada a risparmio presa in guida).
+  Future<void> pianifica(Luogo destinazione, {bool conScelte = false, PercorsoCalcolato? strada}) async {
     final impostazioni = await archivio.impostazioni();
     if (impostazioni.mancante case final m?) return _imposta(ErroreViaggio(m, destinazione: destinazione));
     if (conScelte) {
       _scelte = const [];
       _scelta = 0;
     }
-    if (!auto.elettrica) return _percorsoSolo(destinazione, impostazioni, conScelte: conScelte);
+    if (!auto.elettrica) return _percorsoSolo(destinazione, impostazioni, conScelte: conScelte, strada: strada);
     // Le soste di ricarica sono Premium: senza, l'elettrica ha il percorso
     // come la termica (e la scheda dice che le soste sono con Premium).
     if (!GestorePremium.attivo.value) {
-      return _percorsoSolo(destinazione, impostazioni, conScelte: conScelte, senzaSoste: true);
+      return _percorsoSolo(destinazione, impostazioni, conScelte: conScelte, senzaSoste: true, strada: strada);
     }
     final batteria = auto.stato?.batteria;
     if (batteria == null) {
@@ -444,7 +517,7 @@ class GestoreViaggio extends ChangeNotifier {
       }
       this.condizioni = condizioni;
       final pianificatore = costruisci(impostazioni, auto.veicolo, preferenze, opzioni);
-      final scelto = await _scegli(pianificatore, partenza, destinazione, conScelte);
+      final scelto = strada ?? await _scegli(pianificatore, partenza, destinazione, conScelte);
       final viaggio = await pianificatore
           .pianifica(
             partenza: partenza,
@@ -503,6 +576,7 @@ class GestoreViaggio extends ChangeNotifier {
     Impostazioni impostazioni, {
     bool conScelte = false,
     bool senzaSoste = false,
+    PercorsoCalcolato? strada,
   }) async {
     final partenza = await posizione();
     if (partenza == null) {
@@ -515,7 +589,7 @@ class GestoreViaggio extends ChangeNotifier {
     condizioni = null;
     try {
       final pianificatore = costruisci(impostazioni, auto.veicolo, await archivio.preferenze(), opzioni);
-      final scelto = await _scegli(pianificatore, partenza, destinazione, conScelte);
+      final scelto = strada ?? await _scegli(pianificatore, partenza, destinazione, conScelte);
       final percorso = await pianificatore
           .percorso(
             partenza: partenza,
@@ -613,14 +687,13 @@ class GestoreViaggio extends ChangeNotifier {
   }
 }
 
-/// Le colonnine rapide intorno a [qui] adatte all'auto, dalla più vicina; con
-/// Premium anche libere e occupate adesso. Per «Colonnine vicine» sull'auto e
-/// sul telefono: senza Premium l'elenco c'è lo stesso, con lo stato che dice
-/// la fonte (spesso nessuno) invece di quello in tempo reale.
+/// Le colonnine intorno a [qui] adatte all'auto, lente comprese, dalla più
+/// vicina; con Premium anche libere e occupate adesso. Per «Colonnine vicine»
+/// sull'auto e sul telefono: senza Premium l'elenco c'è lo stesso, con lo
+/// stato che dice la fonte (spesso nessuno) invece di quello in tempo reale.
 ///
-/// [operatoriEsclusi] e [potenzaMinimaKw] sono la scelta fatta nelle
-/// preferenze di ricarica: quello che non si vuole vedere non si vede nemmeno
-/// qui. Senza, si vede tutto — è il comportamento di sempre.
+/// [operatoriEsclusi] è la scelta fatta nelle preferenze di ricarica: quello
+/// che non si vuole vedere non si vede nemmeno qui. Senza, si vede tutto.
 Future<List<Colonnina>> colonnineVicine(
   Punto qui,
   ProfiloVeicolo veicolo, {
@@ -628,12 +701,11 @@ Future<List<Colonnina>> colonnineVicine(
   int quante = 8,
   int conStato = 10,
   Set<String> operatoriEsclusi = const {},
-  double potenzaMinimaKw = 0,
 }) async {
   final fonte = ColonnineLocali(archivioColonnine(), riserva: ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni)));
   final adatte = [
     for (final c in await fonte.lungo([qui], distanzaKm: km))
-      if (c.potenzaNominalePer(veicolo.connettori) >= (potenzaMinimaKw > 0 ? potenzaMinimaKw : 0.1) &&
+      if (c.potenzaNominalePer(veicolo.connettori) > 0 &&
           !operatoreEscluso(c, operatoriEsclusi) &&
           distanzaM(qui, c.posizione) <= km * 1000)
         c,
@@ -649,8 +721,9 @@ Future<List<Colonnina>> colonnineVicine(
   ]);
 }
 
-/// Le colonnine vicine filtrate come si è scelto in «Ricarica»: la potenza
-/// minima e gli operatori che non si vogliono vedere.
+/// Le colonnine vicine senza gli operatori che in «Ricarica» non si vogliono
+/// vedere. La potenza minima no: vale per le soste del viaggio, e intorno a
+/// te si vedono tutte, anche le lente.
 ///
 /// È la porta da cui passano l'elenco del telefono e quello dell'auto, così
 /// la scelta vale in tutt'e due senza che nessuno se la debba ricordare.
@@ -662,19 +735,12 @@ Future<List<Colonnina>> colonnineVicineComeSiVuole(
   int quante = 8,
 }) async {
   final p = await archivio.preferenze();
-  return colonnineVicine(
-    qui,
-    veicolo,
-    km: km,
-    quante: quante,
-    operatoriEsclusi: p.operatoriEsclusi,
-    potenzaMinimaKw: p.minimaIntorno,
-  );
+  return colonnineVicine(qui, veicolo, km: km, quante: quante, operatoriEsclusi: p.operatoriEsclusi);
 }
 
-/// Tutte le colonnine dell'archivio adatte a [veicolo], filtrate come si è
-/// scelto in «Ricarica»: per la mappa di tutta Italia. Con «Tutte» nessun
-/// minimo di potenza, come intorno a te.
+/// Tutte le colonnine dell'archivio adatte a [veicolo], per la mappa di
+/// tutta Italia: anche le lente, senza gli operatori che in «Ricarica» non si
+/// vogliono vedere. La potenza minima vale per le soste, non qui.
 Future<List<Colonnina>> colonnineDellArchivioComeSiVuole(
   ProfiloVeicolo veicolo,
   Archivio archivio, {
@@ -682,10 +748,9 @@ Future<List<Colonnina>> colonnineDellArchivioComeSiVuole(
 }) async {
   final p = await archivio.preferenze();
   final a = await (da ?? archivioColonnine());
-  final minima = p.minimaIntorno > 0 ? p.minimaIntorno : 0.1;
   return [
     for (final c in a.tutte)
-      if (c.potenzaNominalePer(veicolo.connettori) >= minima && !operatoreEscluso(c, p.operatoriEsclusi)) c,
+      if (c.potenzaNominalePer(veicolo.connettori) > 0 && !operatoreEscluso(c, p.operatoriEsclusi)) c,
   ];
 }
 

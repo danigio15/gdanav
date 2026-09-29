@@ -22,6 +22,7 @@ import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/gestore_vicini.dart';
+import '../stato/gestore_ztl.dart';
 import 'abbina_home_assistant.dart';
 import 'cerca_destinazione.dart';
 import 'dettaglio_colonnina.dart';
@@ -40,6 +41,8 @@ import 'distributori.dart';
 import 'scheda_punto.dart';
 import 'segnala.dart';
 import 'schermata_guida.dart';
+import 'strade_risparmio.dart';
+import 'zone_ztl.dart';
 
 typedef CostruisciMappa = Widget Function(BuildContext context, ControlloMappa controllo);
 
@@ -61,6 +64,7 @@ class SchermataPrincipale extends StatefulWidget {
     this.fotoAuto,
     this.premium,
     this.mappeOffline,
+    this.ztl,
     this.menuOspite,
     this.iconaOspite,
     this.apriIlMenu,
@@ -108,6 +112,10 @@ class SchermataPrincipale extends StatefulWidget {
 
   /// Le mappe scaricate; se manca, quelle vere di MapLibre.
   final GestoreMappeOffline? mappeOffline;
+
+  /// Le ZTL e le aree pedonali: sulla mappa, gli avvisi e i permessi.
+  /// `null` nelle prove che non le guardano.
+  final GestoreZtl? ztl;
 
   /// Chiede il permesso della posizione; nelle prove non c'è.
   final Future<bool> Function()? chiediPosizione;
@@ -161,6 +169,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
           posizione: widget.posizione,
           segnalazioni: segnalazioni,
           vicini: widget.vicini,
+          ztl: widget.ztl,
           mappa: widget.mappa,
         ),
       ),
@@ -410,6 +419,27 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                         ),
                       ),
                     ),
+                    if (widget.ztl case final z?)
+                      _VoceMenu(
+                        key: const Key('menu-ztl'),
+                        icona: Icons.do_not_disturb_on_rounded,
+                        colore: const Color(0xFFDC2626),
+                        titolo: 'ZTL e aree pedonali',
+                        sotto: switch (z.scelte.permessi.length) {
+                          0 => z.scelte.sullaMappa ? 'Sulla mappa, e i tuoi permessi' : 'I tuoi permessi',
+                          final n => '$n ZTL a cui hai risposto',
+                        },
+                        onTap: () => vai(ZoneZtlSchermata(ztl: z)),
+                      ),
+                    if (widget.guida.risparmio case final r?)
+                      _VoceMenu(
+                        key: const Key('menu-risparmio'),
+                        icona: Icons.eco_rounded,
+                        colore: const Color(0xFF16A34A),
+                        titolo: 'Strade a risparmio',
+                        sotto: riassuntoRisparmio(r.soglie),
+                        onTap: () => vai(StradeRisparmioSchermata(risparmio: r)),
+                      ),
                     // Ricarica e fonte della batteria servono solo all'elettrica.
                     if (widget.auto.elettrica)
                       _VoceMenu(
@@ -551,6 +581,8 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                   ),
                   onColonnina: (id) => mostraColonnina(context, viaggio, id),
                   vicini: widget.vicini,
+                  ztl: widget.ztl,
+                  risparmio: widget.guida.risparmio,
                   onPunto: (p) => mostraPunto(
                     context,
                     p,
@@ -675,6 +707,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                             onPremium: widget.premium == null
                                 ? null
                                 : () => _apri(SchermataPremium(premium: widget.premium!, perche: 'Le soste di ricarica')),
+                            risparmio: widget.guida.risparmio,
                           ),
                   ),
                 ],

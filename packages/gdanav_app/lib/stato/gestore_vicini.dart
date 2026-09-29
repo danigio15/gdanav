@@ -11,7 +11,7 @@ import 'gestore_posizione.dart';
 import 'gestore_viaggio.dart';
 
 /// Quello che c'è intorno a te, sulla mappa: i distributori coi prezzi se
-/// l'auto è termica, le colonnine rapide adatte se è elettrica. Si ricerca
+/// l'auto è termica, le colonnine adatte se è elettrica. Si ricerca
 /// quando ci si sposta di un paio di chilometri o si cambia auto.
 class GestoreVicini extends ChangeNotifier {
   GestoreVicini({
@@ -59,7 +59,8 @@ class GestoreVicini extends ChangeNotifier {
   List<Colonnina> colonnine = const [];
 
   /// Le colonnine di tutta la mappa, dall'archivio dentro l'app: quelle
-  /// adatte all'auto, con le scelte di «Ricarica». Sono decine di migliaia:
+  /// adatte all'auto, anche le lente, tolti gli operatori spenti in
+  /// «Ricarica». Sono decine di migliaia:
   /// si rifanno solo quando cambia l'auto o la scelta, e la mappa le
   /// raggruppa da sé quando si guarda da lontano. Partono quando le chiede
   /// la mappa ([avviaTutte]): chi non ha la mappa non le carica.

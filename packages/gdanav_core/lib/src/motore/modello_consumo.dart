@@ -86,6 +86,20 @@ double energiaTrattoWh(Tratto tratto, ProfiloVeicolo p, [Condizioni c = const Co
   return wh > 0 ? wh * c.fattorePer(tratto.velocitaKmh) : wh;
 }
 
+/// Quanto si consuma a velocità costante in piano, in kWh ogni 100 km,
+/// senza i consumi fissi (clima, elettronica): chi li vuole li conta a parte,
+/// come TomTom che li chiede come potenza.
+double consumoCostanteKwh100(double kmh, ProfiloVeicolo p, [Condizioni c = const Condizioni()]) {
+  final v = kmh / 3.6;
+  final aria = v + c.ventoControMs;
+  final forza = 0.5 * c.densitaAria * p.cdA * aria * aria.abs() + p.massaKg * _g * p.crr;
+  return forza * 100000 / p.rendimentoTrazione / 3.6e6 * c.fattorePer(kmh);
+}
+
+/// L'energia per tutto il percorso fatto di [tratti], in kWh.
+double energiaPercorsoKwh(List<Tratto> tratti, ProfiloVeicolo p, [Condizioni c = const Condizioni()]) =>
+    tratti.fold(0.0, (s, t) => s + energiaTrattoWh(t, p, c)) / 1000;
+
 /// Consumo medio in Wh/km, il numero che si mostra all'utente.
 double consumoMedioWhKm(List<Tratto> tratti, ProfiloVeicolo p, [Condizioni c = const Condizioni()]) {
   var wh = 0.0, m = 0.0;

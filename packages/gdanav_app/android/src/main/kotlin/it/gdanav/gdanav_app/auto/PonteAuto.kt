@@ -99,6 +99,8 @@ object PonteAuto {
     data class Avviso(
         val titolo: String? = null,
         val tipo: String? = null,
+        /** La seconda riga, quando non è «tra 300 m»: la ZTL («Il percorso la evita»). */
+        val testo: String? = null,
         val metri: Double? = null,
         val limite: Int? = null,
         val ancoraId: String? = null,
@@ -106,6 +108,21 @@ object PonteAuto {
     )
 
     @Volatile var avviso = Avviso()
+
+    /**
+     * La strada a risparmio (o più rapida) proposta dal telefono: il titolo,
+     * «−1,8 kWh · +4 min · arrivi con il 31%», e l'id per la risposta.
+     * Senza id, nessuna.
+     */
+    data class Strada(val id: String? = null, val titolo: String? = null, val testo: String? = null)
+
+    @Volatile var strada = Strada()
+
+    /**
+     * L'auto mostra gli avvisi di Android Auto (API 5): la strada proposta va
+     * lì, coi due tasti, e non nel pannello sulla mappa.
+     */
+    @Volatile var conAvvisi = false
 
     /** Le opzioni del percorso e la voce, per il menu. */
     @Volatile var opzioni: Map<String, Any?> = emptyMap()
@@ -209,10 +226,16 @@ object PonteAuto {
             "avviso" -> avviso = Avviso(
                 titolo = call.argument<String>("titolo"),
                 tipo = call.argument<String>("tipo"),
+                testo = call.argument<String>("testo"),
                 metri = numero(call, "metri"),
                 limite = numero(call, "limite")?.toInt(),
                 ancoraId = call.argument<String>("ancora_id"),
                 ancoraTesto = call.argument<String>("ancora_testo"),
+            )
+            "strada" -> strada = Strada(
+                id = call.argument<String>("id"),
+                titolo = call.argument<String>("titolo"),
+                testo = call.argument<String>("testo"),
             )
             "opzioni" -> opzioni = (call.arguments as? Map<*, *>)?.entries?.associate { "${it.key}" to it.value } ?: emptyMap()
             "svincolo" -> {
@@ -317,7 +340,10 @@ object PonteAuto {
 
     fun ancora(id: String, si: Boolean) = chiedi("ancora", mapOf("id" to id, "si" to si))
 
-    /** Le colonnine rapide vicine, come luoghi da raggiungere. */
+    /** «Prendila» (o «Resto qui») sulla strada proposta. */
+    fun rispondiStrada(id: String, si: Boolean) = chiedi("strada", mapOf("id" to id, "si" to si))
+
+    /** Le colonnine vicine, come luoghi da raggiungere. */
     /** Un punto toccato sulla mappa: il telefono dice cosa è e cosa sapere. */
     fun punto(proprieta: Map<String, Any?>, lat: Double, lon: Double, risposta: (Map<String, Any?>?) -> Unit) =
         chiedi("punto", mapOf("proprieta" to proprieta, "lat" to lat, "lon" to lon)) { r ->

@@ -9,23 +9,27 @@ import '../componenti/icone_segnalazioni.dart';
 import '../componenti/stato_colonnina.dart' show testoDisponibilita;
 import '../componenti/scena_svincolo.dart';
 import '../componenti/vista_svincolo.dart';
+import '../componenti/ztl.dart';
 import '../mappa/dati_viaggio.dart';
 import '../mappa/segnaposto.dart';
 import '../mappa/stile.dart';
 import '../schermate/scheda_punto.dart';
 import '../servizi.dart';
 import '../stato/avvisi_strada.dart';
+import '../stato/avvisi_ztl.dart';
 import '../stato/distributori.dart';
 import '../stato/gestore_auto.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_luoghi.dart';
 import '../stato/gestore_meteo.dart';
 import '../stato/gestore_posizione.dart';
+import '../stato/gestore_risparmio.dart' show sintesiProposta;
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/prova_di_guida.dart';
 import 'richiesta_navigazione.dart';
 import '../stato/gestore_vicini.dart';
+import '../stato/gestore_ztl.dart';
 
 /// Tiene aggiornato lo schermo di Android Auto: stile, percorso, colonnine,
 /// segnalazioni, segnaposto e prossima manovra, e il cruscotto (batteria,
@@ -46,6 +50,7 @@ class PonteAuto {
     this.meteo,
     this.vicini,
     this.prova,
+    this.ztl,
     MethodChannel? canale,
     DateTime Function()? orologio,
   }) : _canale = canale ?? const MethodChannel('gdanav/schermo_auto'),
@@ -66,11 +71,15 @@ class PonteAuto {
 
   /// La prova di guida che Android Auto accende (il «test drive»).
   final ProvaDiGuida? prova;
+
+  /// Le ZTL e le aree pedonali sulla mappa dell'auto, e gli avvisi.
+  final GestoreZtl? ztl;
   final MethodChannel _canale;
   final DateTime Function() _ora;
   var _attivo = true;
   DateTime _ultimaPosizione = DateTime(0);
   AvvisiStrada? _avvisi;
+  AvvisiZtl? _avvisiZtl;
 
   void avvia() {
     _canale.setMethodCallHandler(_dallAuto);
@@ -92,6 +101,11 @@ class PonteAuto {
       s.addListener(_segnalazioni);
       _avvisi = AvvisiStrada.di(guida, s)..addListener(_avviso);
     }
+    if (ztl case final z?) {
+      z.addListener(_zoneDaCapo);
+      _avvisiZtl = AvvisiZtl.di(guida, z)..addListener(_avviso);
+    }
+    guida.risparmio?.addListener(_strada);
     _viaggio();
     _luoghi();
     _opzioni();
@@ -115,6 +129,8 @@ class PonteAuto {
       _manda('immagini', {
         'png': {
           for (final t in TipoSegnalazione.values) nomeIcona(t): await iconaSegnalazionePng(t),
+          // Il cartello della ZTL, per l'avviso.
+          'segnala-ztl': await cartelloZtlPng(),
           // Le icone dei punti: categorie, distributori, colonnine.
           ...await iconePunti(),
         },
@@ -191,6 +207,15 @@ class PonteAuto {
       case 'ancora':
         final s = _avvisi?.passata;
         if (s != null && s.id == a['id']) _avvisi!.rispondi(s, a['si'] == true);
+      // «Prendila» o «Resto qui» sulla strada proposta: vale solo per quella
+      // che l'auto ha davanti.
+      case 'strada':
+        if (a['id'] != _idStrada || _stradaMandata == null) return null;
+        if (a['si'] == true) {
+          await guida.prendiStrada();
+        } else {
+          guida.restaQui();
+        }
       // Auto termica: i distributori intorno; in guida si passa da lì.
       case 'distributori':
         final qui = guida.avanzamento?.posizioneSulPercorso ?? posizione.qui ?? viaggio.ultimaPosizione;
@@ -235,7 +260,7 @@ class PonteAuto {
           await vicini?.statoAdesso(p.id!).timeout(const Duration(seconds: 5), onTimeout: () => null);
         }
         final qui = guida.avanzamento?.posizioneSulPercorso ?? posizione.qui;
-        final (:sopra, :righe) = righePunto(
+        final (:righe, :stato) = schedaInAuto(
           p,
           vicini: vicini,
           qui: qui,
@@ -243,12 +268,14 @@ class PonteAuto {
         );
         return {
           'titolo': p.nome,
-          'sopra': sopra,
-          'righe': righe,
+          'voci': [
+            for (final r in righe) {'icona': r.icona, 'colore': r.colore, 'titolo': r.titolo, 'testo': r.testo},
+          ],
+          'stato': stato,
           'vai': guida.attiva && (guida.pronto?.termica ?? false) ? 'Passa di qui' : 'Vai',
           'luogo': {
             'nome': p.nome,
-            'descrizione': righe.firstOrNull ?? sopra,
+            'descrizione': righe.first.titolo,
             'lat': p.posizione.lat,
             'lon': p.posizione.lon,
           },
@@ -318,6 +345,46 @@ class PonteAuto {
     vicini?.removeListener(_vicini);
     segnalazioni?.removeListener(_segnalazioni);
     _avvisi?.removeListener(_avviso);
+    ztl?.removeListener(_zoneDaCapo);
+    _avvisiZtl?.removeListener(_avviso);
+    guida.risparmio?.removeListener(_strada);
+  }
+
+  /// La strada proposta mandata all'auto, e il suo numero: la risposta
+  /// dell'auto vale solo per quella.
+  PropostaStrada? _stradaMandata;
+  var _numeroStrada = 0;
+  String get _idStrada => 'strada-$_numeroStrada';
+
+  /// La strada a risparmio (o più rapida) proposta in guida: all'auto il
+  /// titolo e le cifre, coi due tasti; sulla mappa la strada verde col
+  /// fumetto. Presa, rifiutata o scaduta: via da tutt'e due.
+  void _strada() {
+    final r = guida.risparmio;
+    final p = r?.proposta;
+    if (identical(p, _stradaMandata)) return;
+    _stradaMandata = p;
+    if (r == null || p == null) {
+      _manda('strada', const {});
+      _manda('sorgenti', {
+        'dati': {sorgenteRisparmio: jsonEncode(datiRisparmio(null, null, ''))},
+      });
+      return;
+    }
+    _numeroStrada++;
+    final arrivo = guida.batteriaArrivoCon(p);
+    _manda('strada', {
+      'id': _idStrada,
+      'titolo': p.motivo == MotivoProposta.rapida ? 'Strada più rapida' : 'Strada a risparmio',
+      'testo': [sintesiProposta(p, r.unita), if (arrivo != null) 'arrivi con il ${arrivo.round()}%'].join(' · '),
+    });
+    _manda('sorgenti', {
+      'dati': {
+        sorgenteRisparmio: jsonEncode(
+          datiRisparmio(p, guida.pronto?.viaggio.percorso, sintesiProposta(p, r.unita, meno: '-')),
+        ),
+      },
+    });
   }
 
   void _viaggio() {
@@ -353,19 +420,61 @@ class PonteAuto {
     });
   }
 
-  /// La segnalazione che si avvicina, o quella appena passata.
+  /// La segnalazione che si avvicina, o quella appena passata; o la ZTL
+  /// attiva. Sull'auto ce n'è posto per uno: la ZTL davanti fuori dal
+  /// percorso vince su tutto (è una multa), le altre ZTL cedono il posto
+  /// alle segnalazioni.
   void _avviso() {
     final a = _avvisi;
-    if (a == null) return;
-    final passata = a.passata;
+    final z = _avvisiZtl?.avviso;
+    final passata = a?.passata;
+    final davanti = a?.davanti;
     _manda('avviso', {
-      if (a.davanti case (final s, final m)) ...{
-        'titolo': s.fissa ? 'Autovelox fisso' : s.tipo.avviso,
-        'tipo': s.tipo.name,
-        'metri': m,
-        'limite': s.limiteKmh,
-      },
+      if (z != null && (z.fuori || davanti == null))
+        ...{'titolo': z.titolo, 'tipo': 'ztl', 'testo': z.testo}
+      else if (davanti case (final s, final m))
+        ...{'titolo': s.fissa ? 'Autovelox fisso' : s.tipo.avviso, 'tipo': s.tipo.name, 'metri': m, 'limite': s.limiteKmh},
       if (passata != null) ...{'ancora_id': passata.id, 'ancora_testo': '${passata.tipo.nome}: c\'è ancora?'},
+    });
+  }
+
+  /// Dove erano centrate le ZTL mandate all'auto, e quando.
+  Punto? _zoneQui;
+  DateTime _zoneAlle = DateTime(0);
+
+  void _zoneDaCapo() => unawaited(_zone(subito: true));
+
+  /// Le ZTL e le aree pedonali intorno all'auto, se si vogliono sulla mappa.
+  /// Si rimandano spostandosi di un paio di chilometri, o ogni cinque minuti:
+  /// cambiano stato nel corso della giornata («attiva fino alle 18»).
+  Future<void> _zone({bool subito = false}) async {
+    final g = ztl;
+    if (g == null || !_attivo) return;
+    final qui = guida.avanzamento?.posizioneSulPercorso ?? posizione.qui ?? viaggio.ultimaPosizione;
+    final ora = _ora();
+    if (!g.scelte.sullaMappa || qui == null) {
+      if (_zoneQui != null || subito) {
+        _zoneQui = null;
+        _manda('sorgenti', {
+          'dati': {sorgenteZtl: jsonEncode(datiZtl(const [], ora))},
+        });
+      }
+      return;
+    }
+    final prima = _zoneQui;
+    if (!subito && prima != null && distanzaM(prima, qui) < 2000 && ora.difference(_zoneAlle) < const Duration(minutes: 5)) {
+      return;
+    }
+    _zoneQui = qui;
+    _zoneAlle = ora;
+    final archivio = await g.zone();
+    // Le ZTL per dieci chilometri; le aree pedonali, che sono tante, per tre.
+    final zone = [
+      for (final z in archivio.vicine(qui, 10000))
+        if (z.tipo == TipoZona.ztl || distanzaM(z.puntoDentro, qui) < 3000) z,
+    ];
+    _manda('sorgenti', {
+      'dati': {sorgenteZtl: jsonEncode(datiZtl(zone.take(1500), ora))},
     });
   }
 
@@ -560,6 +669,7 @@ class PonteAuto {
       'icona': posizione.segnaposto.immagine,
     });
     _cruscotto();
+    unawaited(_zone());
   }
 
   /// Quello che sta sopra la mappa dell'auto.

@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../mappa/categorie_poi.dart';
+import '../mappa/stile.dart' show motivoPedonale, motivoZtl;
 
 /// Il simbolo di ogni categoria di punto di interesse.
 IconData iconaCategoria(CategoriaPoi c) => switch (c.nome) {
@@ -87,8 +88,46 @@ const coloriColonnina = {
   'ignota': Color(0xFF4F46E5),
 };
 
-/// Tutte le icone dei punti sulla mappa: categorie, distributori e colonnine.
+/// Un riquadro da ripetere per riempire una zona: [disegna] ci disegna sopra,
+/// in punti, su un lato di [lato] punti. PNG a [scala]×, come le icone.
+Future<Uint8List> motivoPng(double lato, void Function(Canvas c) disegna, {double scala = 3}) async {
+  final registro = ui.PictureRecorder();
+  final c = Canvas(registro)..scale(scala);
+  disegna(c);
+  final img = await registro.endRecording().toImage((lato * scala).round(), (lato * scala).round());
+  return (await img.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
+}
+
+/// Le righe della ZTL: rosa chiaro, con le righe rosse in diagonale. Le
+/// righe si toccano da un riquadro all'altro: ripetuto, il tratteggio è
+/// continuo.
+Future<Uint8List> motivoZtlPng() {
+  const lato = 14.0;
+  return motivoPng(lato, (c) {
+    c.drawRect(const Rect.fromLTWH(0, 0, lato, lato), Paint()..color = const Color(0x38FCA5A5));
+    final riga = Paint()
+      ..color = const Color(0x55DC2626)
+      ..strokeWidth = 2.4;
+    for (final d in [-lato, 0.0, lato]) {
+      c.drawLine(Offset(d, lato), Offset(d + lato, 0), riga);
+    }
+  });
+}
+
+/// I puntini dell'area pedonale, su un grigio chiaro.
+Future<Uint8List> motivoPedonalePng() {
+  const lato = 8.0;
+  return motivoPng(lato, (c) {
+    c.drawRect(const Rect.fromLTWH(0, 0, lato, lato), Paint()..color = const Color(0x73D1D5DB));
+    c.drawCircle(const Offset(lato / 2, lato / 2), 1.3, Paint()..color = const Color(0x8C6B7280));
+  });
+}
+
+/// Tutte le icone dei punti sulla mappa: categorie, distributori e colonnine;
+/// e i riempimenti delle ZTL e delle aree pedonali.
 Future<Map<String, Uint8List>> iconePunti() async => {
+  motivoZtl: await motivoZtlPng(),
+  motivoPedonale: await motivoPedonalePng(),
   for (final c in [...categoriePoi, poiAltro]) c.immagine: await bollinoPng(coloreHex(c.colore), iconaCategoria(c)),
   'punto-distributore': await bollinoPng(const Color(0xFFF08A24), Icons.local_gas_station, lato: 32),
   /* La stessa pompa col fulmine della scheda del punto — `Icons.ev_station` —

@@ -109,6 +109,10 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     private var spostamentoPrima: CGPoint = .zero
     private var sostaAvvisata: String?
 
+    /// La strada a risparmio già proposta, e il suo avviso finché si vede.
+    private var stradaMostrata: String?
+    private weak var avvisoStrada: CPNavigationAlert?
+
     // MARK: - La scena
 
     public func templateApplicationScene(
@@ -168,6 +172,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         m.aggiorna()
         sincronizzaGuida()
         mostraAvviso()
+        mostraStrada()
         if !GdanavCarPlay.pannelliSullaMappa { avvisaLaSosta() }
         // I tasti si rifanno solo se cambia qualcosa che mostrano.
         if PonteAuto.shared.versioneModello != versione {
@@ -435,7 +440,9 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
             )
         } else {
             var sotto: [String] = []
-            if let metri = a.metri {
+            if let testo = a.testo {
+                sotto.append(testo)
+            } else if let metri = a.metri {
                 let d = ManovreCarPlay.distanza(metri)
                 sotto.append("Fra \(Int(d.value)) \(d.unit == .kilometers ? "km" : "m")")
             }
@@ -449,6 +456,42 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                 duration: 8
             )
         }
+        if t.currentNavigationAlert != nil {
+            t.dismissNavigationAlert(animated: false) { _ in t.present(navigationAlert: alert, animated: true) }
+        } else {
+            t.present(navigationAlert: alert, animated: true)
+        }
+    }
+
+    /// La strada a risparmio (o più rapida) proposta dal telefono: un avviso di
+    /// navigazione coi due tasti, come Mappe quando propone un'altra strada.
+    /// Sparisce da solo dopo venti secondi, come sul telefono; presa,
+    /// rifiutata o scaduta là, sparisce anche qui.
+    private func mostraStrada() {
+        guard let t = modello else { return }
+        let s = PonteAuto.shared.strada
+        guard s.id != stradaMostrata else { return }
+        stradaMostrata = s.id
+        guard let id = s.id else {
+            if let a = avvisoStrada, t.currentNavigationAlert === a {
+                t.dismissNavigationAlert(animated: true) { _ in }
+            }
+            avvisoStrada = nil
+            return
+        }
+        let alert = CPNavigationAlert(
+            titleVariants: [s.titolo ?? "Strada a risparmio"],
+            subtitleVariants: [s.testo ?? ""],
+            image: UIImage(systemName: "leaf.fill")?.withTintColor(.systemGreen, renderingMode: .alwaysOriginal),
+            primaryAction: CPAlertAction(title: "Prendila", style: .default) { _ in
+                PonteAuto.shared.rispondiStrada(id, si: true)
+            },
+            secondaryAction: CPAlertAction(title: "Resto qui", style: .cancel) { _ in
+                PonteAuto.shared.rispondiStrada(id, si: false)
+            },
+            duration: 20
+        )
+        avvisoStrada = alert
         if t.currentNavigationAlert != nil {
             t.dismissNavigationAlert(animated: false) { _ in t.present(navigationAlert: alert, animated: true) }
         } else {

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icona delle schede di Android Auto: le prese, libere o occupate. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M16,7V3h-2v4h-4V3H8v4a1,1 0,0 0,-1 1v4a5,5 0,0 0,4 4.9V21h2v-4.1A5,5 0,0 0,17 12V8a1,1 0,0 0,-1 -1z"/>
+</vector>

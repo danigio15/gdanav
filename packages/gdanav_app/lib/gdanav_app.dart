@@ -14,6 +14,7 @@ import 'stato/foto_auto.dart';
 import 'stato/gestore_consumo.dart';
 import 'stato/gestore_premium.dart';
 import 'stato/gestore_guida.dart';
+import 'stato/gestore_risparmio.dart';
 import 'stato/gestore_luoghi.dart';
 import 'stato/gestore_meteo.dart';
 import 'stato/gestore_posizione.dart';
@@ -21,6 +22,7 @@ import 'stato/gestore_segnalazioni.dart';
 import 'stato/gestore_vicini.dart';
 import 'stato/licenza.dart';
 import 'stato/gestore_viaggio.dart';
+import 'stato/gestore_ztl.dart';
 import 'stato/prova_di_guida.dart';
 import 'stato/posizione.dart';
 import 'stato/voce.dart';
@@ -91,7 +93,18 @@ Future<GdanavApp> preparaGdanav({
   final consumo = GestoreConsumo(archivio);
   await consumo.carica(auto.veicolo.id);
   auto.addListener(() => consumo.carica(auto.veicolo.id));
-  final viaggio = GestoreViaggio(archivio: archivio, auto: auto, posizione: posizioneAttuale, consumo: consumo);
+  // Le ZTL: i permessi servono a ogni percorso; le zone si leggono quando
+  // servono (un percorso, la mappa), non adesso.
+  final ztl = GestoreZtl(archivio);
+  await ztl.carica();
+  GestoreZtl.attuale = ztl;
+  final viaggio = GestoreViaggio(
+    archivio: archivio,
+    auto: auto,
+    posizione: posizioneAttuale,
+    consumo: consumo,
+    ztl: ztl,
+  );
   viaggio.opzioni = await archivio.opzioniPercorso();
   // Premium comprato o scaduto con un viaggio aperto: si ricalcola, con le
   // soste o senza.
@@ -101,6 +114,11 @@ Future<GdanavApp> preparaGdanav({
     eraPremium = premium.sbloccato;
     if (viaggio.stato is ViaggioPronto && viaggio.destinazione != null) unawaited(viaggio.pianifica(viaggio.destinazione!));
   });
+  // Le strade a risparmio: in guida la strada si confronta con le altre, col
+  // modello di consumo dell'auto (TomTom).
+  final risparmio = GestoreRisparmio(archivio: archivio, auto: auto, cerca: cercaConTomTom(archivio), ztl: ztl);
+  await risparmio.carica();
+  GestoreRisparmio.attuale = risparmio;
   // La prova di guida di Android Auto: posizioni finte al posto del GPS.
   final prova = ProvaDiGuida();
   final guida = GestoreGuida(
@@ -109,6 +127,7 @@ Future<GdanavApp> preparaGdanav({
     posizioni: prova.posizioni(posizioniGuida),
     voce: VoceTelefono(),
     consumo: consumo,
+    risparmio: risparmio,
   );
   // La velocità dell'auto entra anche qui: serve a sapere se si è fermi, e da
   // fermi il segnaposto non deve girare dietro al ballonzolamento del GPS.
@@ -147,6 +166,7 @@ Future<GdanavApp> preparaGdanav({
       meteo: meteo,
       vicini: vicini,
       prova: prova,
+      ztl: ztl,
     )..avvia();
     // Una versione da aggiornare spegne anche l'auto: lì si dice di
     // aggiornare gdanav sul telefono.
@@ -171,6 +191,7 @@ Future<GdanavApp> preparaGdanav({
     premium: senzaPremium ? null : premium,
     aggiornamento: aggiornamento,
     chiediPosizione: chiediPosizione,
+    ztl: ztl,
   );
 }
 
@@ -192,6 +213,7 @@ class GdanavApp extends StatelessWidget {
     this.fotoAuto,
     this.premium,
     this.aggiornamento,
+    this.ztl,
   });
 
   final Archivio archivio;
@@ -217,6 +239,9 @@ class GdanavApp extends StatelessWidget {
   /// Nelle prove e nelle anteprime si passa un'altra mappa: quella vera vuole
   /// il codice nativo.
   final CostruisciMappa? mappa;
+
+  /// Le ZTL e le aree pedonali: sulla mappa, gli avvisi e i permessi.
+  final GestoreZtl? ztl;
 
   @override
   Widget build(BuildContext context) {
@@ -261,6 +286,7 @@ class GdanavApp extends StatelessWidget {
     consumo: consumo,
     fotoAuto: fotoAuto,
     premium: premium,
+    ztl: ztl,
   );
 }
 

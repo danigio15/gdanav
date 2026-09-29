@@ -43,7 +43,10 @@ void main() {
     expect(pronto.scelte.first.lunghezzaM, greaterThan(290000));
     expect(pronto.scelte.last.ritardoTraffico, const Duration(minutes: 40));
     expect(find.byKey(const Key('strada-1')), findsOneWidget);
-    expect(find.text('La più veloce'), findsOneWidget);
+    // Come in ABRP, ognuna col suo nome: la corta, con la coda, è la più lenta.
+    expect(find.text('PIÙ RAPIDA'), findsOneWidget);
+    expect(find.text('PIÙ LENTA'), findsOneWidget);
+    expect(find.text('+40 min traffico'), findsOneWidget);
     expect(find.byKey(const Key('traffico')), findsOneWidget);
 
     await scorriScheda(tester, volte: 1);

@@ -8,7 +8,9 @@ import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
+import androidx.car.app.model.Alert
 import androidx.car.app.model.CarIcon
+import androidx.car.app.model.CarText
 import androidx.car.app.model.Template
 import androidx.car.app.navigation.NavigationManager
 import androidx.car.app.navigation.NavigationManagerCallback
@@ -38,7 +40,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
      * fermi, la segnalazione appena passata. La mappa sotto si ridisegna per
      * conto suo, che il modello si rifaccia o no.
      */
-    private fun firma(): Any? = listOf(PonteAuto.guida, PonteAuto.messaggio, PonteAuto.avviso.ancoraId)
+    private fun firma(): Any? = listOf(PonteAuto.guida, PonteAuto.messaggio, PonteAuto.avviso.ancoraId, PonteAuto.strada.id)
 
     private var disegnata: Any? = null
     private var daAggiornare = false
@@ -52,7 +54,47 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         if (ora != disegnata) {
             disegnata = ora
             viaggioAlCruscotto()
+            proponiStrada()
             invalidate()
+        }
+    }
+
+    /** La strada a risparmio già mostrata come avviso di Android Auto. */
+    private var stradaMostrata: String? = null
+
+    /**
+     * La strada a risparmio (o più rapida) proposta dal telefono. Dalle auto
+     * con l'API 5 è l'avviso di Android Auto, coi due tasti, che sparisce da
+     * solo dopo venti secondi come sul telefono; prima i tasti stanno in alto
+     * ([azioni]) e il testo nel pannello sulla mappa.
+     */
+    private fun proponiStrada() {
+        val s = PonteAuto.strada
+        val id = s.id
+        if (id == stradaMostrata || carContext.carAppApiLevel < 5) {
+            stradaMostrata = id
+            return
+        }
+        val app = carContext.getCarService(AppManager::class.java)
+        try {
+            // Presa, rifiutata o scaduta sul telefono: via anche dall'auto.
+            stradaMostrata?.let { app.dismissAlert(it.hashCode()) }
+            stradaMostrata = id
+            if (id == null) return
+            val avviso = Alert.Builder(id.hashCode(), CarText.create(s.titolo ?: "Strada a risparmio"), 20_000)
+                .setIcon(icona(R.drawable.auto_foglia))
+                .addAction(
+                    Action.Builder()
+                        .setTitle("Prendila")
+                        .setFlags(Action.FLAG_PRIMARY)
+                        .setOnClickListener { PonteAuto.rispondiStrada(id, true) }
+                        .build(),
+                )
+                .addAction(Action.Builder().setTitle("Resto qui").setOnClickListener { PonteAuto.rispondiStrada(id, false) }.build())
+            s.testo?.let { avviso.setSubtitle(CarText.create(it)) }
+            app.showAlert(avviso.build())
+        } catch (e: Exception) {
+            // Un'auto che non mostra gli avvisi: restano i tasti in alto.
         }
     }
 
@@ -84,12 +126,18 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
 
     init {
         lifecycle.addObserver(this)
+        PonteAuto.conAvvisi = carContext.carAppApiLevel >= 5
         carContext.getCarService(AppManager::class.java).setSurfaceCallback(renderer)
         renderer.alCambio = { invalidate() }
         // Tocco su un distributore, una colonnina o un ristorante: la scheda.
+        // Toccandone un altro con la scheda aperta sopra la mappa, la scheda
+        // cambia: non se ne impilano due.
         renderer.alPunto = { proprieta, lat, lon ->
             PonteAuto.punto(proprieta, lat, lon) { info ->
-                if (info != null) screenManager.push(SchermoPunto(carContext, info))
+                if (info != null) {
+                    if (screenManager.top is SchermoPunto) screenManager.pop()
+                    screenManager.push(SchermoPunto(carContext, info, renderer, lat, lon))
+                }
             }
         }
         navigazione.setNavigationManagerCallback(object : NavigationManagerCallback {
@@ -156,6 +204,15 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     /** In alto: Cerca, la casa (dentro gdahome) e Menu (in guida anche Fine); appena passata una segnalazione, «C'è ancora?» Sì / No. */
     private fun azioni(): ActionStrip {
         val striscia = ActionStrip.Builder()
+        // La strada a risparmio, sulle auto senza gli avvisi di Android Auto.
+        val strada = PonteAuto.strada.id
+        if (strada != null && carContext.carAppApiLevel < 5) {
+            striscia.addAction(
+                Action.Builder().setTitle("Prendila").setOnClickListener { PonteAuto.rispondiStrada(strada, true) }.build(),
+            )
+            striscia.addAction(tasto(R.drawable.auto_no) { PonteAuto.rispondiStrada(strada, false) })
+            return striscia.build()
+        }
         val ancora = PonteAuto.avviso.ancoraId
         if (ancora != null) {
             striscia.addAction(

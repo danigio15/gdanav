@@ -80,10 +80,21 @@ struct CruscottoAuto {
 struct AvvisoAuto {
     var titolo: String?
     var tipo: String?
+    /// La seconda riga, quando non è «tra 300 m»: la ZTL («Il percorso la evita»).
+    var testo: String? = nil
     var metri: Double?
     var limite: Int?
     var ancoraId: String?
     var ancoraTesto: String?
+}
+
+/// La strada a risparmio (o più rapida) proposta dal telefono: il titolo,
+/// «−1,8 kWh · +4 min · arrivi con il 31%», e l'id per la risposta. Senza
+/// id, nessuna.
+struct StradaAuto {
+    var id: String?
+    var titolo: String?
+    var testo: String?
 }
 
 func numero(_ v: Any?) -> Double? { (v as? NSNumber)?.doubleValue }
@@ -112,6 +123,7 @@ final class PonteAuto {
     private(set) var luoghi: [LuogoAuto] = []
     private(set) var cruscotto = CruscottoAuto()
     private(set) var avviso = AvvisoAuto()
+    private(set) var strada = StradaAuto()
 
     /// Le opzioni del percorso e la voce, per il menu.
     private(set) var opzioni: [String: Any] = [:]
@@ -215,6 +227,7 @@ final class PonteAuto {
             let prossimo = AvvisoAuto(
                 titolo: a["titolo"] as? String,
                 tipo: a["tipo"] as? String,
+                testo: a["testo"] as? String,
                 metri: numero(a["metri"]),
                 limite: numero(a["limite"]).map { Int($0) },
                 ancoraId: a["ancora_id"] as? String,
@@ -224,6 +237,8 @@ final class PonteAuto {
             // CarPlay lo mostra come avviso di navigazione.
             avvisoInArrivo = prossimo.titolo != nil && (prossimo.tipo != avviso.tipo || avviso.titolo == nil)
             avviso = prossimo
+        case "strada":
+            strada = StradaAuto(id: a["id"] as? String, titolo: a["titolo"] as? String, testo: a["testo"] as? String)
         case "opzioni":
             opzioni = a
         case "svincolo":
@@ -364,7 +379,12 @@ final class PonteAuto {
         chiedi("ancora", ["id": id, "si": si])
     }
 
-    /// Le colonnine rapide vicine, come luoghi da raggiungere.
+    /// «Prendila» (o «Resto qui») sulla strada proposta.
+    func rispondiStrada(_ id: String, si: Bool) {
+        chiedi("strada", ["id": id, "si": si])
+    }
+
+    /// Le colonnine vicine, come luoghi da raggiungere.
     func colonnine(risultati: @escaping ([LuogoAuto]) -> Void) {
         chiedi("colonnine") { r in
             risultati((r as? [[String: Any]] ?? []).compactMap { LuogoAuto($0, tipo: "colonnina") })

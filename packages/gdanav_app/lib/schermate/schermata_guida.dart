@@ -6,17 +6,21 @@ import 'package:gdanav_core/gdanav_core.dart';
 import '../componenti/icona_manovra.dart';
 import '../componenti/indicatore_batteria.dart' show eta;
 import '../componenti/icone_segnalazioni.dart';
+import '../componenti/risparmio.dart';
 import '../componenti/tachimetro.dart';
 import '../componenti/vista_svincolo.dart';
 import '../componenti/vetro.dart';
+import '../componenti/ztl.dart';
 import '../mappa/controllo_mappa.dart';
 import '../mappa/mappa_viaggio.dart';
 import '../stato/avvisi_strada.dart';
+import '../stato/avvisi_ztl.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/gestore_vicini.dart';
+import '../stato/gestore_ztl.dart';
 import '../tema.dart';
 import 'scheda_viaggio.dart' show durata, orario;
 import 'schermata_principale.dart' show CostruisciMappa;
@@ -33,6 +37,7 @@ class SchermataGuida extends StatefulWidget {
     required this.posizione,
     this.segnalazioni,
     this.vicini,
+    this.ztl,
     this.mappa,
   });
 
@@ -42,6 +47,9 @@ class SchermataGuida extends StatefulWidget {
 
   /// Distributori o colonnine intorno, sulla mappa.
   final GestoreVicini? vicini;
+
+  /// Le ZTL sulla mappa, e gli avvisi mentre si guida.
+  final GestoreZtl? ztl;
   final CostruisciMappa? mappa;
 
   @override
@@ -53,6 +61,9 @@ class _SchermataGuidaState extends State<SchermataGuida> {
 
   /// Le segnalazioni lungo la strada, condivise con lo schermo dell'auto.
   AvvisiStrada? _avvisi;
+
+  /// Le ZTL attive che si avvicinano, condivise anche loro con l'auto.
+  AvvisiZtl? _ztl;
 
   /// Gli svincoli di cui si è chiuso il popup.
   final _svincoliChiusi = <int>{};
@@ -89,6 +100,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
     });
     widget.guida.avvia();
     if (widget.segnalazioni case final seg?) _avvisi = AvvisiStrada.di(widget.guida, seg);
+    if (widget.ztl case final z?) _ztl = AvvisiZtl.di(widget.guida, z);
   }
 
   @override
@@ -137,6 +149,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                     onPuntoScelto: (_) {},
                     onColonnina: (_) {},
                     vicini: widget.vicini,
+                    ztl: widget.ztl,
                     onPunto: (p) => mostraPunto(
                       context,
                       p,
@@ -149,9 +162,11 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                   ),
             ),
             ListenableBuilder(
-              listenable: Listenable.merge([g, widget.posizione, ?_avvisi]),
+              listenable: Listenable.merge([g, widget.posizione, ?_avvisi, ?_ztl, ?g.risparmio]),
               builder: (context, _) {
                 _copri(context, g);
+                final risparmio = g.risparmio;
+                final strada = risparmio?.proposta;
                 return Column(
                   children: [
                     // In alto la manovra; avvicinandosi a un'uscita o a un
@@ -177,6 +192,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                         },
                       ),
                     ),
+                    if (_ztl?.avviso case final z?) _AvvisoZtl(avviso: z),
                     if (_avvisi?.davanti case (final s, final m)) _AvvisoSegnalazione(segnalazione: s, metri: m),
                     if (_avvisi?.passata case final s?)
                       _Ancora(
@@ -244,12 +260,69 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                         ),
                       ),
                     ),
+                    // Una strada a risparmio (o più rapida): sopra la barra
+                    // in basso, e la strada verde sulla mappa.
+                    if (risparmio != null && strada != null)
+                      PropostaRisparmio(
+                        proposta: strada,
+                        unita: risparmio.unita,
+                        elettrica: g.auto.elettrica,
+                        arrivo: g.batteriaArrivo,
+                        arrivoCon: g.batteriaArrivoCon(strada),
+                        arrivoAlle: g.arrivoAlle,
+                        rimasto: switch (risparmio.propostaAlle) {
+                          final alle? =>
+                            1 -
+                                DateTime.now().difference(alle).inMilliseconds /
+                                    risparmio.durataProposta.inMilliseconds,
+                          null => 1.0,
+                        },
+                        onPrendi: g.prendiStrada,
+                        onResta: g.restaQui,
+                      ),
                     _Fondo(guida: g, onFine: _fine),
                   ],
                 );
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// «ZTL Centro storico, attiva · Il percorso la evita», sotto la manovra.
+class _AvvisoZtl extends StatelessWidget {
+  const _AvvisoZtl({required this.avviso});
+
+  final AvvisoZtl avviso;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Vetro(
+        key: const Key('avviso-ztl'),
+        raggio: 20,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 10, 16, 10),
+          child: Row(
+            children: [
+              const CartelloZtl(lato: 44),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(avviso.titolo, style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    Text(avviso.testo, style: t.bodyMedium),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

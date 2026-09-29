@@ -198,6 +198,81 @@ void main() {
       timeout: const Timeout(Duration(minutes: 4)),
       skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 
+  // Le ZTL: TomTom accetta le «aree da evitare» (in POST) e il percorso ci
+  // gira intorno. Dalla stazione a piazza Dante, col centro antico di Napoli
+  // in mezzo, prima com'è e poi coi rettangoli della zona.
+  test('ZTL: TomTom gira al largo delle aree da evitare', () async {
+    final chiave = Platform.environment['GDANAV_TOMTOM'] ?? '';
+    if (chiave.isEmpty) {
+      avviso('ZTL TomTom', 'senza chiave TomTom: non provata');
+      return;
+    }
+    final tomtom = ClienteTomTom(chiave);
+    final anello = [
+      const Punto(40.8475, 14.2535),
+      const Punto(40.8475, 14.2640),
+      const Punto(40.8545, 14.2640),
+      const Punto(40.8545, 14.2535),
+    ];
+    final zona =
+        ZonaLimitata(id: 'prova', tipo: TipoZona.ztl, nome: 'Centro antico', citta: 'Napoli', anelli: [anello]);
+    final bordo = Linea([...anello, anello.first]);
+    // Dentro davvero: più di cinquanta metri oltre il bordo, non una strada
+    // che lo costeggia.
+    bool dentro(PercorsoCalcolato p) => p.punti.any((q) => zona.contiene(q) && bordo.proietta(q).lontanoM > 50);
+    const da = Punto(40.8527, 14.2724), a = Punto(40.8490, 14.2502);
+    final libero = await tomtom.calcola([da, a]);
+    final rettangoli = zona.copertura();
+    final evitando = await tomtom.calcola([da, a], evita: rettangoli);
+    avviso(
+      'ZTL TomTom',
+      'com\'è: ${libero.durata.inMinutes} min, ${dentro(libero) ? 'dentro' : 'fuori'} · '
+          'con ${rettangoli.length} rettangoli: ${evitando.durata.inMinutes} min, '
+          '${dentro(evitando) ? 'DENTRO' : 'fuori'}',
+    );
+    expect(dentro(evitando), isFalse, reason: 'coi rettangoli il percorso deve stare fuori');
+  },
+      timeout: const Timeout(Duration(minutes: 2)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  // Le strade a risparmio coi server veri: il modello di consumo dell'auto
+  // (kWh, e litri per la termica), la strada «eco» e, da poco dopo la
+  // partenza, la strada di adesso rifatta con le sole alternative migliori.
+  // Quattro richieste.
+  test('strade a risparmio: consumo, strada eco e alternative migliori con TomTom', () async {
+    final chiave = Platform.environment['GDANAV_TOMTOM'] ?? '';
+    if (chiave.isEmpty) {
+      avviso('Risparmio TomTom', 'senza chiave TomTom: non provata');
+      return;
+    }
+    final tomtom = ClienteTomTom(chiave);
+    final elettrica = ModelloConsumoTomTom.elettrica(ProfiloVeicolo.esempio);
+    // Napoli → Salerno: per l'autostrada, o per le statali.
+    const da = Punto(40.8527, 14.2724), a = Punto(40.6780, 14.7594);
+    final rapida = await tomtom.calcola([da, a], consumo: elettrica);
+    final eco = await tomtom.calcola([da, a], eco: true, consumo: elettrica);
+    final davanti = restoDelPercorso(rapida, 2000);
+    final migliori = await tomtom.migliori(davanti, eco: true, consumo: elettrica, staccoM: 1000);
+    final termica = await tomtom.calcola([da, a], consumo: ModelloConsumoTomTom.termica(Carburante.diesel));
+    String quanto(PercorsoCalcolato p) => '${p.durata.inMinutes} min ${p.consumoTomTom?.toStringAsFixed(1) ?? '?'}';
+    avviso(
+      'Risparmio TomTom',
+      'rapida ${quanto(rapida)} kWh · eco ${quanto(eco)} kWh · da qui: ${migliori.length} strade '
+          '(${[for (final p in migliori) quanto(p)].join(', ')}) · diesel ${quanto(termica)} l',
+    );
+    expect(rapida.consumoTomTom, isNotNull, reason: 'col modello TomTom dice i kWh');
+    expect(eco.consumoTomTom, isNotNull);
+    expect(termica.consumoTomTom, isNotNull, reason: 'con la termica i litri');
+    expect(migliori, isNotEmpty, reason: 'almeno la strada di adesso rifatta');
+    expect(migliori.first.consumoTomTom, isNotNull);
+    // Rifatta dai suoi punti è la stessa strada.
+    final linea = Linea(davanti);
+    final fuori = migliori.first.punti.where((q) => linea.proietta(q).lontanoM > 150).length;
+    expect(fuori, lessThan(migliori.first.punti.length ~/ 20));
+  },
+      timeout: const Timeout(Duration(minutes: 2)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
   // Le alternative e il traffico di adesso, coi server veri.
   test('alternative Napoli → Milano col traffico TomTom', () async {
     try {
@@ -390,14 +465,18 @@ void main() {
     ];
     final insieme = await quante('unite', FonteColonnineUnite(fonti));
 
-    // L'unione non può conoscerne meno della più ricca delle sue fonti.
+    // L'unione non può conoscerne meno della più ricca delle sue fonti, sulle
+    // stesse risposte: la fusione si prova su quelle già arrivate, perché due
+    // chiamate al relay a un minuto l'una dall'altra non danno lo stesso
+    // numero (685 e poi 680, il 29 settembre: dietro c'è Overpass). L'unione
+    // chiesta dal vivo resta per i tempi e per il resoconto.
     // Se però nessuna fonte ha risposto — succede: il relay dà 502, Open
     // Charge Map 503 — non è un difetto nostro e non si fa fallire la prova.
     final piuRicca = math.max(daRelay.length, daOcm.length);
     if (piuRicca == 0) {
       avviso('Colonnine', 'nessuna fonte ha risposto: non c\'è niente da confrontare');
     } else {
-      expect(insieme.length, greaterThanOrEqualTo(piuRicca));
+      expect(fondiColonnine([daOcm, daRelay]).length, greaterThanOrEqualTo(piuRicca));
     }
 
     if (Platform.environment['GDANAV_ANTEPRIME'] case final cartella?) {

@@ -6,8 +6,10 @@ import '../componenti/grafico_batteria.dart';
 import '../componenti/itinerario.dart';
 import '../componenti/meteo_viaggio.dart';
 import '../componenti/stato_colonnina.dart';
+import '../componenti/ztl.dart';
 import '../mappa/dati_viaggio.dart';
 import '../stato/gestore_meteo.dart';
+import '../stato/gestore_risparmio.dart';
 import '../stato/gestore_viaggio.dart';
 import '../tema.dart';
 import 'dettaglio_colonnina.dart';
@@ -32,9 +34,13 @@ class SchedaViaggio extends StatelessWidget {
     this.meteo,
     this.onCercaTappa,
     this.onPremium,
+    this.risparmio,
   });
 
   final GestoreViaggio gestore;
+
+  /// I consumi delle strade fra cui scegliere, e quale risparmia energia.
+  final GestoreRisparmio? risparmio;
 
   /// Apre la schermata Premium (le soste di ricarica); `null`: niente tasto.
   final VoidCallback? onPremium;
@@ -108,6 +114,7 @@ class SchedaViaggio extends StatelessWidget {
           meteo: meteo,
           onCercaTappa: onCercaTappa,
           onPremium: onPremium,
+          risparmio: risparmio,
         ),
       },
     );
@@ -169,10 +176,12 @@ class _Pronta extends StatelessWidget {
     this.meteo,
     this.onCercaTappa,
     this.onPremium,
+    this.risparmio,
   });
 
   final Future<Luogo?> Function()? onCercaTappa;
   final VoidCallback? onPremium;
+  final GestoreRisparmio? risparmio;
 
   final GestoreMeteo? meteo;
   final ViaggioPronto pronto;
@@ -198,12 +207,33 @@ class _Pronta extends StatelessWidget {
       if (await cerca?.call() case final l?) await gestore.aggiungiTappa(l);
     }
 
+    // Le ZTL e le aree pedonali: cosa fa il percorso, e la domanda del
+    // permesso la prima volta che passerebbe da una ZTL attiva.
+    final ztl = <Widget>[
+      if (v.percorso.ztl case final z? when !z.vuota) RigaZtl(ztl: z),
+      DomandaZtl(percorso: v.percorso, onRisposta: gestore.rispondiZtl),
+    ];
+
     final stradeETappe = <Widget>[
       if (pronto.scelte.length > 1) ...[
         const SizedBox(height: 18),
         Text('Strade', style: t.titleSmall),
         const SizedBox(height: 8),
-        ScelteStrada(scelte: pronto.scelte, scelta: pronto.scelta, onScegli: gestore.scegli),
+        ScelteStrada(
+          scelte: pronto.scelte,
+          scelta: pronto.scelta,
+          onScegli: gestore.scegli,
+          consumo: switch (risparmio) {
+            final r? => (p) => consumoStrada(p, r.stima),
+            null => null,
+          },
+          unita: risparmio?.unita ?? 'kWh',
+          // La batteria all'arrivo solo senza soste: con una sosta la strada
+          // che consuma meno fa caricare di meno, non arrivare più carichi.
+          arrivo: pronto.soloPercorso || (piano?.soste.isNotEmpty ?? true) ? null : piano?.batteriaArrivo,
+          capacitaKwh: gestore.auto.veicolo.capacitaUtileKwh,
+          minimoPercento: risparmio?.soglie.minimoPercento ?? 5,
+        ),
       ],
       if (pronto.tappe.isNotEmpty) ...[
         const SizedBox(height: 18),
@@ -300,6 +330,7 @@ class _Pronta extends StatelessWidget {
                 style: t.titleMedium?.copyWith(color: muto),
               ),
               RigaTraffico(percorso: v.percorso),
+              ...ztl,
               const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
@@ -319,6 +350,7 @@ class _Pronta extends StatelessWidget {
               if (meteo case final m?) MeteoLungoLaStrada(meteo: m),
             ] else if (piano == null) ...[
               Text('${km.round()} km', style: t.headlineSmall),
+              ...ztl,
               const SizedBox(height: 6),
               const Text(
                 'Con questa batteria non ci si arriva, e lungo la strada non ci sono colonnine adatte abbastanza vicine. '
@@ -339,6 +371,7 @@ class _Pronta extends StatelessWidget {
               ),
               Text('${durata(piano.durata)} · ${km.round()} km', style: t.titleMedium?.copyWith(color: muto)),
               RigaTraffico(percorso: v.percorso),
+              ...ztl,
               const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
@@ -375,7 +408,8 @@ class _Pronta extends StatelessWidget {
                   Expanded(
                     child: _Dato(
                       icona: Icon(Icons.bolt, color: tema.colorScheme.primary),
-                      valore: '${piano.energiaKwh.toStringAsFixed(piano.energiaKwh < 10 ? 1 : 0)} kWh',
+                      // Con la virgola, come i kWh delle strade qui sopra.
+                      valore: '${piano.energiaKwh.toStringAsFixed(piano.energiaKwh < 10 ? 1 : 0).replaceAll('.', ',')} kWh',
                       etichetta: 'consumo',
                     ),
                   ),
