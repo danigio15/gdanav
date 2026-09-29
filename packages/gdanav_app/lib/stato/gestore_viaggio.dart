@@ -138,7 +138,13 @@ PianificatoreViaggio pianificatoreVero(
               .then<PercorsoCalcolato?>((p) => p, onError: (Object _) => null);
     final rapide = await tomtom!.alternative(da, a, opzioni: opzioni, evita: evita, consumo: consumo);
     final e = await eco;
-    return e == null ? rapide : conStradaEco(rapide, e);
+    if (e == null) return rapide;
+    // La strada eco non deve entrare in una ZTL attiva senza permesso: le
+    // ZTL da girare al largo si decidono sulla strada principale.
+    final zone = await archivioZtl();
+    final permessi = GestoreZtl.attuale?.permessi ?? const <String, bool>{};
+    if (PercorsiConZtl.vietate(zone, e, DateTime.now(), permessi).isNotEmpty) return rapide;
+    return conStradaEco(rapide, e);
   }
 
   // Le ZTL: TomTom non le conosce. Le gira al largo chi chiede il percorso,
