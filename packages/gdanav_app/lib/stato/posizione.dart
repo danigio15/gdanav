@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:gdanav_core/gdanav_core.dart';
@@ -28,29 +30,60 @@ Future<bool> haPosizione() async {
 
 /// Un solo flusso del GPS per tutta l'app: una posizione al secondo, anche
 /// da fermi, così il tachimetro scende a zero.
-Stream<Position>? _gps;
+///
+/// E non si arrende. Aperta da Android Auto la schermata del telefono non
+/// c'è, e senza schermata Android non può chiedere di accendere la
+/// precisione di Google: il controllo delle impostazioni fallisce, il GPS
+/// risponde con un errore e non parte. Prima quell'errore finiva nel vuoto e
+/// il flusso restava muto fino a riaprire l'app — «se non si apre l'app non
+/// lega il GPS». Adesso si riprova da solo, e dopo un errore così la
+/// posizione la si chiede direttamente al GPS (`forceLocationManager`), che
+/// quel controllo non lo fa e non apre finestre: a posizione spenta risponde
+/// di no in silenzio, e appena la si riaccende parte.
+final _gps = StreamController<Position>.broadcast(onListen: _accendiIlGps);
+StreamSubscription<Position>? _dalGps;
+Timer? _fraPoco;
+var _soloIlGps = false;
 
-Stream<Position> _flusso() => _gps ??= Geolocator.getPositionStream(
-  locationSettings: switch (defaultTargetPlatform) {
-    TargetPlatform.android => AndroidSettings(
-      accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 0,
-      intervalDuration: const Duration(seconds: 1),
-    ),
-    // Su iPhone, con CarPlay acceso, l'app sul telefono sta dietro: la
-    // posizione deve continuare ad arrivare, e iOS non deve metterla in pausa
-    // a un semaforo lungo.
-    TargetPlatform.iOS => AppleSettings(
-      accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 0,
-      activityType: ActivityType.automotiveNavigation,
-      pauseLocationUpdatesAutomatically: false,
-      allowBackgroundLocationUpdates: true,
-      showBackgroundLocationIndicator: true,
-    ),
-    _ => const LocationSettings(accuracy: LocationAccuracy.bestForNavigation, distanceFilter: 0),
-  },
-).asBroadcastStream();
+Stream<Position> _flusso() => _gps.stream;
+
+void _accendiIlGps() {
+  _fraPoco?.cancel();
+  _fraPoco = null;
+  _dalGps ??= Geolocator.getPositionStream(locationSettings: _comeLeggere()).listen(_gps.add, onError: _riprova);
+}
+
+Future<void> _riprova(Object errore) async {
+  final prima = _dalGps;
+  _dalGps = null;
+  await prima?.cancel();
+  if (errore is LocationServiceDisabledException) _soloIlGps = true;
+  _fraPoco?.cancel();
+  _fraPoco = Timer(const Duration(seconds: 15), () {
+    if (_gps.hasListener) _accendiIlGps();
+  });
+}
+
+LocationSettings _comeLeggere() => switch (defaultTargetPlatform) {
+  TargetPlatform.android => AndroidSettings(
+    accuracy: LocationAccuracy.bestForNavigation,
+    distanceFilter: 0,
+    intervalDuration: const Duration(seconds: 1),
+    forceLocationManager: _soloIlGps,
+  ),
+  // Su iPhone, con CarPlay acceso, l'app sul telefono sta dietro: la
+  // posizione deve continuare ad arrivare, e iOS non deve metterla in pausa
+  // a un semaforo lungo.
+  TargetPlatform.iOS => AppleSettings(
+    accuracy: LocationAccuracy.bestForNavigation,
+    distanceFilter: 0,
+    activityType: ActivityType.automotiveNavigation,
+    pauseLocationUpdatesAutomatically: false,
+    allowBackgroundLocationUpdates: true,
+    showBackgroundLocationIndicator: true,
+  ),
+  _ => const LocationSettings(accuracy: LocationAccuracy.bestForNavigation, distanceFilter: 0),
+};
 
 /// Le posizioni mentre si guida.
 Stream<Punto> posizioniGuida() => _flusso().map((p) => Punto(p.latitude, p.longitude));

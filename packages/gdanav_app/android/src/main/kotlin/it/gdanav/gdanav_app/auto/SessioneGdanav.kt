@@ -45,13 +45,25 @@ open class SessioneGdanav(private val accendi: (Context) -> Unit) : Session() {
      * Si guarda il ciclo di vita della sessione e non quello di uno schermo:
      * gli schermi si aprono e si chiudono fra loro — il menu, le colonnine,
      * le impostazioni — e in macchina ci si resta lo stesso.
+     *
+     * E per tutta la sessione la posizione resta accesa anche col telefono
+     * in tasca (`PosizioneInAuto`): nasce con la sessione, muore con lei, e
+     * se Android all'inizio dice di no ci si riprova a ogni ritorno sullo
+     * schermo dell'auto.
      */
     init {
         lifecycle.addObserver(
             object : DefaultLifecycleObserver {
-                override fun onStart(owner: LifecycleOwner) = PonteAuto.inAuto(true)
+                override fun onCreate(owner: LifecycleOwner) = PosizioneInAuto.accendi(carContext)
+
+                override fun onStart(owner: LifecycleOwner) {
+                    PonteAuto.inAuto(true)
+                    PosizioneInAuto.riprova()
+                }
 
                 override fun onStop(owner: LifecycleOwner) = PonteAuto.inAuto(false)
+
+                override fun onDestroy(owner: LifecycleOwner) = PosizioneInAuto.spegni(carContext)
             },
         )
     }

@@ -12,10 +12,21 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- La notifica di navigazione con la prossima manovra (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- In auto col telefono in tasca: il servizio in primo piano che tiene
+         accesa la posizione finché gdanav è sullo schermo dell'auto
+         (`auto/PosizioneInAuto.kt`). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <queries>
         <!-- La voce della guida: la sintesi vocale del telefono. -->
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
     </queries>
+    <application>
+        <service
+            android:name="it.gdanav.gdanav_app.auto.PosizioneInAuto"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+    </application>
 </manifest>
