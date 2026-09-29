@@ -731,7 +731,12 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           ['has', 'point_count'],
         ],
         'layout': {
-          'icon-image': 'punto-colonnina-ignota',
+          // Col colore dello stato di tutta Italia, quando si sa.
+          'icon-image': [
+            'concat',
+            'punto-colonnina-',
+            _statoOIgnota(),
+          ],
           'icon-size': 0.8,
           'icon-allow-overlap': true,
           'text-field': [
@@ -753,7 +758,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         },
         'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 1.6},
       },
-      ..._bollinoPrese('gdanav-tutte', sorgenteTutte, _coloriIcona['ignota']!, sfusa: true),
+      ..._bollinoPrese('gdanav-tutte', sorgenteTutte, _coloreDelloStato(_statoOIgnota()), sfusa: true),
       // Intorno a te: i distributori col prezzo (auto termica) o le
       // colonnine rapide col colore dello stato (auto elettrica).
       {
@@ -784,13 +789,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         },
         'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 1.6},
       },
-      ..._bollinoPrese('gdanav-vicine', sorgenteVicine, [
-        'match',
-        ['get', 'stato'],
-        for (final MapEntry(:key, :value) in _coloriIcona.entries)
-          if (key != 'ignota') ...[key, value],
-        _coloriIcona['ignota']!,
-      ], minzoom: 10),
+      ..._bollinoPrese('gdanav-vicine', sorgenteVicine, _coloreDelloStato(['get', 'stato']), minzoom: 10),
       {
         'id': 'gdanav-distributori',
         'type': 'symbol',
@@ -1101,6 +1100,23 @@ const _coloriIcona = {
 /// Un cerchio e un testo spostati di qualche punto sullo schermo
 /// (`translate` sulla vista, non sulla mappa: il bollino resta in alto a
 /// destra anche girando la mappa). Il cerchio cresce con le cifre.
+/// Lo stato scritto sulla colonnina, o «ignota» se non c'è: sulla mappa di
+/// tutta Italia lo stato che non si sa non si scrive, per non pesare.
+List<Object> _statoOIgnota() => [
+  'coalesce',
+  ['get', 'stato'],
+  'ignota',
+];
+
+/// Il colore dell'icona per lo stato: lo stesso del bollino delle prese.
+List<Object> _coloreDelloStato(List<Object> stato) => [
+  'match',
+  stato,
+  for (final MapEntry(:key, :value) in _coloriIcona.entries)
+    if (key != 'ignota') ...[key, value],
+  _coloriIcona['ignota']!,
+];
+
 List<Map<String, Object>> _bollinoPrese(
   String strato,
   String sorgente,

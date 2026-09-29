@@ -272,14 +272,20 @@ Map<String, Object?> datiColonnineVicine(List<Colonnina> elenco, Set<TipoConnett
 
 /// Tutte le colonnine dell'archivio sulla mappa. Sono decine di migliaia,
 /// quindi solo quello che serve a disegnarle e a riconoscerle al tocco:
-/// dove, quale, quanti kW e quante prese. Il nome e il resto si prendono
-/// dall'archivio quando se ne tocca una — con anche quelli i dati passavano
-/// da quattro a otto megabyte.
+/// dove, quale, quanti kW, quante prese e — se si sa — lo stato. Il nome e
+/// il resto si prendono dall'archivio quando se ne tocca una — con anche
+/// quelli i dati passavano da quattro a otto megabyte. Lo stato che non si
+/// sa non si scrive: la mappa lo legge come «ignota».
 Map<String, Object?> datiColonnineTutte(List<Colonnina> elenco, Set<TipoConnettore> connettori) => _collezione([
   for (final c in elenco)
     _elemento(
       {'type': 'Point', 'coordinates': _xy(c.posizione)},
-      {'id': c.id, 'kw': c.potenzaNominalePer(connettori).round(), 'prese': preseAdatte(c, connettori)},
+      {
+        'id': c.id,
+        'kw': c.potenzaNominalePer(connettori).round(),
+        'prese': preseAdatte(c, connettori),
+        if (statoDi(c.disponibilitaPer(connettori)) case final s when s != StatoColonnina.ignota) 'stato': s.name,
+      },
     ),
 ]);
 

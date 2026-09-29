@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../mappa/dati_viaggio.dart';
@@ -22,7 +22,12 @@ class GestoreVicini extends ChangeNotifier {
     Future<List<Colonnina>> Function(Punto qui, ProfiloVeicolo v)? colonnine,
     Future<List<Colonnina>> Function(ProfiloVeicolo v)? tutte,
     Future<Colonnina> Function(Colonnina c)? statoAdesso,
+    Future<Map<String, String>> Function()? statiDiTutti,
+    Future<bool> Function()? evseInOrdine,
+    this.ogniQuanto = const Duration(minutes: 10),
   }) : _statoAdesso = statoAdesso ?? statoColonninaAdesso,
+       _statiDiTutti = statiDiTutti ?? statiDiTuttaItalia,
+       _evseInOrdine = evseInOrdine ?? (() async => (await archivioColonnine()).evseInOrdine),
        _cercaTutte = tutte ?? ((v) => colonnineDellArchivioComeSiVuole(v, archivio ?? Archivio())),
        _cercaDistributori = distributori ?? distributoriVicini,
        /* Con la scelta fatta in «Ricarica»: gli operatori che non si vogliono
@@ -42,6 +47,13 @@ class GestoreVicini extends ChangeNotifier {
   final Future<List<Colonnina>> Function(Punto qui, ProfiloVeicolo v) _cercaColonnine;
   final Future<Colonnina> Function(Colonnina c) _statoAdesso;
   final Future<List<Colonnina>> Function(ProfiloVeicolo v) _cercaTutte;
+  final Future<Map<String, String>> Function() _statiDiTutti;
+  final Future<bool> Function() _evseInOrdine;
+
+  /// Ogni quanto, con l'app davanti, si rilegge lo stato di tutta Italia per
+  /// la mappa (zero: mai da sé). Una lettura sono sette richieste e quasi
+  /// nove megabyte: con l'app dietro, o solo sull'auto, non si rilegge.
+  final Duration ogniQuanto;
 
   List<Distributore> distributori = const [];
   List<Colonnina> colonnine = const [];
@@ -60,10 +72,41 @@ class GestoreVicini extends ChangeNotifier {
   (bool, String)? _tuttePer;
   var _giroTutte = 0;
 
+  /// Le colonnine di tutta la mappa come le dà l'archivio, senza stato. Lo
+  /// stato di tutta Italia si mette sempre su queste: così uno vecchio non
+  /// resta attaccato a un punto che nella lettura nuova non c'è.
+  List<Colonnina> _tutteDallArchivio = const [];
+
+  /// L'ultimo stato di tutta Italia (EVSE ID → parola della PUN) e quando è
+  /// arrivato.
+  Map<String, String> _stati = const {};
+  var _statiInOrdine = false;
+  DateTime? statiLetti;
+  Timer? _ogniTanto;
+  AppLifecycleListener? _vita;
+
   void avviaTutte() {
     if (_tutteAvviate) return;
     _tutteAvviate = true;
     _forseTutte();
+    // «Voglio lo stato di tutte sempre»: finché l'app è davanti si rilegge,
+    // e tornando davanti dopo un po' si rilegge subito.
+    if (ogniQuanto > Duration.zero) {
+      _ogniTanto = Timer.periodic(ogniQuanto, (_) {
+        if (_davanti) unawaited(aggiornaStati());
+      });
+    }
+    _vita = AppLifecycleListener(
+      onResume: () {
+        final l = statiLetti;
+        if (l == null || DateTime.now().difference(l) >= ogniQuanto) unawaited(aggiornaStati());
+      },
+    );
+  }
+
+  static bool get _davanti {
+    final s = WidgetsBinding.instance.lifecycleState;
+    return s == null || s == AppLifecycleState.resumed;
   }
 
   void _forseTutte() {
@@ -86,15 +129,52 @@ class GestoreVicini extends ChangeNotifier {
       final elenco = auto.elettrica ? await _cercaTutte(auto.veicolo) : const <Colonnina>[];
       // Ne è partito un altro nel frattempo: vale quello.
       if (giro != _giroTutte) return;
-      tutte = elenco;
-      _perId = {for (final c in elenco) c.id: c};
-      versioneTutte++;
+      _tutteDallArchivio = elenco;
+      _metti();
       notifyListeners();
+      if (elenco.isNotEmpty) unawaited(aggiornaStati());
     } catch (e) {
       if (giro == _giroTutte) _tuttePer = null;
       debugPrint('tutte le colonnine: $e');
     }
   }
+
+  /// Lo stato di tutta Italia sulle colonnine della mappa: libere, piene,
+  /// guaste. Una lettura vale qualche minuto, e chi la chiede nel frattempo
+  /// — il percorso — trova la stessa. Senza Premium, o se la PUN non
+  /// risponde, la mappa resta com'era.
+  Future<void> aggiornaStati() async {
+    if (!_tutteAvviate || _tutteDallArchivio.isEmpty) return;
+    final giro = _giroTutte;
+    try {
+      final stati = await _statiDiTutti();
+      if (stati.isEmpty || giro != _giroTutte) return;
+      final inOrdine = await _evseInOrdine();
+      if (giro != _giroTutte) return;
+      _stati = stati;
+      _statiInOrdine = inOrdine;
+      statiLetti = DateTime.now();
+      _metti();
+      colonnine = [for (final c in colonnine) _conStati(c)];
+      notifyListeners();
+    } catch (e) {
+      debugPrint('stato di tutta Italia: $e');
+    }
+  }
+
+  void _metti() {
+    tutte = _stati.isEmpty
+        ? _tutteDallArchivio
+        : [for (final c in _tutteDallArchivio) DisponibilitaPun.conStati(c, _stati, inOrdine: _statiInOrdine)];
+    _perId = {for (final c in tutte) c.id: c};
+    versioneTutte++;
+  }
+
+  /// Una colonnina intorno a te con lo stato di tutta Italia, se non ne ha
+  /// già uno chiesto per lei: quello è più fresco.
+  Colonnina _conStati(Colonnina c) => _stati.isEmpty || c.connettori.any((p) => p.stato != StatoPresa.sconosciuto)
+      ? c
+      : DisponibilitaPun.conStati(c, _stati, inOrdine: _statiInOrdine);
 
   /// Dove e per che auto si è cercato l'ultima volta.
   Punto? _cercatoDa;
@@ -116,7 +196,7 @@ class GestoreVicini extends ChangeNotifier {
     _perAuto = perAuto;
     try {
       if (auto.elettrica) {
-        colonnine = await _cercaColonnine(qui, auto.veicolo);
+        colonnine = [for (final c in await _cercaColonnine(qui, auto.veicolo)) _conStati(c)];
         distributori = const [];
       } else {
         distributori = await _cercaDistributori(qui);
@@ -170,6 +250,8 @@ class GestoreVicini extends ChangeNotifier {
 
   @override
   void dispose() {
+    _ogniTanto?.cancel();
+    _vita?.dispose();
     auto.removeListener(_forse);
     auto.removeListener(_forseTutte);
     posizione.removeListener(_forse);

@@ -66,6 +66,8 @@ void main() {
         giri++;
         return archivioProva.tutte.toList();
       },
+      statiDiTutti: () async => const {},
+      ogniQuanto: Duration.zero,
     );
     addTearDown(vicini.dispose);
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
@@ -115,6 +117,8 @@ void main() {
         fonte: c.fonte,
         connettori: [for (final p in c.connettori) p.conStato(StatoPresa.disponibile)],
       ),
+      statiDiTutti: () async => const {},
+      ogniQuanto: Duration.zero,
     );
     addTearDown(vicini.dispose);
     vicini.avviaTutte();
@@ -126,6 +130,68 @@ void main() {
     expect(vicini.colonnina('rapida')!.connettori.single.stato, StatoPresa.disponibile);
   });
 
+  /* «Voglio lo stato di tutte sempre.» Le icone viola erano le colonnine di
+   * cui non si sapeva niente: con lo stato di tutta Italia prendono il
+   * colore di quello che sono — tranne quelle dei gestori che non mandano
+   * lo stato di adesso, che restano «non si sa». */
+  testWidgets('lo stato di tutta Italia colora la mappa, e con l\'app davanti si rilegge ogni dieci minuti', (
+    tester,
+  ) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final a = await ambiente(tester);
+    Colonnina pun(String id, List<String> evse, {bool tempoReale = true}) => Colonnina(
+      id: id,
+      nome: id,
+      operatore: 'Plenitude',
+      posizione: const Punto(40.858, 14.279),
+      connettori: [for (final _ in evse) const Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150)],
+      fonte: 'pun',
+      evse: evse,
+      tempoReale: tempoReale,
+    );
+    final colonnine = [
+      pun('pun:isola', ['IT*BEC*E1', 'IT*BEC*E2']),
+      pun('pun:fissa', ['IT*ASM*E1'], tempoReale: false),
+      posto('osm', 'Enel X', TipoConnettore.ccs2, 150),
+    ];
+    var stati = {'IT*BEC*E1': 'AVAILABLE', 'IT*BEC*E2': 'CHARGING', 'IT*ASM*E1': 'AVAILABLE'};
+    var letture = 0;
+    final vicini = GestoreVicini(
+      auto: a.auto,
+      posizione: a.posizione,
+      distributori: (_) async => const [],
+      colonnine: (_, _) async => const [],
+      tutte: (_) async => colonnine,
+      statiDiTutti: () async {
+        letture++;
+        return stati;
+      },
+      evseInOrdine: () async => true,
+    );
+    Map<String, Object?> sullaMappa(String id) => [
+      for (final e in (vicini.datiTutte()['features']! as List).cast<Map>())
+        if ((e['properties'] as Map)['id'] == id) (e['properties'] as Map).cast<String, Object?>(),
+    ].single;
+
+    vicini.avviaTutte();
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    expect(letture, 1);
+    expect(sullaMappa('pun:isola')['stato'], 'libera');
+    // Il gestore non manda lo stato di adesso: AVAILABLE per sempre non vuol
+    // dire libera.
+    expect(sullaMappa('pun:fissa').containsKey('stato'), isFalse);
+    expect(sullaMappa('osm').containsKey('stato'), isFalse);
+    expect(vicini.colonnina('pun:isola')!.disponibilitaPer({TipoConnettore.ccs2}).libere, 1);
+
+    // Dieci minuti dopo, con l'app davanti, si rilegge: adesso è piena.
+    stati = {'IT*BEC*E1': 'CHARGING', 'IT*BEC*E2': 'CHARGING'};
+    await tester.pump(const Duration(minutes: 10));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    expect(letture, 2);
+    expect(sullaMappa('pun:isola')['stato'], 'piena');
+    vicini.dispose();
+  });
+
   test('lo stile: tutte le colonnine raggruppate, sotto quelle intorno a te, e si toccano', () {
     final stile = stileMappa(scuro: false);
     final sorgente = (stile['sources']! as Map)[sorgenteTutte] as Map;
@@ -134,6 +200,9 @@ void main() {
     expect(strati.indexOf('gdanav-tutte-gruppi'), lessThan(strati.indexOf('gdanav-vicine')));
     expect(strati.indexOf('gdanav-tutte'), lessThan(strati.indexOf('gdanav-vicine')));
     expect(stratiToccabili, containsAll(['gdanav-tutte', 'gdanav-tutte-gruppi']));
+    // L'icona col colore dello stato, e «ignota» quando non c'è.
+    final tutte = (stile['layers']! as List).cast<Map>().singleWhere((l) => l['id'] == 'gdanav-tutte');
+    expect('${(tutte['layout'] as Map)['icon-image']}', contains('[coalesce, [get, stato], ignota]'));
   });
 
   /* «Al Centro Direzionale è 1 ma sono 200 prese», e «fai vedere il numero

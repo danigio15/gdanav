@@ -144,12 +144,14 @@ PianificatoreViaggio pianificatoreVero(
      *
      * Overpass resta solo come riserva: è lento (in CI scade anche dopo
      * cinquanta secondi) e non deve rallentare ogni viaggio. */
-    colonnine: FonteColonnineUnite(
-      [
-        if (i.chiaveOcm.isNotEmpty) ClienteOpenChargeMap(chiave: i.chiaveOcm),
-        ColonnineLocali(archivioColonnine(), riserva: ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni))),
-      ],
-      riserva: ClienteOverpass(),
+    colonnine: _conLoStato(
+      FonteColonnineUnite(
+        [
+          if (i.chiaveOcm.isNotEmpty) ClienteOpenChargeMap(chiave: i.chiaveOcm),
+          ColonnineLocali(archivioColonnine(), riserva: ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni))),
+        ],
+        riserva: ClienteOverpass(),
+      ),
     ),
     profilo: profilo,
     preferenze: preferenze,
@@ -158,11 +160,30 @@ PianificatoreViaggio pianificatoreVero(
   );
 }
 
+/// «Nel calcolo del percorso devi vedere quelle libere e in servizio»: con
+/// Premium le colonnine lungo la strada arrivano al pianificatore con lo
+/// stato di tutta Italia già dentro, e le soste si scelgono sapendolo.
+FonteColonnine _conLoStato(FonteColonnine fonte) => GestorePremium.attivo.value
+    ? ColonnineConStato(fonte, stati: statiDiTuttaItalia, inOrdine: () async => (await archivioColonnine()).evseInOrdine)
+    : fonte;
+
+/// La PUN, una per tutta l'app: le credenziali ospite, lo stato di tutta
+/// Italia letto e quello di ogni colonnina toccata. Lo stato di tutta Italia
+/// sono sette richieste e quasi nove megabyte: vale otto minuti, e chi lo
+/// chiede mentre arriva — la mappa, il percorso — aspetta la stessa lettura.
+final _pun = DisponibilitaPun(validitaTutti: const Duration(minutes: 8));
+
+/// Lo stato di adesso di ogni punto di ricarica d'Italia (con Premium),
+/// EVSE ID → `AVAILABLE`, `CHARGING`…: la mappa ne colora le colonnine, il
+/// percorso ne sceglie le soste. Senza Premium, niente.
+Future<Map<String, String>> statiDiTuttaItalia() =>
+    GestorePremium.attivo.value ? _pun.statiDiTutti() : Future.value(const <String, String>{});
+
 /// Libere e occupate adesso: dalla PUN per le colonnine che ne hanno gli EVSE
 /// ID — gratis, punto per punto, chiesto da questo telefono —, da TomTom per
 /// le altre, se c'è la chiave.
 final FonteDisponibilita _disponibilita = DisponibilitaConPun(
-  DisponibilitaPun(),
+  _pun,
   altra: Servizi.chiaveTomTom.isEmpty ? null : DisponibilitaTomTom(Servizi.chiaveTomTom),
 );
 final _traffico = Servizi.chiaveTomTom.isEmpty ? null : TrafficoTomTom(Servizi.chiaveTomTom);

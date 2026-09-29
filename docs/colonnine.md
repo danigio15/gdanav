@@ -126,6 +126,14 @@ E.Mobility, Hera Comm, Acea Energia…), e ogni posto ha gli EVSE ID dei suoi
 punti: servono a chiedere alla PUN lo stato di adesso. La citazione è
 «PUN (GSE), CC BY 4.0».
 
+Il 29 settembre l'archivio è stato rifatto con due cose in più: gli EVSE ID
+scritti **nell'ordine delle prese** (`evseInOrdine`: il punto i-esimo è la
+presa i-esima, anche nei posti con prese diverse), e un nono campo, `0`, per
+i posti di un gestore che **non manda lo stato di adesso** (`realTime:
+false`, letto nel dettaglio di ogni punto): 3.105 posti, 6.995 punti —
+Neogy, On Electric, E-Shore, Sagelio, WROOM, G.M.T., Agsm AIM, UnoEnergy
+DriWe… Sono 45.428 stazioni.
+
 Le regole, tutte con una prova in `test/pun_test.dart`:
 
 * **Una riga è un punto di ricarica**, cioè un'auto alla volta: se ha più
@@ -279,6 +287,31 @@ costo zero, e il relay si pubblica solo da `main`.
 
 Il 28 settembre 2026 al Centro Direzionale la mappa della PUN diceva 724
 libere, 5 in carica, 75 fuori servizio e 51 bloccate su 855.
+
+**Lo stato di tutta Italia** (`DisponibilitaPun.statiDiTutti`). La mappa
+pubblica della PUN, quando si apre, chiede lo stato di ogni punto a pagine
+da dodicimila (`/v1/chargepoints/public/map/search`): sette richieste,
+75.763 punti, **8,7 MB non compressi** (il server non comprime), nove
+secondi. L'app fa lo stesso, con una PUN sola per tutta l'app:
+
+* la **mappa** colora con quello tutte le colonnine (verde, arancio, rosso;
+  viola solo dove non si sa), e lo rilegge ogni dieci minuti finché l'app è
+  davanti — con l'app dietro o solo sull'auto, no;
+* il **percorso** sceglie le soste sapendolo (`ColonnineConStato`): salta
+  le guaste, conta l'attesa alle piene, e fra due vicine prende quella che
+  si sa libera;
+* una lettura vale otto minuti, e chi la chiede mentre arriva aspetta la
+  stessa.
+
+La mappa pubblica non dice se uno stato è vero: lo dice l'archivio (il nono
+campo). I posti a stato fisso restano «non si sa»; toccandoli, lo stato si
+chiede punto per punto come prima.
+
+**I prezzi** arrivano nella stessa risposta del gruppo (`punTariffsDetails`:
+per AC, DC e HPC energia €/kWh, tempo e sosta €/min, avvio €), quindi
+toccando una colonnina e nelle soste del percorso. Li comunicano in pochi:
+su 40 gestori, A2A, Acea, Emobitaly e Convergenze (156 punti su 1.200);
+Plenitude manda i campi vuoti. Dove mancano, la scheda lo dice.
 
 **TomTom, per le altre.** TomTom Search dà 2.500 chiamate al giorno e ne bruciavamo due per colonnina:
 il contatore era a zero e rispondeva 403, che in app diventava «Stato non
