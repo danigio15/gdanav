@@ -40,14 +40,24 @@ import 'valhalla.dart';
 /// Cosa si perde, e va detto: l'altimetria. I tratti escono piatti e il
 /// dislivello lo recupera il consumo vero misurato dall'auto.
 class ClienteTomTom {
-  ClienteTomTom(this.chiave, {http.Client? client, Uri? indirizzo})
-      : _http = client ?? http.Client(),
+  ClienteTomTom(
+    this.chiave, {
+    http.Client? client,
+    Uri? indirizzo,
+    this.pausaSeTroppe = const Duration(milliseconds: 800),
+  })  : _http = client ?? http.Client(),
         indirizzo = indirizzo ?? Uri.parse('https://api.tomtom.com/routing/1/calculateRoute/');
 
   /// La chiave del piano gratuito.
   final String chiave;
   final Uri indirizzo;
   final http.Client _http;
+
+  /// Quanto aspettare quando TomTom dice che in questo secondo le richieste
+  /// sono troppe: la volta dopo il doppio, poi ci si arrende. La chiave è
+  /// una per tutti, e cinque richieste al secondo si superano presto: la
+  /// strada eco chiesta insieme a quella di adesso, o due telefoni insieme.
+  final Duration pausaSeTroppe;
 
   /// Quanti punti al massimo si rimandano a TomTom per rifare un percorso
   /// già calcolato: il corpo della richiesta non deve diventare enorme.
@@ -113,8 +123,20 @@ class ClienteTomTom {
     return Uri.parse('$radice${tappe.map(_luogo).join(':')}/json').replace(queryParameters: parametri);
   }
 
-  /// Legge la risposta, o dice perché non si può.
+  /// Legge la risposta, o dice perché non si può. Se in questo secondo le
+  /// richieste sono troppe, aspetta e riprova, al massimo due volte.
   Future<Map<String, Object?>> _chiedi(Uri via, {Map<String, Object?>? corpo}) async {
+    for (var tentativo = 0;; tentativo++) {
+      try {
+        return await _chiediUnaVolta(via, corpo: corpo);
+      } on ErrorePercorso catch (e) {
+        if (!e.troppeInUnSecondo || tentativo >= 2) rethrow;
+        await Future<void>.delayed(pausaSeTroppe * (tentativo + 1));
+      }
+    }
+  }
+
+  Future<Map<String, Object?>> _chiediUnaVolta(Uri via, {Map<String, Object?>? corpo}) async {
     final http.Response r;
     try {
       r = await (corpo == null

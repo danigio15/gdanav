@@ -248,13 +248,56 @@ void main() {
       final f = finto({
         'detailedError': {'code': 'FORBIDDEN', 'message': 'Developer Over Qps'},
       }, stato: 403);
-      final c = ClienteTomTom('CHIAVE', client: f.client);
+      final c = ClienteTomTom('CHIAVE', client: f.client, pausaSeTroppe: Duration.zero);
       await expectLater(
         c.calcola(const [Punto(45, 9), Punto(46, 10)]),
         throwsA(isA<ErrorePercorso>()
             .having((e) => e.stato, 'stato', 403)
             .having((e) => e.messaggio, 'messaggio', 'Developer Over Qps')),
       );
+    });
+
+    test('troppe richieste in un secondo: aspetta e riprova', () async {
+      final chieste = <http.BaseRequest>[];
+      final client = MockClient((r) async {
+        chieste.add(r);
+        return chieste.length == 1
+            ? http.Response(
+                jsonEncode({
+                  'detailedError': {
+                    'code': 'TOO_MANY_REQUESTS',
+                    'message': 'You have exceeded the permitted rate limit'
+                  },
+                }),
+                429)
+            : http.Response(jsonEncode(corsoMalta()), 200,
+                headers: const {'content-type': 'application/json; charset=utf-8'});
+      });
+      final c = ClienteTomTom('CHIAVE', client: client, pausaSeTroppe: Duration.zero);
+      final p = await c.calcola(const [Punto(40.85, 14.25), Punto(40.86, 14.28)]);
+      expect(p.punti, isNotEmpty);
+      expect(chieste, hasLength(2));
+    });
+
+    test('se le richieste restano troppe, dopo due attese si arrende e lo dice', () async {
+      final f = finto({
+        'detailedError': {'code': 'TOO_MANY_REQUESTS', 'message': 'You have exceeded the permitted rate limit'},
+      }, stato: 429);
+      final c = ClienteTomTom('CHIAVE', client: f.client, pausaSeTroppe: Duration.zero);
+      await expectLater(
+        c.calcola(const [Punto(45, 9), Punto(46, 10)]),
+        throwsA(isA<ErrorePercorso>().having((e) => e.stato, 'stato', 429)),
+      );
+      expect(f.chieste, hasLength(3));
+    });
+
+    test('la quota finita non si riprova: sarebbero richieste buttate', () async {
+      final f = finto({
+        'detailedError': {'code': 'FORBIDDEN', 'message': 'Developer Over Rate'},
+      }, stato: 403);
+      final c = ClienteTomTom('CHIAVE', client: f.client, pausaSeTroppe: Duration.zero);
+      await expectLater(c.calcola(const [Punto(45, 9), Punto(46, 10)]), throwsA(isA<ErrorePercorso>()));
+      expect(f.chieste, hasLength(1));
     });
 
     test('una risposta senza percorsi lo dice', () async {

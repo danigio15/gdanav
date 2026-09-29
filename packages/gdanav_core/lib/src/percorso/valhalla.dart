@@ -437,6 +437,12 @@ class ErrorePercorso implements Exception {
   final String messaggio;
   final int? stato;
 
+  /// Troppe richieste in questo secondo, non la quota finita: fra un attimo
+  /// la stessa richiesta passa. TomTom lo dice col 429 («You have exceeded
+  /// the permitted rate limit»), o col 403 «Developer Over Qps».
+  bool get troppeInUnSecondo =>
+      stato == 429 || (stato == 403 && RegExp('over qps|rate limit', caseSensitive: false).hasMatch(messaggio));
+
   @override
   String toString() => 'percorso: $messaggio';
 }
