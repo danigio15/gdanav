@@ -18,8 +18,8 @@ Colonnina posto(String id, String operatore, TipoConnettore tipo, double kw, {do
 );
 
 /// Una lenta sotto casa, una Plenitude da 22 kW del Centro Direzionale e una
-/// rapida a Milano: tre posti che la mappa di tutta Italia deve saper
-/// mostrare o nascondere secondo le scelte di «Ricarica».
+/// rapida a Milano: tre posti che la mappa di tutta Italia deve mostrare, e
+/// nascondere solo per gli operatori spenti in «Ricarica».
 final archivioProva = ArchivioColonnine([
   posto('lenta', 'Enel X', TipoConnettore.tipo2, 11),
   posto('plenitude', 'Plenitude (Be Charge)', TipoConnettore.tipo2, 22.1),
@@ -29,7 +29,7 @@ final archivioProva = ArchivioColonnine([
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('sulla mappa di tutta Italia valgono le scelte di «Ricarica»', () async {
+  test('sulla mappa di tutta Italia ci sono tutte, anche le lente; mancano solo gli operatori spenti', () async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
     final archivio = Archivio();
     Future<List<String>> ids() async => [
@@ -41,15 +41,14 @@ void main() {
         c.id,
     ];
 
-    // Di base da 50 kW in su: solo la rapida.
-    expect(await ids(), ['rapida']);
-    // «Tutte» vuol dire tutte, anche la lenta da 11 kW.
-    await archivio.salvaPreferenze(const PreferenzeRicarica(potenzaMinimaKw: PreferenzeRicarica.tutte));
+    // Di serie le soste partono da 50 kW, ma la mappa le mostra tutte: anche
+    // la lenta da 11 kW e la Plenitude da 22.
+    expect(await ids(), ['lenta', 'plenitude', 'rapida']);
+    // Nemmeno il minimo più alto per le soste toglie qualcosa dalla mappa.
+    await archivio.salvaPreferenze(const PreferenzeRicarica(potenzaMinimaKw: 150));
     expect(await ids(), ['lenta', 'plenitude', 'rapida']);
     // Un operatore che non si vuole vedere non si vede nemmeno qui.
-    await archivio.salvaPreferenze(
-      PreferenzeRicarica(potenzaMinimaKw: PreferenzeRicarica.tutte, operatoriEsclusi: {operatoreNormale('Ionity')}),
-    );
+    await archivio.salvaPreferenze(PreferenzeRicarica(operatoriEsclusi: {operatoreNormale('Ionity')}));
     expect(await ids(), ['lenta', 'plenitude']);
   });
 

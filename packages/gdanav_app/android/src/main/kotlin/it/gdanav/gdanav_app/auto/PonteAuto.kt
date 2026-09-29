@@ -343,7 +343,7 @@ object PonteAuto {
     /** «Prendila» (o «Resto qui») sulla strada proposta. */
     fun rispondiStrada(id: String, si: Boolean) = chiedi("strada", mapOf("id" to id, "si" to si))
 
-    /** Le colonnine rapide vicine, come luoghi da raggiungere. */
+    /** Le colonnine vicine, come luoghi da raggiungere. */
     /** Un punto toccato sulla mappa: il telefono dice cosa è e cosa sapere. */
     fun punto(proprieta: Map<String, Any?>, lat: Double, lon: Double, risposta: (Map<String, Any?>?) -> Unit) =
         chiedi("punto", mapOf("proprieta" to proprieta, "lat" to lat, "lon" to lon)) { r ->

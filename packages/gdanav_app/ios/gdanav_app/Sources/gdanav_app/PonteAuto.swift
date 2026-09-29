@@ -384,7 +384,7 @@ final class PonteAuto {
         chiedi("strada", ["id": id, "si": si])
     }
 
-    /// Le colonnine rapide vicine, come luoghi da raggiungere.
+    /// Le colonnine vicine, come luoghi da raggiungere.
     func colonnine(risultati: @escaping ([LuogoAuto]) -> Void) {
         chiedi("colonnine") { r in
             risultati((r as? [[String: Any]] ?? []).compactMap { LuogoAuto($0, tipo: "colonnina") })

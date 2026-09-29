@@ -160,7 +160,7 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
                     if (PonteAuto.cruscotto.elettrica) {
                         riga(
                             "Colonnine vicine",
-                            "Le rapide intorno a te",
+                            "Intorno a te, dalla più vicina",
                             sfoglia = true,
                             icona = icona(R.drawable.icona_colonnina, CarColor.GREEN),
                         ) { screenManager.push(SchermoColonnine(carContext)) }
@@ -310,7 +310,7 @@ class SchermoOpzioni(carContext: CarContext) : SchermoAggiornato(carContext) {
     }
 }
 
-/** Le colonnine rapide vicine, adatte alla tua auto; con Premium libere e occupate. */
+/** Le colonnine vicine adatte alla tua auto, anche le lente; con Premium libere e occupate. */
 class SchermoColonnine(carContext: CarContext) : SchermoAggiornato(carContext) {
     private var colonnine: List<PonteAuto.Luogo>? = null
 
@@ -337,7 +337,7 @@ class SchermoColonnine(carContext: CarContext) : SchermoAggiornato(carContext) {
                     screenManager.popToRoot()
                 }
             },
-            "Nessuna colonnina rapida qui intorno",
+            "Nessuna colonnina qui intorno",
         )
     }
 

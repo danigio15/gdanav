@@ -343,7 +343,7 @@ Map<String, Object?> datiDistributori(List<Distributore> elenco, Carburante carb
     ),
 ]);
 
-/// Le colonnine rapide intorno, col colore dello stato e la potenza.
+/// Le colonnine intorno, col colore dello stato e la potenza.
 Map<String, Object?> datiColonnineVicine(List<Colonnina> elenco, Set<TipoConnettore> connettori) => _collezione([
   for (final c in elenco)
     _elemento(

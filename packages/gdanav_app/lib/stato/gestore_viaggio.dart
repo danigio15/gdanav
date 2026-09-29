@@ -687,14 +687,13 @@ class GestoreViaggio extends ChangeNotifier {
   }
 }
 
-/// Le colonnine rapide intorno a [qui] adatte all'auto, dalla più vicina; con
-/// Premium anche libere e occupate adesso. Per «Colonnine vicine» sull'auto e
-/// sul telefono: senza Premium l'elenco c'è lo stesso, con lo stato che dice
-/// la fonte (spesso nessuno) invece di quello in tempo reale.
+/// Le colonnine intorno a [qui] adatte all'auto, lente comprese, dalla più
+/// vicina; con Premium anche libere e occupate adesso. Per «Colonnine vicine»
+/// sull'auto e sul telefono: senza Premium l'elenco c'è lo stesso, con lo
+/// stato che dice la fonte (spesso nessuno) invece di quello in tempo reale.
 ///
-/// [operatoriEsclusi] e [potenzaMinimaKw] sono la scelta fatta nelle
-/// preferenze di ricarica: quello che non si vuole vedere non si vede nemmeno
-/// qui. Senza, si vede tutto — è il comportamento di sempre.
+/// [operatoriEsclusi] è la scelta fatta nelle preferenze di ricarica: quello
+/// che non si vuole vedere non si vede nemmeno qui. Senza, si vede tutto.
 Future<List<Colonnina>> colonnineVicine(
   Punto qui,
   ProfiloVeicolo veicolo, {
@@ -702,12 +701,11 @@ Future<List<Colonnina>> colonnineVicine(
   int quante = 8,
   int conStato = 10,
   Set<String> operatoriEsclusi = const {},
-  double potenzaMinimaKw = 0,
 }) async {
   final fonte = ColonnineLocali(archivioColonnine(), riserva: ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni)));
   final adatte = [
     for (final c in await fonte.lungo([qui], distanzaKm: km))
-      if (c.potenzaNominalePer(veicolo.connettori) >= (potenzaMinimaKw > 0 ? potenzaMinimaKw : 0.1) &&
+      if (c.potenzaNominalePer(veicolo.connettori) > 0 &&
           !operatoreEscluso(c, operatoriEsclusi) &&
           distanzaM(qui, c.posizione) <= km * 1000)
         c,
@@ -723,8 +721,9 @@ Future<List<Colonnina>> colonnineVicine(
   ]);
 }
 
-/// Le colonnine vicine filtrate come si è scelto in «Ricarica»: la potenza
-/// minima e gli operatori che non si vogliono vedere.
+/// Le colonnine vicine senza gli operatori che in «Ricarica» non si vogliono
+/// vedere. La potenza minima no: vale per le soste del viaggio, e intorno a
+/// te si vedono tutte, anche le lente.
 ///
 /// È la porta da cui passano l'elenco del telefono e quello dell'auto, così
 /// la scelta vale in tutt'e due senza che nessuno se la debba ricordare.
@@ -736,19 +735,12 @@ Future<List<Colonnina>> colonnineVicineComeSiVuole(
   int quante = 8,
 }) async {
   final p = await archivio.preferenze();
-  return colonnineVicine(
-    qui,
-    veicolo,
-    km: km,
-    quante: quante,
-    operatoriEsclusi: p.operatoriEsclusi,
-    potenzaMinimaKw: p.minimaIntorno,
-  );
+  return colonnineVicine(qui, veicolo, km: km, quante: quante, operatoriEsclusi: p.operatoriEsclusi);
 }
 
-/// Tutte le colonnine dell'archivio adatte a [veicolo], filtrate come si è
-/// scelto in «Ricarica»: per la mappa di tutta Italia. Con «Tutte» nessun
-/// minimo di potenza, come intorno a te.
+/// Tutte le colonnine dell'archivio adatte a [veicolo], per la mappa di
+/// tutta Italia: anche le lente, senza gli operatori che in «Ricarica» non si
+/// vogliono vedere. La potenza minima vale per le soste, non qui.
 Future<List<Colonnina>> colonnineDellArchivioComeSiVuole(
   ProfiloVeicolo veicolo,
   Archivio archivio, {
@@ -756,10 +748,9 @@ Future<List<Colonnina>> colonnineDellArchivioComeSiVuole(
 }) async {
   final p = await archivio.preferenze();
   final a = await (da ?? archivioColonnine());
-  final minima = p.minimaIntorno > 0 ? p.minimaIntorno : 0.1;
   return [
     for (final c in a.tutte)
-      if (c.potenzaNominalePer(veicolo.connettori) >= minima && !operatoreEscluso(c, p.operatoriEsclusi)) c,
+      if (c.potenzaNominalePer(veicolo.connettori) > 0 && !operatoreEscluso(c, p.operatoriEsclusi)) c,
   ];
 }
 

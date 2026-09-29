@@ -86,17 +86,17 @@ class _PreferenzeRicaricaSchermataState extends State<PreferenzeRicaricaSchermat
                   onChanged: (v) => _cambia(p.copia(massimoRicarica: v)),
                 ),
                 const SizedBox(height: 12),
-                Text('Quali colonnine (kW)', style: t.titleSmall),
+                Text('Soste del viaggio (kW)', style: t.titleSmall),
                 const SizedBox(height: 4),
                 Text(
-                  'Vale per le soste del viaggio e per quelle che vedi intorno a te. '
-                  'Con «Tutte» intorno a te le vedi tutte, anche le lente; le soste restano da 22 kW in su.',
+                  'Il percorso ti fa fermare solo a colonnine da questa potenza in su. '
+                  'Sulla mappa e fra quelle intorno a te le vedi sempre tutte, anche le lente.',
                   style: t.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 8),
                 SegmentedButton<double>(
                   segments: const [
-                    ButtonSegment(value: PreferenzeRicarica.tutte, label: Text('Tutte')),
+                    ButtonSegment(value: PreferenzeRicarica.minimaSoste, label: Text('≥ 22')),
                     ButtonSegment(value: 50, label: Text('≥ 50')),
                     ButtonSegment(value: 100, label: Text('≥ 100')),
                     ButtonSegment(value: 150, label: Text('≥ 150')),

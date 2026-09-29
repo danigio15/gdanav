@@ -139,7 +139,7 @@ enum SchermiCarPlay {
             // Elettrica: le colonnine; termica: i distributori.
             var intorno: [CPListItem] = []
             if p.cruscotto.elettrica {
-                intorno.append(riga("Colonnine vicine", "Le rapide intorno a te", icona: icona("bolt.car.fill", verde), sfoglia: true) {
+                intorno.append(riga("Colonnine vicine", "Intorno a te, dalla più vicina", icona: icona("bolt.car.fill", verde), sfoglia: true) {
                     guard let c else { return }
                     c.pushTemplate(colonnine(c), animated: true, completion: nil)
                 })
@@ -317,9 +317,9 @@ enum SchermiCarPlay {
         return t
     }
 
-    /// Le colonnine rapide vicine, adatte alla tua auto; con Premium libere e occupate.
+    /// Le colonnine vicine adatte alla tua auto, anche le lente; con Premium libere e occupate.
     static func colonnine(_ c: CPInterfaceController) -> CPListTemplate {
-        inArrivo("Colonnine vicine", vuoto: "Nessuna colonnina rapida qui intorno") { [weak c] fatto in
+        inArrivo("Colonnine vicine", vuoto: "Nessuna colonnina qui intorno") { [weak c] fatto in
             PonteAuto.shared.colonnine { trovate in
                 fatto(trovate.map { l in
                     riga(l.nome, l.descrizione, icona: icona("bolt.car.fill", verde)) { vai(l, c) }

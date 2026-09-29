@@ -930,7 +930,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
       },
       ..._bollinoPrese('gdanav-tutte', sorgenteTutte, _coloreDelloStato(_statoOIgnota()), sfusa: true),
       // Intorno a te: i distributori col prezzo (auto termica) o le
-      // colonnine rapide col colore dello stato (auto elettrica).
+      // colonnine col colore dello stato (auto elettrica).
       {
         'id': 'gdanav-vicine',
         'type': 'symbol',

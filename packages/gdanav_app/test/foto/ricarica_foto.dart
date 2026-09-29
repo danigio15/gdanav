@@ -14,8 +14,8 @@
 ///
 /// ## Cosa si guarda
 ///
-/// La riga «Quali colonnine (kW)», che adesso dice di valere anche per quelle
-/// intorno; e sotto le pastiglie degli operatori. Due stati, perché la pagina
+/// La riga «Soste del viaggio (kW)», che dice che intorno a te le vedi
+/// tutte; e sotto le pastiglie degli operatori. Due stati, perché la pagina
 /// ne ha due e sono diversi da leggere:
 ///
 ///  - **tutti accesi**: «Li vedi tutti. Tocca quelli che non vuoi vedere.»;

@@ -59,17 +59,17 @@ class PreferenzeRicarica {
   final double massimoRicarica;
 
   /// Le colonnine più lente non si propongono come soste.
+  ///
+  /// Vale solo per le soste del viaggio. Sulla mappa e fra le colonnine
+  /// intorno a te si vedono tutte, anche le lente: col minimo di serie a 50
+  /// la mappa nascondeva le Plenitude da 22 kW del Centro Direzionale di
+  /// Napoli, duecento prese l'una, proprio accanto a chi le cercava.
   final double potenzaMinimaKw;
 
-  /// «Tutte», nella scelta della potenza. Per le soste del viaggio resta un
-  /// minimo: fermarsi a caricare a 7 kW vuol dire ore.
-  static const tutte = 22.0;
-
-  /// La potenza minima delle colonnine intorno a te. Con «Tutte» nessuna:
-  /// prima valeva 22 anche qui, e 5.758 posti dell'archivio (le 11, 15,
-  /// 20 kW, le Enel X da 21 accanto al Centro Direzionale di Napoli) non si
-  /// vedevano mai, nemmeno scegliendo «Tutte».
-  double get minimaIntorno => potenzaMinimaKw <= tutte ? 0 : potenzaMinimaKw;
+  /// La scelta più bassa per le soste. Sotto non si scende: fermarsi a
+  /// caricare a 7 kW vuol dire ore. Le versioni di prima la chiamavano
+  /// «Tutte» e la salvavano già così.
+  static const minimaSoste = 22.0;
 
   /// Mette in conto un'attesa alle colonnine tutte occupate adesso, così si
   /// preferiscono quelle libere.
