@@ -152,6 +152,7 @@ class PercorsoCalcolato {
     this.trafficoVero = false,
     this.senzaTraffico,
     this.ztl,
+    this.consumoTomTom,
   });
 
   final List<Punto> punti;
@@ -184,6 +185,11 @@ class PercorsoCalcolato {
   /// Cosa fa con le ZTL: quali evita, da quali passa, di quale chiedere il
   /// permesso. `null` dove le ZTL non si guardano (Valhalla, le prove).
   final ZtlDelViaggio? ztl;
+
+  /// Il consumo stimato da TomTom col modello dell'auto, salite e discese
+  /// comprese: kWh per l'elettrica, litri per la termica. `null` se non
+  /// gliel'abbiamo chiesto (o non l'ha detto).
+  final double? consumoTomTom;
 
   /// Il percorso da cui partire per applicare il traffico.
   PercorsoCalcolato get base => senzaTraffico ?? this;
@@ -218,6 +224,7 @@ class PercorsoCalcolato {
         trafficoVero: trafficoVero ?? this.trafficoVero,
         senzaTraffico: senzaTraffico ?? this.senzaTraffico,
         ztl: ztl ?? this.ztl,
+        consumoTomTom: consumoTomTom,
       );
 
   PercorsoCalcolato conLimiti(List<int?> limiti) => _copia(limiti: limiti);

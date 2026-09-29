@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../geo/geo.dart';
 import '../motore/modello_consumo.dart';
 import '../ztl/ztl.dart';
+import 'consumo_tomtom.dart';
 import 'valhalla.dart';
 
 /// I percorsi da TomTom, al posto di Valhalla.
@@ -58,9 +59,18 @@ class ClienteTomTom {
   /// percorsi. Vanno ripetute: separate da virgole TomTom risponde 400.
   static const sezioniChieste = ['traffic', 'speedLimit', 'tollRoad', 'motorway', 'ferry', 'carTrain', 'lanes'];
 
-  Map<String, List<String>> _parametri(String lingua, OpzioniPercorso opzioni, {int alternative = 0}) => {
+  /// [eco]: la strada che consuma meno invece della più rapida. [consumo]:
+  /// il modello dell'auto, e allora ogni percorso torna col suo consumo.
+  Map<String, List<String>> _parametri(
+    String lingua,
+    OpzioniPercorso opzioni, {
+    int alternative = 0,
+    bool eco = false,
+    ModelloConsumoTomTom? consumo,
+  }) =>
+      {
         'key': [chiave],
-        'routeType': const ['fastest'],
+        'routeType': [eco ? 'eco' : 'fastest'],
         'traffic': const ['true'],
         'travelMode': const ['car'],
         'instructionsType': const ['tagged'],
@@ -70,7 +80,22 @@ class ClienteTomTom {
         if (alternative > 0) 'maxAlternatives': ['$alternative'],
         if (opzioni.modo.velocitaMassima case final v?) 'vehicleMaxSpeed': ['$v'],
         if (_daEvitare(opzioni) case final a when a.isNotEmpty) 'avoid': [a.join(',')],
+        ...?consumo?.parametri,
       };
+
+  /// Col modello di consumo, e se TomTom non lo prende (400) senza: il
+  /// percorso conta più del consumo, che allora lo stima gdanav.
+  Future<Map<String, Object?>> _conConsumo(
+    ModelloConsumoTomTom? consumo,
+    Future<Map<String, Object?>> Function(ModelloConsumoTomTom? consumo) chiedi,
+  ) async {
+    try {
+      return await chiedi(consumo);
+    } on ErrorePercorso catch (e) {
+      if (consumo == null || e.stato != 400) rethrow;
+      return chiedi(null);
+    }
+  }
 
   static List<String> _daEvitare(OpzioniPercorso o) => [
         if (o.evitaPedaggi) 'tollRoads',
@@ -135,14 +160,20 @@ class ClienteTomTom {
 
   /// Il percorso fra le [tappe] (partenza, tappe intermedie, arrivo), lontano
   /// dai rettangoli di [evita] (le ZTL senza permesso).
+  /// [eco]: la strada che consuma meno, col [consumo] dell'auto.
   Future<PercorsoCalcolato> calcola(
     List<Punto> tappe, {
     String lingua = 'it-IT',
     OpzioniPercorso opzioni = const OpzioniPercorso(),
     List<Rettangolo> evita = const [],
+    bool eco = false,
+    ModelloConsumoTomTom? consumo,
   }) async {
     if (tappe.length < 2) throw const ErrorePercorso('servono almeno partenza e arrivo');
-    final j = await _chiedi(_via(tappe, _parametri(lingua, opzioni)), corpo: _corpo(evita));
+    final j = await _conConsumo(
+      consumo,
+      (m) => _chiedi(_via(tappe, _parametri(lingua, opzioni, eco: eco, consumo: m)), corpo: _corpo(evita)),
+    );
     final rotte = leggiTutte(j);
     if (rotte.isEmpty) throw const ErrorePercorso('nessun percorso fra questi punti');
     return rotte.first;
@@ -159,8 +190,15 @@ class ClienteTomTom {
     String lingua = 'it-IT',
     OpzioniPercorso opzioni = const OpzioniPercorso(),
     List<Rettangolo> evita = const [],
+    ModelloConsumoTomTom? consumo,
   }) async {
-    final j = await _chiedi(_via([da, a], _parametri(lingua, opzioni, alternative: quante)), corpo: _corpo(evita));
+    final j = await _conConsumo(
+      consumo,
+      (m) => _chiedi(
+        _via([da, a], _parametri(lingua, opzioni, alternative: quante, consumo: m)),
+        corpo: _corpo(evita),
+      ),
+    );
     final rotte = leggiTutte(j);
     if (rotte.isEmpty) throw const ErrorePercorso('nessun percorso fra questi punti');
     return rotte;
@@ -192,6 +230,52 @@ class ClienteTomTom {
     // Rifatto dai suoi punti, è la stessa strada: quello che fa con le ZTL
     // resta vero.
     return rotte.isEmpty ? scelto : rotte.first.conZtl(scelto.ztl);
+  }
+
+  /// Le strade migliori di quella che si sta facendo: [davanti] è il pezzo di
+  /// percorso che resta, da dove si è alla meta. TomTom lo ricostruisce dai
+  /// suoi punti, col traffico di adesso, e dà solo le alternative che lo
+  /// battono (`alternativeType=betterRoute`): che consumano meno con [eco],
+  /// che arrivano prima senza. Le alternative seguono il percorso almeno per
+  /// [staccoM]: non si propone una svolta che non si fa in tempo a fare.
+  ///
+  /// Il primo è il percorso di adesso rifatto, gli altri le strade migliori
+  /// (nessuna, se non ce ne sono). Col [consumo] tutti hanno il loro.
+  Future<List<PercorsoCalcolato>> migliori(
+    List<Punto> davanti, {
+    required bool eco,
+    ModelloConsumoTomTom? consumo,
+    List<Rettangolo> evita = const [],
+    int quante = 2,
+    double staccoM = 500,
+    String lingua = 'it-IT',
+    OpzioniPercorso opzioni = const OpzioniPercorso(),
+  }) async {
+    if (davanti.length < 2) return const [];
+    final corpo = {
+      'supportingPoints': [
+        for (final p in _diradati(davanti, puntiDiAppoggio)) {'latitude': p.lat, 'longitude': p.lon},
+      ],
+      if (evita.isNotEmpty)
+        'avoidAreas': {
+          'rectangles': [for (final r in evita) r.perTomTom()],
+        },
+    };
+    final j = await _conConsumo(
+      consumo,
+      (m) => _chiedi(
+        _via([
+          davanti.first,
+          davanti.last
+        ], {
+          ..._parametri(lingua, opzioni, alternative: quante, eco: eco, consumo: m),
+          'alternativeType': const ['betterRoute'],
+          'minDeviationDistance': ['${staccoM.round()}'],
+        }),
+        corpo: corpo,
+      ),
+    );
+    return leggiTutte(j);
   }
 
   /// [punti] ridotti ad al massimo [quanti], tenendoli distanziati uguale e
@@ -267,6 +351,11 @@ class ClienteTomTom {
       ritardoTraffico: Duration(seconds: _ritardo(sommario, code)),
       // Il tempo di TomTom è quello di adesso: il traffico è già dentro.
       trafficoVero: true,
+      // Col modello di consumo dell'auto, quanto consuma: kWh o litri.
+      consumoTomTom: switch (sommario['batteryConsumptionInkWh'] ?? sommario['fuelConsumptionInLiters']) {
+        final num n => n.toDouble(),
+        _ => null,
+      },
     );
   }
 
