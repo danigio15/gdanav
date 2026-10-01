@@ -276,7 +276,7 @@ class GestoreGuida extends ChangeNotifier {
 
   void alternaVoce() {
     muto = !muto;
-    unawaited(archivio?.salvaVoceMuta(muto));
+    if (archivio case final a?) unawaited(a.salvaVoceMuta(muto));
     if (muto) unawaited(voce.zitta());
     notifyListeners();
   }
