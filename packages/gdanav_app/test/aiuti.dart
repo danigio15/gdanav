@@ -196,6 +196,8 @@ Future<Ambiente> ambiente(
     voce: voce,
     consumo: consumo,
     risparmio: risparmio,
+    archivio: archivio,
+    mutoIniziale: await archivio.voceMuta(),
   );
   addTearDown(guida.dispose);
   final gps = StreamController<Lettura>.broadcast();

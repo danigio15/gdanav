@@ -79,6 +79,7 @@ void main() {
     await tester.tap(find.byTooltip('Silenzia la voce'));
     await tester.pump();
     expect(a.guida.muto, isTrue);
+    expect(await a.archivio.voceMuta(), isTrue);
     final prima = a.voce.frasi.length;
     final punti = (a.viaggio.stato as ViaggioPronto).viaggio.percorso.punti;
     await vai(tester, a, punti.last);

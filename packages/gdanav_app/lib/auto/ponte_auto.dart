@@ -247,39 +247,51 @@ class PonteAuto {
         }
       // Un punto toccato sulla mappa dell'auto: cosa dirne.
       case 'punto':
-        final p = PuntoToccato.daElemento({
-          'properties': a['proprieta'],
-          'geometry': {
-            'type': 'Point',
-            'coordinates': [a['lon'], a['lat']],
-          },
-        });
-        if (p == null) return null;
-        // Libere e occupate di adesso, se arrivano in fretta.
-        if (p.tipo == 'colonnina' && p.id != null) {
-          await vicini?.statoAdesso(p.id!).timeout(const Duration(seconds: 5), onTimeout: () => null);
+        try {
+          final p = PuntoToccato.daElemento({
+            'properties': a['proprieta'],
+            'geometry': {
+              'type': 'Point',
+              'coordinates': [a['lon'], a['lat']],
+            },
+          });
+          if (p == null) return null;
+          // Lo stato live della colonnina e' utile, ma non deve mai poter
+          // impedire l'apertura della scheda se una fonte non risponde.
+          if (p.tipo == 'colonnina' && p.id != null) {
+            try {
+              await vicini?.statoAdesso(p.id!).timeout(const Duration(seconds: 5));
+            } catch (_) {}
+          }
+          final qui = guida.avanzamento?.posizioneSulPercorso ?? posizione.qui;
+          final (:righe, :stato) = schedaInAuto(
+            p,
+            vicini: vicini,
+            qui: qui,
+            carburante: auto?.carburante ?? Carburante.benzina,
+          );
+          final descrizione = righe.isEmpty
+              ? p.nome
+              : righe.first.titolo;
+          return {
+            'titolo': p.nome.isEmpty ? 'Punto' : p.nome,
+            'voci': [
+              for (final r in righe) {'icona': r.icona, 'colore': r.colore, 'titolo': r.titolo, 'testo': r.testo},
+            ],
+            'stato': stato,
+            'vai': guida.attiva && (guida.pronto?.termica ?? false) ? 'Passa di qui' : 'Vai',
+            'luogo': {
+              'nome': p.nome.isEmpty ? 'Punto' : p.nome,
+              'descrizione': descrizione,
+              'lat': p.posizione.lat,
+              'lon': p.posizione.lon,
+            },
+          };
+        } catch (_) {
+          // Un dato POI incompleto o una fonte live guasta non deve far
+          // cadere il motore Flutter/Android Auto.
+          return null;
         }
-        final qui = guida.avanzamento?.posizioneSulPercorso ?? posizione.qui;
-        final (:righe, :stato) = schedaInAuto(
-          p,
-          vicini: vicini,
-          qui: qui,
-          carburante: auto?.carburante ?? Carburante.benzina,
-        );
-        return {
-          'titolo': p.nome,
-          'voci': [
-            for (final r in righe) {'icona': r.icona, 'colore': r.colore, 'titolo': r.titolo, 'testo': r.testo},
-          ],
-          'stato': stato,
-          'vai': guida.attiva && (guida.pronto?.termica ?? false) ? 'Passa di qui' : 'Vai',
-          'luogo': {
-            'nome': p.nome,
-            'descrizione': righe.first.titolo,
-            'lat': p.posizione.lat,
-            'lon': p.posizione.lon,
-          },
-        };
       case 'colonnine':
         final qui = posizione.qui ?? viaggio.ultimaPosizione;
         final v = auto?.veicolo;
