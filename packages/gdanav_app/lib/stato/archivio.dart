@@ -31,6 +31,7 @@ class Archivio {
   static const _gettone = 'licenza_gettone';
   static const _ztl = 'ztl';
   static const _risparmio = 'risparmio';
+  static const _voceMuta = 'voce_muta';
 
   Future<Abbinamento?> abbinamento() async {
     final uri = await _p.read(key: _abbinamento);
@@ -125,6 +126,12 @@ class Archivio {
   Future<bool> premium() async => await _p.read(key: _premium) == 'sì';
 
   Future<void> salvaPremium(bool v) => v ? _p.write(key: _premium, value: 'sì') : _p.delete(key: _premium);
+
+  /// La voce del navigatore: resta spenta anche quando l'app viene riavviata.
+  Future<bool> voceMuta() async => await _p.read(key: _voceMuta) == 'sì';
+
+  Future<void> salvaVoceMuta(bool v) =>
+      v ? _p.write(key: _voceMuta, value: 'sì') : _p.delete(key: _voceMuta);
 
   /// L'identità di questo telefono verso il quadro delle licenze (i codici
   /// regalo): nasce una volta sola e resta qui, col suo segreto.
