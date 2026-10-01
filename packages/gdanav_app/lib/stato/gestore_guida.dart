@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
+import 'archivio.dart';
 import 'gestore_auto.dart';
 import 'gestore_consumo.dart';
 import 'gestore_risparmio.dart';
@@ -19,8 +20,12 @@ class GestoreGuida extends ChangeNotifier {
     required this.voce,
     this.consumo,
     this.risparmio,
+    this.archivio,
+    bool mutoIniziale = false,
     DateTime Function()? orologio,
-  }) : _ora = orologio ?? DateTime.now;
+  }) : _ora = orologio ?? DateTime.now {
+    muto = mutoIniziale;
+  }
 
   /// Il consumo imparato: in guida lo si misura e lo si corregge.
   final GestoreConsumo? consumo;
@@ -28,6 +33,9 @@ class GestoreGuida extends ChangeNotifier {
   /// Le strade a risparmio: ogni tanto la strada che si fa si confronta con
   /// le altre, e se una vale la pena la si propone.
   final GestoreRisparmio? risparmio;
+
+  /// Archivio delle preferenze persistenti del navigatore.
+  final Archivio? archivio;
 
   /// Ogni quanto si confrontano le strade.
   static const intervalloStrade = Duration(minutes: 5);
@@ -268,7 +276,8 @@ class GestoreGuida extends ChangeNotifier {
 
   void alternaVoce() {
     muto = !muto;
-    if (muto) voce.zitta();
+    unawaited(archivio?.salvaVoceMuta(muto));
+    if (muto) unawaited(voce.zitta());
     notifyListeners();
   }
 
