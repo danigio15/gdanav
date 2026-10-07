@@ -30,7 +30,12 @@ double? quantoGiraLaManovra(
   if (prima == null) return null;
   final daDove = rottaGradi(prima, punti[i]);
   double? piuLargo;
-  for (final quanto in dopoM) {
+  for (final quantoRichiesto in dopoM) {
+    // Non guardare oltre la fine di questa manovra: il campione a 150 m
+    // poteva finire dentro la svolta successiva e far sembrare questo
+    // svincolo piu' stretto/largo di quello reale.
+    final massimoDopo = m.lunghezzaM > 20 ? m.lunghezzaM * 0.8 : m.lunghezzaM;
+    final quanto = massimoDopo > 10 ? quantoRichiesto.clamp(10.0, massimoDopo).toDouble() : quantoRichiesto;
     final dopo = _lontano(punti, i, quanto, indietro: false);
     if (dopo == null) continue;
     final gira = diQuantoSiGira(daDove, rottaGradi(punti[i], dopo));

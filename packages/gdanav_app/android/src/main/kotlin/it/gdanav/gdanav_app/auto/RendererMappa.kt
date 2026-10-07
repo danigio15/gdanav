@@ -199,28 +199,36 @@ class RendererMappa(
      * sua scheda.
      */
     override fun onClick(x: Float, y: Float) {
-        val m = mappa ?: return
-        val raggio = 28f
-        val trovati = m.queryRenderedFeatures(
-            RectF(x - raggio, y - raggio, x + raggio, y + raggio),
-            "gdanav-distributori",
-            "gdanav-vicine",
-            "nomi-poi",
-        )
-        // Il più vicino al dito.
-        val punto = trovati.mapNotNull { f ->
-            val g = f.geometry() as? org.maplibre.geojson.Point ?: return@mapNotNull null
-            val schermo = m.projection.toScreenLocation(LatLng(g.latitude(), g.longitude()))
-            Triple(f, g, (schermo.x - x) * (schermo.x - x) + (schermo.y - y) * (schermo.y - y))
-        }.minByOrNull { it.third } ?: return
-        val proprieta = HashMap<String, Any?>()
-        punto.first.properties()?.entrySet()?.forEach { (chiave, valore) ->
-            if (valore.isJsonPrimitive) {
-                val v = valore.asJsonPrimitive
-                proprieta[chiave] = if (v.isNumber) v.asDouble else v.asString
+        // Il tap sulla mappa arriva dal thread dell'host Android Auto: un
+        // layer che nel frattempo e' stato ricreato, o una geometria POI
+        // inattesa, non deve mai abbattere la sessione dell'auto.
+        try {
+            val m = mappa ?: return
+            val raggio = 28f
+            val trovati = m.queryRenderedFeatures(
+                RectF(x - raggio, y - raggio, x + raggio, y + raggio),
+                "gdanav-distributori",
+                "gdanav-vicine",
+                "nomi-poi",
+            )
+            // Il più vicino al dito.
+            val punto = trovati.mapNotNull { f ->
+                val g = f.geometry() as? org.maplibre.geojson.Point ?: return@mapNotNull null
+                val schermo = m.projection.toScreenLocation(LatLng(g.latitude(), g.longitude()))
+                Triple(f, g, (schermo.x - x) * (schermo.x - x) + (schermo.y - y) * (schermo.y - y))
+            }.minByOrNull { it.third } ?: return
+            val proprieta = HashMap<String, Any?>()
+            punto.first.properties()?.entrySet()?.forEach { (chiave, valore) ->
+                if (valore.isJsonPrimitive) {
+                    val v = valore.asJsonPrimitive
+                    proprieta[chiave] = if (v.isNumber) v.asDouble else v.asString
+                }
             }
+            alPunto(proprieta, punto.second.latitude(), punto.second.longitude())
+        } catch (_: Exception) {
+            // Android Auto resta sulla mappa: un POI non valido non e' un
+            // motivo per chiudere l'app.
         }
-        alPunto(proprieta, punto.second.latitude(), punto.second.longitude())
     }
 
     // --- col dito o con la manopola -------------------------------------

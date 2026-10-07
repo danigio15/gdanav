@@ -128,6 +128,8 @@ Future<GdanavApp> preparaGdanav({
     voce: VoceTelefono(),
     consumo: consumo,
     risparmio: risparmio,
+    archivio: archivio,
+    mutoIniziale: await archivio.voceMuta(),
   );
   // La velocità dell'auto entra anche qui: serve a sapere se si è fermi, e da
   // fermi il segnaposto non deve girare dietro al ballonzolamento del GPS.
