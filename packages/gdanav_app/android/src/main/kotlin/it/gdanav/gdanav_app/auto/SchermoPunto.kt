@@ -23,10 +23,15 @@ import it.gdanav.gdanav_app.R
  * La scheda di un punto toccato sulla mappa dell'auto: una colonnina, un
  * distributore, un ristorante.
  *
- * Con Android Auto recente (livello 7 delle auto) la scheda sta sopra la
- * mappa, sulla sinistra: la mappa resta dov'è, col punto acceso del colore
- * del suo stato, e la freccia indietro la lascia com'era. Sulle auto più
- * vecchie la scheda è una pagina a sé, col cerchio grande dello stato.
+ * La scheda è una pagina a sé, col cerchio grande dello stato, su tutte le
+ * auto. Doveva stare sopra la mappa sulle auto recenti (livello 7), ma lì
+ * Android Auto la rifiuta: toccata la colonnina, il punto si accende e
+ * subito dopo l'auto dice «Si è verificato un errore imprevisto nell'app».
+ * L'app non cade e il registro del telefono non dice niente, perché il no
+ * arriva da Android Auto. Il modello sopra la mappa (`MapWithContentTemplate`)
+ * nella libreria che usiamo, la 1.4.0, è ancora sperimentale: il codice
+ * resta qui, spento, finché la libreria non passa alla 1.7 e il Desktop Head
+ * Unit non lo mostra funzionare.
  *
  * Le righe arrivano dal telefono già scritte (`schedaInAuto`): il disegno a
  * sinistra col suo colore, la riga, la linea sotto. Il colore va solo sul
@@ -39,7 +44,8 @@ class SchermoPunto(
     private val lat: Double,
     private val lon: Double,
 ) : Screen(carContext), DefaultLifecycleObserver {
-    private val sullaMappa by lazy { carContext.carAppApiLevel >= 7 }
+    /* Spento su tutte le auto: vedi sopra. */
+    private val sullaMappa = false
 
     init {
         lifecycle.addObserver(this)
