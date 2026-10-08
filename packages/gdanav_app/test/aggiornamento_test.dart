@@ -213,10 +213,16 @@ void main() {
     final ponte = PonteAuto(viaggio: a.viaggio, guida: a.guida, posizione: a.posizione, canale: canale);
     ponte.premium(true, aggiorna: true);
     ponte.premium(true);
+    // Dentro gdahome senza una casa abbinata: si guida base, senza Premium.
+    ponte.premium(false, ospite: true, guidaInAuto: true);
+    // Da aggiornare non si guida, nemmeno base.
+    ponte.premium(false, ospite: true, aggiorna: true, guidaInAuto: true);
     await tester.pump();
     expect(chiamate.map((c) => c.arguments), [
-      {'sbloccato': false, 'ospite': false, 'aggiorna': true},
-      {'sbloccato': true, 'ospite': false, 'aggiorna': false},
+      {'sbloccato': false, 'ospite': false, 'aggiorna': true, 'guida_in_auto': false},
+      {'sbloccato': true, 'ospite': false, 'aggiorna': false, 'guida_in_auto': true},
+      {'sbloccato': false, 'ospite': true, 'aggiorna': false, 'guida_in_auto': true},
+      {'sbloccato': false, 'ospite': true, 'aggiorna': true, 'guida_in_auto': false},
     ]);
   });
 }

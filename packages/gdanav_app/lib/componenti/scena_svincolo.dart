@@ -45,15 +45,33 @@ class ScenaSvincolo extends CustomPainter {
    * disegnare. */
   static const staccaDaGradi = 10.0, massimoGradi = 80.0, senzaGradi = 63.0;
 
+  /* Quando la strada piega dalla parte opposta al ramo — «tieni la sinistra»
+   * dove poi tutto curva a destra — i gradi misurano la curva della strada,
+   * non quanto si allontana il ramo dall'altro: si disegna un distacco
+   * dolce, non una rampa che si avvita dalla parte sbagliata. */
+  static const controGradi = 25.0;
+
+  /// Di quanti gradi si stacca il ramo nel disegno, senza segno.
+  double get _gradiRamo {
+    final g = gradi;
+    if (g == null) return senzaGradi;
+    if (g.abs() < 8 || (g > 0) == _destra) return g.abs();
+    return math.min(g.abs(), controGradi);
+  }
+
   /// Le carreggiate si dividono davvero, o si tratta solo di tenere la corsia?
-  bool get _siStacca => (gradi ?? senzaGradi).abs() >= staccaDaGradi;
+  bool get _siStacca => _gradiRamo >= staccaDaGradi;
 
   /// Quanto gira il ramo nel disegno, in radianti. Zero: resta la stessa strada.
-  double get _curva => _siStacca ? (gradi ?? senzaGradi).abs().clamp(staccaDaGradi, massimoGradi) * math.pi / 180 : 0;
+  double get _curva => _siStacca ? _gradiRamo.clamp(staccaDaGradi, massimoGradi) * math.pi / 180 : 0;
 
-  /* Da che parte si esce. I gradi veri battono il tipo della manovra: il tipo
-   * dice «tieni la sinistra» anche dove la strada piega a destra. */
-  bool get _destra => gradi != null && gradi!.abs() >= 8 ? gradi! > 0 : const {18, 20, 23}.contains(manovra.tipo);
+  /* Da che parte si esce: la stessa risposta dell'icona, del cartello e
+   * delle corsie, da [latoDellaManovra]. Prima qui i gradi battevano il tipo
+   * della manovra, e un «tieni la sinistra» su una strada che poi piega a
+   * destra si disegnava col ramo a destra: il disegno contraddiceva tutto il
+   * resto della scheda. Se non lo dice nessuno, a destra come le uscite in
+   * Italia. */
+  bool get _destra => latoDellaManovra(manovra, gradi: gradi) >= 0;
 
   @override
   void paint(Canvas canvas, Size s) {

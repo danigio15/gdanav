@@ -77,8 +77,9 @@ open class SessioneGdanav(private val accendi: (Context) -> Unit) : Session() {
         accendi(carContext)
         ascoltaEnergia()
         ascoltaPosizioneDellAuto()
-        // Android Auto fa parte di gdanav Premium.
-        if (!PonteAuto.premium(carContext)) return SchermoPremium(carContext)
+        // Android Auto fa parte di gdanav Premium (dentro gdahome senza una
+        // casa abbinata si guida base: `PonteAuto.guidaInAuto`).
+        if (!PonteAuto.guidaInAuto(carContext)) return SchermoPremium(carContext)
         val schermo = SchermoNavigazione(carContext)
         naviga(intent)
         return schermo
@@ -86,7 +87,7 @@ open class SessioneGdanav(private val accendi: (Context) -> Unit) : Session() {
 
     /** «Ok Google, naviga verso…» o un'altra app, con gdanav già aperto sull'auto. */
     override fun onNewIntent(intent: Intent) {
-        if (intent.action != CarContext.ACTION_NAVIGATE || !PonteAuto.premium(carContext)) return
+        if (intent.action != CarContext.ACTION_NAVIGATE || !PonteAuto.guidaInAuto(carContext)) return
         carContext.getCarService(androidx.car.app.ScreenManager::class.java).popToRoot()
         naviga(intent)
     }

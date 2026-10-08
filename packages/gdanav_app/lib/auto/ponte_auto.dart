@@ -743,8 +743,16 @@ class PonteAuto {
   /// [aggiorna]: questa versione è troppo vecchia (`GestoreAggiornamento`):
   /// l'auto resta ferma sullo schermo che dice di aggiornare gdanav sul
   /// telefono, come senza Premium.
-  void premium(bool sbloccato, {bool ospite = false, bool aggiorna = false}) =>
-      _manda('premium', {'sbloccato': sbloccato && !aggiorna, 'ospite': ospite, 'aggiorna': aggiorna});
+  ///
+  /// [guidaInAuto]: se in auto si guida, che non è per forza Premium: dentro
+  /// gdahome, senza una casa abbinata, si guida base (`preparaGdanav`). Senza
+  /// dirlo vale [sbloccato], come prima.
+  void premium(bool sbloccato, {bool ospite = false, bool aggiorna = false, bool? guidaInAuto}) => _manda('premium', {
+        'sbloccato': sbloccato && !aggiorna,
+        'ospite': ospite,
+        'aggiorna': aggiorna,
+        'guida_in_auto': (guidaInAuto ?? sbloccato) && !aggiorna,
+      });
 
   void _manda(String metodo, Map<String, Object?> dati) {
     if (!_attivo) return;

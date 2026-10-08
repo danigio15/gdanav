@@ -59,6 +59,11 @@ export 'sorgenti/sorgente_gdahome.dart';
 /// - [senzaPremium]: tutto sbloccato e niente voce «Premium» (per chi non ha
 ///   ancora i pagamenti).
 ///
+/// [guidaInAutoSenzaPremium]: l'app ospite lascia guidare in auto anche senza
+/// Premium. gdahome lo fa finché non c'è una casa abbinata: il navigatore in
+/// macchina parte base, e da quando c'è una casa segue il suo abbonamento.
+/// Gli extra di Premium restano di Premium.
+///
 /// Le versioni troppo vecchie ([GestoreAggiornamento]) si fermano solo in
 /// gdanav da sola: dentro un'altra app ([premiumOspite], [gdahome] o
 /// [senzaPremium]) ci pensa lei.
@@ -68,6 +73,7 @@ Future<GdanavApp> preparaGdanav({
   SorgenteGdahome? gdahome,
   ValueListenable<bool>? premiumOspite,
   bool senzaPremium = false,
+  ValueListenable<bool>? guidaInAutoSenzaPremium,
 }) async {
   final archivio = Archivio(portachiavi);
   final aggiornamento = GestoreAggiornamento.per(
@@ -174,11 +180,16 @@ Future<GdanavApp> preparaGdanav({
     )..avvia();
     // Una versione da aggiornare spegne anche l'auto: lì si dice di
     // aggiornare gdanav sul telefono.
-    void premiumInAuto() =>
-        ponte.premium(premium.sbloccato, ospite: premium.daOspite, aggiorna: aggiornamento?.daAggiornare ?? false);
+    void premiumInAuto() => ponte.premium(
+          premium.sbloccato,
+          ospite: premium.daOspite,
+          aggiorna: aggiornamento?.daAggiornare ?? false,
+          guidaInAuto: premium.sbloccato || (guidaInAutoSenzaPremium?.value ?? false),
+        );
     premiumInAuto();
     premium.addListener(premiumInAuto);
     aggiornamento?.addListener(premiumInAuto);
+    guidaInAutoSenzaPremium?.addListener(premiumInAuto);
   }
   return GdanavApp(
     archivio: archivio,

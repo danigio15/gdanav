@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/componenti/icona_manovra.dart';
@@ -106,12 +108,92 @@ void main() {
     /* Senza i gradi resta il disegno di prima: sessantatré, e dalla parte che
      * dice il tipo della manovra — qui 20, uscita a destra. */
     expect(uguali(await scena(null), await scena(ScenaSvincolo.senzaGradi)), isTrue);
-    // Il segno dice da che parte, e batte il tipo della manovra.
+    /* Il segno NON sceglie il lato: lo dice il tipo della manovra (qui 20,
+     * uscita a destra), come all'icona e al cartello. Una strada che piega
+     * dalla parte opposta fa solo staccare il ramo più dolcemente. */
     expect(uguali(await scena(40), await scena(-40)), isFalse);
-    expect(uguali(await scena(null), await scena(-ScenaSvincolo.senzaGradi)), isFalse);
+    expect(uguali(await scena(-40), await scena(-ScenaSvincolo.controGradi)), isTrue);
+    expect(uguali(await scena(-40), await scena(ScenaSvincolo.controGradi)), isTrue);
     // Oltre i limiti non si va: una rampa da centoquaranta gradi si disegna
     // come una da ottanta, che è già il massimo che entra nell'inquadratura.
     expect(uguali(await scena(140), await scena(ScenaSvincolo.massimoGradi)), isTrue);
+  });
+
+  /* Napoli, SS162dir verso l'Autostrada del Sole: «tieni la sinistra», le
+   * due corsie di sinistra giuste, il cartello con la freccia a sinistra e
+   * l'icona del bivio a sinistra — e la scena col ramo a destra, perché la
+   * strada dopo il bivio piega a destra e i gradi battevano il tipo. Ora il
+   * lato è uno solo per tutti: quello della manovra. */
+  group('il lato dello svincolo è quello della manovra', () {
+    /// Dove sta il blu delle corsie giuste, sotto l'orizzonte: la x media,
+    /// da 0 (sinistra) a 1 (destra).
+    Future<double> dovEIlBlu(Manovra m, double? gradi) async {
+      const w = 480.0, h = 270.0;
+      final registro = ui.PictureRecorder();
+      ScenaSvincolo(m, gradi: gradi).paint(Canvas(registro), const Size(w, h));
+      final img = await registro.endRecording().toImage(w.round(), h.round());
+      final px = (await img.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+      var somma = 0.0, quanti = 0;
+      for (var y = (h * 0.45).round(); y < h; y++) {
+        for (var x = 0; x < w; x++) {
+          final o = (y * w.round() + x) * 4;
+          final r = px.getUint8(o), g = px.getUint8(o + 1), b = px.getUint8(o + 2);
+          if (b > r + 80 && b > g + 40) {
+            somma += x;
+            quanti++;
+          }
+        }
+      }
+      expect(quanti, greaterThan(200), reason: 'le corsie giuste devono essere blu');
+      return somma / quanti / w;
+    }
+
+    const tieniSinistra = Manovra(
+      istruzione: 'Mantieni la sinistra per SS162dir',
+      lunghezzaM: 600,
+      secondi: 25,
+      inizio: 0,
+      tipo: 24,
+      strada: 'SS162dir',
+      verso: 'SS162dir',
+      corsie: [
+        Corsia([DirezioneCorsia.leggeraSinistra], giusta: true, consigliata: DirezioneCorsia.leggeraSinistra),
+        Corsia([DirezioneCorsia.leggeraSinistra], giusta: true, consigliata: DirezioneCorsia.leggeraSinistra),
+        Corsia([DirezioneCorsia.leggeraDestra]),
+      ],
+    );
+    const tieniDestra = Manovra(
+      istruzione: 'Mantieni la destra per A1',
+      lunghezzaM: 600,
+      secondi: 25,
+      inizio: 0,
+      tipo: 23,
+      verso: 'A1',
+      corsie: [
+        Corsia([DirezioneCorsia.leggeraSinistra]),
+        Corsia([DirezioneCorsia.leggeraDestra], giusta: true, consigliata: DirezioneCorsia.leggeraDestra),
+        Corsia([DirezioneCorsia.leggeraDestra], giusta: true, consigliata: DirezioneCorsia.leggeraDestra),
+      ],
+    );
+
+    test(
+      'tieni la sinistra in autostrada: ramo e corsie blu a sinistra, anche se poi la strada piega a destra',
+      () async {
+        expect(iconaManovra(tieniSinistra.tipo), Icons.fork_left);
+        for (final gradi in [null, -35.0, 35.0, 70.0]) {
+          expect(latoDellaManovra(tieniSinistra, gradi: gradi), -1);
+          expect(await dovEIlBlu(tieniSinistra, gradi), lessThan(0.45), reason: 'gradi $gradi');
+        }
+      },
+    );
+
+    test('tieni la destra: ramo e corsie blu a destra, anche se poi la strada piega a sinistra', () async {
+      expect(iconaManovra(tieniDestra.tipo), Icons.fork_right);
+      for (final gradi in [null, 35.0, -35.0, -70.0]) {
+        expect(latoDellaManovra(tieniDestra, gradi: gradi), 1);
+        expect(await dovEIlBlu(tieniDestra, gradi), greaterThan(0.55), reason: 'gradi $gradi');
+      }
+    });
   });
 
   testWidgets('allo svincolo il popup: la mappa 3D, cartello, corsie, metri; e si chiude', (tester) async {

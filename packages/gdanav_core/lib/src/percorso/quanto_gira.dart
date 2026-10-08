@@ -57,3 +57,37 @@ Punto? _lontano(List<Punto> punti, int i, double metri, {required bool indietro}
   }
   return fatti < 10 ? null : punti[j];
 }
+
+/// Da che parte va la manovra [m]: 1 a destra, -1 a sinistra, 0 dritto.
+///
+/// E' l'unica fonte per il lato dello svincolo: la usano l'icona, il
+/// cartello (anche quello di Android Auto, `PannelloAuto.lato`, che ha la
+/// stessa tabella) e la scena in 3D. Decide il tipo della manovra, cioè quello
+/// che dice il motore del percorso («tieni la sinistra», «esci a destra»).
+///
+/// Prima la scena guardava i gradi della strada, e i gradi battevano il tipo:
+/// a Napoli, sulla SS162dir, «tieni la sinistra» con la strada che poi piega
+/// a destra disegnava il ramo a destra, mentre icona, cartello e corsie
+/// dicevano sinistra. I gradi dicono dove va la strada dopo, non da che parte
+/// si stacca il ramo: servono solo quando il tipo non lo dice (rampa dritta,
+/// resta dritto), e prima di loro le corsie giuste.
+int latoDellaManovra(Manovra m, {double? gradi}) {
+  switch (m.tipo) {
+    case 9 || 10 || 11 || 18 || 20 || 23 || 37:
+      return 1;
+    case 14 || 15 || 16 || 19 || 21 || 24 || 38:
+      return -1;
+  }
+  // Il tipo non lo dice: le corsie giuste, se stanno tutte da una parte.
+  if (m.corsieUtili) {
+    final giuste = [
+      for (final (i, c) in m.corsie.indexed)
+        if (c.giusta) i,
+    ];
+    final n = m.corsie.length;
+    if (giuste.first == 0 && giuste.last < n - 1) return -1;
+    if (giuste.last == n - 1 && giuste.first > 0) return 1;
+  }
+  if (gradi != null && gradi.abs() >= 8) return gradi > 0 ? 1 : -1;
+  return 0;
+}
