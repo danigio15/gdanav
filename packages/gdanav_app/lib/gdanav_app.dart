@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:gdanav_core/gdanav_core.dart' show Luogo, Punto;
 
 import 'auto/ponte_auto.dart';
 import 'schermate/aggiorna_gdanav.dart';
@@ -257,6 +258,18 @@ class GdanavApp extends StatelessWidget {
 
   /// Le ZTL e le aree pedonali: sulla mappa, gli avvisi e i permessi.
   final GestoreZtl? ztl;
+
+  /// Porta a un punto scelto da chi ospita gdanav: calcola il viaggio fin lì,
+  /// e la meta si chiama [nome]. gdahome lo usa per «Apri in mappa» sulla
+  /// scheda di una persona: invece della mappa di Home Assistant, il
+  /// navigatore con la strada per arrivarci.
+  ///
+  /// Coordinate fuori scala non portano da nessuna parte: si torna senza fare
+  /// niente.
+  Future<void> portamiA({required String nome, required double lat, required double lon, String descrizione = ''}) {
+    if (!lat.isFinite || !lon.isFinite || lat.abs() > 90 || lon.abs() > 180) return Future.value();
+    return viaggio.vaiA(Luogo(nome: nome, posizione: Punto(lat, lon), descrizione: descrizione));
+  }
 
   @override
   Widget build(BuildContext context) {
