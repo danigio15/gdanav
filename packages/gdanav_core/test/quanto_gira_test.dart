@@ -76,4 +76,41 @@ void main() {
     );
     expect(quantoGiraLaManovra(corto, corto.manovre.first), isNull);
   });
+
+  /* Il lato dello svincolo è uno solo, per icona, cartello, corsie e scena:
+   * quello del tipo della manovra. I gradi dicono dove va la strada dopo, e
+   * contano solo quando il tipo non dice niente. */
+  group('latoDellaManovra', () {
+    Manovra m(int tipo, [List<Corsia> corsie = const []]) =>
+        Manovra(istruzione: '', lunghezzaM: 300, secondi: 10, inizio: 0, tipo: tipo, corsie: corsie);
+
+    test('tieni la sinistra resta a sinistra anche se la strada poi piega a destra', () {
+      expect(latoDellaManovra(m(24), gradi: 45), -1);
+      expect(latoDellaManovra(m(21), gradi: 30), -1);
+      expect(latoDellaManovra(m(19)), -1);
+    });
+
+    test('tieni la destra resta a destra anche se la strada poi piega a sinistra', () {
+      expect(latoDellaManovra(m(23), gradi: -45), 1);
+      expect(latoDellaManovra(m(20), gradi: -30), 1);
+      expect(latoDellaManovra(m(18)), 1);
+    });
+
+    test('senza lato nel tipo: prima le corsie giuste, poi i gradi', () {
+      const sx = [
+        Corsia([DirezioneCorsia.dritto], giusta: true),
+        Corsia([DirezioneCorsia.dritto])
+      ];
+      const dx = [
+        Corsia([DirezioneCorsia.dritto]),
+        Corsia([DirezioneCorsia.dritto], giusta: true)
+      ];
+      expect(latoDellaManovra(m(17, sx), gradi: 40), -1);
+      expect(latoDellaManovra(m(17, dx), gradi: -40), 1);
+      expect(latoDellaManovra(m(22), gradi: -30), -1);
+      expect(latoDellaManovra(m(22), gradi: 30), 1);
+      expect(latoDellaManovra(m(22), gradi: 3), 0);
+      expect(latoDellaManovra(m(8)), 0);
+    });
+  });
 }
