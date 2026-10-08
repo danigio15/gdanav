@@ -115,8 +115,43 @@ class FlussoGps {
   var _dalFlusso = DateTime(0);
   var _riapriDopo = morto;
 
+  /// Per quanto il GPS dell'auto conta come vivo dopo la sua ultima
+  /// posizione: in questo tempo quelle del telefono non passano.
+  static const autoViva = Duration(seconds: 3);
+
+  /// Certe auto mandano la posizione dieci volte al secondo: alla guida e alla
+  /// mappa ne basta una ogni tanto così.
+  static const autoAlPiu = Duration(milliseconds: 400);
+
+  var _dallAuto = DateTime(0);
+  var _mandataDallAuto = DateTime(0);
+
   /// Le posizioni, finché qualcuno ascolta.
   Stream<Position> get posizioni => _uscita.stream;
+
+  /// Una posizione dal GPS dell'auto, quando Android Auto la passa.
+  ///
+  /// L'antenna dell'auto sta sul tetto e il telefono in tasca, o in un vano:
+  /// finché l'auto ne manda (l'ultima da meno di [autoViva]) vanno avanti
+  /// quelle, e quelle del telefono si lasciano cadere, perché due GPS che si
+  /// alternano farebbero ballare il segnaposto fra due strade. Quando l'auto
+  /// tace si torna al telefono. Per la sentinella è una posizione come le
+  /// altre: finché parla l'auto non chiede niente al telefono e non ne
+  /// riapre il flusso. Le auto che la posizione non la danno (tante) non
+  /// mandano niente, e non cambia niente.
+  ///
+  /// Su CarPlay non c'è niente del genere: iOS non dà il GPS dell'auto alle
+  /// app, e lì resta quello del telefono.
+  void dallAuto(Position p) {
+    final ora = _ora();
+    _dallAuto = ora;
+    if (ora.difference(_mandataDallAuto) < autoAlPiu) return;
+    _mandataDallAuto = ora;
+    _sollecitando = false;
+    _manda(p, ora);
+  }
+
+  bool _parlaLAuto(DateTime ora) => ora.difference(_dallAuto) < autoViva;
 
   void _accendi() {
     // Chi comincia ad ascoltare non ha ancora avuto niente: il silenzio si
@@ -172,6 +207,7 @@ class FlussoGps {
     final ora = _ora();
     _dalFlusso = ora;
     _riapriDopo = morto;
+    if (_parlaLAuto(ora)) return;
     _sollecitando = false;
     _manda(p, ora);
   }
@@ -194,6 +230,8 @@ class FlussoGps {
 
   void _controlla() {
     final ora = _ora();
+    // Finché parla l'auto il telefono non serve: lo si riguarda quando tace.
+    if (_parlaLAuto(ora)) return;
     if (_dalGps == null) {
       // Finito da solo: lo si riapre. Dopo un errore invece c'è già chi
       // aspetta di riprovare.
@@ -262,6 +300,11 @@ LocationSettings _comeChiedere(bool soloIlGps, Duration limite) => switch (defau
   ),
   _ => LocationSettings(accuracy: LocationAccuracy.bestForNavigation, timeLimit: limite),
 };
+
+/// Una posizione dal GPS dell'auto: la passa lo schermo di Android Auto
+/// (`PonteAuto`), e finché arrivano vanno davanti a quelle del telefono.
+/// Vedi [FlussoGps.dallAuto].
+void gpsDellAuto(Position p) => _gps.dallAuto(p);
 
 /// Le posizioni mentre si guida.
 Stream<Punto> posizioniGuida() => _gps.posizioni.map((p) => Punto(p.latitude, p.longitude));

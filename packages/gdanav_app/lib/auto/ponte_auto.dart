@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:gdanav_core/gdanav_core.dart';
+import 'package:geolocator/geolocator.dart' show Position;
 
 import '../componenti/icone_punti.dart';
 import '../componenti/icone_segnalazioni.dart';
@@ -35,10 +36,11 @@ import '../stato/gestore_ztl.dart';
 /// segnalazioni, segnaposto e prossima manovra, e il cruscotto (batteria,
 /// velocità e limite, arrivo, prossima sosta, meteo, avvisi). Dall'auto
 /// arrivano la ricerca, la meta scelta (che parte subito in guida), Casa e
-/// Lavoro da salvare, le opzioni del percorso, le segnalazioni e «Fine». Il
-/// lato nativo è in `android/src/main/kotlin/it/gdanav/gdanav_app/auto` e, per
-/// CarPlay, in `ios/gdanav_app/Sources/gdanav_app`. Nelle prove il canale non
-/// c'è, e si tace.
+/// Lavoro da salvare, le opzioni del percorso, le segnalazioni, «Fine» e, se
+/// l'auto lo passa, il suo GPS. Il lato nativo è in
+/// `android/src/main/kotlin/it/gdanav/gdanav_app/auto` e, per CarPlay, in
+/// `ios/gdanav_app/Sources/gdanav_app`. Nelle prove il canale non c'è, e si
+/// tace.
 class PonteAuto {
   PonteAuto({
     required this.viaggio,
@@ -51,6 +53,7 @@ class PonteAuto {
     this.vicini,
     this.prova,
     this.ztl,
+    this.gpsDellAuto,
     MethodChannel? canale,
     DateTime Function()? orologio,
   }) : _canale = canale ?? const MethodChannel('gdanav/schermo_auto'),
@@ -59,6 +62,11 @@ class PonteAuto {
   final GestoreViaggio viaggio;
   final GestoreGuida guida;
   final GestorePosizione posizione;
+
+  /// Dove mandare le posizioni del GPS dell'auto, quando l'auto le passa: il
+  /// flusso del GPS (`gpsDellAuto` in `stato/posizione.dart`), che le preferisce
+  /// a quelle del telefono finché arrivano.
+  final void Function(Position)? gpsDellAuto;
 
   /// Casa, Lavoro e recenti, da scegliere sullo schermo dell'auto.
   final GestoreLuoghi? luoghi;
@@ -143,6 +151,9 @@ class PonteAuto {
   Future<Object?> _dallAuto(MethodCall call) async {
     final a = (call.arguments as Map?) ?? const {};
     switch (call.method) {
+      // Il GPS dell'auto, quando l'auto lo passa: va nel flusso del GPS.
+      case 'posizione_auto':
+        if (posizioneDellAuto(a) case final p?) gpsDellAuto?.call(p);
       // Lo schermo dell'auto si è acceso o spento: qualcuno sta guardando, e
       // i dati dell'auto si chiedono freschi anche senza un percorso.
       case 'in_auto':
@@ -742,4 +753,29 @@ class PonteAuto {
       if (e is MissingPluginException) _attivo = false;
     });
   }
+}
+
+/// La posizione che manda il lato Kotlin dal GPS dell'auto
+/// (`PonteAuto.posizioneDallAuto`): `lat` e `lon`, e `rotta` in gradi,
+/// `velocita_ms`, `precisione_m` e `letto_ms` quando l'auto li dà. `null` se
+/// non dice dove.
+Position? posizioneDellAuto(Map<Object?, Object?> dati) {
+  final lat = (dati['lat'] as num?)?.toDouble(), lon = (dati['lon'] as num?)?.toDouble();
+  if (lat == null || lon == null || !lat.isFinite || !lon.isFinite) return null;
+  final rotta = (dati['rotta'] as num?)?.toDouble();
+  final ms = (dati['letto_ms'] as num?)?.toInt();
+  return Position(
+    latitude: lat,
+    longitude: lon,
+    timestamp: ms == null ? DateTime.now() : DateTime.fromMillisecondsSinceEpoch(ms),
+    accuracy: (dati['precisione_m'] as num?)?.toDouble() ?? 0,
+    altitude: 0,
+    altitudeAccuracy: 0,
+    heading: rotta ?? 0,
+    // La direzione vale solo se l'auto l'ha data: senza, lo zero vorrebbe
+    // dire nord (vedi rottaDaFidarsi).
+    headingAccuracy: rotta == null ? 0 : 1,
+    speed: (dati['velocita_ms'] as num?)?.toDouble() ?? 0,
+    speedAccuracy: 0,
+  );
 }

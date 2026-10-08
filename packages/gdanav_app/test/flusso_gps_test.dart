@@ -201,4 +201,56 @@ void main() {
     finto.rispondi(45);
     await tester.pump();
   });
+
+  testWidgets(
+    'finché parla l\'auto passano le sue posizioni e quelle del telefono no; quando tace, di nuovo il telefono',
+    (tester) async {
+      final (gps, finto) = nuovo(tester);
+      final arrivate = <Position>[];
+      final iscrizione = gps.posizioni.listen(arrivate.add);
+      finto.flussi.first.add(_a(45));
+      await tester.pump();
+      gps.dallAuto(_a(46));
+      // Il telefono subito dopo: non passa, i due GPS non si alternano.
+      finto.flussi.first.add(_a(45.0001));
+      await tester.pump(const Duration(milliseconds: 100));
+      // Troppo presto dopo l'altra (certe auto ne mandano dieci al secondo).
+      gps.dallAuto(_a(46.0001));
+      await tester.pump(const Duration(seconds: 1));
+      gps.dallAuto(_a(46.001));
+      finto.flussi.first.add(_a(45.001));
+      await tester.pump();
+      expect(arrivate.map((p) => p.latitude), [45, 46, 46.001]);
+
+      // L'auto tace da più di tre secondi: si torna al telefono.
+      await tester.pump(const Duration(milliseconds: 3500));
+      finto.flussi.first.add(_a(45.002));
+      await tester.pump();
+      expect(arrivate.last.latitude, 45.002);
+      unawaited(iscrizione.cancel());
+    },
+  );
+
+  testWidgets('finché parla l\'auto la sentinella non chiede niente al telefono, e non ne riapre il flusso', (
+    tester,
+  ) async {
+    final (gps, finto) = nuovo(tester);
+    final iscrizione = gps.posizioni.listen((_) {});
+    // Il flusso del telefono è muto (il canale staccato), l'auto parla una
+    // volta al secondo.
+    for (var s = 0; s < 20; s++) {
+      gps.dallAuto(_a(46 + s * 0.0001));
+      await tester.pump(const Duration(seconds: 1));
+    }
+    expect(finto.domande, isEmpty);
+    expect(finto.flussi, hasLength(1));
+    // L'auto smette: il flusso muto da tanto si riapre subito, e dopo cinque
+    // secondi senza posizioni se ne chiede una al telefono.
+    await tester.pump(const Duration(seconds: 6));
+    expect(finto.flussi, hasLength(2));
+    expect(finto.domande, hasLength(1));
+    unawaited(iscrizione.cancel());
+    finto.rispondi(45);
+    await tester.pump();
+  });
 }

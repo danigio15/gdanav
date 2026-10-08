@@ -8,6 +8,8 @@ import androidx.car.app.Session
 import androidx.car.app.hardware.CarHardwareManager
 import androidx.car.app.hardware.common.CarValue
 import androidx.car.app.hardware.common.OnCarDataAvailableListener
+import androidx.car.app.hardware.info.CarHardwareLocation
+import androidx.car.app.hardware.info.CarSensors
 import androidx.car.app.hardware.info.EnergyLevel
 import androidx.car.app.hardware.info.Mileage
 import androidx.car.app.hardware.info.Speed
@@ -63,7 +65,10 @@ open class SessioneGdanav(private val accendi: (Context) -> Unit) : Session() {
 
                 override fun onStop(owner: LifecycleOwner) = PonteAuto.inAuto(false)
 
-                override fun onDestroy(owner: LifecycleOwner) = PosizioneInAuto.spegni(carContext)
+                override fun onDestroy(owner: LifecycleOwner) {
+                    smettiPosizioneDellAuto()
+                    PosizioneInAuto.spegni(carContext)
+                }
             },
         )
     }
@@ -71,6 +76,7 @@ open class SessioneGdanav(private val accendi: (Context) -> Unit) : Session() {
     override fun onCreateScreen(intent: Intent): Screen {
         accendi(carContext)
         ascoltaEnergia()
+        ascoltaPosizioneDellAuto()
         // Android Auto fa parte di gdanav Premium.
         if (!PonteAuto.premium(carContext)) return SchermoPremium(carContext)
         val schermo = SchermoNavigazione(carContext)
@@ -139,5 +145,49 @@ open class SessioneGdanav(private val accendi: (Context) -> Unit) : Session() {
             })
         } catch (e: Exception) {
         }
+    }
+
+    /** I sensori dell'auto mentre se ne ascolta il GPS, per smettere a fine sessione. */
+    private var sensori: CarSensors? = null
+
+    private val gpsDellAuto = OnCarDataAvailableListener<CarHardwareLocation> { l ->
+        val posizione = l.location
+        if (posizione.status == CarValue.STATUS_SUCCESS) {
+            posizione.value?.let { PonteAuto.posizioneDallAuto(it) }
+        }
+    }
+
+    /**
+     * Il GPS dell'auto, se lo passa.
+     *
+     * L'antenna dell'auto sta sul tetto, il telefono in tasca o in un vano: il
+     * telefono mette queste posizioni nel flusso del GPS del Dart, che le
+     * preferisce alle sue finché arrivano. Tante auto non le danno
+     * (UNAVAILABLE o UNIMPLEMENTED): allora qui non passa niente e resta il
+     * GPS del telefono, come prima. Serve il permesso della posizione, che
+     * gdanav ha già; se manca, o la libreria dell'auto è troppo vecchia, la
+     * chiamata fallisce e si va avanti senza.
+     */
+    private fun ascoltaPosizioneDellAuto() {
+        if (sensori != null) return
+        try {
+            val s = carContext.getCarService(CarHardwareManager::class.java).carSensors
+            s.addCarHardwareLocationListener(
+                CarSensors.UPDATE_RATE_FASTEST,
+                ContextCompat.getMainExecutor(carContext),
+                gpsDellAuto,
+            )
+            sensori = s
+        } catch (e: Exception) {
+        }
+    }
+
+    /** A fine sessione: l'auto smette di mandare la posizione a chi non c'è più. */
+    private fun smettiPosizioneDellAuto() {
+        try {
+            sensori?.removeCarHardwareLocationListener(gpsDellAuto)
+        } catch (e: Exception) {
+        }
+        sensori = null
     }
 }
