@@ -4,7 +4,7 @@ import 'dart:math' show Point;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:gdanav_core/gdanav_core.dart' show Punto, Rettangolo, TipoSegnalazione, TipoZona;
+import 'package:gdanav_core/gdanav_core.dart' show Avanzamento, Punto, Rettangolo, TipoSegnalazione, TipoZona, Viaggio;
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../componenti/icone_punti.dart';
@@ -39,6 +39,7 @@ class MappaViaggio extends StatefulWidget {
     this.ztl,
     this.risparmio,
     this.onPunto,
+    this.orologio,
   });
 
   final GestoreViaggio gestore;
@@ -74,6 +75,9 @@ class MappaViaggio extends StatefulWidget {
   /// Tocco su un distributore, una colonnina vicina o un punto di interesse.
   final ValueChanged<PuntoToccato>? onPunto;
 
+  /// L'ora, per le prove; di solito quella del telefono.
+  final DateTime Function()? orologio;
+
   @override
   State<MappaViaggio> createState() => _MappaViaggioState();
 }
@@ -81,7 +85,30 @@ class MappaViaggio extends StatefulWidget {
 class _MappaViaggioState extends State<MappaViaggio> {
   MapLibreMapController? _mappa;
   var _stileCaricato = false;
+
+  /// Il viaggio che la mappa ha davvero: si segna solo dopo averlo scritto
+  /// tutto. Segnato prima, una scrittura andata male lasciava la mappa senza
+  /// percorso per sempre, perché per lei era già disegnato.
   StatoViaggio? _disegnato;
+
+  /// Il viaggio che si sta scrivendo adesso: chi chiama nel frattempo non lo
+  /// riscrive una seconda volta.
+  StatoViaggio? _inScrittura;
+
+  /// Cresce a ogni scrittura del viaggio, e a ogni mappa o stile nuovo: una
+  /// scrittura vecchia che finisce dopo non segna niente, e smette di
+  /// scrivere su una mappa che non c'è più.
+  var _giroDisegno = 0;
+
+  /// I dati dell'ultimo viaggio scritto: la rete di sicurezza della guida li
+  /// riscrive senza rifarli.
+  (StatoViaggio, Map<String, Map<String, Object?>>)? _datiFatti;
+  DateTime _ultimoTentativo = DateTime(0);
+  DateTime _ultimaRiscrittura = DateTime(0);
+
+  /// In guida, ogni due secondi: la rete di sicurezza del percorso, e la
+  /// telecamera quando il GPS tace (allora nessun altro chiama [_io]).
+  Timer? _guardia;
   var _inclinata = false;
   var _libera = false;
   var _centrate = 0;
@@ -109,7 +136,10 @@ class _MappaViaggioState extends State<MappaViaggio> {
     // In guida no: lì contano le soste del percorso e quelle vicine, e
     // tutta Italia sulla strada sarebbe solo confusione.
     if (widget.guida == null) widget.vicini?.avviaTutte();
+    if (widget.guida != null) _guardia = Timer.periodic(const Duration(seconds: 2), (_) => _giroDiGuardia());
   }
+
+  DateTime _ora() => (widget.orologio ?? DateTime.now)();
 
   @override
   void dispose() {
@@ -122,6 +152,12 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.ztl?.removeListener(_zoneDaCapo);
     _gestoreRisparmio?.removeListener(_risparmio);
     _orologioZone?.cancel();
+    _guardia?.cancel();
+    // Quello che era ancora in corso (le immagini, una scrittura) non scrive
+    // più su una mappa che non c'è.
+    _mappa = null;
+    _stileCaricato = false;
+    _giroDisegno++;
     super.dispose();
   }
 
@@ -202,6 +238,8 @@ class _MappaViaggioState extends State<MappaViaggio> {
       _libera = widget.controllo.libera;
       if (!_libera) {
         _ultimaCamera = DateTime(0);
+        // Anche la strada intera, col GPS muto: «Riprendi» la rimette.
+        _suTuttaLaStrada = null;
         await _io();
       }
     }
@@ -231,17 +269,44 @@ class _MappaViaggioState extends State<MappaViaggio> {
   Future<void> _io() async {
     final m = _mappa;
     if (m == null || !_stileCaricato) return;
+    _guardiaPercorso();
     final a = widget.guida?.avanzamento;
     final qui = a?.posizioneSulPercorso ?? widget.posizione.qui;
     final rotta = a?.rotta ?? widget.posizione.rotta;
-    await m.setGeoJsonSource(sorgenteIo, datiIo(qui, rotta, widget.posizione.segnaposto).cast<String, dynamic>());
-    await _freccia(m);
-    if (qui == null) return;
-    if (widget.guida != null) {
+    // Segnaposto e freccia per conto loro: se una sorgente non si scrive, la
+    // telecamera deve muoversi lo stesso. Prima un errore qui fermava tutto,
+    // e la mappa restava dov'era.
+    try {
+      await m.setGeoJsonSource(sorgenteIo, datiIo(qui, rotta, widget.posizione.segnaposto).cast<String, dynamic>());
+    } catch (e) {
+      debugPrint('mappa, segnaposto: $e');
+    }
+    try {
+      await _freccia(m);
+    } catch (e) {
+      debugPrint('mappa, freccia: $e');
+    }
+    // Nel frattempo la mappa è stata rifatta (il tema): ci pensa la nuova.
+    if (!identical(m, _mappa) || !mounted) return;
+    try {
+      await _telecamera(m, a, qui, rotta);
+    } catch (e) {
+      debugPrint('mappa, telecamera: $e');
+    }
+  }
+
+  Future<void> _telecamera(MapLibreMapController m, Avanzamento? a, Punto? qui, double rotta) async {
+    if (widget.guida case final g?) {
       // Mappa libera: la si lascia dove l'ha messa chi guida.
       if (widget.controllo.libera) return;
+      // Nessun punto sul percorso e il GPS muto da dieci secondi: il punto che
+      // si ha è vecchio, o non c'è (e la mappa nasce su Roma). Meglio tutta la
+      // strada che restare parcheggiati lì, lontano dalla linea.
+      if (a == null && widget.posizione.tace(const Duration(seconds: 10))) return _tuttaLaStrada(m, g);
+      _suTuttaLaStrada = null;
+      if (qui == null) return;
       // La telecamera segue l'auto; al massimo un movimento al secondo.
-      final ora = DateTime.now();
+      final ora = _ora();
       if (ora.difference(_ultimaCamera) < const Duration(milliseconds: 900)) return;
       _ultimaCamera = ora;
       await m.animateCamera(
@@ -256,13 +321,45 @@ class _MappaViaggioState extends State<MappaViaggio> {
         ),
         duration: const Duration(milliseconds: 900),
       );
-    } else if (_primaPosizione && widget.gestore.stato is! ViaggioPronto) {
+    } else if (qui != null && _primaPosizione && widget.gestore.stato is! ViaggioPronto) {
       _primaPosizione = false;
       await m.animateCamera(CameraUpdate.newLatLngZoom(LatLng(qui.lat, qui.lon), 15));
     }
   }
 
-  (int, int)? _frecciaDisegnata;
+  /// Il viaggio di cui la telecamera mostra già tutta la strada: non la si
+  /// rimette a ogni giro, così chi la guarda può anche avvicinarsi.
+  Viaggio? _suTuttaLaStrada;
+
+  Future<void> _tuttaLaStrada(MapLibreMapController m, GestoreGuida g) async {
+    final v = g.pronto?.viaggio;
+    if (v == null || identical(v, _suTuttaLaStrada)) return;
+    final riquadro = confini(v);
+    if (riquadro == null) return;
+    final (so, ne) = riquadro;
+    _suTuttaLaStrada = v;
+    try {
+      await m.animateCamera(
+        CameraUpdate.newLatLngBounds(
+          LatLngBounds(southwest: LatLng(so.lat, so.lon), northeast: LatLng(ne.lat, ne.lon)),
+          left: 48,
+          top: 200,
+          right: 72,
+          // Sotto ci sono il tachimetro e la scheda dell'arrivo.
+          bottom: MediaQuery.sizeOf(context).height * 0.4,
+        ),
+      );
+    } catch (e) {
+      _suTuttaLaStrada = null;
+      rethrow;
+    }
+  }
+
+  /// La freccia che c'è sulla mappa. Questa vuol dire «non si sa»: una mappa o
+  /// uno stile nuovo nascono con la sorgente vuota, e una scrittura andata male
+  /// non ha lasciato quello che si voleva. La prossima volta si riscrive.
+  static const _frecciaIgnota = (-1, -1);
+  (int, int)? _frecciaDisegnata = _frecciaIgnota;
 
   /// La freccia della prossima manovra sul percorso, avvicinandosi.
   Future<void> _freccia(MapLibreMapController m) async {
@@ -270,21 +367,73 @@ class _MappaViaggioState extends State<MappaViaggio> {
     final v = g?.pronto?.viaggio, a = g?.avanzamento;
     final chiave = chiaveFreccia(v, a?.prossima, a?.allaProssimaM, ricalcolo: g?.ricalcolando ?? false);
     if (chiave == _frecciaDisegnata) return;
+    // Segnata prima, perché chi arriva nel frattempo non la riscriva.
     _frecciaDisegnata = chiave;
     final dati = chiave == null ? datiManovra(null, null) : datiManovra(v, a?.prossima);
-    await m.setGeoJsonSource(sorgenteManovra, dati.cast<String, dynamic>());
+    try {
+      await m.setGeoJsonSource(sorgenteManovra, dati.cast<String, dynamic>());
+    } catch (_) {
+      if (_frecciaDisegnata == chiave) _frecciaDisegnata = _frecciaIgnota;
+      rethrow;
+    }
   }
 
+  /// Le immagini dello stile: una che non si carica non tiene fuori le altre,
+  /// né quello che si fa dopo (il segnaposto, le segnalazioni, i vicini).
   Future<void> _immagini(MapLibreMapController m) async {
+    Future<void> una(String nome, Future<Uint8List> Function() png) async {
+      try {
+        await m.addImage(nome, await png());
+      } catch (e) {
+        debugPrint('mappa, immagine $nome: $e');
+      }
+    }
+
     for (final s in Segnaposto.values) {
-      final byte = await rootBundle.load(s.asset);
-      await m.addImage(s.immagine, byte.buffer.asUint8List());
+      await una(s.immagine, () async => (await rootBundle.load(s.asset)).buffer.asUint8List());
     }
     for (final t in TipoSegnalazione.values) {
-      await m.addImage(nomeIcona(t), await iconaSegnalazionePng(t));
+      await una(nomeIcona(t), () => iconaSegnalazionePng(t));
     }
-    for (final MapEntry(:key, :value) in (await iconePunti()).entries) {
-      await m.addImage(key, value);
+    try {
+      for (final MapEntry(:key, :value) in (await iconePunti()).entries) {
+        await una(key, () async => value);
+      }
+    } catch (e) {
+      debugPrint('mappa, icone dei punti: $e');
+    }
+  }
+
+  /* ─── La rete di sicurezza del percorso, in guida ───────────────────────────
+   *
+   * Dal campo: appena partiti, sulla mappa della guida c'era il traffico e
+   * nessuna linea blu. Non era fuori dallo schermo: la sorgente era vuota
+   * davvero. Una scrittura andata male, una mappa rifatta mentre si scriveva,
+   * e niente la rimetteva più.
+   *
+   * Così, a ogni posizione e a ogni giro dell'orologio: se la mappa non ha il
+   * viaggio di adesso lo si riscrive (al più ogni tre secondi, se continua a
+   * non andare); e anche se ce l'ha, ogni venticinque secondi lo si riscrive
+   * coi dati già fatti, che sono pochi. Fuori dalla guida no: lì riscrivere il
+   * viaggio vuol dire anche rimettere la telecamera sul percorso, e la mappa
+   * scapperebbe di mano a chi la sta guardando.
+   */
+
+  void _giroDiGuardia() {
+    if (!mounted) return;
+    _guardiaPercorso();
+    // Col GPS muto nessuno chiama _io: la telecamera la si sistema da qui.
+    if (widget.posizione.tace()) unawaited(_io());
+  }
+
+  void _guardiaPercorso() {
+    if (widget.guida == null || _mappa == null || !_stileCaricato) return;
+    final ora = _ora();
+    if (!identical(widget.gestore.stato, _disegnato)) {
+      if (ora.difference(_ultimoTentativo) >= const Duration(seconds: 3)) unawaited(_ridisegna());
+    } else if (ora.difference(_ultimaRiscrittura) >= const Duration(seconds: 25)) {
+      _ultimaRiscrittura = ora;
+      unawaited(_ridisegna(ancora: true));
     }
   }
 
@@ -332,12 +481,71 @@ class _MappaViaggioState extends State<MappaViaggio> {
     await m.setLayerVisibility(stratoEdifici3d, _inclinata);
   }
 
-  Future<void> _ridisegna() async {
+  /// Una mappa o uno stile nuovi: le sorgenti sono vuote, e le scritture
+  /// ancora in corso erano per quelle di prima.
+  void _sorgentiVuote() {
+    _disegnato = null;
+    _inScrittura = null;
+    _giroDisegno++;
+    _frecciaDisegnata = _frecciaIgnota;
+    _suTuttaLaStrada = null;
+  }
+
+  /// Il viaggio sulla mappa: percorso, colonnine, arrivo, code, tappe.
+  /// [ancora]: lo stesso viaggio di prima, riscritto coi dati già fatti (la
+  /// rete di sicurezza della guida), senza toccare la telecamera.
+  Future<void> _ridisegna({bool ancora = false}) async {
     final m = _mappa;
     final stato = widget.gestore.stato;
-    if (m == null || !_stileCaricato || identical(stato, _disegnato)) return;
+    if (m == null || !_stileCaricato || identical(stato, _inScrittura)) return;
+    if (!ancora && identical(stato, _disegnato)) return;
+    final giro = ++_giroDisegno;
+    _inScrittura = stato;
+    _ultimoTentativo = _ora();
+    var tutto = true;
+    // Una sorgente alla volta, il percorso per primo: se un'altra non si
+    // scrive (le code, le colonnine) la strada sulla mappa c'è lo stesso.
+    for (final MapEntry(key: id, value: dati) in _datiDel(stato, ancora: ancora).entries) {
+      try {
+        await m.setGeoJsonSource(id, dati.cast<String, dynamic>());
+      } catch (e) {
+        tutto = false;
+        debugPrint('mappa, sorgente $id: $e');
+      }
+      // Nel frattempo è partita una scrittura più nuova, o la mappa è un'altra.
+      if (giro != _giroDisegno) return;
+    }
+    _inScrittura = null;
+    // Qualcosa non è andato: la mappa non ha di sicuro questo viaggio, e la
+    // prossima chiamata lo riscrive.
+    if (!tutto) {
+      _disegnato = null;
+      return;
+    }
     _disegnato = stato;
-    final basso = MediaQuery.sizeOf(context).height * 0.45;
+    _ultimaRiscrittura = _ora();
+    final viaggio = stato is ViaggioPronto ? stato.viaggio : null;
+    if (ancora || viaggio == null || widget.guida != null || !mounted) return;
+    final riquadro = confini(viaggio, anche: stato is ViaggioPronto ? stato.scelte : const []);
+    if (riquadro == null) return;
+    final (so, ne) = riquadro;
+    await m.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(southwest: LatLng(so.lat, so.lon), northeast: LatLng(ne.lat, ne.lon)),
+        left: 48,
+        top: 190,
+        right: 72,
+        bottom: MediaQuery.sizeOf(context).height * 0.45,
+      ),
+    );
+    if (_inclinata) await m.animateCamera(CameraUpdate.tiltTo(_inclinazione));
+  }
+
+  /// I dati delle sorgenti del viaggio per [stato]. [ancora]: quelli già
+  /// fatti, se sono suoi; altrimenti si rifanno (le strade da proporre, per
+  /// esempio, arrivano dopo il viaggio).
+  Map<String, Map<String, Object?>> _datiDel(StatoViaggio stato, {required bool ancora}) {
+    if (_datiFatti case (final s, final fatti) when ancora && identical(s, stato)) return fatti;
     final viaggio = stato is ViaggioPronto ? stato.viaggio : null;
     final dati = stato is ViaggioPronto && widget.guida == null
         ? datiViaggio(
@@ -350,21 +558,8 @@ class _MappaViaggioState extends State<MappaViaggio> {
             eco: stradaCheRisparmia(stato.scelte, _gestoreRisparmio),
           )
         : datiViaggio(viaggio, tappe: stato is ViaggioPronto ? stato.tappe : const []);
-    for (final MapEntry(key: id, value: dati) in dati.entries) {
-      await m.setGeoJsonSource(id, dati.cast<String, dynamic>());
-    }
-    if (viaggio == null || widget.guida != null) return;
-    final (so, ne) = confini(viaggio, anche: stato is ViaggioPronto ? stato.scelte : const [])!;
-    await m.animateCamera(
-      CameraUpdate.newLatLngBounds(
-        LatLngBounds(southwest: LatLng(so.lat, so.lon), northeast: LatLng(ne.lat, ne.lon)),
-        left: 48,
-        top: 190,
-        right: 72,
-        bottom: basso,
-      ),
-    );
-    if (_inclinata) await m.animateCamera(CameraUpdate.tiltTo(_inclinazione));
+    _datiFatti = (stato, dati);
+    return dati;
   }
 
   Future<void> _tocco(Point<double> punto) async {
@@ -417,18 +612,26 @@ class _MappaViaggioState extends State<MappaViaggio> {
       compassEnabled: true,
       attributionButtonPosition: AttributionButtonPosition.topLeft,
       attributionButtonMargins: const Point(12, 200),
-      onMapCreated: (c) => _mappa = c,
+      onMapCreated: (c) {
+        // Una mappa nuova (il tema): finché il suo stile non è pronto non le
+        // si scrive niente. Prima restava acceso lo «stile caricato» della
+        // vecchia, e le scritture partivano verso una mappa ancora vuota.
+        _mappa = c;
+        _stileCaricato = false;
+        _ultimaCamera = DateTime(0);
+        _sorgentiVuote();
+      },
       onStyleLoadedCallback: () {
         _stileCaricato = true;
-        _disegnato = null;
         // Uno stile nuovo (il tema, il traffico) nasce con le sorgenti vuote.
+        _sorgentiVuote();
         _versioneTutte = -1;
         _zoneDisegnate = null;
         _zoneConPedonali = false;
         _zoneSullaMappa = false;
         if (_mappa case final m?) {
           _inclinata = widget.controllo.inclinata;
-          _edifici(m);
+          unawaited(_edifici(m).catchError((Object e) => debugPrint('mappa, edifici: $e')));
           _immagini(m).then((_) {
             _io();
             _segnalazioni();
