@@ -170,21 +170,18 @@ class GestoreGuida extends ChangeNotifier {
     return batteria;
   }
 
-  /// L'autonomia adesso: quella dell'auto se la dice (Home Assistant,
-  /// Android Auto, OBD) ed è recente; altrimenti la batteria di adesso diviso
-  /// il consumo del viaggio (vero, o previsto); senza viaggio la stima a 90
-  /// km/h.
+  /// L'autonomia adesso: quella dell'auto, se la dice (Home Assistant,
+  /// gdahome, Android Auto, OBD), com'è se è recente e altrimenti portata
+  /// alla batteria di adesso ([autonomiaDellAuto]); se non la dice, la
+  /// batteria di adesso diviso il consumo, quello vero o quello del viaggio
+  /// ma mai sotto il riferimento del modello; senza viaggio, la stima di
+  /// [GestoreAuto.autonomiaKm]. È la stessa sullo schermo dell'auto.
   ({double km, bool dallAuto})? get autonomiaOra {
     if (!auto.elettrica || (pronto?.termica ?? false)) return null;
     final s = auto.stato;
-    if (s != null &&
-        s.autonomiaKm != null &&
-        s.sorgente != TipoSorgente.stima &&
-        s.sorgente != TipoSorgente.manuale &&
-        _ora().difference(s.letto) < const Duration(minutes: 10)) {
-      return (km: s.autonomiaKm!, dallAuto: true);
-    }
-    final b = batteriaOra?.valore ?? s?.batteria, c = consumoKwh100;
+    final b = batteriaOra?.valore ?? s?.batteria;
+    if (autonomiaDellAuto(s, batteriaAdesso: b, ora: _ora()) case final km?) return (km: km, dallAuto: true);
+    final c = _consumoMisurato ?? _consumoDelPianoPerAutonomia;
     if (b != null && c != null && c > 5) {
       return (km: b / 100 * auto.veicolo.capacitaUtileKwh / c * 100, dallAuto: false);
     }
@@ -194,14 +191,38 @@ class GestoreGuida extends ChangeNotifier {
 
   /// Il consumo in kWh ogni 100 km: quello vero dopo qualche chilometro con i
   /// dati dell'auto, altrimenti quello previsto per il viaggio.
-  double? get consumoKwh100 {
-    final p = pronto, ora = batteriaOra;
+  double? get consumoKwh100 => _consumoMisurato ?? _consumoDelPiano;
+
+  /// Misurato sui tratti guidati con i dati dell'auto, ricariche escluse.
+  double? get _consumoMisurato {
+    final ora = batteriaOra;
+    if (pronto == null || ora == null || !ora.misurata || _kmMisurati < 3) return null;
+    return _whMisurati / _kmMisurati / 10;
+  }
+
+  double? get _consumoDelPiano {
+    final p = pronto;
     if (p == null) return null;
-    // Misurato sui tratti guidati con i dati dell'auto, ricariche escluse.
-    if (ora != null && ora.misurata && _kmMisurati >= 3) return _whMisurati / _kmMisurati / 10;
     final piano = p.viaggio.piano, totale = p.viaggio.percorso.lunghezzaM / 1000;
     if (piano == null || totale <= 0 || piano.energiaKwh <= 0) return null;
     return piano.energiaKwh / totale * 100;
+  }
+
+  /// Il consumo del piano per dire l'autonomia, ma mai sotto quello di
+  /// riferimento del modello (a 90 km/h in piano, lo stesso che usa la
+  /// schermata principale quando l'auto non dice niente).
+  ///
+  /// Il piano non conosce le partenze e le frenate: per un giro corto in
+  /// città dice 6-8 kWh/100 km, che nel traffico vero nessuna elettrica fa.
+  /// Diviso per quello, il 53% diventava 421 km. Un numero fisso andrebbe
+  /// bene per alcune auto e non per altre (nel catalogo il riferimento va da
+  /// 11 a 25 kWh/100 km): il pavimento è quello dell'auto scelta. Per dire
+  /// quanto si consuma in questo viaggio resta il piano ([consumoKwh100]).
+  double? get _consumoDelPianoPerAutonomia {
+    final piano = _consumoDelPiano;
+    if (piano == null) return null;
+    final riferimento = auto.consumoDiRiferimentoKwh100();
+    return piano < riferimento ? riferimento : piano;
   }
 
   /// Il profilo del piano al chilometro [km], fra i due punti vicini.
