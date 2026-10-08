@@ -71,12 +71,27 @@ class GestorePosizione extends ChangeNotifier {
   /// Quando è arrivata l'ultima lettura.
   DateTime? lettoAlle;
 
+  /// Quando è arrivata l'ultima lettura, anche se scartata perché troppo
+  /// imprecisa: il GPS parla, anche se fra i palazzi dice poco.
+  DateTime? _sentitoAlle;
+
   /// La velocità da mostrare: zero se il GPS tace da qualche secondo (da
   /// fermi certi telefoni non mandano più niente).
   double velocitaAdesso() {
     final t = lettoAlle;
     if (t == null || _ora().difference(t) > const Duration(seconds: 4)) return 0;
     return velocitaKmh;
+  }
+
+  /// Se il GPS tace da almeno [d], o non ha mai parlato.
+  ///
+  /// Serve a dirlo sullo schermo. Una mappa ferma e una velocità vecchia
+  /// sembrano vere: dal campo è arrivata una guida inchiodata sulla prima
+  /// manovra col tachimetro a 31 km/h, e niente diceva che la posizione non
+  /// arrivava più.
+  bool tace([Duration d = const Duration(seconds: 5)]) {
+    final t = _sentitoAlle;
+    return t == null || _ora().difference(t) >= d;
   }
 
   Segnaposto segnaposto = Segnaposto.autoBlu;
@@ -119,6 +134,7 @@ class GestorePosizione extends ChangeNotifier {
   void _nuova(Lettura l) {
     final prima = qui;
     final ora = _ora();
+    _sentitoAlle = ora;
     if (_daButtare(l, ora)) return;
     final lettaPrima = lettoAlle;
     // Molti telefoni non danno la velocità: la si ricava dallo spostamento.

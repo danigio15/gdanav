@@ -130,6 +130,60 @@ void main() {
     expect(t().oltre, isFalse);
   });
 
+  testWidgets('in guida, col GPS muto, il tachimetro va a zero e lo schermo dice «GPS assente»', (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final a = await ambiente(tester, km: 20, orologio: () => tester.binding.clock.now());
+    await tester.pumpWidget(a.app());
+    a.auto.manuale.imposta(90);
+    await tester.pump();
+    await tester.runAsync(() => a.viaggio.vaiA(const Luogo(nome: 'Nord', posizione: Punto(42.18, 12))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Avvia'));
+    await tester.pumpAndSettle();
+
+    a.posizione.avvia();
+    final punti = (a.viaggio.stato as ViaggioPronto).viaggio.percorso.punti;
+    a.posizioni.add(punti[2]);
+    a.gps.add(Lettura(punti[2], velocitaMs: 13.9));
+    await tester.pump(const Duration(milliseconds: 100));
+    Tachimetro t() => tester.widget<Tachimetro>(find.byType(Tachimetro));
+    expect(t().velocitaKmh.round(), 50);
+    expect(find.byKey(const Key('gps-assente')), findsNothing);
+
+    // Cinque secondi senza niente: la velocità vecchia non resta lì.
+    await tester.pump(const Duration(seconds: 5));
+    expect(t().velocitaKmh, 0);
+    expect(find.text('GPS assente'), findsOneWidget);
+
+    // La posizione torna, e l'avviso se ne va.
+    a.gps.add(Lettura(punti[3], velocitaMs: 13.9));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byKey(const Key('gps-assente')), findsNothing);
+    expect(t().velocitaKmh.round(), 50);
+    await tester.tap(find.text('Fine'));
+    await tester.pumpAndSettle();
+  });
+
+  test('il GPS tace finché non arriva niente, e anche una lettura scartata perché imprecisa lo fa parlare', () {
+    var adesso = DateTime(2026, 10, 8, 8);
+    final gps = StreamController<Lettura>(sync: true);
+    addTearDown(gps.close);
+    final p = GestorePosizione(archivio: Archivio(), letture: () => gps.stream, orologio: () => adesso)..avvia();
+    expect(p.tace(), isTrue);
+    gps.add(const Lettura(Punto(45, 9), precisioneM: 8));
+    expect(p.tace(), isFalse);
+    adesso = adesso.add(const Duration(seconds: 3));
+    // Fra i palazzi: la lettura si scarta (ottanta metri), ma il GPS c'è.
+    gps.add(const Lettura(Punto(45.001, 9), precisioneM: 80));
+    expect(p.lettoAlle, isNot(adesso));
+    adesso = adesso.add(const Duration(seconds: 4));
+    expect(p.tace(), isFalse);
+    adesso = adesso.add(const Duration(seconds: 1));
+    expect(p.tace(), isTrue);
+    expect(p.tace(const Duration(seconds: 10)), isFalse);
+    p.dispose();
+  });
+
   testWidgets('il bottone giallo segnala dove sei', (tester) async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
     final a = await ambiente(tester);

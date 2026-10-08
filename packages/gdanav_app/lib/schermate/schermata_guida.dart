@@ -89,7 +89,9 @@ class _SchermataGuidaState extends State<SchermataGuida> {
     });
   }
 
-  /// Ridisegna il tachimetro ogni secondo: da fermi il GPS può tacere.
+  /// Ridisegna ogni secondo il tachimetro e l'avviso del GPS: il GPS può
+  /// tacere (da fermi, o perché il flusso si è perso), e quando tace nessuno
+  /// lo dice.
   Timer? _battito;
 
   @override
@@ -192,6 +194,8 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                         },
                       ),
                     ),
+                    // Si riguarda a ogni battito: il silenzio non avvisa.
+                    if (widget.posizione.tace()) const _GpsAssente(),
                     if (_ztl?.avviso case final z?) _AvvisoZtl(avviso: z),
                     if (_avvisi?.davanti case (final s, final m)) _AvvisoSegnalazione(segnalazione: s, metri: m),
                     if (_avvisi?.passata case final s?)
@@ -209,7 +213,12 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                         builder: (context, _) => Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Tachimetro(velocitaKmh: widget.posizione.velocitaKmh, limiteKmh: g.avanzamento?.limiteKmh),
+                            // Quella di adesso: col GPS muto da qualche
+                            // secondo è zero, non l'ultima letta.
+                            Tachimetro(
+                              velocitaKmh: widget.posizione.velocitaAdesso(),
+                              limiteKmh: g.avanzamento?.limiteKmh,
+                            ),
                             const Spacer(),
                             // Mappa spostata o allontanata: si torna sull'auto.
                             if (controllo.libera)
@@ -286,6 +295,46 @@ class _SchermataGuidaState extends State<SchermataGuida> {
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// «GPS assente», sotto la manovra, finché la posizione non torna.
+///
+/// La manovra, l'arrivo e la mappa restano quelli dell'ultima posizione:
+/// senza questo sembrano veri. Piccolo, per non coprire la strada, ma col
+/// colore degli avvisi: chi guida deve capire al primo sguardo che lo
+/// schermo è fermo perché il telefono non sa dov'è.
+class _GpsAssente extends StatelessWidget {
+  const _GpsAssente();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final rosso = ColoriGdanav.di(context).guasta;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Vetro(
+          key: const Key('gps-assente'),
+          raggio: 16,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 14, 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.gps_off, color: rosso, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'GPS assente',
+                  style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800, color: rosso),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

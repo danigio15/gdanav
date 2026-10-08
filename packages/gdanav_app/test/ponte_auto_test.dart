@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/auto/ponte_auto.dart';
 import 'package:gdanav_app/stato/gestore_luoghi.dart';
 import 'package:gdanav_app/stato/gestore_meteo.dart';
+import 'package:gdanav_app/stato/gestore_posizione.dart';
 import 'package:gdanav_app/stato/gestore_viaggio.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -215,6 +216,32 @@ void main() {
     await dallAuto('voce', null);
     expect(a.guida.muto, isTrue);
     expect(ultima('opzioni'), containsPair('muto', true));
+  });
+
+  testWidgets("sull'auto, col GPS muto, il cruscotto non tiene la velocità vecchia", (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final chiamate = <MethodCall>[];
+    final messaggero = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messaggero.setMockMethodCallHandler(canale, (c) async {
+      chiamate.add(c);
+      return null;
+    });
+    addTearDown(() => messaggero.setMockMethodCallHandler(canale, null));
+    final a = await ambiente(tester, km: 20, orologio: () => tester.binding.clock.now());
+    final ponte = PonteAuto(viaggio: a.viaggio, guida: a.guida, posizione: a.posizione, auto: a.auto, canale: canale)
+      ..avvia();
+    addTearDown(ponte.ferma);
+    Object? velocita() => (chiamate.lastWhere((c) => c.method == 'cruscotto').arguments as Map)['velocita'];
+
+    a.posizione.avvia();
+    a.gps.add(const Lettura(Punto(42, 12), velocitaMs: 13.9));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect((velocita()! as double).round(), 50);
+    // Il GPS tace; il cruscotto si rimanda per altro (la batteria).
+    await tester.pump(const Duration(seconds: 5));
+    a.auto.manuale.imposta(70);
+    await tester.pump();
+    expect(velocita(), 0);
   });
 
   testWidgets('senza Android Auto si tace', (tester) async {

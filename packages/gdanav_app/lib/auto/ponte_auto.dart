@@ -708,7 +708,10 @@ class PonteAuto {
       'batteria': batteria,
       'autonomia_km': autonomia?.km,
       'autonomia_auto': autonomia?.dallAuto ?? false,
-      'velocita': posizione.velocitaKmh,
+      // Come sul telefono: col GPS muto è zero, non l'ultima letta. Il
+      // cruscotto si rimanda anche senza posizioni nuove (i dati dell'auto
+      // si rileggono ogni cinque secondi), e lì restava la velocità vecchia.
+      'velocita': posizione.velocitaAdesso(),
       'limite': guida.attiva ? a?.limiteKmh : null,
       'arrivo_batteria': p == null || !elettrica ? null : guida.batteriaArrivo,
       if (sosta != null) ...{
