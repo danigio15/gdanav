@@ -144,6 +144,20 @@ object PonteAuto {
     fun premium(context: Context): Boolean =
         context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).getBoolean("premium", false)
 
+    /**
+     * Se in auto si guida. Di solito è Premium; dentro gdahome, senza una casa
+     * abbinata, si guida base. Un'app di prima non lo dice, e allora vale
+     * Premium come sempre.
+     */
+    fun guidaInAuto(context: Context): Boolean {
+        val scritte = context.getSharedPreferences("gdanav", Context.MODE_PRIVATE)
+        return if (scritte.contains("guida_in_auto")) {
+            scritte.getBoolean("guida_in_auto", false)
+        } else {
+            scritte.getBoolean("premium", false)
+        }
+    }
+
     /** Premium si compra nell'app che ospita gdanav (gdahome), non in gdanav. */
     fun premiumOspite(context: Context): Boolean =
         context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).getBoolean("premium_ospite", false)
@@ -259,6 +273,10 @@ object PonteAuto {
                 ?.putBoolean("premium", call.argument<Boolean>("sbloccato") == true)
                 ?.putBoolean("premium_ospite", call.argument<Boolean>("ospite") == true)
                 ?.putBoolean("aggiorna", call.argument<Boolean>("aggiorna") == true)
+                ?.putBoolean(
+                    "guida_in_auto",
+                    call.argument<Boolean>("guida_in_auto") ?: (call.argument<Boolean>("sbloccato") == true),
+                )
                 ?.apply()
             "guida" -> {
                 guida = if (call.argument<Boolean>("attiva") == true) {

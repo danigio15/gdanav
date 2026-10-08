@@ -19,7 +19,7 @@ class SchermoPremium(
     /** Aperto sopra la navigazione (versione da aggiornare): chiudendolo si torna lì. */
     private val sopraLaMappa: Boolean = false,
 ) : Screen(carContext), DefaultLifecycleObserver {
-    private val controlla: () -> Unit = { if (PonteAuto.premium(carContext)) apriNavigazione() }
+    private val controlla: () -> Unit = { if (PonteAuto.guidaInAuto(carContext)) apriNavigazione() }
 
     init {
         lifecycle.addObserver(this)
@@ -47,7 +47,7 @@ class SchermoPremium(
                 .addAction(
                     Action.Builder()
                         .setTitle("Ho aggiornato")
-                        .setOnClickListener { if (PonteAuto.premium(carContext)) apriNavigazione() else invalidate() }
+                        .setOnClickListener { if (PonteAuto.guidaInAuto(carContext)) apriNavigazione() else invalidate() }
                         .build(),
                 )
                 .build()
@@ -65,7 +65,7 @@ class SchermoPremium(
             .addAction(
                 Action.Builder()
                     .setTitle("Ho sbloccato")
-                    .setOnClickListener { if (PonteAuto.premium(carContext)) apriNavigazione() else invalidate() }
+                    .setOnClickListener { if (PonteAuto.guidaInAuto(carContext)) apriNavigazione() else invalidate() }
                     .build(),
             )
         // Dentro gdahome la casa non è Premium: ci si arriva anche da qui.
