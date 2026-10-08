@@ -9,6 +9,25 @@ import '../sorgenti/sorgente_gdahome.dart';
 import '../sorgenti/sorgente_manuale.dart';
 import 'archivio.dart';
 
+/// L'autonomia che dice l'auto, se la dice da una fonte vera (non la stima,
+/// non la batteria scritta a mano), portata alla batteria di
+/// [batteriaAdesso]. `null` se l'auto non la dice.
+///
+/// Anche una lettura vecchia vale. Dal campo: dalla casa 227 km al 53%, e in
+/// guida «421 km». Home Assistant (anche attraverso gdahome) data la lettura
+/// con l'ultimo cambio dell'entità, e un'auto ferma in garage non cambia
+/// niente per ore: la lettura sembrava vecchia, e si ripiegava sul consumo del
+/// piano. Ma quanti chilometri fa con un punto di batteria l'auto lo sa meglio
+/// di qualunque stima: se la lettura ha più di dieci minuti la si porta alla
+/// batteria di adesso con quel rapporto, e resta sua.
+double? autonomiaDellAuto(StatoAuto? s, {double? batteriaAdesso, required DateTime ora}) {
+  final km = s?.autonomiaKm;
+  if (s == null || km == null || !km.isFinite) return null;
+  if (s.sorgente == TipoSorgente.stima || s.sorgente == TipoSorgente.manuale) return null;
+  if (ora.difference(s.letto) < const Duration(minutes: 10) || s.batteria <= 0) return km;
+  return km * (batteriaAdesso ?? s.batteria) / s.batteria;
+}
+
 /// Tiene accese le sorgenti dei dati dell'auto e dice all'interfaccia
 /// quale stato vale adesso, secondo lo switch «Fonte dati auto».
 class GestoreAuto extends ChangeNotifier {
@@ -285,15 +304,24 @@ class GestoreAuto extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// I chilometri che restano: quelli dell'auto se li dice, altrimenti una
-  /// stima a 90 km/h in piano con il modello di consumo.
+  /// I chilometri che restano: quelli dell'auto se li dice (vedi
+  /// [autonomiaDellAuto]), altrimenti una stima col consumo di riferimento
+  /// del modello.
   double? autonomiaKm() {
     final s = stato;
     if (s == null) return null;
-    if (s.autonomiaKm != null && s.sorgente != TipoSorgente.stima) return s.autonomiaKm;
-    final whKm = consumoMedioWhKm(const [Tratto(lunghezzaM: 1000, velocitaKmh: 90)], veicolo);
-    return s.batteria / 100 * veicolo.capacitaUtileKwh * 1000 / whKm;
+    if (autonomiaDellAuto(s, ora: _ora()) case final km?) return km;
+    return s.batteria / 100 * veicolo.capacitaUtileKwh / consumoDiRiferimentoKwh100() * 100;
   }
+
+  /// Quanto consuma il modello scelto a 90 km/h in piano, in kWh ogni 100
+  /// km: i consumi fissi sì, il clima no.
+  ///
+  /// È il riferimento dell'autonomia quando l'auto non la dice: qui, e in
+  /// guida come pavimento sotto il consumo del piano (vedi
+  /// `GestoreGuida.autonomiaOra`).
+  double consumoDiRiferimentoKwh100() =>
+      consumoMedioWhKm(const [Tratto(lunghezzaM: 1000, velocitaKmh: 90)], veicolo) / 10;
 
   /// Senza Premium lo switch non si cambia (le fonti automatiche hanno il
   /// lucchetto): resta la batteria scritta a mano, e la scelta di prima

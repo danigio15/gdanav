@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.location.Location
 import android.os.Handler
 import android.os.Looper
 import io.flutter.plugin.common.BinaryMessenger
@@ -15,7 +16,8 @@ import java.util.concurrent.CopyOnWriteArrayList
 /**
  * Quello che il telefono sa e lo schermo dell'auto mostra. L'app Flutter lo
  * aggiorna sul canale `gdanav/schermo_auto`; l'auto manda indietro batteria e
- * autonomia sul canale `gdanav/auto`, e «fine» quando si ferma la guida.
+ * autonomia sul canale `gdanav/auto`, e «fine» quando si ferma la guida e la
+ * posizione del suo GPS su quello dello schermo.
  */
 object PonteAuto {
     /** La prossima manovra e il viaggio, mentre si guida. */
@@ -438,6 +440,23 @@ object PonteAuto {
     fun contachilometriDallAuto(metri: Float) {
         ultimoOdometro = metri / 1000.0
         mandaAuto()
+    }
+
+    /**
+     * Dall'auto: la posizione del suo GPS (vedi `SessioneGdanav`). Al telefono
+     * va sul canale dello schermo, `posizione_auto`: dove, e direzione,
+     * velocità e precisione solo se l'auto le dà, perché un valore che manca
+     * non diventi uno zero (che per la direzione vorrebbe dire nord).
+     */
+    fun posizioneDallAuto(l: Location) {
+        val dati = HashMap<String, Any?>()
+        dati["lat"] = l.latitude
+        dati["lon"] = l.longitude
+        if (l.hasBearing()) dati["rotta"] = l.bearing.toDouble()
+        if (l.hasSpeed()) dati["velocita_ms"] = l.speed.toDouble()
+        if (l.hasAccuracy()) dati["precisione_m"] = l.accuracy.toDouble()
+        dati["letto_ms"] = if (l.time > 0) l.time else System.currentTimeMillis()
+        principale.post { canale?.invokeMethod("posizione_auto", dati) }
     }
 
     /** Tutto quello che l'auto ha detto finora, in una lettura sola. */

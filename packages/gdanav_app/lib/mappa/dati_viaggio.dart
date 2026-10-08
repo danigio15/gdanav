@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../stato/gestore_ztl.dart' show statoBreve;
@@ -20,6 +21,10 @@ StatoColonnina statoDi(Disponibilita d) {
 /// [scelta]), con quanto fanno guadagnare o perdere; con le [tappe] i loro
 /// numeri; con [passandoci] la strada dentro la ZTL di cui si chiede il
 /// permesso.
+///
+/// Ogni sorgente per conto suo, e la linea del percorso prima di tutto: una
+/// colonnina o una coda storte lasciano vuota la loro, non le altre. Prima
+/// un errore qualunque qui dentro lasciava la mappa senza percorso.
 Map<String, Map<String, Object?>> datiViaggio(
   Viaggio? v, {
   List<PercorsoCalcolato> scelte = const [],
@@ -39,47 +44,74 @@ Map<String, Map<String, Object?>> datiViaggio(
       sorgentePassandoci: _collezione([]),
     };
   }
-  final soste = {for (final (i, s) in (v.piano?.soste ?? const <Sosta>[]).indexed) s.colonnina.id: i + 1};
-  final linea = Linea(v.percorso.punti);
+  final strada = _linea(v.percorso.punti);
   return {
     sorgentePercorso: _collezione([
-      if (v.percorso.punti.length > 1)
-        _elemento({
-          'type': 'LineString',
-          'coordinates': [for (final p in v.percorso.punti) _xy(p)],
-        }, const {}),
+      if (strada.length > 1) _elemento({'type': 'LineString', 'coordinates': strada}, const {}),
     ]),
-    sorgenteColonnine: _collezione([
-      // Prima le colonnine comuni, poi le soste: così le soste stanno sopra.
-      for (final c in [
-        ...v.colonnine.where((c) => !soste.containsKey(c.id)),
-        ...v.colonnine.where((c) => soste.containsKey(c.id)),
-      ])
+    sorgenteColonnine: _oVuota('colonnine', () => _colonnine(v)),
+    sorgenteArrivo: _collezione([
+      if (v.percorso.punti.lastOrNull case final fine? when _scrivibile(fine))
+        _elemento({'type': 'Point', 'coordinates': _xy(fine)}, const {}),
+    ]),
+    sorgenteCode: _oVuota('code', () => datiCode(v.percorso)),
+    sorgenteAlternative: _oVuota('alternative', () => datiAlternative(scelte, scelta, eco: eco)),
+    sorgenteTappe: _oVuota(
+      'tappe',
+      () => _collezione([
+        for (final (i, t) in tappe.indexed)
+          if (_scrivibile(t.posizione))
+            _elemento({'type': 'Point', 'coordinates': _xy(t.posizione)}, {'numero': i + 1, 'nome': t.nome}),
+      ]),
+    ),
+    sorgentePassandoci: passandoci ? _oVuota('passandoci', () => datiPassandoci(v.percorso)) : _collezione([]),
+  };
+}
+
+Map<String, Object?> _colonnine(Viaggio v) {
+  final soste = {for (final (i, s) in (v.piano?.soste ?? const <Sosta>[]).indexed) s.colonnina.id: i + 1};
+  final linea = Linea(v.percorso.punti);
+  return _collezione([
+    // Prima le colonnine comuni, poi le soste: così le soste stanno sopra.
+    for (final c in [
+      ...v.colonnine.where((c) => !soste.containsKey(c.id)),
+      ...v.colonnine.where((c) => soste.containsKey(c.id)),
+    ])
+      if (c.dettaglio?.posizione ?? _lungo(linea, c.distanzaM) case final dove? when _scrivibile(dove))
         _elemento(
-          {'type': 'Point', 'coordinates': _xy(c.dettaglio?.posizione ?? _lungo(linea, c.distanzaM))},
+          {'type': 'Point', 'coordinates': _xy(dove)},
           {
             'id': c.id,
             'nome': c.nome,
-            'potenza': c.potenzaKw.round(),
+            'potenza': c.potenzaKw.isFinite ? c.potenzaKw.round() : 0,
             'stato': statoDi(c.disponibilita).name,
             'sosta': soste.containsKey(c.id),
             'numero': soste[c.id] ?? 0,
           },
         ),
-    ]),
-    sorgenteArrivo: _collezione([
-      if (v.percorso.punti.isNotEmpty)
-        _elemento({'type': 'Point', 'coordinates': _xy(v.percorso.punti.last)}, const {}),
-    ]),
-    sorgenteCode: datiCode(v.percorso),
-    sorgenteAlternative: datiAlternative(scelte, scelta, eco: eco),
-    sorgenteTappe: _collezione([
-      for (final (i, t) in tappe.indexed)
-        _elemento({'type': 'Point', 'coordinates': _xy(t.posizione)}, {'numero': i + 1, 'nome': t.nome}),
-    ]),
-    sorgentePassandoci: passandoci ? datiPassandoci(v.percorso) : _collezione([]),
-  };
+  ]);
 }
+
+/// Una sorgente che non si riesce a fare resta vuota, e le altre si fanno lo
+/// stesso.
+Map<String, Object?> _oVuota(String nome, Map<String, Object?> Function() fai) {
+  try {
+    return fai();
+  } catch (e) {
+    debugPrint('dati del viaggio, $nome: $e');
+    return _collezione([]);
+  }
+}
+
+/// Un punto che si può scrivere. Il JSON non sa cosa sia NaN: un punto solo
+/// così, e la mappa rifiutava la sorgente intera.
+bool _scrivibile(Punto p) => p.lat.isFinite && p.lon.isFinite;
+
+/// Le coordinate di una linea, senza i punti che non si possono scrivere.
+List<List<double>> _linea(Iterable<Punto> punti) => [
+  for (final p in punti)
+    if (_scrivibile(p)) _xy(p),
+];
 
 /// La strada che passerebbe dentro la ZTL di cui si chiede il permesso, con
 /// quanto si guadagnerebbe: «-3 min» dove si stacca di più dal percorso.
@@ -100,11 +132,8 @@ Map<String, Object?> datiPassandoci(PercorsoCalcolato p) {
     }
   }
   return _collezione([
-    _elemento({
-      'type': 'LineString',
-      'coordinates': [for (final q in dentro) _xy(q)],
-    }, const {}),
-    if (diff != null)
+    _elemento({'type': 'LineString', 'coordinates': _linea(dentro)}, const {}),
+    if (diff != null && _scrivibile(lontano))
       _elemento(
         {'type': 'Point', 'coordinates': _xy(lontano)},
         // Il trattino normale: il segno meno non c'è in tutti i caratteri della mappa.
@@ -170,14 +199,8 @@ Map<String, Object?> datiCode(PercorsoCalcolato p) {
   final linea = Linea(p.punti);
   return _collezione([
     for (final c in p.code)
-      if (_tratto(linea, c.daM, c.aM) case final pezzo when pezzo.length > 1)
-        _elemento(
-          {
-            'type': 'LineString',
-            'coordinates': [for (final q in pezzo) _xy(q)],
-          },
-          {'livello': c.livello},
-        ),
+      if (_linea(_tratto(linea, c.daM, c.aM)) case final pezzo when pezzo.length > 1)
+        _elemento({'type': 'LineString', 'coordinates': pezzo}, {'livello': c.livello}),
   ]);
 }
 
@@ -195,13 +218,7 @@ Map<String, Object?> datiAlternative(List<PercorsoCalcolato> scelte, int scelta,
     // Il trattino normale: il segno meno non c'è in tutti i caratteri della mappa.
     final etichetta = diff == 0 ? 'Uguale' : '${diff > 0 ? '+' : '-'}${diff.abs()} min';
     elementi.add(
-      _elemento(
-        {
-          'type': 'LineString',
-          'coordinates': [for (final q in a.punti) _xy(q)],
-        },
-        {'alternativa': i, if (i == eco) 'eco': true},
-      ),
+      _elemento({'type': 'LineString', 'coordinates': _linea(a.punti)}, {'alternativa': i, if (i == eco) 'eco': true}),
     );
     // L'etichetta dove l'alternativa è più lontana dal percorso scelto.
     var lontano = a.punti[a.punti.length ~/ 2];
@@ -213,6 +230,7 @@ Map<String, Object?> datiAlternative(List<PercorsoCalcolato> scelte, int scelta,
         lontano = a.punti[k];
       }
     }
+    if (!_scrivibile(lontano)) continue;
     elementi.add(
       _elemento(
         {'type': 'Point', 'coordinates': _xy(lontano)},
@@ -230,8 +248,9 @@ String durataBreve(Duration d) {
 }
 
 /// I punti della [l] fra [da] e [a] metri, con gli estremi interpolati.
+/// Metri che non sono numeri (una coda arrivata storta) non sono un tratto.
 List<Punto> _tratto(Linea l, double da, double a) {
-  if (a <= da) return const [];
+  if (!da.isFinite || !a.isFinite || a <= da || l.punti.isEmpty) return const [];
   Punto a0(double m) {
     for (var i = 1; i < l.punti.length; i++) {
       if (l.cumulate[i] >= m) {
@@ -400,11 +419,13 @@ int preseAdatte(Colonnina c, Set<TipoConnettore> connettori) => c.connettori.whe
   return (Punto(s, o), Punto(n, e));
 }
 
-Punto _lungo(Linea l, double metri) {
+/// Il punto del percorso a tanti metri dalla partenza; `null` se il percorso
+/// non ha punti (prima, lì, un errore portava via tutte le colonnine).
+Punto? _lungo(Linea l, double metri) {
   for (var i = 1; i < l.punti.length; i++) {
     if (l.cumulate[i] >= metri) return l.punti[i];
   }
-  return l.punti.last;
+  return l.punti.lastOrNull;
 }
 
 List<double> _xy(Punto p) => [p.lon, p.lat];

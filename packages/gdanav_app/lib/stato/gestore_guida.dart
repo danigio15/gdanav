@@ -170,21 +170,18 @@ class GestoreGuida extends ChangeNotifier {
     return batteria;
   }
 
-  /// L'autonomia adesso: quella dell'auto se la dice (Home Assistant,
-  /// Android Auto, OBD) ed è recente; altrimenti la batteria di adesso diviso
-  /// il consumo del viaggio (vero, o previsto); senza viaggio la stima a 90
-  /// km/h.
+  /// L'autonomia adesso: quella dell'auto, se la dice (Home Assistant,
+  /// gdahome, Android Auto, OBD), com'è se è recente e altrimenti portata
+  /// alla batteria di adesso ([autonomiaDellAuto]); se non la dice, la
+  /// batteria di adesso diviso il consumo, quello vero o quello del viaggio
+  /// ma mai sotto il riferimento del modello; senza viaggio, la stima di
+  /// [GestoreAuto.autonomiaKm]. È la stessa sullo schermo dell'auto.
   ({double km, bool dallAuto})? get autonomiaOra {
     if (!auto.elettrica || (pronto?.termica ?? false)) return null;
     final s = auto.stato;
-    if (s != null &&
-        s.autonomiaKm != null &&
-        s.sorgente != TipoSorgente.stima &&
-        s.sorgente != TipoSorgente.manuale &&
-        _ora().difference(s.letto) < const Duration(minutes: 10)) {
-      return (km: s.autonomiaKm!, dallAuto: true);
-    }
-    final b = batteriaOra?.valore ?? s?.batteria, c = consumoKwh100;
+    final b = batteriaOra?.valore ?? s?.batteria;
+    if (autonomiaDellAuto(s, batteriaAdesso: b, ora: _ora()) case final km?) return (km: km, dallAuto: true);
+    final c = _consumoMisurato ?? _consumoDelPianoPerAutonomia;
     if (b != null && c != null && c > 5) {
       return (km: b / 100 * auto.veicolo.capacitaUtileKwh / c * 100, dallAuto: false);
     }
@@ -194,14 +191,38 @@ class GestoreGuida extends ChangeNotifier {
 
   /// Il consumo in kWh ogni 100 km: quello vero dopo qualche chilometro con i
   /// dati dell'auto, altrimenti quello previsto per il viaggio.
-  double? get consumoKwh100 {
-    final p = pronto, ora = batteriaOra;
+  double? get consumoKwh100 => _consumoMisurato ?? _consumoDelPiano;
+
+  /// Misurato sui tratti guidati con i dati dell'auto, ricariche escluse.
+  double? get _consumoMisurato {
+    final ora = batteriaOra;
+    if (pronto == null || ora == null || !ora.misurata || _kmMisurati < 3) return null;
+    return _whMisurati / _kmMisurati / 10;
+  }
+
+  double? get _consumoDelPiano {
+    final p = pronto;
     if (p == null) return null;
-    // Misurato sui tratti guidati con i dati dell'auto, ricariche escluse.
-    if (ora != null && ora.misurata && _kmMisurati >= 3) return _whMisurati / _kmMisurati / 10;
     final piano = p.viaggio.piano, totale = p.viaggio.percorso.lunghezzaM / 1000;
     if (piano == null || totale <= 0 || piano.energiaKwh <= 0) return null;
     return piano.energiaKwh / totale * 100;
+  }
+
+  /// Il consumo del piano per dire l'autonomia, ma mai sotto quello di
+  /// riferimento del modello (a 90 km/h in piano, lo stesso che usa la
+  /// schermata principale quando l'auto non dice niente).
+  ///
+  /// Il piano non conosce le partenze e le frenate: per un giro corto in
+  /// città dice 6-8 kWh/100 km, che nel traffico vero nessuna elettrica fa.
+  /// Diviso per quello, il 53% diventava 421 km. Un numero fisso andrebbe
+  /// bene per alcune auto e non per altre (nel catalogo il riferimento va da
+  /// 11 a 25 kWh/100 km): il pavimento è quello dell'auto scelta. Per dire
+  /// quanto si consuma in questo viaggio resta il piano ([consumoKwh100]).
+  double? get _consumoDelPianoPerAutonomia {
+    final piano = _consumoDelPiano;
+    if (piano == null) return null;
+    final riferimento = auto.consumoDiRiferimentoKwh100();
+    return piano < riferimento ? riferimento : piano;
   }
 
   /// Il profilo del piano al chilometro [km], fra i due punti vicini.
@@ -237,6 +258,9 @@ class GestoreGuida extends ChangeNotifier {
     _partitoAlle = _ora();
     _vicinoDetto = false;
     _guida = Guida(p.viaggio.percorso);
+    // L'avanzamento rimasto è del viaggio di prima: fino alla prima posizione
+    // la guida nuova non ne ha, e lo schermo e la mappa devono saperlo.
+    avanzamento = null;
     // Partiti: i ricalcoli partono da dove si è, non dalle strade proposte.
     viaggio.dimenticaScelte();
     // Un viaggio nuovo: le strade rifiutate nell'altro si possono riproporre,
@@ -248,7 +272,9 @@ class GestoreGuida extends ChangeNotifier {
     _whMisurati = 0;
     _nuovoPiano(p);
     auto.addListener(_datiAuto);
-    _iscrizione = posizioni().listen(_posizione);
+    // Un errore del GPS non deve finire nel vuoto né chiudere la guida: la
+    // posizione dopo arriva lo stesso.
+    _iscrizione = posizioni().listen(_posizione, onError: (Object e) => debugPrint('posizioni in guida: $e'));
     _ultimaRichiestaDati = DateTime(0);
     _forseChiediDati();
     _evento('partenza');
@@ -387,13 +413,25 @@ class GestoreGuida extends ChangeNotifier {
     ricalcolando = true;
     _ultimoRicalcolo = _ora();
     notifyListeners();
-    if (!muto) unawaited(voce.parla('Passo da ${l.nome}, poi proseguo.'));
-    await viaggio.pianifica(d);
-    ricalcolando = false;
-    if (pronto case final p?) {
-      _guida = Guida(p.viaggio.percorso);
-      _nuovoPiano(p);
+    try {
+      if (!muto) unawaited(voce.parla('Passo da ${l.nome}, poi proseguo.'));
+      await viaggio.pianifica(d);
+      if (pronto case final p?) {
+        _guida = Guida(p.viaggio.percorso);
+        _nuovoPiano(p);
+      }
+    } catch (e) {
+      debugPrint('passa da ${l.nome}: $e');
+    } finally {
+      _finitoIlRicalcolo();
     }
+  }
+
+  /// Comunque sia andato il ricalcolo. Rimasto acceso dopo un errore,
+  /// «ricalcolando» spegneva i ricalcoli dopo per tutto il viaggio: fuori
+  /// strada, la guida non ne faceva più nessuno.
+  void _finitoIlRicalcolo() {
+    ricalcolando = false;
     notifyListeners();
   }
 
@@ -467,20 +505,26 @@ class GestoreGuida extends ChangeNotifier {
     ricalcolando = true;
     _ultimoRicalcolo = _ora();
     notifyListeners();
-    if (!muto) {
-      unawaited(
-        voce.parla(pr.motivo == MotivoProposta.rapida ? 'Prendo la strada più rapida.' : 'Prendo la strada a risparmio.'),
-      );
+    try {
+      if (!muto) {
+        unawaited(
+          voce.parla(
+            pr.motivo == MotivoProposta.rapida ? 'Prendo la strada più rapida.' : 'Prendo la strada a risparmio.',
+          ),
+        );
+      }
+      // Le ZTL restano quelle di prima: la strada nuova le gira al largo uguale.
+      final z = p.viaggio.percorso.ztl;
+      await viaggio.seguiStrada(z == null ? pr.percorso : pr.percorso.conZtl(z.senzaDomanda()));
+      if (pronto case final nuovo?) {
+        _guida = Guida(nuovo.viaggio.percorso);
+        _nuovoPiano(nuovo);
+      }
+    } catch (e) {
+      debugPrint('strada proposta: $e');
+    } finally {
+      _finitoIlRicalcolo();
     }
-    // Le ZTL restano quelle di prima: la strada nuova le gira al largo uguale.
-    final z = p.viaggio.percorso.ztl;
-    await viaggio.seguiStrada(z == null ? pr.percorso : pr.percorso.conZtl(z.senzaDomanda()));
-    ricalcolando = false;
-    if (pronto case final nuovo?) {
-      _guida = Guida(nuovo.viaggio.percorso);
-      _nuovoPiano(nuovo);
-    }
-    notifyListeners();
   }
 
   /// «Resto qui»: quella strada non si ripropone.
@@ -504,27 +548,35 @@ class GestoreGuida extends ChangeNotifier {
     risparmio?.lascia();
     ricalcolando = true;
     _ultimoRicalcolo = _ora();
-    final prima = pronto?.viaggio.piano?.soste.map((s) => s.colonnina.id).toList();
-    // Le soste scelte già passate non valgono più: si riparte da qui.
-    final fatti = avanzamento?.percorsiM ?? 0;
-    for (final c in pronto?.viaggio.colonnine ?? const <ColonninaSulPercorso>[]) {
-      if (c.distanzaM <= fatti) viaggio.obbligate.remove(c.id);
-    }
-    // Le tappe e il distributore già passati non si ripetono.
-    if (_ultimaPosizione case final q?) viaggio.tappeFatte(q, fattiM: fatti);
-    notifyListeners();
-    if (!perConsumo && !muto) unawaited(voce.parla('Ricalcolo il percorso.'));
-    await viaggio.pianifica(d);
-    ricalcolando = false;
-    if (pronto case final p?) {
-      _guida = Guida(p.viaggio.percorso);
-      _nuovoPiano(p);
-      final dopo = p.viaggio.piano?.soste.map((s) => s.colonnina.id).toList();
-      if (perConsumo && !detto && !listEquals(prima, dopo) && !muto) {
-        unawaited(voce.parla('Ho aggiornato le soste in base al consumo reale.'));
+    try {
+      final prima = pronto?.viaggio.piano?.soste.map((s) => s.colonnina.id).toList();
+      // Le soste scelte già passate non valgono più: si riparte da qui.
+      final fatti = avanzamento?.percorsiM ?? 0;
+      for (final c in pronto?.viaggio.colonnine ?? const <ColonninaSulPercorso>[]) {
+        if (c.distanzaM <= fatti) viaggio.obbligate.remove(c.id);
       }
+      // Le tappe e il distributore già passati non si ripetono.
+      if (_ultimaPosizione case final q?) viaggio.tappeFatte(q, fattiM: fatti);
+      notifyListeners();
+      if (!perConsumo && !muto) unawaited(voce.parla('Ricalcolo il percorso.'));
+      // Gli errori del calcolo li tiene pianifica; qui arriva quello che le
+      // scappa prima (l'archivio, la posizione che non risponde). La guida
+      // resta sul percorso di prima, e la prossima posizione fuori strada
+      // riprova.
+      await viaggio.pianifica(d);
+      if (pronto case final p?) {
+        _guida = Guida(p.viaggio.percorso);
+        _nuovoPiano(p);
+        final dopo = p.viaggio.piano?.soste.map((s) => s.colonnina.id).toList();
+        if (perConsumo && !detto && !listEquals(prima, dopo) && !muto) {
+          unawaited(voce.parla('Ho aggiornato le soste in base al consumo reale.'));
+        }
+      }
+    } catch (e) {
+      debugPrint('ricalcolo: $e');
+    } finally {
+      _finitoIlRicalcolo();
     }
-    notifyListeners();
   }
 
   /// A Home Assistant, se abbinato: dove si va, quando si arriva, con quanta

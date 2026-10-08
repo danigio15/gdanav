@@ -169,6 +169,8 @@ Future<GdanavApp> preparaGdanav({
       vicini: vicini,
       prova: prova,
       ztl: ztl,
+      // Il GPS dell'auto, quando lo passa: davanti a quello del telefono.
+      gpsDellAuto: gpsDellAuto,
     )..avvia();
     // Una versione da aggiornare spegne anche l'auto: lì si dice di
     // aggiornare gdanav sul telefono.

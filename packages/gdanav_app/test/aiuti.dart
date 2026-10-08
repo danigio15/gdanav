@@ -151,6 +151,11 @@ class Ambiente {
   );
 }
 
+/// [orologio] è quello del segnaposto e del tachimetro: le prove che
+/// guardano il GPS tacere gli passano quello finto della prova
+/// (`tester.binding.clock.now`), che va avanti con `pump`. [dove] è dove si
+/// è quando si calcola il viaggio, per le prove che lo vogliono diverso da
+/// [posizione]: un GPS che una volta non risponde, per esempio.
 Future<Ambiente> ambiente(
   WidgetTester tester, {
   int km = 500,
@@ -161,6 +166,8 @@ Future<Ambiente> ambiente(
   GestoreZtl? ztl,
   CercaStrade? strade,
   Duration durataProposta = const Duration(seconds: 20),
+  DateTime Function()? orologio,
+  Future<Punto?> Function()? dove,
 }) async {
   // Uno schermo da telefono, non gli 800×600 delle prove.
   tester.view.physicalSize = const Size(1170, 2532);
@@ -176,7 +183,7 @@ Future<Ambiente> ambiente(
     archivio: archivio,
     auto: auto,
     consumo: consumo,
-    posizione: () async => posizione,
+    posizione: dove ?? () async => posizione,
     costruisci: costruisci ?? pianificatoreFinto(km),
     luoghi: LuoghiFinti(),
     ztl: ztl,
@@ -205,6 +212,7 @@ Future<Ambiente> ambiente(
   final segnaposto = GestorePosizione(
     archivio: archivio,
     letture: prova?.letture(() => gps.stream) ?? () => gps.stream,
+    orologio: orologio,
   );
   await tester.runAsync(segnaposto.carica);
   addTearDown(segnaposto.dispose);

@@ -5,8 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/auto/ponte_auto.dart';
 import 'package:gdanav_app/stato/gestore_luoghi.dart';
 import 'package:gdanav_app/stato/gestore_meteo.dart';
+import 'package:gdanav_app/stato/gestore_posizione.dart';
 import 'package:gdanav_app/stato/gestore_viaggio.dart';
 import 'package:gdanav_core/gdanav_core.dart';
+import 'package:geolocator/geolocator.dart' show Position;
 
 import 'aiuti.dart';
 
@@ -215,6 +217,74 @@ void main() {
     await dallAuto('voce', null);
     expect(a.guida.muto, isTrue);
     expect(ultima('opzioni'), containsPair('muto', true));
+  });
+
+  testWidgets("sull'auto, col GPS muto, il cruscotto non tiene la velocità vecchia", (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final chiamate = <MethodCall>[];
+    final messaggero = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messaggero.setMockMethodCallHandler(canale, (c) async {
+      chiamate.add(c);
+      return null;
+    });
+    addTearDown(() => messaggero.setMockMethodCallHandler(canale, null));
+    final a = await ambiente(tester, km: 20, orologio: () => tester.binding.clock.now());
+    final ponte = PonteAuto(viaggio: a.viaggio, guida: a.guida, posizione: a.posizione, auto: a.auto, canale: canale)
+      ..avvia();
+    addTearDown(ponte.ferma);
+    Object? velocita() => (chiamate.lastWhere((c) => c.method == 'cruscotto').arguments as Map)['velocita'];
+
+    a.posizione.avvia();
+    a.gps.add(const Lettura(Punto(42, 12), velocitaMs: 13.9));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect((velocita()! as double).round(), 50);
+    // Il GPS tace; il cruscotto si rimanda per altro (la batteria).
+    await tester.pump(const Duration(seconds: 5));
+    a.auto.manuale.imposta(70);
+    await tester.pump();
+    expect(velocita(), 0);
+  });
+
+  testWidgets("il GPS dell'auto arriva sul canale dello schermo e va nel flusso del GPS", (tester) async {
+    preparaPiattaforma();
+    final messaggero = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messaggero.setMockMethodCallHandler(canale, (_) async => null);
+    addTearDown(() => messaggero.setMockMethodCallHandler(canale, null));
+    final a = await ambiente(tester);
+    final arrivate = <Position>[];
+    final ponte = PonteAuto(
+      viaggio: a.viaggio,
+      guida: a.guida,
+      posizione: a.posizione,
+      canale: canale,
+      gpsDellAuto: arrivate.add,
+    )..avvia();
+    addTearDown(ponte.ferma);
+    Future<void> dallAuto(Map<String, Object?> dati) async {
+      await tester.runAsync(
+        () => messaggero.handlePlatformMessage(
+          'gdanav/schermo_auto',
+          const StandardMethodCodec().encodeMethodCall(MethodCall('posizione_auto', dati)),
+          (_) {},
+        ),
+      );
+      await tester.pump();
+    }
+
+    await dallAuto({'lat': 45.1, 'lon': 9.2, 'rotta': 0.0, 'velocita_ms': 13.9, 'precisione_m': 4.0, 'letto_ms': 1000});
+    final p = arrivate.single;
+    expect((p.latitude, p.longitude), (45.1, 9.2));
+    // Nord, ma l'ha detto l'auto: è una direzione.
+    expect(rottaDaFidarsi(p.heading, p.headingAccuracy), 0);
+    expect(p.speed, 13.9);
+    expect(p.accuracy, 4);
+    expect(p.timestamp, DateTime.fromMillisecondsSinceEpoch(1000));
+    // Senza direzione non diventa nord; senza dove non arriva niente.
+    await dallAuto({'lat': 45.2, 'lon': 9.2});
+    expect(rottaDaFidarsi(arrivate.last.heading, arrivate.last.headingAccuracy), isNull);
+    expect(arrivate.last.speed, 0);
+    await dallAuto({'lon': 9.2});
+    expect(arrivate, hasLength(2));
   });
 
   testWidgets('senza Android Auto si tace', (tester) async {
