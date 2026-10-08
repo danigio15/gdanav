@@ -237,6 +237,9 @@ class GestoreGuida extends ChangeNotifier {
     _partitoAlle = _ora();
     _vicinoDetto = false;
     _guida = Guida(p.viaggio.percorso);
+    // L'avanzamento rimasto è del viaggio di prima: fino alla prima posizione
+    // la guida nuova non ne ha, e lo schermo e la mappa devono saperlo.
+    avanzamento = null;
     // Partiti: i ricalcoli partono da dove si è, non dalle strade proposte.
     viaggio.dimenticaScelte();
     // Un viaggio nuovo: le strade rifiutate nell'altro si possono riproporre,
@@ -248,7 +251,9 @@ class GestoreGuida extends ChangeNotifier {
     _whMisurati = 0;
     _nuovoPiano(p);
     auto.addListener(_datiAuto);
-    _iscrizione = posizioni().listen(_posizione);
+    // Un errore del GPS non deve finire nel vuoto né chiudere la guida: la
+    // posizione dopo arriva lo stesso.
+    _iscrizione = posizioni().listen(_posizione, onError: (Object e) => debugPrint('posizioni in guida: $e'));
     _ultimaRichiestaDati = DateTime(0);
     _forseChiediDati();
     _evento('partenza');
@@ -387,13 +392,25 @@ class GestoreGuida extends ChangeNotifier {
     ricalcolando = true;
     _ultimoRicalcolo = _ora();
     notifyListeners();
-    if (!muto) unawaited(voce.parla('Passo da ${l.nome}, poi proseguo.'));
-    await viaggio.pianifica(d);
-    ricalcolando = false;
-    if (pronto case final p?) {
-      _guida = Guida(p.viaggio.percorso);
-      _nuovoPiano(p);
+    try {
+      if (!muto) unawaited(voce.parla('Passo da ${l.nome}, poi proseguo.'));
+      await viaggio.pianifica(d);
+      if (pronto case final p?) {
+        _guida = Guida(p.viaggio.percorso);
+        _nuovoPiano(p);
+      }
+    } catch (e) {
+      debugPrint('passa da ${l.nome}: $e');
+    } finally {
+      _finitoIlRicalcolo();
     }
+  }
+
+  /// Comunque sia andato il ricalcolo. Rimasto acceso dopo un errore,
+  /// «ricalcolando» spegneva i ricalcoli dopo per tutto il viaggio: fuori
+  /// strada, la guida non ne faceva più nessuno.
+  void _finitoIlRicalcolo() {
+    ricalcolando = false;
     notifyListeners();
   }
 
@@ -467,20 +484,26 @@ class GestoreGuida extends ChangeNotifier {
     ricalcolando = true;
     _ultimoRicalcolo = _ora();
     notifyListeners();
-    if (!muto) {
-      unawaited(
-        voce.parla(pr.motivo == MotivoProposta.rapida ? 'Prendo la strada più rapida.' : 'Prendo la strada a risparmio.'),
-      );
+    try {
+      if (!muto) {
+        unawaited(
+          voce.parla(
+            pr.motivo == MotivoProposta.rapida ? 'Prendo la strada più rapida.' : 'Prendo la strada a risparmio.',
+          ),
+        );
+      }
+      // Le ZTL restano quelle di prima: la strada nuova le gira al largo uguale.
+      final z = p.viaggio.percorso.ztl;
+      await viaggio.seguiStrada(z == null ? pr.percorso : pr.percorso.conZtl(z.senzaDomanda()));
+      if (pronto case final nuovo?) {
+        _guida = Guida(nuovo.viaggio.percorso);
+        _nuovoPiano(nuovo);
+      }
+    } catch (e) {
+      debugPrint('strada proposta: $e');
+    } finally {
+      _finitoIlRicalcolo();
     }
-    // Le ZTL restano quelle di prima: la strada nuova le gira al largo uguale.
-    final z = p.viaggio.percorso.ztl;
-    await viaggio.seguiStrada(z == null ? pr.percorso : pr.percorso.conZtl(z.senzaDomanda()));
-    ricalcolando = false;
-    if (pronto case final nuovo?) {
-      _guida = Guida(nuovo.viaggio.percorso);
-      _nuovoPiano(nuovo);
-    }
-    notifyListeners();
   }
 
   /// «Resto qui»: quella strada non si ripropone.
@@ -504,27 +527,35 @@ class GestoreGuida extends ChangeNotifier {
     risparmio?.lascia();
     ricalcolando = true;
     _ultimoRicalcolo = _ora();
-    final prima = pronto?.viaggio.piano?.soste.map((s) => s.colonnina.id).toList();
-    // Le soste scelte già passate non valgono più: si riparte da qui.
-    final fatti = avanzamento?.percorsiM ?? 0;
-    for (final c in pronto?.viaggio.colonnine ?? const <ColonninaSulPercorso>[]) {
-      if (c.distanzaM <= fatti) viaggio.obbligate.remove(c.id);
-    }
-    // Le tappe e il distributore già passati non si ripetono.
-    if (_ultimaPosizione case final q?) viaggio.tappeFatte(q, fattiM: fatti);
-    notifyListeners();
-    if (!perConsumo && !muto) unawaited(voce.parla('Ricalcolo il percorso.'));
-    await viaggio.pianifica(d);
-    ricalcolando = false;
-    if (pronto case final p?) {
-      _guida = Guida(p.viaggio.percorso);
-      _nuovoPiano(p);
-      final dopo = p.viaggio.piano?.soste.map((s) => s.colonnina.id).toList();
-      if (perConsumo && !detto && !listEquals(prima, dopo) && !muto) {
-        unawaited(voce.parla('Ho aggiornato le soste in base al consumo reale.'));
+    try {
+      final prima = pronto?.viaggio.piano?.soste.map((s) => s.colonnina.id).toList();
+      // Le soste scelte già passate non valgono più: si riparte da qui.
+      final fatti = avanzamento?.percorsiM ?? 0;
+      for (final c in pronto?.viaggio.colonnine ?? const <ColonninaSulPercorso>[]) {
+        if (c.distanzaM <= fatti) viaggio.obbligate.remove(c.id);
       }
+      // Le tappe e il distributore già passati non si ripetono.
+      if (_ultimaPosizione case final q?) viaggio.tappeFatte(q, fattiM: fatti);
+      notifyListeners();
+      if (!perConsumo && !muto) unawaited(voce.parla('Ricalcolo il percorso.'));
+      // Gli errori del calcolo li tiene pianifica; qui arriva quello che le
+      // scappa prima (l'archivio, la posizione che non risponde). La guida
+      // resta sul percorso di prima, e la prossima posizione fuori strada
+      // riprova.
+      await viaggio.pianifica(d);
+      if (pronto case final p?) {
+        _guida = Guida(p.viaggio.percorso);
+        _nuovoPiano(p);
+        final dopo = p.viaggio.piano?.soste.map((s) => s.colonnina.id).toList();
+        if (perConsumo && !detto && !listEquals(prima, dopo) && !muto) {
+          unawaited(voce.parla('Ho aggiornato le soste in base al consumo reale.'));
+        }
+      }
+    } catch (e) {
+      debugPrint('ricalcolo: $e');
+    } finally {
+      _finitoIlRicalcolo();
     }
-    notifyListeners();
   }
 
   /// A Home Assistant, se abbinato: dove si va, quando si arriva, con quanta
