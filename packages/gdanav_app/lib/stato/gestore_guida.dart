@@ -370,8 +370,57 @@ class GestoreGuida extends ChangeNotifier {
   /// Dove si è, anche fuori dal percorso (lì il segnaposto non si aggancia).
   Punto? get ultimaPosizione => _ultimaPosizione;
 
+  /* ─── L'auto dov'è adesso, non dov'era ────────────────────────────────────
+   *
+   * Il GPS dice dov'era l'auto quando l'ha letta. Fra quella lettura e il
+   * disegno passano centinaia di millisecondi, e la telecamera ci metteva un
+   * altro secondo ad arrivarci: a novanta all'ora il segnaposto stava trenta,
+   * quaranta metri dietro, e le svolte arrivavano prima della freccia. Sulla
+   * strada però si sa dove si va: il punto agganciato si porta avanti lungo
+   * il percorso di velocità × (età della lettura + [anticipo]). Con prudenza:
+   * solo agganciati, solo andando (sopra 1,5 m/s), mai più di
+   * [avantiAlPiuM]. Fuori dalla strada resta il punto del GPS, com'è. */
+
+  /// Quanto si guarda avanti oltre l'età della lettura: il tempo che la
+  /// mappa ci mette a disegnare.
+  static const anticipo = Duration(milliseconds: 300);
+
+  /// Mai più avanti di così: un GPS che tace non deve far correre l'auto da
+  /// sola lungo la strada.
+  static const avantiAlPiuM = 60.0;
+
+  /// Cresce a ogni posizione: chi segue l'auto (la telecamera) si muove una
+  /// volta per posizione, non a ogni novità della guida.
+  int get letture => _letture;
+  var _letture = 0;
+  DateTime? _lettaAlle;
+  double? _velocitaMs;
+
+  /// Dove disegnare l'auto adesso e la direzione della strada lì; `null`
+  /// se non si è agganciati alla strada (si disegna il punto del GPS).
+  ({Punto punto, double rotta})? posizioneStimata() {
+    final a = avanzamento, g = _guida, sulla = a?.posizioneSulPercorso, rotta = a?.rotta;
+    if (a == null || g == null || sulla == null || rotta == null) return null;
+    final v = _velocitaMs, alle = _lettaAlle;
+    if (v == null || alle == null || v < 1.5) return (punto: sulla, rotta: rotta);
+    var eta = _ora().difference(alle);
+    if (eta.isNegative) eta = Duration.zero;
+    if (eta > const Duration(seconds: 2)) eta = const Duration(seconds: 2);
+    final metri = v * (eta + anticipo).inMilliseconds / 1000;
+    return g.avanti(a.percorsiM, metri > avantiAlPiuM ? avantiAlPiuM : metri);
+  }
+
   Future<void> _posizione(Punto qui) async {
     _ultimaPosizione = qui;
+    _letture++;
+    final ora = _ora();
+    // L'ora della lettura del GPS, se è credibile; altrimenti adesso.
+    final letta = qui is PuntoInMoto ? qui.alle : null;
+    _lettaAlle = letta != null && !letta.isAfter(ora) && ora.difference(letta) < const Duration(seconds: 5)
+        ? letta
+        : ora;
+    final kmh = auto.velocitaAuto();
+    _velocitaMs = kmh != null ? kmh / 3.6 : (qui is PuntoInMoto ? qui.velocitaMs : null);
     _forseChiediDati();
     final g = _guida;
     if (g == null || !attiva) return;

@@ -110,13 +110,22 @@ void main() {
     expect((a.viaggio.stato as ViaggioPronto).viaggio.piano!.soste, isEmpty);
   });
 
-  testWidgets('il bottone 3D inclina la mappa e diventa 2D', (tester) async {
+  testWidgets('la mappa parte in 3D; il bottone la mette in 2D, e la scelta si ricorda', (tester) async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
     final a = await ambiente(tester);
     await tester.pumpWidget(a.app());
-    expect(find.text('3D'), findsOneWidget);
-    await tester.tap(find.text('3D'));
     await tester.pumpAndSettle();
+    // Il bottone dice dove si va: in 3D propone il 2D.
     expect(find.text('2D'), findsOneWidget);
+    await tester.tap(find.text('2D'));
+    await tester.pumpAndSettle();
+    expect(find.text('3D'), findsOneWidget);
+    expect(await tester.runAsync(a.archivio.vistaInclinata), isFalse);
+
+    // Riaperta l'app, la mappa è ancora in 2D.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(a.app());
+    await tester.pumpAndSettle();
+    expect(find.text('3D'), findsOneWidget);
   });
 }

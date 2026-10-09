@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -134,7 +135,8 @@ class SchermataPrincipale extends StatefulWidget {
 }
 
 class _SchermataPrincipaleState extends State<SchermataPrincipale> {
-  final controllo = ControlloMappa();
+  /// 2D o 3D si ricorda: in 3D la mappa ti segue anche senza una meta.
+  late final controllo = ControlloMappa(salvaInclinazione: widget.archivio.salvaVistaInclinata);
   PreferenzeRicarica _preferenze = const PreferenzeRicarica();
   late final GestoreLuoghi luoghi = widget.luoghi ?? (GestoreLuoghi(widget.archivio)..carica());
   late final GestoreSegnalazioni segnalazioni = widget.segnalazioni ?? GestoreSegnalazioni(posizione: widget.posizione);
@@ -144,6 +146,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   @override
   void initState() {
     super.initState();
+    unawaited(controllo.carica(widget.archivio.vistaInclinata()));
     _ricaricaPreferenze();
     widget.chiediPosizione?.call().then((ok) {
       if (ok) widget.posizione.avvia();

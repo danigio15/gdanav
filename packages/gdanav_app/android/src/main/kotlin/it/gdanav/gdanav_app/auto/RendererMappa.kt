@@ -429,8 +429,8 @@ class RendererMappa(
             immaginiCaricate = immagini.size
             for ((nome, bitmap) in immagini) s.addImage(nome, bitmap)
         }
-        val guida = PonteAuto.guida != null
-        val inclinata = guida && tridimensionale
+        // In 3D anche senza guida: la vista scelta è una, guidando o no.
+        val inclinata = tridimensionale
         if (inclinata != inclinataOra) {
             inclinataOra = inclinata
             s.getLayer("edifici")?.setProperties(PropertyFactory.visibility(if (inclinata) Property.NONE else Property.VISIBLE))
@@ -464,11 +464,16 @@ class RendererMappa(
             return
         }
         val guida = PonteAuto.guida != null
-        val inclinata = guida && tridimensionale
-        // L'auto al centro dell'area libera; in guida più in basso, per
-        // vedere la strada davanti.
+        /* Il 3D anche senza una meta, come sul telefono: prima la vista 3D
+         * valeva solo in guida, e fuori la mappa tornava piatta e col nord in
+         * su qualunque cosa si fosse scelto. Adesso la mappa segue l'auto girata come va (la rotta che il
+         * telefono manda anche fuori guida) e inclinata; lo zoom resta quello
+         * scelto coi tasti per la mappa senza guida. */
+        val inclinata = tridimensionale
+        // L'auto al centro dell'area libera; in guida, o in 3D, più in basso,
+        // per vedere la strada davanti.
         val a = areaVisibile ?: Rect(0, 0, larghezza, altezza)
-        val sopra = if (guida) (a.height() * 0.3) else 0.0
+        val sopra = if (guida) (a.height() * 0.3) else if (inclinata) (a.height() * 0.2) else 0.0
         val nuovo = doubleArrayOf(
             qui[0], qui[1],
             if (inclinata) PonteAuto.rotta else 0.0,

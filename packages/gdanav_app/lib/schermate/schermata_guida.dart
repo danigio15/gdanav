@@ -58,7 +58,8 @@ class SchermataGuida extends StatefulWidget {
 }
 
 class _SchermataGuidaState extends State<SchermataGuida> {
-  final controllo = ControlloMappa()..inclinata = true;
+  /// La stessa scelta 2D/3D della mappa senza guida, ricordata.
+  late final controllo = ControlloMappa(salvaInclinazione: widget.guida.archivio?.salvaVistaInclinata);
 
   /// Le segnalazioni lungo la strada, condivise con lo schermo dell'auto.
   AvvisiStrada? _avvisi;
@@ -101,6 +102,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
     _battito = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
+    if (widget.guida.archivio case final a?) unawaited(controllo.carica(a.vistaInclinata()));
     widget.guida.avvia();
     if (widget.segnalazioni case final seg?) _avvisi = AvvisiStrada.di(widget.guida, seg);
     if (widget.ztl case final z?) _ztl = AvvisiZtl.di(widget.guida, z);

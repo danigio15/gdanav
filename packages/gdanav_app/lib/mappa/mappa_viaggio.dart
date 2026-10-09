@@ -130,7 +130,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     super.initState();
     widget.gestore.addListener(_ridisegna);
     widget.controllo.addListener(_comandi);
-    widget.posizione.addListener(_io);
+    widget.posizione.addListener(_dallaPosizione);
     widget.guida?.addListener(_io);
     widget.segnalazioni?.addListener(_segnalazioni);
     widget.vicini?.addListener(_vicini);
@@ -151,7 +151,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
   void dispose() {
     widget.gestore.removeListener(_ridisegna);
     widget.controllo.removeListener(_comandi);
-    widget.posizione.removeListener(_io);
+    widget.posizione.removeListener(_dallaPosizione);
     widget.guida?.removeListener(_io);
     widget.segnalazioni?.removeListener(_segnalazioni);
     widget.vicini?.removeListener(_vicini);
@@ -239,12 +239,19 @@ class _MappaViaggioState extends State<MappaViaggio> {
       _inclinata = widget.controllo.inclinata;
       await _edifici(m);
       await m.animateCamera(CameraUpdate.tiltTo(_inclinata ? _inclinazione : 0));
+      // Tornati in 2D fuori dalla guida: il nord di nuovo in su, come prima
+      // che la mappa girasse dietro a chi guida.
+      if (!_inclinata && widget.guida == null) await m.animateCamera(CameraUpdate.bearingTo(0));
+      _seguita = null;
     }
-    // In guida, tornati a seguire l'auto: subito, senza aspettare il GPS.
+    // Tornati a seguire l'auto: subito, senza aspettare il GPS.
+    var seguita = false;
     if (widget.controllo.libera != _libera) {
       _libera = widget.controllo.libera;
       if (!_libera) {
+        seguita = true;
         _ultimaCamera = DateTime(0);
+        _seguita = null;
         // Anche la strada intera, col GPS muto: «Riprendi» la rimette.
         _suTuttaLaStrada = null;
         await _io();
@@ -258,7 +265,14 @@ class _MappaViaggioState extends State<MappaViaggio> {
     if (widget.controllo.richiesteCentra != _centrate) {
       _centrate = widget.controllo.richiesteCentra;
       final qui = widget.posizione.qui;
-      if (qui != null) {
+      // In 3D «Dove sono» vuol dire anche «seguimi»: ci pensa chi segue.
+      if (_seguiFuoriGuida) {
+        // Era libera: ci ha appena pensato il ritorno qui sopra.
+        if (seguita) return;
+        _seguita = null;
+        _ultimaCamera = DateTime(0);
+        await _io();
+      } else if (qui != null) {
         await m.animateCamera(
           CameraUpdate.newCameraPosition(
             CameraPosition(target: LatLng(qui.lat, qui.lon), zoom: 16, tilt: _inclinata ? _inclinazione : 0),
@@ -271,15 +285,44 @@ class _MappaViaggioState extends State<MappaViaggio> {
   var _primaPosizione = true;
   DateTime _ultimaCamera = DateTime(0);
 
-  /// Il segnaposto: in guida agganciato al percorso e girato come la
-  /// strada, altrimenti dove dice il GPS.
+  /// La lettura che la telecamera ha già seguito: si muove una volta per
+  /// posizione nuova, non a ogni novità della guida o del segnaposto.
+  Object? _seguita;
+
+  /* Chi muove il segnaposto. Fuori dalla guida la posizione; in guida la
+   * guida, appena ha la sua prima posizione.
+   *
+   * Prima in guida lo muovevano tutte e due, a ogni lettura del GPS: la
+   * posizione arrivava per prima, e la telecamera partiva con l'avanzamento
+   * della lettura prima — un secondo indietro — consumando il suo turno;
+   * subito dopo la guida, con quello giusto, trovava il turno già preso. */
+  void _dallaPosizione() {
+    if (widget.guida?.avanzamento != null) return;
+    unawaited(_io());
+  }
+
+  /// Fuori dalla guida, in 3D, la mappa segue chi guida: girata come va,
+  /// inclinata, come in guida. Non mentre si guarda un viaggio da fare (la
+  /// sua strada intera), né quando la si è spostata col dito o si guarda una
+  /// persona di casa ([ControlloMappa.libera]).
+  bool get _seguiFuoriGuida =>
+      widget.guida == null &&
+      _inclinata &&
+      !widget.controllo.libera &&
+      widget.gestore.stato is! ViaggioPronto &&
+      widget.persone?.daMostrare == null;
+
+  /// Il segnaposto: in guida agganciato al percorso, portato avanti di
+  /// quanto si è andati dalla lettura ([GestoreGuida.posizioneStimata]) e
+  /// girato come la strada; altrimenti dove dice il GPS.
   Future<void> _io() async {
     final m = _mappa;
     if (m == null || !_stileCaricato) return;
     _guardiaPercorso();
     final a = widget.guida?.avanzamento;
-    final qui = a?.posizioneSulPercorso ?? widget.posizione.qui;
-    final rotta = a?.rotta ?? widget.posizione.rotta;
+    final stimata = widget.guida?.posizioneStimata();
+    final qui = stimata?.punto ?? a?.posizioneSulPercorso ?? widget.posizione.qui;
+    final rotta = stimata?.rotta ?? a?.rotta ?? widget.posizione.rotta;
     // Segnaposto e freccia per conto loro: se una sorgente non si scrive, la
     // telecamera deve muoversi lo stesso. Prima un errore qui fermava tutto,
     // e la mappa restava dov'era.
@@ -312,26 +355,55 @@ class _MappaViaggioState extends State<MappaViaggio> {
       if (a == null && widget.posizione.tace(const Duration(seconds: 10))) return _tuttaLaStrada(m, g);
       _suTuttaLaStrada = null;
       if (qui == null) return;
-      // La telecamera segue l'auto; al massimo un movimento al secondo.
-      final ora = _ora();
-      if (ora.difference(_ultimaCamera) < const Duration(milliseconds: 900)) return;
-      _ultimaCamera = ora;
-      await m.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: LatLng(qui.lat, qui.lon),
-            zoom: _inclinata ? 17 : 16,
-            tilt: _inclinata ? _inclinazione : 0,
-            // Guarda un po' avanti: in curva la manovra resta in vista.
-            bearing: a?.rottaMappa ?? rotta,
-          ),
-        ),
-        duration: const Duration(milliseconds: 900),
-      );
+      // Guarda un po' avanti: in curva la manovra resta in vista.
+      await _segui(m, g.letture, qui, zoom: _inclinata ? 17 : 16, rotta: a?.rottaMappa ?? rotta);
+    } else if (qui != null && _seguiFuoriGuida) {
+      _primaPosizione = false;
+      await _segui(m, widget.posizione.lettoAlle, qui, zoom: 16.5, rotta: rotta);
     } else if (qui != null && _primaPosizione && widget.gestore.stato is! ViaggioPronto) {
       _primaPosizione = false;
       await m.animateCamera(CameraUpdate.newLatLngZoom(LatLng(qui.lat, qui.lon), 15));
     }
+  }
+
+  /* La telecamera che segue: una volta per posizione nuova ([lettura]), con
+   * un moto lineare lungo quanto passa fra due posizioni.
+   *
+   * Prima si muoveva al più una volta ogni 900 ms, con un'animazione di 900 ms
+   * che accelera e frena: una posizione su due cadeva nel turno sbagliato e
+   * aspettava la successiva, e fra una e l'altra la mappa partiva, frenava e
+   * si fermava. Il risultato era una mappa a scatti e un secondo indietro.
+   * Lineare e lunga quanto l'intervallo, la mappa arriva quando arriva la
+   * posizione dopo, e il moto resta continuo (come sull'auto). */
+  Future<void> _segui(
+    MapLibreMapController m,
+    Object? lettura,
+    Punto qui, {
+    required double zoom,
+    required double rotta,
+  }) async {
+    if (lettura != null && lettura == _seguita) return;
+    _seguita = lettura;
+    final ora = _ora();
+    final passo = ora.difference(_ultimaCamera);
+    _ultimaCamera = ora;
+    final durata = passo > const Duration(milliseconds: 1100)
+        ? const Duration(milliseconds: 600)
+        : passo < const Duration(milliseconds: 300)
+        ? const Duration(milliseconds: 300)
+        : passo;
+    await m.easeCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: LatLng(qui.lat, qui.lon),
+          zoom: zoom,
+          tilt: _inclinata ? _inclinazione : 0,
+          bearing: _inclinata || widget.guida != null ? rotta : 0,
+        ),
+      ),
+      duration: durata,
+      interpolation: CameraAnimationInterpolation.linear,
+    );
   }
 
   /// Il viaggio di cui la telecamera mostra già tutta la strada: non la si
@@ -475,7 +547,9 @@ class _MappaViaggioState extends State<MappaViaggio> {
     _mostrate = g.richiesteMostra;
     // Mostrata una persona, il primo GPS non riporta la mappa su di te.
     _primaPosizione = false;
-    if (widget.guida != null) widget.controllo.toccata();
+    // La mappa smette di seguire: in guida torna da sola dopo un po', fuori
+    // resta sulla persona finché non si chiede «Dove sono».
+    widget.controllo.toccata(torna: widget.guida != null);
     final una = g.daMostrare;
     if (una != null) {
       await m.animateCamera(CameraUpdate.newLatLngZoom(LatLng(una.posizione.lat, una.posizione.lon), 15));
@@ -659,8 +733,16 @@ class _MappaViaggioState extends State<MappaViaggio> {
       key: ValueKey((scuro, traffico.isNotEmpty)),
       styleString: jsonEncode(stileMappa(scuro: scuro, chiaveTraffico: traffico)),
       initialCameraPosition: widget.guida != null
-          ? const CameraPosition(target: LatLng(41.9, 12.5), zoom: 17, tilt: _inclinazione)
-          : const CameraPosition(target: LatLng(41.9, 12.5), zoom: 5),
+          ? CameraPosition(
+              target: const LatLng(41.9, 12.5),
+              zoom: 17,
+              tilt: widget.controllo.inclinata ? _inclinazione : 0,
+            )
+          : CameraPosition(
+              target: const LatLng(41.9, 12.5),
+              zoom: 5,
+              tilt: widget.controllo.inclinata ? _inclinazione : 0,
+            ),
       // Il puntino di MapLibre no: il segnaposto lo disegna lo stile.
       myLocationEnabled: false,
       compassEnabled: true,
@@ -673,6 +755,10 @@ class _MappaViaggioState extends State<MappaViaggio> {
         _mappa = c;
         _stileCaricato = false;
         _ultimaCamera = DateTime(0);
+        _seguita = null;
+        // Una mappa nuova (il tema) nasce su Roma: la prima posizione ce la
+        // riporta sopra, come la prima volta.
+        _primaPosizione = true;
         _sorgentiVuote();
       },
       onStyleLoadedCallback: () {
@@ -686,6 +772,13 @@ class _MappaViaggioState extends State<MappaViaggio> {
         if (_mappa case final m?) {
           _inclinata = widget.controllo.inclinata;
           unawaited(_edifici(m).catchError((Object e) => debugPrint('mappa, edifici: $e')));
+          // Lo stile nuovo non sa dell'inclinazione: la si rimette.
+          unawaited(
+            m
+                .animateCamera(CameraUpdate.tiltTo(_inclinata ? _inclinazione : 0))
+                .then((_) {}, onError: (Object e) => debugPrint('mappa, inclinazione: $e')),
+          );
+          _seguita = null;
           _immagini(m).then((_) {
             _io();
             _segnalazioni();
@@ -701,8 +794,9 @@ class _MappaViaggioState extends State<MappaViaggio> {
       onMapClick: (p, _) => _tocco(p),
       onMapLongClick: (_, p) => widget.onPuntoScelto(p),
     );
-    // In guida un dito che muove la mappa la rende libera (zoom, spostamenti).
-    if (widget.guida == null) return mappa;
+    // Un dito che muove la mappa la rende libera (zoom, spostamenti): in
+    // guida, e fuori quando in 3D la mappa ti segue. «Dove sono», o venti
+    // secondi senza tocchi, e si torna a seguire.
     return Listener(onPointerMove: (_) => widget.controllo.toccata(), child: mappa);
   }
 }
