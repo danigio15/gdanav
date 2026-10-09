@@ -82,7 +82,8 @@ class Guida {
   Guida(
     this.percorso, {
     this.sogliaFuoriM = 35,
-    this.lettureFuori = 3,
+    this.lettureFuori = 2,
+    this.sogliaPrestoM = 25,
     this.sogliaAggancioM = 20,
     this.sogliaSgancioM = 32,
     this.sogliaControManoGradi = 75,
@@ -106,7 +107,19 @@ class Guida {
    * sotto la larghezza di un isolato. Sotto non si scende: fra i palazzi alti
    * il telefono sbaglia di quanto basta a gridare al lupo. */
   final double sogliaFuoriM;
+
+  /* Quante letture fuori di fila prima di ricalcolare. Erano tre: con una
+   * lettura al secondo, più il ricalcolo, il percorso nuovo arrivava quando
+   * si era già alla traversa dopo. Due bastano: una lettura storta da sola resta fuori, e
+   * oltre trentacinque metri il GPS non sbaglia due volte di fila. */
   final int lettureFuori;
+
+  /* Prima ancora: oltre [sogliaPrestoM] e ALLONTANANDOSI, lettura dopo
+   * lettura, mentre ci si muove davvero. Il GPS fermo fra i palazzi balla
+   * intorno alla strada, avanti e indietro; chi ha preso l'uscita sbagliata
+   * se ne va, e ogni secondo è più lontano. Due letture così e si ricalcola,
+   * senza aspettare di essere a un isolato di distanza. */
+  final double sogliaPrestoM;
 
   /* Di quanto la direzione in cui si va può discostarsi da quella della strada
    * prima di dire che non è quella strada. Settantacinque gradi: una traversa
@@ -164,6 +177,8 @@ class Guida {
 
   var _segmento = 0;
   var _fuori = 0;
+  var _siAllontana = 0;
+  double? _lontanoPrima;
   var _controMano = 0;
   var _agganciato = false;
   Punto? _precedente;
@@ -181,6 +196,7 @@ class Guida {
       nuovo,
       sogliaFuoriM: sogliaFuoriM,
       lettureFuori: lettureFuori,
+      sogliaPrestoM: sogliaPrestoM,
       sogliaControManoGradi: sogliaControManoGradi,
       lettureContromano: lettureContromano,
       movimentoCheContaM: movimentoCheContaM,
@@ -218,6 +234,7 @@ class Guida {
       _fuori++;
     }
     _guardaDoveSiVa(qui, p, passo);
+    _guardaSeCiSiAllontana(p, passo);
     _precedente = qui;
     final percorsi = p.lungoM;
     final restanti = math.max(0.0, _linea.lunghezzaM - percorsi);
@@ -244,7 +261,7 @@ class Guida {
       prossima: prossima,
       allaProssimaM: alla,
       dopo: dopo,
-      fuoriPercorso: _fuori >= lettureFuori || _controMano >= lettureContromano,
+      fuoriPercorso: _fuori >= lettureFuori || _siAllontana >= 2 || _controMano >= lettureContromano,
       arrivato: arrivato,
       posizioneSulPercorso: sulla,
       rotta: _agganciato ? _rotta(i) : null,
@@ -340,6 +357,41 @@ class Guida {
     } else {
       _controMano = 0;
     }
+  }
+
+  /// Vedi [sogliaPrestoM]: fermi (passi più corti di [movimentoCheContaM])
+  /// non si decide niente, come per la direzione.
+  void _guardaSeCiSiAllontana(Proiezione p, double? passo) {
+    final prima = _lontanoPrima;
+    _lontanoPrima = p.lontanoM;
+    if (p.lontanoM <= sogliaPrestoM) {
+      _siAllontana = 0;
+    } else if (prima != null && passo != null && passo >= movimentoCheContaM && p.lontanoM > prima + 2) {
+      _siAllontana++;
+    } else if (prima != null && p.lontanoM < prima - 2) {
+      // Si torna verso la strada: non ci si sta allontanando.
+      _siAllontana = 0;
+    }
+  }
+
+  /// Il punto [metri] più avanti di [percorsiM] lungo il percorso, con la
+  /// direzione della strada lì; mai oltre l'arrivo.
+  ///
+  /// Serve a chi disegna: il GPS dice dov'era l'auto quando l'ha letta, e
+  /// fra quella lettura e il disegno passano centinaia di millisecondi — a
+  /// novanta all'ora una trentina di metri. Sulla strada si sa dove si va,
+  /// e il segnaposto ci si può portare.
+  ({Punto punto, double rotta}) avanti(double percorsiM, double metri) {
+    final c = _linea.cumulate, punti = _linea.punti;
+    if (punti.length < 2) return (punto: punti.isEmpty ? const Punto(0, 0) : punti.first, rotta: 0);
+    final meta = (percorsiM + math.max(0.0, metri)).clamp(0.0, _linea.lunghezzaM);
+    var j = 1;
+    while (j < c.length - 1 && c[j] < meta) {
+      j++;
+    }
+    final f = c[j] == c[j - 1] ? 0.0 : ((meta - c[j - 1]) / (c[j] - c[j - 1])).clamp(0.0, 1.0);
+    final a = punti[j - 1], b = punti[j];
+    return (punto: Punto(a.lat + f * (b.lat - a.lat), a.lon + f * (b.lon - a.lon)), rotta: _rotta(j - 1));
   }
 
   double _rotta(int i) {

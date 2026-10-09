@@ -120,7 +120,15 @@ class ClienteTomTom {
   /// si rilegge intero.
   Uri _via(List<Punto> tappe, Map<String, List<String>> parametri) {
     final radice = indirizzo.toString().endsWith('/') ? '$indirizzo' : '$indirizzo/';
-    return Uri.parse('$radice${tappe.map(_luogo).join(':')}/json').replace(queryParameters: parametri);
+    final verso = tappe.isEmpty ? null : direzioneDiPartenza(tappe.first);
+    return Uri.parse('$radice${tappe.map(_luogo).join(':')}/json').replace(
+      queryParameters: {
+        ...parametri,
+        // Vale solo per la partenza: TomTom ci fa uscire nel verso in cui si
+        // sta già andando, e non propone un'inversione appena ricalcolato.
+        if (verso != null) 'vehicleHeading': ['$verso'],
+      },
+    );
   }
 
   /// Legge la risposta, o dice perché non si può. Se in questo secondo le

@@ -582,8 +582,18 @@ class ClienteValhalla {
     OpzioniPercorso opzioni = const OpzioniPercorso(),
   }) =>
       _calcola([
-        for (final p in tappe) {'lat': p.lat, 'lon': p.lon},
+        for (final (i, p) in tappe.indexed) _luogo(p, partenza: i == 0),
       ], lingua, opzioni);
+
+  /// Un luogo per Valhalla. La partenza, se si sa dove si sta andando, con la
+  /// direzione: il percorso nuovo parte nel verso in cui si va (vedi
+  /// [direzioneDiPartenza]).
+  static Map<String, Object?> _luogo(Punto p, {bool partenza = false}) => {
+        'lat': p.lat,
+        'lon': p.lon,
+        if (partenza)
+          if (direzioneDiPartenza(p) case final verso?) ...{'heading': verso, 'heading_tolerance': 60},
+      };
 
   Future<PercorsoCalcolato> _calcola(List<Map<String, Object?>> luoghi, String lingua, OpzioniPercorso opzioni) async {
     final corpo = _corpo(luoghi, lingua, opzioni);
@@ -603,8 +613,8 @@ class ClienteValhalla {
   }) async {
     final json = await _route({
       ..._corpo([
-        {'lat': da.lat, 'lon': da.lon},
-        {'lat': a.lat, 'lon': a.lon},
+        _luogo(da, partenza: true),
+        _luogo(a),
       ], lingua, opzioni),
       'alternates': quante,
     });

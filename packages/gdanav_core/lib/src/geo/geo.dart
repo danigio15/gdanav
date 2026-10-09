@@ -17,6 +17,36 @@ class Punto {
   String toString() => '($lat, $lon)';
 }
 
+/// Un punto del GPS con quello che il GPS sa in più: dove si va
+/// ([rotta], gradi da nord in senso orario), quanto in fretta ([velocitaMs])
+/// e quando è stato letto ([alle]).
+///
+/// È ancora un [Punto], e per chi confronta posizioni resta uguale a quello
+/// senza il resto: chi non sa che farsene della direzione non vede niente di
+/// nuovo. Chi la vuole la chiede (`if (qui case PuntoInMoto(:final rotta?))`):
+/// il percorso chiesto da qui parte nel verso in cui si sta andando, senza
+/// proporre un'inversione appena ricalcolato, e il segnaposto in guida si può
+/// portare avanti di quanto si è andati da quando il GPS l'ha letto.
+class PuntoInMoto extends Punto {
+  const PuntoInMoto(super.lat, super.lon, {this.rotta, this.velocitaMs, this.alle});
+
+  final double? rotta;
+  final double? velocitaMs;
+  final DateTime? alle;
+}
+
+/// Il verso in cui si sta andando alla partenza, in gradi interi (0–359), se
+/// [p] viene dal GPS di chi si muove; altrimenti niente. Sotto i due metri al
+/// secondo (7 km/h) la direzione del GPS è rumore, e un verso sbagliato
+/// farebbe partire il percorso dalla parte sbagliata: meglio non dirlo.
+int? direzioneDiPartenza(Punto p) {
+  if (p case PuntoInMoto(:final rotta?, :final velocitaMs) when rotta.isFinite) {
+    if (velocitaMs != null && velocitaMs < 2) return null;
+    return rotta.round() % 360;
+  }
+  return null;
+}
+
 const _raggioTerraM = 6371008.8;
 
 double _rad(double gradi) => gradi * math.pi / 180;

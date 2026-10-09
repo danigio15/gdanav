@@ -176,6 +176,19 @@ void main() {
       expect(via.queryParametersAll['sectionType'], contains('speedLimit'));
     });
 
+    test('ricalcolando in movimento, la partenza porta il verso in cui si va', () async {
+      // Senza verso TomTom può partire dalla carreggiata dall'altra parte, e
+      // il percorso appena ricalcolato comincia con un'inversione.
+      final f = finto(corsoMalta());
+      final c = ClienteTomTom('CHIAVE', client: f.client);
+      await c.calcola(const [PuntoInMoto(40.85561, 14.27407, rotta: 92.6, velocitaMs: 14), Punto(40.86395, 14.29052)]);
+      expect(f.chieste.single.url.queryParameters['vehicleHeading'], '93');
+      // Fermi, o un punto qualunque: niente verso, che sarebbe inventato.
+      await c.calcola(const [PuntoInMoto(40.85561, 14.27407, rotta: 92.6, velocitaMs: 0.4), Punto(40.86395, 14.29052)]);
+      await c.calcola(const [Punto(40.85561, 14.27407), Punto(40.86395, 14.29052)]);
+      expect(f.chieste.skip(1).map((r) => r.url.queryParameters.containsKey('vehicleHeading')), [false, false]);
+    });
+
     test('le scelte del percorso diventano gli «avoid» di TomTom', () async {
       final f = finto(corsoMalta());
       final c = ClienteTomTom('CHIAVE', client: f.client);
