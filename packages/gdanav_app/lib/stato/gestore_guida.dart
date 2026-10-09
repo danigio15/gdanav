@@ -473,7 +473,7 @@ class GestoreGuida extends ChangeNotifier {
     notifyListeners();
     try {
       if (!muto) unawaited(voce.parla('Passo da ${l.nome}, poi proseguo.'));
-      await viaggio.pianifica(d);
+      await viaggio.pianifica(d, partenza: _ultimaPosizione);
       if (pronto case final p?) {
         _guida = Guida(p.viaggio.percorso);
         _nuovoPiano(p);
@@ -573,7 +573,10 @@ class GestoreGuida extends ChangeNotifier {
       }
       // Le ZTL restano quelle di prima: la strada nuova le gira al largo uguale.
       final z = p.viaggio.percorso.ztl;
-      await viaggio.seguiStrada(z == null ? pr.percorso : pr.percorso.conZtl(z.senzaDomanda()));
+      await viaggio.seguiStrada(
+        z == null ? pr.percorso : pr.percorso.conZtl(z.senzaDomanda()),
+        partenza: _ultimaPosizione,
+      );
       if (pronto case final nuovo?) {
         _guida = Guida(nuovo.viaggio.percorso);
         _nuovoPiano(nuovo);
@@ -617,11 +620,25 @@ class GestoreGuida extends ChangeNotifier {
       if (_ultimaPosizione case final q?) viaggio.tappeFatte(q, fattiM: fatti);
       notifyListeners();
       if (!perConsumo && !muto) unawaited(voce.parla('Ricalcolo il percorso.'));
+      final qui = _ultimaPosizione;
+      final vecchio = pronto;
+      if (!perConsumo && qui != null && vecchio != null) {
+        /* Fuori strada: solo il percorso, dalla posizione che si ha già e col
+         * verso in cui si va (GestoreViaggio.ricalcolaDa). Il viaggio di prima
+         * resta sullo schermo finché non arriva il nuovo; se non arriva resta
+         * lui, e la prossima posizione fuori strada riprova. */
+        final fatto = await viaggio.ricalcolaDa(qui, fattiM: fatti, batteria: batteriaOra?.valore);
+        if (pronto case final p? when fatto && !identical(p, vecchio)) {
+          _guida = Guida(p.viaggio.percorso);
+          _nuovoPiano(p);
+        }
+        return;
+      }
       // Gli errori del calcolo li tiene pianifica; qui arriva quello che le
-      // scappa prima (l'archivio, la posizione che non risponde). La guida
-      // resta sul percorso di prima, e la prossima posizione fuori strada
-      // riprova.
-      await viaggio.pianifica(d);
+      // scappa prima (l'archivio). La guida resta sul percorso di prima, e la
+      // prossima posizione fuori strada riprova. Le soste da rifare (il
+      // consumo) vogliono il calcolo intero, ma dalla posizione che si ha.
+      await viaggio.pianifica(d, partenza: qui);
       if (pronto case final p?) {
         _guida = Guida(p.viaggio.percorso);
         _nuovoPiano(p);

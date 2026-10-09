@@ -1,4 +1,5 @@
-import 'package:flutter/services.dart';
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart' show Key;
 import 'package:gdanav_app/stato/gestore_viaggio.dart';
@@ -10,9 +11,14 @@ import 'aiuti.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  Future<Ambiente> inViaggio(WidgetTester tester, {int km = 20, Future<Punto?> Function()? dove}) async {
+  Future<Ambiente> inViaggio(
+    WidgetTester tester, {
+    int km = 20,
+    Future<Punto?> Function()? dove,
+    CostruisciPianificatore? costruisci,
+  }) async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
-    final a = await ambiente(tester, km: km, dove: dove);
+    final a = await ambiente(tester, km: km, dove: dove, costruisci: costruisci);
     await tester.pumpWidget(a.app());
     a.auto.manuale.imposta(90);
     await tester.pump();
@@ -75,18 +81,23 @@ void main() {
   testWidgets('un ricalcolo che cade non spegne i ricalcoli: alla posizione dopo fuori strada si riprova', (
     tester,
   ) async {
-    // Il GPS che una volta non risponde: pianifica non arriva a calcolare, e
-    // l'errore esce.
+    // Il server dei percorsi che una volta non risponde: il ricalcolo cade, e
+    // la guida resta sul viaggio di prima.
     var cade = false;
     final a = await inViaggio(
       tester,
-      dove: () async {
-        if (cade) {
-          cade = false;
-          throw PlatformException(code: 'gps', message: 'il GPS non risponde');
-        }
-        return const Punto(42, 12);
-      },
+      costruisci: (_, profilo, preferenze, _) => PianificatoreViaggio(
+        percorsi: (_) async {
+          if (cade) {
+            cade = false;
+            throw const ErrorePercorso('il server dei percorsi non risponde');
+          }
+          return dritta(20);
+        },
+        colonnine: ColonnineFinte(),
+        profilo: profilo,
+        preferenze: preferenze,
+      ),
     );
     await tester.tap(find.text('Avvia'));
     await tester.pumpAndSettle();
@@ -110,6 +121,53 @@ void main() {
     expect(detti(), 2);
     expect(a.guida.ricalcolando, isFalse);
     expect((a.viaggio.stato as ViaggioPronto).viaggio, isNot(same(primo)));
+  });
+
+  testWidgets('fuori strada si ricalcola da dove si è: niente GPS nuovo, e il viaggio resta sullo schermo', (
+    tester,
+  ) async {
+    var chiesteAlGps = 0;
+    final arriva = Completer<void>();
+    var inAttesa = false;
+    final tappe = <List<Punto>>[];
+    final a = await inViaggio(
+      tester,
+      dove: () async {
+        chiesteAlGps++;
+        return const Punto(42, 12);
+      },
+      costruisci: (_, profilo, preferenze, _) => PianificatoreViaggio(
+        percorsi: (t) async {
+          tappe.add(t);
+          if (inAttesa) await arriva.future;
+          return dritta(20);
+        },
+        colonnine: ColonnineFinte(),
+        profilo: profilo,
+        preferenze: preferenze,
+      ),
+    );
+    await tester.tap(find.text('Avvia'));
+    await tester.pumpAndSettle();
+    final primo = a.viaggio.stato as ViaggioPronto;
+    final gps = chiesteAlGps;
+    inAttesa = true;
+    const lontano = PuntoInMoto(42.05, 12.05, rotta: 90, velocitaMs: 14);
+    for (var i = 0; i < 2; i++) {
+      await vai(tester, a, lontano);
+    }
+    expect(a.guida.ricalcolando, isTrue);
+    // Mentre si calcola, il viaggio di prima è ancora lì: linea e scheda.
+    expect(a.viaggio.stato, same(primo));
+    arriva.complete();
+    await finisceIlRicalcolo(tester, a);
+    expect(a.viaggio.stato, isA<ViaggioPronto>());
+    expect(a.viaggio.stato, isNot(same(primo)));
+    expect(chiesteAlGps, gps, reason: 'la posizione la guida ce l\'ha già');
+    // Il percorso parte da dove si è, col verso in cui si va.
+    expect(tappe.last.first, isA<PuntoInMoto>());
+    expect((tappe.last.first as PuntoInMoto).rotta, 90);
+    await tester.runAsync(a.guida.ferma);
   });
 
   testWidgets('una guida nuova parte senza l\'avanzamento di quella prima', (tester) async {

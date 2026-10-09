@@ -467,27 +467,43 @@ class GestoreViaggio extends ChangeNotifier {
 
   /// La strada proposta in guida, e presa: il viaggio si rifà su quella da
   /// dove si è, soste comprese.
-  Future<void> seguiStrada(PercorsoCalcolato strada) async {
+  Future<void> seguiStrada(PercorsoCalcolato strada, {Punto? partenza}) async {
     final d = destinazione;
     if (d == null) return;
-    await pianifica(d, strada: strada);
+    await pianifica(d, strada: strada, partenza: partenza);
   }
 
   /// [conScelte]: si cercano anche le strade alternative (una meta nuova,
   /// opzioni cambiate); in guida no, si ricalcola e basta. [strada]: il
-  /// percorso c'è già (una strada a risparmio presa in guida).
-  Future<void> pianifica(Luogo destinazione, {bool conScelte = false, PercorsoCalcolato? strada}) async {
+  /// percorso c'è già (una strada a risparmio presa in guida). [partenza]:
+  /// dove si è, se lo si sa già (in guida): niente posizione nuova da
+  /// chiedere al GPS, che può metterci fino a dieci secondi.
+  Future<void> pianifica(
+    Luogo destinazione, {
+    bool conScelte = false,
+    PercorsoCalcolato? strada,
+    Punto? partenza,
+  }) async {
     final impostazioni = await archivio.impostazioni();
     if (impostazioni.mancante case final m?) return _imposta(ErroreViaggio(m, destinazione: destinazione));
     if (conScelte) {
       _scelte = const [];
       _scelta = 0;
     }
-    if (!auto.elettrica) return _percorsoSolo(destinazione, impostazioni, conScelte: conScelte, strada: strada);
+    if (!auto.elettrica) {
+      return _percorsoSolo(destinazione, impostazioni, conScelte: conScelte, strada: strada, partenza: partenza);
+    }
     // Le soste di ricarica sono Premium: senza, l'elettrica ha il percorso
     // come la termica (e la scheda dice che le soste sono con Premium).
     if (!GestorePremium.attivo.value) {
-      return _percorsoSolo(destinazione, impostazioni, conScelte: conScelte, senzaSoste: true, strada: strada);
+      return _percorsoSolo(
+        destinazione,
+        impostazioni,
+        conScelte: conScelte,
+        senzaSoste: true,
+        strada: strada,
+        partenza: partenza,
+      );
     }
     final batteria = auto.stato?.batteria;
     if (batteria == null) {
@@ -495,19 +511,19 @@ class GestoreViaggio extends ChangeNotifier {
         ErroreViaggio('Non so quanta batteria hai: tocca la batteria in alto e scrivila.', destinazione: destinazione),
       );
     }
-    final partenza = await posizione();
-    if (partenza == null) {
+    final da = partenza ?? await posizione();
+    if (da == null) {
       return _imposta(ErroreViaggio('Non so dove sei: attiva la posizione per gdanav.', destinazione: destinazione));
     }
-    ultimaPosizione = partenza;
-    final preferenze = await archivio.preferenze();
+    ultimaPosizione = da;
+    final preferenze = _preferenze = await archivio.preferenze();
     minimoArrivo = preferenze.minimoArrivo;
     opzioni = await archivio.opzioniPercorso();
     final calcolo = Calcolo(destinazione);
     _imposta(calcolo);
     try {
       var condizioni = consumo?.condizioni(auto.stato) ?? const Condizioni();
-      if (await stimaMeteo?.call(partenza, destinazione.posizione) case final m?) {
+      if (await stimaMeteo?.call(da, destinazione.posizione) case final m?) {
         condizioni = Condizioni.daMeteo(
           temperaturaC: m.temperaturaC,
           ventoControMs: m.ventoControMs,
@@ -517,10 +533,10 @@ class GestoreViaggio extends ChangeNotifier {
       }
       this.condizioni = condizioni;
       final pianificatore = costruisci(impostazioni, auto.veicolo, preferenze, opzioni);
-      final scelto = strada ?? await _scegli(pianificatore, partenza, destinazione, conScelte);
+      final scelto = strada ?? await _scegli(pianificatore, da, destinazione, conScelte);
       final viaggio = await pianificatore
           .pianifica(
-            partenza: partenza,
+            partenza: da,
             arrivo: destinazione.posizione,
             tappe: [for (final t in _daPassare) t.posizione],
             scelto: scelto,
@@ -569,6 +585,88 @@ class GestoreViaggio extends ChangeNotifier {
     }
   }
 
+  /* ─── Il ricalcolo in guida, fuori strada ──────────────────────────────────
+   *
+   * Uscire di strada e aspettare era la parte lenta: il ricalcolo era il
+   * calcolo di un viaggio nuovo da capo. Rileggeva le impostazioni, chiedeva
+   * al GPS una posizione nuova (fino a dieci secondi) quando la guida l'aveva
+   * appena avuta, chiedeva il meteo e, per l'elettrica, tutte le colonnine
+   * lungo la strada e il loro stato. E nel frattempo toglieva il viaggio:
+   * sulla mappa niente linea, sullo schermo «Calcolo il percorso…».
+   *
+   * Fuori strada di qualche centinaio di metri la meta è la stessa, le soste
+   * pure, e le colonnine del corridoio anche. Così qui si rifà solo il
+   * percorso, dalla posizione che si ha (con la direzione in cui si va, vedi
+   * PuntoInMoto), con le soste che restano come obbligate e le colonnine già
+   * note; il meteo resta quello di prima. Il viaggio vecchio resta sullo
+   * schermo finché non arriva il nuovo, e se il nuovo non arriva resta lui:
+   * la prossima posizione fuori strada riprova.
+   */
+
+  /// Le preferenze dell'ultimo calcolo: il ricalcolo in guida non le rilegge.
+  PreferenzeRicarica? _preferenze;
+
+  /// Il percorso nuovo da [partenza] alla stessa meta, in fretta: vedi sopra.
+  /// [fattiM]: quanto del viaggio di adesso è già fatto (le soste prima non
+  /// valgono più). [batteria]: quella di adesso, se la si sa meglio
+  /// dell'auto. `true` se il viaggio nuovo è arrivato.
+  Future<bool> ricalcolaDa(Punto partenza, {double fattiM = 0, double? batteria}) async {
+    final d = destinazione, prima = stato;
+    if (d == null || prima is! ViaggioPronto) return false;
+    final impostazioni = await archivio.impostazioni();
+    if (impostazioni.mancante != null) return false;
+    final preferenze = _preferenze ??= await archivio.preferenze();
+    final pianificatore = costruisci(impostazioni, auto.veicolo, preferenze, opzioni);
+    final tappe = [for (final t in _daPassare) t.posizione];
+    final ViaggioPronto nuovo;
+    try {
+      if (prima.soloPercorso || prima.viaggio.piano == null) {
+        final percorso = await pianificatore
+            .percorso(partenza: partenza, arrivo: d.posizione, tappe: tappe)
+            .timeout(tempoMassimo);
+        nuovo = ViaggioPronto(
+          d,
+          Viaggio(percorso: percorso, colonnine: const [], piano: null),
+          prima.senzaSoste ? auto.stato?.batteria ?? prima.batteriaPartenza : prima.batteriaPartenza,
+          calcolatoAlle: _ora(),
+          termica: prima.termica,
+          senzaSoste: prima.senzaSoste,
+          tappe: List.of(this.tappe),
+        );
+      } else {
+        final carica = batteria ?? auto.stato?.batteria ?? prima.batteriaPartenza;
+        // Le soste ancora davanti restano: il percorso nuovo ci deve passare.
+        final soste = {
+          for (final s in prima.viaggio.piano!.soste)
+            if (s.colonnina.distanzaM > fattiM) s.colonnina.id,
+        };
+        final note = [for (final c in prima.viaggio.colonnine) ?c.dettaglio];
+        // Senza i dettagli delle colonnine (un viaggio vecchio) le soste non si
+        // rifanno da lì: si richiedono, come in un calcolo intero.
+        final viaggio = await pianificatore
+            .pianifica(
+              partenza: partenza,
+              arrivo: d.posizione,
+              tappe: tappe,
+              batteria: carica,
+              condizioni: condizioni ?? const Condizioni(),
+              obbligate: {...obbligate, ...soste},
+              colonnineNote: note.isEmpty && soste.isNotEmpty ? null : note,
+            )
+            .timeout(tempoMassimo);
+        nuovo = ViaggioPronto(d, viaggio, carica, calcolatoAlle: _ora(), tappe: List.of(this.tappe));
+      }
+    } catch (e) {
+      debugPrint('ricalcolo in guida: $e');
+      return false;
+    }
+    // Nel frattempo si è annullato, o scelta un'altra meta: non vale più.
+    if (!identical(stato, prima)) return false;
+    ultimaPosizione = partenza;
+    _imposta(nuovo);
+    return true;
+  }
+
   /// Auto termica: il percorso e basta, come un navigatore normale. Anche
   /// per l'elettrica senza Premium ([senzaSoste]).
   Future<void> _percorsoSolo(
@@ -577,8 +675,9 @@ class GestoreViaggio extends ChangeNotifier {
     bool conScelte = false,
     bool senzaSoste = false,
     PercorsoCalcolato? strada,
+    Punto? partenza,
   }) async {
-    final partenza = await posizione();
+    partenza ??= await posizione();
     if (partenza == null) {
       return _imposta(ErroreViaggio('Non so dove sei: attiva la posizione per gdanav.', destinazione: destinazione));
     }
@@ -588,7 +687,7 @@ class GestoreViaggio extends ChangeNotifier {
     _imposta(calcolo);
     condizioni = null;
     try {
-      final pianificatore = costruisci(impostazioni, auto.veicolo, await archivio.preferenze(), opzioni);
+      final pianificatore = costruisci(impostazioni, auto.veicolo, _preferenze = await archivio.preferenze(), opzioni);
       final scelto = strada ?? await _scegli(pianificatore, partenza, destinazione, conScelte);
       final percorso = await pianificatore
           .percorso(

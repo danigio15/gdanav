@@ -306,8 +306,19 @@ LocationSettings _comeChiedere(bool soloIlGps, Duration limite) => switch (defau
 /// Vedi [FlussoGps.dallAuto].
 void gpsDellAuto(Position p) => _gps.dallAuto(p);
 
-/// Le posizioni mentre si guida.
-Stream<Punto> posizioniGuida() => _gps.posizioni.map((p) => Punto(p.latitude, p.longitude));
+/// Le posizioni mentre si guida, con la direzione, la velocità e l'ora della
+/// lettura ([PuntoInMoto]). Prima passavano solo latitudine e longitudine, e
+/// il resto si perdeva qui: il ricalcolo non sapeva da che parte si andava, e
+/// il segnaposto in guida non si poteva portare avanti del ritardo del GPS.
+Stream<Punto> posizioniGuida() => _gps.posizioni.map(
+  (p) => PuntoInMoto(
+    p.latitude,
+    p.longitude,
+    rotta: rottaDaFidarsi(p.heading, p.headingAccuracy),
+    velocitaMs: p.speed.isFinite && p.speed >= 0 ? p.speed : null,
+    alle: p.timestamp,
+  ),
+);
 
 /// Le letture per il segnaposto: posizione, direzione, velocità, e quanto il
 /// telefono dice di potersi sbagliare.
