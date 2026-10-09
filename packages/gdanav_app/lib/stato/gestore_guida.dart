@@ -21,10 +21,10 @@ class GestoreGuida extends ChangeNotifier {
     this.consumo,
     this.risparmio,
     this.archivio,
-    bool mutoIniziale = false,
+    ModoAudio audioIniziale = ModoAudio.tutto,
     DateTime Function()? orologio,
   }) : _ora = orologio ?? DateTime.now {
-    muto = mutoIniziale;
+    audio = audioIniziale;
   }
 
   /// Il consumo imparato: in guida lo si misura e lo si corregge.
@@ -86,7 +86,12 @@ class GestoreGuida extends ChangeNotifier {
   Avanzamento? avanzamento;
   var attiva = false;
   var ricalcolando = false;
-  var muto = false;
+
+  /// Cosa si sente: vedi [ModoAudio].
+  var audio = ModoAudio.tutto;
+
+  /// La voce di guida (manovre, messaggi del viaggio) è spenta.
+  bool get muto => audio.senzaGuida;
 
   /// Con il ricalcolo automatico spento: perché converrebbe ricalcolare. Si
   /// mostra una scheda con «Ricalcola» e «No».
@@ -295,16 +300,68 @@ class GestoreGuida extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Una frase fuori dalle manovre (una segnalazione più avanti).
+  /// Un messaggio del viaggio fuori dalle manovre: tace con la voce di guida.
   void annuncia(String frase) {
     if (!muto) unawaited(voce.parla(frase));
   }
 
+  /// Un avviso: autovelox, segnalazioni, ZTL, limite. Si sente anche con la
+  /// voce di guida spenta («Solo avvisi»); tace solo col silenzio.
+  void annunciaAvviso(String frase) {
+    if (!audio.senzaAvvisi) unawaited(voce.parla(frase));
+  }
+
+  /// Il tasto dell'audio: Tutto → Solo avvisi → Silenzio → Tutto.
   void alternaVoce() {
-    muto = !muto;
-    if (archivio case final a?) unawaited(a.salvaVoceMuta(muto));
-    if (muto) unawaited(voce.zitta());
+    audio = audio.dopo;
+    if (archivio case final a?) unawaited(a.salvaModoAudio(audio));
+    // Quello che si sta dicendo si ferma: col tasto appena toccato, una frase
+    // lunga che continua sembra un tasto che non va.
+    if (audio != ModoAudio.tutto) unawaited(voce.zitta());
     notifyListeners();
+  }
+
+  /* ─── Il limite di velocità, a voce ─────────────────────────────────────
+   *
+   * Il tachimetro diventava rosso e basta: guardare il tachimetro è proprio
+   * quello che non si fa quando si guida. Adesso un avviso, come gli
+   * autovelox: oltre il limite di [oltreIlLimiteKmh] per almeno [oltrePer],
+   * una volta sola per ogni tratto col suo limite. Il margine e l'attesa sono
+   * per non parlare a ogni sorpasso, né per un GPS che salta di un colpo. */
+
+  /// Di quanto oltre il limite prima di dirlo.
+  static const oltreIlLimiteKmh = 5;
+
+  /// E per quanto tempo di fila.
+  static const oltrePer = Duration(seconds: 3);
+
+  int? _limiteVisto;
+  DateTime? _oltreDa;
+  var _limiteDetto = false;
+
+  void _controllaLimite(int? limite, double? kmh) {
+    if (limite != _limiteVisto) {
+      // Un tratto nuovo, con un limite suo: se ne può riparlare.
+      _limiteVisto = limite;
+      _oltreDa = null;
+      _limiteDetto = false;
+    }
+    if (limite == null || kmh == null || kmh <= limite + oltreIlLimiteKmh) {
+      _oltreDa = null;
+      return;
+    }
+    if (_limiteDetto) return;
+    final da = _oltreDa ??= _ora();
+    if (_ora().difference(da) < oltrePer) return;
+    _limiteDetto = true;
+    annunciaAvviso('Attenzione, il limite è $limite.');
+  }
+
+  /// Quanto si va: il tachimetro dell'auto se lo dice, se no il GPS.
+  double? _velocitaKmh(Punto qui) {
+    if (auto.velocitaAuto() case final v?) return v;
+    if (qui case PuntoInMoto(:final velocitaMs?)) return velocitaMs * 3.6;
+    return null;
   }
 
   /// L'ultima posizione vista in guida.
@@ -313,13 +370,63 @@ class GestoreGuida extends ChangeNotifier {
   /// Dove si è, anche fuori dal percorso (lì il segnaposto non si aggancia).
   Punto? get ultimaPosizione => _ultimaPosizione;
 
+  /* ─── L'auto dov'è adesso, non dov'era ────────────────────────────────────
+   *
+   * Il GPS dice dov'era l'auto quando l'ha letta. Fra quella lettura e il
+   * disegno passano centinaia di millisecondi, e la telecamera ci metteva un
+   * altro secondo ad arrivarci: a novanta all'ora il segnaposto stava trenta,
+   * quaranta metri dietro, e le svolte arrivavano prima della freccia. Sulla
+   * strada però si sa dove si va: il punto agganciato si porta avanti lungo
+   * il percorso di velocità × (età della lettura + [anticipo]). Con prudenza:
+   * solo agganciati, solo andando (sopra 1,5 m/s), mai più di
+   * [avantiAlPiuM]. Fuori dalla strada resta il punto del GPS, com'è. */
+
+  /// Quanto si guarda avanti oltre l'età della lettura: il tempo che la
+  /// mappa ci mette a disegnare.
+  static const anticipo = Duration(milliseconds: 300);
+
+  /// Mai più avanti di così: un GPS che tace non deve far correre l'auto da
+  /// sola lungo la strada.
+  static const avantiAlPiuM = 60.0;
+
+  /// Cresce a ogni posizione: chi segue l'auto (la telecamera) si muove una
+  /// volta per posizione, non a ogni novità della guida.
+  int get letture => _letture;
+  var _letture = 0;
+  DateTime? _lettaAlle;
+  double? _velocitaMs;
+
+  /// Dove disegnare l'auto adesso e la direzione della strada lì; `null`
+  /// se non si è agganciati alla strada (si disegna il punto del GPS).
+  ({Punto punto, double rotta})? posizioneStimata() {
+    final a = avanzamento, g = _guida, sulla = a?.posizioneSulPercorso, rotta = a?.rotta;
+    if (a == null || g == null || sulla == null || rotta == null) return null;
+    final v = _velocitaMs, alle = _lettaAlle;
+    if (v == null || alle == null || v < 1.5) return (punto: sulla, rotta: rotta);
+    var eta = _ora().difference(alle);
+    if (eta.isNegative) eta = Duration.zero;
+    if (eta > const Duration(seconds: 2)) eta = const Duration(seconds: 2);
+    final metri = v * (eta + anticipo).inMilliseconds / 1000;
+    return g.avanti(a.percorsiM, metri > avantiAlPiuM ? avantiAlPiuM : metri);
+  }
+
   Future<void> _posizione(Punto qui) async {
     _ultimaPosizione = qui;
+    _letture++;
+    final ora = _ora();
+    // L'ora della lettura del GPS, se è credibile; altrimenti adesso.
+    final letta = qui is PuntoInMoto ? qui.alle : null;
+    _lettaAlle = letta != null && !letta.isAfter(ora) && ora.difference(letta) < const Duration(seconds: 5)
+        ? letta
+        : ora;
+    final kmh = auto.velocitaAuto();
+    _velocitaMs = kmh != null ? kmh / 3.6 : (qui is PuntoInMoto ? qui.velocitaMs : null);
     _forseChiediDati();
     final g = _guida;
     if (g == null || !attiva) return;
     final a = g.aggiorna(qui);
     avanzamento = a;
+    _controllaLimite(a.limiteKmh, _velocitaKmh(qui));
     // Arrivati al distributore: da qui si prosegue verso la meta.
     // Arrivati a una tappa (o al distributore): da qui si prosegue.
     viaggio.tappeFatte(qui);
@@ -415,7 +522,7 @@ class GestoreGuida extends ChangeNotifier {
     notifyListeners();
     try {
       if (!muto) unawaited(voce.parla('Passo da ${l.nome}, poi proseguo.'));
-      await viaggio.pianifica(d);
+      await viaggio.pianifica(d, partenza: _ultimaPosizione);
       if (pronto case final p?) {
         _guida = Guida(p.viaggio.percorso);
         _nuovoPiano(p);
@@ -515,7 +622,10 @@ class GestoreGuida extends ChangeNotifier {
       }
       // Le ZTL restano quelle di prima: la strada nuova le gira al largo uguale.
       final z = p.viaggio.percorso.ztl;
-      await viaggio.seguiStrada(z == null ? pr.percorso : pr.percorso.conZtl(z.senzaDomanda()));
+      await viaggio.seguiStrada(
+        z == null ? pr.percorso : pr.percorso.conZtl(z.senzaDomanda()),
+        partenza: _ultimaPosizione,
+      );
       if (pronto case final nuovo?) {
         _guida = Guida(nuovo.viaggio.percorso);
         _nuovoPiano(nuovo);
@@ -559,11 +669,25 @@ class GestoreGuida extends ChangeNotifier {
       if (_ultimaPosizione case final q?) viaggio.tappeFatte(q, fattiM: fatti);
       notifyListeners();
       if (!perConsumo && !muto) unawaited(voce.parla('Ricalcolo il percorso.'));
+      final qui = _ultimaPosizione;
+      final vecchio = pronto;
+      if (!perConsumo && qui != null && vecchio != null) {
+        /* Fuori strada: solo il percorso, dalla posizione che si ha già e col
+         * verso in cui si va (GestoreViaggio.ricalcolaDa). Il viaggio di prima
+         * resta sullo schermo finché non arriva il nuovo; se non arriva resta
+         * lui, e la prossima posizione fuori strada riprova. */
+        final fatto = await viaggio.ricalcolaDa(qui, fattiM: fatti, batteria: batteriaOra?.valore);
+        if (pronto case final p? when fatto && !identical(p, vecchio)) {
+          _guida = Guida(p.viaggio.percorso);
+          _nuovoPiano(p);
+        }
+        return;
+      }
       // Gli errori del calcolo li tiene pianifica; qui arriva quello che le
-      // scappa prima (l'archivio, la posizione che non risponde). La guida
-      // resta sul percorso di prima, e la prossima posizione fuori strada
-      // riprova.
-      await viaggio.pianifica(d);
+      // scappa prima (l'archivio). La guida resta sul percorso di prima, e la
+      // prossima posizione fuori strada riprova. Le soste da rifare (il
+      // consumo) vogliono il calcolo intero, ma dalla posizione che si ha.
+      await viaggio.pianifica(d, partenza: qui);
       if (pronto case final p?) {
         _guida = Guida(p.viaggio.percorso);
         _nuovoPiano(p);

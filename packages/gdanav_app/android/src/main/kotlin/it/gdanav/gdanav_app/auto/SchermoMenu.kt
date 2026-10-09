@@ -231,11 +231,22 @@ class SchermoImpostazioni(carContext: CarContext, private val renderer: Renderer
                     if (it != renderer.tridimensionale) renderer.alternaVista()
                     invalidate()
                 },
-                interruttore(
-                    "Voce",
-                    o["muto"] != true,
-                    "Le indicazioni e gli avvisi a voce",
-                    icona = icona(R.drawable.icona_voce, CarColor.BLUE),
+                // L'audio a tre stati, come sul telefono: ogni tocco passa al
+                // dopo (Tutto, Solo avvisi, Silenzio). Un interruttore non
+                // basta più: «solo avvisi» tiene gli autovelox e la ZTL anche
+                // con le indicazioni spente.
+                riga(
+                    when (audio(o)) {
+                        "avvisi" -> "Audio: solo avvisi"
+                        "silenzio" -> "Audio: silenzio"
+                        else -> "Audio: tutto"
+                    },
+                    when (audio(o)) {
+                        "avvisi" -> "Autovelox, segnalazioni, ZTL e limite; niente indicazioni"
+                        "silenzio" -> "Nessuna voce, nemmeno gli avvisi"
+                        else -> "Le indicazioni e gli avvisi a voce"
+                    },
+                    icona = icona(R.drawable.icona_voce, if (audio(o) == "silenzio") CarColor.DEFAULT else CarColor.BLUE),
                 ) { PonteAuto.alternaVoce() },
                 riga(
                     "Percorso",
@@ -260,6 +271,13 @@ class SchermoImpostazioni(carContext: CarContext, private val renderer: Renderer
         )
     }
 }
+
+/**
+ * Com'è l'audio: «tutto», «avvisi» (solo gli avvisi) o «silenzio». Un'app
+ * sul telefono più vecchia manda solo «muto»: muta vuol dire senza voce.
+ */
+private fun audio(o: Map<String, Any?>): String =
+    o["audio"] as? String ?: if (o["muto"] == true) "silenzio" else "tutto"
 
 /** Con quanta batteria arrivare alla meta (e alle soste): si ricalcola subito. */
 class SchermoArrivo(carContext: CarContext) : SchermoAggiornato(carContext) {

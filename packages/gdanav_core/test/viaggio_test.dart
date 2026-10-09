@@ -59,6 +59,23 @@ void main() {
     expect(v.piano!.batteriaArrivo, greaterThanOrEqualTo(15));
   });
 
+  test('ricalcolando con le colonnine già note non si chiedono ai server, e la sosta scelta resta', () async {
+    final fonti = FontiFinte([for (var km = 60; km < 500; km += 60) colonnina(km)]);
+    final p =
+        PianificatoreViaggio(percorsi: (_) async => dritta(500), colonnine: fonti, profilo: ProfiloVeicolo.esempio);
+    final note = [for (var km = 60; km < 500; km += 60) colonnina(km)];
+    final v = await p.pianifica(
+      partenza: const Punto(42, 12),
+      arrivo: const Punto(46.5, 12),
+      batteria: 80,
+      colonnineNote: note,
+      obbligate: {'c180'},
+    );
+    expect(fonti.chiamate, 0);
+    expect(v.colonnine, hasLength(8));
+    expect(v.piano!.soste.map((s) => s.colonnina.id), contains('c180'));
+  });
+
   test('le colonnine lente non contano per il viaggio', () async {
     final fonti = FontiFinte([for (var km = 60; km < 500; km += 60) colonnina(km, kw: 22)]);
     final p =

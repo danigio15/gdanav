@@ -350,7 +350,10 @@ class PonteAuto {
       'autostrade': o.evitaAutostrade,
       'traghetti': o.evitaTraghetti,
       'ricalcolo': o.ricalcoloAutomatico,
+      // Il muto di prima (la voce di guida) per un'auto con l'app vecchia, e
+      // l'audio a tre stati per il menu nuovo.
       'muto': guida.muto,
+      'audio': guida.audio.chiave,
       'elettrica': auto?.elettrica ?? true,
       'arrivo': ?viaggio.minimoArrivo,
     });

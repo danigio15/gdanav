@@ -217,6 +217,13 @@ void main() {
     await dallAuto('voce', null);
     expect(a.guida.muto, isTrue);
     expect(ultima('opzioni'), containsPair('muto', true));
+    // Il primo tocco lascia gli avvisi: l'auto lo sa, e il tocco dopo è il silenzio.
+    expect(ultima('opzioni'), containsPair('audio', 'avvisi'));
+    await dallAuto('voce', null);
+    expect(ultima('opzioni'), containsPair('audio', 'silenzio'));
+    await dallAuto('voce', null);
+    expect(ultima('opzioni'), containsPair('audio', 'tutto'));
+    expect(a.guida.muto, isFalse);
   });
 
   testWidgets("sull'auto, col GPS muto, il cruscotto non tiene la velocità vecchia", (tester) async {

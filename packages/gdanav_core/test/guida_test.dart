@@ -68,11 +68,12 @@ void main() {
     }
   });
 
-  test('uscendo di strada, dopo tre letture chiede di ricalcolare', () {
+  test('uscendo di strada, dopo due letture chiede di ricalcolare', () {
+    /* Erano tre: col ricalcolo dopo, il percorso nuovo arrivava alla traversa
+     * successiva. Una lettura storta da sola però non basta ancora. */
     final g = Guida(percorso);
     g.aggiorna(percorso.punti[40]);
     final lontano = Punto(percorso.punti[40].lat + 0.003, percorso.punti[40].lon); // ~330 m a nord
-    expect(g.aggiorna(lontano).fuoriPercorso, isFalse);
     expect(g.aggiorna(lontano).fuoriPercorso, isFalse);
     final a = g.aggiorna(lontano);
     expect(a.fuoriPercorso, isTrue);
@@ -276,6 +277,49 @@ void main() {
     }
     expect(quando, greaterThan(0));
     expect(quando, lessThan(100), reason: 'in una traversa lo si sa in pochi metri');
+  });
+
+  test('allontanandosi dalla strada si ricalcola prima dei trentacinque metri', () {
+    /* L'uscita sbagliata che si stacca piano: venticinque, trenta metri, e
+     * ogni lettura più lontana. Chi la prende se ne va; il GPS fermo no. */
+    final percorso = dritta();
+    final g = Guida(percorso);
+    for (var i = 0; i <= 50; i++) {
+      g.aggiorna(percorso.punti[i]);
+    }
+    final lati = [0.0001, 0.00022, 0.00034, 0.00042]; // ~8, 17, 27, 33 m a est
+    final fuori = <bool>[];
+    for (final (k, lato) in lati.indexed) {
+      final p = percorso.punti[51 + k];
+      final a = g.aggiorna(Punto(p.lat, p.lon + lato));
+      expect(a.lontanoM, lessThan(35));
+      fuori.add(a.fuoriPercorso);
+    }
+    expect(fuori, [false, false, false, true]);
+  });
+
+  test('fermi a trenta metri dalla linea non si ricalcola per il GPS che balla', () {
+    final percorso = dritta();
+    final g = Guida(percorso);
+    for (var i = 0; i <= 50; i++) {
+      g.aggiorna(percorso.punti[i]);
+    }
+    final da = percorso.punti[50];
+    // Fra 26 e 33 metri, avanti e indietro di pochi metri: fermi.
+    for (final lato in [0.00034, 0.00037, 0.0004, 0.00042, 0.00038, 0.00041]) {
+      expect(g.aggiorna(Punto(da.lat, da.lon + lato)).fuoriPercorso, isFalse);
+    }
+  });
+
+  test('avanti: il punto più in là lungo la strada, mai oltre l\'arrivo', () {
+    final percorso = dritta();
+    final g = Guida(percorso);
+    final (:punto, :rotta) = g.avanti(100, 30);
+    // La dritta va a nord, venti metri ogni punto.
+    expect(distanzaM(percorso.punti.first, punto), closeTo(130, 1));
+    expect(rotta, anyOf(lessThan(1), greaterThan(359)));
+    expect(distanzaM(g.avanti(g.lunghezzaM - 5, 500).punto, percorso.punti.last), lessThan(0.5));
+    expect(distanzaM(g.avanti(100, -50).punto, percorso.punti.first), closeTo(100, 1));
   });
 
   test('fermi al semaforo non si ricalcola: il GPS balla e basta', () {

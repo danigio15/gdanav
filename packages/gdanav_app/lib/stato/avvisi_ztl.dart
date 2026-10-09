@@ -229,7 +229,7 @@ class AvvisiZtl extends ChangeNotifier {
   }
 
   void _annuncia(ZonaLimitata z, String frase) {
-    if (_annunciate.add(z.chiave)) guida.annuncia(frase);
+    if (_annunciate.add(z.chiave)) guida.annunciaAvviso(frase);
   }
 
   void _metti(AvvisoZtl? nuovo) {

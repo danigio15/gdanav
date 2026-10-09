@@ -202,6 +202,12 @@ List<Object> _seEco(String verde, String altro) => [
   altro,
 ];
 
+/// Le larghezze del percorso a zoom 12 e a zoom 18: il bordo, la linea
+/// celeste e, dentro, la striscia della coda (vedi lo stile del percorso).
+const larghezzaBordo = (10.5, 30.0);
+const larghezzaPercorso = (8.0, 24.0);
+const larghezzaCoda = (5.5, 17.0);
+
 /// Larghezza che cresce con lo zoom, come fanno le strade vere.
 List<Object> _largo(double a12, double a18) => [
   'interpolate',
@@ -711,31 +717,41 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         'layout': {'line-cap': 'round', 'line-join': 'round'},
         'paint': {'line-color': '#4ADE80', 'line-width': _largo(5.5, 18)},
       },
-      // Il percorso: un alone morbido, il bordo blu scuro, la linea blu e le
-      // frecce della direzione. Sempre blu: nessuna strada ha quel colore.
+      /* Il percorso: un alone morbido, il bordo blu scuro, la linea celeste e
+       * le frecce della direzione. Sempre blu: nessuna strada ha quel colore.
+       *
+       * Col traffico, come in Waze: la coda è una striscia DENTRO la linea,
+       * più stretta e in mezzo, e ai lati resta il celeste. Prima la coda
+       * era larga quanto la linea e ci si posava sopra: nei tratti in coda il
+       * percorso spariva, e una strada rossa sulla mappa non diceva più se
+       * era la propria o una qualunque. Per questo la linea è un po' più
+       * larga di prima ([larghezzaPercorso]) e la coda circa due terzi
+       * ([larghezzaCoda]): «la linea del percorso è leggermente più larga,
+       * quindi si vede al centro striscia rossa e ai lati striscia celeste».
+       * Il celeste è un bordo, non una seconda strada accanto al rosso. */
       {
         'id': 'percorso-alone',
         'type': 'line',
         'source': sorgentePercorso,
         'layout': {'line-cap': 'round', 'line-join': 'round'},
-        'paint': {'line-color': t.percorso, 'line-width': _largo(16, 40), 'line-blur': 10, 'line-opacity': 0.22},
+        'paint': {'line-color': t.percorso, 'line-width': _largo(18, 46), 'line-blur': 10, 'line-opacity': 0.22},
       },
       {
         'id': 'percorso-bordo',
         'type': 'line',
         'source': sorgentePercorso,
         'layout': {'line-cap': 'round', 'line-join': 'round'},
-        'paint': {'line-color': t.percorsoBordo, 'line-width': _largo(8.5, 24)},
+        'paint': {'line-color': t.percorsoBordo, 'line-width': _largo(larghezzaBordo.$1, larghezzaBordo.$2)},
       },
       {
         'id': 'percorso',
         'type': 'line',
         'source': sorgentePercorso,
         'layout': {'line-cap': 'round', 'line-join': 'round'},
-        'paint': {'line-color': t.percorso, 'line-width': _largo(5.5, 18)},
+        'paint': {'line-color': t.percorso, 'line-width': _largo(larghezzaPercorso.$1, larghezzaPercorso.$2)},
       },
-      // Le code di adesso sopra il percorso: dal giallo (rallenta) al rosso
-      // (fermo), bordeaux se è chiusa.
+      // Le code di adesso dentro il percorso: dal giallo (rallenta) al rosso
+      // (fermo), bordeaux se è chiusa. Sopra la linea, sotto le frecce.
       {
         'id': 'code',
         'type': 'line',
@@ -753,7 +769,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
             '#D32F2F',
             '#7B1F1F',
           ],
-          'line-width': _largo(5.5, 18),
+          'line-width': _largo(larghezzaCoda.$1, larghezzaCoda.$2),
         },
       },
       {

@@ -53,6 +53,24 @@ class MappaFinta extends MapLibrePlatform {
     return true;
   }
 
+  /// La telecamera che segue l'auto: anche questa si scrive, con la durata e
+  /// il moto.
+  final seguite = <(CameraPosition, Duration?, CameraAnimationInterpolation?)>[];
+
+  @override
+  Future<bool> easeCamera(
+    CameraUpdate cameraUpdate, {
+    Duration? duration,
+    CameraAnimationInterpolation? interpolation,
+  }) async {
+    final j = cameraUpdate.toJson() as List;
+    telecamere.add(j.first as String);
+    if (j.first == 'newCameraPosition') {
+      seguite.add((CameraPosition.fromMap(j[1])!, duration, interpolation));
+    }
+    return true;
+  }
+
   @override
   Future<CameraPosition?> updateMapOptions(Map<String, dynamic> optionsUpdate) async => null;
 
@@ -85,7 +103,8 @@ class _VistaFintaState extends State<_VistaFinta> {
   }
 
   @override
-  Widget build(BuildContext context) => const SizedBox.expand();
+  // Che si possa toccare, come la mappa vera: le prove ci passano il dito.
+  Widget build(BuildContext context) => const ColoredBox(color: Color(0x00000000), child: SizedBox.expand());
 }
 
 PercorsoCalcolato _strada(List<Punto> punti, {List<Coda> code = const []}) => PercorsoCalcolato(
@@ -266,10 +285,11 @@ void main() {
       final m = mappe.single;
       await stilePronto(tester, m);
       await tester.pump(const Duration(seconds: 2));
-      expect(m.telecamere, ['newLatLngBounds']);
+      // Prima l'inclinazione, che lo stile nuovo non sa; poi la strada.
+      expect(m.telecamere, ['tiltTo', 'newLatLngBounds']);
       // Una volta sola: chi guarda la mappa può anche avvicinarsi.
       await tester.pump(const Duration(seconds: 6));
-      expect(m.telecamere, ['newLatLngBounds']);
+      expect(m.telecamere, ['tiltTo', 'newLatLngBounds']);
 
       a.posizione.avvia();
       final punti = (a.viaggio.stato as ViaggioPronto).viaggio.percorso.punti;
@@ -279,6 +299,172 @@ void main() {
       expect(a.guida.avanzamento, isNotNull);
       expect(m.telecamere.last, 'newCameraPosition');
       await via(tester);
+    });
+
+    testWidgets('in guida la telecamera si muove una volta per posizione, lineare, e l\'auto è dove è adesso', (
+      tester,
+    ) async {
+      await inGuida(tester);
+      final m = mappe.single;
+      await stilePronto(tester, m);
+      a.posizione.avvia();
+      final punti = (a.viaggio.stato as ViaggioPronto).viaggio.percorso.punti;
+      Future<void> lettura(Punto p) async {
+        a.gps.add(Lettura(p, velocitaMs: 25, rotta: 0));
+        // Letta mezzo secondo fa: tanto è indietro quello che dice il GPS.
+        a.posizioni.add(
+          PuntoInMoto(
+            p.lat,
+            p.lon,
+            velocitaMs: 25,
+            rotta: 0,
+            alle: DateTime.now().subtract(const Duration(milliseconds: 500)),
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 1000));
+      }
+
+      final sulla = Punto((punti[2].lat + punti[3].lat) / 2, punti[2].lon);
+      await lettura(sulla);
+      final prima = m.seguite.length;
+      await lettura(Punto(sulla.lat + 0.0002, sulla.lon));
+      // Una sola mossa per posizione: la posizione e la guida non si
+      // rubano più il turno a vicenda.
+      expect(m.seguite.length, prima + 1);
+      final (camera, durata, moto) = m.seguite.last;
+      expect(moto, CameraAnimationInterpolation.linear);
+      // Lunga quanto l'intervallo fra due posizioni, non 900 ms che frenano.
+      expect(durata, const Duration(milliseconds: 1000));
+      // 25 m/s per (0,5 s di età + 0,3 s): una ventina di metri più a nord del GPS.
+      final avanti = distanzaM(Punto(sulla.lat + 0.0002, sulla.lon), Punto(camera.target.latitude, sulla.lon));
+      expect(avanti, closeTo(20, 3));
+      expect(camera.target.latitude, greaterThan(sulla.lat + 0.0002));
+      await tester.runAsync(a.guida.ferma);
+      await via(tester);
+    });
+  });
+
+  group('la mappa senza guida, in 3D', () {
+    late MappaFinta m;
+    late Ambiente a;
+    late ControlloMappa controllo;
+
+    Future<void> senzaGuida(WidgetTester tester, {bool inclinata = true}) async {
+      preparaPiattaforma(portachiavi: impostazioniComplete);
+      final mappe = <MappaFinta>[];
+      final prima = MapLibrePlatform.createInstance;
+      MapLibrePlatform.createInstance = () {
+        final m = MappaFinta();
+        mappe.add(m);
+        return m;
+      };
+      addTearDown(() => MapLibrePlatform.createInstance = prima);
+      a = await ambiente(tester, km: 20, orologio: () => tester.binding.clock.now());
+      controllo = ControlloMappa(inclinata: inclinata);
+      addTearDown(controllo.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: MappaViaggio(
+              gestore: a.viaggio,
+              controllo: controllo,
+              posizione: a.posizione,
+              onPuntoScelto: (_) {},
+              onColonnina: (_) {},
+              orologio: () => tester.binding.clock.now(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      m = mappe.single;
+      m.onMapStyleLoadedPlatform(null);
+      await tester.pump();
+      a.posizione.avvia();
+    }
+
+    var n = 0;
+    Future<void> lettura(WidgetTester tester) async {
+      n++;
+      a.gps.add(Lettura(Punto(42 + n * 0.0001, 12), velocitaMs: 12, rotta: 90));
+      await tester.pump(const Duration(milliseconds: 1000));
+    }
+
+    Future<void> via(WidgetTester tester) async {
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+    }
+
+    testWidgets('segue chi guida: girata come va, inclinata, a ogni posizione', (tester) async {
+      await senzaGuida(tester);
+      await lettura(tester);
+      await lettura(tester);
+      expect(m.seguite, hasLength(2));
+      final (camera, _, moto) = m.seguite.last;
+      expect(camera.tilt, 58);
+      expect(camera.bearing, closeTo(90, 1));
+      expect(camera.zoom, inInclusiveRange(16, 17));
+      expect(moto, CameraAnimationInterpolation.linear);
+      await via(tester);
+    });
+
+    testWidgets('un dito la ferma; «Dove sono» la fa seguire di nuovo', (tester) async {
+      await senzaGuida(tester);
+      await lettura(tester);
+      final prima = m.seguite.length;
+      await tester.drag(find.byType(MappaViaggio), const Offset(0, 120));
+      expect(controllo.libera, isTrue);
+      await lettura(tester);
+      await lettura(tester);
+      expect(m.seguite, hasLength(prima));
+
+      controllo.centra();
+      await tester.pump();
+      expect(m.seguite, hasLength(prima + 1));
+      await lettura(tester);
+      expect(m.seguite, hasLength(prima + 2));
+      await via(tester);
+    });
+
+    testWidgets('in 2D non segue, e mentre si guarda un viaggio da fare nemmeno', (tester) async {
+      await senzaGuida(tester, inclinata: false);
+      await lettura(tester);
+      await lettura(tester);
+      expect(m.seguite, isEmpty);
+
+      controllo.alternaInclinazione();
+      await tester.pump();
+      await lettura(tester);
+      expect(m.seguite, isNotEmpty);
+
+      a.auto.manuale.imposta(90);
+      await tester.runAsync(() => a.viaggio.vaiA(const Luogo(nome: 'Nord', posizione: Punto(42.18, 12))));
+      await tester.pump();
+      expect(a.viaggio.stato, isA<ViaggioPronto>());
+      final prima = m.seguite.length;
+      await lettura(tester);
+      await lettura(tester);
+      expect(m.seguite, hasLength(prima));
+      await via(tester);
+    });
+  });
+
+  group('la scelta 2D/3D', () {
+    test('si ricorda, e quella letta tardi non cancella quella appena fatta', () async {
+      final salvate = <bool>[];
+      final c = ControlloMappa(salvaInclinazione: (v) async => salvate.add(v));
+      expect(c.inclinata, isTrue);
+      await c.carica(Future.value(false));
+      expect(c.inclinata, isFalse);
+      c.alternaInclinazione();
+      expect(salvate, [true]);
+      final tardi = Completer<bool>();
+      final letta = c.carica(tardi.future);
+      c.alternaInclinazione();
+      tardi.complete(true);
+      await letta;
+      expect(c.inclinata, isFalse);
+      c.dispose();
     });
   });
 }

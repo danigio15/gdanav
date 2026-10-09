@@ -79,6 +79,22 @@ void main() {
       expect(p.manovre, hasLength(14));
     });
 
+    test('la partenza in movimento porta la direzione, le altre tappe no', () async {
+      final chiesti = <Map<String, Object?>>[];
+      final client = MockClient((r) async {
+        if (r.url.path == '/trace_attributes') return http.Response('{"edges":[]}', 200);
+        final corpo = jsonDecode(r.body) as Map<String, Object?>;
+        if (corpo['format'] == 'osrm') return http.Response('{"routes":[]}', 200);
+        chiesti.add(corpo);
+        return http.Response(jsonEncode(utrecht()), 200, headers: {'content-type': 'application/json'});
+      });
+      final v = ClienteValhalla(Uri.parse('https://valhalla.esempio.dev/'), client: client);
+      await v.calcola(const [PuntoInMoto(52.0907, 5.1214, rotta: 359.7, velocitaMs: 10), Punto(52.064, 5.19)]);
+      final luoghi = chiesti.single['locations'] as List;
+      expect(luoghi.first, {'lat': 52.0907, 'lon': 5.1214, 'heading': 0, 'heading_tolerance': 60});
+      expect(luoghi.last, {'lat': 52.064, 'lon': 5.19});
+    });
+
     test('le opzioni: risparmio, senza pedaggi, senza traghetti', () async {
       final chiesti = <Map<String, Object?>>[];
       final client = MockClient((r) async {

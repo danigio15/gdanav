@@ -209,6 +209,12 @@ class PianificatoreViaggio {
   /// [obbligate]: gli id delle colonnine dove l'utente vuole fermarsi.
   /// [tappe]: dove passare prima dell'[arrivo], in ordine; le soste si
   /// pianificano sul viaggio intero.
+  ///
+  /// [colonnineNote]: le colonnine già trovate (il ricalcolo in guida, fuori
+  /// strada di qualche centinaio di metri): non si richiedono ai server e non
+  /// se ne ricontrolla lo stato, che sono i secondi lunghi del calcolo. Il
+  /// percorso nuovo sta nello stesso corridoio del vecchio, e le soste scelte
+  /// restano quelle (vanno in [obbligate]).
   Future<Viaggio> pianifica({
     required Punto partenza,
     required Punto arrivo,
@@ -217,6 +223,7 @@ class PianificatoreViaggio {
     PercorsoCalcolato? scelto,
     Condizioni condizioni = const Condizioni(),
     Set<String> obbligate = const {},
+    List<Colonnina>? colonnineNote,
     void Function(FaseViaggio fase)? avanzamento,
   }) async {
     avanzamento?.call(FaseViaggio.percorso);
@@ -240,7 +247,7 @@ class PianificatoreViaggio {
     avanzamento?.call(FaseViaggio.colonnine);
     List<Colonnina> trovate;
     try {
-      trovate = await colonnine.lungo(percorso.punti);
+      trovate = colonnineNote ?? await colonnine.lungo(percorso.punti);
     } catch (_) {
       if (senzaSoste == null) rethrow;
       trovate = const [];
@@ -269,7 +276,7 @@ class PianificatoreViaggio {
     // Come ABRP: le soste scelte si controllano adesso (libere, occupate,
     // guaste); se una è piena o guasta si ripianifica, e si ricontrollano
     // le nuove. Due giri al massimo.
-    final fonte = disponibilita;
+    final fonte = colonnineNote == null ? disponibilita : null;
     if (fonte != null) {
       final controllate = <String>{};
       for (var giro = 0; giro < 2 && piano != null; giro++) {

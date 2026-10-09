@@ -10,6 +10,7 @@ import '../servizi.dart';
 import 'gestore_risparmio.dart';
 import 'gestore_ztl.dart';
 import 'licenza.dart';
+import 'voce.dart';
 
 /// Quello che l'app ricorda: l'abbinamento con Home Assistant (contiene la
 /// chiave, quindi sta nel portachiavi del telefono) e come è messo lo switch.
@@ -32,6 +33,8 @@ class Archivio {
   static const _ztl = 'ztl';
   static const _risparmio = 'risparmio';
   static const _voceMuta = 'voce_muta';
+  static const _avvisiMuti = 'avvisi_muti';
+  static const _vistaPiatta = 'vista_2d';
 
   Future<Abbinamento?> abbinamento() async {
     final uri = await _p.read(key: _abbinamento);
@@ -132,6 +135,31 @@ class Archivio {
 
   Future<void> salvaVoceMuta(bool v) =>
       v ? _p.write(key: _voceMuta, value: 'sì') : _p.delete(key: _voceMuta);
+
+  /// L'audio della guida: due chiavi, la voce di guida e gli avvisi.
+  ///
+  /// La voce di guida resta in `voce_muta`, la chiave di quando il muto era
+  /// uno solo: chi aveva silenziato la voce la ritrova spenta, e con gli
+  /// avvisi accesi, perché la chiave degli avvisi non l'ha mai scritta
+  /// nessuno. Gli avvisi da soli spenti con la voce accesa non si possono
+  /// scegliere: lì vince la voce.
+  Future<ModoAudio> modoAudio() async {
+    if (!await voceMuta()) return ModoAudio.tutto;
+    return await _p.read(key: _avvisiMuti) == 'sì' ? ModoAudio.silenzio : ModoAudio.soloAvvisi;
+  }
+
+  Future<void> salvaModoAudio(ModoAudio m) async {
+    await salvaVoceMuta(m.senzaGuida);
+    await (m.senzaAvvisi ? _p.write(key: _avvisiMuti, value: 'sì') : _p.delete(key: _avvisiMuti));
+  }
+
+  /// La mappa in 3D (inclinata, girata come si va) o in 2D. Si ricorda, e
+  /// vale anche fuori dalla guida. Di partenza 3D, come sullo schermo
+  /// dell'auto: si scrive solo chi l'ha voluta piatta.
+  Future<bool> vistaInclinata() async => await _p.read(key: _vistaPiatta) != 'sì';
+
+  Future<void> salvaVistaInclinata(bool v) =>
+      v ? _p.delete(key: _vistaPiatta) : _p.write(key: _vistaPiatta, value: 'sì');
 
   /// L'identità di questo telefono verso il quadro delle licenze (i codici
   /// regalo): nasce una volta sola e resta qui, col suo segreto.
