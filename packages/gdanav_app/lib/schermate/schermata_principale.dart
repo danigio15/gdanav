@@ -18,6 +18,7 @@ import '../stato/gestore_guida.dart';
 import '../stato/gestore_luoghi.dart';
 import '../stato/gestore_mappe_offline.dart';
 import '../stato/gestore_meteo.dart';
+import '../stato/gestore_persone.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_viaggio.dart';
@@ -60,6 +61,7 @@ class SchermataPrincipale extends StatefulWidget {
     this.segnalazioni,
     this.meteo,
     this.vicini,
+    this.persone,
     this.consumo,
     this.fotoAuto,
     this.premium,
@@ -102,6 +104,9 @@ class SchermataPrincipale extends StatefulWidget {
 
   /// Distributori o colonnine intorno, sulla mappa.
   final GestoreVicini? vicini;
+
+  /// Le persone di casa sulla mappa, quando gdanav sta dentro gdahome.
+  final GestorePersone? persone;
 
   /// Il consumo imparato, da mostrare in «La tua auto».
   final GestoreConsumo? consumo;
@@ -581,6 +586,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                   ),
                   onColonnina: (id) => mostraColonnina(context, viaggio, id),
                   vicini: widget.vicini,
+                  persone: widget.persone,
                   ztl: widget.ztl,
                   risparmio: widget.guida.risparmio,
                   onPunto: (p) => mostraPunto(
@@ -630,7 +636,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
             right: 16,
             top: alto + 10,
             child: ListenableBuilder(
-              listenable: Listenable.merge([controllo, widget.auto]),
+              listenable: Listenable.merge([controllo, widget.auto, ?widget.persone]),
               builder: (context, _) => Column(
                 children: [
                   _BottoneMappa(
@@ -647,6 +653,16 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                     onPressed: controllo.centra,
                     child: Icon(Icons.near_me_rounded, size: 28, color: Theme.of(context).colorScheme.primary),
                   ),
+                  // Dentro gdahome: dove sono quelli di casa, tutti insieme.
+                  if (widget.persone case final persone? when persone.persone.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    _BottoneMappa(
+                      key: const Key('persone-di-casa'),
+                      tooltip: 'Persone di casa',
+                      onPressed: persone.mostraTutte,
+                      child: const Icon(Icons.groups_rounded, size: 28, color: Color(0xFF7C3AED)),
+                    ),
+                  ],
                   // Auto termica: i distributori qui intorno.
                   if (!widget.auto.elettrica) ...[
                     const SizedBox(height: 14),
@@ -721,7 +737,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
 }
 
 class _BottoneMappa extends StatelessWidget {
-  const _BottoneMappa({required this.tooltip, required this.onPressed, required this.child});
+  const _BottoneMappa({super.key, required this.tooltip, required this.onPressed, required this.child});
 
   final String tooltip;
   final VoidCallback onPressed;

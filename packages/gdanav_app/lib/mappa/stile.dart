@@ -21,6 +21,9 @@ const sorgenteCode = 'gdanav-code';
 const sorgenteAlternative = 'gdanav-alternative';
 const sorgenteTappe = 'gdanav-tappe';
 
+/// Le persone di casa, quando gdanav sta dentro gdahome (`GestorePersone`).
+const sorgentePersone = 'gdanav-persone';
+
 /// Le ZTL e le aree pedonali intorno (i contorni e, come punti, dove
 /// scriverne il nome), e la strada che passerebbe dentro la ZTL di cui si
 /// chiede il permesso.
@@ -41,6 +44,7 @@ const sorgenteEvidenza = 'gdanav-evidenza';
 const stratoTraffico = 'traffico';
 const stratoTrafficoLocale = 'traffico-locale';
 const stratiToccabili = [
+  'persone',
   'alternative-etichetta',
   'alternative',
   'gdanav-soste',
@@ -325,6 +329,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
       sorgenteManovra: {'type': 'geojson', 'data': _vuota},
       sorgenteDistributori: {'type': 'geojson', 'data': _vuota},
       sorgenteVicine: {'type': 'geojson', 'data': _vuota},
+      sorgentePersone: {'type': 'geojson', 'data': _vuota},
       if (perAuto) sorgenteEvidenza: {'type': 'geojson', 'data': _vuota},
       // Raggruppate da MapLibre: da lontano un cerchio col numero, da vicino
       // una per una. Il numero del cerchio sono le prese, sommate dentro il
@@ -1198,6 +1203,45 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           ],
           'icon-allow-overlap': true,
         },
+      },
+      // Le persone di casa: un tondo viola con le iniziali, e il nome sotto.
+      {
+        'id': 'persone',
+        'type': 'circle',
+        'source': sorgentePersone,
+        'paint': {
+          'circle-radius': 15,
+          'circle-color': '#7C3AED',
+          'circle-stroke-color': '#FFFFFF',
+          'circle-stroke-width': 3,
+        },
+      },
+      {
+        'id': 'persone-iniziali',
+        'type': 'symbol',
+        'source': sorgentePersone,
+        'layout': {
+          'text-field': ['get', 'iniziali'],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 13,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+        },
+        'paint': {'text-color': '#FFFFFF'},
+      },
+      {
+        'id': 'persone-nome',
+        'type': 'symbol',
+        'source': sorgentePersone,
+        'layout': {
+          'text-field': ['get', 'nome'],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 13,
+          'text-anchor': 'top',
+          'text-offset': [0, 1.5],
+          'text-allow-overlap': true,
+        },
+        'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 2},
       },
       {
         // Dove sei: la freccia o l'auto scelta, girata come vai, distesa sulla
