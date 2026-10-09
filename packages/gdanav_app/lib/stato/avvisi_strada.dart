@@ -68,7 +68,7 @@ class AvvisiStrada extends ChangeNotifier {
       if (!s.fissa && avanti <= 0 && avanti > -250 && !_chieste.contains(s.id)) dietro = s;
     }
     if (primo case (final s, final m) when _annunciate.add(s.id)) {
-      guida.annuncia('${s.avviso} tra ${distanzaParlata(m)}.');
+      guida.annunciaAvviso('${s.avviso} tra ${distanzaParlata(m)}.');
     }
     if (primo?.$1.id != davanti?.$1.id || primo?.$2 != davanti?.$2 || dietro?.id != passata?.id) {
       davanti = primo;

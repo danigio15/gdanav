@@ -1,6 +1,42 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
+/// Cosa si sente in guida. Il tasto dell'audio passa da uno al dopo:
+/// Tutto, Solo avvisi, Silenzio, e di nuovo Tutto.
+///
+/// Prima c'era un muto solo, e spegneva tutto insieme: chi conosce la strada
+/// e silenziava le indicazioni perdeva anche l'autovelox, la ZTL e il limite,
+/// che sono proprio quello che conviene sentire quando la strada la si sa.
+/// Così le due voci si separano: la **voce di guida** (le manovre e i messaggi
+/// del viaggio) e gli **avvisi** (autovelox, segnalazioni, ZTL, limite).
+enum ModoAudio {
+  /// Indicazioni e avvisi.
+  tutto('tutto', 'Tutto'),
+
+  /// Niente indicazioni, ma gli avvisi sì.
+  soloAvvisi('avvisi', 'Avvisi'),
+
+  /// Niente di niente.
+  silenzio('silenzio', 'Muto');
+
+  const ModoAudio(this.chiave, this.etichetta);
+
+  /// Come lo si chiama verso lo schermo dell'auto.
+  final String chiave;
+
+  /// Sotto l'icona del tasto: corta, ci sta in un dito.
+  final String etichetta;
+
+  /// Il prossimo, toccando il tasto.
+  ModoAudio get dopo => values[(index + 1) % values.length];
+
+  /// La voce di guida è spenta.
+  bool get senzaGuida => this != tutto;
+
+  /// Anche gli avvisi sono spenti.
+  bool get senzaAvvisi => this == silenzio;
+}
+
 /// Chi parla durante la guida. Nelle prove se ne usa una che scrive e basta.
 abstract interface class Voce {
   Future<void> parla(String frase);

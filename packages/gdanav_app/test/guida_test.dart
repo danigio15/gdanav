@@ -1,6 +1,8 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart' show Key;
 import 'package:gdanav_app/stato/gestore_viaggio.dart';
+import 'package:gdanav_app/stato/voce.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import 'aiuti.dart';
@@ -93,7 +95,8 @@ void main() {
 
     cade = true;
     const lontano = Punto(42.05, 12.05); // ~4 km a est
-    for (var i = 0; i < 3; i++) {
+    // Due letture fuori strada bastano per ricalcolare.
+    for (var i = 0; i < 2; i++) {
       await vai(tester, a, lontano);
     }
     await finisceIlRicalcolo(tester, a);
@@ -137,9 +140,10 @@ void main() {
     final a = await inViaggio(tester);
     await tester.tap(find.text('Avvia'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Silenzia la voce'));
+    await tester.tap(find.byKey(const Key('audio')));
     await tester.pump();
     expect(a.guida.muto, isTrue);
+    expect(a.guida.audio, ModoAudio.soloAvvisi);
     expect(await a.archivio.voceMuta(), isTrue);
     final prima = a.voce.frasi.length;
     final punti = (a.viaggio.stato as ViaggioPronto).viaggio.percorso.punti;

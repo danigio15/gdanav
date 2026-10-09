@@ -21,10 +21,10 @@ class GestoreGuida extends ChangeNotifier {
     this.consumo,
     this.risparmio,
     this.archivio,
-    bool mutoIniziale = false,
+    ModoAudio audioIniziale = ModoAudio.tutto,
     DateTime Function()? orologio,
   }) : _ora = orologio ?? DateTime.now {
-    muto = mutoIniziale;
+    audio = audioIniziale;
   }
 
   /// Il consumo imparato: in guida lo si misura e lo si corregge.
@@ -86,7 +86,12 @@ class GestoreGuida extends ChangeNotifier {
   Avanzamento? avanzamento;
   var attiva = false;
   var ricalcolando = false;
-  var muto = false;
+
+  /// Cosa si sente: vedi [ModoAudio].
+  var audio = ModoAudio.tutto;
+
+  /// La voce di guida (manovre, messaggi del viaggio) è spenta.
+  bool get muto => audio.senzaGuida;
 
   /// Con il ricalcolo automatico spento: perché converrebbe ricalcolare. Si
   /// mostra una scheda con «Ricalcola» e «No».
@@ -295,16 +300,68 @@ class GestoreGuida extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Una frase fuori dalle manovre (una segnalazione più avanti).
+  /// Un messaggio del viaggio fuori dalle manovre: tace con la voce di guida.
   void annuncia(String frase) {
     if (!muto) unawaited(voce.parla(frase));
   }
 
+  /// Un avviso: autovelox, segnalazioni, ZTL, limite. Si sente anche con la
+  /// voce di guida spenta («Solo avvisi»); tace solo col silenzio.
+  void annunciaAvviso(String frase) {
+    if (!audio.senzaAvvisi) unawaited(voce.parla(frase));
+  }
+
+  /// Il tasto dell'audio: Tutto → Solo avvisi → Silenzio → Tutto.
   void alternaVoce() {
-    muto = !muto;
-    if (archivio case final a?) unawaited(a.salvaVoceMuta(muto));
-    if (muto) unawaited(voce.zitta());
+    audio = audio.dopo;
+    if (archivio case final a?) unawaited(a.salvaModoAudio(audio));
+    // Quello che si sta dicendo si ferma: col tasto appena toccato, una frase
+    // lunga che continua sembra un tasto che non va.
+    if (audio != ModoAudio.tutto) unawaited(voce.zitta());
     notifyListeners();
+  }
+
+  /* ─── Il limite di velocità, a voce ─────────────────────────────────────
+   *
+   * Il tachimetro diventava rosso e basta: guardare il tachimetro è proprio
+   * quello che non si fa quando si guida. Adesso un avviso, come gli
+   * autovelox: oltre il limite di [oltreIlLimiteKmh] per almeno [oltrePer],
+   * una volta sola per ogni tratto col suo limite. Il margine e l'attesa sono
+   * per non parlare a ogni sorpasso, né per un GPS che salta di un colpo. */
+
+  /// Di quanto oltre il limite prima di dirlo.
+  static const oltreIlLimiteKmh = 5;
+
+  /// E per quanto tempo di fila.
+  static const oltrePer = Duration(seconds: 3);
+
+  int? _limiteVisto;
+  DateTime? _oltreDa;
+  var _limiteDetto = false;
+
+  void _controllaLimite(int? limite, double? kmh) {
+    if (limite != _limiteVisto) {
+      // Un tratto nuovo, con un limite suo: se ne può riparlare.
+      _limiteVisto = limite;
+      _oltreDa = null;
+      _limiteDetto = false;
+    }
+    if (limite == null || kmh == null || kmh <= limite + oltreIlLimiteKmh) {
+      _oltreDa = null;
+      return;
+    }
+    if (_limiteDetto) return;
+    final da = _oltreDa ??= _ora();
+    if (_ora().difference(da) < oltrePer) return;
+    _limiteDetto = true;
+    annunciaAvviso('Attenzione, il limite è $limite.');
+  }
+
+  /// Quanto si va: il tachimetro dell'auto se lo dice, se no il GPS.
+  double? _velocitaKmh(Punto qui) {
+    if (auto.velocitaAuto() case final v?) return v;
+    if (qui case PuntoInMoto(:final velocitaMs?)) return velocitaMs * 3.6;
+    return null;
   }
 
   /// L'ultima posizione vista in guida.
@@ -320,6 +377,7 @@ class GestoreGuida extends ChangeNotifier {
     if (g == null || !attiva) return;
     final a = g.aggiorna(qui);
     avanzamento = a;
+    _controllaLimite(a.limiteKmh, _velocitaKmh(qui));
     // Arrivati al distributore: da qui si prosegue verso la meta.
     // Arrivati a una tappa (o al distributore): da qui si prosegue.
     viaggio.tappeFatte(qui);

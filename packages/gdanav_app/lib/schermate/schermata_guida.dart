@@ -21,6 +21,7 @@ import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/gestore_vicini.dart';
 import '../stato/gestore_ztl.dart';
+import '../stato/voce.dart';
 import '../tema.dart';
 import 'scheda_viaggio.dart' show durata, orario;
 import 'schermata_principale.dart' show CostruisciMappa;
@@ -628,11 +629,7 @@ class _Fondo extends StatelessWidget {
                           : const Icon(Icons.refresh),
                     ),
                     const SizedBox(width: 4),
-                    IconButton.filledTonal(
-                      tooltip: guida.muto ? 'Riattiva la voce' : 'Silenzia la voce',
-                      onPressed: guida.alternaVoce,
-                      icon: Icon(guida.muto ? Icons.volume_off : Icons.volume_up),
-                    ),
+                    TastoAudio(audio: guida.audio, onPressed: guida.alternaVoce),
                     const SizedBox(width: 8),
                     FilledButton(
                       style: FilledButton.styleFrom(
@@ -788,6 +785,59 @@ class _Proposta extends StatelessWidget {
               const SizedBox(width: 6),
               OutlinedButton(onPressed: onNo, child: const Text('No')),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Il tasto dell'audio in guida: Tutto → Solo avvisi → Silenzio. Un'icona
+/// e sotto una parola, perché tre stati con la sola icona non si
+/// distinguono di sfuggita: l'altoparlante barrato vuol dire «niente voce»
+/// o «niente di niente»?
+class TastoAudio extends StatelessWidget {
+  const TastoAudio({super.key = const Key('audio'), required this.audio, required this.onPressed});
+
+  final ModoAudio audio;
+  final VoidCallback onPressed;
+
+  static String suggerimento(ModoAudio a) => switch (a) {
+    ModoAudio.tutto => 'Audio: indicazioni e avvisi. Tocca per i soli avvisi',
+    ModoAudio.soloAvvisi => 'Audio: solo avvisi (autovelox, segnalazioni, ZTL, limite). Tocca per il silenzio',
+    ModoAudio.silenzio => 'Audio: silenzio. Tocca per riattivare tutto',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Theme.of(context).colorScheme;
+    final (icona, fondo, colore) = switch (audio) {
+      ModoAudio.tutto => (Icons.volume_up_rounded, s.secondaryContainer, s.onSecondaryContainer),
+      // Gli avvisi: il megafono, arancio come gli avvisi sulla mappa.
+      ModoAudio.soloAvvisi => (Icons.campaign_rounded, const Color(0xFFFFE0B2), const Color(0xFF8A4B00)),
+      ModoAudio.silenzio => (Icons.volume_off_rounded, s.surfaceContainerHighest, s.onSurfaceVariant),
+    };
+    return Tooltip(
+      message: suggerimento(audio),
+      child: Material(
+        color: fondo,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onPressed,
+          child: SizedBox(
+            width: 58,
+            height: 48,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icona, size: 22, color: colore),
+                Text(
+                  audio.etichetta,
+                  style: TextStyle(fontSize: 11, height: 1.1, fontWeight: FontWeight.w700, color: colore),
+                ),
+              ],
+            ),
           ),
         ),
       ),
