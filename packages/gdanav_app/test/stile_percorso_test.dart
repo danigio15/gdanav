@@ -35,10 +35,10 @@ void main() {
         final linea = larghezza(s('percorso'), z);
         final coda = larghezza(s('code'), z);
         expect(linea, lessThan(bordo));
-        // Più stretta della linea, ai lati resta il celeste; ma non un filo:
-        // la coda si deve vedere di sfuggita.
-        expect(coda, lessThan(linea * 0.6));
-        expect(coda, greaterThan(linea * 0.4));
+        // Più stretta della linea, ai lati resta un bordo celeste; ma il
+        // rosso è la cosa che si legge: come in Waze, due terzi abbondanti.
+        expect(coda, lessThan(linea * 0.8));
+        expect(coda, greaterThan(linea * 0.6));
       }
     });
   }
