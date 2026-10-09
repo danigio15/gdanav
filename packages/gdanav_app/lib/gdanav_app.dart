@@ -100,7 +100,7 @@ Future<GdanavApp> preparaGdanav({
   await premium.carica();
   final auto = GestoreAuto(archivio: archivio, gdahome: gdahome)..premium = premium.sbloccato;
   await auto.avvia();
-  premium.addListener(() => auto.consentiPremium(premium.sbloccato));
+  autoSegueIlPremium(auto, premium);
   // Il consumo imparato del modello scelto; cambiando auto si cambia storia.
   final consumo = GestoreConsumo(archivio);
   await consumo.carica(auto.veicolo.id);
@@ -215,6 +215,20 @@ Future<GdanavApp> preparaGdanav({
     ztl: ztl,
     persone: persone,
   );
+}
+
+/// La batteria letta dall'auto segue Premium: da adesso, e a ogni cambio.
+///
+/// Dal campo, dentro gdahome con la casa Premium: «La batteria letta
+/// dall'auto fa parte di Premium: scrivila a mano», e in macchina «Non so
+/// quanta batteria hai». Il Premium della casa arrivava mentre l'auto si
+/// accendeva (`GestoreAuto.avvia`, che legge l'archivio): l'avviso partiva
+/// quando ancora nessuno ascoltava, e l'auto restava senza Premium fino al
+/// cambio dopo, cioè mai. Ci si mette in ascolto e si guarda subito com'è.
+@visibleForTesting
+void autoSegueIlPremium(GestoreAuto auto, GestorePremium premium) {
+  premium.addListener(() => auto.consentiPremium(premium.sbloccato));
+  unawaited(auto.consentiPremium(premium.sbloccato));
 }
 
 class GdanavApp extends StatelessWidget {
