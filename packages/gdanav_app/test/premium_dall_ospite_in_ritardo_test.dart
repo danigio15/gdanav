@@ -7,7 +7,6 @@ import 'package:gdanav_app/gdanav_app.dart';
 import 'package:gdanav_app/stato/archivio.dart';
 import 'package:gdanav_app/stato/gestore_auto.dart';
 import 'package:gdanav_app/stato/gestore_premium.dart';
-import 'package:gdanav_core/gdanav_core.dart';
 
 import 'aiuti.dart';
 
