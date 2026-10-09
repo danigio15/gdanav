@@ -23,7 +23,7 @@ class PuntoToccato {
     this.proprieta = const {},
   });
 
-  /// 'distributore', 'colonnina' o 'poi'.
+  /// 'distributore', 'colonnina', 'persona' (di casa, da gdahome) o 'poi'.
   final String tipo;
   final String? id;
   final String nome;
@@ -40,6 +40,7 @@ class PuntoToccato {
     final dove = Punto((xy[1] as num).toDouble(), (xy[0] as num).toDouble());
     final nome = '${p['nome'] ?? p['name'] ?? ''}';
     return switch (p['tipo']) {
+      'persona' => PuntoToccato(tipo: 'persona', id: p['id'] as String?, nome: nome, posizione: dove, proprieta: p),
       'distributore' || 'colonnina' => PuntoToccato(
         tipo: p['tipo']! as String,
         id: p['id'] as String?,
@@ -154,6 +155,7 @@ class _Scheda extends StatelessWidget {
         Icons.ev_station,
         'COLONNINA DI RICARICA',
       ),
+      'persona' => (const Color(0xFF7C3AED), Icons.person, 'PERSONA DI CASA'),
       _ => () {
         final c = categoriaPoi(punto.proprieta['subclass'] as String?, punto.proprieta['class'] as String?);
         return (coloreHex(c.colore), iconaCategoria(c), c.etichetta.toUpperCase());
@@ -232,6 +234,9 @@ class _Scheda extends StatelessWidget {
         dettagli.add(const SizedBox(height: 8));
         dettagli.add(Text(d.sempreAperto ? 'Aperto 24 ore' : 'Orari: $o', style: t.bodyMedium));
       }
+    } else if (punto.tipo == 'persona') {
+      descrizione = '${punto.proprieta['dove'] ?? ''}'.trim();
+      if (descrizione.isNotEmpty) dettagli.add(Text(descrizione, style: t.bodyMedium?.copyWith(color: muto)));
     } else if (col != null) {
       final c = col;
       final connettori = vicini!.auto.veicolo.connettori;

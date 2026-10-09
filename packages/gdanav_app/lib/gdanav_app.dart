@@ -18,6 +18,7 @@ import 'stato/gestore_guida.dart';
 import 'stato/gestore_risparmio.dart';
 import 'stato/gestore_luoghi.dart';
 import 'stato/gestore_meteo.dart';
+import 'stato/gestore_persone.dart';
 import 'stato/gestore_posizione.dart';
 import 'stato/gestore_segnalazioni.dart';
 import 'stato/gestore_vicini.dart';
@@ -32,11 +33,12 @@ import 'tema.dart';
 
 // Quello che serve a chi ospita gdanav per dargli l'auto: la fonte gdahome e
 // la lettura che le si manda.
-export 'package:gdanav_core/gdanav_core.dart' show StatoAuto, TipoSorgente;
+export 'package:gdanav_core/gdanav_core.dart' show Punto, StatoAuto, TipoSorgente;
 
 export 'risorse.dart' show logoGdanav;
 export 'schermate/schermata_principale.dart' show VoceOspite;
 export 'sorgenti/sorgente_gdahome.dart';
+export 'stato/gestore_persone.dart' show GestorePersone, PersonaSullaMappa;
 
 /// Accende tutto quello che gdanav tiene in piedi — l'auto, il viaggio, la
 /// guida, la posizione, le segnalazioni — e torna l'app pronta da disegnare.
@@ -65,6 +67,8 @@ export 'sorgenti/sorgente_gdahome.dart';
 /// macchina parte base, e da quando c'è una casa segue il suo abbonamento.
 /// Gli extra di Premium restano di Premium.
 ///
+/// [persone]: quelli di casa sulla mappa, li mette l'app ospite (gdahome).
+///
 /// Le versioni troppo vecchie ([GestoreAggiornamento]) si fermano solo in
 /// gdanav da sola: dentro un'altra app ([premiumOspite], [gdahome] o
 /// [senzaPremium]) ci pensa lei.
@@ -75,6 +79,7 @@ Future<GdanavApp> preparaGdanav({
   ValueListenable<bool>? premiumOspite,
   bool senzaPremium = false,
   ValueListenable<bool>? guidaInAutoSenzaPremium,
+  GestorePersone? persone,
 }) async {
   final archivio = Archivio(portachiavi);
   final aggiornamento = GestoreAggiornamento.per(
@@ -208,6 +213,7 @@ Future<GdanavApp> preparaGdanav({
     aggiornamento: aggiornamento,
     chiediPosizione: chiediPosizione,
     ztl: ztl,
+    persone: persone,
   );
 }
 
@@ -230,6 +236,7 @@ class GdanavApp extends StatelessWidget {
     this.premium,
     this.aggiornamento,
     this.ztl,
+    this.persone,
   });
 
   final Archivio archivio;
@@ -258,6 +265,10 @@ class GdanavApp extends StatelessWidget {
 
   /// Le ZTL e le aree pedonali: sulla mappa, gli avvisi e i permessi.
   final GestoreZtl? ztl;
+
+  /// Le persone di casa sulla mappa: le mette chi ospita gdanav (gdahome).
+  /// `null` in gdanav da sola.
+  final GestorePersone? persone;
 
   /// Porta a un punto scelto da chi ospita gdanav: calcola il viaggio fin lì,
   /// e la meta si chiama [nome]. gdahome lo usa per «Apri in mappa» sulla
@@ -310,6 +321,7 @@ class GdanavApp extends StatelessWidget {
     segnalazioni: segnalazioni,
     meteo: meteo,
     vicini: vicini,
+    persone: persone,
     luoghi: luoghi,
     consumo: consumo,
     fotoAuto: fotoAuto,

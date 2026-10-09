@@ -12,6 +12,7 @@ import '../componenti/icone_segnalazioni.dart';
 import '../schermate/scheda_punto.dart';
 import '../servizi.dart';
 import '../stato/gestore_guida.dart';
+import '../stato/gestore_persone.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_risparmio.dart';
 import '../stato/gestore_segnalazioni.dart';
@@ -36,6 +37,7 @@ class MappaViaggio extends StatefulWidget {
     this.guida,
     this.segnalazioni,
     this.vicini,
+    this.persone,
     this.ztl,
     this.risparmio,
     this.onPunto,
@@ -63,6 +65,9 @@ class MappaViaggio extends StatefulWidget {
 
   /// Distributori o colonnine intorno, sulla mappa.
   final GestoreVicini? vicini;
+
+  /// Le persone di casa, quando gdanav sta dentro gdahome.
+  final GestorePersone? persone;
 
   /// Le ZTL e le aree pedonali: si disegnano quelle che si vedono, se si
   /// vogliono sulla mappa.
@@ -129,6 +134,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.guida?.addListener(_io);
     widget.segnalazioni?.addListener(_segnalazioni);
     widget.vicini?.addListener(_vicini);
+    widget.persone?.addListener(_persone);
     widget.ztl?.addListener(_zoneDaCapo);
     _gestoreRisparmio?.addListener(_risparmio);
     // Le ZTL cambiano stato nel corso della giornata: «attiva fino alle 18».
@@ -149,6 +155,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.guida?.removeListener(_io);
     widget.segnalazioni?.removeListener(_segnalazioni);
     widget.vicini?.removeListener(_vicini);
+    widget.persone?.removeListener(_persone);
     widget.ztl?.removeListener(_zoneDaCapo);
     _gestoreRisparmio?.removeListener(_risparmio);
     _orologioZone?.cancel();
@@ -451,6 +458,53 @@ class _MappaViaggioState extends State<MappaViaggio> {
     }
   }
 
+  /// Quante richieste «mostra» ha già seguito la mappa: all'inizio nessuna,
+  /// così una chiesta prima che la mappa ci fosse si segue appena c'è.
+  var _mostrate = 0;
+
+  /// Le persone di casa sulla mappa, e la telecamera su quella da mostrare.
+  Future<void> _persone() async {
+    final m = _mappa, g = widget.persone;
+    if (m == null || !_stileCaricato || g == null) return;
+    try {
+      await m.setGeoJsonSource(sorgentePersone, datiPersone(g.persone).cast<String, dynamic>());
+    } catch (e) {
+      debugPrint('mappa, persone: $e');
+    }
+    if (g.richiesteMostra == _mostrate || !identical(m, _mappa) || !mounted) return;
+    _mostrate = g.richiesteMostra;
+    // Mostrata una persona, il primo GPS non riporta la mappa su di te.
+    _primaPosizione = false;
+    if (widget.guida != null) widget.controllo.toccata();
+    final una = g.daMostrare;
+    if (una != null) {
+      await m.animateCamera(CameraUpdate.newLatLngZoom(LatLng(una.posizione.lat, una.posizione.lon), 15));
+      return;
+    }
+    final punti = [for (final p in g.persone) p.posizione, ?widget.posizione.qui];
+    if (punti.isEmpty) return;
+    if (punti.length == 1) {
+      await m.animateCamera(CameraUpdate.newLatLngZoom(LatLng(punti.first.lat, punti.first.lon), 15));
+      return;
+    }
+    var sud = 90.0, ovest = 180.0, nord = -90.0, est = -180.0;
+    for (final p in punti) {
+      if (p.lat < sud) sud = p.lat;
+      if (p.lat > nord) nord = p.lat;
+      if (p.lon < ovest) ovest = p.lon;
+      if (p.lon > est) est = p.lon;
+    }
+    await m.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(southwest: LatLng(sud, ovest), northeast: LatLng(nord, est)),
+        left: 60,
+        top: 200,
+        right: 60,
+        bottom: MediaQuery.sizeOf(context).height * 0.3,
+      ),
+    );
+  }
+
   Future<void> _segnalazioni() async {
     final m = _mappa, g = widget.segnalazioni;
     if (m == null || !_stileCaricato || g == null) return;
@@ -636,6 +690,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
             _io();
             _segnalazioni();
             _vicini();
+            _persone();
             _zone();
             _risparmio();
           });
