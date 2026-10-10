@@ -109,6 +109,13 @@ class RendererMappa(
                 DiagnosiTraffico.riquadro(operazione, sorgente)
             }
         }
+        /* Il calore in auto. La mappa si ridisegnava a ogni fotogramma dello
+         * schermo, sessanta al secondo, finché si guida: lo scorrere fra due
+         * posizioni non si ferma mai. Sessanta fotogrammi di una mappa 3D, e
+         * Android Auto che li codifica tutti in video per l'auto, scaldano il
+         * telefono come un videogioco. Trenta sono il tetto; lo scorrere
+         * stesso ne chiede venticinque (vedi [FOTOGRAMMA_MS]). */
+        vista.setMaximumFps(FPS_MASSIMI)
         vista.onCreate(null)
         vista.onStart()
         vista.onResume()
@@ -451,6 +458,7 @@ class RendererMappa(
     private var obiettivo: DoubleArray? = null
     private var animazione: ValueAnimator? = null
     private var ultimaPosizione = 0L
+    private var ultimoDisegno = 0L
     private var eraLibera = false
     private val sorgentiCaricate = HashMap<String, String>()
 
@@ -520,6 +528,10 @@ class RendererMappa(
             duration = durata
             interpolator = LinearInterpolator()
             addUpdateListener { va ->
+                // Uno ogni [FOTOGRAMMA_MS], e l'ultimo sempre: arriva dove deve.
+                val adesso = SystemClock.uptimeMillis()
+                if (va.animatedFraction < 1f && adesso - ultimoDisegno < FOTOGRAMMA_MS) return@addUpdateListener
+                ultimoDisegno = adesso
                 val t = (va.animatedValue as Float).toDouble()
                 val v = DoubleArray(nuovo.size) { i ->
                     if (i == 2 || i == 3) angolo(partenza[i], nuovo[i], t) else partenza[i] + (nuovo[i] - partenza[i]) * t
@@ -583,6 +595,12 @@ class RendererMappa(
 
     private companion object {
         const val VUOTA = "{\"type\":\"FeatureCollection\",\"features\":[]}"
+
+        /** Il tetto dei fotogrammi della mappa sull'auto. */
+        const val FPS_MASSIMI = 30
+
+        /** Lo scorrere fra due posizioni: 25 fotogrammi al secondo. */
+        const val FOTOGRAMMA_MS = 40L
 
         /** Il cerchio intorno al punto della scheda aperta (`stile.dart`). */
         const val SORGENTE_EVIDENZA = "gdanav-evidenza"
