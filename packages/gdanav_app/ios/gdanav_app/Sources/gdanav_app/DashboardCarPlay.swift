@@ -18,6 +18,13 @@ public final class GdanavDashboardCarPlay: UIResponder, CPTemplateApplicationDas
     private var mappa: MappaCarPlay?
     private weak var controllo: CPDashboardController?
     private var ascolto: UUID?
+    /// Un tasto del riquadro: dove porta, come si chiama, il suo simbolo.
+    private struct Meta {
+        let tipo: String
+        let nome: String
+        let simbolo: String
+    }
+
     /// I tasti mostrati adesso, per non rifarli a ogni posizione.
     private var tastiMostrati: [String] = []
 
@@ -57,10 +64,11 @@ public final class GdanavDashboardCarPlay: UIResponder, CPTemplateApplicationDas
     private func aggiornaTasti() {
         guard let controllo else { return }
         let ponte = PonteAuto.shared
-        let mete: [(tipo: String, nome: String, simbolo: String)] = ponte.guida != nil ? [] : [
-            ("casa", "Casa", "house.fill"),
-            ("lavoro", "Lavoro", "briefcase.fill"),
-        ].filter { m in ponte.luoghi.contains { $0.tipo == m.tipo } }
+        let tutte = [
+            Meta(tipo: "casa", nome: "Casa", simbolo: "house.fill"),
+            Meta(tipo: "lavoro", nome: "Lavoro", simbolo: "briefcase.fill"),
+        ]
+        let mete = ponte.guida != nil ? [] : tutte.filter { m in ponte.luoghi.contains { $0.tipo == m.tipo } }
         let chiavi = mete.map(\.tipo)
         if chiavi == tastiMostrati { return }
         tastiMostrati = chiavi
