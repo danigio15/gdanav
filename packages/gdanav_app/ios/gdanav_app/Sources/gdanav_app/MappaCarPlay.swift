@@ -40,7 +40,13 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         }
     }
 
-    init() {
+    /// Nel riquadro del Dashboard di CarPlay: la mappa e basta, senza i
+    /// dati sopra — il riquadro è piccolo, e la manovra la scrive CarPlay
+    /// accanto.
+    let soloMappa: Bool
+
+    init(soloMappa: Bool = false) {
+        self.soloMappa = soloMappa
         let p = UserDefaults.standard
         tridimensionale = p.object(forKey: "gdanav.auto_3d") as? Bool ?? true
         zoomGuida = p.object(forKey: "gdanav.auto_zoom_guida") as? Double ?? 16.5
@@ -86,6 +92,10 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
         areaSicura = view.safeAreaInsets
+        /* Il percorso rientra subito nell'area libera: aspettare la prossima
+         * posizione voleva dire, fermi al semaforo, l'auto sotto la scheda
+         * appena aperta (o a lato, se l'area si è stretta). */
+        if isViewLoaded, stilePronto, !libera { muovi() }
     }
 
     override func viewDidLayoutSubviews() {
@@ -171,7 +181,7 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     /// Chiamata a ogni novità dal telefono.
     func aggiorna() {
         guard isViewLoaded else { return }
-        pannello.isHidden = !GdanavCarPlay.pannelliSullaMappa
+        pannello.isHidden = soloMappa || !GdanavCarPlay.pannelliSullaMappa
         pannello.aggiorna()
         let ponte = PonteAuto.shared
         guard let json = (scuro ? ponte.stileScuro : ponte.stileChiaro) ?? ponte.stileChiaro else { return }
@@ -234,6 +244,17 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     private var ultimaPosizione: CFTimeInterval = 0
     private var eraLibera = false
 
+    /// Quanto si avvicina la mappa arrivando a una svolta, un'uscita, una
+    /// rotonda: da 600 metri si comincia, a 150 si è vicini di un livello e
+    /// mezzo, e passata la manovra si torna allo zoom di prima. Come su
+    /// Android Auto (`RendererMappa.zoomInSvolta`).
+    static func zoomInSvolta(_ g: GuidaAuto?) -> Double {
+        guard let g else { return 0 }
+        guard (9...27).contains(g.tipo) || g.tipo == 37 || g.tipo == 38 else { return 0 }
+        let inizio = 600.0, vicino = 150.0
+        return 1.5 * min(max((inizio - g.distanzaM) / (inizio - vicino), 0), 1)
+    }
+
     private func muovi() {
         let ponte = PonteAuto.shared
         guard let qui = ponte.qui else {
@@ -254,7 +275,7 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
             qui.lat, qui.lon,
             inclinata ? ponte.rotta : 0,
             ponte.rottaIo,
-            guida ? zoomGuida : zoomFermo,
+            guida ? zoomGuida + MappaCarPlay.zoomInSvolta(ponte.guida) : zoomFermo,
             inclinata ? 55 : 0,
             Double(a.left), Double(a.top) + sopra, Double(a.right), Double(a.bottom),
         ]

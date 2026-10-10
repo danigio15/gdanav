@@ -90,6 +90,13 @@ class RendererMappa(
         display = d
         larghezza = contenitore.width
         altezza = contenitore.height
+        /* L'area libera di prima vale per la superficie di prima. Dal campo,
+         * col video: a mezzo schermo (la mappa da una parte, la musica
+         * dall'altra) l'auto finiva sul bordo destro della mappa, perché la
+         * si centrava ancora nell'area dello schermo intero. Se non ci sta
+         * più dentro, si dimentica: la rimanda Android Auto, e intanto vale
+         * tutta la superficie. */
+        areaVisibile?.let { if (it.right > larghezza || it.bottom > altezza) areaVisibile = null }
         densita = contenitore.dpi / 160f
         MapLibre.getInstance(carContext)
         val p = Presentation(carContext, d.display)
@@ -109,6 +116,13 @@ class RendererMappa(
                 DiagnosiTraffico.riquadro(operazione, sorgente)
             }
         }
+        /* Il calore in auto. La mappa si ridisegnava a ogni fotogramma dello
+         * schermo, sessanta al secondo, finché si guida: lo scorrere fra due
+         * posizioni non si ferma mai. Sessanta fotogrammi di una mappa 3D, e
+         * Android Auto che li codifica tutti in video per l'auto, scaldano il
+         * telefono come un videogioco. Trenta sono il tetto; lo scorrere
+         * stesso ne chiede venticinque (vedi [FOTOGRAMMA_MS]). */
+        vista.setMaximumFps(FPS_MASSIMI)
         vista.onCreate(null)
         vista.onStart()
         vista.onResume()
@@ -174,6 +188,14 @@ class RendererMappa(
 
     /** L'area non coperta dalle schede di Android Auto. */
     private var areaVisibile: Rect? = null
+
+    /** L'area libera, sempre dentro la superficie di adesso. */
+    private fun areaLibera(): Rect {
+        val tutta = Rect(0, 0, larghezza, altezza)
+        val a = areaVisibile ?: return tutta
+        val dentro = Rect(a)
+        return if (dentro.intersect(tutta) && !dentro.isEmpty) dentro else tutta
+    }
 
     override fun onVisibleAreaChanged(area: Rect) {
         areaVisibile = Rect(area)
@@ -370,7 +392,7 @@ class RendererMappa(
         val m = mappa ?: return
         val p = evidenziato ?: return
         if (!libera) return
-        val a = areaVisibile ?: Rect(0, 0, larghezza, altezza)
+        val a = areaLibera()
         val margine = 32 * densita
         val s = m.projection.toScreenLocation(p)
         if (s.x >= a.left + margine && s.x <= a.right - margine && s.y >= a.top + margine && s.y <= a.bottom - margine) {
@@ -451,6 +473,7 @@ class RendererMappa(
     private var obiettivo: DoubleArray? = null
     private var animazione: ValueAnimator? = null
     private var ultimaPosizione = 0L
+    private var ultimoDisegno = 0L
     private var eraLibera = false
     private val sorgentiCaricate = HashMap<String, String>()
 
@@ -472,13 +495,13 @@ class RendererMappa(
         val inclinata = tridimensionale
         // L'auto al centro dell'area libera; in guida, o in 3D, più in basso,
         // per vedere la strada davanti.
-        val a = areaVisibile ?: Rect(0, 0, larghezza, altezza)
+        val a = areaLibera()
         val sopra = if (guida) (a.height() * 0.3) else if (inclinata) (a.height() * 0.2) else 0.0
         val nuovo = doubleArrayOf(
             qui[0], qui[1],
             if (inclinata) PonteAuto.rotta else 0.0,
             PonteAuto.rottaIo,
-            if (guida) zoomGuida else zoomFermo,
+            if (guida) zoomGuida + zoomInSvolta(PonteAuto.guida) else zoomFermo,
             if (inclinata) 55.0 else 0.0,
             a.left.toDouble(),
             a.top.toDouble() + sopra,
@@ -520,6 +543,10 @@ class RendererMappa(
             duration = durata
             interpolator = LinearInterpolator()
             addUpdateListener { va ->
+                // Uno ogni [FOTOGRAMMA_MS], e l'ultimo sempre: arriva dove deve.
+                val adesso = SystemClock.uptimeMillis()
+                if (va.animatedFraction < 1f && adesso - ultimoDisegno < FOTOGRAMMA_MS) return@addUpdateListener
+                ultimoDisegno = adesso
                 val t = (va.animatedValue as Float).toDouble()
                 val v = DoubleArray(nuovo.size) { i ->
                     if (i == 2 || i == 3) angolo(partenza[i], nuovo[i], t) else partenza[i] + (nuovo[i] - partenza[i]) * t
@@ -531,6 +558,18 @@ class RendererMappa(
             }
             start()
         }
+    }
+
+    /**
+     * Quanto si avvicina la mappa arrivando a una svolta, un'uscita, una
+     * rotonda: da 600 metri si comincia, a 150 si è vicini di un livello e
+     * mezzo, e passata la manovra si torna allo zoom di prima. Lo scorrere
+     * fra due posizioni lo rende un movimento, non un salto.
+     */
+    private fun zoomInSvolta(g: PonteAuto.Guida?): Double {
+        g ?: return 0.0
+        if (g.tipo !in 9..27 && g.tipo != 37 && g.tipo != 38) return 0.0
+        return ZOOM_IN_SVOLTA * ((INIZIO_SVOLTA_M - g.distanzaM) / (INIZIO_SVOLTA_M - VICINO_SVOLTA_M)).coerceIn(0.0, 1.0)
     }
 
     private fun camera(v: DoubleArray) = CameraPosition.Builder()
@@ -583,6 +622,17 @@ class RendererMappa(
 
     private companion object {
         const val VUOTA = "{\"type\":\"FeatureCollection\",\"features\":[]}"
+
+        /** Il tetto dei fotogrammi della mappa sull'auto. */
+        const val FPS_MASSIMI = 30
+
+        /** Lo scorrere fra due posizioni: 25 fotogrammi al secondo. */
+        const val FOTOGRAMMA_MS = 40L
+
+        /** Lo zoom in più vicino a una svolta, e da dove a dove si avvicina. */
+        const val ZOOM_IN_SVOLTA = 1.5
+        const val INIZIO_SVOLTA_M = 600.0
+        const val VICINO_SVOLTA_M = 150.0
 
         /** Il cerchio intorno al punto della scheda aperta (`stile.dart`). */
         const val SORGENTE_EVIDENZA = "gdanav-evidenza"

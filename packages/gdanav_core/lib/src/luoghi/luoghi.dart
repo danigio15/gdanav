@@ -37,11 +37,18 @@ class ClientePhoton implements FonteLuoghi {
     final uri = indirizzo.replace(queryParameters: {
       'q': q,
       'limit': '10',
+      'lang': 'it',
       if (vicinoA != null) ...{'lat': '${vicinoA.lat}', 'lon': '${vicinoA.lon}'},
     });
     final r = await _http.get(uri, headers: {'user-agent': 'gdanav (github.com/danigio15/gdanav)'});
     if (r.statusCode != 200) throw Exception('Photon: ${r.statusCode}');
-    return leggi(jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>);
+    final luoghi = leggi(jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>);
+    // Chi scrive un numero civico vuole quello: se Photon lo conosce, prima
+    // del nome della via (che con la posizione vicina spesso gli passa avanti).
+    final numero = RegExp(r'\b(\d+[a-zA-Z]?)\b').firstMatch(q)?.group(1)?.toLowerCase();
+    if (numero == null) return luoghi;
+    bool col(Luogo l) => l.nome.toLowerCase().endsWith(' $numero') || l.descrizione.toLowerCase().contains(' $numero,');
+    return [...luoghi.where(col), ...luoghi.where((l) => !col(l))];
   }
 
   /// Legge la FeatureCollection GeoJSON di Photon.

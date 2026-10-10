@@ -375,6 +375,10 @@ class _MappaViaggioState extends State<MappaViaggio> {
    * si fermava. Il risultato era una mappa a scatti e un secondo indietro.
    * Lineare e lunga quanto l'intervallo, la mappa arriva quando arriva la
    * posizione dopo, e il moto resta continuo (come sull'auto). */
+  /// Ogni quanto la mappa del telefono segue l'auto quando gdanav è sullo
+  /// schermo dell'auto.
+  static const _conLAutoOgni = Duration(seconds: 2);
+
   Future<void> _segui(
     MapLibreMapController m,
     Object? lettura,
@@ -383,8 +387,25 @@ class _MappaViaggioState extends State<MappaViaggio> {
     required double rotta,
   }) async {
     if (lettura != null && lettura == _seguita) return;
-    _seguita = lettura;
     final ora = _ora();
+    final posizione = CameraPosition(
+      target: LatLng(qui.lat, qui.lon),
+      zoom: zoom,
+      tilt: _inclinata ? _inclinazione : 0,
+      bearing: _inclinata || widget.guida != null ? rotta : 0,
+    );
+    /* Con gdanav sullo schermo dell'auto, la mappa che scorre è quella: il
+     * telefono nel supporto, con lo schermo acceso, ridisegnava la sua a ogni
+     * fotogramma in più, ed era metà del calore. Qui si sposta ogni due
+     * secondi, senza animazione: chi guarda guarda l'auto. */
+    if (widget.gestore.auto.schermoDellAutoAcceso) {
+      if (ora.difference(_ultimaCamera) < _conLAutoOgni) return;
+      _seguita = lettura;
+      _ultimaCamera = ora;
+      await m.moveCamera(CameraUpdate.newCameraPosition(posizione));
+      return;
+    }
+    _seguita = lettura;
     final passo = ora.difference(_ultimaCamera);
     _ultimaCamera = ora;
     final durata = passo > const Duration(milliseconds: 1100)
@@ -393,14 +414,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
         ? const Duration(milliseconds: 300)
         : passo;
     await m.easeCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(
-          target: LatLng(qui.lat, qui.lon),
-          zoom: zoom,
-          tilt: _inclinata ? _inclinazione : 0,
-          bearing: _inclinata || widget.guida != null ? rotta : 0,
-        ),
-      ),
+      CameraUpdate.newCameraPosition(posizione),
       duration: durata,
       interpolation: CameraAnimationInterpolation.linear,
     );

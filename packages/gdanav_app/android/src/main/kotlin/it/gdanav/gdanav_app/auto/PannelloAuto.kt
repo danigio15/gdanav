@@ -55,18 +55,54 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
     fun aggiorna() = postInvalidate()
 
     override fun onDraw(canvas: Canvas) {
-        val a = area ?: Rect(0, 0, width, height)
+        val tutta = Rect(0, 0, width, height)
+        val a = area?.let { Rect(it) }?.takeIf { it.intersect(tutta) && !it.isEmpty } ?: tutta
         val margine = dp(10f)
         val c = PonteAuto.cruscotto
 
+        // A mezzo schermo il cartello dello svincolo lo mettiamo noi: vedi
+        // [cartelloAMezzoSchermo]. L'avviso, se c'è, gli sta sotto.
+        val sottoIlCartello = cartelloAMezzoSchermo(canvas, a, margine)
+
         // In alto niente, per vedere la strada davanti: solo l'avviso che si
         // avvicina (autovelox, polizia, incidente…), finché serve.
-        avviso(canvas, a.left + margine, a.right - margine, a.top + margine)
+        avviso(canvas, a.left + margine, a.right - margine, (sottoIlCartello ?: a.top.toFloat()) + margine)
 
         // In basso a sinistra, dal lato di chi guida: velocità e limite, e
         // sopra una barra sottile coi dati dell'auto e il meteo.
         val tachimetro = velocita(canvas, a, c)
         barra(canvas, a, tachimetro, c)
+    }
+
+    /**
+     * Il cartello dello svincolo sulla mappa, quando la mappa sta a mezzo
+     * schermo.
+     *
+     * Dal campo, col video: «quando è aperto a metà i cartelli degli svincoli
+     * non escono». Il cartello normalmente sta nell'immagine dello svincolo,
+     * dentro la scheda della manovra; ma Android Auto quell'immagine la mostra
+     * solo se c'è posto, e a mezzo schermo il posto non c'è. Allora, quando
+     * l'area libera è più alta che larga (o quasi) e ci si avvicina a
+     * un'uscita o a un bivio con le indicazioni, il cartello lo si disegna qui,
+     * in cima all'area libera. A schermo intero no: c'è già nella scheda.
+     *
+     * Restituisce dove finisce, per mettere sotto quello che viene dopo.
+     */
+    private fun cartelloAMezzoSchermo(canvas: Canvas, a: Rect, margine: Float): Float? {
+        val g = PonteAuto.guida ?: return null
+        if (a.width() > a.height() * STRETTA) return null
+        if (g.uscita.isEmpty() && g.verso.isEmpty()) return null
+        if (g.distanzaM > CARTELLO_DA_M) return null
+        val box = cartelloUscita(
+            canvas,
+            a.left + margine,
+            a.right - margine,
+            a.top + margine,
+            a.width() - margine * 2,
+            g,
+            righe = 2,
+        )
+        return box.bottom
     }
 
     /** L'ultima vista composta per la scheda: id, cartello, immagine. */
@@ -424,4 +460,12 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         if (m < 1000) "${(Math.round(m / 10.0) * 10)} m" else String.format(java.util.Locale.ITALY, "%.1f km", m / 1000)
 
     private fun accorcia(s: String, n: Int) = if (s.length <= n) s else s.take(n - 1) + "…"
+
+    private companion object {
+        /** L'area libera è «a mezzo schermo» se non è più larga di così rispetto all'altezza. */
+        const val STRETTA = 1.25f
+
+        /** Da quanti metri prima il cartello si vede sulla mappa. */
+        const val CARTELLO_DA_M = 2000.0
+    }
 }

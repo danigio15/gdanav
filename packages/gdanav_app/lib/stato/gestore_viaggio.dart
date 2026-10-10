@@ -219,6 +219,11 @@ final FonteDisponibilita _disponibilita = DisponibilitaConPun(
 );
 final _traffico = Servizi.chiaveTomTom.isEmpty ? null : TrafficoTomTom(Servizi.chiaveTomTom);
 
+/// Dove si cercano le mete: TomTom se c'è la chiave — i numeri civici e le
+/// attività per categoria («farmacia», «benzinaio») — e Photon di riserva.
+FonteLuoghi luoghiPredefiniti({String chiave = Servizi.chiaveTomTom}) =>
+    chiave.isEmpty ? ClientePhoton() : LuoghiConRiserva(ClienteTomTomLuoghi(chiave), ClientePhoton());
+
 class GestoreViaggio extends ChangeNotifier {
   GestoreViaggio({
     required this.archivio,
@@ -229,7 +234,7 @@ class GestoreViaggio extends ChangeNotifier {
     this.ztl,
     FonteLuoghi? luoghi,
     DateTime Function()? orologio,
-  }) : luoghi = luoghi ?? ClientePhoton(),
+  }) : luoghi = luoghi ?? luoghiPredefiniti(),
        _ora = orologio ?? DateTime.now;
 
   /// I permessi delle ZTL: la risposta alla domanda del percorso si ricorda
