@@ -40,7 +40,13 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         }
     }
 
-    init() {
+    /// Nel riquadro del Dashboard di CarPlay: la mappa e basta, senza i
+    /// dati sopra — il riquadro è piccolo, e la manovra la scrive CarPlay
+    /// accanto.
+    let soloMappa: Bool
+
+    init(soloMappa: Bool = false) {
+        self.soloMappa = soloMappa
         let p = UserDefaults.standard
         tridimensionale = p.object(forKey: "gdanav.auto_3d") as? Bool ?? true
         zoomGuida = p.object(forKey: "gdanav.auto_zoom_guida") as? Double ?? 16.5
@@ -175,7 +181,7 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     /// Chiamata a ogni novità dal telefono.
     func aggiorna() {
         guard isViewLoaded else { return }
-        pannello.isHidden = !GdanavCarPlay.pannelliSullaMappa
+        pannello.isHidden = soloMappa || !GdanavCarPlay.pannelliSullaMappa
         pannello.aggiorna()
         let ponte = PonteAuto.shared
         guard let json = (scuro ? ponte.stileScuro : ponte.stileChiaro) ?? ponte.stileChiaro else { return }

@@ -43,6 +43,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>CPSupportsDashboardNavigationScene</key>
+	<true/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -69,6 +71,17 @@
 					<string>CarPlay</string>
 					<key>UISceneDelegateClassName</key>
 					<string>GdanavCarPlay</string>
+				</dict>
+			</array>
+			<key>CPTemplateApplicationDashboardSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>CPTemplateApplicationDashboardScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>CarPlay Dashboard</string>
+					<key>UISceneDelegateClassName</key>
+					<string>GdanavDashboardCarPlay</string>
 				</dict>
 			</array>
 		</dict>
