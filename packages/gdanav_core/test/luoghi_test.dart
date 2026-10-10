@@ -32,6 +32,29 @@ void main() {
     expect(chieste, isEmpty);
     final l = await p.cerca(' bologna ', vicinoA: const Punto(45, 9));
     expect(l, hasLength(3));
-    expect(chieste.single.queryParameters, {'q': 'bologna', 'limit': '10', 'lat': '45.0', 'lon': '9.0'});
+    expect(chieste.single.queryParameters, {'q': 'bologna', 'limit': '10', 'lang': 'it', 'lat': '45.0', 'lon': '9.0'});
+  });
+
+  test('chi scrive il civico lo trova prima della via', () async {
+    final client = MockClient((r) async => http.Response(
+        jsonEncode({
+          'features': [
+            {
+              'geometry': {
+                'coordinates': [9.19, 45.46]
+              },
+              'properties': {'name': 'Via Torino', 'city': 'Milano'},
+            },
+            {
+              'geometry': {
+                'coordinates': [9.18, 45.45]
+              },
+              'properties': {'street': 'Via Torino', 'housenumber': '12', 'city': 'Milano'},
+            },
+          ],
+        }),
+        200));
+    final l = await ClientePhoton(client: client).cerca('via torino 12');
+    expect(l.map((x) => x.nome), ['Via Torino 12', 'Via Torino']);
   });
 }
