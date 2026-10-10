@@ -17,6 +17,8 @@ public class GdanavAppPlugin: NSObject, FlutterPlugin {
             }
         }
         PonteAuto.shared.collega(registrar: registrar)
+        // La guida per l'Apple Watch dell'app ospite (`GdanavOrologio`).
+        GdanavOrologio.accendi()
         // La scena di CarPlay la crea iOS dal nome scritto nell'Info.plist:
         // senza un riferimento qui il linker potrebbe lasciarla fuori.
         _ = GdanavCarPlay.self
