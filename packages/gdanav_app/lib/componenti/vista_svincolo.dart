@@ -35,11 +35,28 @@ class PopupSvincolo extends StatelessWidget {
 
   static const daMetri = 800.0;
 
+  /// Quanto puo' essere largo, al massimo. Su un pieghevole aperto o un tablet
+  /// il popup a tutta larghezza, in 16:9, copriva piu' di meta' della mappa.
+  static const larghezzaMassima = 520.0;
+
+  /// La larghezza del disegno su uno schermo largo [schermo].
+  static double larghezzaSu(double schermo) => (schermo - 24).clamp(0.0, larghezzaMassima).toDouble();
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     const scuro = Color(0xFF2A3140);
     final strada = manovra.strada.isNotEmpty ? manovra.strada : manovra.istruzione;
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: larghezzaMassima + 24),
+        child: _popup(context, t, scuro, strada),
+      ),
+    );
+  }
+
+  Widget _popup(BuildContext context, TextTheme t, Color scuro, String strada) {
     return Padding(
       key: const Key('popup-svincolo'),
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),

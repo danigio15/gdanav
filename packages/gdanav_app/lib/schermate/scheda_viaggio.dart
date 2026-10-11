@@ -247,7 +247,13 @@ class _Pronta extends StatelessWidget {
       ],
     ];
 
-    return DraggableScrollableSheet(
+    return Align(
+      alignment: Alignment.bottomCenter,
+      /* Su un pieghevole aperto o un tablet il pannello non va da un bordo
+       * all'altro: resta largo quanto un telefono, e la mappa si vede ai lati. */
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640),
+        child: DraggableScrollableSheet(
       initialChildSize: 0.46,
       minChildSize: 0.2,
       maxChildSize: 0.92,
@@ -468,6 +474,8 @@ class _Pronta extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    ),
       ),
     );
   }
