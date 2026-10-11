@@ -204,9 +204,12 @@ List<Object> _seEco(String verde, String altro) => [
 
 /// Le larghezze del percorso a zoom 12 e a zoom 18: il bordo, la linea
 /// celeste e, dentro, la striscia della coda (vedi lo stile del percorso).
-const larghezzaBordo = (10.5, 30.0);
-const larghezzaPercorso = (8.0, 24.0);
-const larghezzaCoda = (5.5, 17.0);
+/* «Se c'è il rosso, la linea celeste all'esterno deve essere ancora un po'
+ * più larga: si deve vedere.» Il celeste ai lati della coda era 1,25 px per
+ * parte a zoom 12 e 3,5 a zoom 18: adesso 2,25 e 7. */
+const larghezzaBordo = (12.0, 35.0);
+const larghezzaPercorso = (9.5, 29.0);
+const larghezzaCoda = (5.0, 15.0);
 
 /// Larghezza che cresce con lo zoom, come fanno le strade vere.
 List<Object> _largo(double a12, double a18) => [
@@ -725,7 +728,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
        * era larga quanto la linea e ci si posava sopra: nei tratti in coda il
        * percorso spariva, e una strada rossa sulla mappa non diceva più se
        * era la propria o una qualunque. Per questo la linea è un po' più
-       * larga di prima ([larghezzaPercorso]) e la coda circa due terzi
+       * larga di prima ([larghezzaPercorso]) e la coda circa la metà
        * ([larghezzaCoda]): «la linea del percorso è leggermente più larga,
        * quindi si vede al centro striscia rossa e ai lati striscia celeste».
        * Il celeste è un bordo, non una seconda strada accanto al rosso. */
