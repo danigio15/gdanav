@@ -294,6 +294,100 @@ void main() {
     expect(arrivate, hasLength(2));
   });
 
+  /* Dal campo, CarPlay dentro gdahome: «scelgo un indirizzo, lo schermo
+   * sfarfalla e resta sulla pagina iniziale». La meta scelta in auto deve
+   * finire o in guida o in un messaggio sull'auto: mai in un errore sul
+   * canale che nessuno legge. */
+  group("la meta scelta in auto: guida, o un messaggio, mai il silenzio", () {
+    Future<({Ambiente a, List<MethodCall> chiamate, Future<Object?> Function(String, Object?) dallAuto})> prepara(
+      WidgetTester tester, {
+      Future<Punto?> Function()? dove,
+    }) async {
+      preparaPiattaforma(portachiavi: impostazioniComplete);
+      final chiamate = <MethodCall>[];
+      final messaggero = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messaggero.setMockMethodCallHandler(canale, (c) async {
+        chiamate.add(c);
+        return null;
+      });
+      addTearDown(() => messaggero.setMockMethodCallHandler(canale, null));
+      final a = await ambiente(tester, km: 20, dove: dove);
+      a.auto.manuale.imposta(90);
+      final luoghi = GestoreLuoghi(a.archivio);
+      await tester.runAsync(luoghi.carica);
+      final ponte = PonteAuto(
+        viaggio: a.viaggio,
+        guida: a.guida,
+        posizione: a.posizione,
+        luoghi: luoghi,
+        canale: canale,
+      )..avvia();
+      addTearDown(ponte.ferma);
+      await tester.pump();
+
+      Future<Object?> dallAuto(String metodo, Object? argomenti) async {
+        Object? risposta;
+        await tester.runAsync(
+          () => messaggero.handlePlatformMessage(
+            'gdanav/schermo_auto',
+            const StandardMethodCodec().encodeMethodCall(MethodCall(metodo, argomenti)),
+            // Un errore sul canale qui fa fallire la prova: è proprio quello
+            // che non deve più succedere.
+            (dati) => risposta = dati == null ? null : const StandardMethodCodec().decodeEnvelope(dati),
+          ),
+        );
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+        await tester.pump();
+        return risposta;
+      }
+
+      return (a: a, chiamate: chiamate, dallAuto: dallAuto);
+    }
+
+    const meta = {'nome': 'Via Roma 1', 'descrizione': 'Bologna', 'lat': 42.1, 'lon': 12.0};
+
+    Iterable<Object?> messaggi(List<MethodCall> chiamate) =>
+        chiamate.where((c) => c.method == 'messaggio').map((c) => (c.arguments as Map)['testo']);
+
+    testWidgets("partita: la risposta all'auto è sì, e la guida è accesa", (tester) async {
+      final p = await prepara(tester);
+      expect(await p.dallAuto('vai', meta), isTrue);
+      expect(p.a.guida.attiva, isTrue);
+      expect((p.chiamate.lastWhere((c) => c.method == 'guida').arguments as Map)['attiva'], isTrue);
+      // Una meta già scelta e poi un'altra: si cambia, e si riparte.
+      expect(await p.dallAuto('vai', {...meta, 'nome': 'Via Milano 3', 'lat': 42.15}), isTrue);
+      expect(p.a.viaggio.destinazione!.nome, 'Via Milano 3');
+      expect(p.a.guida.attiva, isTrue);
+    });
+
+    testWidgets("dove sei lancia (il permesso, col telefono in tasca): un messaggio, non un errore", (tester) async {
+      final p = await prepara(tester, dove: () async => throw StateError('permesso in corso'));
+      expect(await p.dallAuto('vai', meta), isFalse);
+      expect(p.a.guida.attiva, isFalse);
+      expect(messaggi(p.chiamate), contains('Non sono riuscito a calcolare il viaggio per Via Roma 1. Riprova.'));
+    });
+
+    testWidgets("il calcolo non riesce: lo dice il viaggio, e la risposta è no", (tester) async {
+      final p = await prepara(tester, dove: () async => null);
+      expect(await p.dallAuto('vai', meta), isFalse);
+      expect(p.a.guida.attiva, isFalse);
+      expect(messaggi(p.chiamate), contains('Non so dove sei: attiva la posizione per gdanav.'));
+    });
+
+    testWidgets("una meta che non si capisce: no, e niente si muove", (tester) async {
+      final p = await prepara(tester);
+      expect(await p.dallAuto('vai', {'nome': 'Senza punto'}), isFalse);
+      expect(await p.dallAuto('passa', null), isFalse);
+      expect(p.a.viaggio.stato, isA<NessunViaggio>());
+    });
+
+    testWidgets("«passa» da fermi è una meta come le altre: si parte", (tester) async {
+      final p = await prepara(tester);
+      expect(await p.dallAuto('passa', meta), isTrue);
+      expect(p.a.guida.attiva, isTrue);
+    });
+  });
+
   testWidgets('senza Android Auto si tace', (tester) async {
     preparaPiattaforma();
     final a = await ambiente(tester);

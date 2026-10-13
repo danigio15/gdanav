@@ -151,6 +151,19 @@ final class PonteAuto {
     /// intanto niente Premium).
     var aggiorna: Bool { UserDefaults.standard.bool(forKey: "gdanav.aggiorna") }
 
+    /// Se in auto si guida: di solito è Premium, ma dentro gdahome, senza una
+    /// casa abbinata, si guida base (`preparaGdanav`, `guida_in_auto`). Era
+    /// arrivato solo su Android (`PonteAuto.guidaInAuto` in Kotlin): qui
+    /// CarPlay guardava ancora [premium], e con Premium spento la guida
+    /// calcolata dal telefono non diventava mai la guida di CarPlay — niente
+    /// scheda della manovra, la mappa ferma come prima di scegliere — e
+    /// l'avviso del Premium tornava sopra a ogni novità. Un'app di prima non lo
+    /// dice, e allora vale [premium], come sempre.
+    var guidaInAuto: Bool {
+        let d = UserDefaults.standard
+        return d.object(forKey: "gdanav.guida_in_auto") != nil ? d.bool(forKey: "gdanav.guida_in_auto") : premium
+    }
+
     func casa() -> LuogoAuto? { luoghi.first { $0.tipo == "casa" } }
     func lavoro() -> LuogoAuto? { luoghi.first { $0.tipo == "lavoro" } }
 
@@ -261,6 +274,10 @@ final class PonteAuto {
             UserDefaults.standard.set((a["sbloccato"] as? Bool) == true, forKey: "gdanav.premium")
             UserDefaults.standard.set((a["ospite"] as? Bool) == true, forKey: "gdanav.premium_ospite")
             UserDefaults.standard.set((a["aggiorna"] as? Bool) == true, forKey: "gdanav.aggiorna")
+            UserDefaults.standard.set(
+                (a["guida_in_auto"] as? Bool) ?? ((a["sbloccato"] as? Bool) == true),
+                forKey: "gdanav.guida_in_auto"
+            )
         case "guida":
             guida = (a["attiva"] as? Bool) == true ? guidaDa(a) : nil
         default:

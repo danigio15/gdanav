@@ -1,6 +1,93 @@
 import CarPlay
 import UIKit
 
+/* ─── I passi fra gli schermi, senza far cadere l'app ──────────────────────
+ *
+ * Dal campo, su iPhone con CarPlay dentro gdahome: «ogni volta che scelgo un
+ * indirizzo e lo confermo, lo schermo sfarfalla per un attimo e resta sulla
+ * pagina iniziale del navigatore dove si sceglie la destinazione. Ho provato
+ * piu' volte, sempre uguale».
+ *
+ * Scegliere una meta faceva, tutto dentro il tocco e prima di dire a CarPlay
+ * che il tocco era finito (il `completionHandler` della ricerca, il `fatto`
+ * delle righe): `PonteAuto.vai`, che fa girare subito `novita()` — e li'
+ * dentro `controllaPremium()` puo' aprire l'avviso del Premium con
+ * `presentTemplate` — e poi `popToRootTemplate`. Tutti e due con
+ * `completion: nil`.
+ *
+ * Le regole di CarPlay qui sono secche: push, pop, popToRoot, present e
+ * dismiss, se non riescono e non gli si e' dato il blocco di fine,
+ * **lanciano un'eccezione** (e' scritto cosi' nella documentazione di
+ * `CPInterfaceController`). Un'eccezione Objective-C non si ferma: l'app si
+ * chiude. CarPlay allora rifa' la scena da capo, e la scena da capo e' la
+ * mappa con «Cerca»: lo sfarfallio, e la pagina iniziale. Con l'app chiusa
+ * il telefono non calcolava piu' niente, e la meta era persa. Tornare
+ * indietro mentre CarPlay sta ancora chiudendo il tocco della ricerca, o
+ * mentre si apre un avviso sopra (quello del Premium, o la conferma di un
+ * comando di gdahome), e' proprio il caso in cui un passo puo' non riuscire.
+ * Da qui non lo si vede (serve l'auto, o il simulatore), ma e' la strada nel
+ * codice che spiega lo sfarfallio. Le altre due che lasciavano la mappa
+ * ferma senza dire perche' sono sistemate anche loro: la guida base senza
+ * Premium che CarPlay non accendeva (`PonteAuto.guidaInAuto`), e un errore
+ * nel Dart prima del calcolo che finiva nel vuoto (`vaiDallAuto` in
+ * `lib/auto/ponte_auto.dart`).
+ *
+ * Adesso:
+ *  - ogni passo fra gli schermi ha il suo blocco di fine (questi qui sotto):
+ *    se CarPlay dice di no, si scrive nel registro e si va avanti, l'app
+ *    resta in piedi;
+ *  - una meta scelta ([SchermiCarPlay.parti]) prima chiude il tocco, poi
+ *    torna alla mappa, e **solo a mappa davanti** la manda al telefono: il
+ *    «Calcolo il percorso…» e l'eventuale avviso arrivano sulla mappa, non a
+ *    meta' di un passaggio. */
+extension CPInterfaceController {
+    private func registra(_ passo: String, _ errore: Error?) {
+        NSLog("gdanav CarPlay: \(passo) non riuscito: \(errore?.localizedDescription ?? "senza motivo")")
+    }
+
+    /// Uno schermo sopra; [poi] dice se c'è.
+    func spingi(_ t: CPTemplate, poi: ((Bool) -> Void)? = nil) {
+        pushTemplate(t, animated: true) { [weak self] ok, errore in
+            if !ok { self?.registra("push", errore) }
+            poi?(ok)
+        }
+    }
+
+    /// Indietro di uno.
+    func togli(poi: (() -> Void)? = nil) {
+        popTemplate(animated: true) { [weak self] ok, errore in
+            if !ok { self?.registra("pop", errore) }
+            poi?()
+        }
+    }
+
+    /// Fino alla mappa. [poi] arriva comunque, anche se CarPlay dice di no
+    /// (per esempio perché la mappa è già davanti): chi aspetta non resta
+    /// appeso.
+    func allaRadice(poi: (() -> Void)? = nil) {
+        popToRootTemplate(animated: true) { [weak self] ok, errore in
+            if !ok { self?.registra("popToRoot", errore) }
+            poi?()
+        }
+    }
+
+    /// Un avviso sopra tutto; [poi] dice se si vede.
+    func mostraSopra(_ t: CPTemplate, poi: ((Bool) -> Void)? = nil) {
+        presentTemplate(t, animated: true) { [weak self] ok, errore in
+            if !ok { self?.registra("present", errore) }
+            poi?(ok)
+        }
+    }
+
+    /// Via l'avviso sopra; [poi] dice se c'era.
+    func chiudiSopra(poi: ((Bool) -> Void)? = nil) {
+        dismissTemplate(animated: true) { [weak self] ok, errore in
+            if !ok { self?.registra("dismiss", errore) }
+            poi?(ok)
+        }
+    }
+}
+
 /// Gli schermi di CarPlay sopra la mappa: la copia di `SchermoMenu.kt`,
 /// `SchermoCerca.kt` e `SchermoDestinazioni.kt`. Si rifanno da soli quando il
 /// telefono manda novità.
@@ -93,8 +180,22 @@ enum SchermiCarPlay {
     }
 
     private static func vai(_ l: LuogoAuto, _ c: CPInterfaceController?) {
-        PonteAuto.shared.vai(l)
-        c?.popToRootTemplate(animated: true, completion: nil)
+        parti(l, c)
+    }
+
+    /// Una meta scelta (una riga, un risultato della ricerca): si torna alla
+    /// mappa e poi la si manda al telefono con [manda] (di solito
+    /// `PonteAuto.vai`). Si aspetta il giro dopo, così il tocco che l'ha
+    /// scelta è già chiuso; vedi «I passi fra gli schermi» in cima.
+    static func parti(
+        _ l: LuogoAuto,
+        _ c: CPInterfaceController?,
+        manda: @escaping (LuogoAuto) -> Void = { PonteAuto.shared.vai($0) }
+    ) {
+        DispatchQueue.main.async { [weak c] in
+            guard let c else { return manda(l) }
+            c.allaRadice { manda(l) }
+        }
     }
 
     private static let blu = UIColor.systemBlue
@@ -113,7 +214,7 @@ enum SchermiCarPlay {
             if let casa = GdanavCarPlay.casa {
                 vaiA.append(riga("La tua casa", "Comandi rapidi e dispositivi", icona: icona("house.fill", .systemOrange), sfoglia: true) {
                     guard let c else { return }
-                    c.pushTemplate(casa(c), animated: true, completion: nil)
+                    c.spingi(casa(c))
                 })
             }
             if let casa = p.casa() {
@@ -121,7 +222,7 @@ enum SchermiCarPlay {
             } else {
                 vaiA.append(riga("Casa", "Tocca per impostarla", icona: icona("house.fill", blu), sfoglia: true) {
                     guard let c else { return }
-                    c.pushTemplate(cerca(c, imposta: "casa"), animated: true, completion: nil)
+                    c.spingi(cerca(c, imposta: "casa"))
                 })
             }
             if let lavoro = p.lavoro() {
@@ -129,29 +230,29 @@ enum SchermiCarPlay {
             } else {
                 vaiA.append(riga("Lavoro", "Tocca per impostarlo", icona: icona("briefcase.fill", blu), sfoglia: true) {
                     guard let c else { return }
-                    c.pushTemplate(cerca(c, imposta: "lavoro"), animated: true, completion: nil)
+                    c.spingi(cerca(c, imposta: "lavoro"))
                 })
             }
             vaiA.append(riga("Preferiti e recenti", icona: icona("star.fill", giallo), sfoglia: true) {
                 guard let c else { return }
-                c.pushTemplate(destinazioni(c), animated: true, completion: nil)
+                c.spingi(destinazioni(c))
             })
             // Elettrica: le colonnine; termica: i distributori.
             var intorno: [CPListItem] = []
             if p.cruscotto.elettrica {
                 intorno.append(riga("Colonnine vicine", "Intorno a te, dalla più vicina", icona: icona("bolt.car.fill", verde), sfoglia: true) {
                     guard let c else { return }
-                    c.pushTemplate(colonnine(c), animated: true, completion: nil)
+                    c.spingi(colonnine(c))
                 })
             } else {
                 intorno.append(riga("Distributori vicini", "Coi prezzi di oggi", icona: icona("fuelpump.fill", verde), sfoglia: true) {
                     guard let c else { return }
-                    c.pushTemplate(distributori(c), animated: true, completion: nil)
+                    c.spingi(distributori(c))
                 })
             }
             intorno.append(riga("Segnala", "Polizia, incidente, traffico, pericolo…", icona: icona("exclamationmark.bubble.fill", giallo), sfoglia: true) {
                     guard let c else { return }
-                    c.pushTemplate(segnala(c), animated: true, completion: nil)
+                    c.spingi(segnala(c))
                 })
             let impostazioni = riga(
                 "Impostazioni",
@@ -160,7 +261,7 @@ enum SchermiCarPlay {
                 sfoglia: true
             ) {
                 guard let c, let mappa else { return }
-                c.pushTemplate(SchermiCarPlay.impostazioni(c, mappa: mappa), animated: true, completion: nil)
+                c.spingi(SchermiCarPlay.impostazioni(c, mappa: mappa))
             }
             return [
                 CPListSection(items: vaiA, header: "Vai a", sectionIndexTitle: nil),
@@ -185,7 +286,7 @@ enum SchermiCarPlay {
                     sfoglia: true
                 ) {
                     guard let c else { return }
-                    c.pushTemplate(SchermiCarPlay.arrivo(c), animated: true, completion: nil)
+                    c.spingi(SchermiCarPlay.arrivo(c))
                 })
             }
             righe.append(interruttore(
@@ -212,7 +313,7 @@ enum SchermiCarPlay {
                 sfoglia: true
             ) {
                 guard let c else { return }
-                c.pushTemplate(SchermiCarPlay.opzioni(), animated: true, completion: nil)
+                c.spingi(SchermiCarPlay.opzioni())
             })
             righe.append(interruttore(
                 "Prova di guida",
@@ -222,11 +323,11 @@ enum SchermiCarPlay {
             ) { acceso in PonteAuto.shared.prova(acceso) })
             righe.append(riga("Imposta Casa", PonteAuto.shared.casa()?.nome ?? "Non ancora impostata", icona: icona("house.fill"), sfoglia: true) {
                 guard let c else { return }
-                c.pushTemplate(cerca(c, imposta: "casa"), animated: true, completion: nil)
+                c.spingi(cerca(c, imposta: "casa"))
             })
             righe.append(riga("Imposta Lavoro", PonteAuto.shared.lavoro()?.nome ?? "Non ancora impostato", icona: icona("briefcase.fill"), sfoglia: true) {
                 guard let c else { return }
-                c.pushTemplate(cerca(c, imposta: "lavoro"), animated: true, completion: nil)
+                c.spingi(cerca(c, imposta: "lavoro"))
             })
             return [CPListSection(items: righe)]
         }
@@ -239,7 +340,7 @@ enum SchermiCarPlay {
             let righe = [5, 10, 15, 20, 25, 30].map { v in
                 riga(v == ora ? "✓  \(v)%" : "\(v)%", v == ora ? "Scelta adesso" : nil) {
                     PonteAuto.shared.cambiaOpzione("arrivo", v)
-                    c?.popTemplate(animated: true, completion: nil)
+                    c?.togli()
                 }
             }
             return [CPListSection(items: righe)]
@@ -278,7 +379,7 @@ enum SchermiCarPlay {
             var righe: [CPListItem] = [
                 riga("Cerca un indirizzo o un posto", icona: icona("magnifyingglass", blu), sfoglia: true) {
                     guard let c else { return }
-                    c.pushTemplate(cerca(c), animated: true, completion: nil)
+                    c.spingi(cerca(c))
                 },
             ]
             // L'auto decide quante righe si vedono: una è già «Cerca».
@@ -334,8 +435,7 @@ enum SchermiCarPlay {
             PonteAuto.shared.distributori { trovati in
                 fatto(trovati.map { l in
                     riga(l.nome, l.descrizione, icona: icona("fuelpump.fill", verde)) {
-                        PonteAuto.shared.passa(l)
-                        c?.popToRootTemplate(animated: true, completion: nil)
+                        parti(l, c) { PonteAuto.shared.passa($0) }
                     }
                 })
             }
@@ -362,7 +462,7 @@ enum SchermiCarPlay {
                 PonteAuto.shared.segnala(tipo) { frase in
                     GdanavCarPlay.attuale?.avvisa(frase)
                 }
-                c?.popTemplate(animated: true, completion: nil)
+                c?.togli()
             }
         }
         return CPGridTemplate(title: "Segnala", gridButtons: tasti)
@@ -378,7 +478,6 @@ private final class Ricerca: NSObject, CPSearchTemplateDelegate {
     private var inAttesa: (([CPListItem]) -> Void)?
     private var ultima = 0
     private var ultimi: [CPListItem] = []
-    private var luoghi: [ObjectIdentifier: LuogoAuto] = [:]
 
     init(controllore: CPInterfaceController, imposta: String?) {
         self.controllore = controllore
@@ -405,10 +504,15 @@ private final class Ricerca: NSObject, CPSearchTemplateDelegate {
             PonteAuto.shared.cerca(searchText) { trovati in
                 guard let self, questa == self.ultima, let fine = self.inAttesa else { return }
                 self.inAttesa = nil
-                self.luoghi.removeAll()
                 self.ultimi = trovati.prefix(SchermiCarPlay.righeMassime).map { l in
                     let r = CPListItem(text: l.nome, detailText: l.descrizione.isEmpty ? nil : l.descrizione)
-                    self.luoghi[ObjectIdentifier(r)] = l
+                    /* Il posto sta sulla riga stessa (`userInfo`, come negli
+                     * esempi di Apple): prima stava in un elenco a parte per
+                     * indirizzo di memoria, che si svuotava a ogni nuova
+                     * ricerca — una riga toccata appena prima che arrivassero
+                     * i risultati nuovi non si ritrovava piu', e il tocco non
+                     * faceva niente. */
+                    r.userInfo = l
                     return r
                 }
                 fine(self.ultimi)
@@ -423,17 +527,22 @@ private final class Ricerca: NSObject, CPSearchTemplateDelegate {
         selectedResult item: CPListItem,
         completionHandler: @escaping () -> Void
     ) {
-        defer { completionHandler() }
-        guard let l = luoghi[ObjectIdentifier(item)] else { return }
+        /* Prima si dice a CarPlay che il tocco è finito, e solo dopo ci si
+         * muove fra gli schermi: tornare alla mappa a tocco ancora aperto, e
+         * senza blocco di fine, poteva far chiudere l'app («I passi
+         * fra gli schermi», in cima). */
+        completionHandler()
+        guard let l = item.userInfo as? LuogoAuto else { return }
         guard let tipo = imposta else {
-            PonteAuto.shared.vai(l)
-            controllore?.popToRootTemplate(animated: true, completion: nil)
+            SchermiCarPlay.parti(l, controllore)
             return
         }
         PonteAuto.shared.imposta(tipo, l) { [weak self] fatto in
             let nome = tipo == "casa" ? "Casa" : "Lavoro"
-            self?.controllore?.popTemplate(animated: true, completion: nil)
-            GdanavCarPlay.attuale?.avvisa(fatto ? "\(nome) salvato: \(l.nome)" : "Non si è potuto salvare \(nome)")
+            let detto = fatto ? "\(nome) salvato: \(l.nome)" : "Non si è potuto salvare \(nome)"
+            // Uno dopo l'altro: indietro, poi alla mappa col messaggio.
+            guard let c = self?.controllore else { return }
+            c.togli { GdanavCarPlay.attuale?.avvisa(detto) }
         }
     }
 
