@@ -38,6 +38,8 @@ object PonteAuto {
         val dopoStrada: String = "",
         /** La vista dello svincolo da mostrare, se pronta (vedi [svincoli]). */
         val svincolo: Int? = null,
+        /** Il pedaggio che resta, per la scheda dell'arrivo: «~12,40 € pedaggio». */
+        val pedaggio: String? = null,
     )
 
     /** Una corsia prima dello svincolo: le frecce, se è giusta, quale seguire. */
@@ -93,6 +95,8 @@ object PonteAuto {
         val meteoTemperatura: Double? = null,
         val meteoEmoji: String? = null,
         val meteoDove: String? = null,
+        /** Il pedaggio che resta, breve: «~12,40 €». */
+        val pedaggio: String? = null,
     )
 
     @Volatile var cruscotto = Cruscotto()
@@ -125,6 +129,13 @@ object PonteAuto {
      * lì, coi due tasti, e non nel pannello sulla mappa.
      */
     @Volatile var conAvvisi = false
+
+    /**
+     * L'auto scrive un testo accanto ai km che restano (API 5,
+     * `TravelEstimate.setTripText`): il pedaggio va lì, e non nella barra
+     * sulla mappa.
+     */
+    @Volatile var pedaggioNellaStima = false
 
     /** Le opzioni del percorso e la voce, per il menu. */
     @Volatile var opzioni: Map<String, Any?> = emptyMap()
@@ -238,6 +249,7 @@ object PonteAuto {
                 meteoTemperatura = numero(call, "meteo_temperatura"),
                 meteoEmoji = call.argument<String>("meteo_emoji"),
                 meteoDove = call.argument<String>("meteo_dove"),
+                pedaggio = call.argument<String>("pedaggio"),
             )
             "avviso" -> avviso = Avviso(
                 titolo = call.argument<String>("titolo"),
@@ -302,6 +314,7 @@ object PonteAuto {
                         dopoTipo = numero(call, "dopo_tipo")?.toInt(),
                         dopoStrada = call.argument<String>("dopo_strada") ?: "",
                         svincolo = numero(call, "svincolo")?.toInt(),
+                        pedaggio = call.argument<String>("pedaggio"),
                     )
                 } else {
                     null

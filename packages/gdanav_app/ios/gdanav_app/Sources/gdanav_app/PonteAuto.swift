@@ -47,6 +47,8 @@ struct GuidaAuto {
     let destinazioneLat: Double?
     let destinazioneLon: Double?
     let arrivoBatteria: Double?
+    /// Il pedaggio che resta, «Pedaggio ~12,40 €»; `nil` se non se ne paga.
+    let pedaggio: String?
     let uscita: String
     let verso: String
     let rotonda: Int?
@@ -74,6 +76,8 @@ struct CruscottoAuto {
     var meteoTemperatura: Double?
     var meteoEmoji: String?
     var meteoDove: String?
+    /// Il pedaggio che resta, breve: «~12,40 €».
+    var pedaggio: String?
 }
 
 /// La segnalazione che si avvicina, e quella appena passata.
@@ -234,7 +238,8 @@ final class PonteAuto {
                 sostaBatteria: numero(a["sosta_batteria"]),
                 meteoTemperatura: numero(a["meteo_temperatura"]),
                 meteoEmoji: a["meteo_emoji"] as? String,
-                meteoDove: a["meteo_dove"] as? String
+                meteoDove: a["meteo_dove"] as? String,
+                pedaggio: a["pedaggio"] as? String
             )
         case "avviso":
             let prossimo = AvvisoAuto(
@@ -303,6 +308,7 @@ final class PonteAuto {
             destinazioneLat: numero(a["destinazione_lat"]),
             destinazioneLon: numero(a["destinazione_lon"]),
             arrivoBatteria: numero(a["arrivo_batteria"]),
+            pedaggio: a["pedaggio"] as? String,
             uscita: a["uscita"] as? String ?? "",
             verso: a["verso"] as? String ?? "",
             rotonda: numero(a["rotonda"]).map { Int($0) },

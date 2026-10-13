@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../geo/geo.dart';
 import '../motore/modello_consumo.dart';
 import '../ztl/ztl.dart';
+import 'pedaggi.dart';
 
 /// Dove porta una corsia: le frecce dipinte sull'asfalto.
 enum DirezioneCorsia {
@@ -153,6 +154,8 @@ class PercorsoCalcolato {
     this.senzaTraffico,
     this.ztl,
     this.consumoTomTom,
+    this.pedaggi = const [],
+    this.prezzoPedaggio,
   });
 
   final List<Punto> punti;
@@ -191,6 +194,15 @@ class PercorsoCalcolato {
   /// gliel'abbiamo chiesto (o non l'ha detto).
   final double? consumoTomTom;
 
+  /// Dove si paga il pedaggio: i tratti a pagamento, in metri sulla
+  /// geometria dei [punti]. Vuota se non se ne paga, o se il motore non dice
+  /// dove ([conPedaggi] resta vero).
+  final List<TrattoPedaggio> pedaggi;
+
+  /// Il pedaggio vero in euro, se il motore dei percorsi lo sa (HERE,
+  /// TollGuru); `null`: lo stima [TariffaPedaggio.stima].
+  final double? prezzoPedaggio;
+
   /// Il percorso da cui partire per applicare il traffico.
   PercorsoCalcolato get base => senzaTraffico ?? this;
 
@@ -225,6 +237,8 @@ class PercorsoCalcolato {
         senzaTraffico: senzaTraffico ?? this.senzaTraffico,
         ztl: ztl ?? this.ztl,
         consumoTomTom: consumoTomTom,
+        pedaggi: pedaggi,
+        prezzoPedaggio: prezzoPedaggio,
       );
 
   PercorsoCalcolato conLimiti(List<int?> limiti) => _copia(limiti: limiti);
@@ -344,6 +358,8 @@ class PercorsoCalcolato {
     final punti = <Punto>[];
     final tratti = <Tratto>[];
     final manovre = <Manovra>[];
+    // Le manovre su strade a pagamento (`toll`), da quale a quale punto.
+    final aPagamento = <({int da, int a, bool vignetta, String? paese})>[];
 
     for (final leg in (trip['legs'] as List).cast<Map<String, Object?>>()) {
       final base = punti.isEmpty ? 0 : punti.length - 1;
@@ -374,6 +390,7 @@ class PercorsoCalcolato {
           ].where((t) => t.isNotEmpty).join(' · '),
           uscitaRotonda: m['roundabout_exit_count'] as int?,
         ));
+        if (m['toll'] == true) aPagamento.add((da: base + da, a: base + a, vignetta: false, paese: null));
         if (a <= da || lunghezza <= 0 || secondi <= 0) continue;
         final kmh = lunghezza / secondi * 3.6;
         // Le distanze fra i punti non tornano mai al metro con quelle di
@@ -399,6 +416,7 @@ class PercorsoCalcolato {
       conPedaggi: sommario['has_toll'] == true,
       conAutostrade: sommario['has_highway'] == true,
       conTraghetti: sommario['has_ferry'] == true,
+      pedaggi: trattiDaIndici(punti, aPagamento),
     );
   }
 }
@@ -471,6 +489,8 @@ class OpzioniPercorso {
     this.evitaAutostrade = false,
     this.evitaTraghetti = false,
     this.ricalcoloAutomatico = true,
+    this.classePedaggio = ClassePedaggio.a,
+    this.euroAlKm = TariffaPedaggio.euroAlKmPredefinito,
   });
 
   factory OpzioniPercorso.daJson(Map<String, Object?> j) => OpzioniPercorso(
@@ -479,6 +499,11 @@ class OpzioniPercorso {
         evitaAutostrade: j['evita_autostrade'] as bool? ?? false,
         evitaTraghetti: j['evita_traghetti'] as bool? ?? false,
         ricalcoloAutomatico: j['ricalcolo_automatico'] as bool? ?? true,
+        classePedaggio: ClassePedaggio.da(j['classe_pedaggio']),
+        euroAlKm: switch (j['euro_al_km']) {
+          final num n when n > 0 => n.toDouble(),
+          _ => TariffaPedaggio.euroAlKmPredefinito,
+        },
       );
 
   final ModoGuida modo;
@@ -490,12 +515,30 @@ class OpzioniPercorso {
   /// soli le soste, o chiederlo prima. Fuori percorso si ricalcola sempre.
   final bool ricalcoloAutomatico;
 
+  /// La classe del veicolo al casello, e quanto costa al km la classe A:
+  /// per stimare il pedaggio (vedi [TariffaPedaggio]). Non cambiano la
+  /// strada.
+  final ClassePedaggio classePedaggio;
+  final double euroAlKm;
+
+  TariffaPedaggio get tariffaPedaggio => TariffaPedaggio(classe: classePedaggio, euroAlKmClasseA: euroAlKm);
+
+  /// Le stesse opzioni per scegliere la strada: cambia solo come si stima
+  /// il pedaggio, e il percorso non va rifatto.
+  bool stessaStrada(OpzioniPercorso o) =>
+      o.modo == modo &&
+      o.evitaPedaggi == evitaPedaggi &&
+      o.evitaAutostrade == evitaAutostrade &&
+      o.evitaTraghetti == evitaTraghetti;
+
   OpzioniPercorso copia({
     ModoGuida? modo,
     bool? evitaPedaggi,
     bool? evitaAutostrade,
     bool? evitaTraghetti,
     bool? ricalcoloAutomatico,
+    ClassePedaggio? classePedaggio,
+    double? euroAlKm,
   }) =>
       OpzioniPercorso(
         modo: modo ?? this.modo,
@@ -503,6 +546,8 @@ class OpzioniPercorso {
         evitaAutostrade: evitaAutostrade ?? this.evitaAutostrade,
         evitaTraghetti: evitaTraghetti ?? this.evitaTraghetti,
         ricalcoloAutomatico: ricalcoloAutomatico ?? this.ricalcoloAutomatico,
+        classePedaggio: classePedaggio ?? this.classePedaggio,
+        euroAlKm: euroAlKm ?? this.euroAlKm,
       );
 
   Map<String, Object?> toJson() => {
@@ -511,6 +556,8 @@ class OpzioniPercorso {
         'evita_autostrade': evitaAutostrade,
         'evita_traghetti': evitaTraghetti,
         'ricalcolo_automatico': ricalcoloAutomatico,
+        'classe_pedaggio': classePedaggio.name,
+        'euro_al_km': euroAlKm,
       };
 
   /// I `costing_options.auto` di Valhalla: 0 vuol dire «solo se non c'è

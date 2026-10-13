@@ -2,7 +2,12 @@ package it.gdanav.gdanav_app.auto
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.text.SpannableString
+import android.text.Spanned
+import androidx.car.app.model.CarColor
 import androidx.car.app.model.CarIcon
+import androidx.car.app.model.CarText
+import androidx.car.app.model.ForegroundCarColorSpan
 import androidx.car.app.model.DateTimeWithZone
 import androidx.car.app.model.Distance
 import androidx.car.app.navigation.model.Destination
@@ -22,6 +27,7 @@ import java.util.TimeZone
  * dell'auto (NF-4) e la notifica di navigazione (NF-3) partono da qui.
  */
 class GuidaAuto(private val context: Context) {
+
     /** Compone lo svincolo col cartello: la stessa grafica del pannello. */
     private val pannello = PannelloAuto(context, context.resources.displayMetrics.density)
 
@@ -82,11 +88,27 @@ class GuidaAuto(private val context: Context) {
         return routing.build()
     }
 
-    /** Arrivo, tempo e km che restano. */
-    fun stima(g: PonteAuto.Guida): TravelEstimate =
-        TravelEstimate.Builder(distanza(g.restantiM), DateTimeWithZone.create(g.arrivoMs, TimeZone.getDefault()))
+    /**
+     * Arrivo, tempo e km che restano. Con [conTesto] (l'auto ha l'API 5)
+     * accanto ai km anche il pedaggio che resta, in ambra: «~12,40 €
+     * pedaggio». Il colore l'auto può ignorarlo; il testo resta.
+     */
+    fun stima(g: PonteAuto.Guida, conTesto: Boolean = false): TravelEstimate {
+        val stima = TravelEstimate.Builder(distanza(g.restantiM), DateTimeWithZone.create(g.arrivoMs, TimeZone.getDefault()))
             .setRemainingTimeSeconds(g.restantiS.coerceAtLeast(0))
-            .build()
+        val pedaggio = g.pedaggio
+        if (conTesto && !pedaggio.isNullOrEmpty()) {
+            val testo = SpannableString(pedaggio)
+            testo.setSpan(
+                ForegroundCarColorSpan.create(CarColor.createCustom(AMBRA_GIORNO, AMBRA_NOTTE)),
+                0,
+                pedaggio.length,
+                Spanned.SPAN_INCLUSIVE_EXCLUSIVE,
+            )
+            stima.setTripText(CarText.create(testo))
+        }
+        return stima.build()
+    }
 
     /** Il tempo alla prossima manovra, alla velocità media di quello che resta. */
     private fun stimaPasso(g: PonteAuto.Guida): TravelEstimate {
@@ -121,6 +143,10 @@ class GuidaAuto(private val context: Context) {
     }
 
     companion object {
+        /** L'ambra della pastiglia del pedaggio sul telefono, di giorno e di notte. */
+        private val AMBRA_GIORNO = android.graphics.Color.rgb(138, 83, 0)
+        private val AMBRA_NOTTE = android.graphics.Color.rgb(255, 207, 112)
+
         fun distanza(metri: Double): Distance =
             if (metri < 1000) {
                 Distance.create((Math.round(metri / 10.0) * 10).toDouble(), Distance.UNIT_METERS)

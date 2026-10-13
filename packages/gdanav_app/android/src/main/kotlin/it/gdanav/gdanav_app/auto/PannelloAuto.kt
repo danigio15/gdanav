@@ -71,7 +71,9 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         // In basso a sinistra, dal lato di chi guida: velocità e limite, e
         // sopra una barra sottile coi dati dell'auto e il meteo.
         val tachimetro = velocita(canvas, a, c)
-        barra(canvas, a, tachimetro, c)
+        // Il pedaggio sta nella scheda dell'arrivo, accanto ai km, quando
+        // l'auto lo sa scrivere: qui solo per le auto più vecchie.
+        barra(canvas, a, tachimetro, if (PonteAuto.pedaggioNellaStima) c.copy(pedaggio = null) else c)
     }
 
     /**
@@ -263,7 +265,7 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
     private fun barra(canvas: Canvas, a: Rect, tachimetro: RectF?, c: PonteAuto.Cruscotto) {
         val b = c.batteria
         val meteo = c.meteoTemperatura
-        if (b == null && meteo == null && c.sostaNome == null) return
+        if (b == null && meteo == null && c.sostaNome == null && c.pedaggio == null) return
         val margine = dp(10f)
         val forte = font(20f)
         val piccolo = font(13f, grassetto = false, colore = muto)
@@ -311,7 +313,34 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
             val t = "${c.meteoEmoji ?: ""} ${m.roundToInt()}°".trim()
             pezzi += forte.measureText(t) to { x: Float, y: Float -> canvas.drawText(t, x, y, forte) }
         }
-        val larghezzaRiga = pezzi.sumOf { it.first.toDouble() }.toFloat() + spazio * 2 * (pezzi.size - 1).coerceAtLeast(0)
+        fun larghezzaDi(n: Int, somma: Float) = somma + spazio * 2 * (n - 1).coerceAtLeast(0)
+        // Lo spazio che le schede di Android Auto lasciano: la barra non ci
+        // deve finire sotto.
+        val spazioMassimo = a.width() - margine * 2 - p * 2
+
+        // Il pedaggio che resta, in ambra come la pastiglia del telefono: in
+        // fila con gli altri se ci sta, se no piccolo nella riga di sopra
+        // (con un'elettrica la riga ha già batteria, km, meta e meteo).
+        val ambra = Color.rgb(255, 207, 112)
+        var pedaggioSopra: String? = null
+        c.pedaggio?.let { t ->
+            val valore = font(20f, colore = ambra)
+            val etichetta = font(14f, grassetto = false, colore = muto)
+            val spazioEtichetta = etichetta.measureText("pedaggio") + dp(6f)
+            val largo = spazioEtichetta + valore.measureText(t)
+            val somma = pezzi.sumOf { it.first.toDouble() }.toFloat()
+            if (larghezzaDi(pezzi.size + 1, somma + largo) <= spazioMassimo) {
+                // Prima del meteo, che resta in fondo.
+                val dove = if (meteo != null) pezzi.size - 1 else pezzi.size
+                pezzi.add(dove, largo to { x: Float, y: Float ->
+                    canvas.drawText("pedaggio", x, y, etichetta)
+                    canvas.drawText(t, x + spazioEtichetta, y, valore)
+                })
+            } else {
+                pedaggioSopra = "pedaggio $t"
+            }
+        }
+        val larghezzaRiga = larghezzaDi(pezzi.size, pezzi.sumOf { it.first.toDouble() }.toFloat())
         val sosta = c.sostaNome?.let { nome ->
             listOfNotNull(
                 "⚡ $nome",
@@ -319,10 +348,14 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
                 c.sostaBatteria?.let { "arrivi col ${it.roundToInt()}%" },
             ).joinToString(" · ")
         }
-        // Larga quanto la riga; la sosta, se è più lunga, si accorcia.
-        val w = (if (pezzi.isEmpty()) dp(220f) else larghezzaRiga) + p * 2
+        // Larga quanto la riga (e il pedaggio sopra, se c'è), mai più dello
+        // spazio libero; la sosta, se è più lunga, si accorcia.
+        val sopraPaint = font(14f, colore = ambra)
+        val larghezzaSopra = pedaggioSopra?.let { sopraPaint.measureText(it) } ?: 0f
+        val w = (maxOf(if (pezzi.isEmpty()) dp(220f) else larghezzaRiga, larghezzaSopra) + p * 2)
+            .coerceAtMost(a.width() - margine * 2)
         val hRiga = dp(54f)
-        val hSosta = if (sosta != null) dp(24f) else 0f
+        val hSosta = if (sosta != null || pedaggioSopra != null) dp(24f) else 0f
         val h = hRiga + hSosta
 
         // Dove: in basso a sinistra, sopra la capsula del tachimetro.
@@ -330,9 +363,16 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val basso = tachimetro?.let { it.top - dp(8f) } ?: (a.bottom - margine)
         val box = RectF(x, basso - h, x + w, basso)
         canvas.drawRoundRect(box, dp(18f), dp(18f), sfondoScheda)
+        // La riga di sopra: la sosta a sinistra e il pedaggio a destra, o il
+        // pedaggio da solo a sinistra.
+        val ySopra = box.top + dp(19f)
+        pedaggioSopra?.let {
+            canvas.drawText(it, if (sosta != null) box.right - p - larghezzaSopra else box.left + p, ySopra, sopraPaint)
+        }
         sosta?.let {
-            val t = taglia(piccolo, it, w - p * 2)
-            canvas.drawText(t, box.left + p, box.top + dp(19f), piccolo)
+            val resta = w - p * 2 - if (pedaggioSopra != null) larghezzaSopra + dp(12f) else 0f
+            val t = taglia(piccolo, it, resta)
+            canvas.drawText(t, box.left + p, ySopra, piccolo)
         }
         val linea = box.bottom - hRiga / 2 + dp(7f)
         var cx = box.left + p + (w - p * 2 - larghezzaRiga).coerceAtLeast(0f) / 2

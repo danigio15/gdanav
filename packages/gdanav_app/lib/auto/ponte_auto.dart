@@ -666,6 +666,10 @@ class PonteAuto {
       'destinazione_lon': p.destinazione.posizione.lon,
       // Con quanta batteria si arriva, per il riepilogo del viaggio.
       if (auto?.elettrica ?? true) 'arrivo_batteria': ?guida.batteriaArrivo,
+      // Il pedaggio che resta, accanto ai km che restano: nella scheda
+      // dell'arrivo di Android Auto («~12,40 € pedaggio»); niente se non se
+      // ne paga.
+      if (guida.pedaggioDavanti case final c? when !c.senzaPedaggi) 'pedaggio': c.perStima,
       'uscita': m?.uscita ?? '',
       'verso': m?.verso ?? '',
       'rotonda': m?.uscitaRotonda,
@@ -770,6 +774,10 @@ class PonteAuto {
       'velocita': posizione.velocitaAdesso(),
       'limite': guida.attiva ? a?.limiteKmh : null,
       'arrivo_batteria': p == null || !elettrica ? null : guida.batteriaArrivo,
+      // Il pedaggio che resta, breve («~12,40 €»), sulla barra dell'auto.
+      if (guida.attiva)
+        if (guida.pedaggioDavanti case final c? when c.conPrezzo || c.vignetta || c.kmNonStimati > 0)
+          'pedaggio': c.breve,
       if (sosta != null) ...{
         'sosta_nome': sosta.colonnina.nome,
         'sosta_km': (sosta.colonnina.distanzaM - (a?.percorsiM ?? 0)) / 1000,

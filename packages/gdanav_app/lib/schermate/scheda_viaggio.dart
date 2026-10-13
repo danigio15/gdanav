@@ -209,6 +209,19 @@ class _Pronta extends StatelessWidget {
 
     // Le ZTL e le aree pedonali: cosa fa il percorso, e la domanda del
     // permesso la prima volta che passerebbe da una ZTL attiva.
+    // Il pedaggio, stimato con classe e tariffa delle opzioni. Si dice
+    // «senza pedaggi» solo se un'altra strada li avrebbe.
+    final tariffa = gestore.opzioni.tariffaPedaggio;
+    final pedaggio = tariffa.stima(v.percorso);
+    final altrePagano = pronto.scelte.any((p) => !tariffa.stima(p).senzaPedaggi);
+    final rigaPedaggio = <Widget>[
+      if (!pedaggio.senzaPedaggi || altrePagano)
+        RigaPedaggio(
+          costo: pedaggio,
+          onTap: () => mostraOpzioniPercorso(context, gestore.opzioni, gestore.cambiaOpzioni),
+        ),
+    ];
+
     final ztl = <Widget>[
       if (v.percorso.ztl case final z? when !z.vuota) RigaZtl(ztl: z),
       DomandaZtl(percorso: v.percorso, onRisposta: gestore.rispondiZtl),
@@ -233,6 +246,7 @@ class _Pronta extends StatelessWidget {
           arrivo: pronto.soloPercorso || (piano?.soste.isNotEmpty ?? true) ? null : piano?.batteriaArrivo,
           capacitaKwh: gestore.auto.veicolo.capacitaUtileKwh,
           minimoPercento: risparmio?.soglie.minimoPercento ?? 5,
+          pedaggio: tariffa.stima,
         ),
       ],
       if (pronto.tappe.isNotEmpty) ...[
@@ -336,6 +350,7 @@ class _Pronta extends StatelessWidget {
                 style: t.titleMedium?.copyWith(color: muto),
               ),
               RigaTraffico(percorso: v.percorso),
+              ...rigaPedaggio,
               ...ztl,
               const SizedBox(height: 14),
               SizedBox(
@@ -356,6 +371,7 @@ class _Pronta extends StatelessWidget {
               if (meteo case final m?) MeteoLungoLaStrada(meteo: m),
             ] else if (piano == null) ...[
               Text('${km.round()} km', style: t.headlineSmall),
+              ...rigaPedaggio,
               ...ztl,
               const SizedBox(height: 6),
               const Text(
@@ -377,6 +393,7 @@ class _Pronta extends StatelessWidget {
               ),
               Text('${durata(piano.durata)} · ${km.round()} km', style: t.titleMedium?.copyWith(color: muto)),
               RigaTraffico(percorso: v.percorso),
+              ...rigaPedaggio,
               ...ztl,
               const SizedBox(height: 14),
               SizedBox(

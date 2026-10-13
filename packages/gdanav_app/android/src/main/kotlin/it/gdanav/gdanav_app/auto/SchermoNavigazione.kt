@@ -127,6 +127,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     init {
         lifecycle.addObserver(this)
         PonteAuto.conAvvisi = carContext.carAppApiLevel >= 5
+        PonteAuto.pedaggioNellaStima = carContext.carAppApiLevel >= 5
         carContext.getCarService(AppManager::class.java).setSurfaceCallback(renderer)
         renderer.alCambio = { invalidate() }
         // Tocco su un distributore, una colonnina o un ristorante: la scheda.
@@ -292,7 +293,8 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             // i navigatori (NF-2): sulla mappa restano velocità, limite e dati
             // dell'auto.
             modello.setNavigationInfo(guidaAuto.scheda(guida))
-            modello.setDestinationTravelEstimate(guidaAuto.stima(guida))
+            // Il pedaggio che resta accanto ai km, se l'auto sa scriverlo (API 5).
+            modello.setDestinationTravelEstimate(guidaAuto.stima(guida, conTesto = PonteAuto.pedaggioNellaStima))
         } else {
             // Da fermi la mappa resta pulita; il riquadro solo se c'è qualcosa
             // da dire («Calcolo il percorso…», un errore).

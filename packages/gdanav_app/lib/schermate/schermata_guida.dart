@@ -5,6 +5,7 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import '../componenti/icona_manovra.dart';
 import '../componenti/indicatore_batteria.dart' show eta;
+import '../componenti/itinerario.dart' show BadgePedaggio;
 import '../componenti/icone_segnalazioni.dart';
 import '../componenti/risparmio.dart';
 import '../componenti/tachimetro.dart';
@@ -594,6 +595,9 @@ class _Fondo extends StatelessWidget {
     final restante = a?.restante ?? p?.viaggio.percorso.durata ?? Duration.zero;
     final arrivo = guida.arrivoAlle;
     final sosta = guida.prossimaSosta;
+    // Il pedaggio che resta da pagare: solo se c'è.
+    final pedaggio = guida.pedaggioDavanti;
+    final ambra = BadgePedaggio.colori(context, paga: true).$2;
     return SafeArea(
       top: false,
       child: Padding(
@@ -615,9 +619,35 @@ class _Fondo extends StatelessWidget {
                             arrivo == null ? '' : orario(arrivo),
                             style: t.headlineSmall?.copyWith(color: ColoriGdanav.di(context).libera),
                           ),
-                          Text(
-                            '${durata(restante)} · ${distanzaBreve(restantiM)}',
-                            style: t.titleSmall?.copyWith(color: muto),
+                          // Il pedaggio che resta, accanto ai km che restano; se
+                          // non ci sta (i tasti a destra), subito sotto.
+                          Wrap(
+                            key: const Key('restanti'),
+                            spacing: 10,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                '${durata(restante)} · ${distanzaBreve(restantiM)}',
+                                style: t.titleSmall?.copyWith(color: muto),
+                              ),
+                              if (pedaggio != null && !pedaggio.senzaPedaggi)
+                                Row(
+                                  key: const Key('pedaggio-restante'),
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.toll_rounded, size: 17, color: ambra),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        pedaggio.breve,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: t.titleSmall?.copyWith(color: ambra, fontWeight: FontWeight.w800),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                            ],
                           ),
                         ],
                       ),

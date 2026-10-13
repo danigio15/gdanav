@@ -369,9 +369,10 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
             a.name = g.destinazione
             var riepilogo = [g.destinazione]
             if let b = g.arrivoBatteria { riepilogo.insert("Arrivi con il \(Int(b.rounded()))%", at: 0) }
+            // Il pedaggio, come le informazioni in più di una strada.
             let scelta = CPRouteChoice(
                 summaryVariants: riepilogo,
-                additionalInformationVariants: [],
+                additionalInformationVariants: g.pedaggio.map { [$0] } ?? [],
                 selectionSummaryVariants: []
             )
             let v = CPTrip(origin: da, destination: a, routeChoices: [scelta])

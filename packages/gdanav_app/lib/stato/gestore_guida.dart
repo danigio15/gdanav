@@ -245,6 +245,14 @@ class GestoreGuida extends ChangeNotifier {
     return profilo.last.batteria;
   }
 
+  /// Il pedaggio ancora da pagare (stimato, con classe e tariffa delle
+  /// opzioni): il tratto in cui si è conta tutto, si paga all'uscita.
+  CostoPedaggio? get pedaggioDavanti {
+    final p = pronto;
+    if (p == null) return null;
+    return viaggio.opzioni.tariffaPedaggio.stima(p.viaggio.percorso, daM: avanzamento?.percorsiM ?? 0);
+  }
+
   /// La prossima sosta ancora davanti, e quanto manca.
   (Sosta, double)? get prossimaSosta {
     final a = avanzamento, p = pronto;
