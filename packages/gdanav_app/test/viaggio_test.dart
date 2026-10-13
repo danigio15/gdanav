@@ -99,11 +99,20 @@ void main() {
   });
 
   testWidgets('senza batteria chiede di scriverla', (tester) async {
-    preparaPiattaforma(portachiavi: impostazioniComplete);
+    preparaPiattaforma(portachiavi: {...impostazioniComplete, 'veicolo': ProfiloVeicolo.esempio.id});
     final a = await ambiente(tester);
     await tester.pumpWidget(a.app());
     await cercaBologna(tester);
     expect(find.textContaining('Non so quanta batteria hai'), findsOneWidget);
+  });
+
+  testWidgets('senza auto elettrica né batteria propone la termica', (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final a = await ambiente(tester);
+    await tester.pumpWidget(a.app());
+    await cercaBologna(tester);
+    expect(find.textContaining("Non trovo un'auto elettrica configurata"), findsOneWidget);
+    expect(find.text('Usa auto termica'), findsOneWidget);
   });
 
   testWidgets('senza posizione lo dice', (tester) async {

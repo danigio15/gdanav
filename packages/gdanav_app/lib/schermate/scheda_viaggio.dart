@@ -35,9 +35,18 @@ class SchedaViaggio extends StatelessWidget {
     this.onCercaTappa,
     this.onPremium,
     this.risparmio,
+    this.onScriviBatteria,
+    this.onConfiguraAuto,
   });
 
   final GestoreViaggio gestore;
+
+  /// Senza batteria: apre dove la si scrive a mano (e poi si riprova).
+  /// `null`: niente tasto.
+  final Future<void> Function()? onScriviBatteria;
+
+  /// Senza auto elettrica: apre «La tua auto». `null`: niente tasto.
+  final Future<void> Function()? onConfiguraAuto;
 
   /// I consumi delle strade fra cui scegliere, e quale risparmia energia.
   final GestoreRisparmio? risparmio;
@@ -80,6 +89,21 @@ class SchedaViaggio extends StatelessWidget {
             ),
           ],
         ),
+        ErroreViaggio(:final senzaBatteria?, :final messaggio, :final destinazione) => _Piccola(
+          titolo: destinazione?.nome ?? 'Viaggio',
+          onChiudi: gestore.annulla,
+          children: [
+            _SenzaBatteria(
+              perche: senzaBatteria,
+              messaggio: messaggio,
+              dettaglio: senzaBatteria == SenzaBatteria.batteriaIgnota ? gestore.auto.percheSenzaDati : null,
+              onTermica: gestore.passaATermica,
+              onScriviBatteria: onScriviBatteria,
+              onConfiguraAuto: onConfiguraAuto,
+              onRiprova: destinazione == null ? null : () => gestore.pianifica(destinazione),
+            ),
+          ],
+        ),
         ErroreViaggio(:final messaggio, :final destinazione) => _Piccola(
           titolo: destinazione?.nome ?? 'Viaggio',
           onChiudi: gestore.annulla,
@@ -117,6 +141,116 @@ class SchedaViaggio extends StatelessWidget {
           risparmio: risparmio,
         ),
       },
+    );
+  }
+}
+
+/// Le soste non si calcolano senza batteria. Prima chiedere di scriverla era
+/// tutto, e senza un'auto elettrica configurata era un vicolo cieco: adesso
+/// si propone anche l'auto termica, e quale tasto viene prima dipende dal
+/// [perche].
+class _SenzaBatteria extends StatelessWidget {
+  const _SenzaBatteria({
+    required this.perche,
+    required this.messaggio,
+    required this.onTermica,
+    this.dettaglio,
+    this.onScriviBatteria,
+    this.onConfiguraAuto,
+    this.onRiprova,
+  });
+
+  final SenzaBatteria perche;
+  final String messaggio;
+
+  /// Perché l'auto non dice la batteria, quando lo si sa.
+  final String? dettaglio;
+  final Future<void> Function() onTermica;
+  final Future<void> Function()? onScriviBatteria;
+  final Future<void> Function()? onConfiguraAuto;
+  final VoidCallback? onRiprova;
+
+  @override
+  Widget build(BuildContext context) {
+    final nessuna = perche == SenzaBatteria.nessunaElettrica;
+    final t = Theme.of(context).textTheme;
+    final termica = nessuna
+        ? FilledButton.icon(
+            key: const Key('usa-termica'),
+            onPressed: onTermica,
+            icon: const Icon(Icons.local_gas_station),
+            label: const Text('Usa auto termica'),
+          )
+        : OutlinedButton.icon(
+            key: const Key('usa-termica'),
+            onPressed: onTermica,
+            icon: const Icon(Icons.local_gas_station),
+            label: const Text('Usa auto termica'),
+          );
+    final scrivi = switch (onScriviBatteria) {
+      final f? when nessuna => TextButton.icon(
+        key: const Key('scrivi-batteria'),
+        onPressed: f,
+        icon: const Icon(Icons.battery_unknown),
+        label: const Text('Scrivi la batteria'),
+      ),
+      final f? => FilledButton.icon(
+        key: const Key('scrivi-batteria'),
+        onPressed: f,
+        icon: const Icon(Icons.battery_unknown),
+        label: const Text('Scrivi la batteria'),
+      ),
+      null => null,
+    };
+    final configura = switch (onConfiguraAuto) {
+      final f? when nessuna => TextButton.icon(
+        key: const Key('configura-auto'),
+        onPressed: f,
+        icon: const Icon(Icons.electric_car),
+        label: const Text('Configura auto'),
+      ),
+      _ => null,
+    };
+    final riprova = switch (onRiprova) {
+      final f? when !nessuna => TextButton(onPressed: f, child: const Text('Riprova')),
+      _ => null,
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(nessuna ? Icons.electric_car_outlined : Icons.battery_unknown, color: ColoriGdanav.di(context).piena),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(messaggio, key: const Key('senza-batteria'), style: t.bodyLarge),
+                  if (dettaglio case final d?) ...[
+                    const SizedBox(height: 4),
+                    Text(d, style: t.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Senza elettrica prima la termica; con l'elettrica prima la batteria.
+        if (nessuna) ...[
+          termica,
+          if (configura != null || scrivi != null) ...[
+            const SizedBox(height: 4),
+            Wrap(alignment: WrapAlignment.center, children: [?configura, ?scrivi]),
+          ],
+        ] else ...[
+          if (scrivi != null) ...[scrivi, const SizedBox(height: 8)],
+          termica,
+          if (riprova != null) ...[const SizedBox(height: 4), Center(child: riprova)],
+        ],
+      ],
     );
   }
 }
@@ -268,231 +402,249 @@ class _Pronta extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640),
         child: DraggableScrollableSheet(
-      initialChildSize: 0.46,
-      minChildSize: 0.2,
-      maxChildSize: 0.92,
-      snap: true,
-      snapSizes: const [0.2, 0.46, 0.92],
-      builder: (context, scorrimento) => Material(
-        color: tema.colorScheme.surface,
-        elevation: 12,
-        shadowColor: Colors.black45,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        child: ListView(
-          controller: scorrimento,
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-          children: [
-            Center(
-              child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 10),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: tema.colorScheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          initialChildSize: 0.46,
+          minChildSize: 0.2,
+          maxChildSize: 0.92,
+          snap: true,
+          snapSizes: const [0.2, 0.46, 0.92],
+          builder: (context, scorrimento) => Material(
+            color: tema.colorScheme.surface,
+            elevation: 12,
+            shadowColor: Colors.black45,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            child: ListView(
+              controller: scorrimento,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 10),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: tema.colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            pronto.destinazione.nome,
+                            style: t.titleLarge,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (pronto.destinazione.descrizione.isNotEmpty)
+                            Text(
+                              pronto.destinazione.descrizione,
+                              style: t.bodyMedium?.copyWith(color: muto),
+                              maxLines: 1,
+                            ),
+                        ],
+                      ),
+                    ),
+                    IconButton.filledTonal(
+                      onPressed: gestore.annulla,
+                      icon: const Icon(Icons.close),
+                      tooltip: 'Chiudi',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    ActionChip(
+                      key: const Key('opzioni-percorso'),
+                      avatar: const Icon(Icons.tune, size: 18),
+                      label: Text(gestore.opzioni.riassunto),
+                      onPressed: () => mostraOpzioniPercorso(context, gestore.opzioni, gestore.cambiaOpzioni),
+                    ),
+                    if (cerca != null)
+                      ActionChip(
+                        key: const Key('aggiungi-tappa-chip'),
+                        avatar: const Icon(Icons.add_location_alt_outlined, size: 18),
+                        label: const Text('Tappa'),
+                        onPressed: aggiungiTappa,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                if (pronto.soloPercorso) ...[
+                  // Auto termica (o elettrica senza Premium): un navigatore
+                  // normale, arrivo e via.
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Arrivo ',
+                          style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w400),
+                        ),
+                        TextSpan(text: orario(pronto.arrivoAlle!), style: t.headlineSmall),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '${durata(v.percorso.durata)} · ${km.round()} km',
+                    key: const Key('durata-termica'),
+                    style: t.titleMedium?.copyWith(color: muto),
+                  ),
+                  RigaTraffico(percorso: v.percorso),
+                  ...rigaPedaggio,
+                  ...ztl,
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: onAvvia,
+                      icon: const Icon(Icons.navigation),
+                      label: const Text('Avvia'),
+                    ),
+                  ),
+                  // Elettrica senza Premium: subito sotto «Avvia», che resta in vista.
+                  if (pronto.senzaSoste) ...[
+                    const SizedBox(height: 12),
+                    AvvisoSosteConPremium(batteria: pronto.batteriaPartenza, onPremium: onPremium),
+                  ],
+                  ...stradeETappe,
+                  // Il meteo lungo la strada è per tutti.
+                  if (meteo case final m?) MeteoLungoLaStrada(meteo: m),
+                ] else if (piano == null) ...[
+                  Text('${km.round()} km', style: t.headlineSmall),
+                  ...rigaPedaggio,
+                  ...ztl,
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Con questa batteria non ci si arriva, e lungo la strada non ci sono colonnine adatte abbastanza vicine. '
+                    'Prova ad abbassare la potenza minima nelle preferenze di ricarica.',
+                  ),
+                  ...stradeETappe,
+                ] else ...[
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Arrivo ',
+                          style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w400),
+                        ),
+                        TextSpan(text: orario(pronto.arrivoAlle!), style: t.headlineSmall),
+                      ],
+                    ),
+                  ),
+                  Text('${durata(piano.durata)} · ${km.round()} km', style: t.titleMedium?.copyWith(color: muto)),
+                  RigaTraffico(percorso: v.percorso),
+                  ...rigaPedaggio,
+                  ...ztl,
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: onAvvia,
+                      icon: const Icon(Icons.navigation),
+                      label: const Text('Avvia'),
+                    ),
+                  ),
+                  ...stradeETappe,
+                  const SizedBox(height: 16),
+                  Row(
                     children: [
-                      Text(pronto.destinazione.nome, style: t.titleLarge, maxLines: 1, overflow: TextOverflow.ellipsis),
-                      if (pronto.destinazione.descrizione.isNotEmpty)
-                        Text(pronto.destinazione.descrizione, style: t.bodyMedium?.copyWith(color: muto), maxLines: 1),
+                      Expanded(
+                        child: _Dato(
+                          icona: AnelloBatteria(batteria: piano.batteriaArrivo, dimensione: 30, spessore: 4),
+                          valore: '${piano.batteriaArrivo.round()}%',
+                          etichetta: "all'arrivo",
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _Dato(
+                          icona: Icon(Icons.ev_station, color: ColoriGdanav.di(context).libera),
+                          valore: soste.isEmpty ? 'Nessuna' : durata(piano.ricarica),
+                          etichetta: switch (soste.length) {
+                            0 => 'sosta',
+                            1 => '1 sosta',
+                            final n => '$n soste',
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _Dato(
+                          icona: Icon(Icons.bolt, color: tema.colorScheme.primary),
+                          // Con la virgola, come i kWh delle strade qui sopra.
+                          valore:
+                              '${piano.energiaKwh.toStringAsFixed(piano.energiaKwh < 10 ? 1 : 0).replaceAll('.', ',')} kWh',
+                          etichetta: 'consumo',
+                        ),
+                      ),
                     ],
                   ),
-                ),
-                IconButton.filledTonal(onPressed: gestore.annulla, icon: const Icon(Icons.close), tooltip: 'Chiudi'),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                ActionChip(
-                  key: const Key('opzioni-percorso'),
-                  avatar: const Icon(Icons.tune, size: 18),
-                  label: Text(gestore.opzioni.riassunto),
-                  onPressed: () => mostraOpzioniPercorso(context, gestore.opzioni, gestore.cambiaOpzioni),
-                ),
-                if (cerca != null)
-                  ActionChip(
-                    key: const Key('aggiungi-tappa-chip'),
-                    avatar: const Icon(Icons.add_location_alt_outlined, size: 18),
-                    label: const Text('Tappa'),
-                    onPressed: aggiungiTappa,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            if (pronto.soloPercorso) ...[
-              // Auto termica (o elettrica senza Premium): un navigatore
-              // normale, arrivo e via.
-              Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: 'Arrivo ',
-                      style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w400),
-                    ),
-                    TextSpan(text: orario(pronto.arrivoAlle!), style: t.headlineSmall),
-                  ],
-                ),
-              ),
-              Text(
-                '${durata(v.percorso.durata)} · ${km.round()} km',
-                key: const Key('durata-termica'),
-                style: t.titleMedium?.copyWith(color: muto),
-              ),
-              RigaTraffico(percorso: v.percorso),
-              ...rigaPedaggio,
-              ...ztl,
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: onAvvia,
-                  icon: const Icon(Icons.navigation),
-                  label: const Text('Avvia'),
-                ),
-              ),
-              // Elettrica senza Premium: subito sotto «Avvia», che resta in vista.
-              if (pronto.senzaSoste) ...[
-                const SizedBox(height: 12),
-                AvvisoSosteConPremium(batteria: pronto.batteriaPartenza, onPremium: onPremium),
-              ],
-              ...stradeETappe,
-              // Il meteo lungo la strada è per tutti.
-              if (meteo case final m?) MeteoLungoLaStrada(meteo: m),
-            ] else if (piano == null) ...[
-              Text('${km.round()} km', style: t.headlineSmall),
-              ...rigaPedaggio,
-              ...ztl,
-              const SizedBox(height: 6),
-              const Text(
-                'Con questa batteria non ci si arriva, e lungo la strada non ci sono colonnine adatte abbastanza vicine. '
-                'Prova ad abbassare la potenza minima nelle preferenze di ricarica.',
-              ),
-              ...stradeETappe,
-            ] else ...[
-              Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: 'Arrivo ',
-                      style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w400),
-                    ),
-                    TextSpan(text: orario(pronto.arrivoAlle!), style: t.headlineSmall),
-                  ],
-                ),
-              ),
-              Text('${durata(piano.durata)} · ${km.round()} km', style: t.titleMedium?.copyWith(color: muto)),
-              RigaTraffico(percorso: v.percorso),
-              ...rigaPedaggio,
-              ...ztl,
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: onAvvia,
-                  icon: const Icon(Icons.navigation),
-                  label: const Text('Avvia'),
-                ),
-              ),
-              ...stradeETappe,
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _Dato(
-                      icona: AnelloBatteria(batteria: piano.batteriaArrivo, dimensione: 30, spessore: 4),
-                      valore: '${piano.batteriaArrivo.round()}%',
-                      etichetta: "all'arrivo",
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _Dato(
-                      icona: Icon(Icons.ev_station, color: ColoriGdanav.di(context).libera),
-                      valore: soste.isEmpty ? 'Nessuna' : durata(piano.ricarica),
-                      etichetta: switch (soste.length) {
-                        0 => 'sosta',
-                        1 => '1 sosta',
-                        final n => '$n soste',
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _Dato(
-                      icona: Icon(Icons.bolt, color: tema.colorScheme.primary),
-                      // Con la virgola, come i kWh delle strade qui sopra.
-                      valore: '${piano.energiaKwh.toStringAsFixed(piano.energiaKwh < 10 ? 1 : 0).replaceAll('.', ',')} kWh',
-                      etichetta: 'consumo',
-                    ),
-                  ),
+                  const SizedBox(height: 20),
+                  Text('Batteria lungo il viaggio', style: t.titleSmall),
+                  const SizedBox(height: 8),
+                  GraficoBatteria(piano: piano, soglia: soglia),
+                  if (meteo case final m?) MeteoLungoLaStrada(meteo: m, condizioni: gestore.condizioni),
+                  const SizedBox(height: 20),
+                  Text(soste.isEmpty ? 'Soste' : 'Le soste', style: t.titleSmall),
+                  const SizedBox(height: 8),
+                  if (soste.isEmpty)
+                    _Riga(
+                      icona: Icon(Icons.check_circle, color: ColoriGdanav.di(context).libera),
+                      testo: 'Ci arrivi senza fermarti.',
+                    )
+                  else
+                    for (final (i, s) in soste.indexed)
+                      _SchedaSosta(
+                        numero: i + 1,
+                        sosta: s,
+                        onTap: () => mostraColonnina(context, gestore, s.colonnina.id),
+                      ),
                 ],
-              ),
-              const SizedBox(height: 20),
-              Text('Batteria lungo il viaggio', style: t.titleSmall),
-              const SizedBox(height: 8),
-              GraficoBatteria(piano: piano, soglia: soglia),
-              if (meteo case final m?) MeteoLungoLaStrada(meteo: m, condizioni: gestore.condizioni),
-              const SizedBox(height: 20),
-              Text(soste.isEmpty ? 'Soste' : 'Le soste', style: t.titleSmall),
-              const SizedBox(height: 8),
-              if (soste.isEmpty)
-                _Riga(
-                  icona: Icon(Icons.check_circle, color: ColoriGdanav.di(context).libera),
-                  testo: 'Ci arrivi senza fermarti.',
-                )
-              else
-                for (final (i, s) in soste.indexed)
-                  _SchedaSosta(numero: i + 1, sosta: s, onTap: () => mostraColonnina(context, gestore, s.colonnina.id)),
-            ],
-            if (altre.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Text('Colonnine lungo la strada', style: t.titleSmall),
-              Text('Toccane una per fermarti lì.', style: t.bodySmall?.copyWith(color: muto)),
-              const SizedBox(height: 4),
-              for (final c in altre.take(12))
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  leading: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: coloreStato(context, statoDi(c.disponibilita)),
-                      shape: BoxShape.circle,
+                if (altre.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  Text('Colonnine lungo la strada', style: t.titleSmall),
+                  Text('Toccane una per fermarti lì.', style: t.bodySmall?.copyWith(color: muto)),
+                  const SizedBox(height: 4),
+                  for (final c in altre.take(12))
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      leading: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: coloreStato(context, statoDi(c.disponibilita)),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      minLeadingWidth: 12,
+                      title: Text(c.nome, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      subtitle: Text(
+                        '${(c.distanzaM / 1000).round()} km · ${c.potenzaKw.round()} kW · ${testoDisponibilita(c.disponibilita)}',
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => mostraColonnina(context, gestore, c.id),
                     ),
-                  ),
-                  minLeadingWidth: 12,
-                  title: Text(c.nome, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: Text(
-                    '${(c.distanzaM / 1000).round()} km · ${c.potenzaKw.round()} kW · ${testoDisponibilita(c.disponibilita)}',
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => mostraColonnina(context, gestore, c.id),
+                ],
+                const SizedBox(height: 16),
+                Text(
+                  pronto.soloPercorso
+                      ? 'Mappa: © OpenFreeMap © OpenStreetMap contributors'
+                      : 'Colonnine: © OpenStreetMap contributors, © Open Charge Map contributors, ${Pun.attribuzione} · '
+                            'Mappa: © OpenFreeMap © OpenStreetMap contributors',
+                  style: t.bodySmall?.copyWith(color: muto),
                 ),
-            ],
-            const SizedBox(height: 16),
-            Text(
-              pronto.soloPercorso
-                  ? 'Mappa: © OpenFreeMap © OpenStreetMap contributors'
-                  : 'Colonnine: © OpenStreetMap contributors, © Open Charge Map contributors, ${Pun.attribuzione} · '
-                        'Mappa: © OpenFreeMap © OpenStreetMap contributors',
-              style: t.bodySmall?.copyWith(color: muto),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
-    ),
       ),
     );
   }

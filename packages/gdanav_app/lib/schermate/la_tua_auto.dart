@@ -153,7 +153,7 @@ class _LaTuaAutoState extends State<LaTuaAuto> {
                     ),
                   ),
                 ),
-              if (widget.consumo case final c? when elettrica) _ConsumoImparato(consumo: c),
+              if (widget.consumo case final c? when elettrica) _ConsumoImparato(consumo: c, veicolo: scelta),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
                 child: Text('Come ti vedi sulla mappa', style: t.titleSmall),
@@ -298,10 +298,12 @@ bool corrisponde(ProfiloVeicolo v, String filtro) {
 }
 
 /// Quanto la tua auto consuma davvero rispetto alla scheda, imparato
-/// guidando con i dati dell'auto.
+/// guidando con i dati dell'auto; e il consumo di riferimento, se lo si sa
+/// (quello calibrato di ABRP), per partire giusti da subito.
 class _ConsumoImparato extends StatelessWidget {
-  const _ConsumoImparato({required this.consumo});
+  const _ConsumoImparato({required this.consumo, required this.veicolo});
   final GestoreConsumo consumo;
+  final ProfiloVeicolo veicolo;
 
   @override
   Widget build(BuildContext context) {
@@ -313,6 +315,19 @@ class _ConsumoImparato extends StatelessWidget {
         final c = consumo.imparato;
         final km = c.kmOsservati.round();
         final scarto = c.scartoPercento;
+        final r = c.riferimento;
+        final dettaglio = switch ((km, r)) {
+          (0, null) =>
+            'Ancora nessun dato: guida con Home Assistant o Android Auto collegati e gdanav '
+                'impara quanto consuma davvero la tua auto.',
+          (0, final r?) =>
+            'Dal consumo di riferimento: ${r.whKm.round()} Wh/km a ${r.kmh.round()} km/h '
+                '(${scarto >= 0 ? '+' : ''}$scarto% rispetto alla scheda)',
+          _ =>
+            '${scarto == 0 ? 'Come la scheda' : '${scarto > 0 ? '+' : ''}$scarto% rispetto '
+                          'alla scheda'} · misurato su $km km'
+                '${r == null ? '' : ' · riferimento ${r.whKm.round()} Wh/km'}',
+        };
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
           child: Card(
@@ -328,18 +343,23 @@ class _ConsumoImparato extends StatelessWidget {
                       children: [
                         Text('Consumo imparato', style: t.titleSmall),
                         Text(
-                          km == 0
-                              ? 'Ancora nessun dato: guida con Home Assistant o Android Auto collegati e gdanav '
-                                    'impara quanto consuma davvero la tua auto.'
-                              : '${scarto == 0 ? 'Come la scheda' : '${scarto > 0 ? '+' : ''}$scarto% rispetto '
-                                          'alla scheda'} · misurato su $km km',
+                          dettaglio,
                           key: const Key('consumo-imparato'),
                           style: t.bodySmall?.copyWith(color: muto),
+                        ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(
+                            key: const Key('consumo-riferimento'),
+                            style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                            onPressed: () => _chiediRiferimento(context),
+                            child: Text(r == null ? 'Ho il consumo di ABRP' : 'Cambia il consumo di riferimento'),
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  if (km > 0) TextButton(onPressed: consumo.azzera, child: const Text('Azzera')),
+                  if (km > 0 || r != null) TextButton(onPressed: consumo.azzera, child: const Text('Azzera')),
                 ],
               ),
             ),
@@ -347,5 +367,48 @@ class _ConsumoImparato extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _chiediRiferimento(BuildContext context) async {
+    final r = consumo.imparato.riferimento;
+    final wh = TextEditingController(text: r == null ? '' : '${r.whKm.round()}');
+    final kmh = TextEditingController(text: '${(r?.kmh ?? 110).round()}');
+    double? numero(TextEditingController c) => double.tryParse(c.text.trim().replaceAll(',', '.'));
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Consumo di riferimento'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'In ABRP, nelle impostazioni dell\'auto: «Consumo di riferimento» (calibrato) e '
+              '«Velocità di riferimento». gdanav parte da lì e poi continua a imparare guidando.',
+            ),
+            TextField(
+              key: const Key('riferimento-wh'),
+              controller: wh,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Consumo', suffixText: 'Wh/km'),
+            ),
+            TextField(
+              key: const Key('riferimento-kmh'),
+              controller: kmh,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Velocità di riferimento', suffixText: 'km/h'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annulla')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Usa')),
+        ],
+      ),
+    );
+    // I campi non si chiudono qui: il dialogo li usa ancora mentre sparisce.
+    final w = numero(wh), v = numero(kmh);
+    if (ok != true || w == null || v == null || w < 50 || w > 500 || v < 30 || v > 200) return;
+    await consumo.impostaRiferimento(whKm: w, kmh: v, veicolo: veicolo);
   }
 }

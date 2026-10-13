@@ -269,11 +269,21 @@ class PianificatoreSoste {
       passo = da[(i, arrivo)];
     }
     final ordinateSoste = soste.reversed.toList();
+    // Il cammino lavora a punti interi arrotondati per difetto, e va bene per
+    // scegliere le soste. All'arrivo però si dice il numero vero: il punto
+    // tolto in più si vedeva («57%» dove il conto dava 57,9) e, sommato al
+    // resto, faceva sembrare il calcolo più pessimista di ABRP.
+    final ultima = ordinateSoste.lastOrNull;
+    final daM = ultima?.colonnina.distanzaM ?? 0;
+    final kWh =
+        prog.energiaKwh(daM, prog.lunghezza) + (ultima == null ? 0 : _deviazioneKwh(ultima.colonnina.deviazioneM));
+    final esatto = (ultima?.batteriaPartenza ?? batteriaPartenza) - kWh / profilo.capacitaUtileKwh * 100;
+    final arrivo = esatto >= fine.$2 && esatto < fine.$2 + 1 ? esatto : fine.$2.toDouble();
     return PianoViaggio(
       soste: ordinateSoste,
-      batteriaArrivo: fine.$2.toDouble(),
+      batteriaArrivo: arrivo,
       durata: Duration(seconds: secondi.round()),
-      profiloBatteria: _profilo(ordinateSoste, prog, batteriaPartenza, fine.$2.toDouble()),
+      profiloBatteria: _profilo(ordinateSoste, prog, batteriaPartenza, arrivo),
       energiaKwh: prog.energiaKwh(0, prog.lunghezza),
     );
   }

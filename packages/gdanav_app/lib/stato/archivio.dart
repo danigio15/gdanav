@@ -72,6 +72,10 @@ class Archivio {
 
   Future<void> salvaVeicolo(ProfiloVeicolo v) => _p.write(key: _veicolo, value: v.id);
 
+  /// Se un'auto è stata scelta davvero (a mano o dalla plancia di gdahome):
+  /// finché no, [veicolo] è solo il profilo d'esempio.
+  Future<bool> veicoloScelto() async => await _p.read(key: _veicolo) != null;
+
   /// L'ultima auto vista nella plancia di gdahome (marca, modello, kWh):
   /// quando cambia, cambia anche la tua auto.
   Future<String?> autoGdahome() => _p.read(key: _autoGdahome);
@@ -133,8 +137,7 @@ class Archivio {
   /// La voce del navigatore: resta spenta anche quando l'app viene riavviata.
   Future<bool> voceMuta() async => await _p.read(key: _voceMuta) == 'sì';
 
-  Future<void> salvaVoceMuta(bool v) =>
-      v ? _p.write(key: _voceMuta, value: 'sì') : _p.delete(key: _voceMuta);
+  Future<void> salvaVoceMuta(bool v) => v ? _p.write(key: _voceMuta, value: 'sì') : _p.delete(key: _voceMuta);
 
   /// L'audio della guida: due chiavi, la voce di guida e gli avvisi.
   ///
@@ -180,7 +183,8 @@ class Archivio {
   /// verificare a ogni avvio.
   Future<String?> gettoneLicenza() => _p.read(key: _gettone);
 
-  Future<void> salvaGettoneLicenza(String? g) => g == null ? _p.delete(key: _gettone) : _p.write(key: _gettone, value: g);
+  Future<void> salvaGettoneLicenza(String? g) =>
+      g == null ? _p.delete(key: _gettone) : _p.write(key: _gettone, value: g);
 
   Future<void> salvaOpzioniPercorso(OpzioniPercorso o) =>
       _p.write(key: _opzioniPercorso, value: jsonEncode(o.toJson()));

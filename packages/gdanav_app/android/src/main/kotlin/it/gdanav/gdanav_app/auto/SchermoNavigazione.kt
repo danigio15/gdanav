@@ -40,7 +40,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
      * fermi, la segnalazione appena passata. La mappa sotto si ridisegna per
      * conto suo, che il modello si rifaccia o no.
      */
-    private fun firma(): Any? = listOf(PonteAuto.guida, PonteAuto.messaggio, PonteAuto.avviso.ancoraId, PonteAuto.strada.id)
+    private fun firma(): Any? = listOf(PonteAuto.guida, PonteAuto.messaggio, PonteAuto.avviso.ancoraId, PonteAuto.strada.id, PonteAuto.termica.id)
 
     private var disegnata: Any? = null
     private var daAggiornare = false
@@ -55,6 +55,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             disegnata = ora
             viaggioAlCruscotto()
             proponiStrada()
+            proponiTermica()
             invalidate()
         }
     }
@@ -96,6 +97,23 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         } catch (e: Exception) {
             // Un'auto che non mostra gli avvisi: restano i tasti in alto.
         }
+    }
+
+    /** La proposta dell'auto termica già aperta ([SchermoTermica]). */
+    private var termicaMostrata: String? = null
+
+    /**
+     * Manca la batteria: il messaggio sulla mappa non ha tasti, e in auto la
+     * batteria non si scrive. Si apre sopra [SchermoTermica], col tasto per
+     * passare all'auto termica; una proposta per volta.
+     */
+    private fun proponiTermica() {
+        val id = PonteAuto.termica.id
+        if (id == termicaMostrata) return
+        termicaMostrata = id
+        if (id == null || PonteAuto.guida != null) return
+        // Quella di prima, se c'è, si chiude da sé: l'id non è più il suo.
+        screenManager.push(SchermoTermica(carContext, id))
     }
 
     /**

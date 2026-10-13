@@ -68,8 +68,11 @@ void main() {
     final auto = _AutoSpia(() => adesso);
     await auto.avvia();
     addTearDown(auto.dispose);
+    // Aprendo l'app si chiede una volta: chi la apre guarda la batteria.
+    expect(auto.chieste, 1);
 
     // Col telefono in tasca e nessuno che guarda, non si chiede niente.
+    adesso = adesso.add(GestoreAuto.ognisQuanto);
     expect(auto.vaChiestoAdesso, isFalse);
     adesso = adesso.add(const Duration(hours: 3));
     expect(auto.vaChiestoAdesso, isFalse, reason: 'senza nessuno che guarda');
@@ -77,7 +80,7 @@ void main() {
     // Si sale in macchina: subito, perché è il momento in cui il numero
     // vecchio si nota di più.
     auto.schermoDellAuto(true);
-    expect(auto.chieste, 1);
+    expect(auto.chieste, 2);
     expect(auto.vaChiestoAdesso, isFalse, reason: 'appena chiesto');
 
     // E poi ogni minuto, finché si è lì.
@@ -91,7 +94,7 @@ void main() {
     auto.schermoDellAuto(false);
     adesso = adesso.add(const Duration(hours: 1));
     expect(auto.vaChiestoAdesso, isFalse);
-    expect(auto.chieste, 1);
+    expect(auto.chieste, 2);
   });
 
   test('un dongle OBD scelto dà i dati dell\'auto e resta salvato', () async {

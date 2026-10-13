@@ -471,7 +471,10 @@ class GestoreGuida extends ChangeNotifier {
       _misuratore = null;
       return;
     }
-    final senza = consumo?.condizioni(auto.stato, conFattore: false) ?? const Condizioni();
+    // Le condizioni del piano (col clima dal meteo), senza correttivo: se
+    // no il clima finiva dentro il correttivo e si contava due volte.
+    final senza =
+        viaggio.condizioni?.senzaCorrettivo ?? consumo?.condizioni(auto.stato, conFattore: false) ?? const Condizioni();
     _fattorePiano = consumo?.imparato.fattore ?? 1;
     _misuratore = MisuratoreConsumo(
       percorso: p.viaggio.percorso,

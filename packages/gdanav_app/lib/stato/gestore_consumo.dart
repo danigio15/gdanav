@@ -26,6 +26,22 @@ class GestoreConsumo extends ChangeNotifier {
     if (_veicolo case final v?) await archivio.salvaConsumo(v, imparato);
   }
 
+  /// Il consumo di riferimento scritto a mano, per esempio quello calibrato
+  /// di ABRP («Consumo di riferimento calibrato 188 Wh/km», alla velocità di
+  /// riferimento, di solito 110 km/h): si parte da lì invece che dalla
+  /// scheda tecnica, e guidando lo si corregge. Le misure per tipo di strada
+  /// restano, per la precisione.
+  Future<void> impostaRiferimento({required double whKm, required double kmh, required ProfiloVeicolo veicolo}) async {
+    final r = RiferimentoConsumo(
+      whKm: whKm,
+      kmh: kmh,
+      fattore: fattoreDaRiferimento(whKm: whKm, kmh: kmh, profilo: veicolo),
+    );
+    imparato = ConsumoImparato(fattore: r.fattore, strade: imparato.strade, riferimento: r);
+    notifyListeners();
+    if (_veicolo case final v?) await archivio.salvaConsumo(v, imparato);
+  }
+
   Future<void> azzera() async {
     imparato = const ConsumoImparato();
     notifyListeners();
