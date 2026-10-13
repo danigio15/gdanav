@@ -178,13 +178,11 @@ class PonteAuto {
         final trovati = await viaggio.luoghi.cerca(testo, vicinoA: posizione.qui ?? viaggio.ultimaPosizione);
         return [for (final l in trovati) luogoJson(l)];
       // Una meta scelta in auto: si calcola e si parte, senza toccare il telefono.
+      // La risposta dice se la guida è partita (vedi [vaiDallAuto]).
       case 'vai':
         final l = luogoDaJson(call.arguments);
-        if (l == null) return null;
-        if (guida.attiva) await guida.ferma();
-        await luoghi?.usato(l);
-        await viaggio.vaiA(l);
-        if (viaggio.stato is ViaggioPronto) guida.avvia();
+        if (l == null) return false;
+        return vaiDallAuto(l);
       // «Imposta Casa» (o Lavoro) scelto dalla ricerca sull'auto.
       case 'imposta':
         final l = luogoDaJson(a['luogo']);
@@ -246,16 +244,14 @@ class PonteAuto {
         }
       case 'passa':
         final l = luogoDaJson(call.arguments);
-        if (l == null) return null;
+        if (l == null) return false;
         // Con la termica ci si passa e si prosegue; con l'elettrica il
         // punto diventa la meta (le soste le fa il piano).
         if (guida.attiva && (guida.pronto?.termica ?? false)) {
           await guida.passaDa(l);
-        } else {
-          if (guida.attiva) await guida.ferma();
-          await viaggio.vaiA(l);
-          if (viaggio.stato is ViaggioPronto) guida.avvia();
+          return true;
         }
+        return vaiDallAuto(l, ricorda: false);
       // Un punto toccato sulla mappa dell'auto: cosa dirne.
       case 'punto':
         try {
@@ -532,10 +528,56 @@ class PonteAuto {
       await guida.passaDa(meta);
       return;
     }
-    if (guida.attiva) await guida.ferma();
-    await luoghi?.usato(meta);
-    await viaggio.vaiA(meta);
-    if (viaggio.stato is ViaggioPronto) guida.avvia();
+    await vaiDallAuto(meta);
+  }
+
+  /* ─── Una meta scelta in auto, fino alla guida ───────────────────────────
+   *
+   * Dal campo, su iPhone con CarPlay dentro gdahome: «ogni volta che scelgo
+   * un indirizzo e lo confermo, lo schermo sfarfalla un attimo e resta sulla
+   * pagina iniziale del navigatore dove si sceglie la destinazione».
+   *
+   * La parte grossa era sul lato nativo (vedi `SchermiCarPlay.swift`, «I
+   * passi fra gli schermi»), ma anche qui c'era un buco: tutto quello che
+   * succede prima che il viaggio entri in «Calcolo» — chiedere dove si è (che
+   * la prima volta chiede il permesso, e con il telefono in tasca può anche
+   * lanciare), ricordare la meta fra le recenti nel portachiavi — stava fuori
+   * da ogni `try`. Un errore li' saliva fino al canale, l'auto riceveva un
+   * errore che nessuno guardava, e sullo schermo restava solo «Calcolo il
+   * percorso…» per cinque secondi, poi la mappa ferma: proprio quello che si
+   * vedeva. Adesso:
+   *
+   *  - ricordare la meta non ferma mai il viaggio: se non si scrive, pazienza;
+   *  - un errore prima del calcolo diventa un messaggio sull'auto, con il nome
+   *    della meta, invece del silenzio;
+   *  - la risposta all'auto dice se la guida e' partita davvero (`true`), cosi'
+   *    il lato nativo non deve indovinarlo.
+   *
+   * Gli errori del calcolo vero (niente batteria, server lenti, percorso
+   * impossibile) li dice gia' il viaggio stesso (`ErroreViaggio`), e arrivano
+   * all'auto da [_viaggio] come sempre: qui non si ripetono. */
+
+  /// Ferma la guida in corso, calcola il viaggio verso [meta] e, se è
+  /// pronto, parte. [ricorda]: la meta va fra le recenti (non per un
+  /// distributore dove si passa). Torna `true` se la guida è partita.
+  Future<bool> vaiDallAuto(Luogo meta, {bool ricorda = true}) async {
+    try {
+      if (guida.attiva) await guida.ferma();
+      if (ricorda) {
+        try {
+          await luoghi?.usato(meta);
+        } catch (_) {
+          // Fra le recenti la si rimette la prossima volta: si parte lo stesso.
+        }
+      }
+      await viaggio.vaiA(meta);
+    } catch (_) {
+      _manda('messaggio', {'testo': 'Non sono riuscito a calcolare il viaggio per ${meta.nome}. Riprova.'});
+      return false;
+    }
+    if (viaggio.stato is! ViaggioPronto) return false;
+    guida.avvia();
+    return guida.attiva;
   }
 
   var _conProva = false;

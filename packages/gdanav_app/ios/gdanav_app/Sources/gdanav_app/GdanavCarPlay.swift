@@ -135,7 +135,10 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         t.guidanceBackgroundColor = UIColor(red: 0.08, green: 0.36, blue: 0.75, alpha: 1)
         t.tripEstimateStyle = .dark
         modello = t
-        interfaceController.setRootTemplate(t, animated: false, completion: nil)
+        // Col blocco di fine anche qui: senza, un «no» di CarPlay chiude l'app.
+        interfaceController.setRootTemplate(t, animated: false) { ok, errore in
+            if !ok { NSLog("gdanav CarPlay: setRootTemplate non riuscito: \(errore?.localizedDescription ?? "")") }
+        }
 
         ascolto = PonteAuto.shared.ascolta { [weak self] in self?.novita() }
         novita()
@@ -260,38 +263,45 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
 
     private func apriCerca() {
         guard let c = controllore else { return }
-        c.pushTemplate(SchermiCarPlay.cerca(c), animated: true, completion: nil)
+        c.spingi(SchermiCarPlay.cerca(c))
     }
 
     private func apriMenu() {
         guard let c = controllore, let m = mappa else { return }
-        c.pushTemplate(SchermiCarPlay.menu(c, mappa: m), animated: true, completion: nil)
+        c.spingi(SchermiCarPlay.menu(c, mappa: m))
     }
 
     private func apriCasa() {
         guard let c = controllore, let casa = GdanavCarPlay.casa else { return }
-        c.pushTemplate(casa(c), animated: true, completion: nil)
+        c.spingi(casa(c))
     }
 
     // MARK: - Premium
 
     /// Senza gdanav Premium la mappa c'è, ma la navigazione no: si dice come
     /// sbloccarlo dal telefono. Appena l'app lo sblocca, l'avviso se ne va.
+    ///
+    /// Conta [PonteAuto.guidaInAuto], non Premium da solo: dentro gdahome,
+    /// senza una casa abbinata, si guida base anche senza Premium (come su
+    /// Android Auto). Apre e chiude coi blocchi di fine («I passi fra gli
+    /// schermi», in `SchermiCarPlay.swift`): se CarPlay non lo mostra — c'è
+    /// già un altro avviso sopra — si riprova alla novità dopo, invece di
+    /// far chiudere l'app.
     private func controllaPremium() {
         // Finché l'app non ha parlato (niente stile) non si sa ancora niente.
         guard let c = controllore, PonteAuto.shared.stileChiaro != nil else { return }
-        let premium = PonteAuto.shared.premium
-        if premium && premiumMostrato {
+        let siGuida = PonteAuto.shared.guidaInAuto
+        if siGuida && premiumMostrato {
             premiumMostrato = false
-            c.dismissTemplate(animated: true, completion: nil)
-        } else if !premium && !premiumMostrato {
+            c.chiudiSopra()
+        } else if !siGuida && !premiumMostrato {
             premiumMostrato = true
             var azioni = [
                 CPAlertAction(title: PonteAuto.shared.aggiorna ? "Ho aggiornato" : "Ho sbloccato", style: .default) { [weak self] _ in
                     guard let self else { return }
-                    if PonteAuto.shared.premium {
+                    if PonteAuto.shared.guidaInAuto {
                         self.premiumMostrato = false
-                        self.controllore?.dismissTemplate(animated: true, completion: nil)
+                        self.controllore?.chiudiSopra()
                     }
                 },
             ]
@@ -300,7 +310,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                 azioni.append(CPAlertAction(title: "Casa", style: .default) { [weak self] _ in
                     guard let self else { return }
                     self.premiumMostrato = false
-                    self.controllore?.dismissTemplate(animated: true) { _, _ in self.apriCasa() }
+                    self.controllore?.chiudiSopra { _ in self.apriCasa() }
                 })
             }
             // Dentro gdahome Premium si attiva lì, non nel negozio di gdanav.
@@ -322,7 +332,9 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                     ],
                 actions: azioni
             )
-            c.presentTemplate(avviso, animated: true, completion: nil)
+            c.mostraSopra(avviso) { [weak self] ok in
+                if !ok { self?.premiumMostrato = false }
+            }
         }
     }
 
@@ -333,7 +345,9 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     private func sincronizzaGuida() {
         guard let t = modello else { return }
         let ponte = PonteAuto.shared
-        guard let g = ponte.guida, ponte.premium else {
+        // Come l'avviso del Premium: conta se in auto si guida, non Premium da
+        // solo (dentro gdahome senza casa abbinata si guida base).
+        guard let g = ponte.guida, ponte.guidaInAuto else {
             if let s = sessione {
                 s.finishTrip()
                 sessione = nil
