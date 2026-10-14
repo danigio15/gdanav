@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../sorgenti/canale_ble.dart';
@@ -207,10 +208,16 @@ class GestoreAuto extends ChangeNotifier {
     return 'Home Assistant è collegato, ma non ha ancora mandato la batteria';
   }
 
-  /// In viaggio: che Home Assistant rilegga l'auto e mandi i dati freschi.
+  /// In viaggio: che Home Assistant rilegga l'auto e mandi i dati freschi,
+  /// sia dall'integrazione gdanav sia da gdahome (che prima non lo chiedeva
+  /// mai: i dati da gdahome arrivavano solo quando l'integrazione dell'auto
+  /// cambiava un valore, e «Da gdahome · 2 h fa» restava lì).
   Future<void> chiediAggiornamento() async {
     _chiestoIl = _ora();
-    if (_sorgenti[TipoSorgente.homeAssistant] case final SorgenteHomeAssistant h) await h.chiediAggiornamento();
+    await Future.wait([
+      if (_sorgenti[TipoSorgente.homeAssistant] case final SorgenteHomeAssistant h) h.chiediAggiornamento(),
+      if (gdahome case final g?) g.chiediAggiornamento(),
+    ]);
   }
 
   /// Ogni quanto si chiedono dati freschi mentre qualcuno sta guardando.
@@ -248,8 +255,19 @@ class GestoreAuto extends ChangeNotifier {
     if (acceso) unawaited(chiediAggiornamento());
   }
 
+  /// Un'auto scelta davvero, in «La tua auto» o dalla plancia di gdahome:
+  /// finché no, [veicolo] è il profilo d'esempio.
+  bool veicoloScelto = false;
+
+  /// C'è un'auto elettrica da qualche parte: scelta, nella plancia di
+  /// gdahome, o una fonte della batteria collegata (Home Assistant, il
+  /// dongle). Senza niente di tutto questo, e senza batteria, il navigatore
+  /// non insiste a chiederla: propone l'auto termica.
+  bool get elettricaConfigurata => veicoloScelto || gdahome?.auto != null || abbinamento != null || dongle != null;
+
   Future<void> avvia() async {
     veicolo = await archivio.veicolo();
+    veicoloScelto = await archivio.veicoloScelto();
     elettrica = await archivio.elettrica();
     carburante = await archivio.carburante();
     arbitro.capacitaUtileKwh = veicolo.capacitaUtileKwh;
@@ -274,7 +292,18 @@ class GestoreAuto extends ChangeNotifier {
       _aggiorna();
       _forseChiedi();
     });
+    // Aprendo l'app e tornandoci si guarda la batteria: dati freschi subito,
+    // non quelli di quando l'integrazione dell'auto ha aggiornato l'ultima
+    // volta.
+    try {
+      _ritorno = AppLifecycleListener(onResume: () => unawaited(chiediAggiornamento()));
+    } catch (_) {
+      // Senza Flutter intorno (le prove in Dart puro) non c'è un ritorno.
+    }
+    unawaited(chiediAggiornamento());
   }
+
+  AppLifecycleListener? _ritorno;
 
   /// L'auto della plancia di gdahome diventa la tua auto: marca e modello
   /// cercati nel catalogo.
@@ -299,6 +328,7 @@ class GestoreAuto extends ChangeNotifier {
 
   Future<void> scegliVeicolo(ProfiloVeicolo v) async {
     veicolo = v;
+    veicoloScelto = true;
     arbitro.capacitaUtileKwh = v.capacitaUtileKwh;
     await archivio.salvaVeicolo(v);
     notifyListeners();
@@ -455,6 +485,7 @@ class GestoreAuto extends ChangeNotifier {
   @override
   void dispose() {
     _orologio?.cancel();
+    _ritorno?.dispose();
     gdahome?.removeListener(_autoDaGdahome);
     for (final i in _iscrizioni) {
       i.cancel();

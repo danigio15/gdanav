@@ -477,8 +477,11 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    // La prima lettura: si misura dal primo cambio di punto (vedi
+    // `MisuratoreConsumo.registra`), quindi da qui solo si parte.
+    await letturaVera(1, 90);
     // A 3 km la batteria è in linea col piano: nessun ricalcolo.
-    await letturaVera(3, a.guida.batteriaOra!.valore.roundToDouble());
+    await letturaVera(3, 89);
     expect(identical((a.viaggio.stato as ViaggioPronto).viaggio, primo), isTrue);
 
     // A 8 km l'auto dice 6 punti in meno del previsto: si impara e si ricalcola.

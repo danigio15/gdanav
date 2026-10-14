@@ -106,6 +106,9 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     private var manovre: [CPManeuver] = []
     private var messaggioMostrato: String?
     private var premiumMostrato = false
+    /// L'ultima proposta dell'auto termica vista, e se è sopra la mappa.
+    private var termicaVista: String?
+    private var termicaSopra = false
     private var spostamentoPrima: CGPoint = .zero
     private var sostaAvvisata: String?
 
@@ -182,6 +185,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
             versione = PonteAuto.shared.versioneModello
             aggiornaTasti()
             mostraMessaggio()
+            proponiTermica()
             controllaPremium()
         }
     }
@@ -369,9 +373,10 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
             a.name = g.destinazione
             var riepilogo = [g.destinazione]
             if let b = g.arrivoBatteria { riepilogo.insert("Arrivi con il \(Int(b.rounded()))%", at: 0) }
+            // Il pedaggio, come le informazioni in più di una strada.
             let scelta = CPRouteChoice(
                 summaryVariants: riepilogo,
-                additionalInformationVariants: [],
+                additionalInformationVariants: g.pedaggio.map { [$0] } ?? [],
                 selectionSummaryVariants: []
             )
             let v = CPTrip(origin: da, destination: a, routeChoices: [scelta])
@@ -537,9 +542,54 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         }
     }
 
+    /// Manca la batteria: l'avviso breve sparirebbe senza lasciare niente da
+    /// fare, e in auto la batteria non si scrive. Un avviso sopra la mappa
+    /// (`CPAlertTemplate`) col tasto per passare all'auto termica, come
+    /// `SchermoTermica.kt`; se il telefono risolve da sé, se ne va.
+    private func proponiTermica() {
+        guard let c = controllore, !premiumMostrato else { return }
+        let id = PonteAuto.shared.guida == nil ? PonteAuto.shared.termica.id : nil
+        // Una proposta per volta, e una volta sola: «Annulla» non la fa tornare.
+        guard id != termicaVista else { return }
+        termicaVista = id
+        if termicaSopra {
+            termicaSopra = false
+            c.chiudiSopra { [weak self] _ in
+                if let id { self?.mostraTermica(id) }
+            }
+        } else if let id {
+            mostraTermica(id)
+        }
+    }
+
+    private func mostraTermica(_ id: String) {
+        guard let c = controllore else { return }
+        let t = PonteAuto.shared.termica
+        let testo = PonteAuto.shared.messaggio ?? "Passiamo all'auto termica?"
+        let avviso = CPAlertTemplate(
+            titleVariants: [testo, t.titolo ?? "Passiamo all'auto termica?"],
+            actions: [
+                // Senza auto elettrica la termica è la proposta; altrimenti una via d'uscita.
+                CPAlertAction(title: "Usa auto termica", style: t.primaria ? .default : .cancel) { [weak self] _ in
+                    self?.termicaSopra = false
+                    self?.controllore?.chiudiSopra()
+                    PonteAuto.shared.usaTermica(id)
+                },
+                CPAlertAction(title: "Annulla", style: t.primaria ? .cancel : .default) { [weak self] _ in
+                    self?.termicaSopra = false
+                    self?.controllore?.chiudiSopra()
+                },
+            ]
+        )
+        termicaSopra = true
+        c.mostraSopra(avviso) { [weak self] ok in
+            if !ok { self?.termicaSopra = false }
+        }
+    }
+
     /// «Calcolo il percorso…» o cosa non va, da fermi: un avviso breve.
     private func mostraMessaggio() {
-        let testo = PonteAuto.shared.guida == nil ? PonteAuto.shared.messaggio : nil
+        let testo = PonteAuto.shared.guida == nil && PonteAuto.shared.termica.id == nil ? PonteAuto.shared.messaggio : nil
         guard testo != messaggioMostrato else { return }
         messaggioMostrato = testo
         guard let t = modello, let testo, !testo.isEmpty else { return }

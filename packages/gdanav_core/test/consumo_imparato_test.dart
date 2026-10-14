@@ -30,17 +30,23 @@ void main() {
       profilo: (t) => energiaTrattoWh(t, auto),
     );
     expect(m.previstaFinoA(10000), closeTo(whKm() * 10, 1e-6));
-    expect(m.registra(batteria: 80, metri: 0), isNull);
+    // La prima lettura non si sa dove sia dentro il suo punto: si parte dal
+    // primo cambio.
+    expect(m.registra(batteria: 81, metri: 0), isNull);
+    expect(m.registra(batteria: 81, metri: 1500), isNull);
+    expect(m.registra(batteria: 80, metri: 2000), isNull); // si parte da qui
     expect(m.registra(batteria: 79, metri: 5000), isNull); // un punto solo
-    final misura = m.registra(batteria: 78, metri: 7000)!;
+    final misura = m.registra(batteria: 78, metri: 9000)!;
     expect(misura.km, closeTo(7, 1e-9));
     expect(misura.realeWh, closeTo(0.02 * auto.capacitaUtileKwh * 1000, 1e-6));
     expect(misura.previstoWh, closeTo(whKm() * 7, 1e-6));
     // Si riparte da lì.
-    expect(m.registra(batteria: 77, metri: 9000), isNull);
-    // Una ricarica azzera il riferimento.
+    expect(m.registra(batteria: 77, metri: 11000), isNull);
+    // Una ricarica azzera il riferimento, e si riaspetta un cambio.
     expect(m.registra(batteria: 90, metri: 20000, inCarica: true), isNull);
-    expect(m.registra(batteria: 88, metri: 21000), isNotNull);
+    expect(m.registra(batteria: 90, metri: 20500), isNull);
+    expect(m.registra(batteria: 89, metri: 21000), isNull);
+    expect(m.registra(batteria: 87, metri: 23000), isNotNull);
   });
 
   test("il fattore impara dai chilometri e non esagera", () {
@@ -134,7 +140,8 @@ void main() {
       manovre: const [],
     );
     final m = MisuratoreConsumo(percorso: percorso, capacitaKwh: 60, profilo: (t) => t.lunghezzaM * 0.15);
-    m.registra(batteria: 80, metri: 0);
+    m.registra(batteria: 81, metri: 0);
+    m.registra(batteria: 80, metri: 500);
     final citta = m.registra(batteria: 78, metri: 9000)!;
     expect(citta.tipo, TipoStrada.urbana);
     expect(citta.velocitaKmh, closeTo(50, 1));

@@ -61,17 +61,46 @@ final class PannelloCarPlay: UIView {
         let margine = dp(10)
         avviso(sinistra: a.minX + margine, destra: a.maxX - margine, alto: a.minY + margine)
         let tachimetro = velocita(a, c)
-        barra(a, tachimetro, c)
+        // CarPlay non ha un posto per il testo accanto ai km che restano
+        // (`CPTravelEstimates` è solo tempo e distanza): il pedaggio sta in
+        // una capsula sua sulla riga in basso, accanto al tachimetro, dal lato
+        // della scheda dei tempi. Nella barra no.
+        pedaggio(a, tachimetro, c)
+        var senza = c
+        senza.pedaggio = nil
+        barra(a, tachimetro, senza)
+    }
+
+    /// «pedaggio ~12,40 €» in ambra, in una capsula alta come il tachimetro,
+    /// subito alla sua destra (o in basso a sinistra, senza tachimetro).
+    private func pedaggio(_ a: CGRect, _ tachimetro: CGRect?, _ c: CruscottoAuto) {
+        guard let t = c.pedaggio else { return }
+        let margine = dp(10)
+        let h = dp(54)
+        let p = dp(16)
+        let valore = font(20, colore: UIColor(red: 1, green: 207 / 255, blue: 112 / 255, alpha: 1))
+        let etichetta = font(14, grassetto: false, colore: muto)
+        let spazioEtichetta = larghezza("pedaggio", etichetta) + dp(6)
+        let x = tachimetro.map { $0.maxX + dp(8) } ?? (a.minX + margine)
+        let w = min(spazioEtichetta + larghezza(t, valore) + p * 2, a.maxX - margine - x)
+        guard w > p * 2 else { return }
+        let box = CGRect(x: x, y: a.maxY - margine - h, width: w, height: h)
+        fondoScheda.setFill()
+        UIBezierPath(roundedRect: box, cornerRadius: h / 2).fill()
+        let y = box.midY + dp(7)
+        scrivi("pedaggio", box.minX + p, y, etichetta)
+        scrivi(taglia(t, valore, w - p * 2 - spazioEtichetta), box.minX + p + spazioEtichetta, y, valore)
     }
 
     // MARK: - La barra dei dati
 
     /// Batteria (icona e %), km che restano, batteria alla meta, meteo; sopra,
-    /// piccola, la prossima sosta. Con la termica solo il meteo.
+    /// piccola, la prossima sosta. Con la termica solo il meteo (e il
+    /// pedaggio, per tutte).
     private func barra(_ a: CGRect, _ tachimetro: CGRect?, _ c: CruscottoAuto) {
         let b = c.elettrica ? c.batteria : nil
         let meteo = c.meteoTemperatura
-        if b == nil && meteo == nil && c.sostaNome == nil { return }
+        if b == nil && meteo == nil && c.sostaNome == nil && c.pedaggio == nil { return }
         let margine = dp(10)
         let forte = font(20)
         let piccolo = font(13, grassetto: false, colore: muto)
@@ -125,7 +154,31 @@ final class PannelloCarPlay: UIView {
             let t = "\(c.meteoEmoji ?? "") \(Int(m.rounded()))°".trimmingCharacters(in: .whitespaces)
             pezzi.append((larghezza(t, forte), { x, y in self.scrivi(t, x, y, forte) }))
         }
-        let larghezzaRiga = pezzi.reduce(0) { $0 + $1.0 } + spazio * 2 * CGFloat(max(pezzi.count - 1, 0))
+        func larghezzaDi(_ n: Int, _ somma: CGFloat) -> CGFloat { somma + spazio * 2 * CGFloat(max(n - 1, 0)) }
+        // Lo spazio che CarPlay lascia: la barra non ci deve finire sotto.
+        let spazioMassimo = a.width - margine * 2 - p * 2
+
+        // Il pedaggio che resta, in ambra come la pastiglia del telefono: in
+        // fila con gli altri se ci sta, se no piccolo nella riga di sopra.
+        let ambra = UIColor(red: 1, green: 207 / 255, blue: 112 / 255, alpha: 1)
+        var pedaggioSopra: String?
+        if let t = c.pedaggio {
+            let valore = font(20, colore: ambra)
+            let etichetta = font(14, grassetto: false, colore: muto)
+            let spazioEtichetta = larghezza("pedaggio", etichetta) + dp(6)
+            let largo = spazioEtichetta + larghezza(t, valore)
+            let somma = pezzi.reduce(0) { $0 + $1.0 }
+            if larghezzaDi(pezzi.count + 1, somma + largo) <= spazioMassimo {
+                // Prima del meteo, che resta in fondo.
+                pezzi.insert((largo, { x, y in
+                    self.scrivi("pedaggio", x, y, etichetta)
+                    self.scrivi(t, x + spazioEtichetta, y, valore)
+                }), at: meteo != nil ? pezzi.count - 1 : pezzi.count)
+            } else {
+                pedaggioSopra = "pedaggio \(t)"
+            }
+        }
+        let larghezzaRiga = larghezzaDi(pezzi.count, pezzi.reduce(0) { $0 + $1.0 })
         var sosta: String?
         if let nome = c.sostaNome {
             sosta = [
@@ -134,18 +187,27 @@ final class PannelloCarPlay: UIView {
                 c.sostaBatteria.map { "arrivi col \(Int($0.rounded()))%" },
             ].compactMap { $0 }.joined(separator: " · ")
         }
-        // Larga quanto la riga; la sosta, se è più lunga, si accorcia.
-        let w = min((pezzi.isEmpty ? dp(220) : larghezzaRiga) + p * 2, a.width - margine * 2)
+        // Larga quanto la riga (e il pedaggio sopra), mai più dello spazio
+        // libero; la sosta, se è più lunga, si accorcia.
+        let sopraFont = font(14, colore: ambra)
+        let larghezzaSopra = pedaggioSopra.map { larghezza($0, sopraFont) } ?? 0
+        let w = min(max(pezzi.isEmpty ? dp(220) : larghezzaRiga, larghezzaSopra) + p * 2, a.width - margine * 2)
         let hRiga = dp(54)
-        let hSosta: CGFloat = sosta != nil ? dp(24) : 0
+        let hSosta: CGFloat = sosta != nil || pedaggioSopra != nil ? dp(24) : 0
         let h = hRiga + hSosta
         // In basso a sinistra, sopra la capsula del tachimetro.
         let basso = tachimetro.map { $0.minY - dp(8) } ?? (a.maxY - margine)
         let box = CGRect(x: a.minX + margine, y: basso - h, width: w, height: h)
         fondoScheda.setFill()
         UIBezierPath(roundedRect: box, cornerRadius: dp(18)).fill()
+        // La riga di sopra: la sosta a sinistra e il pedaggio a destra, o il
+        // pedaggio da solo a sinistra.
+        if let t = pedaggioSopra {
+            scrivi(t, sosta != nil ? box.maxX - p - larghezzaSopra : box.minX + p, box.minY + dp(19), sopraFont)
+        }
         if let sosta {
-            scrivi(taglia(sosta, piccolo, w - p * 2), box.minX + p, box.minY + dp(19), piccolo)
+            let resta = w - p * 2 - (pedaggioSopra != nil ? larghezzaSopra + dp(12) : 0)
+            scrivi(taglia(sosta, piccolo, resta), box.minX + p, box.minY + dp(19), piccolo)
         }
         let linea = box.maxY - hRiga / 2 + dp(7)
         var cx = box.minX + p + max(w - p * 2 - larghezzaRiga, 0) / 2

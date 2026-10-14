@@ -7,6 +7,7 @@ import '../geo/geo.dart';
 import '../motore/modello_consumo.dart';
 import '../ztl/ztl.dart';
 import 'consumo_tomtom.dart';
+import 'pedaggi.dart';
 import 'valhalla.dart';
 
 /// I percorsi da TomTom, al posto di Valhalla.
@@ -67,7 +68,20 @@ class ClienteTomTom {
   /// disco del limite in guida, che con Valhalla arrivava da una chiamata a
   /// parte (`/locate`); le altre dicono com'è la strada, per scegliere fra i
   /// percorsi. Vanno ripetute: separate da virgole TomTom risponde 400.
-  static const sezioniChieste = ['traffic', 'speedLimit', 'tollRoad', 'motorway', 'ferry', 'carTrain', 'lanes'];
+  /// `tollRoad`, `tollVignette` e `country` dicono dove si paga e in che
+  /// paese: il pedaggio si stima da lì ([TariffaPedaggio]), perché TomTom il
+  /// prezzo non lo dà.
+  static const sezioniChieste = [
+    'traffic',
+    'speedLimit',
+    'tollRoad',
+    'tollVignette',
+    'country',
+    'motorway',
+    'ferry',
+    'carTrain',
+    'lanes',
+  ];
 
   /// [eco]: la strada che consuma meno invece della più rapida. [consumo]:
   /// il modello dell'auto, e allora ogni percorso torna col suo consumo.
@@ -375,6 +389,7 @@ class ClienteTomTom {
       manovre: manovre,
       limiti: _limiti(sezioni, punti.length),
       conPedaggi: _haSezione(sezioni, 'TOLL_ROAD') || _haSezione(sezioni, 'TOLL_VIGNETTE'),
+      pedaggi: _pedaggi(sezioni, punti),
       conAutostrade: _haSezione(sezioni, 'MOTORWAY') || manovre.any((m) => m.tipo == 25),
       conTraghetti: _haSezione(sezioni, 'FERRY') || _haSezione(sezioni, 'CAR_TRAIN'),
       code: code,
@@ -467,6 +482,34 @@ class ClienteTomTom {
         'LEFT_U_TURN' => DirezioneCorsia.inversioneSinistra,
         _ => null,
       };
+
+  /// I tratti a pagamento (`TOLL_ROAD`, `TOLL_VIGNETTE`), ognuno col paese
+  /// in cui sta: quello della sezione `COUNTRY` che ne contiene la metà.
+  static List<TrattoPedaggio> _pedaggi(List<Map> sezioni, List<Punto> punti) {
+    ({int da, int a})? indici(Map s) {
+      final da = (s['startPointIndex'] as num?)?.toInt();
+      final a = (s['endPointIndex'] as num?)?.toInt();
+      return da == null || a == null || a <= da ? null : (da: da, a: a);
+    }
+
+    String tipo(Map s) => '${s['sectionType']}'.toUpperCase();
+    final paesi = [
+      for (final s in sezioni)
+        if (tipo(s) == 'COUNTRY' && s['countryCode'] is String)
+          if (indici(s) case final i?) (da: i.da, a: i.a, codice: '${s['countryCode']}'.toUpperCase()),
+    ];
+    return trattiDaIndici(punti, [
+      for (final s in sezioni)
+        if (tipo(s) == 'TOLL_ROAD' || tipo(s) == 'TOLL_VIGNETTE')
+          if (indici(s) case final i?)
+            (
+              da: i.da,
+              a: i.a,
+              vignetta: tipo(s) == 'TOLL_VIGNETTE',
+              paese: paesi.where((p) => p.da <= (i.da + i.a) ~/ 2 && (i.da + i.a) ~/ 2 <= p.a).firstOrNull?.codice,
+            ),
+    ]);
+  }
 
   static bool _haSezione(List<Map> sezioni, String tipo) =>
       sezioni.any((s) => '${s['sectionType']}'.toUpperCase() == tipo);

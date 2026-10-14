@@ -131,8 +131,9 @@ void main() {
 
     final piano = a.guida.consumoKwh100!;
     final riferimento = a.auto.consumoDiRiferimentoKwh100();
-    // Il piano, che le partenze e le frenate non le conosce, resta quello.
-    expect(piano, inInclusiveRange(6, 8.5));
+    // Il piano conta le partenze e le frenate (non più 6-8 kWh/100 km), ma
+    // in città resta sotto il riferimento a 90 km/h.
+    expect(piano, inInclusiveRange(8.5, 12));
     expect(piano, lessThan(riferimento));
     // Ma l'autonomia si fa col riferimento del modello, non con lui.
     final autonomia = a.guida.autonomiaOra!;

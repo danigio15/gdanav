@@ -77,9 +77,40 @@ class ViaggioPronto extends StatoViaggio {
 }
 
 class ErroreViaggio extends StatoViaggio {
-  const ErroreViaggio(this.messaggio, {this.destinazione});
+  const ErroreViaggio(this.messaggio, {this.destinazione, this.senzaBatteria});
   final String messaggio;
   final Luogo? destinazione;
+
+  /// Le soste non si calcolano perché manca la batteria, e perché: la
+  /// scheda (e l'auto) propongono di scriverla o di passare alla termica.
+  /// `null` per gli altri errori.
+  final SenzaBatteria? senzaBatteria;
+}
+
+/// Perché un viaggio elettrico non sa quanta batteria c'è.
+enum SenzaBatteria {
+  /// Nessuna auto elettrica configurata: né scelta in «La tua auto», né
+  /// nella plancia di gdahome, né una fonte collegata. Prima cosa da
+  /// proporre: l'auto termica.
+  nessunaElettrica(
+    'Non trovo un\'auto elettrica configurata. Passiamo all\'auto termica?',
+    'Non trovo un\'auto elettrica. Passiamo all\'auto termica?',
+  ),
+
+  /// L'auto elettrica c'è, ma la batteria no (né dall'auto né scritta).
+  /// Prima cosa da proporre: scriverla; la termica resta lì accanto.
+  batteriaIgnota(
+    'Non so quanta batteria hai: scrivila per calcolare le soste di ricarica.',
+    'Non so quanta batteria hai: scrivila sul telefono, o passa all\'auto termica.',
+  );
+
+  const SenzaBatteria(this.messaggio, this.inAuto);
+
+  /// Il testo della scheda sul telefono.
+  final String messaggio;
+
+  /// Il testo sullo schermo dell'auto, dove la batteria non si scrive.
+  final String inAuto;
 }
 
 /// Costruisce il pianificatore con le impostazioni del momento: nelle prove
@@ -176,13 +207,10 @@ PianificatoreViaggio pianificatoreVero(
      * Overpass resta solo come riserva: è lento (in CI scade anche dopo
      * cinquanta secondi) e non deve rallentare ogni viaggio. */
     colonnine: _conLoStato(
-      FonteColonnineUnite(
-        [
-          if (i.chiaveOcm.isNotEmpty) ClienteOpenChargeMap(chiave: i.chiaveOcm),
-          ColonnineLocali(archivioColonnine(), riserva: ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni))),
-        ],
-        riserva: ClienteOverpass(),
-      ),
+      FonteColonnineUnite([
+        if (i.chiaveOcm.isNotEmpty) ClienteOpenChargeMap(chiave: i.chiaveOcm),
+        ColonnineLocali(archivioColonnine(), riserva: ClienteColonnineRelay(Uri.parse(Servizi.segnalazioni))),
+      ], riserva: ClienteOverpass()),
     ),
     profilo: profilo,
     preferenze: preferenze,
@@ -195,7 +223,11 @@ PianificatoreViaggio pianificatoreVero(
 /// Premium le colonnine lungo la strada arrivano al pianificatore con lo
 /// stato di tutta Italia già dentro, e le soste si scelgono sapendolo.
 FonteColonnine _conLoStato(FonteColonnine fonte) => GestorePremium.attivo.value
-    ? ColonnineConStato(fonte, stati: statiDiTuttaItalia, inOrdine: () async => (await archivioColonnine()).evseInOrdine)
+    ? ColonnineConStato(
+        fonte,
+        stati: statiDiTuttaItalia,
+        inOrdine: () async => (await archivioColonnine()).evseInOrdine,
+      )
     : fonte;
 
 /// La PUN, una per tutta l'app: le credenziali ospite, lo stato di tutta
@@ -455,6 +487,15 @@ class GestoreViaggio extends ChangeNotifier {
     }
   }
 
+  /// «Usa auto termica»: l'auto diventa termica (come in «La tua auto», e
+  /// resta così) e il viaggio aperto si rifà subito, senza soste di ricarica.
+  Future<void> passaATermica() async {
+    await auto.impostaElettrica(false);
+    obbligate.clear();
+    final d = destinazione;
+    if (d != null) await pianifica(d, conScelte: _daPassare.isEmpty);
+  }
+
   /// «Fermati qui»: la colonnina diventa una sosta, e si ricalcola.
   Future<void> fermatiA(String idColonnina) async {
     final d = destinazione;
@@ -512,9 +553,11 @@ class GestoreViaggio extends ChangeNotifier {
     }
     final batteria = auto.stato?.batteria;
     if (batteria == null) {
-      return _imposta(
-        ErroreViaggio('Non so quanta batteria hai: tocca la batteria in alto e scrivila.', destinazione: destinazione),
-      );
+      // «Nel caso non trova vettura elettrica devi mostrare avviso»: senza
+      // un'auto elettrica configurata chiedere la batteria era un vicolo
+      // cieco. Si propone la termica; con l'elettrica, di scriverla.
+      final perche = auto.elettricaConfigurata ? SenzaBatteria.batteriaIgnota : SenzaBatteria.nessunaElettrica;
+      return _imposta(ErroreViaggio(perche.messaggio, destinazione: destinazione, senzaBatteria: perche));
     }
     final da = partenza ?? await posizione();
     if (da == null) {
@@ -529,8 +572,11 @@ class GestoreViaggio extends ChangeNotifier {
     try {
       var condizioni = consumo?.condizioni(auto.stato) ?? const Condizioni();
       if (await stimaMeteo?.call(da, destinazione.posizione) case final m?) {
+        // La temperatura dell'auto, se la dice, vale più di quella del meteo
+        // (che è della zona, e di un'ora): dal meteo il vento, e la
+        // temperatura quando l'auto non la manda.
         condizioni = Condizioni.daMeteo(
-          temperaturaC: m.temperaturaC,
+          temperaturaC: auto.stato?.temperaturaEsternaC ?? m.temperaturaC,
           ventoControMs: m.ventoControMs,
           fattoreConsumo: condizioni.fattoreConsumo,
           fattoriStrada: condizioni.fattoriStrada,

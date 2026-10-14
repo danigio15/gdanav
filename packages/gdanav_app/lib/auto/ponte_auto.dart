@@ -225,6 +225,14 @@ class PonteAuto {
         } else {
           guida.restaQui();
         }
+      // «Usa auto termica» sull'avviso dell'auto: vale solo per l'ultimo
+      // «manca la batteria» mandato, e se il viaggio è ancora fermo lì.
+      case 'termica':
+        if (a['id'] != 'termica-$_numeroTermica' || !identical(viaggio.stato, _senzaBatteriaMandato)) return false;
+        await viaggio.passaATermica();
+        if (viaggio.stato is! ViaggioPronto) return false;
+        guida.avvia();
+        return guida.attiva;
       // Auto termica: i distributori intorno; in guida si passa da lì.
       case 'distributori':
         final qui = guida.avanzamento?.posizioneSulPercorso ?? posizione.qui ?? viaggio.ultimaPosizione;
@@ -277,9 +285,7 @@ class PonteAuto {
             qui: qui,
             carburante: auto?.carburante ?? Carburante.benzina,
           );
-          final descrizione = righe.isEmpty
-              ? p.nome
-              : righe.first.titolo;
+          final descrizione = righe.isEmpty ? p.nome : righe.first.titolo;
           return {
             'titolo': p.nome.isEmpty ? 'Punto' : p.nome,
             'voci': [
@@ -415,15 +421,41 @@ class PonteAuto {
     _manda('messaggio', {
       'testo': switch (stato) {
         Calcolo(:final destinazione) => 'Calcolo il percorso per ${destinazione.nome}…',
+        ErroreViaggio(:final senzaBatteria?) => senzaBatteria.inAuto,
         ErroreViaggio(:final messaggio) => messaggio,
         _ => null,
       },
+      ...?_propostaTermica(stato),
     });
     final dati = datiViaggio(stato is ViaggioPronto ? stato.viaggio : null);
     _manda('sorgenti', {
       'dati': {for (final MapEntry(:key, :value) in dati.entries) key: jsonEncode(value)},
     });
     _cruscotto();
+  }
+
+  /// L'ultimo «manca la batteria» mandato all'auto, e il suo numero: la
+  /// risposta dell'auto vale solo per quello.
+  ErroreViaggio? _senzaBatteriaMandato;
+  var _numeroTermica = 0;
+
+  /// Manca la batteria: l'auto propone di passare alla termica, con un
+  /// tasto (Android Auto: un messaggio coi tasti; CarPlay: un avviso). Lì la
+  /// batteria non si scrive, e la scheda del telefono è lontana. `titolo` e
+  /// `primaria` dicono quale dei due casi è: senza auto elettrica la termica
+  /// è la proposta; con l'elettrica, una via d'uscita.
+  Map<String, Object?>? _propostaTermica(StatoViaggio stato) {
+    if (stato is! ErroreViaggio || stato.senzaBatteria == null) return null;
+    if (!identical(stato, _senzaBatteriaMandato)) {
+      _senzaBatteriaMandato = stato;
+      _numeroTermica++;
+    }
+    final nessuna = stato.senzaBatteria == SenzaBatteria.nessunaElettrica;
+    return {
+      'termica': 'termica-$_numeroTermica',
+      'termica_titolo': nessuna ? 'Nessuna auto elettrica' : 'Batteria sconosciuta',
+      'termica_primaria': nessuna,
+    };
   }
 
   void _vicini() {
@@ -452,10 +484,16 @@ class PonteAuto {
     final passata = a?.passata;
     final davanti = a?.davanti;
     _manda('avviso', {
-      if (z != null && (z.fuori || davanti == null))
-        ...{'titolo': z.titolo, 'tipo': 'ztl', 'testo': z.testo}
-      else if (davanti case (final s, final m))
-        ...{'titolo': s.fissa ? 'Autovelox fisso' : s.tipo.avviso, 'tipo': s.tipo.name, 'metri': m, 'limite': s.limiteKmh},
+      if (z != null && (z.fuori || davanti == null)) ...{
+        'titolo': z.titolo,
+        'tipo': 'ztl',
+        'testo': z.testo,
+      } else if (davanti case (final s, final m)) ...{
+        'titolo': s.fissa ? 'Autovelox fisso' : s.tipo.avviso,
+        'tipo': s.tipo.name,
+        'metri': m,
+        'limite': s.limiteKmh,
+      },
       if (passata != null) ...{'ancora_id': passata.id, 'ancora_testo': '${passata.tipo.nome}: c\'è ancora?'},
     });
   }
@@ -484,7 +522,10 @@ class PonteAuto {
       return;
     }
     final prima = _zoneQui;
-    if (!subito && prima != null && distanzaM(prima, qui) < 2000 && ora.difference(_zoneAlle) < const Duration(minutes: 5)) {
+    if (!subito &&
+        prima != null &&
+        distanzaM(prima, qui) < 2000 &&
+        ora.difference(_zoneAlle) < const Duration(minutes: 5)) {
       return;
     }
     _zoneQui = qui;
@@ -666,6 +707,10 @@ class PonteAuto {
       'destinazione_lon': p.destinazione.posizione.lon,
       // Con quanta batteria si arriva, per il riepilogo del viaggio.
       if (auto?.elettrica ?? true) 'arrivo_batteria': ?guida.batteriaArrivo,
+      // Il pedaggio che resta, accanto ai km che restano: nella scheda
+      // dell'arrivo di Android Auto («~12,40 € pedaggio»); niente se non se
+      // ne paga.
+      if (guida.pedaggioDavanti case final c? when !c.senzaPedaggi) 'pedaggio': c.perStima,
       'uscita': m?.uscita ?? '',
       'verso': m?.verso ?? '',
       'rotonda': m?.uscitaRotonda,
@@ -770,6 +815,10 @@ class PonteAuto {
       'velocita': posizione.velocitaAdesso(),
       'limite': guida.attiva ? a?.limiteKmh : null,
       'arrivo_batteria': p == null || !elettrica ? null : guida.batteriaArrivo,
+      // Il pedaggio che resta, breve («~12,40 €»), sulla barra dell'auto.
+      if (guida.attiva)
+        if (guida.pedaggioDavanti case final c? when c.conPrezzo || c.vignetta || c.kmNonStimati > 0)
+          'pedaggio': c.breve,
       if (sosta != null) ...{
         'sosta_nome': sosta.colonnina.nome,
         'sosta_km': (sosta.colonnina.distanzaM - (a?.percorsiM ?? 0)) / 1000,
@@ -793,11 +842,11 @@ class PonteAuto {
   /// gdahome, senza una casa abbinata, si guida base (`preparaGdanav`). Senza
   /// dirlo vale [sbloccato], come prima.
   void premium(bool sbloccato, {bool ospite = false, bool aggiorna = false, bool? guidaInAuto}) => _manda('premium', {
-        'sbloccato': sbloccato && !aggiorna,
-        'ospite': ospite,
-        'aggiorna': aggiorna,
-        'guida_in_auto': (guidaInAuto ?? sbloccato) && !aggiorna,
-      });
+    'sbloccato': sbloccato && !aggiorna,
+    'ospite': ospite,
+    'aggiorna': aggiorna,
+    'guida_in_auto': (guidaInAuto ?? sbloccato) && !aggiorna,
+  });
 
   void _manda(String metodo, Map<String, Object?> dati) {
     if (!_attivo) return;

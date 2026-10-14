@@ -38,6 +38,8 @@ object PonteAuto {
         val dopoStrada: String = "",
         /** La vista dello svincolo da mostrare, se pronta (vedi [svincoli]). */
         val svincolo: Int? = null,
+        /** Il pedaggio che resta, per la scheda dell'arrivo: «~12,40 € pedaggio». */
+        val pedaggio: String? = null,
     )
 
     /** Una corsia prima dello svincolo: le frecce, se è giusta, quale seguire. */
@@ -93,6 +95,8 @@ object PonteAuto {
         val meteoTemperatura: Double? = null,
         val meteoEmoji: String? = null,
         val meteoDove: String? = null,
+        /** Il pedaggio che resta, breve: «~12,40 €». */
+        val pedaggio: String? = null,
     )
 
     @Volatile var cruscotto = Cruscotto()
@@ -126,6 +130,13 @@ object PonteAuto {
      */
     @Volatile var conAvvisi = false
 
+    /**
+     * L'auto scrive un testo accanto ai km che restano (API 5,
+     * `TravelEstimate.setTripText`): il pedaggio va lì, e non nella barra
+     * sulla mappa.
+     */
+    @Volatile var pedaggioNellaStima = false
+
     /** Le opzioni del percorso e la voce, per il menu. */
     @Volatile var opzioni: Map<String, Any?> = emptyMap()
 
@@ -137,6 +148,15 @@ object PonteAuto {
 
     /** Cosa dire quando non si guida: «Calcolo il percorso…», o cosa non va. */
     @Volatile var messaggio: String? = null
+
+    /**
+     * Manca la batteria (nessuna auto elettrica, o la batteria non si sa): il
+     * telefono propone l'auto termica. [primaria]: senza auto elettrica è la
+     * proposta principale. Senza id, nessuna proposta.
+     */
+    data class Termica(val id: String? = null, val titolo: String? = null, val primaria: Boolean = false)
+
+    @Volatile var termica = Termica()
 
     /** gdanav Premium: l'app lo dice, l'auto lo ricorda anche a telefono spento. */
     private var preferenze: SharedPreferences? = null
@@ -223,7 +243,14 @@ object PonteAuto {
             "luoghi" -> {
                 luoghi = (call.argument<List<Map<String, Any?>>>("elenco") ?: emptyList()).mapNotNull(::luogo)
             }
-            "messaggio" -> messaggio = call.argument<String>("testo")
+            "messaggio" -> {
+                messaggio = call.argument<String>("testo")
+                termica = Termica(
+                    id = call.argument<String>("termica"),
+                    titolo = call.argument<String>("termica_titolo"),
+                    primaria = call.argument<Boolean>("termica_primaria") == true,
+                )
+            }
             "cruscotto" -> cruscotto = Cruscotto(
                 elettrica = call.argument<Boolean>("elettrica") != false,
                 batteria = numero(call, "batteria"),
@@ -238,6 +265,7 @@ object PonteAuto {
                 meteoTemperatura = numero(call, "meteo_temperatura"),
                 meteoEmoji = call.argument<String>("meteo_emoji"),
                 meteoDove = call.argument<String>("meteo_dove"),
+                pedaggio = call.argument<String>("pedaggio"),
             )
             "avviso" -> avviso = Avviso(
                 titolo = call.argument<String>("titolo"),
@@ -302,6 +330,7 @@ object PonteAuto {
                         dopoTipo = numero(call, "dopo_tipo")?.toInt(),
                         dopoStrada = call.argument<String>("dopo_strada") ?: "",
                         svincolo = numero(call, "svincolo")?.toInt(),
+                        pedaggio = call.argument<String>("pedaggio"),
                     )
                 } else {
                     null
@@ -359,6 +388,14 @@ object PonteAuto {
         chiedi("segnala", mapOf("tipo" to tipo)) { risposta(it as? String ?: "Non è partita.") }
 
     fun ancora(id: String, si: Boolean) = chiedi("ancora", mapOf("id" to id, "si" to si))
+
+    /** «Usa auto termica»: l'auto diventa termica, il viaggio si rifà e, se è pronto, parte. */
+    fun usaTermica(id: String) {
+        termica = Termica()
+        messaggio = "Passo all'auto termica…"
+        avvisa()
+        chiedi("termica", mapOf("id" to id))
+    }
 
     /** «Prendila» (o «Resto qui») sulla strada proposta. */
     fun rispondiStrada(id: String, si: Boolean) = chiedi("strada", mapOf("id" to id, "si" to si))

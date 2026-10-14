@@ -67,6 +67,22 @@ class SorgenteGdahome extends ChangeNotifier implements SorgenteDatiAuto {
     notifyListeners();
   }
 
+  /// Come si chiede alla casa di rileggere l'auto adesso: lo mette chi
+  /// ospita gdanav (gdahome chiama `homeassistant.update_entity` sui sensori
+  /// dell'auto). Senza, i dati arrivano solo quando l'integrazione dell'auto
+  /// li aggiorna da sé, che per alcune vuol dire ogni mezz'ora o più.
+  Future<void> Function()? aggiorna;
+
+  /// In viaggio, all'avvio e quando si torna nell'app: dati freschi, se chi
+  /// ospita sa chiederli. Un errore non si propaga: i dati di prima restano.
+  Future<void> chiediAggiornamento() async {
+    try {
+      await aggiorna?.call();
+    } catch (e) {
+      debugPrint('gdahome, aggiornamento dell\'auto: $e');
+    }
+  }
+
   /// Quale auto c'è nella plancia; `null` se non ce n'è nessuna.
   void descrivi(AutoDiGdahome? auto) {
     if (auto == _auto) return;

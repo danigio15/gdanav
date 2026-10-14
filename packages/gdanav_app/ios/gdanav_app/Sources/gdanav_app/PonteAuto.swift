@@ -47,6 +47,8 @@ struct GuidaAuto {
     let destinazioneLat: Double?
     let destinazioneLon: Double?
     let arrivoBatteria: Double?
+    /// Il pedaggio che resta, «Pedaggio ~12,40 €»; `nil` se non se ne paga.
+    let pedaggio: String?
     let uscita: String
     let verso: String
     let rotonda: Int?
@@ -74,6 +76,8 @@ struct CruscottoAuto {
     var meteoTemperatura: Double?
     var meteoEmoji: String?
     var meteoDove: String?
+    /// Il pedaggio che resta, breve: «~12,40 €».
+    var pedaggio: String?
 }
 
 /// La segnalazione che si avvicina, e quella appena passata.
@@ -95,6 +99,15 @@ struct StradaAuto {
     var id: String?
     var titolo: String?
     var testo: String?
+}
+
+/// Manca la batteria (nessuna auto elettrica, o la batteria non si sa): il
+/// telefono propone l'auto termica. `primaria`: senza auto elettrica è la
+/// proposta principale. Senza id, nessuna proposta.
+struct TermicaAuto {
+    var id: String?
+    var titolo: String?
+    var primaria = false
 }
 
 func numero(_ v: Any?) -> Double? { (v as? NSNumber)?.doubleValue }
@@ -136,6 +149,9 @@ final class PonteAuto {
 
     /// Cosa dire quando non si guida: «Calcolo il percorso…», o cosa non va.
     private(set) var messaggio: String?
+
+    /// La proposta di passare all'auto termica, quando manca la batteria.
+    private(set) var termica = TermicaAuto()
 
     /// Cresce quando cambia qualcosa dei modelli di CarPlay (manovra, messaggi,
     /// luoghi, opzioni): il resto (posizione, cruscotto) ridisegna solo la mappa.
@@ -220,6 +236,11 @@ final class PonteAuto {
             luoghi = (a["elenco"] as? [[String: Any]] ?? []).compactMap { LuogoAuto($0) }
         case "messaggio":
             messaggio = a["testo"] as? String
+            termica = TermicaAuto(
+                id: a["termica"] as? String,
+                titolo: a["termica_titolo"] as? String,
+                primaria: (a["termica_primaria"] as? Bool) == true
+            )
         case "cruscotto":
             cruscotto = CruscottoAuto(
                 elettrica: (a["elettrica"] as? Bool) != false,
@@ -234,7 +255,8 @@ final class PonteAuto {
                 sostaBatteria: numero(a["sosta_batteria"]),
                 meteoTemperatura: numero(a["meteo_temperatura"]),
                 meteoEmoji: a["meteo_emoji"] as? String,
-                meteoDove: a["meteo_dove"] as? String
+                meteoDove: a["meteo_dove"] as? String,
+                pedaggio: a["pedaggio"] as? String
             )
         case "avviso":
             let prossimo = AvvisoAuto(
@@ -303,6 +325,7 @@ final class PonteAuto {
             destinazioneLat: numero(a["destinazione_lat"]),
             destinazioneLon: numero(a["destinazione_lon"]),
             arrivoBatteria: numero(a["arrivo_batteria"]),
+            pedaggio: a["pedaggio"] as? String,
             uscita: a["uscita"] as? String ?? "",
             verso: a["verso"] as? String ?? "",
             rotonda: numero(a["rotonda"]).map { Int($0) },
@@ -364,6 +387,16 @@ final class PonteAuto {
         versioneModello += 1
         avvisa()
         chiedi("vai", l.comeMappa)
+    }
+
+    /// «Usa auto termica»: l'auto diventa termica, il viaggio si rifà e, se
+    /// è pronto, parte.
+    func usaTermica(_ id: String) {
+        termica = TermicaAuto()
+        messaggio = "Passo all'auto termica…"
+        versioneModello += 1
+        avvisa()
+        chiedi("termica", ["id": id])
     }
 
     /// In guida si passa dal distributore e poi si prosegue; fermi, ci si va.

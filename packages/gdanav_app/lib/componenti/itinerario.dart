@@ -47,6 +47,115 @@ class RigaTraffico extends StatelessWidget {
   }
 }
 
+/// Il pedaggio come lo mostra Waze: una pastiglia col casello, «~12,40 €»
+/// in ambra se si paga, «Senza pedaggi» in verde se no.
+class BadgePedaggio extends StatelessWidget {
+  const BadgePedaggio({super.key, required this.costo, this.grande = false});
+
+  final CostoPedaggio costo;
+
+  /// Nel riepilogo del viaggio, un po' più grande che sulle strade.
+  final bool grande;
+
+  /// Ambra per chi paga, verde per chi no: sullo sfondo chiaro e scuro.
+  static (Color sfondo, Color testo) colori(BuildContext context, {required bool paga}) {
+    final scuro = Theme.of(context).brightness == Brightness.dark;
+    return switch ((paga, scuro)) {
+      (true, false) => (const Color(0xFFFFF1CC), const Color(0xFF8A5300)),
+      (true, true) => (const Color(0xFF3D2F10), const Color(0xFFFFCF70)),
+      (false, false) => (const Color(0xFFDDF5E4), const Color(0xFF15803D)),
+      (false, true) => (const Color(0xFF123222), const Color(0xFF4ADE80)),
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final paga = !costo.senzaPedaggi;
+    final (sfondo, testo) = colori(context, paga: paga);
+    final t = Theme.of(context).textTheme;
+    return Container(
+      key: const Key('pedaggio'),
+      padding: EdgeInsets.symmetric(horizontal: grande ? 10 : 7, vertical: grande ? 4 : 2),
+      decoration: BoxDecoration(color: sfondo, borderRadius: BorderRadius.circular(999)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(paga ? Icons.toll_rounded : Icons.money_off_rounded, size: grande ? 16 : 13, color: testo),
+          SizedBox(width: grande ? 5 : 4),
+          // Testi corti («~12,40 € + vignetta»): la pastiglia è larga
+          // quanto serve, e chi la mette in fila si stringe attorno.
+          Text(
+            // Nel riepilogo per esteso, come chiesto: «Pedaggio ~12,40 €».
+            grande && costo.conPrezzo ? 'Pedaggio ${costo.breve}' : costo.breve,
+            maxLines: 1,
+            style: (grande ? t.labelLarge : t.labelSmall)?.copyWith(
+              color: testo,
+              fontWeight: FontWeight.w800,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Nel riepilogo del viaggio: «Pedaggio ~12,40 €» e, sotto, da dove viene
+/// la stima («108 km a pagamento · classe A · stimato»). Toccandola si
+/// cambiano classe e tariffa.
+class RigaPedaggio extends StatelessWidget {
+  const RigaPedaggio({super.key, required this.costo, this.onTap});
+
+  final CostoPedaggio costo;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    final muto = tema.colorScheme.onSurfaceVariant;
+    final km = costo.km + costo.kmNonStimati;
+    final dettaglio = costo.senzaPedaggi
+        ? null
+        : [
+            if (km >= 1) '${km.round()} km a pagamento',
+            if (costo.conPrezzo) 'classe ${costo.classe.sigla}',
+            if (costo.conPrezzo && costo.stimato) 'stimato',
+            if (!costo.conPrezzo && costo.vignetta) 'bollino non compreso',
+          ].join(' · ');
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: InkWell(
+        key: const Key('riga-pedaggio'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          // Il dettaglio accanto alla pastiglia, o sotto se non ci sta.
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              BadgePedaggio(costo: costo, grande: true),
+              if (dettaglio != null && dettaglio.isNotEmpty)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(child: Text(dettaglio, style: tema.textTheme.bodySmall?.copyWith(color: muto))),
+                    if (onTap != null && costo.conPrezzo) ...[
+                      const SizedBox(width: 4),
+                      Icon(Icons.info_outline_rounded, size: 16, color: muto),
+                    ],
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Le strade fra cui scegliere, una sotto l'altra, ognuna col suo nome come
 /// in ABRP — più rapida, risparmia energia, tempo simile, più lenta — la
 /// durata col traffico, da dove passa, la batteria all'arrivo e quanto
@@ -62,6 +171,7 @@ class ScelteStrada extends StatelessWidget {
     this.arrivo,
     this.capacitaKwh,
     this.minimoPercento = 5,
+    this.pedaggio,
   });
 
   final List<PercorsoCalcolato> scelte;
@@ -82,17 +192,33 @@ class ScelteStrada extends StatelessWidget {
   /// Da quanto in su una strada «risparmia energia».
   final double minimoPercento;
 
+  /// Il pedaggio di ogni strada; `null`: non si mostra.
+  final CostoPedaggio Function(PercorsoCalcolato p)? pedaggio;
+
   @override
   Widget build(BuildContext context) {
     final f = consumo;
     final consumi = [for (final s in scelte) f?.call(s)];
+    final costi = [for (final s in scelte) pedaggio?.call(s)];
+    // «Senza pedaggi» ha senso solo se un'altra strada li ha: in città
+    // sarebbe rumore su ogni carta.
+    final qualcunaPaga = costi.any((c) => c != null && !c.senzaPedaggi);
     final etichette = etichetteStrade(scelte, (p) => f?.call(p) ?? 0, minimoPercento: minimoPercento);
     final rapida = etichette.indexOf(EtichettaStrada.piuRapida);
     return Column(
       children: [
         for (final (i, s) in scelte.indexed) ...[
           if (i > 0) const SizedBox(height: 8),
-          _carta(context, i, s, etichette[i], consumi[i], rapida < 0 ? null : consumi[rapida], consumi[scelta]),
+          _carta(
+            context,
+            i,
+            s,
+            etichette[i],
+            consumi[i],
+            rapida < 0 ? null : consumi[rapida],
+            consumi[scelta],
+            qualcunaPaga ? costi[i] : null,
+          ),
         ],
       ],
     );
@@ -106,6 +232,7 @@ class ScelteStrada extends StatelessWidget {
     double? consumoQui,
     double? consumoRapida,
     double? consumoScelta,
+    CostoPedaggio? costo,
   ) {
     final tema = Theme.of(context);
     final t = tema.textTheme;
@@ -184,18 +311,34 @@ class ScelteStrada extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: t.bodySmall?.copyWith(color: muto),
                     ),
-                    if (s.conPedaggi || traffico != null)
-                      Text(
-                        [if (s.conPedaggi) 'pedaggi', ?traffico].join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: t.labelSmall?.copyWith(
-                          color: !s.trafficoVero || s.ritardoTraffico.inMinutes < 1
-                              ? muto
-                              : s.ritardoTraffico.inMinutes >= 10
-                              ? c.guasta
-                              : c.piena,
-                          fontWeight: FontWeight.w600,
+                    // Il pedaggio come in Waze, accanto al traffico; senza
+                    // stima (nessun pedaggio da nessuna parte) resta la parola.
+                    if (costo != null || (s.conPedaggi && pedaggio == null) || traffico != null)
+                      Padding(
+                        padding: EdgeInsets.only(top: costo != null ? 4 : 0),
+                        child: Row(
+                          children: [
+                            if (costo != null) ...[
+                              BadgePedaggio(costo: costo),
+                              if (traffico != null) const SizedBox(width: 8),
+                            ],
+                            if ((s.conPedaggi && pedaggio == null) || traffico != null)
+                              Flexible(
+                                child: Text(
+                                  [if (s.conPedaggi && pedaggio == null) 'pedaggi', ?traffico].join(' · '),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: t.labelSmall?.copyWith(
+                                    color: !s.trafficoVero || s.ritardoTraffico.inMinutes < 1
+                                        ? muto
+                                        : s.ritardoTraffico.inMinutes >= 10
+                                        ? c.guasta
+                                        : c.piena,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                   ],

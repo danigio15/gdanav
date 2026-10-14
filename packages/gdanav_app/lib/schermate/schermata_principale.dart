@@ -352,12 +352,26 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   Future<void> _apri(Widget schermata) async {
     await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => schermata));
     await _ricaricaPreferenze();
-    // Auto o preferenze cambiate: il viaggio aperto si ricalcola.
-    if (viaggio.stato is ViaggioPronto && viaggio.destinazione != null) await viaggio.pianifica(viaggio.destinazione!);
+    // Auto o preferenze cambiate: il viaggio aperto si ricalcola. Anche se
+    // mancava la batteria: l'auto appena configurata può averla portata.
+    final rifai = switch (viaggio.stato) {
+      ViaggioPronto() || ErroreViaggio(senzaBatteria: _?) => true,
+      _ => false,
+    };
+    if (rifai && viaggio.destinazione != null) await viaggio.pianifica(viaggio.destinazione!);
+  }
+
+  /// «Scrivi la batteria» dalla scheda del viaggio: il foglio della fonte
+  /// dati, dove la si scrive a mano; chiuso, si riprova il viaggio.
+  Future<void> _scriviBatteria() async {
+    await _fonteDatiAuto();
+    if (viaggio.stato case ErroreViaggio(senzaBatteria: _?, :final destinazione?)) {
+      await viaggio.pianifica(destinazione);
+    }
   }
 
   /// «Fonte dati auto»: senza Premium le fonti automatiche portano a Premium.
-  void _fonteDatiAuto() => mostraFonteDatiAuto(
+  Future<void> _fonteDatiAuto() => mostraFonteDatiAuto(
     context,
     widget.auto,
     consumo: widget.consumo,
@@ -725,8 +739,13 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                             onCercaTappa: () => _scegli(titolo: 'Aggiungi una tappa'),
                             onPremium: widget.premium == null
                                 ? null
-                                : () => _apri(SchermataPremium(premium: widget.premium!, perche: 'Le soste di ricarica')),
+                                : () =>
+                                      _apri(SchermataPremium(premium: widget.premium!, perche: 'Le soste di ricarica')),
                             risparmio: widget.guida.risparmio,
+                            onScriviBatteria: _scriviBatteria,
+                            onConfiguraAuto: () => _apri(
+                              LaTuaAuto(auto: widget.auto, posizione: widget.posizione, consumo: widget.consumo),
+                            ),
                           ),
                   ),
                 ],

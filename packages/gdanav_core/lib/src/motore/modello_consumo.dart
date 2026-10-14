@@ -3,7 +3,55 @@ import 'dart:math' as math;
 import '../veicolo/profilo_veicolo.dart';
 import 'consumo_imparato.dart';
 
+/* ─── Il modello, in breve ──────────────────────────────────────────────────
+ *
+ * L'energia di un tratto, presa dalla batteria, è la somma di:
+ *
+ *  - **ruota**: aria (½·ρ·CdA·v², con ρ dalla temperatura e il vento
+ *    contro), rotolamento (m·g·Crr) e quota (m·g·Δh), diviso il rendimento
+ *    della trazione; in discesa la quota torna indietro col rendimento del
+ *    recupero;
+ *  - **partenze e frenate** ([fermatePerKm]): la strada vera non si fa a
+ *    velocità costante. A ogni rallentamento l'energia cinetica ½·m·v² si
+ *    spende per riprendere velocità e se ne recupera solo una parte, quindi
+ *    ogni «fermata» costa ½·m·v²·(1/ηtrazione − ηrecupero). In città se ne
+ *    fa una ogni centinaio di metri, in autostrada quasi mai. Senza questo
+ *    termine un giro in città a 50 km/h usciva a 7-8 kWh/100 km, che nessuna
+ *    elettrica fa, e il correttivo imparato lo compensava gonfiando anche
+ *    le autostrade;
+ *  - **consumi fissi** (elettronica, pompe) e **clima**, in watt per il tempo
+ *    del tratto. Il clima solo se la temperatura si sa (dall'auto o dal
+ *    meteo): senza, nessun riscaldamento inventato ([Condizioni.daMeteo]);
+ *  - tutto per il **correttivo** dell'auto ([Condizioni.fattorePer]): quello
+ *    imparato guidando ([ConsumoImparato]) o, prima, quello del «consumo di
+ *    riferimento» scritto dall'utente (per esempio quello calibrato di ABRP,
+ *    [fattoreDaRiferimento]).
+ *
+ * Le velocità sono quelle dei tratti di Valhalla o TomTom (limiti, tempi
+ * col traffico), le quote quelle di Valhalla dove ci sono.
+ */
+
 const _g = 9.81;
+
+/// Quante volte per chilometro si rallenta fino a fermarsi (o l'equivalente
+/// in rallentamenti parziali) su una strada percorsa in media a [kmh]:
+/// semafori, rotonde, precedenze, code.
+///
+/// Valori tipici da cicli di guida misurati (WLTP, Artemis): in città una
+/// ogni 300-500 metri, su una statale una ogni qualche chilometro, in
+/// autostrada quasi nessuna.
+double fermatePerKm(double kmh) {
+  const tabella = [(0.0, 3.0), (20.0, 3.0), (30.0, 2.0), (50.0, 1.0), (70.0, 0.4), (90.0, 0.15), (110.0, 0.05)];
+  if (kmh >= tabella.last.$1) return tabella.last.$2;
+  for (var i = 1; i < tabella.length; i++) {
+    final (v1, f1) = tabella[i];
+    if (kmh <= v1) {
+      final (v0, f0) = tabella[i - 1];
+      return f0 + (f1 - f0) * (kmh - v0) / (v1 - v0);
+    }
+  }
+  return tabella.last.$2;
+}
 
 /// Un pezzo di strada a velocità e pendenza costanti, come arriva da
 /// Valhalla dopo averlo spezzato per limite di velocità e quota.
@@ -62,6 +110,14 @@ class Condizioni {
   /// Il correttivo per tipo di strada, dove misurato; altrove [fattoreConsumo].
   final Map<TipoStrada, double> fattoriStrada;
 
+  /// Le stesse condizioni (temperatura, vento, clima) senza il correttivo
+  /// dell'auto: quello che il misuratore confronta con la batteria vera,
+  /// perché il correttivo lo si vuole misurare, non presupporre. Il clima
+  /// resta: se no il riscaldamento finiva dentro il correttivo e il piano,
+  /// che il clima lo conta già dal meteo, lo contava due volte.
+  Condizioni get senzaCorrettivo =>
+      Condizioni(temperaturaC: temperaturaC, ventoControMs: ventoControMs, climaW: climaW);
+
   double fattorePer(double kmh) => fattoriStrada[TipoStrada.daVelocita(kmh)] ?? fattoreConsumo;
 
   /// Densità dell'aria alla temperatura data, al livello del mare.
@@ -80,8 +136,11 @@ double energiaTrattoWh(Tratto tratto, ProfiloVeicolo p, [Condizioni c = const Co
   final ruota = (aerodinamica + rotolamento) * d + p.massaKg * _g * tratto.dislivelloM;
 
   final batteria = ruota >= 0 ? ruota / p.rendimentoTrazione : ruota * p.rendimentoRecupero;
+  // Partenze e frenate: l'energia cinetica spesa e recuperata solo in parte.
+  final fermate = fermatePerKm(tratto.velocitaKmh) * d / 1000;
+  final dinamica = fermate * 0.5 * p.massaKg * v * v * (1 / p.rendimentoTrazione - p.rendimentoRecupero);
   final fissi = (p.consumoFissoW + c.climaW) * tratto.secondi;
-  final wh = (batteria + fissi) / 3600;
+  final wh = (batteria + dinamica + fissi) / 3600;
   // Il correttivo vale per quello che si spende, non per il recupero.
   return wh > 0 ? wh * c.fattorePer(tratto.velocitaKmh) : wh;
 }
@@ -108,4 +167,19 @@ double consumoMedioWhKm(List<Tratto> tratti, ProfiloVeicolo p, [Condizioni c = c
     m += t.lunghezzaM;
   }
   return m == 0 ? 0 : wh / (m / 1000);
+}
+
+/// Il correttivo che porta il modello al «consumo di riferimento» scritto
+/// dall'utente: [whKm] a [kmh] costanti, in piano, senza clima. È il numero
+/// che ABRP chiama «consumo di riferimento» (calibrato guidando, alla sua
+/// «velocità di riferimento», di solito 110 km/h).
+///
+/// Si confronta con quello che il modello dice alla stessa velocità, con
+/// le stesse partenze e frenate e i consumi fissi: il rapporto è quanto la
+/// tua auto si discosta dalla scheda tecnica. Tenuto fra 0,6 e 1,8 come il
+/// correttivo imparato.
+double fattoreDaRiferimento({required double whKm, required double kmh, required ProfiloVeicolo profilo}) {
+  final modello = consumoMedioWhKm([Tratto(lunghezzaM: 1000, velocitaKmh: kmh)], profilo);
+  if (whKm <= 0 || modello <= 0) return 1;
+  return (whKm / modello).clamp(ConsumoImparato.minimo, ConsumoImparato.massimo).toDouble();
 }
