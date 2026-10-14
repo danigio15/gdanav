@@ -177,6 +177,29 @@ class Guida {
 
   var _segmento = 0;
   var _fuori = 0;
+  DateTime? _ultimaAlle;
+
+  /// Oltre questa precisione dichiarata una lettura non conta per il fuori
+  /// strada: è quella che anche il segnaposto scarta.
+  static const precisioneMassimaM = 50.0;
+
+  /// Quanto indietro sul percorso ci si cerca: una lettura un po' in
+  /// ritardo (l'altro GPS, una lettura arrivata tardi) sta indietro di
+  /// qualche decina di metri, e tre segmenti su un percorso fitto sono pochi
+  /// metri. Fuori da questa finestra la lettura era «lontana dalla strada».
+  static const indietroM = 150.0;
+
+  int _indietro() {
+    final c = _linea.cumulate;
+    if (c.isEmpty) return 0;
+    final da = c[math.min(_segmento, c.length - 1)];
+    var j = math.min(_segmento, c.length - 1);
+    while (j > 0 && da - c[j - 1] <= indietroM) {
+      j--;
+    }
+    return math.max(0, math.min(j, _segmento - 3));
+  }
+
   var _siAllontana = 0;
   double? _lontanoPrima;
   var _controMano = 0;
@@ -212,6 +235,7 @@ class Guida {
      * direzione si prenderebbe un secondo di pausa a ogni giro. */
     g._precedente = _precedente;
     g._annunciate.addAll(_annunciate);
+    g._ultimaAlle = _ultimaAlle;
     return g;
   }
 
@@ -225,17 +249,44 @@ class Guida {
      * continuo, e bastava girare in una traversa per proiettarsi su un tratto
      * lontanissimo: la distanza restava piccola, il cursore saltava in avanti,
      * e il navigatore diceva che quella strada l'avevi già fatta. */
-    final p = _linea.proiettaTra(qui, math.max(0, _segmento - 3), _segmento + _quantiAvanti(qui));
+    final p = _linea.proiettaTra(qui, _indietro(), _segmento + _quantiAvanti(qui));
     final passo = _precedente == null ? null : distanzaM(_precedente!, qui);
-    if (p.lontanoM <= sogliaFuoriM) {
-      _segmento = p.segmento;
-      _fuori = 0;
-    } else {
+    /* Una lettura che non può dire «sei fuori strada» non lo dice.
+     *
+     * «Durante la navigazione all'improvviso perde il percorso e lo
+     * ricalcola», sulla strada giusta. Le letture che lo facevano erano due:
+     *  · quelle che il telefono stesso dichiara larghe (fra i palazzi, sotto
+     *    un cavalcavia, uscendo da una galleria: ottanta, cento metri). Il
+     *    segnaposto le scartava già (`GestorePosizione`), la guida no: due
+     *    di fila a quaranta metri dalla linea e si ricalcolava;
+     *  · quelle arrivate dopo una più fresca: il GPS dell'auto e quello del
+     *    telefono si danno il cambio, e uno dei due è un po' indietro. Per la
+     *    guida era un salto all'indietro, che si sommava al conto.
+     * Queste si usano per dire a che punto si è, se cadono vicino alla
+     * strada, ma non contano per il fuori strada, né in un senso né
+     * nell'altro. E fra trentacinque e cinquanta metri di precisione la
+     * soglia è la precisione: a quaranta metri da una strada, con un GPS che
+     * dice «più o meno quaranta», non si sa da che parte si è. */
+    final precisione = qui is PuntoInMoto ? qui.precisioneM : null;
+    final alle = qui is PuntoInMoto ? qui.alle : null;
+    // Vecchia di poco: arrivata fuori ordine. Di tanto è un altro orologio
+    // (quello dell'auto può essere indietro di minuti): da lì si riparte.
+    final ritardo = alle == null || _ultimaAlle == null ? Duration.zero : _ultimaAlle!.difference(alle);
+    final vecchia = ritardo > Duration.zero && ritardo < const Duration(seconds: 10);
+    final incerta = vecchia || (precisione != null && precisione > precisioneMassimaM);
+    if (alle != null && !vecchia) _ultimaAlle = alle;
+    final soglia = math.max(sogliaFuoriM, precisione ?? 0);
+    if (p.lontanoM <= soglia) {
+      if (p.lontanoM <= sogliaFuoriM || !incerta) _segmento = p.segmento;
+      if (!incerta) _fuori = 0;
+    } else if (!incerta) {
       _fuori++;
     }
-    _guardaDoveSiVa(qui, p, passo);
-    _guardaSeCiSiAllontana(p, passo);
-    _precedente = qui;
+    if (!incerta) {
+      _guardaDoveSiVa(qui, p, passo);
+      _guardaSeCiSiAllontana(p, passo, soglia: math.max(sogliaPrestoM, precisione ?? 0));
+      _precedente = qui;
+    }
     final percorsi = p.lungoM;
     final restanti = math.max(0.0, _linea.lunghezzaM - percorsi);
     final i = p.segmento;
@@ -361,10 +412,10 @@ class Guida {
 
   /// Vedi [sogliaPrestoM]: fermi (passi più corti di [movimentoCheContaM])
   /// non si decide niente, come per la direzione.
-  void _guardaSeCiSiAllontana(Proiezione p, double? passo) {
+  void _guardaSeCiSiAllontana(Proiezione p, double? passo, {required double soglia}) {
     final prima = _lontanoPrima;
     _lontanoPrima = p.lontanoM;
-    if (p.lontanoM <= sogliaPrestoM) {
+    if (p.lontanoM <= soglia) {
       _siAllontana = 0;
     } else if (prima != null && passo != null && passo >= movimentoCheContaM && p.lontanoM > prima + 2) {
       _siAllontana++;

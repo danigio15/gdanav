@@ -99,4 +99,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(aperta, 1);
   });
+
+  testWidgets('in auto: solo le impostazioni, senza la mappa, e la X le chiude', (tester) async {
+    final a = await ambiente(tester);
+    var chiuse = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GdanavDentro(app: a.app() as GdanavApp, soloImpostazioni: true, chiudiImpostazioni: () => chiuse++),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Navigatore e auto'), findsOneWidget);
+    expect(find.text('La tua auto'), findsOneWidget);
+    expect(find.text('Percorso'), findsOneWidget);
+    // Niente mappa e niente ☰: si è già nel menu.
+    expect(find.byTooltip('Menu'), findsNothing);
+
+    // Una voce si apre sopra la pagina, e si torna alla pagina.
+    await tester.tap(find.text('Percorso'));
+    await tester.pumpAndSettle();
+    expect(find.text('Navigatore e auto'), findsNothing);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Navigatore e auto'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Chiudi'));
+    expect(chiuse, 1);
+  });
 }

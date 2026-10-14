@@ -387,4 +387,87 @@ void main() {
     final a = g.aggiorna(Punto(andata[20].lat, andata[20].lon + 0.00051));
     expect(a.percorsiM, lessThan(primaM + 200), reason: 'il cursore non salta di due chilometri');
   });
+
+  group('niente ricalcoli per letture che non lo possono dire', () {
+    // Una strada dritta verso nord, un punto ogni ~11 m, 3 km.
+    final dritta = PercorsoCalcolato(
+      punti: [for (var i = 0; i <= 270; i++) Punto(45 + i * 0.0001, 9)],
+      tratti: const [],
+      manovre: const [],
+    );
+    // [m] metri lungo la strada, [lato] metri a est.
+    PuntoInMoto a(double m, {double lato = 0, double? precisione, DateTime? alle}) => PuntoInMoto(
+          45 + m / 111195,
+          9 + lato / (111195 * 0.7071),
+          precisioneM: precisione,
+          alle: alle,
+        );
+    final t0 = DateTime(2026, 10, 14, 8);
+
+    test('il telefono dice «più o meno 80 m»: non si ricalcola', () {
+      final g = Guida(dritta);
+      for (var s = 0; s < 10; s++) {
+        expect(g.aggiorna(a(s * 25.0, alle: t0.add(Duration(seconds: s)))).fuoriPercorso, isFalse);
+      }
+      for (var s = 10; s < 20; s++) {
+        final r = g.aggiorna(a(s * 25.0, lato: 45 + s.toDouble(), precisione: 80, alle: t0.add(Duration(seconds: s))));
+        expect(r.fuoriPercorso, isFalse, reason: 'lettura larga al secondo $s');
+      }
+      // Precise, a 45 m: è davvero un'altra strada.
+      var fuori = false;
+      for (var s = 20; s < 23; s++) {
+        fuori |= g.aggiorna(a(s * 25.0, lato: 45, precisione: 5, alle: t0.add(Duration(seconds: s)))).fuoriPercorso;
+      }
+      expect(fuori, isTrue);
+    });
+
+    test('a 40 m con una precisione di 45 non si sa: non si ricalcola', () {
+      final g = Guida(dritta);
+      for (var s = 0; s < 6; s++) {
+        g.aggiorna(a(s * 25.0, alle: t0.add(Duration(seconds: s))));
+      }
+      for (var s = 6; s < 12; s++) {
+        final r = g.aggiorna(a(s * 25.0, lato: 40, precisione: 45, alle: t0.add(Duration(seconds: s))));
+        expect(r.fuoriPercorso, isFalse);
+      }
+    });
+
+    test('il GPS dell\'auto e quello del telefono si danno il cambio, uno in ritardo', () {
+      final g = Guida(dritta);
+      for (var s = 0; s < 40; s++) {
+        final ora = t0.add(Duration(seconds: s));
+        // Il telefono, puntuale.
+        final r = g.aggiorna(a(s * 30.0, alle: ora));
+        expect(r.fuoriPercorso, isFalse);
+        expect(r.percorsiM, closeTo(s * 30.0, 15));
+        // L'auto: la stessa strada di tre secondi fa, arrivata adesso.
+        if (s >= 3 && s.isOdd) {
+          final dopo = g.aggiorna(a((s - 3) * 30.0, alle: ora.subtract(const Duration(seconds: 3))));
+          expect(dopo.fuoriPercorso, isFalse, reason: 'lettura in ritardo al secondo $s');
+        }
+      }
+    });
+
+    test('una lettura un po\' indietro sulla stessa strada non è «lontana»', () {
+      final g = Guida(dritta);
+      for (var s = 0; s < 20; s++) {
+        g.aggiorna(a(s * 30.0));
+      }
+      // 90 m indietro, due volte, senza ora: si ritrova sulla strada.
+      expect(g.aggiorna(a(480)).lontanoM, lessThan(5));
+      expect(g.aggiorna(a(490)).fuoriPercorso, isFalse);
+    });
+
+    test('un orologio dell\'auto indietro di minuti non spegne il fuori strada', () {
+      final g = Guida(dritta);
+      g.aggiorna(a(0, alle: t0));
+      var fuori = false;
+      for (var s = 1; s < 8; s++) {
+        final r = g.aggiorna(
+            a(s * 25.0, lato: s > 3 ? 60 : 0, precisione: 4, alle: t0.subtract(Duration(minutes: 2, seconds: -s))));
+        fuori |= r.fuoriPercorso;
+      }
+      expect(fuori, isTrue);
+    });
+  });
 }

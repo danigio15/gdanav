@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:gdanav_core/gdanav_core.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:test/test.dart';
 
 /// Torino → Milano, due strade: la prima per la A4 (due sezioni `TOLL_ROAD`
@@ -202,5 +204,145 @@ void main() {
     expect(euroItaliani(12.4), '12,40 €');
     expect(arrotondaPedaggio(8.65), 8.7);
     expect(arrotondaPedaggio(8.64), 8.6);
+  });
+
+  group('prezzi veri', () {
+    PercorsoCalcolato corsoMalta() {
+      final r = (jsonDecode(File('test/dati/tomtom_corso_malta.json').readAsStringSync()) as Map)['routes'] as List;
+      return ClienteTomTom.leggi((r.first as Map).cast<String, Object?>());
+    }
+
+    test('la Tangenziale di Napoli costa 1,05 €, non «~1,00 €»', () {
+      final c = tariffa.stima(corsoMalta());
+      expect(c.euro, closeTo(1.05, 1e-9));
+      expect(c.stimato, isFalse);
+      expect(c.prezzo, '1,05 €');
+      expect(c.perStima, '1,05 € pedaggio');
+    });
+
+    test('la Tangenziale in classe B: il listino non c\'è, resta stimata', () {
+      final c = tariffa.copia(classe: ClassePedaggio.b).stima(corsoMalta());
+      expect(c.stimato, isTrue);
+      expect(c.euro, closeTo(1.10, 1e-9));
+    });
+
+    test('una strada a km resta stimata e arrotondata ai dieci centesimi', () {
+      final p = conSezioni(30, [
+        {'sectionType': 'TOLL_ROAD', 'startPointIndex': 2, 'endPointIndex': 22},
+      ]);
+      final c = tariffa.stima(p);
+      expect(c.stimato, isTrue);
+      expect((c.euro * 10).roundToDouble(), closeTo(c.euro * 10, 1e-9));
+    });
+
+    test('con i pagamenti veri si sommano quelli che restano', () {
+      final p = conSezioni(30, [
+        {'sectionType': 'TOLL_ROAD', 'startPointIndex': 2, 'endPointIndex': 22},
+      ]).conPagamenti(const [
+        PagamentoPedaggio(euro: 1.05, aM: 5000, nome: 'Barriera'),
+        PagamentoPedaggio(euro: 2.40, aM: 22000, nome: 'Uscita'),
+      ]);
+      final tutto = tariffa.stima(p);
+      expect(tutto.euro, closeTo(3.45, 1e-9));
+      expect(tutto.stimato, isFalse);
+      expect(tutto.prezzo, '3,45 €');
+      expect(tutto.caselli, ['Barriera', 'Uscita']);
+      final dopo = tariffa.stima(p, daM: 10000);
+      expect(dopo.euro, closeTo(2.40, 1e-9));
+      // I pagamenti restano anche sotto il traffico.
+      expect(p.conTraffico(const []).pagamentiPedaggio, hasLength(2));
+    });
+  });
+
+  group('HERE', () {
+    final percorso = conSezioni(30, [
+      {'sectionType': 'TOLL_ROAD', 'startPointIndex': 2, 'endPointIndex': 22},
+    ]);
+    Map<String, Object?> risposta() => {
+          'routes': [
+            {
+              'sections': [
+                {
+                  'tolls': [
+                    {
+                      'countryCode': 'ITA',
+                      'tollSystem': 'AUTOSTRADE PER L\'ITALIA',
+                      'fares': [
+                        {
+                          'id': '1',
+                          'name': 'x',
+                          'price': {'type': 'value', 'currency': 'EUR', 'value': 2.4},
+                          'paymentMethods': ['cash', 'transponder'],
+                        },
+                      ],
+                      'tollCollectionLocations': [
+                        {
+                          'name': 'Uscita',
+                          'location': {'lat': 45 + 22 * 0.009, 'lng': 7.0},
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        };
+
+    test('legge prezzo e posto dove si paga', () {
+      final p = PedaggiHere.leggiPedaggi(risposta(), percorso.punti)!;
+      expect(p, hasLength(1));
+      expect(p.single.euro, 2.4);
+      expect(p.single.nome, 'Uscita');
+      expect(p.single.aM / 1000, closeTo(22, 0.1));
+    });
+
+    test('un pedaggio senza prezzo: niente, si stima', () {
+      final r = risposta();
+      ((((r['routes'] as List).first as Map)['sections'] as List).first as Map)['tolls'] = [
+        {'fares': <Object>[]},
+      ];
+      expect(PedaggiHere.leggiPedaggi(r, percorso.punti), isNull);
+    });
+
+    test('i punti mandati non superano il massimo', () {
+      final punti = [for (var i = 0; i < 5000; i++) Punto(45 + i * 0.0005, 7)];
+      final scelti = PedaggiHere.puntiDaMandare(punti);
+      expect(scelti.length, lessThanOrEqualTo(PedaggiHere.puntiMassimi));
+      expect(scelti.first, punti.first);
+      expect(scelti.last, punti.last);
+    });
+
+    test('import e poi i pedaggi, una volta per percorso', () async {
+      var chiamate = 0;
+      final cliente = PedaggiHere('k', client: MockClient((r) async {
+        chiamate++;
+        if (r.method == 'POST') {
+          expect(r.url.path, '/v8/import');
+          expect(r.url.queryParameters['return'], 'routeHandle');
+          return http.Response(
+              jsonEncode({
+                'routes': [
+                  {'routeHandle': 'abc'},
+                ],
+              }),
+              200);
+        }
+        expect(r.url.path, '/v8/routes/abc');
+        expect(r.url.queryParameters['return'], contains('tolls'));
+        return http.Response(jsonEncode(risposta()), 200);
+      }));
+      final p = await cliente.di(percorso, ClassePedaggio.a);
+      expect(p!.single.euro, 2.4);
+      await cliente.di(percorso, ClassePedaggio.a);
+      expect(chiamate, 2);
+      // I mezzi pesanti: HERE li vuole come camion, si resta alla stima.
+      expect(await cliente.di(percorso, ClassePedaggio.quattro), isNull);
+    });
+
+    test('HERE che non risponde: niente, si stima', () async {
+      final cliente = PedaggiHere('k', client: MockClient((_) async => http.Response('no', 403)));
+      expect(await cliente.di(percorso, ClassePedaggio.a), isNull);
+    });
   });
 }
