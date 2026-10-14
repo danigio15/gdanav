@@ -39,6 +39,10 @@ class GestoreSegnalazioni extends ChangeNotifier {
   List<Segnalazione> get vicine => [..._comunita, ..._fisse];
   var _comunita = <Segnalazione>[];
   var _fisse = <Segnalazione>[];
+
+  /// I Tutor intorno: i tratti a velocità media.
+  List<TrattoTutor> get tutor => _tutor;
+  var _tutor = <TrattoTutor>[];
   var _avviato = false;
   Punto? _ultimaRichiesta;
   DateTime _ultimaVolta = DateTime(0);
@@ -67,7 +71,9 @@ class GestoreSegnalazioni extends ChangeNotifier {
     _ultimaRichiesta = qui;
     _ultimaVolta = _ora();
     if (autovelox case final a?) {
-      _fisse = (await a).vicini(qui, 30000);
+      final archivio = await a;
+      _fisse = archivio.vicini(qui, 30000);
+      _tutor = archivio.tutorVicini(qui, 30000);
       notifyListeners();
     }
     if (c == null) return;

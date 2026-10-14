@@ -10,6 +10,7 @@ import '../servizi.dart';
 import 'gestore_risparmio.dart';
 import 'gestore_ztl.dart';
 import 'licenza.dart';
+import 'scelte_avvisi.dart';
 import 'voce.dart';
 
 /// Quello che l'app ricorda: l'abbinamento con Home Assistant (contiene la
@@ -34,6 +35,7 @@ class Archivio {
   static const _risparmio = 'risparmio';
   static const _voceMuta = 'voce_muta';
   static const _avvisiMuti = 'avvisi_muti';
+  static const _avvisiScelti = 'avvisi_scelti';
   static const _vistaPiatta = 'vista_2d';
 
   Future<Abbinamento?> abbinamento() async {
@@ -155,6 +157,11 @@ class Archivio {
     await salvaVoceMuta(m.senzaGuida);
     await (m.senzaAvvisi ? _p.write(key: _avvisiMuti, value: 'sì') : _p.delete(key: _avvisiMuti));
   }
+
+  /// Gli avvisi della guida, uno per uno (vedi [ScelteAvvisi]).
+  Future<Map<Avviso, ComeAvvisare>> scelteAvvisi() async => ScelteAvvisi.daJson(await _p.read(key: _avvisiScelti));
+
+  Future<void> salvaScelteAvvisi(ScelteAvvisi s) => _p.write(key: _avvisiScelti, value: s.aJson());
 
   /// La mappa in 3D (inclinata, girata come si va) o in 2D. Si ricorda, e
   /// vale anche fuori dalla guida. Di partenza 3D, come sullo schermo

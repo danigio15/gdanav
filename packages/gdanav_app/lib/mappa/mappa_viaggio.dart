@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:math' show Point;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:gdanav_core/gdanav_core.dart' show Avanzamento, Punto, Rettangolo, TipoSegnalazione, TipoZona, Viaggio;
+import 'package:gdanav_core/gdanav_core.dart' show Avanzamento, Punto, distanzaM, Rettangolo, TipoSegnalazione, TipoZona, Viaggio;
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../componenti/icone_punti.dart';
@@ -143,6 +144,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     // tutta Italia sulla strada sarebbe solo confusione.
     if (widget.guida == null) widget.vicini?.avviaTutte();
     if (widget.guida != null) _guardia = Timer.periodic(const Duration(seconds: 2), (_) => _giroDiGuardia());
+    if (widget.guida != null) _fotogrammi = Timer.periodic(fotogramma, (_) => unawaited(_fotogramma()));
   }
 
   DateTime _ora() => (widget.orologio ?? DateTime.now)();
@@ -160,6 +162,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     _gestoreRisparmio?.removeListener(_risparmio);
     _orologioZone?.cancel();
     _guardia?.cancel();
+    _fotogrammi?.cancel();
     // Quello che era ancora in corso (le immagini, una scrittura) non scrive
     // più su una mappa che non c'è.
     _mappa = null;
@@ -312,6 +315,105 @@ class _MappaViaggioState extends State<MappaViaggio> {
       widget.gestore.stato is! ViaggioPronto &&
       widget.persone?.daMostrare == null;
 
+  /* ─── In guida, l'auto che scorre ───────────────────────────────────────
+   *
+   * Il segnaposto si scriveva una volta per posizione, mentre la telecamera
+   * scorreva: a 90 all'ora l'auto saltava avanti di 25 metri a ogni lettura
+   * e poi tornava al centro mentre la mappa la raggiungeva. Un dente di sega
+   * al secondo: la posizione «a scatti».
+   *
+   * Adesso, come sullo schermo dell'auto, segnaposto e telecamera si muovono
+   * insieme a ogni fotogramma: verso dove l'auto è adesso
+   * ([GestoreGuida.posizioneStimata], che va avanti lungo la strada con la
+   * velocità fra una lettura e l'altra), avvicinandosi un po' alla volta,
+   * così anche la correzione di una lettura nuova si vede come un moto e non
+   * come un salto. */
+
+  /// Ogni quanto si ridisegnano l'auto e la mappa in guida: 25 al secondo.
+  static const fotogramma = Duration(milliseconds: 40);
+
+  /// Quanto si avvicina a dove deve essere a ogni fotogramma: in un quinto
+  /// di secondo ha fatto i due terzi della strada.
+  static final _avvicina = 1 - math.exp(-fotogramma.inMilliseconds / 200);
+
+  /// Più lontano di così si salta: un ricalcolo, un GPS che torna.
+  static const _saltoM = 120.0;
+
+  Timer? _fotogrammi;
+  var _disegnando = false;
+
+  /// Dov'è disegnata l'auto adesso, e girata come.
+  Punto? _mostrata;
+  double _rottaMostrata = 0, _rottaMappaMostrata = 0;
+
+  /// Se l'auto la muovono i fotogrammi: in guida, con la mappa che la segue,
+  /// agganciata alla strada, e senza lo schermo dell'auto acceso (lì la mappa
+  /// del telefono si sposta di rado, apposta).
+  bool get _scorre {
+    final g = widget.guida;
+    return g != null &&
+        g.attiva &&
+        g.avanzamento?.posizioneSulPercorso != null &&
+        !widget.controllo.libera &&
+        !widget.gestore.auto.schermoDellAutoAcceso;
+  }
+
+  static double _verso(double da, double a, double quanto) {
+    final d = ((a - da) % 360 + 540) % 360 - 180;
+    return (da + d * quanto) % 360;
+  }
+
+  Future<void> _fotogramma() async {
+    final m = _mappa, g = widget.guida;
+    if (m == null || g == null || !_stileCaricato || _disegnando || !_scorre) {
+      _mostrata = null;
+      return;
+    }
+    final stimata = g.posizioneStimata();
+    if (stimata == null) return;
+    final a = g.avanzamento;
+    final rottaMappa = a?.rottaMappa ?? stimata.rotta;
+    final prima = _mostrata;
+    if (prima == null || distanzaM(prima, stimata.punto) > _saltoM) {
+      _mostrata = stimata.punto;
+      _rottaMostrata = stimata.rotta;
+      _rottaMappaMostrata = rottaMappa;
+    } else {
+      final k = _avvicina;
+      _mostrata = Punto(
+        prima.lat + (stimata.punto.lat - prima.lat) * k,
+        prima.lon + (stimata.punto.lon - prima.lon) * k,
+      );
+      _rottaMostrata = _verso(_rottaMostrata, stimata.rotta, k);
+      _rottaMappaMostrata = _verso(_rottaMappaMostrata, rottaMappa, k);
+    }
+    final qui = _mostrata!;
+    _disegnando = true;
+    try {
+      await m.setGeoJsonSource(
+        sorgenteIo,
+        datiIo(qui, _rottaMostrata, widget.posizione.segnaposto).cast<String, dynamic>(),
+      );
+      if (!identical(m, _mappa) || !mounted) return;
+      await m.moveCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: LatLng(qui.lat, qui.lon),
+            zoom: _inclinata ? 17 : 16,
+            tilt: _inclinata ? _inclinazione : 0,
+            bearing: _rottaMappaMostrata,
+          ),
+        ),
+      );
+      _seguita = g.letture;
+      _ultimaCamera = _ora();
+    } catch (e) {
+      debugPrint('mappa, fotogramma: $e');
+    } finally {
+      _disegnando = false;
+    }
+  }
+
   /// Il segnaposto: in guida agganciato al percorso, portato avanti di
   /// quanto si è andati dalla lettura ([GestoreGuida.posizioneStimata]) e
   /// girato come la strada; altrimenti dove dice il GPS.
@@ -323,6 +425,16 @@ class _MappaViaggioState extends State<MappaViaggio> {
     final stimata = widget.guida?.posizioneStimata();
     final qui = stimata?.punto ?? a?.posizioneSulPercorso ?? widget.posizione.qui;
     final rotta = stimata?.rotta ?? a?.rotta ?? widget.posizione.rotta;
+    // In guida, con l'auto agganciata alla strada, segnaposto e telecamera li
+    // muovono i fotogrammi: qui solo la freccia della manovra.
+    if (_scorre) {
+      try {
+        await _freccia(m);
+      } catch (e) {
+        debugPrint('mappa, freccia: $e');
+      }
+      return;
+    }
     // Segnaposto e freccia per conto loro: se una sorgente non si scrive, la
     // telecamera deve muoversi lo stesso. Prima un errore qui fermava tutto,
     // e la mappa restava dov'era.
@@ -408,10 +520,15 @@ class _MappaViaggioState extends State<MappaViaggio> {
     _seguita = lettura;
     final passo = ora.difference(_ultimaCamera);
     _ultimaCamera = ora;
-    final durata = passo > const Duration(milliseconds: 1100)
-        ? const Duration(milliseconds: 600)
+    // Lunga quanto l'intervallo fra due letture: un telefono a un secondo ne
+    // dà spesso a 1,1–1,3 s, e tagliarla lì fermava la mappa mezzo secondo
+    // a ogni lettura. Solo dopo un vero silenzio si riparte da un secondo.
+    final durata = passo > const Duration(seconds: 2)
+        ? const Duration(milliseconds: 1000)
         : passo < const Duration(milliseconds: 300)
         ? const Duration(milliseconds: 300)
+        : passo > const Duration(milliseconds: 1500)
+        ? const Duration(milliseconds: 1500)
         : passo;
     await m.easeCamera(
       CameraUpdate.newCameraPosition(posizione),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
+import '../componenti/avvisi_in_guida.dart';
 import '../componenti/icona_manovra.dart';
 import '../componenti/indicatore_batteria.dart' show eta;
 import '../componenti/itinerario.dart' show BadgePedaggio;
@@ -201,7 +202,8 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                     // Si riguarda a ogni battito: il silenzio non avvisa.
                     if (widget.posizione.tace()) const _GpsAssente(),
                     if (_ztl?.avviso case final z?) _AvvisoZtl(avviso: z),
-                    if (_avvisi?.davanti case (final s, final m)) _AvvisoSegnalazione(segnalazione: s, metri: m),
+                    if (_avvisi?.davanti case (final s, final m)) AvvisoSegnalazione(segnalazione: s, metri: m),
+                    if (_avvisi?.tutor case final t?) AvvisoTutor(stato: t),
                     if (_avvisi?.passata case final s?)
                       _Ancora(
                         segnalazione: s,
@@ -383,50 +385,6 @@ class _AvvisoZtl extends StatelessWidget {
 }
 
 /// «Polizia segnalata · tra 400 m», sotto la manovra.
-class _AvvisoSegnalazione extends StatelessWidget {
-  const _AvvisoSegnalazione({required this.segnalazione, required this.metri});
-
-  final Segnalazione segnalazione;
-  final double metri;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      child: Vetro(
-        raggio: 20,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 10, 16, 10),
-          child: Row(
-            children: [
-              BollinoSegnalazione(segnalazione.tipo, lato: 44),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      segnalazione.fissa ? 'Autovelox fisso' : segnalazione.tipo.avviso,
-                      style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                    Text(
-                      'tra ${distanzaBreve(metri)}'
-                      '${segnalazione.conferme > 0 ? ' · confermata da ${segnalazione.conferme}' : ''}',
-                      style: t.bodyMedium,
-                    ),
-                  ],
-                ),
-              ),
-              if (segnalazione.limiteKmh case final l?) CartelloLimite(limiteKmh: l, lato: 44),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Appena passati: «C'è ancora?» Sì / No, come in Waze.
 class _Ancora extends StatelessWidget {
   const _Ancora({required this.segnalazione, required this.onSi, required this.onNo});

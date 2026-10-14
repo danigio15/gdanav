@@ -6,6 +6,7 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import 'gestore_guida.dart';
 import 'gestore_ztl.dart';
+import 'scelte_avvisi.dart';
 
 /// Un avviso di ZTL mentre si guida, uguale sul telefono e sull'auto.
 class AvvisoZtl {
@@ -45,6 +46,7 @@ class AvvisiZtl extends ChangeNotifier {
   AvvisiZtl._(this.guida, this.ztl, this._ora) {
     guida.addListener(_aggiorna);
     ztl.addListener(_aggiorna);
+    guida.avvisi.addListener(_aggiorna);
   }
 
   static final _perGuida = Expando<AvvisiZtl>();
@@ -85,7 +87,7 @@ class AvvisiZtl extends ChangeNotifier {
   void _aggiorna() {
     final a = guida.attiva ? guida.avanzamento : null;
     final p = guida.pronto;
-    if (a == null || p == null || !ztl.scelte.avvisi) {
+    if (a == null || p == null || !ztl.scelte.avvisi || guida.avvisi.spento(Avviso.ztl)) {
       if (!guida.attiva) _annunciate.clear();
       return _metti(null);
     }
@@ -229,7 +231,7 @@ class AvvisiZtl extends ChangeNotifier {
   }
 
   void _annuncia(ZonaLimitata z, String frase) {
-    if (_annunciate.add(z.chiave)) guida.annunciaAvviso(frase);
+    if (_annunciate.add(z.chiave)) guida.annunciaAvviso(frase, quale: Avviso.ztl);
   }
 
   void _metti(AvvisoZtl? nuovo) {
