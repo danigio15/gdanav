@@ -8,6 +8,7 @@ import UIKit
 ///
 /// La scheda della manovra e arrivo/durata/km li disegna CarPlay: qui non si
 /// ripetono. Tutto sta dentro l'area sicura che CarPlay lascia libera.
+/// Sugli schermi piccoli (800×480) solo velocità, limite e avviso, piccoli.
 final class PannelloCarPlay: UIView {
     /// L'area non coperta dai tasti e dalle schede di CarPlay.
     var area: UIEdgeInsets = .zero {
@@ -54,11 +55,22 @@ final class PannelloCarPlay: UIView {
         return s
     }
 
+    /// Lo schermo è piccolo: una 500 con lo schermo da 800×480 dà a CarPlay
+    /// circa 400×240 punti, e la scheda della manovra se ne prende metà.
+    /// Lì sopra la mappa resta solo l'essenziale (vedi `disegnaPiccolo`).
+    static func piccolo(finestra: CGSize, libera: CGRect) -> Bool {
+        finestra.height < 300 || finestra.width < 500 || libera.height < 170 || libera.width < 240
+    }
+
     override func draw(_ rect: CGRect) {
         let a = bounds.inset(by: area)
         guard a.width > 0, a.height > 0 else { return }
         let c = PonteAuto.shared.cruscotto
         let margine = dp(10)
+        if PannelloCarPlay.piccolo(finestra: bounds.size, libera: a) {
+            disegnaPiccolo(a, c)
+            return
+        }
         avviso(sinistra: a.minX + margine, destra: a.maxX - margine, alto: a.minY + margine)
         let tachimetro = velocita(a, c)
         // CarPlay non ha un posto per il testo accanto ai km che restano
@@ -222,6 +234,55 @@ final class PannelloCarPlay: UIView {
         }
     }
 
+    // MARK: - Lo schermo piccolo
+
+    /// Sullo schermo piccolo la barra (batteria, meteo, sosta) e il pedaggio
+    /// non ci stanno: coprivano la poca mappa che la scheda della manovra
+    /// lascia. Resta la velocità, piccola, col limite sotto, in alto
+    /// nell'angolo lontano dalla scheda (che sta dal lato dell'area sicura
+    /// più larga), e l'avviso in una riga accanto. Arrivo e km li dice già
+    /// CarPlay.
+    private func disegnaPiccolo(_ a: CGRect, _ c: CruscottoAuto) {
+        let margine: CGFloat = 6
+        let schedaASinistra = area.left >= area.right
+        let colonna = velocitaPiccola(a, c, aDestra: schedaASinistra, margine: margine)
+        // L'avviso nello spazio che resta accanto alla colonna.
+        var sinistra = a.minX + margine
+        var destra = a.maxX - margine
+        if let colonna {
+            if schedaASinistra { destra = colonna.minX - margine } else { sinistra = colonna.maxX + margine }
+        }
+        if destra - sinistra > 80 {
+            avviso(sinistra: sinistra, destra: destra, alto: a.minY + margine, piccolo: true)
+        }
+    }
+
+    /// Velocità e limite uno sopra l'altro, in una colonna stretta: in alto a
+    /// destra dell'area libera se la scheda è a sinistra, se no a sinistra.
+    private func velocitaPiccola(_ a: CGRect, _ c: CruscottoAuto, aDestra: Bool, margine: CGFloat) -> CGRect? {
+        guard let v = c.velocita else { return nil }
+        let r: CGFloat = 15
+        let rLimite: CGFloat = 13
+        let p: CGFloat = 4
+        let w = r * 2 + p * 2
+        let h = p + r * 2 + (c.limite != nil ? 4 + rLimite * 2 : 0) + p
+        let x = aDestra ? a.maxX - margine - w : a.minX + margine
+        let box = CGRect(x: x, y: a.minY + margine, width: w, height: h)
+        fondoScheda.setFill()
+        UIBezierPath(roundedRect: box, cornerRadius: w / 2).fill()
+        let cy = box.minY + p + r
+        let oltre = c.limite.map { v > Double($0) + 3 } ?? false
+        (oltre ? UIColor(red: 229 / 255, green: 57 / 255, blue: 53 / 255, alpha: 1) : .white).setFill()
+        UIBezierPath(ovalIn: CGRect(x: box.midX - r, y: cy - r, width: r * 2, height: r * 2)).fill()
+        let colore: UIColor = oltre ? .white : UIColor(red: 32 / 255, green: 38 / 255, blue: 51 / 255, alpha: 1)
+        let numero: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 14, weight: .bold), .foregroundColor: colore]
+        let unita: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 6.5, weight: .bold), .foregroundColor: colore]
+        centrato("\(Int(v.rounded()))", box.midX, cy + 3, numero)
+        centrato("km/h", box.midX, cy + 11, unita)
+        if let l = c.limite { cartello(box.midX, cy + r + 4 + rLimite, rLimite, l) }
+        return box
+    }
+
     // MARK: - Il tachimetro
 
     /// In basso a sinistra, in una capsula: la velocità (rossa oltre il
@@ -278,7 +339,8 @@ final class PannelloCarPlay: UIView {
     /// La segnalazione che si avvicina (autovelox, polizia, incidente…) o
     /// quella appena passata («c'è ancora?», si risponde coi tasti in alto):
     /// una capsula piccola in alto al centro, finché serve.
-    private func avviso(sinistra: CGFloat, destra: CGFloat, alto: CGFloat) {
+    /// [piccolo]: sullo schermo piccolo una riga sola, più bassa.
+    private func avviso(sinistra: CGFloat, destra: CGFloat, alto: CGFloat, piccolo: Bool = false) {
         let av = PonteAuto.shared.avviso
         let riga1: String
         let riga2: String?
@@ -299,6 +361,24 @@ final class PannelloCarPlay: UIView {
             riga2 = "Rispondi coi tasti in alto"
             colore = UIColor(red: 32 / 255, green: 38 / 255, blue: 51 / 255, alpha: 0.92)
         } else {
+            return
+        }
+        if piccolo {
+            // Una riga: «Autovelox · 300 m», l'icona e il limite piccoli.
+            let testo = font(14)
+            let riga = [riga1, riga2].compactMap { $0 }.joined(separator: " · ")
+            let icona = av.tipo.flatMap { PonteAuto.shared.immagini["segnala-\($0)"] }
+            let h: CGFloat = 30
+            let spazioIcona: CGFloat = icona != nil ? 26 : 0
+            let spazioLimite: CGFloat = av.limite != nil ? 28 : 0
+            let w = min(larghezza(riga, testo) + 20 + spazioIcona + spazioLimite, destra - sinistra)
+            let box = CGRect(x: (sinistra + destra - w) / 2, y: alto, width: w, height: h)
+            colore.setFill()
+            UIBezierPath(roundedRect: box, cornerRadius: h / 2).fill()
+            if let icona { icona.draw(in: CGRect(x: box.minX + 8, y: box.midY - 10, width: 20, height: 20)) }
+            let x = box.minX + 10 + spazioIcona
+            scrivi(taglia(riga, testo, box.maxX - spazioLimite - 8 - x), x, box.midY + 5, testo)
+            if let l = av.limite { cartello(box.maxX - 16, box.midY, 11, l) }
             return
         }
         let testo = font(19)

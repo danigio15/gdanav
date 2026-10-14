@@ -36,6 +36,12 @@ object PonteAuto {
         val corsie: List<CorsiaAuto> = emptyList(),
         val dopoTipo: Int? = null,
         val dopoStrada: String = "",
+        /** L'uscita della rotonda dopo, per il tipo giusto della manovra. */
+        val dopoRotonda: Int? = null,
+        /** Le frasi della manovra dalla più lunga alla più corta (`frasiManovra` dell'app). */
+        val frasi: List<String> = emptyList(),
+        /** Le frasi del «poi», dalla più lunga: «Poi a destra · Via Roma», «Poi». */
+        val dopoFrasi: List<String> = emptyList(),
         /** La vista dello svincolo da mostrare, se pronta (vedi [svincoli]). */
         val svincolo: Int? = null,
         /** Il pedaggio che resta, per la scheda dell'arrivo: «~12,40 € pedaggio». */
@@ -329,6 +335,9 @@ object PonteAuto {
                         },
                         dopoTipo = numero(call, "dopo_tipo")?.toInt(),
                         dopoStrada = call.argument<String>("dopo_strada") ?: "",
+                        dopoRotonda = numero(call, "dopo_rotonda")?.toInt(),
+                        frasi = frasi(call, "frasi"),
+                        dopoFrasi = frasi(call, "dopo_frasi"),
                         svincolo = numero(call, "svincolo")?.toInt(),
                         pedaggio = call.argument<String>("pedaggio"),
                     )
@@ -360,6 +369,10 @@ object PonteAuto {
     }
 
     private fun numero(call: MethodCall, chiave: String): Double? = (call.argument<Any?>(chiave) as? Number)?.toDouble()
+
+    /** Un elenco di frasi, senza quelle vuote: un'app di prima non lo manda. */
+    private fun frasi(call: MethodCall, chiave: String): List<String> =
+        (call.argument<Any?>(chiave) as? List<*>)?.filterIsInstance<String>()?.filter { it.isNotBlank() } ?: emptyList()
 
     /** Una domanda all'app, con la risposta sul filo principale. */
     fun chiedi(metodo: String, argomenti: Any?, risposta: (Any?) -> Unit = {}) {

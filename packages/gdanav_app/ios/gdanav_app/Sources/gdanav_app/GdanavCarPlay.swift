@@ -387,6 +387,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         // Una manovra nuova si dà solo quando cambia: aggiornarla a ogni metro
         // fa sfarfallare la scheda. La distanza si aggiorna a parte.
         let chiave = "\(g.tipo)|\(g.istruzione)|\(g.strada)|\(g.svincolo ?? -1)|\(g.corsie.count)|\(g.dopoTipo ?? -1)|\(g.dopoStrada)"
+            + "|\(g.rotonda ?? -1)|\(g.frasi.joined(separator: "¦"))|\(g.dopoFrasi.joined(separator: "¦"))"
         if chiave != chiaveManovra {
             chiaveManovra = chiave
             manovre = manovreDa(g)
@@ -411,14 +412,21 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     private func manovreDa(_ g: GuidaAuto) -> [CPManeuver] {
         let ponte = PonteAuto.shared
         let m = CPManeuver()
-        // Lo stesso testo della scheda di Android Auto; CarPlay sceglie la
-        // variante che ci sta, dalla più lunga.
-        let testo = ManovreCarPlay.testo(g)
-        var righe = [testo]
-        if !g.strada.isEmpty && g.strada != testo { righe.append(g.strada) }
-        if !g.istruzione.isEmpty && !righe.contains(g.istruzione) { righe.append(g.istruzione) }
-        m.instructionVariants = righe
-        m.symbolImage = ManovreCarPlay.immagine(g.tipo)
+        // Le frasi le scrive l'app (`frasiManovra`), dalla più lunga alla più
+        // corta: CarPlay prende la prima che ci sta. Su uno schermo piccolo
+        // (800×480, 400×240 punti) è «2ª uscita», non tre righe con
+        // «/SP253». Un'app di prima non le manda: il testo di sempre.
+        if !g.frasi.isEmpty {
+            m.instructionVariants = g.frasi
+        } else {
+            let testo = ManovreCarPlay.testo(g)
+            var righe = [testo]
+            if !g.strada.isEmpty && g.strada != testo { righe.append(g.strada) }
+            if !g.istruzione.isEmpty && !righe.contains(g.istruzione) { righe.append(g.istruzione) }
+            m.instructionVariants = righe
+        }
+        // La rotonda disegnata con la sua uscita, non il simbolo di «aggiorna».
+        m.symbolImage = ManovreCarPlay.immagine(g.tipo, rotonda: g.rotonda)
         m.initialTravelEstimates = CPTravelEstimates(
             distanceRemaining: ManovreCarPlay.distanza(g.distanzaM),
             timeRemaining: 0
@@ -430,10 +438,16 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         } else if let strisce = ManovreCarPlay.corsie(g.corsie) {
             m.junctionImage = ManovreCarPlay.dentro(strisce, CGSize(width: 140, height: 100))
         }
+        // Il «poi» arriva solo se la manovra dopo è vicina (entro 150 m,
+        // `poiVicino`), come in Mappe: lontana era una riga in più sulla mappa.
         guard let dopo = g.dopoTipo else { return [m] }
         let poi = CPManeuver()
-        poi.instructionVariants = g.dopoStrada.isEmpty ? ["Poi"] : ["Poi \(g.dopoStrada)"]
-        poi.symbolImage = ManovreCarPlay.immagine(dopo)
+        if !g.dopoFrasi.isEmpty {
+            poi.instructionVariants = g.dopoFrasi
+        } else {
+            poi.instructionVariants = g.dopoStrada.isEmpty ? ["Poi"] : ["Poi \(g.dopoStrada)", "Poi"]
+        }
+        poi.symbolImage = ManovreCarPlay.immagine(dopo, rotonda: g.dopoRotonda)
         return [m, poi]
     }
 
