@@ -195,6 +195,9 @@ class GestorePosizione extends ChangeNotifier {
 
   bool _rottaConosciuta = false;
 
+  /// Se [rotta] viene da letture vere, e non è lo zero di partenza.
+  bool get rottaConosciuta => _rottaConosciuta;
+
   void _dovePunta(Punto? prima, Lettura l, double vaKmh) {
     // La bussola del telefono, quando c'è e si sta andando abbastanza.
     if (l.rotta != null && l.velocitaMs > 1.5) {

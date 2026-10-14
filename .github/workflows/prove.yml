@@ -341,9 +341,11 @@ jobs:
             curl -sSfL --retry 5 -o $nome.osm.pbf https://download.geofabrik.de/$zona-latest.osm.pbf
             osmium tags-filter $nome.osm.pbf nwr/amenity=charging_station -o $nome-cs.osm.pbf
             osmium export $nome-cs.osm.pbf -f geojsonseq --add-unique-id=type_id -o $nome.colonnine.geojsonseq
-            osmium tags-filter $nome.osm.pbf n/highway=speed_camera -o $nome-av.osm.pbf
-            osmium export $nome-av.osm.pbf -f geojsonseq -o $nome.autovelox.geojsonseq
-            echo "$nome: $(wc -l < $nome.colonnine.geojsonseq) colonnine, $(wc -l < $nome.autovelox.geojsonseq) autovelox"
+            # Gli autovelox e le relazioni dei controlli (i Tutor, e verso dove
+            # guardano), coi loro membri: in OPL, una riga per oggetto.
+            osmium tags-filter $nome.osm.pbf n/highway=speed_camera r/type=enforcement -o $nome-av.osm.pbf
+            osmium cat $nome-av.osm.pbf -f opl -o $nome.autovelox.opl
+            echo "$nome: $(wc -l < $nome.colonnine.geojsonseq) colonnine, $(grep -c '^r' $nome.autovelox.opl || true) controlli"
             rm $nome.osm.pbf
           done
       - run: dart pub get
@@ -368,7 +370,7 @@ jobs:
               https://raw.githubusercontent.com/ondata/rete_ricarica_veicoli_elettrici/main/data/pdr_latest_ready.csv
           fi
           dart run tool/colonnine_pun.dart colonnine.json ${{ runner.temp }}/pun.csv colonnine.json | tee -a $GITHUB_STEP_SUMMARY
-      - run: dart run tool/autovelox_osm.dart autovelox.json ${{ runner.temp }}/*.autovelox.geojsonseq
+      - run: dart run tool/autovelox_osm.dart autovelox.json ${{ runner.temp }}/*.autovelox.opl
         working-directory: packages/gdanav_core
       - name: Nella release
         working-directory: packages/gdanav_core

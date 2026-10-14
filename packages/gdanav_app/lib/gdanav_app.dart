@@ -9,6 +9,7 @@ import 'auto/ponte_auto.dart';
 import 'schermate/aggiorna_gdanav.dart';
 import 'schermate/schermata_principale.dart';
 import 'stato/archivio.dart';
+import 'stato/scelte_avvisi.dart';
 import 'stato/gestore_aggiornamento.dart';
 import 'stato/gestore_auto.dart';
 import 'stato/foto_auto.dart';
@@ -142,6 +143,7 @@ Future<GdanavApp> preparaGdanav({
     risparmio: risparmio,
     archivio: archivio,
     audioIniziale: await archivio.modoAudio(),
+    avvisi: ScelteAvvisi(await archivio.scelteAvvisi(), (s) => unawaited(archivio.salvaScelteAvvisi(s))),
   );
   // La velocità dell'auto entra anche qui: serve a sapere se si è fermi, e da
   // fermi il segnaposto non deve girare dietro al ballonzolamento del GPS.

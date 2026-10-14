@@ -71,6 +71,16 @@ class MappaFinta extends MapLibrePlatform {
     return true;
   }
 
+  /// La telecamera spostata di colpo: in guida, a ogni fotogramma.
+  final spostate = <CameraPosition>[];
+
+  @override
+  Future<bool?> moveCamera(CameraUpdate cameraUpdate) async {
+    final j = cameraUpdate.toJson() as List;
+    if (j.first == 'newCameraPosition') spostate.add(CameraPosition.fromMap(j[1])!);
+    return true;
+  }
+
   @override
   Future<CameraPosition?> updateMapOptions(Map<String, dynamic> optionsUpdate) async => null;
 
@@ -301,7 +311,7 @@ void main() {
       await via(tester);
     });
 
-    testWidgets('in guida la telecamera si muove una volta per posizione, lineare, e l\'auto è dove è adesso', (
+    testWidgets('in guida auto e mappa scorrono insieme a ogni fotogramma, senza salti, e l\'auto è dove è adesso', (
       tester,
     ) async {
       await inGuida(tester);
@@ -321,24 +331,35 @@ void main() {
             alle: DateTime.now().subtract(const Duration(milliseconds: 500)),
           ),
         );
-        await tester.pump(const Duration(milliseconds: 1000));
+        for (var i = 0; i < 25; i++) {
+          await tester.pump(const Duration(milliseconds: 40));
+        }
       }
 
       final sulla = Punto((punti[2].lat + punti[3].lat) / 2, punti[2].lon);
       await lettura(sulla);
-      final prima = m.seguite.length;
-      await lettura(Punto(sulla.lat + 0.0002, sulla.lon));
-      // Una sola mossa per posizione: la posizione e la guida non si
-      // rubano più il turno a vicenda.
-      expect(m.seguite.length, prima + 1);
-      final (camera, durata, moto) = m.seguite.last;
-      expect(moto, CameraAnimationInterpolation.linear);
-      // Lunga quanto l'intervallo fra due posizioni, non 900 ms che frenano.
-      expect(durata, const Duration(milliseconds: 1000));
+      final prima = m.spostate.length;
+      final segnapostiPrima = m.scritture.where((s) => s.$1 == sorgenteIo).length;
+      final animatePrima = m.seguite.length;
+      final dopo = Punto(sulla.lat + 0.0002, sulla.lon);
+      await lettura(dopo);
+      // Una mossa a fotogramma, non una a lettura: la mappa scorre.
+      final mosse = m.spostate.sublist(prima);
+      expect(mosse.length, greaterThan(15));
+      // E il segnaposto con lei, non a salti.
+      expect(m.scritture.where((s) => s.$1 == sorgenteIo).length - segnapostiPrima, mosse.length);
+      expect(m.seguite.length, animatePrima, reason: 'niente animazioni che si rincorrono');
+      // Sempre avanti, a piccoli passi: nessun dente di sega.
+      for (var i = 1; i < mosse.length; i++) {
+        final passo = mosse[i].target.latitude - mosse[i - 1].target.latitude;
+        expect(passo, greaterThanOrEqualTo(-1e-9));
+        expect(passo * 111320, lessThan(6), reason: 'un passo per fotogramma, non 25 m in una volta');
+      }
       // 25 m/s per (0,5 s di età + 0,3 s): una ventina di metri più a nord del GPS.
-      final avanti = distanzaM(Punto(sulla.lat + 0.0002, sulla.lon), Punto(camera.target.latitude, sulla.lon));
-      expect(avanti, closeTo(20, 3));
-      expect(camera.target.latitude, greaterThan(sulla.lat + 0.0002));
+      final camera = mosse.last;
+      final avanti = distanzaM(dopo, Punto(camera.target.latitude, sulla.lon));
+      expect(avanti, closeTo(20, 4));
+      expect(camera.target.latitude, greaterThan(dopo.lat));
       await tester.runAsync(a.guida.ferma);
       await via(tester);
     });

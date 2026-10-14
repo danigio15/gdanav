@@ -8,6 +8,7 @@ import 'gestore_auto.dart';
 import 'gestore_consumo.dart';
 import 'gestore_risparmio.dart';
 import 'gestore_viaggio.dart';
+import 'scelte_avvisi.dart';
 import 'voce.dart';
 
 /// La guida passo-passo: segue la posizione, dice le manovre, ricalcola se
@@ -22,8 +23,10 @@ class GestoreGuida extends ChangeNotifier {
     this.risparmio,
     this.archivio,
     ModoAudio audioIniziale = ModoAudio.tutto,
+    ScelteAvvisi? avvisi,
     DateTime Function()? orologio,
-  }) : _ora = orologio ?? DateTime.now {
+  }) : _ora = orologio ?? DateTime.now,
+       avvisi = avvisi ?? ScelteAvvisi() {
     audio = audioIniziale;
   }
 
@@ -36,6 +39,9 @@ class GestoreGuida extends ChangeNotifier {
 
   /// Archivio delle preferenze persistenti del navigatore.
   final Archivio? archivio;
+
+  /// Quali avvisi si vogliono, e come: a voce, solo a schermo o spenti.
+  final ScelteAvvisi avvisi;
 
   /// Ogni quanto si confrontano le strade.
   static const intervalloStrade = Duration(minutes: 5);
@@ -308,14 +314,19 @@ class GestoreGuida extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// L'ora della guida (nelle prove, quella finta).
+  DateTime ora() => _ora();
+
   /// Un messaggio del viaggio fuori dalle manovre: tace con la voce di guida.
   void annuncia(String frase) {
     if (!muto) unawaited(voce.parla(frase));
   }
 
   /// Un avviso: autovelox, segnalazioni, ZTL, limite. Si sente anche con la
-  /// voce di guida spenta («Solo avvisi»); tace solo col silenzio.
-  void annunciaAvviso(String frase) {
+  /// voce di guida spenta («Solo avvisi»); tace col silenzio, e quando
+  /// [quale] è scelto solo a schermo o spento.
+  void annunciaAvviso(String frase, {Avviso? quale}) {
+    if (quale != null && !avvisi.aVoce(quale)) return;
     if (!audio.senzaAvvisi) unawaited(voce.parla(frase));
   }
 
@@ -362,7 +373,7 @@ class GestoreGuida extends ChangeNotifier {
     final da = _oltreDa ??= _ora();
     if (_ora().difference(da) < oltrePer) return;
     _limiteDetto = true;
-    annunciaAvviso('Attenzione, il limite è $limite.');
+    annunciaAvviso('Attenzione, il limite è $limite.', quale: Avviso.limite);
   }
 
   /// Quanto si va: il tachimetro dell'auto se lo dice, se no il GPS.

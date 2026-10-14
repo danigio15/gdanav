@@ -305,9 +305,13 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         }
         // Dura quanto l'intervallo fra due posizioni: si arriva quando arriva
         // la prossima, e il moto resta continuo.
+        // Cambia solo lo zoom o i margini (avvicinandosi a una svolta, di
+        // continuo): si finisce nel tempo che restava, invece di ripartire da
+        // 0,45 s e arrivare prima della posizione dopo, e lì fermarsi.
+        let resta = inizio + durata - ora
         partenza = da
         inizio = ora
-        durata = spostata ? min(max(passo, 0.25), 1.1) : 0.45
+        durata = spostata ? min(max(passo, 0.25), 1.3) : (resta > 0.08 ? resta : 0.45)
         if collegamento == nil {
             let c = CADisplayLink(target: self, selector: #selector(fotogramma))
             c.add(to: .main, forMode: .common)

@@ -6,11 +6,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
+import '../componenti/avvisi_in_guida.dart';
 import '../componenti/scheda_auto.dart';
 import '../componenti/vetro.dart';
 import '../mappa/controllo_mappa.dart';
 import '../mappa/mappa_viaggio.dart';
 import '../stato/archivio.dart';
+import '../stato/avvisi_strada.dart';
 import '../stato/gestore_auto.dart';
 import '../stato/foto_auto.dart';
 import '../stato/gestore_consumo.dart';
@@ -26,6 +28,7 @@ import '../stato/gestore_viaggio.dart';
 import '../stato/gestore_vicini.dart';
 import '../stato/gestore_ztl.dart';
 import 'abbina_home_assistant.dart';
+import 'avvisi_guida.dart';
 import 'cerca_destinazione.dart';
 import 'dettaglio_colonnina.dart';
 import 'diagnosi_auto.dart';
@@ -150,6 +153,9 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   PreferenzeRicarica _preferenze = const PreferenzeRicarica();
   late final GestoreLuoghi luoghi = widget.luoghi ?? (GestoreLuoghi(widget.archivio)..carica());
   late final GestoreSegnalazioni segnalazioni = widget.segnalazioni ?? GestoreSegnalazioni(posizione: widget.posizione);
+
+  /// Gli avvisi lungo la strada: senza percorso, quelli che si hanno davanti.
+  late final _avvisi = AvvisiStrada.di(widget.guida, segnalazioni);
 
   GestoreViaggio get viaggio => widget.viaggio;
 
@@ -410,7 +416,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   /// foglio prima di aprire una voce; nella pagina non c'è niente da chiudere.
   Widget _vociMenu(BuildContext contesto, {required VoidCallback chiudi}) {
     return ListenableBuilder(
-      listenable: Listenable.merge([widget.auto, widget.viaggio, luoghi, ?widget.premium]),
+      listenable: Listenable.merge([widget.auto, widget.viaggio, luoghi, widget.guida.avvisi, ?widget.premium]),
       builder: (contesto, _) {
         void vai(Widget w) {
           chiudi();
@@ -464,6 +470,14 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                           onCambia: widget.viaggio.cambiaOpzioni,
                         ),
                       ),
+                    ),
+                    _VoceMenu(
+                      key: const Key('menu-avvisi'),
+                      icona: Icons.campaign_rounded,
+                      colore: const Color(0xFF7C3AED),
+                      titolo: 'Avvisi in guida',
+                      sotto: widget.guida.avvisi.riassunto,
+                      onTap: () => vai(AvvisiGuidaSchermata(scelte: widget.guida.avvisi)),
                     ),
                     if (widget.ztl case final z?)
                       _VoceMenu(
@@ -686,6 +700,20 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                   ),
                 ],
               ],
+            ),
+          ),
+          // Senza percorso, in macchina: l'autovelox o la segnalazione che si
+          // ha davanti, come in guida.
+          Positioned(
+            left: 4,
+            right: 80,
+            top: alto + 74,
+            child: ListenableBuilder(
+              listenable: _avvisi,
+              builder: (context, _) => switch (_avvisi.davanti) {
+                (final s, final m) => AvvisoSegnalazione(key: const Key('avviso-senza-percorso'), segnalazione: s, metri: m),
+                null => const SizedBox.shrink(),
+              },
             ),
           ),
           Positioned(

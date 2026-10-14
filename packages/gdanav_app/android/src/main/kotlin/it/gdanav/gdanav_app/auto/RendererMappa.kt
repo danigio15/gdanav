@@ -473,6 +473,7 @@ class RendererMappa(
     private var obiettivo: DoubleArray? = null
     private var animazione: ValueAnimator? = null
     private var ultimaPosizione = 0L
+    private var fineAnimazione = 0L
     private var ultimoDisegno = 0L
     private var eraLibera = false
     private val sorgentiCaricate = HashMap<String, String>()
@@ -536,7 +537,12 @@ class RendererMappa(
         }
         // Dura quanto l'intervallo fra due posizioni: si arriva quando arriva
         // la prossima, e il moto resta continuo.
-        val durata = if (spostata) passo.coerceIn(250L, 1100L) else 450L
+        // Cambia solo lo zoom o i margini (avvicinandosi a una svolta, di
+        // continuo): si finisce nel tempo che restava, invece di ripartire da
+        // 450 ms e arrivare prima della posizione dopo, e lì fermarsi.
+        val resta = fineAnimazione - ora
+        val durata = if (spostata) passo.coerceIn(250L, 1300L) else if (resta > 80L) resta else 450L
+        fineAnimazione = ora + durata
         val partenza = da.copyOf()
         animazione?.cancel()
         animazione = ValueAnimator.ofFloat(0f, 1f).apply {

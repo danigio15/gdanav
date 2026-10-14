@@ -99,6 +99,9 @@ class PonteAuto {
     viaggio.addListener(_viaggio);
     viaggio.addListener(_opzioni);
     guida.addListener(_guida);
+    // Anche dalla guida: l'avanzamento arriva dopo la posizione, e mandare
+    // quello vecchio faceva passi a volte lunghi a volte corti.
+    guida.addListener(_posizione);
     posizione.addListener(_posizione);
     luoghi?.addListener(_luoghi);
     auto?.addListener(_cruscotto);
@@ -365,6 +368,7 @@ class PonteAuto {
     viaggio.removeListener(_viaggio);
     viaggio.removeListener(_opzioni);
     guida.removeListener(_guida);
+    guida.removeListener(_posizione);
     posizione.removeListener(_posizione);
     luoghi?.removeListener(_luoghi);
     auto?.removeListener(_cruscotto);
@@ -484,7 +488,7 @@ class PonteAuto {
     final passata = a?.passata;
     final davanti = a?.davanti;
     _manda('avviso', {
-      if (z != null && (z.fuori || davanti == null)) ...{
+      if (z != null && z.fuori) ...{
         'titolo': z.titolo,
         'tipo': 'ztl',
         'testo': z.testo,
@@ -493,6 +497,19 @@ class PonteAuto {
         'tipo': s.tipo.name,
         'metri': m,
         'limite': s.limiteKmh,
+      } else if (a?.tutor case final t?) ...{
+        'titolo': switch (t) {
+          DentroTutor(:final mediaKmh?) => 'Tutor · media ${mediaKmh.round()} km/h',
+          _ => 'Tutor',
+        },
+        'tipo': 'autovelox',
+        if (t case TutorDavanti(:final metri)) 'metri': metri,
+        if (t case final DentroTutor d) 'testo': 'mancano ${distanzaBreve(d.restantiM)}${d.sopra() ? ' · rallenta' : ''}',
+        'limite': t.tratto.limiteKmh,
+      } else if (z != null) ...{
+        'titolo': z.titolo,
+        'tipo': 'ztl',
+        'testo': z.testo,
       },
       if (passata != null) ...{'ancora_id': passata.id, 'ancora_testo': '${passata.tipo.nome}: c\'è ancora?'},
     });
@@ -775,13 +792,16 @@ class PonteAuto {
   /// da sé segnaposto e mappa.
   void _posizione() {
     final a = guida.attiva ? guida.avanzamento : null;
-    final qui = a?.posizioneSulPercorso ?? posizione.qui;
+    // In guida dove l'auto è adesso, portata avanti lungo la strada da
+    // quando è arrivata la lettura: come sul telefono, a passi uguali.
+    final stimata = a == null ? null : guida.posizioneStimata();
+    final qui = stimata?.punto ?? a?.posizioneSulPercorso ?? posizione.qui;
     // Senza posizione non c'è niente da mostrare: non si consuma il turno.
     if (qui == null) return;
     final ora = _ora();
     if (ora.difference(_ultimaPosizione) < const Duration(milliseconds: 300)) return;
     _ultimaPosizione = ora;
-    final rotta = a?.rotta ?? posizione.rotta;
+    final rotta = stimata?.rotta ?? a?.rotta ?? posizione.rotta;
     // La mappa guarda un po' avanti; la freccia dell'auto segue la strada.
     // Il segnaposto lo disegna l'auto, che lo fa scorrere fra due posizioni.
     _manda('posizione', {
