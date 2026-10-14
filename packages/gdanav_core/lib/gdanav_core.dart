@@ -43,6 +43,7 @@ export 'src/protocollo/codice.dart';
 export 'src/protocollo/messaggio.dart';
 export 'src/segnalazioni/autovelox.dart';
 export 'src/segnalazioni/segnalazioni.dart';
+export 'src/segnalazioni/tutor.dart';
 export 'src/traffico/traffico_tomtom.dart';
 export 'src/veicolo/arbitro_sorgenti.dart';
 export 'src/veicolo/catalogo.dart';
