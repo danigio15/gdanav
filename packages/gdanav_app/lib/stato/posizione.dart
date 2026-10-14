@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleState, WidgetsBinding;
 import 'package:geolocator/geolocator.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -61,8 +62,9 @@ final _gps = FlussoGps(
 /// ogni giro; se il flusso tace da [morto], o finisce, lo chiude e lo
 /// riapre. Quando nessuno ascolta, la sentinella dorme e il GPS si spegne.
 class FlussoGps {
-  FlussoGps({required this.apri, required this.chiedi, DateTime Function()? orologio})
-    : _ora = orologio ?? DateTime.now {
+  FlussoGps({required this.apri, required this.chiedi, DateTime Function()? orologio, bool Function()? siPuoRiaprire})
+    : _ora = orologio ?? DateTime.now,
+      _siPuoRiaprire = siPuoRiaprire ?? _inPrimoPianoSuIPhone {
     _uscita = StreamController<Position>.broadcast(onListen: _accendi, onCancel: _spegni);
   }
 
@@ -75,6 +77,25 @@ class FlussoGps {
 
   final DateTime Function() _ora;
   late final StreamController<Position> _uscita;
+
+  /* Su iPhone il GPS si accende solo con l'app davanti.
+   *
+   * «Su CarPlay, col telefono bloccato, la posizione resta ferma.» Col
+   * permesso «mentre usi l'app» iOS lascia continuare in sottofondo un
+   * flusso aperto davanti, ma non ne lascia partire uno nuovo: chiudere e
+   * riaprire il flusso col telefono bloccato voleva dire spegnerlo. E la
+   * posizione chiesta una volta sola, che in sottofondo fallisce, mandava il
+   * suo errore anche al flusso, che si chiudeva per riprovare. Su iPhone in
+   * sottofondo la sentinella quindi non chiude, non riapre e non chiede:
+   * lascia il flusso com'è, e torna a guardarlo appena l'app è di nuovo
+   * davanti. Su Android non cambia niente. */
+  final bool Function() _siPuoRiaprire;
+
+  static bool _inPrimoPianoSuIPhone() {
+    if (defaultTargetPlatform != TargetPlatform.iOS) return true;
+    final stato = WidgetsBinding.instance.lifecycleState;
+    return stato == null || stato == AppLifecycleState.resumed;
+  }
 
   /// Ogni quanto la sentinella guarda se il GPS parla.
   static const giro = Duration(seconds: 2);
@@ -219,6 +240,8 @@ class FlussoGps {
 
   void _riprova(Object errore, StreamSubscription<Position>? da) {
     if (da != null && !identical(_dalGps, da)) return;
+    // In sottofondo su iPhone il flusso aperto si tiene: riaprirlo non si può.
+    if (da != null && !_siPuoRiaprire()) return;
     _chiudi();
     if (errore is LocationServiceDisabledException) _soloIlGps = true;
     _fraPoco?.cancel();
@@ -232,6 +255,7 @@ class FlussoGps {
     final ora = _ora();
     // Finché parla l'auto il telefono non serve: lo si riguarda quando tace.
     if (_parlaLAuto(ora)) return;
+    if (!_siPuoRiaprire()) return;
     if (_dalGps == null) {
       // Finito da solo: lo si riapre. Dopo un errore invece c'è già chi
       // aspetta di riprovare.
