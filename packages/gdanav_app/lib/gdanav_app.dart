@@ -320,7 +320,11 @@ class GdanavApp extends StatelessWidget {
     Widget? iconaOspite,
     ValueNotifier<bool>? apriIlMenu,
     List<VoceOspite> vociOspite = const [],
+    bool soloImpostazioni = false,
+    VoidCallback? chiudiImpostazioni,
   }) => SchermataPrincipale(
+    soloImpostazioni: soloImpostazioni,
+    chiudiImpostazioni: chiudiImpostazioni,
     menuOspite: menuOspite,
     iconaOspite: iconaOspite,
     apriIlMenu: apriIlMenu,
@@ -359,7 +363,14 @@ class GdanavDentro extends StatelessWidget {
     this.iconaOspite,
     this.apriIlMenu,
     this.vociOspite = const [],
+    this.soloImpostazioni = false,
+    this.chiudiImpostazioni,
   });
+
+  /// Solo le impostazioni di gdanav, senza mappa: vedi
+  /// [SchermataPrincipale.soloImpostazioni].
+  final bool soloImpostazioni;
+  final VoidCallback? chiudiImpostazioni;
 
   /// Il disegno del tasto del menu di chi ospita (il suo marchio).
   final Widget? iconaOspite;
@@ -390,6 +401,8 @@ class GdanavDentro extends StatelessWidget {
               iconaOspite: iconaOspite,
               apriIlMenu: apriIlMenu,
               vociOspite: vociOspite,
+              soloImpostazioni: soloImpostazioni,
+              chiudiImpostazioni: chiudiImpostazioni,
             ),
           ),
         ),

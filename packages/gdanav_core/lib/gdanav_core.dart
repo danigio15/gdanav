@@ -31,6 +31,7 @@ export 'src/obd/profili_obd.dart';
 export 'src/obd/sorgente_obd.dart';
 export 'src/percorso/consumo_tomtom.dart';
 export 'src/percorso/pedaggi.dart';
+export 'src/percorso/pedaggi_here.dart';
 export 'src/percorso/quanto_gira.dart';
 export 'src/percorso/percorso_tomtom.dart';
 export 'src/percorso/valhalla.dart';

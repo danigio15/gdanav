@@ -28,11 +28,14 @@ class Punto {
 /// proporre un'inversione appena ricalcolato, e il segnaposto in guida si può
 /// portare avanti di quanto si è andati da quando il GPS l'ha letto.
 class PuntoInMoto extends Punto {
-  const PuntoInMoto(super.lat, super.lon, {this.rotta, this.velocitaMs, this.alle});
+  const PuntoInMoto(super.lat, super.lon, {this.rotta, this.velocitaMs, this.alle, this.precisioneM});
 
   final double? rotta;
   final double? velocitaMs;
   final DateTime? alle;
+
+  /// Di quanti metri il GPS dice di potersi sbagliare; `null` se non lo dice.
+  final double? precisioneM;
 }
 
 /// Il verso in cui si sta andando alla partenza, in gradi interi (0–359), se

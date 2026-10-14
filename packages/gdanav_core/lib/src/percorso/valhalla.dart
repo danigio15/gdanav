@@ -156,6 +156,7 @@ class PercorsoCalcolato {
     this.consumoTomTom,
     this.pedaggi = const [],
     this.prezzoPedaggio,
+    this.pagamentiPedaggio,
   });
 
   final List<Punto> punti;
@@ -203,6 +204,16 @@ class PercorsoCalcolato {
   /// TollGuru); `null`: lo stima [TariffaPedaggio.stima].
   final double? prezzoPedaggio;
 
+  /// I pedaggi veri, casello per casello, dove si pagano (HERE): con
+  /// questi [TariffaPedaggio.stima] non stima, somma quelli ancora da
+  /// pagare. `null`: non si sanno, si stima.
+  final List<PagamentoPedaggio>? pagamentiPedaggio;
+
+  /// Coi pedaggi veri: anche sotto il traffico, che si rifà da
+  /// [senzaTraffico] e non deve perderli.
+  PercorsoCalcolato conPagamenti(List<PagamentoPedaggio>? pagamenti) =>
+      _copia(pagamentiPedaggio: pagamenti, senzaTraffico: senzaTraffico?.conPagamenti(pagamenti));
+
   /// Il percorso da cui partire per applicare il traffico.
   PercorsoCalcolato get base => senzaTraffico ?? this;
 
@@ -222,6 +233,7 @@ class PercorsoCalcolato {
     bool? trafficoVero,
     PercorsoCalcolato? senzaTraffico,
     ZtlDelViaggio? ztl,
+    List<PagamentoPedaggio>? pagamentiPedaggio,
   }) =>
       PercorsoCalcolato(
         punti: punti,
@@ -239,6 +251,7 @@ class PercorsoCalcolato {
         consumoTomTom: consumoTomTom,
         pedaggi: pedaggi,
         prezzoPedaggio: prezzoPedaggio,
+        pagamentiPedaggio: pagamentiPedaggio ?? this.pagamentiPedaggio,
       );
 
   PercorsoCalcolato conLimiti(List<int?> limiti) => _copia(limiti: limiti);

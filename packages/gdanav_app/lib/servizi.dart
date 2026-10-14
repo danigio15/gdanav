@@ -28,6 +28,11 @@ abstract final class Servizi {
   /// resta senza traffico e i percorsi tornano a Valhalla.
   static const chiaveTomTom = String.fromEnvironment('GDANAV_TOMTOM_CHIAVE', defaultValue: _chiaveTomTom);
 
+  /// I pedaggi veri, casello per casello: HERE Routing v8 (`return=tolls`)
+  /// sullo stesso percorso di TomTom. Senza chiave il pedaggio si stima
+  /// (`TariffaPedaggio`), con le strade a prezzo fisso al loro prezzo.
+  static const chiaveHere = String.fromEnvironment('GDANAV_HERE_CHIAVE');
+
   /// Le segnalazioni della comunità (incidenti, polizia, pericoli): il relay
   /// di gdanav su Cloudflare.
   static const segnalazioni = String.fromEnvironment('GDANAV_SEGNALAZIONI', defaultValue: _segnalazioni);

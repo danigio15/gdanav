@@ -116,32 +116,75 @@ class TariffaPedaggio {
   /// Il pedaggio del [percorso]. Con [daM] solo quello ancora da pagare,
   /// in guida: in Italia si paga all'uscita, quindi un tratto in cui si è
   /// dentro conta tutto.
+  ///
+  /// Nell'ordine: i pedaggi veri casello per casello
+  /// ([PercorsoCalcolato.pagamentiPedaggio], da HERE); se no il prezzo vero
+  /// del motore ([PercorsoCalcolato.prezzoPedaggio]); se no la stima, dove
+  /// le strade a prezzo fisso ([stradeAPrezzoFisso]) hanno il loro prezzo
+  /// vero e il resto va a km.
   CostoPedaggio stima(PercorsoCalcolato percorso, {double daM = 0}) {
     final tratti = [
       for (final t in percorso.pedaggi)
         if (t.aM > daM) t,
     ];
-    var km = 0.0, kmFuori = 0.0, euro = 0.0;
-    var vignetta = false;
+    final vignetta = tratti.any((t) => t.vignetta);
+    final kmTutti = tratti.fold(0.0, (s, t) => s + (t.vignetta ? 0 : t.lunghezzaM)) / 1000;
+
+    // I pedaggi veri, casello per casello: quelli che restano da pagare.
+    if (percorso.pagamentiPedaggio case final pagamenti?) {
+      final restano = [
+        for (final p in pagamenti)
+          if (p.aM >= daM) p,
+      ];
+      return CostoPedaggio(
+        euro: restano.fold(0.0, (s, p) => s + p.euro),
+        km: kmTutti,
+        stimato: false,
+        vignetta: vignetta,
+        // Si paga ma HERE non ha dato prezzi (un tratto che non conosce): si
+        // sa solo che c'è.
+        sconosciuto: restano.isEmpty && kmTutti > 0 && pagamenti.isEmpty,
+        classe: classe,
+        caselli: [for (final p in restano) p.nome].where((n) => n.isNotEmpty).toList(),
+      );
+    }
+
+    final nomi = _NomiDelleStrade(percorso);
+    var km = 0.0, kmFuori = 0.0, euroKm = 0.0, euroFissi = 0.0;
+    var fissiStimati = false;
     TrattoPedaggio? aperto;
     var metriAperto = 0.0;
+    StradaAPrezzoFisso? fissa;
+    var fineFissa = double.negativeInfinity;
     void chiudi() {
       if (aperto == null) return;
-      euro += math.max(minimoPerTratta, metriAperto / 1000 * euroAlKm);
+      euroKm += math.max(minimoPerTratta, metriAperto / 1000 * euroAlKm);
       aperto = null;
       metriAperto = 0;
     }
 
     for (final t in tratti) {
-      if (t.vignetta) {
-        vignetta = true;
-        continue;
-      }
+      if (t.vignetta) continue;
       if (t.paese != null && !paesiStimati.contains(t.paese)) {
         kmFuori += t.lunghezzaM / 1000;
         continue;
       }
       km += t.lunghezzaM / 1000;
+      // Una strada a prezzo fisso: si paga una volta a passaggio, quanto
+      // dice il suo listino, e non a km. Due pezzi attaccati della stessa
+      // strada sono lo stesso passaggio.
+      if (nomi.prezzoFisso(t) case final f?) {
+        chiudi();
+        if (!(identical(f, fissa) && t.daM - fineFissa <= _giunzioneM)) {
+          final prezzo = f.prezzo(classe);
+          euroFissi += prezzo.euro;
+          fissiStimati = fissiStimati || prezzo.stimato;
+        }
+        fissa = f;
+        fineFissa = t.aM;
+        continue;
+      }
+      fissa = null;
       if (aperto case final a? when t.daM - a.aM <= _giunzioneM) {
         aperto = t;
         metriAperto += t.lunghezzaM;
@@ -167,13 +210,18 @@ class TariffaPedaggio {
       );
     }
     return CostoPedaggio(
-      euro: arrotondaPedaggio(euro),
+      // La stima a km si arrotonda ai dieci centesimi; i prezzi fissi no:
+      // la Tangenziale di Napoli costa 1,05 €, non 1,10.
+      euro: arrotondaPedaggio(euroKm) + euroFissi,
       km: km,
       kmNonStimati: kmFuori,
       vignetta: vignetta,
       // Il motore dice che si paga, ma non dove (Valhalla con `has_toll`
       // e nessuna manovra segnata): si sa solo che c'è.
       sconosciuto: daM <= 0 && percorso.conPedaggi && percorso.pedaggi.isEmpty,
+      // Esatto solo se tutto quello che si paga è a prezzo fisso, col
+      // listino della classe.
+      stimato: euroKm > 0 || fissiStimati || (euroFissi <= 0),
       classe: classe,
     );
   }
@@ -199,7 +247,12 @@ class CostoPedaggio {
     this.sconosciuto = false,
     this.stimato = true,
     this.classe = ClassePedaggio.a,
+    this.caselli = const [],
   });
+
+  /// Dove si paga, quando i pedaggi sono quelli veri: i nomi dei caselli
+  /// (o delle barriere), nell'ordine.
+  final List<String> caselli;
 
   /// Quanto si paga (in euro) sui tratti che si sanno stimare.
   final double euro;
@@ -298,4 +351,111 @@ List<TrattoPedaggio> trattiDaIndici(
     }
   }
   return tratti;
+}
+
+/// Un pedaggio vero: quanto, e dove lungo il percorso si paga (in metri
+/// sulla geometria dei punti). In Italia si paga all'uscita: un pagamento
+/// oltre la posizione di adesso è ancora da fare.
+class PagamentoPedaggio {
+  const PagamentoPedaggio({required this.euro, required this.aM, this.nome = ''});
+
+  final double euro;
+  final double aM;
+
+  /// Il casello o la barriera, come lo chiama chi ha dato il prezzo.
+  final String nome;
+
+  @override
+  String toString() => 'PagamentoPedaggio(${euroItaliani(euro)} a ${aM.round()} m${nome.isEmpty ? '' : ', $nome'})';
+}
+
+/// Il prezzo di un passaggio su una strada a prezzo fisso, per una classe.
+class PrezzoFisso {
+  const PrezzoFisso(this.euro, {this.stimato = false});
+  final double euro;
+
+  /// `true` se il listino di questa classe non si sa e si è fatto in
+  /// proporzione alla classe A.
+  final bool stimato;
+}
+
+/// Una strada a sistema aperto: si paga lo stesso prezzo a ogni passaggio,
+/// comunque si entri e si esca. Si riconosce dai nomi e dai numeri delle
+/// strade delle manovre (TomTom: `street` e `roadNumbers`).
+class StradaAPrezzoFisso {
+  const StradaAPrezzoFisso({
+    required this.nome,
+    required this.schema,
+    required this.listino,
+    required this.dal,
+  });
+
+  final String nome;
+
+  /// Come la chiamano le manovre: «A56», «Tangenziale di Napoli».
+  final String schema;
+
+  /// Il prezzo vero per classe, IVA compresa. Le classi che mancano si fanno
+  /// in proporzione alla A ([ClassePedaggio.fattore]) e restano stimate.
+  final Map<ClassePedaggio, double> listino;
+
+  /// Da quando vale il listino: per ricordarsi di aggiornarlo.
+  final String dal;
+
+  bool riconosce(String testo) => RegExp(schema, caseSensitive: false).hasMatch(testo);
+
+  PrezzoFisso prezzo(ClassePedaggio c) {
+    if (listino[c] case final e?) return PrezzoFisso(e);
+    final a = listino[ClassePedaggio.a] ?? 0;
+    return PrezzoFisso((a * c.fattore * 20).round() / 20, stimato: true);
+  }
+}
+
+/// Le strade italiane a prezzo fisso che si conoscono. Si aggiungono qui,
+/// col listino ufficiale e la data da cui vale.
+const stradeAPrezzoFisso = [
+  // A56: 1,05 € a passaggio in classe A dal 1° gennaio 2026 (prima 1,00 €).
+  StradaAPrezzoFisso(
+    nome: 'Tangenziale di Napoli',
+    schema: r'\bA\s?56\b|tangenziale di napoli',
+    listino: {ClassePedaggio.a: 1.05},
+    dal: '2026-01-01',
+  ),
+];
+
+/// I nomi delle strade lungo il percorso, dalle manovre: ogni manovra vale
+/// dal suo punto a quello della manovra dopo.
+class _NomiDelleStrade {
+  _NomiDelleStrade(PercorsoCalcolato p) {
+    if (p.punti.length < 2 || p.manovre.isEmpty) return;
+    final cumulate = Linea(p.punti).cumulate;
+    final n = cumulate.length - 1;
+    for (var i = 0; i < p.manovre.length; i++) {
+      final m = p.manovre[i];
+      final da = cumulate[m.inizio.clamp(0, n)];
+      final a = i + 1 < p.manovre.length ? cumulate[p.manovre[i + 1].inizio.clamp(0, n)] : cumulate[n];
+      // Una rampa senza nome porta alla strada della manovra dopo: la
+      // barriera della Tangenziale sta proprio sulla rampa d'ingresso.
+      final dopo = i + 1 < p.manovre.length ? p.manovre[i + 1] : null;
+      final testo = m.strada.trim().isEmpty && dopo != null ? '${dopo.strada} ${dopo.verso}' : '${m.strada} ${m.verso}';
+      if (a > da) _pezzi.add((da: da, a: a, testo: testo));
+    }
+  }
+
+  final _pezzi = <({double da, double a, String testo})>[];
+
+  /// La strada a prezzo fisso su cui sta [t]: quella delle manovre che ne
+  /// coprono almeno metà.
+  StradaAPrezzoFisso? prezzoFisso(TrattoPedaggio t) {
+    if (t.lunghezzaM <= 0) return null;
+    for (final f in stradeAPrezzoFisso) {
+      var coperti = 0.0;
+      for (final p in _pezzi) {
+        if (!f.riconosce(p.testo)) continue;
+        coperti += math.max(0, math.min(p.a, t.aM) - math.max(p.da, t.daM));
+      }
+      if (coperti >= t.lunghezzaM / 2) return f;
+    }
+    return null;
+  }
 }

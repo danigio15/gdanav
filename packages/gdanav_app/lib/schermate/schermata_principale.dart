@@ -72,7 +72,17 @@ class SchermataPrincipale extends StatefulWidget {
     this.iconaOspite,
     this.apriIlMenu,
     this.vociOspite = const [],
+    this.soloImpostazioni = false,
+    this.chiudiImpostazioni,
   });
+
+  /// Solo le impostazioni, in una pagina, senza la mappa: chi ospita gdanav
+  /// le apre quando il navigatore è sullo schermo dell'auto, e sul telefono
+  /// non deve partire una seconda mappa (né il GPS, né le segnalazioni).
+  final bool soloImpostazioni;
+
+  /// La «X» della pagina delle impostazioni: la chiude chi l'ha aperta.
+  final VoidCallback? chiudiImpostazioni;
 
   /// Le voci che chi ospita gdanav aggiunge al suo menu (gdahome: i comandi
   /// rapidi in auto). Stanno sotto «gdahome».
@@ -146,8 +156,10 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   @override
   void initState() {
     super.initState();
-    unawaited(controllo.carica(widget.archivio.vistaInclinata()));
     _ricaricaPreferenze();
+    // Solo le impostazioni: niente mappa, posizione né segnalazioni.
+    if (widget.soloImpostazioni) return;
+    unawaited(controllo.carica(widget.archivio.vistaInclinata()));
     widget.chiediPosizione?.call().then((ok) {
       if (ok) widget.posizione.avvia();
     });
@@ -192,10 +204,12 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
 
   @override
   void dispose() {
-    widget.guida.removeListener(_guidaDaFuori);
-    widget.apriIlMenu?.removeListener(_menuDaFuori);
+    if (!widget.soloImpostazioni) {
+      widget.guida.removeListener(_guidaDaFuori);
+      widget.apriIlMenu?.removeListener(_menuDaFuori);
+      if (widget.segnalazioni == null) segnalazioni.dispose();
+    }
     controllo.dispose();
-    if (widget.segnalazioni == null) segnalazioni.dispose();
     super.dispose();
   }
 
@@ -387,9 +401,19 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (contesto) {
+      builder: (contesto) => _vociMenu(contesto, chiudi: () => Navigator.of(contesto).pop()),
+    );
+  }
+
+  /// Le voci del menu: nel foglio sopra la mappa ([_menu]) o da sole, in una
+  /// pagina ([SchermataPrincipale.soloImpostazioni]). [chiudi] chiude il
+  /// foglio prima di aprire una voce; nella pagina non c'è niente da chiudere.
+  Widget _vociMenu(BuildContext contesto, {required VoidCallback chiudi}) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([widget.auto, widget.viaggio, luoghi, ?widget.premium]),
+      builder: (contesto, _) {
         void vai(Widget w) {
-          Navigator.of(contesto).pop();
+          chiudi();
           _apri(w);
         }
 
@@ -420,7 +444,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                           titolo: v.titolo,
                           sotto: v.sotto,
                           onTap: () {
-                            Navigator.of(contesto).pop();
+                            chiudi();
                             v.apri();
                           },
                         ),
@@ -492,7 +516,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                         titolo: 'Fonte dati auto',
                         sotto: sbloccato ? 'Da dove arriva la batteria' : 'A mano; dall\'auto con Premium',
                         onTap: () {
-                          Navigator.of(contesto).pop();
+                          chiudi();
                           _fonteDatiAuto();
                         },
                       ),
@@ -525,7 +549,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                         if (!sbloccato && widget.auto.gdahome != null) {
                           return vai(SchermataPremium(premium: widget.premium!, perche: 'La batteria da gdahome'));
                         }
-                        Navigator.of(contesto).pop();
+                        chiudi();
                         mostraFonteGdahome(context, widget.auto);
                       },
                     ),
@@ -538,7 +562,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                         if (!sbloccato) {
                           return vai(SchermataPremium(premium: widget.premium!, perche: PannelloPremium.schermoAuto));
                         }
-                        Navigator.of(contesto).pop();
+                        chiudi();
                         mostraDiagnosiAuto(context);
                       },
                     ),
@@ -581,6 +605,21 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.soloImpostazioni) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Navigatore e auto'),
+          leading: widget.chiudiImpostazioni == null
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  tooltip: 'Chiudi',
+                  onPressed: widget.chiudiImpostazioni,
+                ),
+        ),
+        body: SafeArea(top: false, child: _vociMenu(context, chiudi: () {})),
+      );
+    }
     final alto = MediaQuery.paddingOf(context).top;
     final schermo = MediaQuery.sizeOf(context).height;
     return Scaffold(

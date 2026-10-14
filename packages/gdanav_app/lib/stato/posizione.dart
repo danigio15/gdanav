@@ -317,6 +317,8 @@ Stream<Punto> posizioniGuida() => _gps.posizioni.map(
     rotta: rottaDaFidarsi(p.heading, p.headingAccuracy),
     velocitaMs: p.speed.isFinite && p.speed >= 0 ? p.speed : null,
     alle: p.timestamp,
+    // Quanto può sbagliare: la guida non ricalcola per una lettura larga.
+    precisioneM: p.accuracy.isFinite && p.accuracy > 0 ? p.accuracy : null,
   ),
 );
 

@@ -188,10 +188,22 @@ PianificatoreViaggio pianificatoreVero(
           calcola: (tappe, evita) => tomtom.calcola(tappe, opzioni: opzioni, evita: evita),
           alternative: strade,
         );
+  // I pedaggi veri da HERE, se c'è la chiave, sul percorso già scelto: se
+  // HERE non risponde resta la stima.
+  Future<PercorsoCalcolato> conPedaggiVeri(PercorsoCalcolato p) async {
+    final here = _pedaggiHere;
+    if (here == null || !p.conPedaggi) return p;
+    final pagamenti = await here.di(p, opzioni.classePedaggio);
+    return pagamenti == null ? p : p.conPagamenti(pagamenti);
+  }
+
   return PianificatoreViaggio(
-    percorsi: (tappe) => ztl?.percorso(tappe) ?? valhalla!.calcola(tappe, opzioni: opzioni),
-    alternative: (da, a) => ztl?.scelte(da, a) ?? valhalla!.alternative(da, a, opzioni: opzioni),
-    seguendo: (p) => tomtom?.seguendo(p, opzioni: opzioni) ?? valhalla!.seguendo(p, opzioni: opzioni),
+    percorsi: (tappe) async =>
+        conPedaggiVeri(await (ztl?.percorso(tappe) ?? valhalla!.calcola(tappe, opzioni: opzioni))),
+    alternative: (da, a) async =>
+        Future.wait((await (ztl?.scelte(da, a) ?? valhalla!.alternative(da, a, opzioni: opzioni))).map(conPedaggiVeri)),
+    seguendo: (p) async =>
+        conPedaggiVeri(await (tomtom?.seguendo(p, opzioni: opzioni) ?? valhalla!.seguendo(p, opzioni: opzioni))),
     // Il traffico di adesso sul percorso (per tutti, se c'è la chiave
     // TomTom): arrivo e soste lo mettono in conto.
     traffico: traffico?.applica,
@@ -249,6 +261,7 @@ final FonteDisponibilita _disponibilita = DisponibilitaConPun(
   _pun,
   altra: Servizi.chiaveTomTom.isEmpty ? null : DisponibilitaTomTom(Servizi.chiaveTomTom),
 );
+final _pedaggiHere = Servizi.chiaveHere.isEmpty ? null : PedaggiHere(Servizi.chiaveHere);
 final _traffico = Servizi.chiaveTomTom.isEmpty ? null : TrafficoTomTom(Servizi.chiaveTomTom);
 
 /// Dove si cercano le mete: TomTom se c'è la chiave — i numeri civici e le
