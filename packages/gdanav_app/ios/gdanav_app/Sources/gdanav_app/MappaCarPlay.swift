@@ -106,6 +106,7 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     deinit {
         torna?.invalidate()
         collegamento?.invalidate()
+        orologio?.invalidate()
     }
 
     // MARK: - Col dito o con la manopola
@@ -241,6 +242,8 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     private var inizio: CFTimeInterval = 0
     private var durata: CFTimeInterval = 0
     private var collegamento: CADisplayLink?
+    /// Quando lo schermo dell'auto non si sa ancora: vedi [accendiFotogrammi].
+    private var orologio: Timer?
     private var ultimaPosizione: CFTimeInterval = 0
     private var eraLibera = false
 
@@ -312,11 +315,30 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         partenza = da
         inizio = ora
         durata = spostata ? min(max(passo, 0.25), 1.3) : (resta > 0.08 ? resta : 0.45)
-        if collegamento == nil {
-            let c = CADisplayLink(target: self, selector: #selector(fotogramma))
+        if collegamento == nil && orologio == nil { accendiFotogrammi() }
+    }
+
+    /* I fotogrammi li da' lo schermo dell'auto, non quello del telefono.
+     *
+     * «Col telefono sbloccato la posizione va avanti, bloccato resta ferma.»
+     * Un `CADisplayLink(target:selector:)` segue lo schermo principale, cioe'
+     * quello dell'iPhone: col telefono bloccato quello schermo e' spento e i
+     * fotogrammi non arrivano piu'. Le posizioni continuavano ad arrivare, ma
+     * il segnaposto restava fermo (e saltava avanti solo dopo un chilometro).
+     * Adesso il ritmo e' quello dello schermo dell'auto; se la finestra non
+     * c'e' ancora, un orologio a 30 al secondo, che non dipende da nessuno
+     * schermo. */
+    private func accendiFotogrammi() {
+        if let schermo = view.window?.windowScene?.screen ?? view.window?.screen,
+           schermo !== UIScreen.main,
+           let c = schermo.displayLink(withTarget: self, selector: #selector(fotogramma)) {
             c.add(to: .main, forMode: .common)
             collegamento = c
+            return
         }
+        let o = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in self?.fotogramma() }
+        RunLoop.main.add(o, forMode: .common)
+        orologio = o
     }
 
     @objc private func fotogramma() {
@@ -334,6 +356,8 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     private func fermaAnimazione() {
         collegamento?.invalidate()
         collegamento = nil
+        orologio?.invalidate()
+        orologio = nil
     }
 
     private func disegna(_ v: [Double], animata: Bool = false) {
