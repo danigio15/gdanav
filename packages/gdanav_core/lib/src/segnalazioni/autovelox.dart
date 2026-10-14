@@ -3,19 +3,38 @@ import 'dart:convert';
 import '../geo/geo.dart';
 import 'segnalazioni.dart';
 
-/// Gli autovelox fissi di OpenStreetMap (`highway=speed_camera`), dentro
-/// l'app: preparati in CI (`tool/autovelox_osm.dart`), divisi in celle di un
-/// decimo di grado per trovare in fretta quelli vicini.
+/// Un tratto con la velocità media controllata (il Tutor): si entra da
+/// [inizio], si esce da [fine], e conta la media fra i due.
+class TrattoTutor {
+  const TrattoTutor({required this.id, required this.inizio, required this.fine, this.limiteKmh});
+
+  final String id;
+  final Punto inizio;
+  final Punto fine;
+  final int? limiteKmh;
+
+  /// Da dove si guarda, per trovarli: il mezzo.
+  Punto get mezzo => Punto((inizio.lat + fine.lat) / 2, (inizio.lon + fine.lon) / 2);
+
+  /// In linea d'aria, da un capo all'altro.
+  double get lunghezzaM => distanzaM(inizio, fine);
+}
+
+/// Gli autovelox fissi di OpenStreetMap, dentro l'app: preparati in CI
+/// (`tool/autovelox_osm.dart`), divisi in celle di un decimo di grado per
+/// trovare in fretta quelli vicini. Con i Tutor, i tratti a velocità media.
 ///
-///     {"v":1,"generato":"…","a":[[lat,lon,limite,direzione],…]}
+///     {"v":2,"generato":"…","a":[[lat,lon,limite,direzione],…],
+///      "t":[[lat1,lon1,lat2,lon2,limite],…]}
 ///
-/// limite 0: non si sa; direzione -1: non si sa.
+/// limite 0: non si sa; direzione -1: non si sa. La versione 1 non ha `t`.
 class ArchivioAutovelox {
-  ArchivioAutovelox(List<Segnalazione> tutti, {this.generato}) {
+  ArchivioAutovelox(List<Segnalazione> tutti, {this.generato, List<TrattoTutor> tutor = const []}) {
     for (final a in tutti) {
       (_celle[_cella(a.punto)] ??= []).add(a);
     }
     quanti = tutti.length;
+    _tutor = tutor;
   }
 
   static final vuoto = ArchivioAutovelox(const []);
@@ -23,6 +42,17 @@ class ArchivioAutovelox {
   final DateTime? generato;
   late final int quanti;
   final _celle = <(int, int), List<Segnalazione>>{};
+  late final List<TrattoTutor> _tutor;
+
+  /// Quanti Tutor.
+  int get quantiTutor => _tutor.length;
+
+  /// I Tutor che hanno un capo entro [raggioM] da [qui]. Sono pochi (qualche
+  /// centinaio): si guardano tutti.
+  List<TrattoTutor> tutorVicini(Punto qui, double raggioM) => [
+        for (final t in _tutor)
+          if (distanzaM(qui, t.inizio) <= raggioM || distanzaM(qui, t.fine) <= raggioM) t,
+      ];
 
   static (int, int) _cella(Punto p) => ((p.lat * 10).floor(), (p.lon * 10).floor());
 
@@ -38,8 +68,15 @@ class ArchivioAutovelox {
     ];
   }
 
-  static String scrivi(List<(double, double, int?, double?)> autovelox, {DateTime? generato}) => jsonEncode({
-        'v': 1,
+  static double _cinque(double v) => double.parse(v.toStringAsFixed(5));
+
+  static String scrivi(
+    List<(double, double, int?, double?)> autovelox, {
+    DateTime? generato,
+    List<(double, double, double, double, int?)> tutor = const [],
+  }) =>
+      jsonEncode({
+        'v': 2,
         'generato': (generato ?? DateTime.now().toUtc()).toIso8601String(),
         'a': [
           for (final (lat, lon, limite, direzione) in autovelox)
@@ -50,11 +87,15 @@ class ArchivioAutovelox {
               direzione?.round() ?? -1,
             ],
         ],
+        't': [
+          for (final (lat1, lon1, lat2, lon2, limite) in tutor)
+            [_cinque(lat1), _cinque(lon1), _cinque(lat2), _cinque(lon2), limite ?? 0],
+        ],
       });
 
   static ArchivioAutovelox leggi(String testo) {
     final j = jsonDecode(testo) as Map<String, Object?>;
-    if (j['v'] != 1) throw FormatException('Archivio autovelox: versione ${j['v']}');
+    if (j['v'] != 1 && j['v'] != 2) throw FormatException('Archivio autovelox: versione ${j['v']}');
     final zero = DateTime.fromMillisecondsSinceEpoch(0);
     final tutti = <Segnalazione>[];
     for (final (i, r) in (j['a'] as List).cast<List>().indexed) {
@@ -69,6 +110,15 @@ class ArchivioAutovelox {
         direzioneGradi: direzione >= 0 ? direzione : null,
       ));
     }
-    return ArchivioAutovelox(tutti, generato: DateTime.tryParse('${j['generato']}'));
+    final tutor = <TrattoTutor>[
+      for (final (i, r) in ((j['t'] as List?) ?? const []).cast<List>().indexed)
+        TrattoTutor(
+          id: 'tutor-$i',
+          inizio: Punto((r[0] as num).toDouble(), (r[1] as num).toDouble()),
+          fine: Punto((r[2] as num).toDouble(), (r[3] as num).toDouble()),
+          limiteKmh: (r[4] as num) > 0 ? (r[4] as num).toInt() : null,
+        ),
+    ];
+    return ArchivioAutovelox(tutti, generato: DateTime.tryParse('${j['generato']}'), tutor: tutor);
   }
 }
