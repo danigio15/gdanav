@@ -19,20 +19,168 @@ enum ManovreCarPlay {
         case 23: return "arrow.triangle.branch"
         case 24: return "arrow.triangle.branch"
         case 25, 37, 38: return "arrow.triangle.merge"
-        case 26, 27: return "arrow.triangle.2.circlepath"
         case 28, 29: return "ferry"
+        // Rotonde, inversioni e svolte strette si disegnano a mano (`disegno`):
+        // «arrow.triangle.2.circlepath» era il simbolo di «aggiorna», non una
+        // rotonda.
         default: return "arrow.up"
         }
     }
 
-    /// Il disegno della manovra: bianco, sul fondo della scheda di guida.
-    static func immagine(_ valhalla: Int) -> UIImage? {
-        let conf = UIImage.SymbolConfiguration(pointSize: 44, weight: .bold)
-        let nome = simbolo(valhalla)
-        let base = UIImage(systemName: nome, withConfiguration: conf) ?? UIImage(systemName: "arrow.up", withConfiguration: conf)
-        // Il bivio a sinistra è quello a destra allo specchio.
-        let giusta = valhalla == 24 ? base?.withHorizontallyFlippedOrientation() : base
-        return giusta?.withTintColor(.white, renderingMode: .alwaysOriginal)
+    /// Il lato del simbolo della manovra, in punti: CarPlay lo vuole entro
+    /// 50×50 (con 44 punti di carattere il simbolo usciva più grande).
+    static let latoSimbolo: CGFloat = 50
+
+    /// Il disegno della manovra, nelle due varianti: bianco sul fondo scuro
+    /// (la scheda di guida, blu) e quasi nero sul fondo chiaro (il Dashboard
+    /// e il quadro di giorno). CarPlay sceglie quella giusta dall'asset.
+    /// [rotonda] è l'uscita da prendere, per disegnarla.
+    static func immagine(_ valhalla: Int, rotonda: Int? = nil) -> UIImage? {
+        guard let scuro = disegno(valhalla, rotonda: rotonda, colore: .white),
+              let chiaro = disegno(valhalla, rotonda: rotonda, colore: UIColor(white: 0.12, alpha: 1))
+        else { return nil }
+        let scala = UITraitCollection(displayScale: scuro.scale)
+        let asset = UIImageAsset()
+        asset.register(chiaro, with: UITraitCollection(traitsFrom: [scala, UITraitCollection(userInterfaceStyle: .light)]))
+        asset.register(scuro, with: UITraitCollection(traitsFrom: [scala, UITraitCollection(userInterfaceStyle: .dark)]))
+        return asset.image(with: UITraitCollection(traitsFrom: [scala, UITraitCollection(userInterfaceStyle: .dark)]))
+    }
+
+    /// Una variante del disegno, nel colore [colore], in un quadrato di
+    /// `latoSimbolo` punti.
+    private static func disegno(_ valhalla: Int, rotonda: Int?, colore: UIColor) -> UIImage? {
+        let lato = latoSimbolo
+        let quadro = UIGraphicsImageRenderer(size: CGSize(width: lato, height: lato))
+        switch valhalla {
+        case 26:
+            return quadro.image { _ in disegnaRotonda(lato, uscita: rotonda, colore: colore) }
+        case 27:
+            // Si esce dalla rotonda: la prima uscita, senza numero.
+            return quadro.image { _ in disegnaRotonda(lato, uscita: 1, colore: colore) }
+        case 12, 13:
+            // 13 inversione a sinistra (in Italia), 12 a destra.
+            return quadro.image { _ in disegnaInversione(lato, aSinistra: valhalla == 13, colore: colore) }
+        case 11, 14:
+            // «arrow.turn.down.right» scendeva e poi girava: non era una
+            // svolta stretta. Qui sale, e torna indietro di 135 gradi.
+            return quadro.image { _ in disegnaSvolta(lato, gradi: valhalla == 11 ? 135 : -135, colore: colore) }
+        default:
+            let conf = UIImage.SymbolConfiguration(pointSize: 40, weight: .bold)
+            guard let base = UIImage(systemName: simbolo(valhalla), withConfiguration: conf)
+                ?? UIImage(systemName: "arrow.up", withConfiguration: conf)
+            else { return nil }
+            let tinta = base.withTintColor(colore, renderingMode: .alwaysOriginal)
+            return quadro.image { contesto in
+                // Il bivio a sinistra è quello a destra allo specchio.
+                if valhalla == 24 {
+                    contesto.cgContext.translateBy(x: lato, y: 0)
+                    contesto.cgContext.scaleBy(x: -1, y: 1)
+                }
+                let s = tinta.size
+                let r = min((lato * 0.9) / s.width, (lato * 0.9) / s.height, 1)
+                let w = s.width * r, h = s.height * r
+                tinta.draw(in: CGRect(x: (lato - w) / 2, y: (lato - h) / 2, width: w, height: h))
+            }
+        }
+    }
+
+    /// Un punto sul cerchio di centro [c] e raggio [r], a [gradi] come la
+    /// bussola: 0 in alto, 90 a destra, 180 in basso.
+    private static func sulCerchio(_ c: CGPoint, _ r: CGFloat, _ gradi: CGFloat) -> CGPoint {
+        let a = gradi * .pi / 180
+        return CGPoint(x: c.x + r * sin(a), y: c.y - r * cos(a))
+    }
+
+    /// La punta della freccia in [punta], rivolta a [gradi] (come la bussola).
+    private static func punta(_ punta: CGPoint, gradi: CGFloat, lato: CGFloat, colore: UIColor) {
+        let lunga = lato * 0.22, larga = lato * 0.32
+        let base = sulCerchio(punta, lunga, gradi + 180)
+        let p = UIBezierPath()
+        p.move(to: punta)
+        p.addLine(to: sulCerchio(base, larga / 2, gradi - 90))
+        p.addLine(to: sulCerchio(base, larga / 2, gradi + 90))
+        p.close()
+        colore.setFill()
+        p.fill()
+    }
+
+    private static func tratto(_ p: UIBezierPath, _ lato: CGFloat, _ colore: UIColor, spessore: CGFloat = 0.12) {
+        p.lineWidth = lato * spessore
+        p.lineCapStyle = .butt
+        p.lineJoinStyle = .round
+        colore.setStroke()
+        p.stroke()
+    }
+
+    /// La rotonda come la disegna Mappe: l'anello, l'ingresso dal basso e il
+    /// giro fino all'uscita, pieno; il resto dell'anello leggero. Si guida a
+    /// destra: si gira in senso antiorario. L'uscita non sa quante strade ha
+    /// la rotonda: la prima a destra, la seconda dritto, la terza a
+    /// sinistra, dalla quarta quasi indietro; il numero giusto lo dice il
+    /// testo («2ª uscita»).
+    private static func disegnaRotonda(_ lato: CGFloat, uscita: Int?, colore: UIColor) {
+        let c = CGPoint(x: lato * 0.5, y: lato * 0.52)
+        let r = lato * 0.16
+        let anello = UIBezierPath(arcCenter: c, radius: r, startAngle: 0, endAngle: 2 * .pi, clockwise: true)
+        tratto(anello, lato, colore.withAlphaComponent(0.4), spessore: 0.07)
+        let n = max(uscita ?? 2, 1)
+        let verso: CGFloat
+        switch n {
+        case 1: verso = 90
+        case 2: verso = 0
+        case 3: verso = -90
+        default: verso = -120
+        }
+        let giro = UIBezierPath()
+        giro.move(to: CGPoint(x: c.x, y: lato * 0.96))
+        giro.addLine(to: sulCerchio(c, r, 180))
+        // Dal basso (180) a destra (90), in alto (0), a sinistra (-90):
+        // sullo schermo è il senso antiorario. Gli angoli di UIKit partono da
+        // destra: quello della bussola meno 90.
+        giro.addArc(
+            withCenter: c,
+            radius: r,
+            startAngle: (180 - 90) * .pi / 180,
+            endAngle: (verso - 90) * .pi / 180,
+            clockwise: false
+        )
+        // Il braccio dell'uscita, che finisce sotto la punta.
+        giro.addLine(to: sulCerchio(c, r + lato * 0.1, verso))
+        tratto(giro, lato, colore)
+        punta(sulCerchio(c, r + lato * 0.28, verso), gradi: verso, lato: lato, colore: colore)
+    }
+
+    /// L'inversione a U: si sale, si gira in alto e si torna giù.
+    private static func disegnaInversione(_ lato: CGFloat, aSinistra: Bool, colore: UIColor) {
+        let s: CGFloat = aSinistra ? 1 : -1
+        let da = lato * 0.5 + s * lato * 0.16
+        let a = lato * 0.5 - s * lato * 0.16
+        let p = UIBezierPath()
+        p.move(to: CGPoint(x: da, y: lato * 0.94))
+        p.addLine(to: CGPoint(x: da, y: lato * 0.4))
+        p.addArc(
+            withCenter: CGPoint(x: lato * 0.5, y: lato * 0.4),
+            radius: lato * 0.16,
+            startAngle: aSinistra ? 0 : .pi,
+            endAngle: aSinistra ? .pi : 0,
+            clockwise: !aSinistra
+        )
+        p.addLine(to: CGPoint(x: a, y: lato * 0.6))
+        tratto(p, lato, colore)
+        punta(CGPoint(x: a, y: lato * 0.84), gradi: 180, lato: lato, colore: colore)
+    }
+
+    /// Una svolta di [gradi] (positivi a destra): si sale e si gira.
+    private static func disegnaSvolta(_ lato: CGFloat, gradi: CGFloat, colore: UIColor) {
+        // Il gambo spostato dal lato opposto, perché la freccia stia al centro.
+        let x = lato * 0.5 - (gradi > 0 ? 1 : -1) * lato * 0.2
+        let incrocio = CGPoint(x: x, y: lato * 0.3)
+        let p = UIBezierPath()
+        p.move(to: CGPoint(x: x, y: lato * 0.94))
+        p.addLine(to: incrocio)
+        p.addLine(to: sulCerchio(incrocio, lato * 0.4, gradi))
+        tratto(p, lato, colore)
+        punta(sulCerchio(incrocio, lato * 0.58, gradi), gradi: gradi, lato: lato, colore: colore)
     }
 
     /// La freccia di una corsia, come la manda l'app.

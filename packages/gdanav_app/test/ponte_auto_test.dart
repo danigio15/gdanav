@@ -49,6 +49,14 @@ void main() {
     expect(guida['attiva'], isTrue);
     expect(guida['destinazione'], 'Nord');
     expect(guida['restanti'] as double, lessThan(Linea(punti).lunghezzaM));
+    // Le frasi della scheda, dalla più lunga: l'auto sceglie quella che ci
+    // sta (il percorso finto non ha manovre: allora niente frasi).
+    final frasi = ((guida['frasi'] as List?) ?? const []).cast<String>();
+    for (var i = 1; i < frasi.length; i++) {
+      expect(frasi[i].length, lessThanOrEqualTo(frasi[i - 1].length));
+    }
+    // Il «poi» solo con la manovra dopo vicina.
+    expect(guida.containsKey('dopo_tipo'), guida.containsKey('dopo_frasi'));
     final pos = chiamate.lastWhere((c) => c.method == 'posizione').arguments as Map;
     expect(pos['lat'], isNotNull);
     // Il segnaposto lo fa scorrere l'auto: arrivano immagine e rotta.

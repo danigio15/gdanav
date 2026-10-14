@@ -55,6 +55,13 @@ struct GuidaAuto {
     let corsie: [CorsiaAuto]
     let dopoTipo: Int?
     let dopoStrada: String
+    /// L'uscita della rotonda dopo, per disegnarla giusta.
+    let dopoRotonda: Int?
+    /// Le frasi della manovra dalla più lunga alla più corta, scritte
+    /// dall'app (`frasiManovra`): CarPlay prende la prima che ci sta.
+    let frasi: [String]
+    /// Le frasi del «poi», dalla più lunga: «Poi a destra · Via Roma», «Poi».
+    let dopoFrasi: [String]
     /// La vista dello svincolo da mostrare, se pronta (vedi `svincoli`).
     let svincolo: Int?
 }
@@ -338,6 +345,9 @@ final class PonteAuto {
             },
             dopoTipo: numero(a["dopo_tipo"]).map { Int($0) },
             dopoStrada: a["dopo_strada"] as? String ?? "",
+            dopoRotonda: numero(a["dopo_rotonda"]).map { Int($0) },
+            frasi: (a["frasi"] as? [Any] ?? []).compactMap { $0 as? String }.filter { !$0.isEmpty },
+            dopoFrasi: (a["dopo_frasi"] as? [Any] ?? []).compactMap { $0 as? String }.filter { !$0.isEmpty },
             svincolo: numero(a["svincolo"]).map { Int($0) }
         )
     }

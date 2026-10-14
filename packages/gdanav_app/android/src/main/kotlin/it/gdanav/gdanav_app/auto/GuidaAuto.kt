@@ -42,7 +42,9 @@ class GuidaAuto(private val context: Context) {
         val manovra = Maneuver.Builder(IconeManovra.tipo(g.tipo, g.rotonda)).setIcon(icona(IconeManovra.icona(g.tipo)))
         val rotonda = g.rotonda
         if (g.tipo == 26 && rotonda != null && rotonda > 0) manovra.setRoundaboutExitNumber(rotonda)
-        val passo = Step.Builder(testo(g)).setManeuver(manovra.build())
+        // Le frasi dalla più lunga alla più corta: sugli schermi piccoli
+        // l'auto prende quella che ci sta («2ª uscita»).
+        val passo = Step.Builder(cue(g.frasi, testo(g))).setManeuver(manovra.build())
         if (g.strada.isNotEmpty()) passo.setRoad(g.strada)
         if (conCorsie && g.corsie.isNotEmpty()) {
             for (c in g.corsie) {
@@ -72,11 +74,28 @@ class GuidaAuto(private val context: Context) {
         }
     }
 
-    /** La manovra dopo, piccola sotto la scheda («Poi»). */
+    /**
+     * Il testo della manovra con le sue varianti, dalla più lunga: l'auto
+     * mostra la prima che ci sta. Senza frasi (un'app di prima) [riserva].
+     */
+    private fun cue(frasi: List<String>, riserva: String): CarText {
+        if (frasi.isEmpty()) return CarText.create(riserva)
+        val t = CarText.Builder(frasi.first())
+        for (f in frasi.drop(1)) t.addVariant(f)
+        return t.build()
+    }
+
+    /**
+     * La manovra dopo, piccola sotto la scheda («Poi»). L'app la manda solo
+     * se arriva entro 150 m da questa (`poiVicino`), come Mappe di Apple.
+     */
     private fun dopo(g: PonteAuto.Guida): Step? {
         val tipo = g.dopoTipo ?: return null
-        return Step.Builder(g.dopoStrada.ifEmpty { " " })
-            .setManeuver(Maneuver.Builder(IconeManovra.tipo(tipo)).setIcon(icona(IconeManovra.icona(tipo))).build())
+        val manovra = Maneuver.Builder(IconeManovra.tipo(tipo, g.dopoRotonda)).setIcon(icona(IconeManovra.icona(tipo)))
+        val rotonda = g.dopoRotonda
+        if (tipo == 26 && rotonda != null && rotonda > 0) manovra.setRoundaboutExitNumber(rotonda)
+        return Step.Builder(cue(g.dopoFrasi, g.dopoStrada.ifEmpty { " " }))
+            .setManeuver(manovra.build())
             .build()
     }
 
