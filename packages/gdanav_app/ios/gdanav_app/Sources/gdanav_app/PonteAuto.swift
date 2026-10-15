@@ -9,9 +9,13 @@ struct LuogoAuto {
     let lat: Double
     let lon: Double
     let tipo: String
+    /// Un viaggio pianificato: si parte con le sue tappe, non solo verso la meta.
+    let viaggio: String?
 
     var comeMappa: [String: Any] {
-        ["nome": nome, "descrizione": descrizione, "lat": lat, "lon": lon]
+        var m: [String: Any] = ["nome": nome, "descrizione": descrizione, "lat": lat, "lon": lon]
+        if let viaggio { m["viaggio"] = viaggio }
+        return m
     }
 
     init?(_ m: [String: Any], tipo predefinito: String = "risultato") {
@@ -24,6 +28,7 @@ struct LuogoAuto {
         etichetta = m["etichetta"] as? String ?? nome
         descrizione = m["descrizione"] as? String ?? ""
         tipo = m["tipo"] as? String ?? predefinito
+        viaggio = m["viaggio"] as? String
     }
 }
 

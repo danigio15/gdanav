@@ -28,6 +28,7 @@ import '../stato/gestore_risparmio.dart' show sintesiProposta;
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/prova_di_guida.dart';
+import '../stato/viaggi_pianificati.dart';
 import 'richiesta_navigazione.dart';
 import '../stato/gestore_vicini.dart';
 import '../stato/gestore_ztl.dart';
@@ -47,6 +48,7 @@ class PonteAuto {
     required this.guida,
     required this.posizione,
     this.luoghi,
+    this.pianificati,
     this.auto,
     this.segnalazioni,
     this.meteo,
@@ -70,6 +72,9 @@ class PonteAuto {
 
   /// Casa, Lavoro e recenti, da scegliere sullo schermo dell'auto.
   final GestoreLuoghi? luoghi;
+
+  /// I viaggi pianificati (sul telefono o da PC): in cima a «Dove andiamo?».
+  final GestoreViaggiPianificati? pianificati;
   final GestoreAuto? auto;
   final GestoreSegnalazioni? segnalazioni;
   final GestoreMeteo? meteo;
@@ -104,6 +109,7 @@ class PonteAuto {
     guida.addListener(_posizione);
     posizione.addListener(_posizione);
     luoghi?.addListener(_luoghi);
+    pianificati?.addListener(_luoghi);
     auto?.addListener(_cruscotto);
     auto?.addListener(_opzioni);
     meteo?.addListener(_cruscotto);
@@ -183,7 +189,9 @@ class PonteAuto {
         return [for (final l in trovati) luogoJson(l)];
       // Una meta scelta in auto: si calcola e si parte, senza toccare il telefono.
       // La risposta dice se la guida è partita (vedi [vaiDallAuto]).
+      // Un viaggio pianificato porta il suo numero: si parte con le sue tappe.
       case 'vai':
+        if (_pianificato(a['viaggio']) case final v?) return vaiPianificato(v);
         final l = luogoDaJson(call.arguments);
         if (l == null) return false;
         return vaiDallAuto(l);
@@ -332,13 +340,37 @@ class PonteAuto {
     return null;
   }
 
+  ViaggioPianificato? _pianificato(Object? id) =>
+      id is String ? pianificati?.viaggi.where((v) => v.id == id).firstOrNull : null;
+
+  /// I viaggi pianificati per «Dove andiamo?»: la meta come posto (un'auto
+  /// con l'app vecchia ci va e basta), il nome e quando partire.
+  List<Map<String, Object?>> _viaggiPerLAuto() {
+    final g = pianificati;
+    if (g == null || !g.sbloccato) return const [];
+    final adesso = _ora();
+    return [
+      for (final v in g.perLAuto)
+        if (v.meta case final m? when v.id != null)
+          {
+            ...luogoJson(m.luogo),
+            'tipo': 'pianificato',
+            'viaggio': v.id,
+            'etichetta': v.titolo,
+            'descrizione': sottotitoloInAuto(v, adesso),
+          },
+    ];
+  }
+
   void _luoghi() {
     final g = luoghi;
     if (g == null) return;
     _manda('luoghi', {
-      // Casa e Lavoro, gli ultimi posti, poi gli altri salvati (importati da
-      // Google possono essere centinaia: l'auto ne mostra pochi).
+      // I viaggi pianificati, Casa e Lavoro, gli ultimi posti, poi gli altri
+      // salvati (importati da Google possono essere centinaia: l'auto ne
+      // mostra pochi).
       'elenco': [
+        ..._viaggiPerLAuto(),
         for (final p in [?g.casa, ?g.lavoro]) {...luogoJson(p.luogo), 'tipo': p.tipo.name, 'etichetta': p.etichetta},
         for (final l in g.recenti.take(5)) {...luogoJson(l), 'tipo': 'recente', 'etichetta': l.nome},
         for (final p in g.altri.take(60)) {...luogoJson(p.luogo), 'tipo': p.tipo.name, 'etichetta': p.etichetta},
@@ -372,6 +404,7 @@ class PonteAuto {
     guida.removeListener(_posizione);
     posizione.removeListener(_posizione);
     luoghi?.removeListener(_luoghi);
+    pianificati?.removeListener(_luoghi);
     auto?.removeListener(_cruscotto);
     auto?.removeListener(_opzioni);
     meteo?.removeListener(_cruscotto);
@@ -633,6 +666,23 @@ class PonteAuto {
       await viaggio.vaiA(meta);
     } catch (_) {
       _manda('messaggio', {'testo': 'Non sono riuscito a calcolare il viaggio per ${meta.nome}. Riprova.'});
+      return false;
+    }
+    if (viaggio.stato is! ViaggioPronto) return false;
+    guida.avvia();
+    return guida.attiva;
+  }
+
+  /// Un viaggio pianificato scelto in auto: si parte con tutte le sue tappe,
+  /// dall'ultima che si è salvata. Torna `true` se la guida è partita.
+  Future<bool> vaiPianificato(ViaggioPianificato v) async {
+    final tappe = [for (final t in v.tappe) t.luogo];
+    if (tappe.isEmpty) return false;
+    try {
+      if (guida.attiva) await guida.ferma();
+      await viaggio.vaiPerTappe(tappe);
+    } catch (_) {
+      _manda('messaggio', {'testo': 'Non sono riuscito a calcolare ${v.titolo}. Riprova.'});
       return false;
     }
     if (viaggio.stato is! ViaggioPronto) return false;

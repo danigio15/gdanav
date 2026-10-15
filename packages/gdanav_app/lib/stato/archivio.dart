@@ -37,6 +37,7 @@ class Archivio {
   static const _avvisiMuti = 'avvisi_muti';
   static const _avvisiScelti = 'avvisi_scelti';
   static const _vistaPiatta = 'vista_2d';
+  static const _viaggiPianificati = 'viaggi_pianificati';
 
   Future<Abbinamento?> abbinamento() async {
     final uri = await _p.read(key: _abbinamento);
@@ -236,6 +237,12 @@ class Archivio {
   }
 
   Future<void> salvaLuoghi(Map<String, Object?> j) => _p.write(key: _luoghi, value: jsonEncode(j));
+
+  /// I viaggi pianificati di gdanav da sola, come JSON (dentro gdahome
+  /// stanno nella casa).
+  Future<String?> viaggiPianificati() => _p.read(key: _viaggiPianificati);
+
+  Future<void> salvaViaggiPianificati(String testo) => _p.write(key: _viaggiPianificati, value: testo);
 
   /// Il dongle OBD Bluetooth scelto: indirizzo e nome.
   Future<({String id, String nome})?> dongleObd() async {

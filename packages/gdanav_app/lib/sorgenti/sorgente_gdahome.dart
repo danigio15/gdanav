@@ -73,6 +73,19 @@ class SorgenteGdahome extends ChangeNotifier implements SorgenteDatiAuto {
   /// li aggiorna da sé, che per alcune vuol dire ogni mezz'ora o più.
   Future<void> Function()? aggiorna;
 
+  /// Come si manda un comando alla casa e se ne aspetta la risposta: lo
+  /// mette chi ospita gdanav (gdahome, sul suo filo con la casa). Serve ai
+  /// viaggi pianificati, che dentro gdahome stanno nella casa
+  /// (`ponte/viaggi/*`): la casa sa chi chiede, e ognuno vede solo i suoi.
+  /// `null` in gdanav da sola, o finché gdahome non ha una casa.
+  Future<Object?> Function(Map<String, Object?> comando)? get chiedi => _chiedi;
+  Future<Object?> Function(Map<String, Object?> comando)? _chiedi;
+  set chiedi(Future<Object?> Function(Map<String, Object?> comando)? c) {
+    if (identical(c, _chiedi)) return;
+    _chiedi = c;
+    notifyListeners();
+  }
+
   /// In viaggio, all'avvio e quando si torna nell'app: dati freschi, se chi
   /// ospita sa chiederli. Un errore non si propaga: i dati di prima restano.
   Future<void> chiediAggiornamento() async {

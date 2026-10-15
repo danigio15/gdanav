@@ -26,6 +26,7 @@ import 'stato/gestore_vicini.dart';
 import 'stato/licenza.dart';
 import 'stato/gestore_viaggio.dart';
 import 'stato/gestore_ztl.dart';
+import 'stato/viaggi_pianificati.dart';
 import 'stato/prova_di_guida.dart';
 import 'stato/posizione.dart';
 import 'stato/voce.dart';
@@ -161,6 +162,16 @@ Future<GdanavApp> preparaGdanav({
   final vicini = GestoreVicini(auto: auto, posizione: posizione);
   final luoghi = GestoreLuoghi(archivio);
   await luoghi.carica();
+  // I viaggi pianificati: dentro gdahome nella casa, da sola nel telefono.
+  final pianificati = GestoreViaggiPianificati(
+    fonteDeiViaggi(archivio, gdahome),
+    calcolaStima: (da, per) async {
+      final s = await viaggio.stimaDellaStrada(da, per);
+      return s == null ? null : StimaViaggio(durata: s.durata, km: s.km, colTraffico: s.colTraffico);
+    },
+  );
+  gdahome?.addListener(() => pianificati.cambiaFonte(fonteDeiViaggi(archivio, gdahome, pianificati.fonte)));
+  unawaited(pianificati.carica());
   // Le colonnine dentro l'app: si leggono mentre si guarda la mappa.
   unawaited(archivioColonnine());
   final fotoAuto = GestoreFotoAuto();
@@ -177,6 +188,7 @@ Future<GdanavApp> preparaGdanav({
       guida: guida,
       posizione: posizione,
       luoghi: luoghi,
+      pianificati: pianificati,
       auto: auto,
       segnalazioni: segnalazioni,
       meteo: meteo,
@@ -209,6 +221,7 @@ Future<GdanavApp> preparaGdanav({
     meteo: meteo,
     vicini: vicini,
     luoghi: luoghi,
+    pianificati: pianificati,
     consumo: consumo,
     fotoAuto: fotoAuto,
     premium: senzaPremium ? null : premium,
@@ -217,6 +230,17 @@ Future<GdanavApp> preparaGdanav({
     ztl: ztl,
     persone: persone,
   );
+}
+
+/// Da dove leggere i viaggi pianificati: la casa, se chi ospita gdanav sa
+/// chiederle qualcosa; se no il telefono. [prima]: quella di adesso, che
+/// resta se non è cambiato niente.
+@visibleForTesting
+FonteViaggi fonteDeiViaggi(Archivio archivio, SorgenteGdahome? gdahome, [FonteViaggi? prima]) {
+  final chiedi = gdahome?.chiedi;
+  if (chiedi == null) return prima is FonteViaggiDelTelefono ? prima : FonteViaggiDelTelefono(archivio);
+  if (prima is FonteViaggiDellaCasa && identical(prima.chiedi, chiedi)) return prima;
+  return FonteViaggiDellaCasa(chiedi);
 }
 
 /// La batteria letta dall'auto segue Premium: da adesso, e a ogni cambio.
@@ -247,6 +271,7 @@ class GdanavApp extends StatelessWidget {
     this.meteo,
     this.vicini,
     this.luoghi,
+    this.pianificati,
     this.consumo,
     this.fotoAuto,
     this.premium,
@@ -265,6 +290,9 @@ class GdanavApp extends StatelessWidget {
   final GestoreMeteo? meteo;
   final GestoreVicini? vicini;
   final GestoreLuoghi? luoghi;
+
+  /// I viaggi pianificati (il Pianificatore): `null` nelle prove.
+  final GestoreViaggiPianificati? pianificati;
   final GestoreConsumo? consumo;
   final GestoreFotoAuto? fotoAuto;
 
@@ -343,6 +371,7 @@ class GdanavApp extends StatelessWidget {
     vicini: vicini,
     persone: persone,
     luoghi: luoghi,
+    pianificati: pianificati,
     consumo: consumo,
     fotoAuto: fotoAuto,
     premium: premium,

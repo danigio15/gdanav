@@ -370,6 +370,34 @@ class GestoreViaggio extends ChangeNotifier {
     return pianifica(destinazione, conScelte: true);
   }
 
+  /// Un viaggio pianificato che parte: le sue tappe, l'ultima è la meta. Le
+  /// soste e il distributore di prima non valgono più.
+  Future<void> vaiPerTappe(List<Luogo> tutte) {
+    if (tutte.isEmpty) return Future.value();
+    obbligate.clear();
+    tappa = null;
+    tappe
+      ..clear()
+      ..addAll(tutte.take(tutte.length - 1));
+    return pianifica(tutte.last, conScelte: tappe.isEmpty);
+  }
+
+  /// Quanto ci vuole da [da] (o da dove si è) passando per [per], senza
+  /// toccare il viaggio aperto: per i viaggi pianificati. Con TomTom i tempi
+  /// sono quelli del traffico di adesso. `null` se non si può calcolare.
+  Future<({Duration durata, double km, bool colTraffico})?> stimaDellaStrada(Punto? da, List<Punto> per) async {
+    if (per.isEmpty) return null;
+    final partenza = da ?? await posizione() ?? ultimaPosizione;
+    if (partenza == null) return null;
+    final impostazioni = await archivio.impostazioni();
+    if (impostazioni.mancante != null) return null;
+    final preferenze = _preferenze ??= await archivio.preferenze();
+    final p = await costruisci(impostazioni, auto.veicolo, preferenze, opzioni)
+        .percorso(partenza: partenza, arrivo: per.last, tappe: per.sublist(0, per.length - 1))
+        .timeout(tempoMassimo);
+    return (durata: p.durata, km: p.lunghezzaM / 1000, colTraffico: p.trafficoVero);
+  }
+
   /// Il traffico di adesso sul percorso (per tutti, con la chiave TomTom);
   /// nelle prove se ne passa uno finto.
   Future<PercorsoCalcolato> Function(PercorsoCalcolato percorso)? trafficoFinto;
