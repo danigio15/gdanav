@@ -220,6 +220,41 @@ void main() {
       expect(c.perStima, '1,05 € pedaggio');
     });
 
+    test('la Tangenziale anche quando le manovre non la chiamano per nome', () {
+      // Da Melito al Centro Direzionale: il chilometro della barriera sta
+      // sotto la manovra dell'Asse Perimetrale. Dentro Napoli, a pagamento,
+      // c'e' solo lei: 1,05 €, non «~1,00 €».
+      PercorsoCalcolato dentro(double lat, double lon) {
+        final punti = [for (var i = 0; i <= 20; i++) Punto(lat, lon + i * 0.006)];
+        final linea = Linea(punti);
+        return PercorsoCalcolato(
+          punti: punti,
+          tratti: [
+            for (var i = 1; i < punti.length; i++)
+              Tratto(lunghezzaM: linea.cumulate[i] - linea.cumulate[i - 1], velocitaKmh: 70),
+          ],
+          manovre: [
+            Manovra(
+              istruzione: 'Prendi la Strada Provinciale Asse Perimetrale di Melito',
+              lunghezzaM: linea.lunghezzaM,
+              secondi: 900,
+              inizio: 0,
+              strada: 'Strada Provinciale Asse Perimetrale di Melito',
+            ),
+          ],
+          conPedaggi: true,
+          pedaggi: [TrattoPedaggio(daM: linea.cumulate[10], aM: linea.cumulate[12])],
+        );
+      }
+
+      final napoli = tariffa.stima(dentro(40.87, 14.15));
+      expect(napoli.euro, closeTo(1.05, 1e-9));
+      expect(napoli.stimato, isFalse);
+      // La stessa strada lontano da Napoli resta una stima a km.
+      final altrove = tariffa.stima(dentro(43.5, 11.0));
+      expect(altrove.stimato, isTrue);
+    });
+
     test('la Tangenziale in classe B: il listino non c\'è, resta stimata', () {
       final c = tariffa.copia(classe: ClassePedaggio.b).stima(corsoMalta());
       expect(c.stimato, isTrue);

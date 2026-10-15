@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import '../geo/geo.dart';
+import '../ztl/ztl.dart' show Rettangolo;
 import 'valhalla.dart';
 
 /// Quanto costa il pedaggio di un percorso, come lo mostra Waze: «Pedaggio
@@ -388,6 +389,9 @@ class StradaAPrezzoFisso {
     required this.schema,
     required this.listino,
     required this.dal,
+    this.zona,
+    this.nellaZona,
+    this.cortaNellaZonaM = 0,
   });
 
   final String nome;
@@ -402,7 +406,22 @@ class StradaAPrezzoFisso {
   /// Da quando vale il listino: per ricordarsi di aggiornarlo.
   final String dal;
 
-  bool riconosce(String testo) => RegExp(schema, caseSensitive: false).hasMatch(testo);
+  /// Dove sta la strada, se la si conosce: dentro, basta un nome piu'
+  /// largo ([nellaZona]) — «Tangenziale» e basta — e un tratto a pagamento
+  /// lungo fino a [cortaNellaZonaM], tutto li' dentro, e' lei.
+  final Rettangolo? zona;
+  final String? nellaZona;
+  final double cortaNellaZonaM;
+
+  bool riconosce(String testo, [Punto? dove]) {
+    if (RegExp(schema, caseSensitive: false).hasMatch(testo)) return true;
+    final z = zona, largo = nellaZona;
+    return z != null &&
+        largo != null &&
+        dove != null &&
+        z.contiene(dove) &&
+        RegExp(largo, caseSensitive: false).hasMatch(testo);
+  }
 
   PrezzoFisso prezzo(ClassePedaggio c) {
     if (listino[c] case final e?) return PrezzoFisso(e);
@@ -415,20 +434,29 @@ class StradaAPrezzoFisso {
 /// col listino ufficiale e la data da cui vale.
 const stradeAPrezzoFisso = [
   // A56: 1,05 € a passaggio in classe A dal 1° gennaio 2026 (prima 1,00 €).
+  // «Di nuovo pedaggio 1,00»: TomTom la chiama anche solo «Tangenziale», o
+  // il chilometro della barriera sta sotto la manovra di un'altra strada.
+  // Dentro questo riquadro di Napoli l'unica strada a pagamento e' la
+  // Tangenziale (le barriere dell'A1 e dell'A3 stanno fuori): un tratto a
+  // pagamento tutto li' dentro e' lei.
   StradaAPrezzoFisso(
     nome: 'Tangenziale di Napoli',
     schema: r'\bA\s?56\b|tangenziale di napoli',
     listino: {ClassePedaggio.a: 1.05},
     dal: '2026-01-01',
+    zona: Rettangolo(40.82, 14.12, 40.91, 14.285),
+    nellaZona: r'\btangenziale\b|\btang\.',
+    cortaNellaZonaM: 25000,
   ),
 ];
 
 /// I nomi delle strade lungo il percorso, dalle manovre: ogni manovra vale
 /// dal suo punto a quello della manovra dopo.
 class _NomiDelleStrade {
-  _NomiDelleStrade(PercorsoCalcolato p) {
-    if (p.punti.length < 2 || p.manovre.isEmpty) return;
-    final cumulate = Linea(p.punti).cumulate;
+  _NomiDelleStrade(PercorsoCalcolato p) : _punti = p.punti {
+    if (p.punti.length < 2) return;
+    final cumulate = _cumulate = Linea(p.punti).cumulate;
+    if (p.manovre.isEmpty) return;
     final n = cumulate.length - 1;
     for (var i = 0; i < p.manovre.length; i++) {
       final m = p.manovre[i];
@@ -443,6 +471,17 @@ class _NomiDelleStrade {
   }
 
   final _pezzi = <({double da, double a, String testo})>[];
+  final List<Punto> _punti;
+  List<double> _cumulate = const [];
+
+  /// Il punto del percorso a [m] metri dalla partenza.
+  Punto? _a(double m) {
+    if (_cumulate.isEmpty) return null;
+    for (var i = 0; i < _cumulate.length; i++) {
+      if (_cumulate[i] >= m) return _punti[i];
+    }
+    return _punti.last;
+  }
 
   /// La strada a prezzo fisso su cui sta [t]: quella delle manovre che ne
   /// coprono almeno metà.
@@ -451,10 +490,21 @@ class _NomiDelleStrade {
     for (final f in stradeAPrezzoFisso) {
       var coperti = 0.0;
       for (final p in _pezzi) {
-        if (!f.riconosce(p.testo)) continue;
+        if (!f.riconosce(p.testo, _a((p.da + p.a) / 2))) continue;
         coperti += math.max(0, math.min(p.a, t.aM) - math.max(p.da, t.daM));
       }
       if (coperti >= t.lunghezzaM / 2) return f;
+      // Un tratto tutto nella zona della strada, comunque lo chiamino le
+      // manovre.
+      final z = f.zona, inizio = _a(t.daM), fine = _a(t.aM);
+      if (z != null &&
+          t.lunghezzaM <= f.cortaNellaZonaM &&
+          inizio != null &&
+          fine != null &&
+          z.contiene(inizio) &&
+          z.contiene(fine)) {
+        return f;
+      }
     }
     return null;
   }
