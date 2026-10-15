@@ -51,7 +51,7 @@ void main() {
     expect(dopo.condizioni(null).fattoreConsumo, c.imparato.fattore);
   });
 
-  testWidgets('«Ho il consumo di ABRP» in La tua auto', (tester) async {
+  testWidgets('in La tua auto il consumo lo impara gdanav: niente numeri da altre app', (tester) async {
     final archivio = Archivio();
     await archivio.salvaVeicolo(b10);
     final auto = GestoreAuto(archivio: archivio);
@@ -69,15 +69,9 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.tap(find.byKey(const Key('consumo-riferimento')));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('riferimento-wh')), '188');
-    await tester.tap(find.text('Usa'));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-    await tester.pumpAndSettle();
-    expect(consumo.imparato.riferimento?.whKm, 188);
-    expect(consumo.imparato.riferimento?.kmh, 110);
-    expect(find.textContaining('188 Wh/km a 110 km/h'), findsOneWidget);
+    expect(find.text('Consumo imparato'), findsOneWidget);
+    expect(find.textContaining('ABRP'), findsNothing);
+    expect(find.byKey(const Key('consumo-riferimento')), findsNothing);
     auto.dispose();
   });
 }

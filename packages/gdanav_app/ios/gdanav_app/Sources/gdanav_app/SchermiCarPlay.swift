@@ -495,8 +495,17 @@ private final class Ricerca: NSObject, CPSearchTemplateDelegate {
         inAttesa = nil
         ultima += 1
         let questa = ultima
+        /* Prima di scrivere: le ultime ricerche, come in Waze. «Su CarPlay
+         * continuano a non uscire le ultime ricerche fatte»: la casella
+         * restava vuota fino alla terza lettera. */
         guard searchText.trimmingCharacters(in: .whitespaces).count >= 3 else {
-            return completionHandler([])
+            let recenti = PonteAuto.shared.luoghi.filter { $0.tipo == "recente" }
+            return completionHandler(recenti.prefix(SchermiCarPlay.righeMassime).map { l in
+                let r = CPListItem(text: l.etichetta, detailText: l.descrizione.isEmpty ? nil : l.descrizione)
+                r.setImage(UIImage(systemName: "clock.arrow.circlepath"))
+                r.userInfo = l
+                return r
+            })
         }
         inAttesa = completionHandler
         // Una richiesta quando si smette di scrivere, non una per lettera.

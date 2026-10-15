@@ -298,8 +298,8 @@ bool corrisponde(ProfiloVeicolo v, String filtro) {
 }
 
 /// Quanto la tua auto consuma davvero rispetto alla scheda, imparato
-/// guidando con i dati dell'auto; e il consumo di riferimento, se lo si sa
-/// (quello calibrato di ABRP), per partire giusti da subito.
+/// guidando con i dati dell'auto. L'impara gdanav da solo: niente numeri da
+/// portare da altre app.
 class _ConsumoImparato extends StatelessWidget {
   const _ConsumoImparato({required this.consumo, required this.veicolo});
   final GestoreConsumo consumo;
@@ -347,15 +347,6 @@ class _ConsumoImparato extends StatelessWidget {
                           key: const Key('consumo-imparato'),
                           style: t.bodySmall?.copyWith(color: muto),
                         ),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton(
-                            key: const Key('consumo-riferimento'),
-                            style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                            onPressed: () => _chiediRiferimento(context),
-                            child: Text(r == null ? 'Ho il consumo di ABRP' : 'Cambia il consumo di riferimento'),
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -369,46 +360,4 @@ class _ConsumoImparato extends StatelessWidget {
     );
   }
 
-  Future<void> _chiediRiferimento(BuildContext context) async {
-    final r = consumo.imparato.riferimento;
-    final wh = TextEditingController(text: r == null ? '' : '${r.whKm.round()}');
-    final kmh = TextEditingController(text: '${(r?.kmh ?? 110).round()}');
-    double? numero(TextEditingController c) => double.tryParse(c.text.trim().replaceAll(',', '.'));
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Consumo di riferimento'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'In ABRP, nelle impostazioni dell\'auto: «Consumo di riferimento» (calibrato) e '
-              '«Velocità di riferimento». gdanav parte da lì e poi continua a imparare guidando.',
-            ),
-            TextField(
-              key: const Key('riferimento-wh'),
-              controller: wh,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Consumo', suffixText: 'Wh/km'),
-            ),
-            TextField(
-              key: const Key('riferimento-kmh'),
-              controller: kmh,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Velocità di riferimento', suffixText: 'km/h'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annulla')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Usa')),
-        ],
-      ),
-    );
-    // I campi non si chiudono qui: il dialogo li usa ancora mentre sparisce.
-    final w = numero(wh), v = numero(kmh);
-    if (ok != true || w == null || v == null || w < 50 || w > 500 || v < 30 || v > 200) return;
-    await consumo.impostaRiferimento(whKm: w, kmh: v, veicolo: veicolo);
-  }
 }
