@@ -101,6 +101,17 @@ class GestoreAuto extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Auto termica ibrida (full hybrid o e-Power): consuma meno in città, e
+  /// la strada che risparmia si sceglie con la sua curva.
+  bool ibrida = false;
+
+  Future<void> impostaIbrida(bool si) async {
+    if (si == ibrida) return;
+    ibrida = si;
+    await archivio.salvaIbrida(si);
+    notifyListeners();
+  }
+
   /// L'auto dell'utente: da lei dipendono consumi, soste e prese.
   ProfiloVeicolo veicolo = ProfiloVeicolo.esempio;
   StatoAuto? stato;
@@ -270,6 +281,7 @@ class GestoreAuto extends ChangeNotifier {
     veicoloScelto = await archivio.veicoloScelto();
     elettrica = await archivio.elettrica();
     carburante = await archivio.carburante();
+    ibrida = await archivio.ibrida();
     arbitro.capacitaUtileKwh = veicolo.capacitaUtileKwh;
     sceltaUtente = await archivio.fonte();
     arbitro.modalita = _modalitaEffettiva;

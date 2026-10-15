@@ -210,6 +210,16 @@ void main() {
       expect(ModelloConsumoTomTom.litriTratto(100000, 80, Carburante.benzina), closeTo(5.65, 0.001));
       expect(ModelloConsumoTomTom.litriTratto(100000, 150, Carburante.benzina), greaterThan(8.3));
     });
+
+    test("l'ibrida (anche e-Power) consuma meno in città, e in autostrada quasi come una termica", () {
+      final ibrida = ModelloConsumoTomTom.termica(Carburante.benzina, ibrida: true);
+      expect(ibrida.parametri['vehicleEngineType'], ['combustion']);
+      expect(ibrida.parametri['constantSpeedConsumptionInLitersPerHundredkm']!.single, startsWith('30,3.80:'));
+      final citta = ModelloConsumoTomTom.litriTratto(100000, 50, Carburante.benzina, ibrida: true);
+      expect(citta, lessThan(ModelloConsumoTomTom.litriTratto(100000, 50, Carburante.benzina) * 0.75));
+      final autostrada = ModelloConsumoTomTom.litriTratto(100000, 130, Carburante.benzina, ibrida: true);
+      expect(autostrada, closeTo(8.0, 0.001));
+    });
   });
 
   group('TomTom: le strade migliori di quella che si fa', () {

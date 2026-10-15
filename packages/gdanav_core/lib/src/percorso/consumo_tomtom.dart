@@ -13,7 +13,8 @@ import '../veicolo/profilo_veicolo.dart';
 /// soste: la curva del consumo a velocità costante (aria e rotolamento), i
 /// consumi fissi come potenza a parte, il peso, e i rendimenti di trazione e
 /// recupero per le salite e le discese. Per la termica una curva da auto
-/// media, un po' più bassa col gasolio e più alta col GPL.
+/// media, un po' più bassa col gasolio e più alta col GPL; per l'ibrida una
+/// curva sua, bassa in città.
 class ModelloConsumoTomTom {
   const ModelloConsumoTomTom._(this.parametri, {required this.elettrica, this.unita = 'kWh'});
 
@@ -37,10 +38,10 @@ class ModelloConsumoTomTom {
     }, elettrica: true);
   }
 
-  factory ModelloConsumoTomTom.termica(Carburante carburante) {
+  factory ModelloConsumoTomTom.termica(Carburante carburante, {bool ibrida = false}) {
     final k = fattoreCarburante(carburante);
     final curva = [
-      for (final (v, l) in curvaTermica) '$v,${(l * k).toStringAsFixed(2)}',
+      for (final (v, l) in ibrida ? curvaIbrida : curvaTermica) '$v,${(l * k).toStringAsFixed(2)}',
     ].join(':');
     return ModelloConsumoTomTom._({
       'vehicleEngineType': const ['combustion'],
@@ -53,6 +54,11 @@ class ModelloConsumoTomTom {
 
   /// Litri ogni 100 km di un'auto media a benzina, a velocità costante.
   static const curvaTermica = [(30, 7.2), (50, 6.1), (70, 5.5), (90, 5.8), (110, 6.8), (130, 8.3)];
+
+  /// Litri ogni 100 km di un'ibrida (full hybrid, o e-Power: il motore fa
+  /// solo da generatore). In città va molto in elettrico e consuma poco; in
+  /// autostrada il vantaggio si perde, e a 130 è quasi una termica.
+  static const curvaIbrida = [(30, 3.8), (50, 4.0), (70, 4.5), (90, 5.3), (110, 6.5), (130, 8.0)];
 
   /// Il gasolio ne fa meno, il GPL di più; il metano si conta in kg.
   static double fattoreCarburante(Carburante c) => switch (c) {
@@ -72,8 +78,8 @@ class ModelloConsumoTomTom {
 
   /// Il consumo di un tratto con la curva della termica, in litri (o kg),
   /// per quando TomTom non l'ha detto.
-  static double litriTratto(double lunghezzaM, double kmh, Carburante carburante) {
-    final curva = curvaTermica;
+  static double litriTratto(double lunghezzaM, double kmh, Carburante carburante, {bool ibrida = false}) {
+    final curva = ibrida ? curvaIbrida : curvaTermica;
     double l;
     if (kmh <= curva.first.$1) {
       l = curva.first.$2;

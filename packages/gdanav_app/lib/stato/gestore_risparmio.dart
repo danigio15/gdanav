@@ -114,14 +114,14 @@ class GestoreRisparmio extends ChangeNotifier {
 
   /// Il modello di consumo dell'auto, come lo vuole TomTom.
   ModelloConsumoTomTom modello([Condizioni c = const Condizioni()]) =>
-      auto.elettrica ? ModelloConsumoTomTom.elettrica(auto.veicolo, c) : ModelloConsumoTomTom.termica(auto.carburante);
+      auto.elettrica ? ModelloConsumoTomTom.elettrica(auto.veicolo, c) : ModelloConsumoTomTom.termica(auto.carburante, ibrida: auto.ibrida);
 
   /// Quanto consuma [p] se TomTom non l'ha detto: col profilo dell'auto.
   double stima(PercorsoCalcolato p, [Condizioni c = const Condizioni()]) => auto.elettrica
       ? energiaPercorsoKwh(p.tratti, auto.veicolo, c)
       : p.tratti.fold(
           0.0,
-          (s, t) => s + ModelloConsumoTomTom.litriTratto(t.lunghezzaM, t.velocitaKmh, auto.carburante),
+          (s, t) => s + ModelloConsumoTomTom.litriTratto(t.lunghezzaM, t.velocitaKmh, auto.carburante, ibrida: auto.ibrida),
         );
 
   /// Di cosa sono i consumi: «kWh», «l» o «kg».
