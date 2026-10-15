@@ -74,9 +74,12 @@ object PonteAuto {
         val lat: Double,
         val lon: Double,
         val tipo: String,
+        /** Un viaggio pianificato: si parte con le sue tappe, non solo verso la meta. */
+        val viaggio: String? = null,
     ) {
         fun comeMappa(): Map<String, Any> =
-            mapOf("nome" to nome, "descrizione" to descrizione, "lat" to lat, "lon" to lon)
+            mapOf("nome" to nome, "descrizione" to descrizione, "lat" to lat, "lon" to lon) +
+                (viaggio?.let { mapOf("viaggio" to it) } ?: emptyMap())
     }
 
     @Volatile var luoghi: List<Luogo> = emptyList()
@@ -460,6 +463,7 @@ object PonteAuto {
             lat = lat,
             lon = lon,
             tipo = m["tipo"] as? String ?: "risultato",
+            viaggio = m["viaggio"] as? String,
         )
     }
 

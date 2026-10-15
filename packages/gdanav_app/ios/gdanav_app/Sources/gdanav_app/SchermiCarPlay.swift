@@ -373,7 +373,8 @@ enum SchermiCarPlay {
 
     // MARK: - Dove andare
 
-    /// «Dove andiamo?»: Cerca, poi Casa, Lavoro, i preferiti e i recenti.
+    /// «Dove andiamo?»: Cerca, poi i viaggi pianificati, Casa, Lavoro, i
+    /// preferiti e i recenti.
     static func destinazioni(_ c: CPInterfaceController) -> CPListTemplate {
         elenco("Dove andiamo?") { [weak c] in
             var righe: [CPListItem] = [
@@ -396,11 +397,15 @@ enum SchermiCarPlay {
                 case "recente":
                     titolo = l.etichetta
                     simbolo = icona("clock.arrow.circlepath")
+                case "pianificato":
+                    // I viaggi salvati nel Pianificatore, sul telefono o da PC.
+                    titolo = l.etichetta
+                    simbolo = icona("calendar.badge.clock", blu)
                 default:
                     titolo = l.etichetta
                     simbolo = icona("star.fill", giallo)
                 }
-                let sotto = l.tipo == "recente" ? l.descrizione : l.nome
+                let sotto = l.tipo == "recente" || l.tipo == "pianificato" ? l.descrizione : l.nome
                 righe.append(riga(titolo, sotto, icona: simbolo) { vai(l, c) })
             }
             return [CPListSection(items: righe)]

@@ -10,7 +10,10 @@ import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import it.gdanav.gdanav_app.R
 
-/** «Dove andiamo?» sull'auto: Cerca, poi Casa, Lavoro, i preferiti e i recenti. */
+/**
+ * «Dove andiamo?» sull'auto: Cerca, poi i viaggi pianificati, Casa, Lavoro, i
+ * preferiti e i recenti.
+ */
 class SchermoDestinazioni(carContext: CarContext) : SchermoAggiornato(carContext) {
     // In pagina: le mete che manda il telefono, e basta.
     override fun firma(): Any? = PonteAuto.luoghi
@@ -34,11 +37,13 @@ class SchermoDestinazioni(carContext: CarContext) : SchermoAggiornato(carContext
                     "casa" -> icona(R.drawable.icona_casa, CarColor.BLUE)
                     "lavoro" -> icona(R.drawable.icona_lavoro, CarColor.BLUE)
                     "recente" -> icona(R.drawable.icona_recenti)
+                    // I viaggi salvati nel Pianificatore, sul telefono o da PC.
+                    "pianificato" -> icona(R.drawable.icona_percorso, CarColor.BLUE)
                     else -> icona(R.drawable.icona_stella, CarColor.YELLOW)
                 },
                 Row.IMAGE_TYPE_ICON,
             )
-            val sotto = if (l.tipo == "recente") l.descrizione else l.nome
+            val sotto = if (l.tipo == "recente" || l.tipo == "pianificato") l.descrizione else l.nome
             if (sotto.isNotEmpty()) riga.addText(sotto)
             elenco.addItem(riga.build())
         }

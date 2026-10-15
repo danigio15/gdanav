@@ -17,6 +17,7 @@ import '../stato/gestore_auto.dart';
 import '../stato/foto_auto.dart';
 import '../stato/gestore_consumo.dart';
 import '../stato/gestore_premium.dart';
+import '../stato/viaggi_pianificati.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_luoghi.dart';
 import '../stato/gestore_mappe_offline.dart';
@@ -39,6 +40,7 @@ import 'la_tua_auto.dart';
 import 'mappe_offline.dart';
 import 'opzioni_percorso.dart';
 import 'pannello_partenza.dart';
+import 'pianificatore.dart';
 import 'premium.dart';
 import 'ricarica.dart';
 import 'scheda_viaggio.dart';
@@ -62,6 +64,7 @@ class SchermataPrincipale extends StatefulWidget {
     this.mappa,
     this.chiediPosizione,
     this.luoghi,
+    this.pianificati,
     this.segnalazioni,
     this.meteo,
     this.vicini,
@@ -109,6 +112,9 @@ class SchermataPrincipale extends StatefulWidget {
 
   /// Casa, Lavoro e recenti; se manca se ne crea uno sull'archivio.
   final GestoreLuoghi? luoghi;
+
+  /// I viaggi pianificati (il Pianificatore); `null` nelle prove.
+  final GestoreViaggiPianificati? pianificati;
 
   /// Le segnalazioni della comunità; se manca se ne crea uno sui servizi cablati.
   final GestoreSegnalazioni? segnalazioni;
@@ -238,6 +244,13 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   Future<void> _cerca() async {
     final luogo = await _scegli();
     if (luogo != null) await _vai(luogo);
+  }
+
+  /// Un viaggio pianificato che parte adesso: con le sue tappe, come una
+  /// meta scelta qui (il pannello della partenza, poi la guida).
+  Future<void> _avviaPianificato(ViaggioPianificato v) async {
+    if (widget.guida.attiva) await widget.guida.ferma();
+    await viaggio.vaiPerTappe([for (final t in v.tappe) t.luogo]);
   }
 
   Future<void> _vai(Luogo luogo) async {
@@ -416,7 +429,14 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   /// foglio prima di aprire una voce; nella pagina non c'è niente da chiudere.
   Widget _vociMenu(BuildContext contesto, {required VoidCallback chiudi}) {
     return ListenableBuilder(
-      listenable: Listenable.merge([widget.auto, widget.viaggio, luoghi, widget.guida.avvisi, ?widget.premium]),
+      listenable: Listenable.merge([
+        widget.auto,
+        widget.viaggio,
+        luoghi,
+        widget.guida.avvisi,
+        ?widget.premium,
+        ?widget.pianificati,
+      ]),
       builder: (contesto, _) {
         void vai(Widget w) {
           chiudi();
@@ -459,6 +479,32 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                 _GruppoMenu(
                   titolo: 'Viaggio',
                   voci: [
+                    if (widget.pianificati case final g?)
+                      _VoceMenu(
+                        key: const Key('menu-pianificatore'),
+                        icona: Icons.event_rounded,
+                        colore: const Color(0xFF2563EB),
+                        titolo: 'Pianificatore',
+                        sotto: !sbloccato
+                            ? 'Premium'
+                            : switch (g.viaggi.length) {
+                                0 => 'Viaggi programmati, di ogni settimana e a tappe',
+                                1 => '1 viaggio pianificato',
+                                final n => '$n viaggi pianificati',
+                              },
+                        onTap: () => vai(
+                          sbloccato
+                              ? SchermataPianificatore(
+                                  gestore: g,
+                                  scegli: (titolo) => _scegli(titolo: titolo),
+                                  avvia: _avviaPianificato,
+                                  premium: widget.premium == null
+                                      ? null
+                                      : () => _apri(SchermataPremium(premium: widget.premium!, perche: 'Il pianificatore')),
+                                )
+                              : SchermataPremium(premium: widget.premium!, perche: 'Il pianificatore'),
+                        ),
+                      ),
                     _VoceMenu(
                       icona: Icons.alt_route_rounded,
                       colore: const Color(0xFF2563EB),
