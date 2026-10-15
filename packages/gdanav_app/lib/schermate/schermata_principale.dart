@@ -580,6 +580,9 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                           _fonteDatiAuto();
                         },
                       ),
+                    // Dentro gdahome la casa c'è già: niente codice QR per
+                    // abbinare Home Assistant (vedi `conHomeAssistant`).
+                    if (conHomeAssistant(widget.auto))
                     _VoceMenu(
                       icona: Icons.home_rounded,
                       colore: const Color(0xFF0EA5E9),

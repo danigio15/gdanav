@@ -45,6 +45,11 @@ Future<void> mostraFonteDatiAuto(
   );
 }
 
+/// Se offrire l'abbinamento con Home Assistant (il codice QR): in gdanav da
+/// sola sì; dentro gdahome no, perché la casa e la sua auto ci sono già. Solo
+/// un abbinamento fatto prima resta, per poterlo vedere e togliere.
+bool conHomeAssistant(GestoreAuto gestore) => gestore.gdahome == null || gestore.abbinamento != null;
+
 class FonteDatiAuto extends StatelessWidget {
   const FonteDatiAuto({super.key, required this.gestore, this.consumo, this.onPremium});
 
@@ -75,9 +80,12 @@ class FonteDatiAuto extends StatelessWidget {
           Fissa(:final sorgente) => sorgente,
         };
         final premium = gestore.premium;
+        final conHa = conHomeAssistant(gestore);
         final automatica = gestore.gdahome == null
             ? 'Auto, poi OBD, poi Home Assistant se recente, poi stima'
-            : 'Auto, poi OBD, poi gdahome e Home Assistant se recenti, poi stima';
+            : conHa
+            ? 'Auto, poi OBD, poi gdahome e Home Assistant se recenti, poi stima'
+            : 'Auto, poi OBD, poi gdahome se recente, poi stima';
         return SafeArea(
           child: RadioGroup<TipoSorgente?>(
             groupValue: scelta,
@@ -101,7 +109,9 @@ class FonteDatiAuto extends StatelessWidget {
                 for (final t in _scelte)
                   // gdahome c'è solo dentro l'app gdahome; Android Auto solo
                   // su Android (CarPlay la batteria non la dice).
+                  // Dentro gdahome la casa c'è già: Home Assistant a parte no.
                   if ((t != TipoSorgente.gdahome || gestore.gdahome != null) &&
+                      (t != TipoSorgente.homeAssistant || conHa) &&
                       (t != TipoSorgente.androidAuto || defaultTargetPlatform != TargetPlatform.iOS))
                     if (premium || t == TipoSorgente.manuale)
                       RadioListTile<TipoSorgente?>(

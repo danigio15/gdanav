@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gdanav_app/schermate/fonte_dati_auto.dart';
 import 'package:gdanav_app/schermate/fonte_gdahome.dart';
 import 'package:gdanav_app/sorgenti/sorgente_gdahome.dart';
 import 'package:gdanav_app/stato/archivio.dart';
@@ -129,5 +130,26 @@ void main() {
     expect(GestoreAuto.percheHomeAssistant(h), contains('non dice la batteria'));
     h.senzaBatteria = false;
     expect(GestoreAuto.percheHomeAssistant(h), contains('non ha ancora mandato'));
+  });
+
+  /* «Elimina dalle impostazioni di gdanav, se presente in gdahome, la
+   * possibilità di integrare con Home Assistant con QR code.» Dentro gdahome
+   * la casa c'è già: Home Assistant a parte non si offre, ne' nel menu ne'
+   * fra le fonti. In gdanav da sola resta. */
+  testWidgets('dentro gdahome niente abbinamento a Home Assistant col QR', (tester) async {
+    final daSola = GestoreAuto(archivio: Archivio())..premium = true;
+    final dentro = GestoreAuto(archivio: Archivio(), gdahome: SorgenteGdahome())..premium = true;
+    expect(conHomeAssistant(daSola), isTrue);
+    expect(conHomeAssistant(dentro), isFalse);
+    for (final (gestore, vista) in [(daSola, true), (dentro, false)]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: temaGdanav(Brightness.light),
+          home: Scaffold(body: FonteDatiAuto(gestore: gestore)),
+        ),
+      );
+      expect(find.byKey(const Key('fonte-homeAssistant')), vista ? findsOneWidget : findsNothing);
+      expect(find.byKey(const Key('fonte-gdahome')), vista ? findsNothing : findsOneWidget);
+    }
   });
 }
