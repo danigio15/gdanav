@@ -22,24 +22,43 @@ import androidx.core.content.ContextCompat
  * usa per mostrare la manovra quando si è su un'altra schermata, il telefono
  * per tenere la guida in vista con l'app dietro. Suona (in silenzio: parla
  * già la voce) solo quando cambia la manovra, non a ogni metro.
+ *
+ * Con Android Auto collegato il telefono sta zitto: la guida è sullo schermo
+ * dell'auto. Se lì davanti c'è gdanav la notifica non serve e non c'è; se
+ * c'è un'altra app (la musica, il telefono) serve all'auto per la manovra in
+ * alto, e sul telefono passa per un canale al minimo: niente icona, niente
+ * finestrella, in fondo alle notifiche.
  */
 object NotificaGuida {
     const val CANALE = "gdanav_guida"
+    const val CANALE_IN_AUTO = "gdanav_guida_in_auto"
     private const val ID = 4201
 
     private var ultimaManovra: String? = null
-    private var canaleFatto = false
+    private var canaliFatti = false
 
-    private fun canale(context: Context) {
-        if (canaleFatto || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+    /** La sessione di Android Auto è aperta. */
+    @Volatile var inAuto = false
+
+    /** Sullo schermo dell'auto, davanti, c'è gdanav. */
+    @Volatile var davantiInAuto = false
+
+    private fun canali(context: Context) {
+        if (canaliFatti || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val c = NotificationChannel(CANALE, "Guida", NotificationManager.IMPORTANCE_HIGH).apply {
             description = "La prossima manovra mentre gdanav ti guida"
             setSound(null, null)
             enableVibration(false)
             setShowBadge(false)
         }
-        context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(c)
-        canaleFatto = true
+        val a = NotificationChannel(CANALE_IN_AUTO, "Guida in auto", NotificationManager.IMPORTANCE_MIN).apply {
+            description = "La manovra per lo schermo dell'auto: sul telefono non si vede"
+            setSound(null, null)
+            enableVibration(false)
+            setShowBadge(false)
+        }
+        context.getSystemService(NotificationManager::class.java)?.createNotificationChannels(listOf(c, a))
+        canaliFatti = true
     }
 
     private fun puo(context: Context): Boolean =
@@ -50,13 +69,13 @@ object NotificaGuida {
     @SuppressLint("MissingPermission")
     fun aggiorna(context: Context, g: PonteAuto.Guida?) {
         val gestore = NotificationManagerCompat.from(context)
-        if (g == null) {
+        if (g == null || (inAuto && davantiInAuto)) {
             if (ultimaManovra != null) gestore.cancel(ID)
             ultimaManovra = null
             return
         }
         if (!puo(context)) return
-        canale(context)
+        canali(context)
         val testo = testo(g)
         val titolo = "${GuidaAuto.distanzaTesto(g.distanzaM)} · ${IconeManovra.frase(g.tipo)}"
         val chiave = "${g.tipo}|$testo"
@@ -76,16 +95,17 @@ object NotificaGuida {
             .setImportance(if (nuova) NotificationManagerCompat.IMPORTANCE_HIGH else NotificationManagerCompat.IMPORTANCE_LOW)
         grande?.let { auto.setLargeIcon(it) }
         apri?.let { auto.setContentIntent(it) }
-        val n = NotificationCompat.Builder(context, CANALE)
+        val n = NotificationCompat.Builder(context, if (inAuto) CANALE_IN_AUTO else CANALE)
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
             .setSmallIcon(icona)
             .setContentTitle(titolo)
             .setContentText(testo)
             .setSubText("$meta · arrivo $arrivo")
             .setOngoing(true)
-            .setOnlyAlertOnce(!nuova)
+            .setOnlyAlertOnce(!nuova || inAuto)
+            .setSilent(inAuto)
             .setShowWhen(false)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(if (inAuto) NotificationCompat.PRIORITY_MIN else NotificationCompat.PRIORITY_HIGH)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .extend(auto.build())
         grande?.let { n.setLargeIcon(it) }
