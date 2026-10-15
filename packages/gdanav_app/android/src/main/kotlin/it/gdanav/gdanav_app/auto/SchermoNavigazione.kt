@@ -119,7 +119,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     /**
      * Questa versione di gdanav è troppo vecchia (lo dice il telefono, vedi
      * `GestoreAggiornamento`): la guida si ferma e sopra la mappa resta lo
-     * schermo che dice di aggiornare gdanav sul telefono.
+     * schermo che dice che serve un aggiornamento.
      */
     private fun fermaSeVecchia() {
         val vecchia = PonteAuto.aggiorna(carContext)

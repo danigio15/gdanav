@@ -299,8 +299,10 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
 
     // MARK: - Premium
 
-    /// Senza gdanav Premium la mappa c'è, ma la navigazione no: si dice come
-    /// sbloccarlo dal telefono. Appena l'app lo sblocca, l'avviso se ne va.
+    /// Senza gdanav Premium la mappa c'è, ma la navigazione no: lo si dice, e
+    /// basta — niente «fallo dal telefono», che guidando non si fa (come su
+    /// Android Auto, dove Google ha rifiutato l'app per questo). Appena l'app
+    /// lo sblocca, l'avviso se ne va da solo.
     ///
     /// Conta [PonteAuto.guidaInAuto], non Premium da solo: dentro gdahome,
     /// senza una casa abbinata, si guida base anche senza Premium (come su
@@ -318,7 +320,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         } else if !siGuida && !premiumMostrato {
             premiumMostrato = true
             var azioni = [
-                CPAlertAction(title: PonteAuto.shared.aggiorna ? "Ho aggiornato" : "Ho sbloccato", style: .default) { [weak self] _ in
+                CPAlertAction(title: "Riprova", style: .default) { [weak self] _ in
                     guard let self else { return }
                     if PonteAuto.shared.guidaInAuto {
                         self.premiumMostrato = false
@@ -339,17 +341,17 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
             let avviso = CPAlertTemplate(
                 titleVariants: PonteAuto.shared.aggiorna
                     ? [
-                        "C'è una versione nuova di gdanav. Aggiorna gdanav sul telefono per continuare.",
-                        "Aggiorna gdanav sul telefono.",
+                        "C'è una versione nuova di gdanav: questa non è più attiva.",
+                        "Serve un aggiornamento.",
                     ]
                     : PonteAuto.shared.premiumOspite
                     ? [
-                        "La navigazione in auto fa parte del Premium di gdahome. Attivalo dall'app gdahome sul telefono.",
-                        "gdahome Premium: attivalo dall'app gdahome.",
+                        "La navigazione in auto è inclusa in gdahome Premium.",
+                        "Inclusa in gdahome Premium.",
                     ]
                     : [
-                        "La navigazione in auto fa parte di gdanav Premium. Sbloccalo dall'app sul telefono: menu → Premium.",
-                        "gdanav Premium: sbloccalo dal telefono.",
+                        "La navigazione in auto è inclusa in gdanav Premium.",
+                        "Inclusa in gdanav Premium.",
                     ],
                 actions: azioni
             )

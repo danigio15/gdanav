@@ -9,17 +9,26 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 
 /**
- * Senza gdanav Premium: si dice come sbloccarlo dal telefono. Appena l'app
- * lo sblocca (o lo ritrova dal Play Store), si passa alla navigazione. Con
- * una versione troppo vecchia ([PonteAuto.aggiorna]) si dice invece di
- * aggiornare gdanav sul telefono.
+ * Senza gdanav Premium: si dice che in auto la navigazione è Premium, e
+ * basta. Appena l'app lo sblocca (o lo ritrova dal Play Store) si passa da sé
+ * alla navigazione. Con una versione troppo vecchia ([PonteAuto.aggiorna]) si
+ * dice invece che serve un aggiornamento.
+ *
+ * Niente «fallo dal telefono» e niente tasti che lo chiedono: chi guida non
+ * deve prendere in mano il telefono, e Google ha rifiutato l'app per questo
+ * («Visual info on phone»). Si dice com'è; il resto succede da solo, perché
+ * lo schermo ascolta l'app ([controlla]). Finché l'app non ha detto niente
+ * (la prima volta, con l'auto accesa prima del telefono) si aspetta, invece
+ * di dare il muro a chi Premium ce l'ha.
  */
 class SchermoPremium(
     carContext: CarContext,
     /** Aperto sopra la navigazione (versione da aggiornare): chiudendolo si torna lì. */
     private val sopraLaMappa: Boolean = false,
 ) : Screen(carContext), DefaultLifecycleObserver {
-    private val controlla: () -> Unit = { if (PonteAuto.guidaInAuto(carContext)) apriNavigazione() }
+    private val controlla: () -> Unit = {
+        if (PonteAuto.guidaInAuto(carContext) && !PonteAuto.aggiorna(carContext)) apriNavigazione() else invalidate()
+    }
 
     init {
         lifecycle.addObserver(this)
@@ -41,33 +50,27 @@ class SchermoPremium(
 
     override fun onGetTemplate(): Template {
         if (PonteAuto.aggiorna(carContext)) {
-            return MessageTemplate.Builder("Aggiorna gdanav sul telefono: questa versione non è più attiva.")
+            return MessageTemplate.Builder("Questa versione non è più attiva: serve un aggiornamento.")
                 .setTitle("C'è una versione nuova di gdanav")
                 .setHeaderAction(Action.APP_ICON)
-                .addAction(
-                    Action.Builder()
-                        .setTitle("Ho aggiornato")
-                        .setOnClickListener { if (PonteAuto.guidaInAuto(carContext)) apriNavigazione() else invalidate() }
-                        .build(),
-                )
+                .build()
+        }
+        if (!PonteAuto.premiumNoto(carContext)) {
+            return MessageTemplate.Builder("Un momento…")
+                .setTitle("gdanav")
+                .setHeaderAction(Action.APP_ICON)
                 .build()
         }
         val ospite = PonteAuto.premiumOspite(carContext)
         val messaggio = MessageTemplate.Builder(
             if (ospite) {
-                "La navigazione in auto fa parte del Premium di gdahome. Attivalo dall'app gdahome sul telefono."
+                "La navigazione in auto è inclusa in gdahome Premium."
             } else {
-                "La navigazione in auto fa parte di gdanav Premium. Sbloccalo dall'app sul telefono: menu → Premium."
+                "La navigazione in auto è inclusa in gdanav Premium."
             },
         )
             .setTitle(if (ospite) "gdahome Premium" else "gdanav Premium")
             .setHeaderAction(Action.APP_ICON)
-            .addAction(
-                Action.Builder()
-                    .setTitle("Ho sbloccato")
-                    .setOnClickListener { if (PonteAuto.guidaInAuto(carContext)) apriNavigazione() else invalidate() }
-                    .build(),
-            )
         // Dentro gdahome la casa non è Premium: ci si arriva anche da qui.
         GdanavInAuto.casa?.let { casa ->
             messaggio.addAction(
