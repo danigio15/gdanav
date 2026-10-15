@@ -1,6 +1,7 @@
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../risorse.dart';
+import '../stato/scelte_avvisi.dart';
 
 /// Come ti vedi sulla mappa: la freccia di navigazione o un'auto vista
 /// dall'alto. Il nome è anche quello dell'immagine nello stile.
@@ -46,18 +47,20 @@ Map<String, Object?> datiIo(Punto? qui, double rotta, Segnaposto segnaposto) => 
   ],
 };
 
-/// Le segnalazioni per la sorgente `gdanav-segnalazioni`.
-Map<String, Object?> datiSegnalazioni(List<Segnalazione> tutte) => {
+/// Le segnalazioni per la sorgente `gdanav-segnalazioni`. Quelle di un
+/// avviso scelto spento non si vedono neanche sulla mappa.
+Map<String, Object?> datiSegnalazioni(List<Segnalazione> tutte, [ScelteAvvisi? scelte]) => {
   'type': 'FeatureCollection',
   'features': [
     for (final s in tutte)
-      {
-        'type': 'Feature',
-        'geometry': {
-          'type': 'Point',
-          'coordinates': [s.punto.lon, s.punto.lat],
+      if (scelte == null || !scelte.spento(Avviso.diSegnalazione(s.tipo)))
+        {
+          'type': 'Feature',
+          'geometry': {
+            'type': 'Point',
+            'coordinates': [s.punto.lon, s.punto.lat],
+          },
+          'properties': {'id': s.id, 'tipo': s.tipo.name},
         },
-        'properties': {'id': s.id, 'tipo': s.tipo.name},
-      },
   ],
 };

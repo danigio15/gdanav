@@ -134,6 +134,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.posizione.addListener(_dallaPosizione);
     widget.guida?.addListener(_io);
     widget.segnalazioni?.addListener(_segnalazioni);
+    widget.guida?.avvisi.addListener(_segnalazioni);
     widget.vicini?.addListener(_vicini);
     widget.persone?.addListener(_persone);
     widget.ztl?.addListener(_zoneDaCapo);
@@ -156,6 +157,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     widget.posizione.removeListener(_dallaPosizione);
     widget.guida?.removeListener(_io);
     widget.segnalazioni?.removeListener(_segnalazioni);
+    widget.guida?.avvisi.removeListener(_segnalazioni);
     widget.vicini?.removeListener(_vicini);
     widget.persone?.removeListener(_persone);
     widget.ztl?.removeListener(_zoneDaCapo);
@@ -713,7 +715,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
   Future<void> _segnalazioni() async {
     final m = _mappa, g = widget.segnalazioni;
     if (m == null || !_stileCaricato || g == null) return;
-    await m.setGeoJsonSource(sorgenteSegnalazioni, datiSegnalazioni(g.vicine).cast<String, dynamic>());
+    await m.setGeoJsonSource(sorgenteSegnalazioni, datiSegnalazioni(g.vicine, widget.guida?.avvisi).cast<String, dynamic>());
   }
 
   GestoreRisparmio? get _gestoreRisparmio => widget.risparmio ?? widget.guida?.risparmio;

@@ -357,6 +357,13 @@ object PonteAuto {
      * manovra o finisce, altrimenti (la distanza che scende) al più una volta
      * al secondo.
      */
+    /** Rifà la notifica subito: è cambiato chi c'è sullo schermo dell'auto. */
+    fun notificaDaCapo() {
+        manovraNotificata = null
+        ultimaNotifica = 0
+        notifica()
+    }
+
     private fun notifica() {
         val c = contesto ?: return
         val g = guida

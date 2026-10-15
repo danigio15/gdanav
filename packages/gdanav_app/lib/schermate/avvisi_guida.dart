@@ -105,7 +105,7 @@ class _Nota extends StatelessWidget {
           riga(
             Icons.notifications_off_rounded,
             'Spento',
-            'niente voce e niente riquadro. Sulla mappa le segnalazioni restano.',
+            'niente voce, niente riquadro, e sparisce anche dalla mappa.',
           ),
         ],
       ),

@@ -56,16 +56,28 @@ open class SessioneGdanav(private val accendi: (Context) -> Unit) : Session() {
     init {
         lifecycle.addObserver(
             object : DefaultLifecycleObserver {
-                override fun onCreate(owner: LifecycleOwner) = PosizioneInAuto.accendi(carContext)
+                override fun onCreate(owner: LifecycleOwner) {
+                    NotificaGuida.inAuto = true
+                    PosizioneInAuto.accendi(carContext)
+                }
 
                 override fun onStart(owner: LifecycleOwner) {
+                    NotificaGuida.davantiInAuto = true
+                    PonteAuto.notificaDaCapo()
                     PonteAuto.inAuto(true)
                     PosizioneInAuto.riprova()
                 }
 
-                override fun onStop(owner: LifecycleOwner) = PonteAuto.inAuto(false)
+                override fun onStop(owner: LifecycleOwner) {
+                    NotificaGuida.davantiInAuto = false
+                    PonteAuto.notificaDaCapo()
+                    PonteAuto.inAuto(false)
+                }
 
                 override fun onDestroy(owner: LifecycleOwner) {
+                    NotificaGuida.inAuto = false
+                    NotificaGuida.davantiInAuto = false
+                    PonteAuto.notificaDaCapo()
                     smettiPosizioneDellAuto()
                     PosizioneInAuto.spegni(carContext)
                 }

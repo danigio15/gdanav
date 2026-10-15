@@ -41,7 +41,7 @@ enum ComeAvvisare {
   /// Il riquadro in guida, senza voce.
   schermo('Schermo'),
 
-  /// Niente: né voce né riquadro. Sulla mappa le segnalazioni restano.
+  /// Niente: né voce né riquadro, e le segnalazioni spariscono dalla mappa.
   spento('Spento');
 
   const ComeAvvisare(this.etichetta);
