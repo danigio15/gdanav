@@ -241,7 +241,8 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         }
         t.leadingNavigationBarButtons = sinistra
         t.trailingNavigationBarButtons = destra
-        // A lato della mappa: + e −, 2D/3D (o Centra se la si è spostata), sposta.
+        // A lato della mappa: + e −, 2D/3D (o Centra se la si è spostata), sposta;
+        // da fermi prima la lente e la casa.
         let vista: CPMapButton
         if m.libera {
             vista = tastoMappa("location.fill") { [weak m] in m?.segui() }
@@ -251,7 +252,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                 self?.aggiornaTasti()
             }
         }
-        t.mapButtons = [
+        var tasti = [
             tastoMappa("plus") { [weak m] in m?.zoom(1) },
             tastoMappa("minus") { [weak m] in m?.zoom(-1) },
             vista,
@@ -259,6 +260,22 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                 t?.showPanningInterface(animated: true)
             },
         ]
+        /* Da fermi la lente e la casa anche di lato, prima di tutto.
+         *
+         * «Sullo schermo piccolo non fa più selezionare niente»: su certe
+         * autoradio piccole la barra in alto (Cerca, casa, Menu) non si vede, e
+         * la mappa restava senza un modo di scegliere dove andare. I tasti di
+         * lato si vedono sempre; CarPlay ne tiene quattro, quindi da fermi
+         * cedono il posto 2D/3D e «sposta» (la mappa si sposta anche col dito).
+         * In guida restano quelli di prima: la meta c'e' gia'. */
+        if ponte.guida == nil {
+            var davanti = [tastoMappa("magnifyingglass") { [weak self] in self?.apriCerca() }]
+            if GdanavCarPlay.casa != nil {
+                davanti.append(tastoMappa("house.fill") { [weak self] in self?.apriCasa() })
+            }
+            tasti = Array((davanti + tasti).prefix(4))
+        }
+        t.mapButtons = tasti
     }
 
     private func fine() {
