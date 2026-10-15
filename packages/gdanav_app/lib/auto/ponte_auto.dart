@@ -110,6 +110,7 @@ class PonteAuto {
     vicini?.addListener(_vicini);
     if (segnalazioni case final s?) {
       s.addListener(_segnalazioni);
+      guida.avvisi.addListener(_segnalazioni);
       _avvisi = AvvisiStrada.di(guida, s)..addListener(_avviso);
     }
     if (ztl case final z?) {
@@ -376,6 +377,7 @@ class PonteAuto {
     meteo?.removeListener(_cruscotto);
     vicini?.removeListener(_vicini);
     segnalazioni?.removeListener(_segnalazioni);
+    guida.avvisi.removeListener(_segnalazioni);
     _avvisi?.removeListener(_avviso);
     ztl?.removeListener(_zoneDaCapo);
     _avvisiZtl?.removeListener(_avviso);
@@ -474,7 +476,7 @@ class PonteAuto {
     final s = segnalazioni;
     if (s == null) return;
     _manda('sorgenti', {
-      'dati': {sorgenteSegnalazioni: jsonEncode(datiSegnalazioni(s.vicine))},
+      'dati': {sorgenteSegnalazioni: jsonEncode(datiSegnalazioni(s.vicine, guida.avvisi))},
     });
   }
 

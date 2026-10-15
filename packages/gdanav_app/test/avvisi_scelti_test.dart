@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gdanav_app/mappa/segnaposto.dart';
 import 'package:gdanav_app/schermate/avvisi_guida.dart';
 import 'package:gdanav_app/stato/archivio.dart';
 import 'package:gdanav_app/stato/gestore_posizione.dart';
@@ -17,6 +18,22 @@ void main() {
     await tester.runAsync(() => Future<void>.delayed(Duration(milliseconds: ms)));
     await tester.pump();
   }
+
+  test('spento sparisce anche dalla mappa, sul telefono e in auto', () {
+    Segnalazione una(String id, TipoSegnalazione tipo) =>
+        Segnalazione(id: id, tipo: tipo, punto: const Punto(40.85, 14.26), creata: DateTime(2026));
+    final tutte = [una('a', TipoSegnalazione.autovelox), una('p', TipoSegnalazione.polizia)];
+    List<Object?> ids(Map<String, Object?> d) => [
+      for (final f in d['features']! as List) ((f as Map)['properties'] as Map)['id'],
+    ];
+    final s = ScelteAvvisi();
+    expect(ids(datiSegnalazioni(tutte, s)), ['a', 'p']);
+    s.scegli(Avviso.polizia, ComeAvvisare.schermo);
+    expect(ids(datiSegnalazioni(tutte, s)), ['a', 'p'], reason: 'solo a schermo: sulla mappa resta');
+    s.scegli(Avviso.autovelox, ComeAvvisare.spento);
+    expect(ids(datiSegnalazioni(tutte, s)), ['p']);
+    expect(ids(datiSegnalazioni(tutte)), ['a', 'p'], reason: 'senza scelte, tutte');
+  });
 
   test('di partenza tutti a voce; il limite non si spegne, resta il tachimetro', () {
     final s = ScelteAvvisi();
