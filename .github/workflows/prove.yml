@@ -216,7 +216,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "gdanav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app è nella release «anteprima»."
+          gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "gdanav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app non sta su GitHub, solo nei negozi."
           for f in anteprima.json anteprima_tappa.json percorso_motori.txt colonnine_fonti.txt pun_prezzi.txt; do
             [ -s "$f" ] && gh release upload lavoro "$f" --clobber
           done
@@ -275,7 +275,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls tomtom-*.png > /dev/null 2>&1 || exit 0
-          gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "gdanav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app è nella release «anteprima»."
+          gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "gdanav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app non sta su GitHub, solo nei negozi."
           gh release upload lavoro tomtom-*.png --clobber
           ls percorso-*.json > /dev/null 2>&1 && gh release upload lavoro percorso-*.json --clobber
           [ -s colonnine_sonda.txt ] && gh release upload lavoro colonnine_sonda.txt --clobber
@@ -427,8 +427,11 @@ jobs:
           gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
           gh release upload anteprima ztl.json --clobber
 
-  # L'APK da provare: a ogni push su main finisce nella release «anteprima»,
-  # da scaricare dal telefono.
+  # L'APK e il pacchetto del Play Store si costruiscono per sapere che stanno
+  # in piedi, e basta: **l'app non si pubblica su GitHub**, ne' fra gli
+  # artefatti ne' nella release «anteprima». Va solo nei negozi (test interno
+  # e TestFlight), dentro gdahome. Su main, quello che una volta era stato
+  # caricato nell'anteprima si toglie.
   apk:
     runs-on: ubuntu-latest
     needs: [app, motore]
@@ -474,7 +477,6 @@ jobs:
           HERE: ${{ secrets.GDANAV_HERE_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
           GDANAV_ANTEPRIME: ${{ github.workspace }}
-      - run: cp build/app/outputs/flutter-apk/app-release.apk gdanav.apk
       # Il pacchetto per il Play Store (test interno): da lì Android Auto
       # mostra l'app senza «Origini sconosciute». Premium come nell'APK qui
       # sopra: sbloccato finche' GDANAV_PAGAMENTI non e' «si».
@@ -490,22 +492,14 @@ jobs:
           HERE: ${{ secrets.GDANAV_HERE_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
           GDANAV_ANTEPRIME: ${{ github.workspace }}
-      - run: cp build/app/outputs/bundle/release/app-release.aab gdanav.aab
-      - uses: actions/upload-artifact@v4
-        with:
-          name: gdanav-apk
-          path: |
-            app/gdanav.apk
-            app/gdanav.aab
-      - name: Pubblica l'anteprima
+      - name: Niente app sull'anteprima
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          note="Versione di prova di gdanav, dal commit ${GITHUB_SHA::7} (versione ${GITHUB_RUN_NUMBER}). gdanav.apk si installa sul telefono aprendolo (va permesso di installare app da fonti sconosciute). gdanav.aab è il pacchetto da caricare nella Play Console, nel test interno."
-          gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "$note"
-          gh release upload anteprima gdanav.apk gdanav.aab --clobber
-          gh release edit anteprima --notes "$note"
+          for f in gdanav.apk gdanav.aab; do
+            gh release delete-asset anteprima "$f" --yes 2>/dev/null || true
+          done
 
   # L'app per iPhone. La costruisce solo un Mac, e i Mac di GitHub costano
   # dieci volte i minuti degli altri: gira su main, sulle richieste di unione
