@@ -72,21 +72,157 @@ class PostoPianificato {
   PostoPianificato conSosta(int minuti) => PostoPianificato(luogo, sostaMin: minuti);
 }
 
-/// Quanto ci vuole: la strada calcolata, col traffico o senza.
+/// Una sosta di ricarica del viaggio, come la calcola il pianificatore del
+/// telefono, per la casa (`ponte/viaggi/stima`): con la disponibilità di
+/// adesso (TomTom) e la curva di ricarica del modello, prende il posto di
+/// quella che il ponte calcola da sé, come la stima col traffico. I campi
+/// sono quelli che il ponte controlla, coi suoi limiti.
+@immutable
+class SostaPianificata {
+  const SostaPianificata({
+    required this.km,
+    required this.nome,
+    this.operatore,
+    required this.kw,
+    required this.posizione,
+    required this.da,
+    required this.a,
+    required this.minuti,
+    this.libera,
+  });
+
+  /// Dove si esce per la colonnina, in km dalla partenza.
+  final double km;
+  final String nome;
+  final String? operatore;
+
+  /// La potenza più alta della colonnina, in kW.
+  final double kw;
+  final Punto posizione;
+
+  /// La batteria all'arrivo alla sosta e alla ripartenza, in percento.
+  final int da;
+  final int a;
+
+  /// I minuti di ricarica.
+  final int minuti;
+
+  /// Libera o tutta occupata adesso; `null` se non si sa.
+  final bool? libera;
+
+  static const nomeAlPiu = 80;
+  static const operatoreAlPiu = 60;
+
+  /// Dal piano del pianificatore; `null` se una colonnina non ha la scheda
+  /// (niente posizione): allora le soste le calcola la casa.
+  static SostaPianificata? daSosta(Sosta s) {
+    final c = s.colonnina, d = c.dettaglio;
+    if (d == null) return null;
+    final operatore = _corta((d.operatore ?? '').trim(), operatoreAlPiu);
+    final nome = [
+      d.nome,
+      c.nome,
+      d.operatore ?? '',
+    ].map((n) => n.trim()).firstWhere((n) => n.isNotEmpty, orElse: () => 'Colonnina');
+    final kw = d.connettori.fold(c.potenzaKw, (m, p) => math.max(m, p.potenzaKw));
+    final disp = c.disponibilita;
+    return SostaPianificata(
+      km: double.parse((c.distanzaM / 1000).toStringAsFixed(1)),
+      nome: _corta(nome, nomeAlPiu),
+      operatore: operatore.isEmpty ? null : operatore,
+      kw: kw,
+      posizione: Punto(
+        double.parse(d.posizione.lat.toStringAsFixed(5)),
+        double.parse(d.posizione.lon.toStringAsFixed(5)),
+      ),
+      da: _percento(s.batteriaArrivo),
+      a: _percento(s.batteriaPartenza),
+      minuti: (s.ricarica.inSeconds / 60).round(),
+      libera: disp.nota ? disp.libere > 0 : null,
+    );
+  }
+
+  /// Tutte le soste del piano (anche nessuna, se la batteria basta); `null`
+  /// senza piano o se una sosta non si può scrivere.
+  static List<SostaPianificata>? dalPiano(PianoViaggio? piano) {
+    if (piano == null) return null;
+    final soste = [for (final s in piano.soste) daSosta(s)];
+    return soste.contains(null) ? null : soste.cast<SostaPianificata>();
+  }
+
+  Map<String, Object?> toJson() => {
+    'km': km,
+    'nome': nome,
+    'operatore': ?operatore,
+    'kw': kw,
+    'lat': posizione.lat,
+    'lon': posizione.lon,
+    'da': da,
+    'a': a,
+    'min': minuti,
+    'libera': ?libera,
+  };
+
+  static SostaPianificata? daJson(Object? j) {
+    if (j is! Map) return null;
+    final km = j['km'], kw = j['kw'], lat = j['lat'], lon = j['lon'], da = j['da'], a = j['a'], min = j['min'];
+    if (km is! num || kw is! num || lat is! num || lon is! num || da is! num || a is! num || min is! num) return null;
+    if (lat.abs() > 90 || lon.abs() > 180) return null;
+    final nome = j['nome'] is String && (j['nome'] as String).isNotEmpty ? j['nome'] as String : 'Colonnina';
+    final operatore = j['operatore'];
+    return SostaPianificata(
+      km: km.toDouble(),
+      nome: _corta(nome, nomeAlPiu),
+      operatore: operatore is String && operatore.isNotEmpty ? _corta(operatore, operatoreAlPiu) : null,
+      kw: kw.toDouble(),
+      posizione: Punto(lat.toDouble(), lon.toDouble()),
+      da: _percento(da),
+      a: _percento(a),
+      minuti: math.max(0, min.round()),
+      libera: j['libera'] is bool ? j['libera'] as bool : null,
+    );
+  }
+
+  static int _percento(num p) => p.round().clamp(0, 100);
+
+  /// Al più [n] unità, come le conta il ponte (JavaScript): senza spezzare
+  /// una lettera fatta di due.
+  static String _corta(String s, int n) {
+    if (s.length <= n) return s;
+    final c = s.substring(0, n);
+    final ultimo = c.codeUnitAt(n - 1);
+    return ultimo >= 0xD800 && ultimo <= 0xDBFF ? c.substring(0, n - 1) : c;
+  }
+}
+
+/// Quanto ci vuole: la strada calcolata, col traffico o senza. Per l'auto
+/// elettrica, con le soste di ricarica del telefono quando le ha
+/// ([soste], e la batteria all'[arrivo]); senza, la casa le calcola da sé.
 @immutable
 class StimaViaggio {
-  const StimaViaggio({required this.durata, this.km, this.colTraffico = false, this.alle});
+  const StimaViaggio({required this.durata, this.km, this.colTraffico = false, this.alle, this.soste, this.arrivo});
 
   final Duration durata;
   final double? km;
   final bool colTraffico;
   final DateTime? alle;
 
+  /// Le soste del piano del telefono: vuota se la batteria basta, `null` se
+  /// il telefono un piano non l'ha.
+  final List<SostaPianificata>? soste;
+
+  /// La batteria a destinazione, in percento, col piano delle [soste].
+  final double? arrivo;
+
   Map<String, Object?> toJson() => {
     'durataS': durata.inSeconds,
     'km': ?km,
     'fonte': colTraffico ? 'traffico' : 'strada',
     if (alle case final a?) 'alle': a.millisecondsSinceEpoch,
+    if (soste case final s?) ...{
+      'soste': [for (final x in s) x.toJson()],
+      if (arrivo case final a?) 'arrivo': SostaPianificata._percento(a),
+    },
   };
 
   static StimaViaggio? daJson(Object? j) {
@@ -94,11 +230,14 @@ class StimaViaggio {
     final s = j['durataS'];
     if (s is! num || s <= 0) return null;
     final alle = j['alle'];
+    final soste = j['soste'] is List ? [for (final x in j['soste'] as List) ?SostaPianificata.daJson(x)] : null;
     return StimaViaggio(
       durata: Duration(seconds: s.round()),
       km: (j['km'] as num?)?.toDouble(),
       colTraffico: j['fonte'] == 'traffico',
       alle: alle is num ? DateTime.fromMillisecondsSinceEpoch(alle.toInt()) : null,
+      soste: soste,
+      arrivo: soste == null ? null : (j['arrivo'] as num?)?.toDouble(),
     );
   }
 
@@ -594,8 +733,9 @@ class FonteViaggiDelTelefono implements FonteViaggi {
 }
 
 /// Calcola quanto ci vuole da [da] (o da dove si è) per le [tappe]: lo fa il
-/// navigatore, col traffico di adesso quando può (TomTom).
-typedef CalcolaStima = Future<StimaViaggio?> Function(Punto? da, List<Punto> tappe);
+/// navigatore, col traffico di adesso quando può (TomTom). [conSoste]: per
+/// l'auto elettrica anche le soste di ricarica, da portare alla casa.
+typedef CalcolaStima = Future<StimaViaggio?> Function(Punto? da, List<Punto> tappe, {bool conSoste});
 
 /// I viaggi pianificati, per le schermate e per l'auto.
 class GestoreViaggiPianificati extends ChangeNotifier {
@@ -623,6 +763,7 @@ class GestoreViaggiPianificati extends ChangeNotifier {
     if (identical(f, _fonte)) return;
     _fonte = f;
     viaggi = [];
+    _sosteProvate.clear();
     unawaited(carica());
   }
 
@@ -665,11 +806,13 @@ class GestoreViaggiPianificati extends ChangeNotifier {
   }
 
   /// La stima per una bozza (prima di salvare): col traffico se si può.
-  Future<StimaViaggio?> stimaPer(ViaggioPianificato v) async {
+  /// [conSoste]: anche le soste di ricarica (più lento: le colonnine e il
+  /// loro stato), per la casa.
+  Future<StimaViaggio?> stimaPer(ViaggioPianificato v, {bool conSoste = false}) async {
     final c = calcolaStima;
     if (c == null || v.tappe.isEmpty) return null;
     try {
-      return await c(v.da?.luogo.posizione, [for (final t in v.tappe) t.luogo.posizione]);
+      return await c(v.da?.luogo.posizione, [for (final t in v.tappe) t.luogo.posizione], conSoste: conSoste);
     } catch (_) {
       return null;
     }
@@ -677,9 +820,16 @@ class GestoreViaggiPianificati extends ChangeNotifier {
 
   var _stimando = false;
 
+  /// I viaggi per cui il telefono ha già provato a fare le soste, riuscendoci
+  /// o no (auto termica, batteria che non si sa, niente Premium, una casa
+  /// che le soste non le tiene): una stima fresca senza soste per loro non
+  /// si rifà a ogni lettura, ma solo quando non è più fresca.
+  final _sosteProvate = <String>{};
+
   /// Le stime dei viaggi delle prossime 12 ore senza traffico fresco si
   /// rifanno col traffico di adesso, e si portano a chi le tiene: così la
-  /// casa avvisa all'ora giusta.
+  /// casa avvisa all'ora giusta. Alla casa vanno anche le soste di ricarica
+  /// del telefono, che valgono più delle sue; nel telefono non servono.
   Future<void> _stimeVecchie() async {
     if (_stimando || calcolaStima == null) return;
     _stimando = true;
@@ -689,9 +839,14 @@ class GestoreViaggiPianificati extends ChangeNotifier {
         final id = v.id, p = v.prossima;
         if (id == null || p == null) continue;
         if (p.partenza.difference(adesso) > const Duration(hours: 12)) continue;
-        if (v.stima?.frescaAlle(adesso) ?? false) continue;
-        final s = await stimaPer(v);
+        final conSoste = _fonte.dellaCasa;
+        if ((v.stima?.frescaAlle(adesso) ?? false) &&
+            (!conSoste || v.stima?.soste != null || _sosteProvate.contains(id))) {
+          continue;
+        }
+        final s = await stimaPer(v, conSoste: conSoste);
         if (s == null) continue;
+        if (conSoste) _sosteProvate.add(id);
         try {
           final nuovo = await _fonte.stima(id, s);
           if (nuovo != null) {

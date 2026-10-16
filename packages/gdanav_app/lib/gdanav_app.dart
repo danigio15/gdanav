@@ -165,9 +165,18 @@ Future<GdanavApp> preparaGdanav({
   // I viaggi pianificati: dentro gdahome nella casa, da sola nel telefono.
   final pianificati = GestoreViaggiPianificati(
     fonteDeiViaggi(archivio, gdahome),
-    calcolaStima: (da, per) async {
-      final s = await viaggio.stimaDellaStrada(da, per);
-      return s == null ? null : StimaViaggio(durata: s.durata, km: s.km, colTraffico: s.colTraffico);
+    // Per la casa, con l'elettrica, anche le soste di ricarica del telefono.
+    calcolaStima: (da, per, {conSoste = false}) async {
+      final s = await viaggio.stimaDellaStrada(da, per, conSoste: conSoste);
+      if (s == null) return null;
+      final soste = SostaPianificata.dalPiano(s.piano);
+      return StimaViaggio(
+        durata: s.durata,
+        km: s.km,
+        colTraffico: s.colTraffico,
+        soste: soste,
+        arrivo: soste == null ? null : s.piano?.batteriaArrivo,
+      );
     },
   );
   gdahome?.addListener(() => pianificati.cambiaFonte(fonteDeiViaggi(archivio, gdahome, pianificati.fonte)));

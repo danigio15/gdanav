@@ -158,6 +158,22 @@ scelta della potenza: **«Tutte» valeva 22 kW**, e 5.758 posti dell'archivio
 (le 11, 15, 20 kW, le Enel X da 21) non si vedevano mai. Adesso «Tutte»
 intorno a te vuol dire tutte; per le soste del viaggio il minimo resta 22.
 
+### Le sole rapide, per la casa
+
+Accanto a `colonnine.json` lo stesso lavoro mette nella release «anteprima»
+`colonnine-rapide.json.gz` (`tool/colonnine_rapide.dart`): stesso formato e
+stessa testa (v, generato, evseInOrdine, q), solo le colonnine con almeno
+una presa da 50 kW in su, compresso. Di quelle restano **tutte le prese** e
+tutti i campi della riga: il ponte di Home Assistant ne usa il kW massimo, e
+togliere le prese lente sfaserebbe gli EVSE ID, scritti nell'ordine delle
+prese. Con l'archivio di settembre 2026: 12.069 colonnine su 45.428, circa
+470 kB. Il ponte lo scarica una volta a settimana da
+`https://github.com/danigio15/gdanav/releases/download/anteprima/colonnine-rapide.json.gz`
+(la repo è pubblica: niente chiavi) e ci calcola le soste del pianificatore
+nella plancia; col telefono collegato valgono quelle che manda gdanav con la
+stima (`ponte/viaggi/stima`, campo `soste`), che sanno se la colonnina è
+libera e conoscono la curva di ricarica del modello.
+
 ## Perché le altre app le hanno
 
 Dalla scheda di EVDC esce l'identificativo `IT*PLN*EW002913*1`: paese,
