@@ -7,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/gdanav_app.dart';
 import 'package:gdanav_app/mappa/controllo_mappa.dart';
+import 'package:gdanav_app/sorgenti/sorgente_gdahome.dart';
 import 'package:gdanav_app/stato/archivio.dart';
 import 'package:gdanav_app/stato/gestore_auto.dart';
 import 'package:gdanav_app/stato/gestore_consumo.dart';
@@ -155,7 +156,8 @@ class Ambiente {
 /// guardano il GPS tacere gli passano quello finto della prova
 /// (`tester.binding.clock.now`), che va avanti con `pump`. [dove] è dove si
 /// è quando si calcola il viaggio, per le prove che lo vogliono diverso da
-/// [posizione]: un GPS che una volta non risponde, per esempio.
+/// [posizione]: un GPS che una volta non risponde, per esempio. [gdahome]:
+/// la fonte dei dati dell'auto quando gdanav gira dentro gdahome.
 Future<Ambiente> ambiente(
   WidgetTester tester, {
   int km = 500,
@@ -168,13 +170,14 @@ Future<Ambiente> ambiente(
   Duration durataProposta = const Duration(seconds: 20),
   DateTime Function()? orologio,
   Future<Punto?> Function()? dove,
+  SorgenteGdahome? gdahome,
 }) async {
   // Uno schermo da telefono, non gli 800×600 delle prove.
   tester.view.physicalSize = const Size(1170, 2532);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
   final archivio = Archivio();
-  final auto = GestoreAuto(archivio: archivio);
+  final auto = GestoreAuto(archivio: archivio, gdahome: gdahome);
   await tester.runAsync(auto.avvia);
   addTearDown(auto.dispose);
   final consumo = GestoreConsumo(archivio);

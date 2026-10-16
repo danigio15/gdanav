@@ -4,8 +4,10 @@ import 'dart:math' as math;
 import 'dart:math' show Point;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
-import 'package:gdanav_core/gdanav_core.dart' show Avanzamento, Punto, distanzaM, Rettangolo, TipoSegnalazione, TipoZona, Viaggio;
+import 'package:gdanav_core/gdanav_core.dart'
+    show Avanzamento, MotoFluido, Punto, Rettangolo, TipoSegnalazione, TipoZona, Viaggio, diQuantoSiGira, versoDiLa;
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../componenti/icone_punti.dart';
@@ -88,7 +90,7 @@ class MappaViaggio extends StatefulWidget {
   State<MappaViaggio> createState() => _MappaViaggioState();
 }
 
-class _MappaViaggioState extends State<MappaViaggio> {
+class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderStateMixin {
   MapLibreMapController? _mappa;
   var _stileCaricato = false;
 
@@ -145,7 +147,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     // tutta Italia sulla strada sarebbe solo confusione.
     if (widget.guida == null) widget.vicini?.avviaTutte();
     if (widget.guida != null) _guardia = Timer.periodic(const Duration(seconds: 2), (_) => _giroDiGuardia());
-    if (widget.guida != null) _fotogrammi = Timer.periodic(fotogramma, (_) => unawaited(_fotogramma()));
+    if (widget.guida != null) _fotogrammi = createTicker(_alFotogramma);
   }
 
   DateTime _ora() => (widget.orologio ?? DateTime.now)();
@@ -164,7 +166,8 @@ class _MappaViaggioState extends State<MappaViaggio> {
     _gestoreRisparmio?.removeListener(_risparmio);
     _orologioZone?.cancel();
     _guardia?.cancel();
-    _fotogrammi?.cancel();
+    _fotogrammi?.dispose();
+    _fotogrammi = null;
     // Quello che era ancora in corso (le immagini, una scrittura) non scrive
     // più su una mappa che non c'è.
     _mappa = null;
@@ -327,26 +330,36 @@ class _MappaViaggioState extends State<MappaViaggio> {
    * Adesso, come sullo schermo dell'auto, segnaposto e telecamera si muovono
    * insieme a ogni fotogramma: verso dove l'auto è adesso
    * ([GestoreGuida.posizioneStimata], che va avanti lungo la strada con la
-   * velocità fra una lettura e l'altra), avvicinandosi un po' alla volta,
-   * così anche la correzione di una lettura nuova si vede come un moto e non
-   * come un salto. */
+   * velocità fra una lettura e l'altra), inseguita da [MotoFluido] (in
+   * gdanav_core, con le sue prove): una lettura nuova diventa una correzione
+   * morbida, mai un passo indietro lungo la strada.
+   *
+   * Dal campo: «la freccia non è fluida, prende pause e poi cammina». I
+   * fotogrammi li dava un `Timer` ogni 40 ms, che non va d'accordo con lo
+   * schermo (due nello stesso fotogramma, poi nessuno) e che girava anche da
+   * fermi, o con la mappa dietro un'altra schermata. Adesso li dà lo schermo
+   * (un `Ticker`): uno ogni [_fotogrammaMinimo] al più, spento da solo quando
+   * la mappa non si vede, e spento da noi quando l'auto è ferma e la freccia
+   * è arrivata ([MotoFluido.fermo]); la posizione dopo lo riaccende ([_io]). */
 
-  /// Ogni quanto si ridisegnano l'auto e la mappa in guida: 25 al secondo.
-  static const fotogramma = Duration(milliseconds: 40);
+  /// Al più un fotogramma ogni tanto: trenta al secondo bastano per un moto
+  /// continuo, e scaldano la metà dei sessanta (o dei centoventi) dello schermo.
+  static const _fotogrammaMinimo = Duration(milliseconds: 30);
 
-  /// Quanto si avvicina a dove deve essere a ogni fotogramma: in un quinto
-  /// di secondo ha fatto i due terzi della strada.
-  static final _avvicina = 1 - math.exp(-fotogramma.inMilliseconds / 200);
+  /// Quanto la rotta della mappa insegue quella della strada: come la freccia.
+  static const _tauRotta = 200.0;
 
-  /// Più lontano di così si salta: un ricalcolo, un GPS che torna.
-  static const _saltoM = 120.0;
-
-  Timer? _fotogrammi;
+  Ticker? _fotogrammi;
   var _disegnando = false;
+  final _moto = MotoFluido();
 
-  /// Dov'è disegnata l'auto adesso, e girata come.
-  Punto? _mostrata;
-  double _rottaMostrata = 0, _rottaMappaMostrata = 0;
+  /// Il tempo dei fotogrammi: va solo avanti, anche fra uno spegnimento e
+  /// l'altro del [Ticker] (che a ogni accensione riparte da zero).
+  var _tempo = Duration.zero, _ultimoTick = Duration.zero;
+  Duration? _ultimoDisegno;
+
+  /// Com'è girata la mappa adesso.
+  double _rottaMappaMostrata = 0;
 
   /// Se l'auto la muovono i fotogrammi: in guida, con la mappa che la segue,
   /// agganciata alla strada, e senza lo schermo dell'auto acceso (lì la mappa
@@ -360,42 +373,53 @@ class _MappaViaggioState extends State<MappaViaggio> {
         !widget.gestore.auto.schermoDellAutoAcceso;
   }
 
-  static double _verso(double da, double a, double quanto) {
-    final d = ((a - da) % 360 + 540) % 360 - 180;
-    return (da + d * quanto) % 360;
+  /// Riaccende i fotogrammi, se servono e sono spenti.
+  void _accendiFotogrammi() {
+    final t = _fotogrammi;
+    if (t == null || t.isActive || !_scorre) return;
+    _ultimoTick = Duration.zero;
+    t.start();
   }
 
-  Future<void> _fotogramma() async {
+  void _alFotogramma(Duration trascorso) {
+    _tempo += trascorso - _ultimoTick;
+    _ultimoTick = trascorso;
+    final ultimo = _ultimoDisegno;
+    if (_disegnando || (ultimo != null && _tempo - ultimo < _fotogrammaMinimo)) return;
+    unawaited(_fotogramma(_tempo));
+  }
+
+  Future<void> _fotogramma(Duration adesso) async {
     final m = _mappa, g = widget.guida;
-    if (m == null || g == null || !_stileCaricato || _disegnando || !_scorre) {
-      _mostrata = null;
+    if (m == null || g == null || !_stileCaricato || !_scorre) {
+      _moto.dimentica();
+      _ultimoDisegno = null;
+      _fotogrammi?.stop();
       return;
     }
     final stimata = g.posizioneStimata();
     if (stimata == null) return;
     final a = g.avanzamento;
     final rottaMappa = a?.rottaMappa ?? stimata.rotta;
-    final prima = _mostrata;
-    if (prima == null || distanzaM(prima, stimata.punto) > _saltoM) {
-      _mostrata = stimata.punto;
-      _rottaMostrata = stimata.rotta;
+    // La guida porta già avanti il punto lungo la strada (anche in curva):
+    // qui lo si insegue. Sotto 1,5 m/s la guida non lo porta avanti, e
+    // l'auto è ferma.
+    final v = g.velocitaMs ?? 0;
+    final primo = _moto.mostrata == null;
+    _moto.posizione(stimata.punto, rotta: stimata.rotta, velocitaMs: v < 1.5 ? 0 : v, alle: adesso);
+    final f = _moto.fotogramma(adesso)!;
+    final prima = _ultimoDisegno;
+    _ultimoDisegno = adesso;
+    if (primo || prima == null) {
       _rottaMappaMostrata = rottaMappa;
     } else {
-      final k = _avvicina;
-      _mostrata = Punto(
-        prima.lat + (stimata.punto.lat - prima.lat) * k,
-        prima.lon + (stimata.punto.lon - prima.lon) * k,
-      );
-      _rottaMostrata = _verso(_rottaMostrata, stimata.rotta, k);
-      _rottaMappaMostrata = _verso(_rottaMappaMostrata, rottaMappa, k);
+      final dt = (adesso - prima).inMicroseconds / 1000;
+      _rottaMappaMostrata = versoDiLa(_rottaMappaMostrata, rottaMappa, 1 - math.exp(-dt.clamp(0, 100) / _tauRotta));
     }
-    final qui = _mostrata!;
+    final qui = f.punto;
     _disegnando = true;
     try {
-      await m.setGeoJsonSource(
-        sorgenteIo,
-        datiIo(qui, _rottaMostrata, widget.posizione.segnaposto).cast<String, dynamic>(),
-      );
+      await m.setGeoJsonSource(sorgenteIo, datiIo(qui, f.rotta, widget.posizione.segnaposto).cast<String, dynamic>());
       if (!identical(m, _mappa) || !mounted) return;
       await m.moveCamera(
         CameraUpdate.newCameraPosition(
@@ -414,6 +438,8 @@ class _MappaViaggioState extends State<MappaViaggio> {
     } finally {
       _disegnando = false;
     }
+    // Ferma e arrivata: niente fotogrammi fino alla posizione dopo.
+    if (_moto.fermo && diQuantoSiGira(_rottaMappaMostrata, rottaMappa).abs() < 0.5) _fotogrammi?.stop();
   }
 
   /// Il segnaposto: in guida agganciato al percorso, portato avanti di
@@ -430,6 +456,7 @@ class _MappaViaggioState extends State<MappaViaggio> {
     // In guida, con l'auto agganciata alla strada, segnaposto e telecamera li
     // muovono i fotogrammi: qui solo la freccia della manovra.
     if (_scorre) {
+      _accendiFotogrammi();
       try {
         await _freccia(m);
       } catch (e) {

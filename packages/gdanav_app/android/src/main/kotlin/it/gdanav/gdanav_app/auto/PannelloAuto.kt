@@ -280,7 +280,9 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
                 b < 50 -> Color.rgb(255, 193, 7)
                 else -> Color.rgb(102, 187, 106)
             }
-            val t = "${b.roundToInt()}%"
+            // «~» fra due letture dell'auto: è la stima, come il pedaggio.
+            val circa = if (c.batteriaStimata) "~" else ""
+            val t = "$circa${b.roundToInt()}%"
             pezzi += (dp(32f) + forte.measureText(t)) to { x: Float, y: Float ->
                 val corpo = RectF(x, y - dp(15f), x + dp(24f), y - dp(2f))
                 bordo.color = Color.WHITE
@@ -294,7 +296,7 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
                 canvas.drawText(t, x + dp(32f), y, forte)
             }
             c.autonomiaKm?.let { km ->
-                val t = "${km.roundToInt()} km"
+                val t = "$circa${km.roundToInt()} km"
                 pezzi += forte.measureText(t) to { x: Float, y: Float -> canvas.drawText(t, x, y, forte) }
             }
             c.arrivoBatteria?.let { v ->

@@ -63,6 +63,9 @@ object PonteAuto {
 
     /** La rotta del segnaposto (la mappa guarda un po' avanti) e la sua immagine. */
     @Volatile var rottaIo: Double = 0.0
+
+    /** La velocità lungo la strada, in m/s: fra due posizioni la mappa porta avanti l'auto da sola (`RendererMappa`). */
+    @Volatile var velocita: Double = 0.0
     @Volatile var icona: String = "freccia"
     @Volatile var guida: Guida? = null
 
@@ -92,6 +95,8 @@ object PonteAuto {
         /** Auto termica: niente batteria né colonnine. */
         val elettrica: Boolean = true,
         val batteria: Double? = null,
+        /** Fra due letture la batteria è una stima: si scrive «~21%». */
+        val batteriaStimata: Boolean = false,
         val autonomiaKm: Double? = null,
         /** L'autonomia la dice l'auto (non una stima). */
         val autonomiaAuto: Boolean = false,
@@ -251,6 +256,7 @@ object PonteAuto {
                 qui = if (lat != null && lon != null) doubleArrayOf(lat, lon) else null
                 rotta = call.argument<Double>("rotta") ?: 0.0
                 rottaIo = call.argument<Double>("rotta_io") ?: rotta
+                velocita = numero(call, "velocita_ms") ?: 0.0
                 call.argument<String>("icona")?.let { icona = it }
             }
             "luoghi" -> {
@@ -267,6 +273,7 @@ object PonteAuto {
             "cruscotto" -> cruscotto = Cruscotto(
                 elettrica = call.argument<Boolean>("elettrica") != false,
                 batteria = numero(call, "batteria"),
+                batteriaStimata = call.argument<Boolean>("batteria_stimata") == true,
                 autonomiaKm = numero(call, "autonomia_km"),
                 autonomiaAuto = call.argument<Boolean>("autonomia_auto") == true,
                 velocita = numero(call, "velocita"),

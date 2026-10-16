@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/auto/ponte_auto.dart';
+import 'package:gdanav_app/sorgenti/sorgente_gdahome.dart';
 import 'package:gdanav_app/stato/gestore_auto.dart';
 import 'package:gdanav_app/stato/gestore_viaggio.dart';
 import 'package:gdanav_core/gdanav_core.dart';
@@ -140,6 +141,70 @@ void main() {
     expect(autonomia.dallAuto, isFalse);
     expect(autonomia.km, closeTo(80 / 100 * a.auto.veicolo.capacitaUtileKwh / riferimento * 100, 0.5));
     expect(autonomia.km, lessThan(80 / 100 * a.auto.veicolo.capacitaUtileKwh / piano * 100));
+    await tester.runAsync(a.guida.ferma);
+  });
+
+  testWidgets('dal campo: l\'auto dice 23% e 95 km, e in guida (telefono e auto) si vede 23% e 95 km, non la stima', (
+    tester,
+  ) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final chiamate = <MethodCall>[];
+    const canale = MethodChannel('gdanav/schermo_auto');
+    final messaggero = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messaggero.setMockMethodCallHandler(canale, (c) async {
+      chiamate.add(c);
+      return null;
+    });
+    addTearDown(() => messaggero.setMockMethodCallHandler(canale, null));
+    final casa = SorgenteGdahome();
+    addTearDown(casa.dispose);
+    final a = await ambiente(tester, km: 20, gdahome: casa);
+    final ponte = PonteAuto(viaggio: a.viaggio, guida: a.guida, posizione: a.posizione, auto: a.auto, canale: canale)
+      ..avvia();
+    addTearDown(ponte.ferma);
+    StatoAuto daCasa(double batteria, double km, Duration fa) => StatoAuto(
+      sorgente: TipoSorgente.gdahome,
+      letto: DateTime.now().subtract(fa),
+      batteria: batteria,
+      autonomiaKm: km,
+    );
+
+    // Prima di partire: 25% e 103 km, datati mezz'ora fa.
+    casa.manda(daCasa(25, 103, const Duration(minutes: 30)));
+    await tester.pump();
+    expect(a.auto.stato?.batteria, 25);
+    // Qui si guarda la batteria, non le soste: niente ricalcoli a metà prova.
+    await tester.runAsync(() => a.viaggio.cambiaOpzioni(const OpzioniPercorso(ricalcoloAutomatico: false)));
+    await tester.runAsync(() => a.viaggio.vaiA(const Luogo(nome: 'Nord', posizione: Punto(42.18, 12))));
+    expect(a.viaggio.stato, isA<ViaggioPronto>());
+    a.guida.avvia();
+    final punti = (a.viaggio.stato as ViaggioPronto).viaggio.percorso.punti;
+    a.posizioni.add(punti[15]);
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    await tester.pump();
+    // Fra due letture: la stima, dalla lettura vera, coi km dell'auto.
+    final stimata = a.guida.batteriaOra!;
+    expect(stimata.misurata, isFalse);
+    expect(stimata.valore, lessThan(25));
+    expect(a.guida.autonomiaOra!.km, closeTo(103 * stimata.valore / 25, 0.01));
+
+    // Arriva il dato nuovo dalla casa: Home Assistant lo data col suo ultimo
+    // cambio, prima della partenza e più di dieci minuti fa.
+    casa.manda(daCasa(23, 95, const Duration(minutes: 12)));
+    await tester.pump();
+    a.posizioni.add(punti[16]);
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    await tester.pump();
+    final adesso = a.guida.batteriaOra!;
+    expect(adesso.misurata, isTrue);
+    expect(adesso.valore, 23);
+    expect(a.guida.autonomiaOra!.km, 95);
+    expect(a.guida.autonomiaOra!.dallAuto, isTrue);
+    // Lo stesso sullo schermo dell'auto, senza il segno della stima.
+    final cruscotto = chiamate.lastWhere((c) => c.method == 'cruscotto').arguments as Map;
+    expect(cruscotto['batteria'], 23);
+    expect(cruscotto['autonomia_km'], 95);
+    expect(cruscotto['batteria_stimata'], isFalse);
     await tester.runAsync(a.guida.ferma);
   });
 }

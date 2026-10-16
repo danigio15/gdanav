@@ -840,8 +840,18 @@ class PonteAuto {
     }
   }
 
-  /// Al massimo tre volte al secondo: fra una e l'altra l'auto fa scorrere
-  /// da sé segnaposto e mappa.
+  /// Al massimo tre volte al secondo, più ogni posizione nuova della guida:
+  /// fra una e l'altra l'auto fa scorrere da sé segnaposto e mappa.
+  ///
+  /// Prima una posizione nuova arrivata entro 300 ms dall'ultimo invio (il
+  /// GPS avvisa la posizione e subito dopo la guida) si buttava: l'auto
+  /// riceveva la stima fatta con la lettura di prima, e quella giusta solo un
+  /// secondo dopo. Adesso la lettura nuova della guida passa sempre.
+  ///
+  /// Con la posizione va la velocità lungo la strada (`velocita_ms`): l'auto
+  /// la usa per andare avanti da sola fra un invio e l'altro, invece di
+  /// fermarsi sull'ultimo punto ad aspettare il prossimo (`MotoFluido` in
+  /// gdanav_core, rifatto in `RendererMappa` e `MappaCarPlay`).
   void _posizione() {
     final a = guida.attiva ? guida.avanzamento : null;
     // In guida dove l'auto è adesso, portata avanti lungo la strada da
@@ -851,9 +861,14 @@ class PonteAuto {
     // Senza posizione non c'è niente da mostrare: non si consuma il turno.
     if (qui == null) return;
     final ora = _ora();
-    if (ora.difference(_ultimaPosizione) < const Duration(milliseconds: 300)) return;
+    final nuova = a != null && guida.letture != _lettureMandate;
+    if (!nuova && ora.difference(_ultimaPosizione) < const Duration(milliseconds: 300)) return;
     _ultimaPosizione = ora;
+    if (a != null) _lettureMandate = guida.letture;
     final rotta = stimata?.rotta ?? a?.rotta ?? posizione.rotta;
+    // Agganciati alla strada la velocità della guida; se no quella del GPS
+    // (zero col GPS muto: l'auto allora non va avanti da sola).
+    final velocita = a != null ? guida.velocitaMs ?? 0.0 : posizione.velocitaAdesso() / 3.6;
     // La mappa guarda un po' avanti; la freccia dell'auto segue la strada.
     // Il segnaposto lo disegna l'auto, che lo fa scorrere fra due posizioni.
     _manda('posizione', {
@@ -861,11 +876,15 @@ class PonteAuto {
       'lon': qui.lon,
       'rotta': a?.rottaMappa ?? rotta,
       'rotta_io': rotta,
+      'velocita_ms': velocita.isFinite ? velocita : 0.0,
       'icona': posizione.segnaposto.immagine,
     });
     _cruscotto();
     unawaited(_zone());
   }
+
+  /// La lettura della guida già mandata all'auto.
+  int _lettureMandate = -1;
 
   /// Quello che sta sopra la mappa dell'auto.
   void _cruscotto() {
@@ -889,6 +908,9 @@ class PonteAuto {
     _manda('cruscotto', {
       'elettrica': elettrica,
       'batteria': batteria,
+      // Fra due letture la batteria è una stima: l'auto la scrive «~21%»,
+      // come il pedaggio stimato. Quella detta dall'auto resta senza.
+      'batteria_stimata': batteria != null && ora != null && !ora.misurata,
       'autonomia_km': autonomia?.km,
       'autonomia_auto': autonomia?.dallAuto ?? false,
       // Come sul telefono: col GPS muto è zero, non l'ultima letta. Il
