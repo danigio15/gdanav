@@ -149,6 +149,8 @@ gdanav si scarica gratis. Non ha pubblicità e non chiede di creare un account.
 16% in meno). I **primi 14 giorni sono gratis**, una volta sola: se disdici
 durante la prova non paghi niente. Si compra dal menu → **Premium**, si paga
 e si disdice dal Play Store o dall'App Store, e il rinnovo è automatico.
+Premium lo vende **CRV Immobiliare S.r.l.** attraverso il Play Store e l'App
+Store: le ricevute arrivano da Google o da Apple, come per ogni abbonamento.
 
 <p align="center">
   <img src="docs/immagini/premium.png" alt="Premium: annuale 29,99 €, mensile 2,99 €, prova gratis per 14 giorni" width="260">
