@@ -1,6 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gdanav_app/auto/ponte_auto.dart';
 import 'package:gdanav_app/mappa/segnaposto.dart';
+import 'package:gdanav_app/mappa/stile.dart' show sorgenteSegnalazioni;
 import 'package:gdanav_app/schermate/avvisi_guida.dart';
 import 'package:gdanav_app/stato/archivio.dart';
 import 'package:gdanav_app/stato/gestore_posizione.dart';
@@ -126,6 +131,65 @@ void main() {
     await aspetta(tester);
     expect(find.text('Incidente segnalato'), findsNothing);
     expect(a.voce.frasi.where((f) => f.startsWith('Incidente')), isEmpty);
+    await tester.runAsync(a.guida.ferma);
+  });
+
+  testWidgets("in auto valgono le stesse scelte: spento non arriva né sulla mappa né nel riquadro", (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    const canale = MethodChannel('gdanav/schermo_auto');
+    final chiamate = <MethodCall>[];
+    final messaggero = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messaggero.setMockMethodCallHandler(canale, (c) async {
+      chiamate.add(c);
+      return null;
+    });
+    addTearDown(() => messaggero.setMockMethodCallHandler(canale, null));
+    final a = await ambiente(tester, km: 20);
+    await tester.pumpWidget(a.app());
+    a.auto.manuale.imposta(90);
+    await tester.pump();
+    await tester.runAsync(() => a.viaggio.vaiA(const Luogo(nome: 'Nord', posizione: Punto(42.18, 12))));
+    await tester.pumpAndSettle();
+    final punti = (a.viaggio.stato as ViaggioPronto).viaggio.percorso.punti;
+    a.relay.segnalazioni.add({
+      'id': 'z~incidente1',
+      'tipo': 'incidente',
+      'lat': punti[5].lat,
+      'lon': punti[5].lon,
+      'creata': 0,
+      'conferme': 0,
+    });
+    final ponte = PonteAuto(
+      viaggio: a.viaggio,
+      guida: a.guida,
+      posizione: a.posizione,
+      auto: a.auto,
+      segnalazioni: a.segnalazioni,
+      canale: canale,
+    )..avvia();
+    addTearDown(ponte.ferma);
+    a.posizione.avvia();
+    a.gps.add(Lettura(punti[0]));
+    await aspetta(tester, 60);
+    await tester.tap(find.text('Avvia'));
+    await tester.pumpAndSettle();
+    a.posizioni.add(Punto(punti[4].lat + 0.003, punti[4].lon));
+    await aspetta(tester);
+
+    String mappa() {
+      final ultima = chiamate.lastWhere((c) => c.method == 'sorgenti').arguments as Map;
+      return (ultima['dati'] as Map)[sorgenteSegnalazioni] as String;
+    }
+
+    Map<Object?, Object?> riquadro() => chiamate.lastWhere((c) => c.method == 'avviso').arguments as Map;
+    expect(mappa(), contains('incidente'));
+    expect(riquadro()['tipo'], 'incidente');
+
+    // Spento nell'app: sparisce dalla mappa e dal riquadro dell'auto.
+    a.guida.avvisi.scegli(Avviso.incidente, ComeAvvisare.spento);
+    await aspetta(tester);
+    expect((jsonDecode(mappa()) as Map)['features'], isEmpty);
+    expect(riquadro()['tipo'], isNull);
     await tester.runAsync(a.guida.ferma);
   });
 }
