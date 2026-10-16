@@ -239,10 +239,12 @@ MIMIT (prezzi dei carburanti).
 ## Licenza
 
 Il codice è pubblico perché chiunque possa controllare cosa fa con l'auto, la
-posizione e i dati di chi lo usa. Non è open source:
-[licenza proprietaria](LICENSE), tutti i diritti riservati. Puoi installarlo e
-usarlo per te; non puoi ripubblicarlo, distribuirlo modificato o usarlo
-commercialmente senza permesso scritto.
+posizione e i dati di chi lo usa. Non è open source: vale la
+[Licenza d'uso di gdanav](LICENSE), in italiano con la traduzione inglese.
+Puoi installarlo e usarlo, per te o per la tua attività; non puoi
+ripubblicarlo, distribuirlo, modificato o no, né rivenderlo. Chi lo installa
+per i clienti lo fa con l'autorizzazione di CRV Immobiliare S.r.l., a cui si
+chiedono anche gli altri permessi.
 
 ---
 
