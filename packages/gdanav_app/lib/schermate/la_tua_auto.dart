@@ -123,6 +123,21 @@ class _LaTuaAutoState extends State<LaTuaAuto> {
                     ],
                   ),
                 ),
+                SwitchListTile(
+                  key: const Key('ibrida'),
+                  contentPadding: const EdgeInsets.fromLTRB(20, 0, 16, 0),
+                  secondary: const Icon(Icons.eco_outlined),
+                  title: const Text('Ibrida (anche e-Power)'),
+                  subtitle: const Text(
+                    'Full hybrid o e-Power: in città va spesso in elettrico e consuma meno. '
+                    'Il carburante resta quello sopra, per i prezzi.',
+                  ),
+                  value: widget.auto.ibrida,
+                  onChanged: (si) async {
+                    await widget.auto.impostaIbrida(si);
+                    if (mounted) setState(() {});
+                  },
+                ),
               ],
               if (elettrica)
                 Padding(

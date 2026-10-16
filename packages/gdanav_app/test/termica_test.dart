@@ -101,4 +101,20 @@ void main() {
     expect(cruscotto()['batteria'], isNull);
     expect(cruscotto()['autonomia_km'], isNull);
   });
+
+  testWidgets("l'ibrida (anche e-Power) si accende sotto il carburante e resta salvata", (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final a = await ambiente(tester);
+    await tester.pumpWidget(MaterialApp(home: LaTuaAuto(auto: a.auto, posizione: a.posizione)));
+    expect(find.byKey(const Key('ibrida')), findsNothing, reason: "con l'elettrica non c'è");
+    await tester.tap(find.text('Termica'));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+    await tester.pumpAndSettle();
+    expect(a.auto.ibrida, isFalse);
+    await tester.tap(find.byKey(const Key('ibrida')));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+    await tester.pumpAndSettle();
+    expect(a.auto.ibrida, isTrue);
+    expect(await tester.runAsync(a.archivio.ibrida), isTrue);
+  });
 }

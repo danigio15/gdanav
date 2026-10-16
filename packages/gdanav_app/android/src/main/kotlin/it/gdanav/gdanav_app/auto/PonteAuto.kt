@@ -187,11 +187,15 @@ object PonteAuto {
         }
     }
 
+    /** Se l'app ha già detto almeno una volta com'è messo il Premium. */
+    fun premiumNoto(context: Context): Boolean =
+        context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).contains("premium")
+
     /** Premium si compra nell'app che ospita gdanav (gdahome), non in gdanav. */
     fun premiumOspite(context: Context): Boolean =
         context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).getBoolean("premium_ospite", false)
 
-    /** Questa versione è troppo vecchia: si aggiorna gdanav sul telefono (e intanto niente Premium). */
+    /** Questa versione è troppo vecchia: serve un aggiornamento (e intanto niente Premium). */
     fun aggiorna(context: Context): Boolean =
         context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).getBoolean("aggiorna", false)
 

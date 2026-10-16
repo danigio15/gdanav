@@ -97,6 +97,11 @@ class Archivio {
 
   Future<void> salvaCarburante(Carburante c) => _p.write(key: 'carburante', value: c.name);
 
+  /// Auto termica ibrida (full hybrid o e-Power). Di base no.
+  Future<bool> ibrida() async => await _p.read(key: 'ibrida') == 'si';
+
+  Future<void> salvaIbrida(bool si) => _p.write(key: 'ibrida', value: si ? 'si' : 'no');
+
   Future<void> salvaElettrica(bool si) =>
       si ? _p.delete(key: 'tipo_auto') : _p.write(key: 'tipo_auto', value: 'termica');
 

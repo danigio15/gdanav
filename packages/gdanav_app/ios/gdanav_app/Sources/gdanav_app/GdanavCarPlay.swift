@@ -241,7 +241,8 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         }
         t.leadingNavigationBarButtons = sinistra
         t.trailingNavigationBarButtons = destra
-        // A lato della mappa: + e −, 2D/3D (o Centra se la si è spostata), sposta.
+        // A lato della mappa: + e −, 2D/3D (o Centra se la si è spostata), sposta;
+        // da fermi prima la lente e la casa.
         let vista: CPMapButton
         if m.libera {
             vista = tastoMappa("location.fill") { [weak m] in m?.segui() }
@@ -251,7 +252,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                 self?.aggiornaTasti()
             }
         }
-        t.mapButtons = [
+        var tasti = [
             tastoMappa("plus") { [weak m] in m?.zoom(1) },
             tastoMappa("minus") { [weak m] in m?.zoom(-1) },
             vista,
@@ -259,6 +260,22 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                 t?.showPanningInterface(animated: true)
             },
         ]
+        /* Da fermi la lente e la casa anche di lato, prima di tutto.
+         *
+         * «Sullo schermo piccolo non fa più selezionare niente»: su certe
+         * autoradio piccole la barra in alto (Cerca, casa, Menu) non si vede, e
+         * la mappa restava senza un modo di scegliere dove andare. I tasti di
+         * lato si vedono sempre; CarPlay ne tiene quattro, quindi da fermi
+         * cedono il posto 2D/3D e «sposta» (la mappa si sposta anche col dito).
+         * In guida restano quelli di prima: la meta c'e' gia'. */
+        if ponte.guida == nil {
+            var davanti = [tastoMappa("magnifyingglass") { [weak self] in self?.apriCerca() }]
+            if GdanavCarPlay.casa != nil {
+                davanti.append(tastoMappa("house.fill") { [weak self] in self?.apriCasa() })
+            }
+            tasti = Array((davanti + tasti).prefix(4))
+        }
+        t.mapButtons = tasti
     }
 
     private func fine() {
@@ -282,8 +299,10 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
 
     // MARK: - Premium
 
-    /// Senza gdanav Premium la mappa c'è, ma la navigazione no: si dice come
-    /// sbloccarlo dal telefono. Appena l'app lo sblocca, l'avviso se ne va.
+    /// Senza gdanav Premium la mappa c'è, ma la navigazione no: lo si dice, e
+    /// basta — niente «fallo dal telefono», che guidando non si fa (come su
+    /// Android Auto, dove Google ha rifiutato l'app per questo). Appena l'app
+    /// lo sblocca, l'avviso se ne va da solo.
     ///
     /// Conta [PonteAuto.guidaInAuto], non Premium da solo: dentro gdahome,
     /// senza una casa abbinata, si guida base anche senza Premium (come su
@@ -301,7 +320,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         } else if !siGuida && !premiumMostrato {
             premiumMostrato = true
             var azioni = [
-                CPAlertAction(title: PonteAuto.shared.aggiorna ? "Ho aggiornato" : "Ho sbloccato", style: .default) { [weak self] _ in
+                CPAlertAction(title: "Riprova", style: .default) { [weak self] _ in
                     guard let self else { return }
                     if PonteAuto.shared.guidaInAuto {
                         self.premiumMostrato = false
@@ -322,17 +341,17 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
             let avviso = CPAlertTemplate(
                 titleVariants: PonteAuto.shared.aggiorna
                     ? [
-                        "C'è una versione nuova di gdanav. Aggiorna gdanav sul telefono per continuare.",
-                        "Aggiorna gdanav sul telefono.",
+                        "C'è una versione nuova di gdanav: questa non è più attiva.",
+                        "Serve un aggiornamento.",
                     ]
                     : PonteAuto.shared.premiumOspite
                     ? [
-                        "La navigazione in auto fa parte del Premium di gdahome. Attivalo dall'app gdahome sul telefono.",
-                        "gdahome Premium: attivalo dall'app gdahome.",
+                        "La navigazione in auto è inclusa in gdahome Premium.",
+                        "Inclusa in gdahome Premium.",
                     ]
                     : [
-                        "La navigazione in auto fa parte di gdanav Premium. Sbloccalo dall'app sul telefono: menu → Premium.",
-                        "gdanav Premium: sbloccalo dal telefono.",
+                        "La navigazione in auto è inclusa in gdanav Premium.",
+                        "Inclusa in gdanav Premium.",
                     ],
                 actions: azioni
             )
