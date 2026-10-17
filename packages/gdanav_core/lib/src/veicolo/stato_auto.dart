@@ -44,6 +44,7 @@ class StatoAuto {
     this.velocitaKmh,
     this.potenzaKw,
     this.odometroKm,
+    this.stimataDa,
   });
 
   final TipoSorgente sorgente;
@@ -74,13 +75,25 @@ class StatoAuto {
   /// Il contachilometri: i chilometri veri fra due letture.
   final double? odometroKm;
 
+  /// Per una [TipoSorgente.stima]: la sorgente della lettura vera da cui la
+  /// stima parte (la batteria di Home Assistant, meno quello che si è
+  /// consumato dopo). `null` per una lettura vera.
+  final TipoSorgente? stimataDa;
+
   Duration eta(DateTime ora) => ora.difference(letto);
 
-  StatoAuto conBatteria(double batteria, {TipoSorgente? sorgente, DateTime? letto}) => StatoAuto(
+  StatoAuto conBatteria(
+    double batteria, {
+    TipoSorgente? sorgente,
+    DateTime? letto,
+    double? autonomiaKm,
+    TipoSorgente? stimataDa,
+  }) =>
+      StatoAuto(
         sorgente: sorgente ?? this.sorgente,
         letto: letto ?? this.letto,
         batteria: batteria.clamp(0, 100).toDouble(),
-        autonomiaKm: autonomiaKm,
+        autonomiaKm: autonomiaKm ?? this.autonomiaKm,
         inCarica: inCarica,
         potenzaCaricaKw: potenzaCaricaKw,
         temperaturaBatteriaC: temperaturaBatteriaC,
@@ -90,6 +103,7 @@ class StatoAuto {
         velocitaKmh: velocitaKmh,
         potenzaKw: potenzaKw,
         odometroKm: odometroKm,
+        stimataDa: stimataDa ?? this.stimataDa,
       );
 
   @override

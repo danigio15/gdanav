@@ -385,17 +385,45 @@ class GestoreViaggio extends ChangeNotifier {
   /// Quanto ci vuole da [da] (o da dove si è) passando per [per], senza
   /// toccare il viaggio aperto: per i viaggi pianificati. Con TomTom i tempi
   /// sono quelli del traffico di adesso. `null` se non si può calcolare.
-  Future<({Duration durata, double km, bool colTraffico})?> stimaDellaStrada(Punto? da, List<Punto> per) async {
+  ///
+  /// [conSoste]: con l'auto elettrica (e Premium, come le soste del viaggio
+  /// aperto) anche il [piano] delle soste di ricarica su quella strada, con
+  /// la batteria di adesso: per la casa, che lo preferisce al suo. `null`
+  /// se non si può fare: la stima della strada resta buona lo stesso.
+  Future<({Duration durata, double km, bool colTraffico, PianoViaggio? piano})?> stimaDellaStrada(
+    Punto? da,
+    List<Punto> per, {
+    bool conSoste = false,
+  }) async {
     if (per.isEmpty) return null;
     final partenza = da ?? await posizione() ?? ultimaPosizione;
     if (partenza == null) return null;
     final impostazioni = await archivio.impostazioni();
     if (impostazioni.mancante != null) return null;
     final preferenze = _preferenze ??= await archivio.preferenze();
-    final p = await costruisci(impostazioni, auto.veicolo, preferenze, opzioni)
-        .percorso(partenza: partenza, arrivo: per.last, tappe: per.sublist(0, per.length - 1))
-        .timeout(tempoMassimo);
-    return (durata: p.durata, km: p.lunghezzaM / 1000, colTraffico: p.trafficoVero);
+    final pianificatore = costruisci(impostazioni, auto.veicolo, preferenze, opzioni);
+    final tappe = per.sublist(0, per.length - 1);
+    final p = await pianificatore.percorso(partenza: partenza, arrivo: per.last, tappe: tappe).timeout(tempoMassimo);
+    PianoViaggio? piano;
+    final batteria = auto.stato?.batteria;
+    if (conSoste && auto.elettrica && GestorePremium.attivo.value && batteria != null) {
+      try {
+        final v = await pianificatore
+            .pianifica(
+              partenza: partenza,
+              arrivo: per.last,
+              tappe: tappe,
+              scelto: p,
+              batteria: batteria,
+              condizioni: consumo?.condizioni(auto.stato) ?? const Condizioni(),
+            )
+            .timeout(tempoMassimo);
+        piano = v.piano;
+      } catch (e) {
+        debugPrint('soste del viaggio pianificato: $e');
+      }
+    }
+    return (durata: p.durata, km: p.lunghezzaM / 1000, colTraffico: p.trafficoVero, piano: piano);
   }
 
   /// Il traffico di adesso sul percorso (per tutti, con la chiave TomTom);

@@ -269,7 +269,13 @@ class _SchermataPianificatoreState extends State<SchermataPianificatore> {
   @override
   void initState() {
     super.initState();
-    unawaited(g.carica());
+    // Dopo il primo disegno: [GestoreViaggiPianificati.carica] avvisa subito
+    // chi ascolta (la scheda sulla mappa, il menu che si sta chiudendo), e
+    // farlo mentre questa schermata si costruisce era un setState durante
+    // il build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(g.carica());
+    });
   }
 
   Future<void> _nuovo() async {

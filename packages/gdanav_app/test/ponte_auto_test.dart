@@ -62,6 +62,8 @@ void main() {
     // Il segnaposto lo fa scorrere l'auto: arrivano immagine e rotta.
     expect(pos['icona'], 'auto_blu');
     expect(pos['rotta_io'], isA<double>());
+    // E la velocità, perché fra due posizioni l'auto vada avanti da sola.
+    expect(pos['velocita_ms'], isA<double>());
 
     // Dall'auto si cambia la batteria all'arrivo: si salva e si ricalcola.
     await tester.runAsync(

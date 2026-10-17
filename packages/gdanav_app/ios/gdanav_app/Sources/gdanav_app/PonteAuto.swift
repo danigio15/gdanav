@@ -76,6 +76,8 @@ struct CruscottoAuto {
     /// Auto termica: niente batteria né colonnine.
     var elettrica = true
     var batteria: Double?
+    /// Fra due letture la batteria è una stima: si scrive «~21%».
+    var batteriaStimata = false
     var autonomiaKm: Double?
     /// L'autonomia la dice l'auto (non una stima).
     var autonomiaAuto = false
@@ -143,6 +145,10 @@ final class PonteAuto {
 
     /// La rotta del segnaposto (la mappa guarda un po' avanti) e la sua immagine.
     private(set) var rottaIo = 0.0
+
+    /// La velocità lungo la strada, in m/s: fra due posizioni la mappa porta
+    /// avanti l'auto da sola (`MappaCarPlay`).
+    private(set) var velocita = 0.0
     private(set) var icona = "freccia"
     private(set) var guida: GuidaAuto?
     private(set) var luoghi: [LuogoAuto] = []
@@ -243,6 +249,7 @@ final class PonteAuto {
             }
             rotta = numero(a["rotta"]) ?? 0
             rottaIo = numero(a["rotta_io"]) ?? rotta
+            velocita = numero(a["velocita_ms"]) ?? 0
             if let i = a["icona"] as? String { icona = i }
         case "luoghi":
             luoghi = (a["elenco"] as? [[String: Any]] ?? []).compactMap { LuogoAuto($0) }
@@ -257,6 +264,7 @@ final class PonteAuto {
             cruscotto = CruscottoAuto(
                 elettrica: (a["elettrica"] as? Bool) != false,
                 batteria: numero(a["batteria"]),
+                batteriaStimata: (a["batteria_stimata"] as? Bool) == true,
                 autonomiaKm: numero(a["autonomia_km"]),
                 autonomiaAuto: (a["autonomia_auto"] as? Bool) == true,
                 velocita: numero(a["velocita"]),

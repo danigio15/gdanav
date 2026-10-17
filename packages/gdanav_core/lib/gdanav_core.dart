@@ -17,6 +17,7 @@ export 'src/distributori/distributori.dart';
 export 'src/geo/geo.dart';
 export 'src/guida/frasi_manovra.dart';
 export 'src/guida/guida.dart';
+export 'src/guida/moto_fluido.dart';
 export 'src/luoghi/google.dart';
 export 'src/luoghi/luoghi.dart';
 export 'src/luoghi/luoghi_tomtom.dart';

@@ -120,26 +120,37 @@ class GestoreGuida extends ChangeNotifier {
     return _ora().add(a.restante + ricariche);
   }
 
-  DateTime? _partitoAlle;
-
   /// La batteria quando si è partiti (anche dopo un ricalcolo).
   double? get batteriaPartenza => _batteriaInizio ?? pronto?.batteriaPartenza;
 
-  /// La batteria adesso: quella vera se l'auto l'ha mandata dopo la
-  /// partenza (Home Assistant, Android Auto), altrimenti la stima del piano
-  /// al punto in cui si è.
+  /// La batteria adesso: quella che ha detto l'auto, com'è, finché è l'ultima
+  /// parola dell'auto (`misurata`); fra una lettura e l'altra la stima che
+  /// parte da lì e scende col consumo del piano (vedi [_consuma] e
+  /// `ArbitroSorgenti.registraConsumo`), e che si riallinea appena l'auto
+  /// manda un dato nuovo. Senza nessuna lettura, il piano.
+  ///
+  /// Dal campo: l'auto diceva 23% e 95 km, gdanav 21% e 88 km. Una lettura
+  /// datata prima della partenza (Home Assistant la data col suo ultimo
+  /// cambio, non con l'arrivo) qui non contava: si mostrava il piano dal
+  /// chilometro zero, che scende come crede lui e non si riallinea mai, e
+  /// l'autonomia vera dell'auto si scalava su quello (95 × 21,3 / 23 = 88).
+  /// Dopo un ricalcolo era peggio: il piano nuovo partiva dalla stima.
   ({double valore, bool misurata})? get batteriaOra {
     final p = pronto;
     if (p == null || p.soloPercorso) return null;
-    final s = auto.stato, partito = _partitoAlle;
-    if (s != null &&
-        partito != null &&
-        !s.letto.isBefore(partito) &&
-        s.sorgente != TipoSorgente.manuale &&
-        s.sorgente != TipoSorgente.stima) {
-      return (valore: s.batteria, misurata: true);
-    }
-    return (valore: _prevista(p, (avanzamento?.percorsiM ?? 0) / 1000), misurata: false);
+    final s = auto.stato;
+    if (s == null) return (valore: _prevista(p, (avanzamento?.percorsiM ?? 0) / 1000), misurata: false);
+    return (valore: s.batteria, misurata: _dallAuto(s.sorgente));
+  }
+
+  /// Una sorgente che è l'auto: non la stima, non la batteria scritta a mano.
+  static bool _dallAuto(TipoSorgente? t) => t != null && t != TipoSorgente.stima && t != TipoSorgente.manuale;
+
+  /// La batteria di adesso parte da una lettura dell'auto, anche se stimata.
+  bool get _ancorataAllAuto {
+    final s = auto.stato;
+    if (s == null) return false;
+    return _dallAuto(s.sorgente) || (s.sorgente == TipoSorgente.stima && _dallAuto(s.stimataDa));
   }
 
   /// La batteria all'arrivo: il piano, con la pendenza corretta da quanto la
@@ -147,7 +158,7 @@ class GestoreGuida extends ChangeNotifier {
   double? get batteriaArrivo {
     final p = pronto, ora = batteriaOra, piano = p?.viaggio.piano;
     if (p == null || piano == null || ora == null) return null;
-    if (!ora.misurata) return piano.batteriaArrivo;
+    if (!ora.misurata && !_ancorataAllAuto) return piano.batteriaArrivo;
     final km = (avanzamento?.percorsiM ?? 0) / 1000;
     return batteriaAllArrivo(
       adesso: ora.valore,
@@ -156,6 +167,27 @@ class GestoreGuida extends ChangeNotifier {
       fattore: _fattoreDelConsumo,
       dopoLUltimaSosta: _dopoLUltimaSosta(piano, km),
     );
+  }
+
+  /// Fin dove (in km del piano di adesso) l'energia consumata è già stata
+  /// detta all'auto ([_consuma]).
+  double _kmConsumo = 0;
+
+  /// Il piano di cui sono quei chilometri. Durante un ricalcolo il viaggio
+  /// nuovo arriva prima della guida nuova: finché la guida è quella di prima,
+  /// i suoi chilometri non sono del piano nuovo, e non si contano.
+  ViaggioPronto? _pianoConsumo;
+
+  /// Quanto si è consumato da [_kmConsumo] a [km], secondo il piano: lo si
+  /// dice all'auto, che ne fa la stima fra due letture. Con le soste del
+  /// piano la curva risale: è la ricarica prevista, che conta come prima.
+  void _consuma(ViaggioPronto p, double km) {
+    if (p.soloPercorso || p.viaggio.piano == null || !identical(p, _pianoConsumo)) return;
+    final da = _kmConsumo;
+    // Un passo indietro del GPS non ricarica la batteria.
+    if (km <= da) return;
+    _kmConsumo = km;
+    auto.consumato((_prevista(p, da) - _prevista(p, km)) / 100 * auto.veicolo.capacitaUtileKwh);
   }
 
   /// Quanto la macchina beve davvero rispetto al piano, o niente se non si è
@@ -274,7 +306,6 @@ class GestoreGuida extends ChangeNotifier {
     final p = pronto;
     if (p == null || attiva) return;
     attiva = true;
-    _partitoAlle = _ora();
     _vicinoDetto = false;
     _guida = Guida(p.viaggio.percorso);
     // L'avanzamento rimasto è del viaggio di prima: fino alla prima posizione
@@ -415,6 +446,10 @@ class GestoreGuida extends ChangeNotifier {
   DateTime? _lettaAlle;
   double? _velocitaMs;
 
+  /// Quanto si va, in m/s (il tachimetro dell'auto se lo dice, se no il
+  /// GPS), all'ultima posizione; `null` se non si sa.
+  double? get velocitaMs => _velocitaMs;
+
   /// Dove disegnare l'auto adesso e la direzione della strada lì; `null`
   /// se non si è agganciati alla strada (si disegna il punto del GPS).
   ({Punto punto, double rotta})? posizioneStimata() {
@@ -445,6 +480,7 @@ class GestoreGuida extends ChangeNotifier {
     if (g == null || !attiva) return;
     final a = g.aggiorna(qui);
     avanzamento = a;
+    if (pronto case final p?) _consuma(p, a.percorsiM / 1000);
     _controllaLimite(a.limiteKmh, _velocitaKmh(qui));
     // Arrivati al distributore: da qui si prosegue verso la meta.
     // Arrivati a una tappa (o al distributore): da qui si prosegue.
@@ -477,6 +513,9 @@ class GestoreGuida extends ChangeNotifier {
 
   /// Si comincia a misurare sul piano nuovo, col modello senza correttivo.
   void _nuovoPiano(ViaggioPronto p) {
+    // Il piano nuovo parte da qui: i suoi chilometri ricominciano da zero.
+    _kmConsumo = 0;
+    _pianoConsumo = p;
     // Auto termica, o elettrica senza soste: niente piano da misurare.
     if (p.soloPercorso) {
       _misuratore = null;

@@ -232,20 +232,41 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
 
     // MARK: - L'auto che scorre
 
+    /* Dal campo: «la freccia sulla mappa non è fluida, prende pause e poi
+     * cammina». A ogni posizione dal telefono si partiva da dov'era la
+     * freccia verso la posizione nuova, in un tempo pari all'intervallo di
+     * prima, e lì ci si fermava ad aspettare la prossima.
+     *
+     * Adesso è il conto di `MotoFluido` (gdanav_core, con le sue prove), come
+     * su Android Auto (`RendererMappa`): fra una posizione e l'altra l'auto va
+     * avanti da sola con la velocità che manda il telefono (`velocita_ms`) e
+     * girando come stava girando, al più per un secondo e mezzo; quello che si
+     * disegna la insegue a ogni fotogramma, mai indietro lungo la strada; da
+     * fermi, arrivata, i fotogrammi si spengono fino alla posizione dopo. */
+
     /// Latitudine, longitudine, rotta della mappa, rotta del segnaposto, zoom,
-    /// inclinazione e i quattro margini. Fra una posizione e l'altra (dal
-    /// telefono ogni 300 ms circa) segnaposto e mappa scorrono a ogni
-    /// fotogramma, invece di saltare.
+    /// inclinazione e i quattro margini: quello che si vede adesso.
     private var mostrata: [Double]?
+    /// L'ultima posizione dal telefono, con zoom e margini di adesso.
     private var obiettivo: [Double]?
-    private var partenza: [Double] = []
-    private var inizio: CFTimeInterval = 0
-    private var durata: CFTimeInterval = 0
+    /// Quando è arrivata l'ultima posizione, a che velocità (m/s) e quanto si
+    /// girava (gradi al secondo).
+    private var fixAlle: CFTimeInterval = 0
+    private var fixVelocita = 0.0
+    private var fixGira = 0.0
+    private var ultimoFotogramma: CFTimeInterval = 0
     private var collegamento: CADisplayLink?
     /// Quando lo schermo dell'auto non si sa ancora: vedi [accendiFotogrammi].
     private var orologio: Timer?
-    private var ultimaPosizione: CFTimeInterval = 0
     private var eraLibera = false
+
+    /// I numeri di `MotoFluido` (gdanav_core).
+    private static let tau = 0.2
+    private static let oltreAlPiu = 1.5
+    private static let saltoM = 120.0
+    private static let fermoSotto = 0.5
+    private static let giraAlPiu = 45.0
+    private static let metriPerGrado = 111195.08
 
     /// Quanto si avvicina la mappa arrivando a una svolta, un'uscita, una
     /// rotonda: da 600 metri si comincia, a 150 si è vicini di un livello e
@@ -282,40 +303,52 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
             inclinata ? 55 : 0,
             Double(a.left), Double(a.top) + sopra, Double(a.right), Double(a.bottom),
         ]
+        let ora = CACurrentMediaTime()
         // Tornando a seguire l'auto dopo averla spostata col dito: un volo.
         if eraLibera && !libera {
             eraLibera = false
             fermaAnimazione()
             mostrata = nuovo
             obiettivo = nuovo
+            fixAlle = ora
+            fixVelocita = 0
+            fixGira = 0
             disegna(nuovo, animata: true)
             return
         }
         eraLibera = libera
         let prima = obiettivo
         if let p = prima, p == nuovo { return }
+        // Una posizione nuova (non solo zoom o margini, che cambiano di
+        // continuo avvicinandosi a una svolta): da qui riparte la previsione.
+        if prima == nil || prima![0] != nuovo[0] || prima![1] != nuovo[1] {
+            let passo = ora - fixAlle
+            let v = ponte.velocita
+            if let p = prima, v >= 2, passo >= 0.2, passo <= 3 {
+                fixGira = min(max(MappaCarPlay.giro(p[3], nuovo[3]) / passo, -MappaCarPlay.giraAlPiu), MappaCarPlay.giraAlPiu)
+            } else if prima == nil || passo > 0.2 {
+                fixGira = 0
+            }
+            fixAlle = ora
+            fixVelocita = v.isFinite && v > 0 ? v : 0
+        }
         obiettivo = nuovo
-        let ora = CACurrentMediaTime()
-        let spostata = prima == nil || prima![0] != nuovo[0] || prima![1] != nuovo[1]
-        let passo = ora - ultimaPosizione
-        if spostata { ultimaPosizione = ora }
-        // Troppo lontano (prima volta, salto del GPS): subito lì.
-        guard let da = mostrata, abs(da[0] - nuovo[0]) <= 0.01, abs(da[1] - nuovo[1]) <= 0.01 else {
-            fermaAnimazione()
+        // Troppo lontano (prima volta, salto del GPS, ricalcolo): subito lì.
+        guard let da = mostrata, MappaCarPlay.distanzaM(da[0], da[1], nuovo[0], nuovo[1]) <= MappaCarPlay.saltoM else {
             mostrata = nuovo
             disegna(nuovo)
+            ultimoFotogramma = ora
+            if fixVelocita >= MappaCarPlay.fermoSotto { accendi() }
             return
         }
-        // Dura quanto l'intervallo fra due posizioni: si arriva quando arriva
-        // la prossima, e il moto resta continuo.
-        // Cambia solo lo zoom o i margini (avvicinandosi a una svolta, di
-        // continuo): si finisce nel tempo che restava, invece di ripartire da
-        // 0,45 s e arrivare prima della posizione dopo, e lì fermarsi.
-        let resta = inizio + durata - ora
-        partenza = da
-        inizio = ora
-        durata = spostata ? min(max(passo, 0.25), 1.3) : (resta > 0.08 ? resta : 0.45)
-        if collegamento == nil && orologio == nil { accendiFotogrammi() }
+        accendi()
+    }
+
+    private func accendi() {
+        if collegamento == nil && orologio == nil {
+            ultimoFotogramma = CACurrentMediaTime()
+            accendiFotogrammi()
+        }
     }
 
     /* I fotogrammi li da' lo schermo dell'auto, non quello del telefono.
@@ -341,16 +374,61 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         orologio = o
     }
 
+    /// Dove l'auto dovrebbe essere adesso: l'ultima posizione portata avanti.
+    private func previsione(_ o: [Double], _ ora: CFTimeInterval) -> [Double] {
+        var v = o
+        if fixVelocita < MappaCarPlay.fermoSotto { return v }
+        let t = min(max(ora - fixAlle, 0), MappaCarPlay.oltreAlPiu)
+        let r0 = o[3] * .pi / 180
+        let w = fixGira * .pi / 180
+        let est: Double, nord: Double
+        if abs(w) < 1e-4 {
+            est = fixVelocita * t * sin(r0)
+            nord = fixVelocita * t * cos(r0)
+        } else {
+            let r1 = r0 + w * t
+            est = fixVelocita / w * (cos(r0) - cos(r1))
+            nord = fixVelocita / w * (sin(r1) - sin(r0))
+        }
+        v[0] = o[0] + nord / MappaCarPlay.metriPerGrado
+        v[1] = o[1] + est / (MappaCarPlay.metriPerGrado * cos(o[0] * .pi / 180))
+        v[3] = ((o[3] + fixGira * t).truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
+        return v
+    }
+
     @objc private func fotogramma() {
-        guard let arrivo = obiettivo, partenza.count == arrivo.count else { return fermaAnimazione() }
-        let t = min((CACurrentMediaTime() - inizio) / max(durata, 0.001), 1)
-        var v = arrivo
-        for i in 0..<arrivo.count {
-            v[i] = (i == 2 || i == 3) ? angolo(partenza[i], arrivo[i], t) : partenza[i] + (arrivo[i] - partenza[i]) * t
+        guard let o = obiettivo, let da = mostrata, da.count == o.count else { return fermaAnimazione() }
+        let ora = CACurrentMediaTime()
+        // Un fotogramma saltato non diventa un salto: al più un decimo di secondo.
+        let dt = min(max(ora - ultimoFotogramma, 0), 0.1)
+        ultimoFotogramma = ora
+        let p = previsione(o, ora)
+        let k = 1 - exp(-dt / MappaCarPlay.tau)
+        let coslat = cos(da[0] * .pi / 180)
+        var est = (p[1] - da[1]) * MappaCarPlay.metriPerGrado * coslat * k
+        var nord = (p[0] - da[0]) * MappaCarPlay.metriPerGrado * k
+        if fixVelocita >= MappaCarPlay.fermoSotto {
+            // Mai indietro lungo la strada: quella parte del passo si toglie.
+            let r = p[3] * .pi / 180
+            let lungo = est * sin(r) + nord * cos(r)
+            if lungo < 0 {
+                est -= lungo * sin(r)
+                nord -= lungo * cos(r)
+            }
+        }
+        var v = da
+        v[0] = da[0] + nord / MappaCarPlay.metriPerGrado
+        v[1] = da[1] + est / (MappaCarPlay.metriPerGrado * coslat)
+        var arrivata = MappaCarPlay.distanzaM(v[0], v[1], p[0], p[1]) < 0.3
+        for i in 2..<o.count {
+            v[i] = (i == 2 || i == 3) ? angolo(da[i], p[i], k) : da[i] + (p[i] - da[i]) * k
+            let scarto = (i == 2 || i == 3) ? abs(MappaCarPlay.giro(v[i], p[i])) : abs(v[i] - p[i])
+            if scarto > 0.05 { arrivata = false }
         }
         mostrata = v
         disegna(v)
-        if t >= 1 { fermaAnimazione() }
+        let ferma = fixVelocita < MappaCarPlay.fermoSotto || ora - fixAlle >= MappaCarPlay.oltreAlPiu
+        if arrivata && ferma { fermaAnimazione() }
     }
 
     private func fermaAnimazione() {
@@ -358,6 +436,18 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         collegamento = nil
         orologio?.invalidate()
         orologio = nil
+    }
+
+    /// Di quanto si gira da `da` ad `a`, fra -180 e 180.
+    private static func giro(_ da: Double, _ a: Double) -> Double {
+        ((a - da + 540).truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360) - 180
+    }
+
+    /// Metri fra due punti vicini.
+    private static func distanzaM(_ lat1: Double, _ lon1: Double, _ lat2: Double, _ lon2: Double) -> Double {
+        let nord = (lat2 - lat1) * metriPerGrado
+        let est = (lon2 - lon1) * metriPerGrado * cos(lat1 * .pi / 180)
+        return (nord * nord + est * est).squareRoot()
     }
 
     private func disegna(_ v: [Double], animata: Bool = false) {

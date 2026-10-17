@@ -217,11 +217,137 @@ void main() {
       final g = GestoreViaggiPianificati(
         casa,
         orologio: () => giovedi,
-        calcolaStima: (da, per) async => const StimaViaggio(durata: Duration(minutes: 50), km: 40, colTraffico: true),
+        calcolaStima: (da, per, {conSoste = false}) async =>
+            const StimaViaggio(durata: Duration(minutes: 50), km: 40, colTraffico: true),
       );
       await g.carica();
       await Future<void>.delayed(Duration.zero);
       expect(stime, ['v_1']);
+    });
+
+    test('alla casa le soste del telefono, sul filo della stima', () async {
+      final mandati = <Map<String, Object?>>[];
+      final chiesteConSoste = <bool>[];
+      final casa = FonteViaggiDellaCasa((c) async {
+        mandati.add(c);
+        if (c['type'] == 'ponte/viaggi/stima') return {'viaggio': _dallaCasa()};
+        return {
+          'sbloccato': true,
+          'viaggi': [
+            {
+              ..._dallaCasa(),
+              'stima': {'durataS': 2400, 'fonte': 'strada', 'alle': 0},
+            },
+          ],
+        };
+      });
+      final g = GestoreViaggiPianificati(
+        casa,
+        orologio: () => giovedi,
+        calcolaStima: (da, per, {conSoste = false}) async {
+          chiesteConSoste.add(conSoste);
+          return StimaViaggio(
+            durata: const Duration(minutes: 50),
+            km: 40,
+            colTraffico: true,
+            soste: SostaPianificata.dalPiano(_piano()),
+            arrivo: 41.6,
+          );
+        },
+      );
+      await g.carica();
+      await Future<void>.delayed(Duration.zero);
+      expect(chiesteConSoste, [true]);
+      final stima = mandati.lastWhere((c) => c['type'] == 'ponte/viaggi/stima')['stima'] as Map;
+      expect(stima['arrivo'], 42);
+      expect(stima['soste'], [
+        {
+          'km': 123.5,
+          'nome': 'Area di servizio Arda Ovest',
+          'operatore': 'Ionity',
+          'kw': 350.0,
+          'lat': 45.12346,
+          'lon': 9.87654,
+          'da': 12,
+          'a': 80,
+          'min': 23,
+          'libera': true,
+        },
+      ]);
+    });
+
+    test('nel telefono le soste non si chiedono', () async {
+      preparaPiattaforma();
+      final telefono = FonteViaggiDelTelefono(Archivio(), orologio: () => giovedi);
+      await telefono.salva(
+        ViaggioPianificato.nuovo(TipoViaggioPianificato.una, giovedi).copia(
+          tappe: [const PostoPianificato(Luogo(nome: 'Caserta', posizione: Punto(41.07, 14.33)))],
+        ),
+      );
+      final chiesteConSoste = <bool>[];
+      final g = GestoreViaggiPianificati(
+        telefono,
+        orologio: () => giovedi,
+        calcolaStima: (da, per, {conSoste = false}) async {
+          chiesteConSoste.add(conSoste);
+          return const StimaViaggio(durata: Duration(minutes: 50), colTraffico: true);
+        },
+      );
+      await g.carica();
+      await Future<void>.delayed(Duration.zero);
+      expect(chiesteConSoste, everyElement(isFalse));
+    });
+  });
+
+  group('le soste per la casa', () {
+    test('dal piano del telefono: i campi che il ponte controlla', () {
+      final soste = SostaPianificata.dalPiano(_piano(nomeLungo: 'A' * 100, operatoreLungo: 'B' * 70))!;
+      final j = soste.single.toJson();
+      expect((j['nome'] as String).length, 80);
+      expect((j['operatore'] as String).length, 60);
+      // La potenza più alta della colonnina, anche se l'auto ne prende meno.
+      expect(j['kw'], 350);
+      expect(j['min'], isA<int>());
+    });
+
+    test('libera o no: assente se non si sa; operatore assente se non c\'è', () {
+      final j = SostaPianificata.dalPiano(_piano(disponibilita: Disponibilita.sconosciuta, operatore: null))!.single
+          .toJson();
+      expect(j.containsKey('libera'), isFalse);
+      expect(j.containsKey('operatore'), isFalse);
+      final occupata = SostaPianificata.dalPiano(_piano(disponibilita: const Disponibilita(occupate: 2, totali: 2)))!
+          .single
+          .toJson();
+      expect(occupata['libera'], isFalse);
+    });
+
+    test('senza piano niente soste, e la stima resta com\'era', () {
+      expect(SostaPianificata.dalPiano(null), isNull);
+      // Una colonnina senza scheda non ha la posizione: le soste le fa la casa.
+      expect(SostaPianificata.dalPiano(_piano(senzaScheda: true)), isNull);
+      const s = StimaViaggio(durata: Duration(minutes: 40), km: 39, colTraffico: true, arrivo: 30);
+      expect(s.toJson(), {'durataS': 2400, 'km': 39.0, 'fonte': 'traffico'});
+    });
+
+    test('la batteria basta: soste vuote, e l\'arrivo', () {
+      final s = StimaViaggio(
+        durata: const Duration(minutes: 40),
+        soste: SostaPianificata.dalPiano(const PianoViaggio(soste: [], batteriaArrivo: 55.4, durata: Duration.zero)),
+        arrivo: 55.4,
+      );
+      expect(s.toJson(), {'durataS': 2400, 'fonte': 'strada', 'soste': <Object?>[], 'arrivo': 55});
+    });
+
+    test('va e torna', () {
+      final s = StimaViaggio(
+        durata: const Duration(minutes: 50),
+        colTraffico: true,
+        soste: SostaPianificata.dalPiano(_piano()),
+        arrivo: 42,
+      );
+      final r = StimaViaggio.daJson(s.toJson())!;
+      expect(r.toJson(), s.toJson());
+      expect(r.soste!.single.libera, isTrue);
     });
   });
 
@@ -370,4 +496,44 @@ void main() {
     expect(find.text('OGNI SETTIMANA'), findsOneWidget);
     expect(find.text('Lun – Sab · arrivo entro le 8:30'), findsOneWidget);
   });
+}
+
+/// Un piano con una sosta sola, come lo fa il pianificatore del telefono.
+PianoViaggio _piano({
+  String? nomeLungo,
+  String? operatore = 'Ionity',
+  String? operatoreLungo,
+  Disponibilita disponibilita = const Disponibilita(libere: 3, occupate: 1, totali: 4),
+  bool senzaScheda = false,
+}) {
+  final scheda = Colonnina(
+    id: 'osm-node-7',
+    nome: nomeLungo ?? 'Area di servizio Arda Ovest',
+    operatore: operatoreLungo ?? operatore,
+    posizione: const Punto(45.123456, 9.876543),
+    connettori: const [
+      Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 350),
+      Connettore(tipo: TipoConnettore.ccs2, potenzaKw: 150),
+      Connettore(tipo: TipoConnettore.tipo2, potenzaKw: 22),
+    ],
+  );
+  return PianoViaggio(
+    soste: [
+      Sosta(
+        colonnina: ColonninaSulPercorso(
+          id: scheda.id,
+          nome: scheda.nome,
+          distanzaM: 123456,
+          potenzaKw: 150,
+          disponibilita: disponibilita,
+          dettaglio: senzaScheda ? null : scheda,
+        ),
+        batteriaArrivo: 12.4,
+        batteriaPartenza: 80,
+        ricarica: const Duration(minutes: 22, seconds: 40),
+      ),
+    ],
+    batteriaArrivo: 41.6,
+    durata: const Duration(hours: 2),
+  );
 }
