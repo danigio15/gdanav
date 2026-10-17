@@ -358,6 +358,7 @@ class GdanavApp extends StatelessWidget {
     VoidCallback? menuOspite,
     Widget? iconaOspite,
     ValueNotifier<bool>? apriIlMenu,
+    ValueNotifier<bool>? apriIlPianificatore,
     List<VoceOspite> vociOspite = const [],
     bool soloImpostazioni = false,
     VoidCallback? chiudiImpostazioni,
@@ -367,6 +368,7 @@ class GdanavApp extends StatelessWidget {
     menuOspite: menuOspite,
     iconaOspite: iconaOspite,
     apriIlMenu: apriIlMenu,
+    apriIlPianificatore: apriIlPianificatore,
     vociOspite: vociOspite,
     auto: auto,
     viaggio: viaggio,
@@ -402,6 +404,7 @@ class GdanavDentro extends StatelessWidget {
     this.menuOspite,
     this.iconaOspite,
     this.apriIlMenu,
+    this.apriIlPianificatore,
     this.vociOspite = const [],
     this.soloImpostazioni = false,
     this.chiudiImpostazioni,
@@ -427,6 +430,10 @@ class GdanavDentro extends StatelessWidget {
   /// Per aprire da fuori il menu di gdanav (le sue impostazioni).
   final ValueNotifier<bool>? apriIlMenu;
 
+  /// Per aprire da fuori «Pianifica i viaggi» sopra la mappa (la voce del
+  /// menu di gdahome): vedi [SchermataPrincipale.apriIlPianificatore].
+  final ValueNotifier<bool>? apriIlPianificatore;
+
   @override
   Widget build(BuildContext context) {
     return Theme(
@@ -440,6 +447,7 @@ class GdanavDentro extends StatelessWidget {
               menuOspite: menuOspite,
               iconaOspite: iconaOspite,
               apriIlMenu: apriIlMenu,
+              apriIlPianificatore: apriIlPianificatore,
               vociOspite: vociOspite,
               soloImpostazioni: soloImpostazioni,
               chiudiImpostazioni: chiudiImpostazioni,

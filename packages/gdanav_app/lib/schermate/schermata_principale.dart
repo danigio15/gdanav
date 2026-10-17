@@ -40,6 +40,7 @@ import 'la_tua_auto.dart';
 import 'mappe_offline.dart';
 import 'opzioni_percorso.dart';
 import 'pannello_partenza.dart';
+import 'pianifica_i_viaggi.dart';
 import 'pianificatore.dart';
 import 'premium.dart';
 import 'ricarica.dart';
@@ -77,6 +78,7 @@ class SchermataPrincipale extends StatefulWidget {
     this.menuOspite,
     this.iconaOspite,
     this.apriIlMenu,
+    this.apriIlPianificatore,
     this.vociOspite = const [],
     this.soloImpostazioni = false,
     this.chiudiImpostazioni,
@@ -103,6 +105,12 @@ class SchermataPrincipale extends StatefulWidget {
   /// Messo a `true` da chi ospita gdanav: si apre il menu di gdanav (le sue
   /// impostazioni), e torna `false`.
   final ValueNotifier<bool>? apriIlMenu;
+
+  /// Messo a `true` da chi ospita gdanav: si apre «Pianifica i viaggi» (o
+  /// Premium, se è chiuso), sopra la mappa, e torna `false`. gdahome lo usa
+  /// per la voce del suo menu laterale. Vale con la mappa: nella pagina delle
+  /// sole impostazioni ([soloImpostazioni]) non si guarda.
+  final ValueNotifier<bool>? apriIlPianificatore;
 
   final GestoreAuto auto;
   final GestoreViaggio viaggio;
@@ -178,8 +186,39 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
     segnalazioni.avvia();
     widget.guida.addListener(_guidaDaFuori);
     widget.apriIlMenu?.addListener(_menuDaFuori);
+    widget.apriIlPianificatore?.addListener(_pianificatoreDaFuori);
     // Chiesto prima che la schermata ci fosse: si apre appena c'è.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _menuDaFuori());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _menuDaFuori();
+      _pianificatoreDaFuori();
+    });
+  }
+
+  void _pianificatoreDaFuori() {
+    final chiesto = widget.apriIlPianificatore;
+    if (chiesto == null || !chiesto.value || !mounted) return;
+    chiesto.value = false;
+    _pianificatore();
+  }
+
+  /// «Pianifica i viaggi»: dal menu, dalla scheda sulla mappa o da chi
+  /// ospita gdanav. Senza Premium, Premium.
+  void _pianificatore() {
+    final g = widget.pianificati;
+    if (g == null) return;
+    final premium = widget.premium;
+    if (premium != null && !premium.sbloccato) {
+      _apri(SchermataPremium(premium: premium, perche: 'Il pianificatore'));
+      return;
+    }
+    _apri(
+      SchermataPianificatore(
+        gestore: g,
+        scegli: (titolo) => _scegli(titolo: titolo),
+        avvia: _avviaPianificato,
+        premium: premium == null ? null : () => _apri(SchermataPremium(premium: premium, perche: 'Il pianificatore')),
+      ),
+    );
   }
 
   void _menuDaFuori() {
@@ -219,6 +258,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
     if (!widget.soloImpostazioni) {
       widget.guida.removeListener(_guidaDaFuori);
       widget.apriIlMenu?.removeListener(_menuDaFuori);
+      widget.apriIlPianificatore?.removeListener(_pianificatoreDaFuori);
       if (widget.segnalazioni == null) segnalazioni.dispose();
     }
     controllo.dispose();
@@ -484,7 +524,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                         key: const Key('menu-pianificatore'),
                         icona: Icons.event_rounded,
                         colore: const Color(0xFF2563EB),
-                        titolo: 'Pianificatore',
+                        titolo: 'Pianifica i viaggi',
                         sotto: !sbloccato
                             ? 'Premium'
                             : switch (g.viaggi.length) {
@@ -492,18 +532,10 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                                 1 => '1 viaggio pianificato',
                                 final n => '$n viaggi pianificati',
                               },
-                        onTap: () => vai(
-                          sbloccato
-                              ? SchermataPianificatore(
-                                  gestore: g,
-                                  scegli: (titolo) => _scegli(titolo: titolo),
-                                  avvia: _avviaPianificato,
-                                  premium: widget.premium == null
-                                      ? null
-                                      : () => _apri(SchermataPremium(premium: widget.premium!, perche: 'Il pianificatore')),
-                                )
-                              : SchermataPremium(premium: widget.premium!, perche: 'Il pianificatore'),
-                        ),
+                        onTap: () {
+                          chiudi();
+                          _pianificatore();
+                        },
                       ),
                     _VoceMenu(
                       icona: Icons.alt_route_rounded,
@@ -812,6 +844,33 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
               ),
             ),
           ),
+          // «Pianifica i viaggi», sotto il menu, a sinistra dei tasti della
+          // mappa: solo a mappa libera, senza un avviso davanti, e dove sta
+          // sopra il foglio della partenza (in orizzontale no).
+          if (widget.pianificati case final g? when alto + 84 + 110 < schermo * 0.5)
+            Positioned(
+              left: 16,
+              right: 92,
+              top: alto + 84,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: ListenableBuilder(
+                    listenable: Listenable.merge([g, viaggio, widget.guida, _avvisi, ?widget.premium]),
+                    builder: (context, _) {
+                      final libero = viaggio.stato is NessunViaggio && !widget.guida.attiva && _avvisi.davanti == null;
+                      if (!libero) return const SizedBox.shrink();
+                      return SchedaPianificaIViaggi(
+                        gestore: g,
+                        sbloccato: widget.premium?.sbloccato ?? true,
+                        onTap: _pianificatore,
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
           ListenableBuilder(
             listenable: viaggio,
             builder: (context, _) {
