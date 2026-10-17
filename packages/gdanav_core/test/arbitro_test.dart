@@ -70,4 +70,55 @@ void main() {
       ..registra(lettura(TipoSorgente.androidAuto, 78, const Duration(seconds: 5)));
     expect(a.statoAttuale(ora), isNull);
   });
+
+  group('i dati dell\'auto contro la stima (dal campo: auto 23% e 95 km, gdanav 21% e 88 km)', () {
+    StatoAuto daCasa(double batteria, double km, Duration fa) => StatoAuto(
+          sorgente: TipoSorgente.gdahome,
+          letto: ora.subtract(fa),
+          batteria: batteria,
+          autonomiaKm: km,
+        );
+
+    test('una lettura nuova datata col suo ultimo cambio vale da quando arriva, e si mostra com\'è', () {
+      final a = nuovo()
+        ..registra(daCasa(25, 103, const Duration(minutes: 30)), ricevuto: ora.subtract(const Duration(minutes: 20)))
+        // La guida consuma: 1,2 kWh su 60 sono due punti.
+        ..registraConsumo(1.2, ora: ora.subtract(const Duration(minutes: 1)))
+        // Arriva il dato nuovo, ma Home Assistant lo data un quarto d'ora fa.
+        ..registra(daCasa(23, 95, const Duration(minutes: 15)), ricevuto: ora);
+      final s = a.statoAttuale(ora)!;
+      expect(s.sorgente, TipoSorgente.gdahome);
+      expect(s.batteria, 23);
+      expect(s.autonomiaKm, 95);
+      // Finché è fresca, il consumo non la tocca.
+      a.registraConsumo(0.3, ora: ora.add(const Duration(minutes: 2)));
+      expect(a.statoAttuale(ora.add(const Duration(minutes: 2)))!.batteria, 23);
+    });
+
+    test('la stima comincia solo fra due letture, scala anche i km, e si riallinea alla lettura dopo', () {
+      final a = nuovo()..registra(daCasa(23, 95, const Duration(minutes: 30)), ricevuto: ora);
+      // Vecchia (la prima lettura vale dalla sua ora): la stima parte da lei.
+      a.registraConsumo(0.6, ora: ora); // un punto
+      final stimata = a.statoAttuale(ora)!;
+      expect(stimata.sorgente, TipoSorgente.stima);
+      expect(stimata.stimataDa, TipoSorgente.gdahome);
+      expect(stimata.batteria, closeTo(22, 1e-9));
+      expect(stimata.autonomiaKm, closeTo(95 * 22 / 23, 1e-9));
+      // Arriva il dato vero: quello, non la stima.
+      a.registra(daCasa(22.5, 93, const Duration(minutes: 12)), ricevuto: ora.add(const Duration(seconds: 30)));
+      final vera = a.statoAttuale(ora.add(const Duration(seconds: 31)))!;
+      expect(vera.sorgente, TipoSorgente.gdahome);
+      expect(vera.batteria, 22.5);
+      expect(vera.autonomiaKm, 93);
+    });
+
+    test('una lettura rimandata uguale non azzera la stima e non diventa fresca', () {
+      final a = nuovo()..registra(daCasa(23, 95, const Duration(minutes: 30)));
+      a.registraConsumo(0.6, ora: ora);
+      a.registra(daCasa(23, 95, const Duration(minutes: 30)), ricevuto: ora);
+      final s = a.statoAttuale(ora)!;
+      expect(s.sorgente, TipoSorgente.stima);
+      expect(s.batteria, closeTo(22, 1e-9));
+    });
+  });
 }

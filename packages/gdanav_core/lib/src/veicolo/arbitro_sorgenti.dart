@@ -55,22 +55,55 @@ class ArbitroSorgenti {
 
   final _ultime = <TipoSorgente, StatoAuto>{};
 
+  /// Da quando ogni lettura vale come «adesso»: di solito la sua ora
+  /// ([StatoAuto.letto]), ma vedi [registra].
+  final _quando = <TipoSorgente, DateTime>{};
+
   /// Energia consumata (positiva) o recuperata (negativa) dopo ogni lettura,
   /// tenuta per sorgente perché ognuna ha la sua ora.
   final _consumoDopo = <TipoSorgente, double>{};
 
-  void registra(StatoAuto lettura) {
-    final precedente = _ultime[lettura.sorgente];
+  /// Una lettura da una sorgente. [ricevuto] è quando è arrivata al telefono.
+  ///
+  /// Dal campo: l'auto diceva 23% e 95 km, gdanav 21% e 88 km. I dati di Home
+  /// Assistant erano giusti, ma datati col loro ultimo cambio (e
+  /// l'integrazione dell'auto, o l'orologio della casa, li data come vuole):
+  /// una lettura **nuova**, appena arrivata, sembrava vecchia di un quarto
+  /// d'ora, e al suo posto si mostrava la stima. Adesso una lettura che dice
+  /// qualcosa di diverso dalla precedente della stessa sorgente vale da
+  /// quando è arrivata: Home Assistant manda un cambio quando c'è, non una
+  /// fotografia di ore fa. La prima lettura di una sorgente, che può essere
+  /// quella rimasta da ieri, vale invece dalla sua ora. E una lettura uguale
+  /// alla precedente, rimandata (una sorgente che si riaccende), non cambia
+  /// niente: né l'ora, né la stima già fatta dopo di lei.
+  void registra(StatoAuto lettura, {DateTime? ricevuto}) {
+    final tipo = lettura.sorgente;
+    final precedente = _ultime[tipo];
     if (precedente != null && lettura.letto.isBefore(precedente.letto)) return;
-    _ultime[lettura.sorgente] = lettura;
-    _consumoDopo[lettura.sorgente] = 0;
+    final diversa = precedente != null &&
+        (precedente.batteria != lettura.batteria || precedente.autonomiaKm != lettura.autonomiaKm);
+    if (precedente != null && !diversa && !lettura.letto.isAfter(precedente.letto)) return;
+    _ultime[tipo] = lettura;
+    _quando[tipo] = diversa && ricevuto != null && ricevuto.isAfter(lettura.letto) ? ricevuto : lettura.letto;
+    _consumoDopo[tipo] = 0;
   }
 
-  /// Il motore lo chiama man mano che l'auto consuma, in kWh.
-  void registraConsumo(double kWh) {
+  /// Il motore (la guida) lo chiama man mano che l'auto consuma, in kWh.
+  ///
+  /// Con [ora] il consumo non si conta per le letture ancora fresche: quelle
+  /// si mostrano come le ha dette l'auto, e la stima comincia quando smettono
+  /// di esserlo. Così il numero non salta, né quando la lettura arriva né
+  /// quando invecchia, e la stima vale solo **fra** due letture.
+  void registraConsumo(double kWh, {DateTime? ora}) {
     for (final k in _consumoDopo.keys) {
+      if (ora != null && _fresca(k, ora)) continue;
       _consumoDopo[k] = _consumoDopo[k]! + kWh;
     }
+  }
+
+  bool _fresca(TipoSorgente tipo, DateTime ora) {
+    final da = _quando[tipo];
+    return da != null && ora.difference(da) <= freschezza[tipo]!;
   }
 
   StatoAuto? statoAttuale(DateTime ora) {
@@ -81,7 +114,7 @@ class ArbitroSorgenti {
       case Automatica():
         for (final tipo in priorita) {
           final l = _ultime[tipo];
-          if (l != null && l.eta(ora) <= freschezza[tipo]!) return l;
+          if (l != null && _fresca(tipo, ora)) return l;
         }
         final piuRecente = _piuRecente();
         return piuRecente == null ? null : _aggiornata(piuRecente, ora);
@@ -89,18 +122,30 @@ class ArbitroSorgenti {
   }
 
   /// La lettura tolto il consumo avvenuto dopo: se non è cambiato niente
-  /// resta com'è, con la sua sorgente vera.
+  /// resta com'è, con la sua sorgente vera. L'autonomia dell'auto scende con
+  /// lei, coi chilometri per punto che dice l'auto.
   StatoAuto _aggiornata(StatoAuto l, DateTime ora) {
     final consumo = _consumoDopo[l.sorgente] ?? 0;
     if (consumo == 0) return l;
-    final batteria = l.batteria - consumo / capacitaUtileKwh * 100;
-    return l.conBatteria(batteria, sorgente: TipoSorgente.stima);
+    final batteria = (l.batteria - consumo / capacitaUtileKwh * 100).clamp(0, 100).toDouble();
+    final km = l.autonomiaKm;
+    return l.conBatteria(
+      batteria,
+      sorgente: TipoSorgente.stima,
+      autonomiaKm: km != null && l.batteria > 0 ? km * batteria / l.batteria : null,
+      stimataDa: l.sorgente,
+    );
   }
 
   StatoAuto? _piuRecente() {
     StatoAuto? migliore;
-    for (final l in _ultime.values) {
-      if (migliore == null || l.letto.isAfter(migliore.letto)) migliore = l;
+    DateTime? quando;
+    for (final MapEntry(key: tipo, value: l) in _ultime.entries) {
+      final q = _quando[tipo] ?? l.letto;
+      if (quando == null || q.isAfter(quando)) {
+        migliore = l;
+        quando = q;
+      }
     }
     return migliore;
   }

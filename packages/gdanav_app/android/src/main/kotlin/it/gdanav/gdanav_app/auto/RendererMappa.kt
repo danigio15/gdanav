@@ -1,6 +1,5 @@
 package it.gdanav.gdanav_app.auto
 
-import android.animation.ValueAnimator
 import android.app.Presentation
 import android.content.Context
 import android.graphics.BitmapFactory
@@ -13,7 +12,6 @@ import android.hardware.display.VirtualDisplay
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import androidx.car.app.CarContext
 import androidx.car.app.SurfaceCallback
@@ -29,7 +27,11 @@ import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.sources.GeoJsonSource
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.ln
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
  * Disegna la mappa di gdanav sullo schermo dell'auto: una MapView di
@@ -163,8 +165,7 @@ class RendererMappa(
             alCambio()
         }
         if (!soloMappa) DiagnosiTraffico.salva()
-        animazione?.cancel()
-        animazione = null
+        spegniFotogrammi()
         mostrata = null
         obiettivo = null
         sorgentiCaricate.clear()
@@ -463,25 +464,75 @@ class RendererMappa(
 
     // --- l'auto che scorre -----------------------------------------------
 
+    /*
+     * Dal campo: «la freccia sulla mappa non è fluida, prende pause e poi
+     * cammina». A ogni posizione dal telefono (una al secondo, col GPS) si
+     * partiva da dov'era la freccia verso la posizione nuova, in un tempo pari
+     * all'intervallo di prima, e lì ci si fermava ad aspettare la prossima:
+     * con una posizione in ritardo, la pausa; con una in anticipo, lo scatto.
+     *
+     * Adesso è il conto di `MotoFluido` (gdanav_core, con le sue prove), rifatto
+     * qui coi suoi numeri: fra una posizione e l'altra l'auto va avanti da sola
+     * con la velocità che manda il telefono (`velocita_ms`) e girando come
+     * stava girando, al più per [OLTRE_AL_PIU_MS]; quello che si disegna la
+     * insegue a ogni fotogramma con la costante di tempo [TAU_S], mai indietro
+     * lungo la strada; da fermi, arrivata, i fotogrammi si spengono fino alla
+     * posizione dopo.
+     *
+     * I fotogrammi li dà un `Handler` ogni [FOTOGRAMMA_MS], non il vsync del
+     * telefono: la mappa va sullo schermo dell'auto (un display virtuale che
+     * Android Auto codifica in video), e col telefono in tasca a schermo
+     * spento il vsync del telefono non c'è. Venticinque al secondo, sotto il
+     * tetto di [FPS_MASSIMI]: di più scalda e basta.
+     */
+
     /**
-     * Quello che si vede adesso e dove si va: latitudine, longitudine, rotta
-     * della mappa, rotta del segnaposto, zoom, inclinazione e i quattro
-     * margini. Fra una posizione e l'altra (dal telefono ogni 300 ms circa)
-     * segnaposto e mappa scorrono a ogni fotogramma, invece di saltare.
+     * Quello che si vede adesso: latitudine, longitudine, rotta della mappa,
+     * rotta del segnaposto, zoom, inclinazione e i quattro margini.
      */
     private var mostrata: DoubleArray? = null
+
+    /** L'ultima posizione dal telefono, con zoom e margini di adesso. */
     private var obiettivo: DoubleArray? = null
-    private var animazione: ValueAnimator? = null
-    private var ultimaPosizione = 0L
-    private var fineAnimazione = 0L
-    private var ultimoDisegno = 0L
+
+    /** Quando è arrivata l'ultima posizione, a che velocità (m/s) e quanto si girava (gradi al secondo). */
+    private var fixAlle = 0L
+    private var fixVelocita = 0.0
+    private var fixGira = 0.0
+    private var ultimoFotogramma = 0L
+    private var scorrendo = false
     private var eraLibera = false
     private val sorgentiCaricate = HashMap<String, String>()
+
+    private val fotogramma = object : Runnable {
+        override fun run() {
+            if (!scorrendo) return
+            val m = mappa
+            val s = stile
+            if (m == null || s == null || !passo(m, s)) {
+                scorrendo = false
+                return
+            }
+            principale.postDelayed(this, FOTOGRAMMA_MS)
+        }
+    }
+
+    private fun accendiFotogrammi() {
+        if (scorrendo) return
+        scorrendo = true
+        ultimoFotogramma = SystemClock.uptimeMillis()
+        principale.postDelayed(fotogramma, FOTOGRAMMA_MS)
+    }
+
+    private fun spegniFotogrammi() {
+        scorrendo = false
+        principale.removeCallbacks(fotogramma)
+    }
 
     private fun muovi(m: MapLibreMap, s: Style) {
         val qui = PonteAuto.qui
         if (qui == null) {
-            animazione?.cancel()
+            spegniFotogrammi()
             mostrata = null
             obiettivo = null
             s.getSourceAs<GeoJsonSource>("gdanav-io")?.setGeoJson(VUOTA)
@@ -509,12 +560,16 @@ class RendererMappa(
             (larghezza - a.right).toDouble().coerceAtLeast(0.0),
             (altezza - a.bottom).toDouble().coerceAtLeast(0.0),
         )
+        val ora = SystemClock.uptimeMillis()
         // Tornando a seguire l'auto dopo averla spostata col dito: un volo.
         if (eraLibera && !libera) {
             eraLibera = false
-            animazione?.cancel()
+            spegniFotogrammi()
             mostrata = nuovo
             obiettivo = nuovo
+            fixAlle = ora
+            fixVelocita = 0.0
+            fixGira = 0.0
             disegna(m, s, nuovo, sposta = false)
             m.animateCamera(CameraUpdateFactory.newCameraPosition(camera(nuovo)), 700)
             return
@@ -522,48 +577,97 @@ class RendererMappa(
         eraLibera = libera
         val prima = obiettivo
         if (prima != null && prima.contentEquals(nuovo)) return
+        // Una posizione nuova (non solo zoom o margini, che cambiano di
+        // continuo avvicinandosi a una svolta): da qui riparte la previsione.
+        if (prima == null || prima[0] != nuovo[0] || prima[1] != nuovo[1]) {
+            val passo = (ora - fixAlle) / 1000.0
+            val v = PonteAuto.velocita
+            fixGira = if (prima != null && v >= 2.0 && passo >= 0.2 && passo <= 3.0) {
+                (giro(prima[3], nuovo[3]) / passo).coerceIn(-GIRA_AL_PIU, GIRA_AL_PIU)
+            } else if (prima == null || passo > 0.2) {
+                0.0
+            } else {
+                fixGira
+            }
+            fixAlle = ora
+            fixVelocita = if (v.isFinite() && v > 0.0) v else 0.0
+        }
         obiettivo = nuovo
         val da = mostrata
-        val ora = SystemClock.uptimeMillis()
-        val spostata = prima == null || prima[0] != nuovo[0] || prima[1] != nuovo[1]
-        val passo = ora - ultimaPosizione
-        if (spostata) ultimaPosizione = ora
-        // Troppo lontano (prima volta, salto del GPS): subito lì.
-        if (da == null || abs(da[0] - nuovo[0]) > 0.01 || abs(da[1] - nuovo[1]) > 0.01) {
-            animazione?.cancel()
-            mostrata = nuovo
+        // Troppo lontano (prima volta, salto del GPS, ricalcolo): subito lì.
+        if (da == null || distanzaM(da[0], da[1], nuovo[0], nuovo[1]) > SALTO_M) {
+            mostrata = nuovo.copyOf()
             disegna(m, s, nuovo)
-            return
+            ultimoFotogramma = ora
+            if (fixVelocita < FERMO_SOTTO_MS) return
         }
-        // Dura quanto l'intervallo fra due posizioni: si arriva quando arriva
-        // la prossima, e il moto resta continuo.
-        // Cambia solo lo zoom o i margini (avvicinandosi a una svolta, di
-        // continuo): si finisce nel tempo che restava, invece di ripartire da
-        // 450 ms e arrivare prima della posizione dopo, e lì fermarsi.
-        val resta = fineAnimazione - ora
-        val durata = if (spostata) passo.coerceIn(250L, 1300L) else if (resta > 80L) resta else 450L
-        fineAnimazione = ora + durata
-        val partenza = da.copyOf()
-        animazione?.cancel()
-        animazione = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = durata
-            interpolator = LinearInterpolator()
-            addUpdateListener { va ->
-                // Uno ogni [FOTOGRAMMA_MS], e l'ultimo sempre: arriva dove deve.
-                val adesso = SystemClock.uptimeMillis()
-                if (va.animatedFraction < 1f && adesso - ultimoDisegno < FOTOGRAMMA_MS) return@addUpdateListener
-                ultimoDisegno = adesso
-                val t = (va.animatedValue as Float).toDouble()
-                val v = DoubleArray(nuovo.size) { i ->
-                    if (i == 2 || i == 3) angolo(partenza[i], nuovo[i], t) else partenza[i] + (nuovo[i] - partenza[i]) * t
-                }
-                mostrata = v
-                val st = stile ?: return@addUpdateListener
-                val mm = mappa ?: return@addUpdateListener
-                disegna(mm, st, v)
+        accendiFotogrammi()
+    }
+
+    /** Dove l'auto dovrebbe essere adesso: l'ultima posizione portata avanti. */
+    private fun previsione(o: DoubleArray, ora: Long): DoubleArray {
+        val v = o.copyOf()
+        if (fixVelocita < FERMO_SOTTO_MS) return v
+        val t = ((ora - fixAlle) / 1000.0).coerceIn(0.0, OLTRE_AL_PIU_MS / 1000.0)
+        val r0 = Math.toRadians(o[3])
+        val w = Math.toRadians(fixGira)
+        val est: Double
+        val nord: Double
+        if (abs(w) < 1e-4) {
+            est = fixVelocita * t * sin(r0)
+            nord = fixVelocita * t * cos(r0)
+        } else {
+            val r1 = r0 + w * t
+            est = fixVelocita / w * (cos(r0) - cos(r1))
+            nord = fixVelocita / w * (sin(r1) - sin(r0))
+        }
+        v[0] = o[0] + nord / METRI_PER_GRADO
+        v[1] = o[1] + est / (METRI_PER_GRADO * cos(Math.toRadians(o[0])))
+        v[3] = ((o[3] + fixGira * t) % 360.0 + 360.0) % 360.0
+        return v
+    }
+
+    /** Un fotogramma: un passo verso la previsione. `false` quando non ne servono altri. */
+    private fun passo(m: MapLibreMap, s: Style): Boolean {
+        val o = obiettivo ?: return false
+        val da = mostrata ?: return false
+        val ora = SystemClock.uptimeMillis()
+        // Un fotogramma saltato non diventa un salto: al più un decimo di secondo.
+        val dt = ((ora - ultimoFotogramma) / 1000.0).coerceIn(0.0, 0.1)
+        ultimoFotogramma = ora
+        val p = previsione(o, ora)
+        val k = 1 - exp(-dt / TAU_S)
+        val coslat = cos(Math.toRadians(da[0]))
+        var est = (p[1] - da[1]) * METRI_PER_GRADO * coslat * k
+        var nord = (p[0] - da[0]) * METRI_PER_GRADO * k
+        if (fixVelocita >= FERMO_SOTTO_MS) {
+            // Mai indietro lungo la strada: quella parte del passo si toglie.
+            val r = Math.toRadians(p[3])
+            val ve = sin(r)
+            val vn = cos(r)
+            val lungo = est * ve + nord * vn
+            if (lungo < 0) {
+                est -= lungo * ve
+                nord -= lungo * vn
             }
-            start()
         }
+        val v = DoubleArray(o.size) { i ->
+            when (i) {
+                0 -> da[0] + nord / METRI_PER_GRADO
+                1 -> da[1] + est / (METRI_PER_GRADO * coslat)
+                2, 3 -> angolo(da[i], p[i], k)
+                else -> da[i] + (p[i] - da[i]) * k
+            }
+        }
+        mostrata = v
+        disegna(m, s, v)
+        var arrivata = distanzaM(v[0], v[1], p[0], p[1]) < 0.3
+        for (i in 2 until v.size) {
+            val scarto = if (i == 2 || i == 3) abs(giro(v[i], p[i])) else abs(v[i] - p[i])
+            if (scarto > 0.05) arrivata = false
+        }
+        val ferma = fixVelocita < FERMO_SOTTO_MS || ora - fixAlle >= OLTRE_AL_PIU_MS
+        return !(arrivata && ferma)
     }
 
     /**
@@ -594,6 +698,16 @@ class RendererMappa(
                 "\"properties\":{\"icona\":\"$icona\",\"rotta\":${v[3]}}}]}",
         )
         if (sposta && !libera) m.moveCamera(CameraUpdateFactory.newCameraPosition(camera(v)))
+    }
+
+    /** Di quanto si gira da [da] ad [a], fra -180 e 180. */
+    private fun giro(da: Double, a: Double): Double = ((a - da + 540.0) % 360.0 + 360.0) % 360.0 - 180.0
+
+    /** Metri fra due punti vicini. */
+    private fun distanzaM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val nord = (lat2 - lat1) * METRI_PER_GRADO
+        val est = (lon2 - lon1) * METRI_PER_GRADO * cos(Math.toRadians(lat1))
+        return sqrt(nord * nord + est * est)
     }
 
     /** Da un angolo all'altro per la via più corta. */
@@ -634,6 +748,14 @@ class RendererMappa(
 
         /** Lo scorrere fra due posizioni: 25 fotogrammi al secondo. */
         const val FOTOGRAMMA_MS = 40L
+
+        /** I numeri di `MotoFluido` (gdanav_core): inseguimento, previsione, salto, fermi, curva. */
+        const val TAU_S = 0.2
+        const val OLTRE_AL_PIU_MS = 1500L
+        const val SALTO_M = 120.0
+        const val FERMO_SOTTO_MS = 0.5
+        const val GIRA_AL_PIU = 45.0
+        const val METRI_PER_GRADO = 111195.08
 
         /** Lo zoom in più vicino a una svolta, e da dove a dove si avvicina. */
         const val ZOOM_IN_SVOLTA = 1.5

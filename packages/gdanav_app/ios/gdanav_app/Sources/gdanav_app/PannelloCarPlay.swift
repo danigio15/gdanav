@@ -126,7 +126,9 @@ final class PannelloCarPlay: UIView {
                 ? UIColor(red: 239 / 255, green: 83 / 255, blue: 80 / 255, alpha: 1)
                 : b < 50 ? UIColor(red: 1, green: 193 / 255, blue: 7 / 255, alpha: 1)
                 : UIColor(red: 102 / 255, green: 187 / 255, blue: 106 / 255, alpha: 1)
-            let t = "\(Int(b.rounded()))%"
+            // «~» fra due letture dell'auto: è la stima, come il pedaggio.
+            let circa = c.batteriaStimata ? "~" : ""
+            let t = "\(circa)\(Int(b.rounded()))%"
             pezzi.append((dp(32) + larghezza(t, forte), { x, y in
                 let corpo = CGRect(x: x, y: y - self.dp(15), width: self.dp(24), height: self.dp(13))
                 UIColor.white.setStroke()
@@ -146,7 +148,7 @@ final class PannelloCarPlay: UIView {
                 self.scrivi(t, x + self.dp(32), y, forte)
             }))
             if let km = c.autonomiaKm {
-                let t = "\(Int(km.rounded())) km"
+                let t = "\(circa)\(Int(km.rounded())) km"
                 pezzi.append((larghezza(t, forte), { x, y in self.scrivi(t, x, y, forte) }))
             }
             if let v = c.arrivoBatteria {

@@ -315,7 +315,8 @@ jobs:
   # spesso sovraccarico — più i posti della Piattaforma Unica Nazionale nel
   # CSV di onData (CC BY 4.0). Solo quando il commit lo chiede con
   # «[colonnine]»; il JSON va nella release «anteprima», da mettere in
-  # packages/gdanav_app/assets.
+  # packages/gdanav_app/assets, e accanto colonnine-rapide.json.gz per il
+  # ponte di Home Assistant (la repo è pubblica: lo scarica senza chiavi).
   colonnine-dati:
     if: contains(github.event.head_commit.message, '[colonnine]')
     runs-on: ubuntu-latest
@@ -372,13 +373,18 @@ jobs:
           dart run tool/colonnine_pun.dart colonnine.json ${{ runner.temp }}/pun.csv colonnine.json | tee -a $GITHUB_STEP_SUMMARY
       - run: dart run tool/autovelox_osm.dart autovelox.json ${{ runner.temp }}/*.autovelox.opl
         working-directory: packages/gdanav_core
+      # Le sole rapide (una presa da 50 kW in su, con tutte le loro prese),
+      # compresse: il ponte di Home Assistant le scarica una volta a settimana
+      # per le soste di ricarica del pianificatore nella plancia.
+      - run: dart run tool/colonnine_rapide.dart colonnine.json colonnine-rapide.json.gz | tee -a $GITHUB_STEP_SUMMARY
+        working-directory: packages/gdanav_core
       - name: Nella release
         working-directory: packages/gdanav_core
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
-          gh release upload anteprima colonnine.json autovelox.json --clobber
+          gh release upload anteprima colonnine.json autovelox.json colonnine-rapide.json.gz --clobber
 
   # Le ZTL e le aree pedonali per l'archivio dentro l'app, dall'estratto
   # d'Italia di OpenStreetMap (Geofabrik) filtrato con osmium, coi paesi per

@@ -10,9 +10,13 @@ import '../sorgenti/sorgente_gdahome.dart';
 import '../sorgenti/sorgente_manuale.dart';
 import 'archivio.dart';
 
-/// L'autonomia che dice l'auto, se la dice da una fonte vera (non la stima,
-/// non la batteria scritta a mano), portata alla batteria di
-/// [batteriaAdesso]. `null` se l'auto non la dice.
+/// L'autonomia che dice l'auto, se la dice da una fonte vera (non la
+/// batteria scritta a mano), portata alla batteria di [batteriaAdesso].
+/// `null` se l'auto non la dice.
+///
+/// Vale anche la stima fatta da una lettura vera dell'auto
+/// ([StatoAuto.stimataDa]): l'arbitro ha già portato i suoi chilometri alla
+/// batteria stimata, coi chilometri per punto dell'auto.
 ///
 /// Anche una lettura vecchia vale. Dal campo: dalla casa 227 km al 53%, e in
 /// guida «421 km». Home Assistant (anche attraverso gdahome) data la lettura
@@ -24,7 +28,8 @@ import 'archivio.dart';
 double? autonomiaDellAuto(StatoAuto? s, {double? batteriaAdesso, required DateTime ora}) {
   final km = s?.autonomiaKm;
   if (s == null || km == null || !km.isFinite) return null;
-  if (s.sorgente == TipoSorgente.stima || s.sorgente == TipoSorgente.manuale) return null;
+  final da = s.sorgente == TipoSorgente.stima ? s.stimataDa : s.sorgente;
+  if (da == null || da == TipoSorgente.stima || da == TipoSorgente.manuale) return null;
   if (ora.difference(s.letto) < const Duration(minutes: 10) || s.batteria <= 0) return km;
   return km * (batteriaAdesso ?? s.batteria) / s.batteria;
 }
@@ -437,7 +442,9 @@ class GestoreAuto extends ChangeNotifier {
     _sorgenti[s.tipo] = s;
     _iscrizioni.add(
       s.letture.listen((l) {
-        arbitro.registra(l);
+        // Con l'ora d'arrivo: una lettura nuova vale da adesso anche se Home
+        // Assistant la data col suo ultimo cambio (`ArbitroSorgenti.registra`).
+        arbitro.registra(l, ricevuto: DateTime.now());
         _aggiorna();
       }),
     );
@@ -474,6 +481,18 @@ class GestoreAuto extends ChangeNotifier {
     stato = arbitro.statoAttuale(DateTime.now());
     if (stato?.velocitaKmh case final v?) _velocita(v, notifica: false);
     notifyListeners();
+  }
+
+  /// In guida, l'energia consumata (o recuperata, negativa) da quando la
+  /// guida l'ha detto l'ultima volta, in kWh: la stima della batteria parte
+  /// dall'ultima lettura vera e scende con questo, finché non ne arriva
+  /// un'altra (`ArbitroSorgenti.registraConsumo`). Non si avvisa nessuno: chi
+  /// lo chiama (la guida) avvisa da sé a ogni posizione.
+  void consumato(double kWh) {
+    if (kWh == 0 || !kWh.isFinite) return;
+    final ora = DateTime.now();
+    arbitro.registraConsumo(kWh, ora: ora);
+    stato = arbitro.statoAttuale(ora);
   }
 
   /// La velocità del cruscotto (Android Auto, Home Assistant), per il
