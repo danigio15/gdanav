@@ -172,7 +172,7 @@ object PonteAuto {
 
     @Volatile var termica = Termica()
 
-    /** gdanav Premium: l'app lo dice, l'auto lo ricorda anche a telefono spento. */
+    /** GdANav Premium: l'app lo dice, l'auto lo ricorda anche a telefono spento. */
     private var preferenze: SharedPreferences? = null
 
     fun premium(context: Context): Boolean =
@@ -196,7 +196,7 @@ object PonteAuto {
     fun premiumNoto(context: Context): Boolean =
         context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).contains("premium")
 
-    /** Premium si compra nell'app che ospita gdanav (GdAHome), non in gdanav. */
+    /** Premium si compra nell'app che ospita GdANav (GdAHome), non in GdANav. */
     fun premiumOspite(context: Context): Boolean =
         context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).getBoolean("premium_ospite", false)
 
@@ -302,20 +302,35 @@ object PonteAuto {
                 testo = call.argument<String>("testo"),
             )
             "opzioni" -> opzioni = (call.arguments as? Map<*, *>)?.entries?.associate { "${it.key}" to it.value } ?: emptyMap()
+            /* Le immagini si decodificano fuori dal filo principale: la vista
+             * dello svincolo è un PNG di 960×380, le icone sono un centinaio,
+             * e il filo principale è quello che risponde ad Android Auto.
+             * Pronte, tornano qui e avvisano gli schermi. */
             "svincolo" -> {
                 val id = numero(call, "id")?.toInt()
                 val png = call.argument<ByteArray>("png")
-                val bitmap = png?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-                if (id != null && bitmap != null) {
-                    svincoli = svincoli.entries.toList().takeLast(2).associate { it.key to it.value } + (id to bitmap)
+                if (id != null && png != null) {
+                    RendererMappa.lavoro.execute {
+                        val bitmap = BitmapFactory.decodeByteArray(png, 0, png.size) ?: return@execute
+                        principale.post {
+                            svincoli = svincoli.entries.toList().takeLast(2).associate { it.key to it.value } + (id to bitmap)
+                            avvisa()
+                        }
+                    }
                 }
             }
             "immagini" -> {
-                val nuove = HashMap(immagini)
-                (call.argument<Map<String, ByteArray>>("png") ?: emptyMap()).forEach { (nome, byte) ->
-                    BitmapFactory.decodeByteArray(byte, 0, byte.size)?.let { nuove[nome] = it }
+                val png = call.argument<Map<String, ByteArray>>("png") ?: emptyMap()
+                RendererMappa.lavoro.execute {
+                    val lette = HashMap<String, Bitmap>()
+                    png.forEach { (nome, byte) ->
+                        BitmapFactory.decodeByteArray(byte, 0, byte.size)?.let { lette[nome] = it }
+                    }
+                    principale.post {
+                        immagini = HashMap(immagini).apply { putAll(lette) }
+                        avvisa()
+                    }
                 }
-                immagini = nuove
             }
             "premium" -> preferenze?.edit()
                 ?.putBoolean("premium", call.argument<Boolean>("sbloccato") == true)
@@ -506,7 +521,21 @@ object PonteAuto {
      * solo allora si rifà: la guida arriva ogni secondo, e rifare tutto ogni
      * secondo fa tremare gli schermi che della guida non mostrano niente.
      */
-    private fun avvisa() = principale.post { ascoltatori.forEach { it() } }
+    private fun avvisa() {
+        /* Una volta per giro del filo principale: dal telefono arrivano a
+         * raffica (posizione, cruscotto e guida a ogni lettura del GPS), e
+         * ogni avviso rifaceva pannello e mappa di ogni schermo aperto. Gli
+         * schermi leggono lo stato di adesso: uno basta per tutta la raffica. */
+        if (avvisoInCoda) return
+        avvisoInCoda = true
+        principale.post {
+            avvisoInCoda = false
+            ascoltatori.forEach { it() }
+        }
+    }
+
+    /** Un avviso è già in coda sul filo principale (si tocca solo da lì). */
+    private var avvisoInCoda = false
 
     private var ultimaVelocita: Double? = null
     private var ultimoOdometro: Double? = null

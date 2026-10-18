@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Quello che serve a gdanav sul telefono, in qualunque app stia: si
-         unisce da solo al manifesto di chi lo porta dentro (l'app gdanav,
+    <!-- Quello che serve a GdANav sul telefono, in qualunque app stia: si
+         unisce da solo al manifesto di chi lo porta dentro (l'app GdANav,
          GdAHome). Android Auto invece lo dichiara l'app. -->
     <!-- Mappe, percorsi, relay di Home Assistant. -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -13,7 +13,7 @@
     <!-- La notifica di navigazione con la prossima manovra (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- In auto col telefono in tasca: il servizio in primo piano che tiene
-         accesa la posizione finché gdanav è sullo schermo dell'auto
+         accesa la posizione finché GdANav è sullo schermo dell'auto
          (`auto/PosizioneInAuto.kt`). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />

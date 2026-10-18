@@ -156,7 +156,7 @@ class Ambiente {
 /// (`tester.binding.clock.now`), che va avanti con `pump`. [dove] è dove si
 /// è quando si calcola il viaggio, per le prove che lo vogliono diverso da
 /// [posizione]: un GPS che una volta non risponde, per esempio. [GdAHome]:
-/// la fonte dei dati dell'auto quando gdanav gira dentro GdAHome.
+/// la fonte dei dati dell'auto quando GdANav gira dentro GdAHome.
 Future<Ambiente> ambiente(
   WidgetTester tester, {
   int km = 500,

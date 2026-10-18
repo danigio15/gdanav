@@ -17,7 +17,7 @@ class PannelloPremium extends StatefulWidget {
   static const privacy = 'https://gdanav.gdahome.org/privacy';
 
   /// Le condizioni d'uso: quelle standard di Apple (EULA), valide anche per
-  /// Google Play finché gdanav non ne ha di sue.
+  /// Google Play finché GdANav non ne ha di sue.
   static const condizioni = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 
   /// Lo schermo dell'auto: Android Auto o, su iPhone, CarPlay. Solo quello
@@ -96,7 +96,7 @@ class _PannelloPremiumState extends State<PannelloPremium> {
                 Icon(Icons.workspace_premium, color: s.primary, size: 36),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text('gdanav Premium', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                  child: Text('GdANav Premium', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
                 ),
               ],
             ),
@@ -165,7 +165,7 @@ class _PannelloPremiumState extends State<PannelloPremium> {
                 ),
               TextButton(onPressed: p.inCorso ? null : p.ripristina, child: const Text('Ripristina abbonamento')),
             ],
-            // Il codice regalo: gdanav da sola, anche con Premium già attivo
+            // Il codice regalo: GdANav da sola, anche con Premium già attivo
             // (per allungarlo), mai dentro GdAHome (lì si riscatta per la casa).
             if (p.codiciRegalo)
               OutlinedButton.icon(

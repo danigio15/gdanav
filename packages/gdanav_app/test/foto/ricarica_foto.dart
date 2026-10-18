@@ -40,7 +40,7 @@ import 'package:gdanav_core/gdanav_core.dart';
 import '../aiuti.dart';
 
 /// Un carattere vero dal sistema: senza, la fotografia esce a quadratini e
-/// non si giudica niente. gdanav non ne porta uno suo — usa quello del
+/// non si giudica niente. GdANav non ne porta uno suo — usa quello del
 /// telefono — e qui si prende il più vicino che c'è su questa macchina.
 Future<void> _ilCarattere() async {
   const dove = [

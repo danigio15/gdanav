@@ -74,7 +74,7 @@ class GestoreAuto extends ChangeNotifier {
   final ArbitroSorgenti arbitro;
   final manuale = SorgenteManuale();
 
-  /// La fonte GdAHome, quando gdanav gira dentro l'app GdAHome: si accende da
+  /// La fonte GdAHome, quando GdANav gira dentro l'app GdAHome: si accende da
   /// sola, senza abbinamento. Come le altre fonti automatiche, la sua
   /// batteria vale solo con Premium (lì: la casa è Premium).
   final SorgenteGdahome? gdahome;
@@ -217,19 +217,19 @@ class GestoreAuto extends ChangeNotifier {
     final r = h.relay;
     if (!r.collegato) return 'Non raggiungo il relay di Home Assistant: controlla la rete';
     if (r.casa == false) {
-      return 'Home Assistant non è collegato al relay: controlla l\'integrazione gdanav in Home Assistant';
+      return 'Home Assistant non è collegato al relay: controlla l\'integrazione GdANav in Home Assistant';
     }
     if (r.scartate > 0 && r.aperte == 0) {
       return 'I dati di Home Assistant non si aprono: controlla l\'ora di Home Assistant o rifai l\'abbinamento';
     }
     if (h.senzaBatteria) {
-      return 'Home Assistant non dice la batteria: scegli il sensore nell\'integrazione gdanav';
+      return 'Home Assistant non dice la batteria: scegli il sensore nell\'integrazione GdANav';
     }
     return 'Home Assistant è collegato, ma non ha ancora mandato la batteria';
   }
 
   /// In viaggio: che Home Assistant rilegga l'auto e mandi i dati freschi,
-  /// sia dall'integrazione gdanav sia da GdAHome (che prima non lo chiedeva
+  /// sia dall'integrazione GdANav sia da GdAHome (che prima non lo chiedeva
   /// mai: i dati da GdAHome arrivavano solo quando l'integrazione dell'auto
   /// cambiava un valore, e «Da GdAHome · 2 h fa» restava lì).
   Future<void> chiediAggiornamento() async {

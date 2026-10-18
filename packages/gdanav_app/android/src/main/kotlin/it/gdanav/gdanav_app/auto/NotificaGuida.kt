@@ -24,7 +24,7 @@ import androidx.core.content.ContextCompat
  * già la voce) solo quando cambia la manovra, non a ogni metro.
  *
  * Con Android Auto collegato il telefono sta zitto: la guida è sullo schermo
- * dell'auto. Se lì davanti c'è gdanav la notifica non serve e non c'è; se
+ * dell'auto. Se lì davanti c'è GdANav la notifica non serve e non c'è; se
  * c'è un'altra app (la musica, il telefono) serve all'auto per la manovra in
  * alto, e sul telefono passa per un canale al minimo: niente icona, niente
  * finestrella, in fondo alle notifiche.
@@ -40,13 +40,13 @@ object NotificaGuida {
     /** La sessione di Android Auto è aperta. */
     @Volatile var inAuto = false
 
-    /** Sullo schermo dell'auto, davanti, c'è gdanav. */
+    /** Sullo schermo dell'auto, davanti, c'è GdANav. */
     @Volatile var davantiInAuto = false
 
     private fun canali(context: Context) {
         if (canaliFatti || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val c = NotificationChannel(CANALE, "Guida", NotificationManager.IMPORTANCE_HIGH).apply {
-            description = "La prossima manovra mentre gdanav ti guida"
+            description = "La prossima manovra mentre GdANav ti guida"
             setSound(null, null)
             enableVibration(false)
             setShowBadge(false)

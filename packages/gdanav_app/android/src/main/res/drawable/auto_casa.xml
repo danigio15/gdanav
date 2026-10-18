@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- La casa, per Android Auto: il tasto che apre lo schermo di chi porta
-     gdanav dentro (GdAHome). -->
+     GdANav dentro (GdAHome). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp"
     android:height="48dp"

@@ -11,13 +11,13 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import 'aiuti.dart';
 
-/// Il confronto con ABRP: lo stesso viaggio, la stessa B10, e gdanav più
+/// Il confronto con ABRP: lo stesso viaggio, la stessa B10, e GdANav più
 /// pessimista e coi dati «di 2 h fa».
 void main() {
   setUp(preparaPiattaforma);
   final b10 = catalogoVeicoli.firstWhere((v) => v.id == 'leapmotor-b10-56');
 
-  test('gdanav chiede dati freschi anche a GdAHome: all\'avvio e in viaggio', () async {
+  test('GdANav chiede dati freschi anche a GdAHome: all\'avvio e in viaggio', () async {
     var chieste = 0;
     final g = SorgenteGdahome()..aggiorna = () async => chieste++;
     final auto = GestoreAuto(archivio: Archivio(), gdahome: g);
@@ -51,7 +51,7 @@ void main() {
     expect(dopo.condizioni(null).fattoreConsumo, c.imparato.fattore);
   });
 
-  testWidgets('in La tua auto il consumo lo impara gdanav: niente numeri da altre app', (tester) async {
+  testWidgets('in La tua auto il consumo lo impara GdANav: niente numeri da altre app', (tester) async {
     final archivio = Archivio();
     await archivio.salvaVeicolo(b10);
     final auto = GestoreAuto(archivio: archivio);

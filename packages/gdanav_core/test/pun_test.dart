@@ -63,7 +63,7 @@ void main() {
     });
 
     /* Il caso dal campo: la colonnina di Via Domenico Aulisio che ABRP ed
-     * EVDC mostrano e gdanav no. È della rete Be Charge, oggi Plenitude. */
+     * EVDC mostrano e GdANav no. È della rete Be Charge, oggi Plenitude. */
     test('il Parcheggio P5 di Via Domenico Aulisio, di Plenitude', () {
       final p5 = chiamata(esempio(), 'Parcheggio P5');
       expect(p5.connettori, hasLength(4));

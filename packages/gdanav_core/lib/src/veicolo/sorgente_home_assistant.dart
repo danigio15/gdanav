@@ -6,7 +6,7 @@ import 'sorgente_dati_auto.dart';
 import 'stato_auto.dart';
 
 /// Lo stato dell'auto come lo vede Home Assistant, attraverso l'integrazione
-/// gdanav e il relay.
+/// GdANav e il relay.
 class SorgenteHomeAssistant implements SorgenteDatiAuto {
   SorgenteHomeAssistant(this.relay);
 

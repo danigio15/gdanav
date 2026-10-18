@@ -22,7 +22,7 @@ class SessioneQuadro : Session() {
     override fun onCreateScreen(intent: Intent): Screen = SchermoQuadro(carContext)
 }
 
-/** Lo schermo del quadro: la mappa di gdanav e basta. */
+/** Lo schermo del quadro: la mappa di GdANav e basta. */
 class SchermoQuadro(carContext: CarContext) : Screen(carContext), DefaultLifecycleObserver {
     private val renderer = RendererMappa(carContext, soloMappa = true)
     private val aggiorna: () -> Unit = { renderer.aggiorna() }
@@ -45,13 +45,13 @@ class SchermoQuadro(carContext: CarContext) : Screen(carContext), DefaultLifecyc
     override fun onGetTemplate(): Template =
         NavigationTemplate.Builder()
             .setActionStrip(
-                ActionStrip.Builder().addAction(Action.Builder().setTitle("gdanav").setOnClickListener {}.build()).build(),
+                ActionStrip.Builder().addAction(Action.Builder().setTitle("GdANav").setOnClickListener {}.build()).build(),
             )
             .build()
 }
 
 /**
- * Per il servizio d'auto di chi porta gdanav dentro (l'app gdanav,
+ * Per il servizio d'auto di chi porta GdANav dentro (l'app GdANav,
  * GdAHome): la sessione giusta per lo schermo che l'auto apre, quello
  * centrale o il quadro strumenti.
  */

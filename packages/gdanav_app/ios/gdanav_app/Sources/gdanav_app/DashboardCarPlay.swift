@@ -1,16 +1,16 @@
 import CarPlay
 import UIKit
 
-/// gdanav nel Dashboard di CarPlay: il riquadro della mappa accanto alla
+/// GdANav nel Dashboard di CarPlay: il riquadro della mappa accanto alla
 /// musica e al calendario, quando l'app non è a schermo intero.
 ///
-/// Come la mappa a mezzo schermo di Android Auto: la stessa mappa di gdanav
+/// Come la mappa a mezzo schermo di Android Auto: la stessa mappa di GdANav
 /// (`MappaCarPlay`, senza i dati sopra) che segue l'auto. In guida la manovra
 /// e i tempi li scrive CarPlay da sé, accanto alla mappa, dal viaggio che la
 /// scena principale ha già aperto (`GdanavCarPlay`). Senza una guida in
 /// corso, due tasti: Casa e Lavoro, se sono impostati.
 ///
-/// Chi porta gdanav dentro la mette nell'Info.plist come delegato della scena
+/// Chi porta GdANav dentro la mette nell'Info.plist come delegato della scena
 /// `CPTemplateApplicationDashboardSceneSessionRoleApplication`, col nome
 /// `GdanavDashboardCarPlay`.
 @objc(GdanavDashboardCarPlay)

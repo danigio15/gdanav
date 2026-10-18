@@ -32,7 +32,7 @@ void main() {
       expect(letto.nomeAuto, a.nomeAuto);
     });
 
-    test('rifiuta un QR che non è di gdanav', () {
+    test('rifiuta un QR che non è di GdANav', () {
       expect(() => Abbinamento.daUri('https://esempio.dev/?k=x'), throwsFormatException);
       expect(() => Abbinamento.daUri('gdanav://abbina?v=2&k=x&r=y'), throwsFormatException);
     });

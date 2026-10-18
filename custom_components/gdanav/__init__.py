@@ -1,4 +1,4 @@
-"""gdanav: il navigatore per auto elettriche, collegato a Home Assistant."""
+"""GdANav: il navigatore per auto elettriche, collegato a Home Assistant."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
             if call.data.get("config_entry_id") in (None, e.entry_id)
         ]
         if not voci:
-            raise HomeAssistantError("Nessuna auto gdanav configurata")
+            raise HomeAssistantError("Nessuna auto GdANav configurata")
         dati = {k: v for k, v in call.data.items() if k != "config_entry_id"}
         if "partenza" in dati:
             dati["partenza"] = dati["partenza"].isoformat()

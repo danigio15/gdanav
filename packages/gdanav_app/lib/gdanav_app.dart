@@ -33,7 +33,7 @@ import 'stato/voce.dart';
 import 'sorgenti/sorgente_gdahome.dart';
 import 'tema.dart';
 
-// Quello che serve a chi ospita gdanav per dargli l'auto: la fonte GdAHome e
+// Quello che serve a chi ospita GdANav per dargli l'auto: la fonte GdAHome e
 // la lettura che le si manda.
 export 'package:gdanav_core/gdanav_core.dart' show Punto, StatoAuto, TipoSorgente;
 
@@ -42,12 +42,12 @@ export 'schermate/schermata_principale.dart' show VoceOspite;
 export 'sorgenti/sorgente_gdahome.dart';
 export 'stato/gestore_persone.dart' show GestorePersone, PersonaSullaMappa;
 
-/// Accende tutto quello che gdanav tiene in piedi — l'auto, il viaggio, la
+/// Accende tutto quello che GdANav tiene in piedi — l'auto, il viaggio, la
 /// guida, la posizione, le segnalazioni — e torna l'app pronta da disegnare.
 ///
-/// La chiama `main` nell'app gdanav, e la chiama GdAHome la prima volta che si
+/// La chiama `main` nell'app GdANav, e la chiama GdAHome la prima volta che si
 /// apre la sezione del navigatore: lì il portachiavi è un altro ([portachiavi],
-/// per non mescolare le chiavi della casa con quelle di gdanav) e Android Auto
+/// per non mescolare le chiavi della casa con quelle di GdANav) e Android Auto
 /// lo decide lei ([conLAuto]). Lì c'è anche [GdAHome]: l'auto della
 /// sezione Auto della sua plancia, coi dati in tempo reale dalla casa, senza
 /// abbinamento.
@@ -55,12 +55,12 @@ export 'stato/gestore_persone.dart' show GestorePersone, PersonaSullaMappa;
 /// Premium (Home Assistant e la batteria letta dall'auto, il percorso con le
 /// soste e le colonnine in tempo reale, Android Auto e CarPlay; il resto è per
 /// tutti):
-/// - **gdanav da sola**: l'abbonamento di gdanav dal Play Store o dall'App
+/// - **GdANav da sola**: l'abbonamento di GdANav dal Play Store o dall'App
 ///   Store, oppure un codice regalo riscattato per questo telefono (le
 ///   licenze di `docs/LICENZE.md` di GdAHome);
 /// - **dentro un'altra app** ([premiumOspite], gdahome): lo decide lei. Se lì
-///   è stato comprato il suo Premium è tutto sbloccato; se no, gdanav dice di
-///   comprarlo lì, senza il negozio di gdanav;
+///   è stato comprato il suo Premium è tutto sbloccato; se no, GdANav dice di
+///   comprarlo lì, senza il negozio di GdANav;
 /// - [senzaPremium]: tutto sbloccato e niente voce «Premium» (per chi non ha
 ///   ancora i pagamenti).
 ///
@@ -72,7 +72,7 @@ export 'stato/gestore_persone.dart' show GestorePersone, PersonaSullaMappa;
 /// [persone]: quelli di casa sulla mappa, li mette l'app ospite (GdAHome).
 ///
 /// Le versioni troppo vecchie ([GestoreAggiornamento]) si fermano solo in
-/// gdanav da sola: dentro un'altra app ([premiumOspite], [GdAHome] o
+/// GdANav da sola: dentro un'altra app ([premiumOspite], [GdAHome] o
 /// [senzaPremium]) ci pensa lei.
 Future<GdanavApp> preparaGdanav({
   FlutterSecureStorage? portachiavi,
@@ -190,7 +190,7 @@ Future<GdanavApp> preparaGdanav({
   if (await haPosizione()) posizione.avvia();
   // Le segnalazioni servono anche con l'app aperta solo sull'auto.
   segnalazioni.avvia();
-  // Lo schermo dell'auto: solo dove Android Auto è di gdanav.
+  // Lo schermo dell'auto: solo dove Android Auto è di GdANav.
   if (conLAuto) {
     final ponte = PonteAuto(
       viaggio: viaggio,
@@ -208,7 +208,7 @@ Future<GdanavApp> preparaGdanav({
       gpsDellAuto: gpsDellAuto,
     )..avvia();
     // Una versione da aggiornare spegne anche l'auto: lì si dice di
-    // aggiornare gdanav sul telefono.
+    // aggiornare GdANav sul telefono.
     void premiumInAuto() => ponte.premium(
           premium.sbloccato,
           ospite: premium.daOspite,
@@ -241,7 +241,7 @@ Future<GdanavApp> preparaGdanav({
   );
 }
 
-/// Da dove leggere i viaggi pianificati: la casa, se chi ospita gdanav sa
+/// Da dove leggere i viaggi pianificati: la casa, se chi ospita GdANav sa
 /// chiederle qualcosa; se no il telefono. [prima]: quella di adesso, che
 /// resta se non è cambiato niente.
 @visibleForTesting
@@ -319,11 +319,11 @@ class GdanavApp extends StatelessWidget {
   /// Le ZTL e le aree pedonali: sulla mappa, gli avvisi e i permessi.
   final GestoreZtl? ztl;
 
-  /// Le persone di casa sulla mappa: le mette chi ospita gdanav (GdAHome).
-  /// `null` in gdanav da sola.
+  /// Le persone di casa sulla mappa: le mette chi ospita GdANav (GdAHome).
+  /// `null` in GdANav da sola.
   final GestorePersone? persone;
 
-  /// Porta a un punto scelto da chi ospita gdanav: calcola il viaggio fin lì,
+  /// Porta a un punto scelto da chi ospita GdANav: calcola il viaggio fin lì,
   /// e la meta si chiama [nome]. GdAHome lo usa per «Apri in mappa» sulla
   /// scheda di una persona: invece della mappa di Home Assistant, il
   /// navigatore con la strada per arrivarci.
@@ -338,7 +338,7 @@ class GdanavApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'gdanav',
+      title: 'GdANav',
       debugShowCheckedModeBanner: false,
       theme: temaGdanav(Brightness.light),
       darkTheme: temaGdanav(Brightness.dark),
@@ -390,12 +390,12 @@ class GdanavApp extends StatelessWidget {
   );
 }
 
-/// gdanav dentro un'altra app: GdAHome, che lo apre come una sua sezione.
+/// GdANav dentro un'altra app: GdAHome, che lo apre come una sua sezione.
 ///
-/// Ha il suo tema e il suo navigatore: le schermate che gdanav apre sopra la
-/// mappa restano dentro la sezione, col vestito di gdanav, e il resto
+/// Ha il suo tema e il suo navigatore: le schermate che GdANav apre sopra la
+/// mappa restano dentro la sezione, col vestito di GdANav, e il resto
 /// dell'app — la barra, il menu — resta dov'è. Il tasto Indietro lo decide chi
-/// ospita: con [navigatore] in mano chiude prima le schermate di gdanav.
+/// ospita: con [navigatore] in mano chiude prima le schermate di GdANav.
 class GdanavDentro extends StatelessWidget {
   const GdanavDentro({
     super.key,
@@ -410,7 +410,7 @@ class GdanavDentro extends StatelessWidget {
     this.chiudiImpostazioni,
   });
 
-  /// Solo le impostazioni di gdanav, senza mappa: vedi
+  /// Solo le impostazioni di GdANav, senza mappa: vedi
   /// [SchermataPrincipale.soloImpostazioni].
   final bool soloImpostazioni;
   final VoidCallback? chiudiImpostazioni;
@@ -418,16 +418,16 @@ class GdanavDentro extends StatelessWidget {
   /// Il disegno del tasto del menu di chi ospita (il suo marchio).
   final Widget? iconaOspite;
 
-  /// Le voci che chi ospita aggiunge al menu di gdanav.
+  /// Le voci che chi ospita aggiunge al menu di GdANav.
   final List<VoceOspite> vociOspite;
 
   final GdanavApp app;
   final GlobalKey<NavigatorState>? navigatore;
 
-  /// Il menu di chi ospita: lo apre il suo tasto, accanto al menu di gdanav.
+  /// Il menu di chi ospita: lo apre il suo tasto, accanto al menu di GdANav.
   final VoidCallback? menuOspite;
 
-  /// Per aprire da fuori il menu di gdanav (le sue impostazioni).
+  /// Per aprire da fuori il menu di GdANav (le sue impostazioni).
   final ValueNotifier<bool>? apriIlMenu;
 
   /// Per aprire da fuori «Pianifica i viaggi» sopra la mappa (la voce del

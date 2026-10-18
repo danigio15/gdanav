@@ -12,11 +12,11 @@ import it.gdanav.gdanav_app.auto.Diagnosi
 import it.gdanav.gdanav_app.auto.PosizioneInAuto
 
 /**
- * Il pezzo nativo di gdanav che viaggia col pacchetto: i permessi Bluetooth
+ * Il pezzo nativo di GdANav che viaggia col pacchetto: i permessi Bluetooth
  * per il dongle OBD e la diagnosi di Android Auto. Gli schermi dell'auto
- * (`auto/`) li usa il servizio dell'app che porta gdanav dentro.
+ * (`auto/`) li usa il servizio dell'app che porta GdANav dentro.
  *
- * Flutter lo registra da solo in ogni app che porta gdanav dentro; con l'app
+ * Flutter lo registra da solo in ogni app che porta GdANav dentro; con l'app
  * aperta solo da Android Auto un'attività non c'è, e ai permessi la risposta
  * è «no».
  */

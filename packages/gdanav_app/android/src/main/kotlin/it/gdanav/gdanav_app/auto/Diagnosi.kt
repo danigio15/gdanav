@@ -8,7 +8,7 @@ import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * Cosa vede il telefono di gdanav per Android Auto: se il servizio per
+ * Cosa vede il telefono di GdANav per Android Auto: se il servizio per
  * l'auto è registrato, che versione di Android Auto c'è e chi ha installato
  * l'app. Serve a capire perché l'app non compare sull'auto. E il traffico
  * che la mappa dell'auto ha ricevuto nell'ultimo viaggio ([DiagnosiTraffico]).

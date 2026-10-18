@@ -9,7 +9,7 @@ import '../veicolo/profilo_veicolo.dart';
 /// `fuelConsumptionInLiters` per la termica), salite e discese comprese, e la
 /// strada «eco» si sceglie per quell'auto e non per una media.
 ///
-/// Per l'elettrica si parte dallo stesso profilo con cui gdanav calcola le
+/// Per l'elettrica si parte dallo stesso profilo con cui GdANav calcola le
 /// soste: la curva del consumo a velocità costante (aria e rotolamento), i
 /// consumi fissi come potenza a parte, il peso, e i rendimenti di trazione e
 /// recupero per le salite e le discese. Per la termica una curva da auto

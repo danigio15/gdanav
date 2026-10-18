@@ -84,7 +84,7 @@ class SchermataPrincipale extends StatefulWidget {
     this.chiudiImpostazioni,
   });
 
-  /// Solo le impostazioni, in una pagina, senza la mappa: chi ospita gdanav
+  /// Solo le impostazioni, in una pagina, senza la mappa: chi ospita GdANav
   /// le apre quando il navigatore è sullo schermo dell'auto, e sul telefono
   /// non deve partire una seconda mappa (né il GPS, né le segnalazioni).
   final bool soloImpostazioni;
@@ -92,21 +92,21 @@ class SchermataPrincipale extends StatefulWidget {
   /// La «X» della pagina delle impostazioni: la chiude chi l'ha aperta.
   final VoidCallback? chiudiImpostazioni;
 
-  /// Le voci che chi ospita gdanav aggiunge al suo menu (GdAHome: i comandi
+  /// Le voci che chi ospita GdANav aggiunge al suo menu (GdAHome: i comandi
   /// rapidi in auto). Stanno sotto «GdAHome».
   final List<VoceOspite> vociOspite;
 
-  /// Dentro un'altra app (GdAHome): accanto al menu di gdanav, in alto, un
+  /// Dentro un'altra app (GdAHome): accanto al menu di GdANav, in alto, un
   /// secondo tasto apre il menu di quell'app, come i tre trattini della sua
   /// plancia. Il disegno del tasto e' [iconaOspite] (il suo marchio).
   final VoidCallback? menuOspite;
   final Widget? iconaOspite;
 
-  /// Messo a `true` da chi ospita gdanav: si apre il menu di gdanav (le sue
+  /// Messo a `true` da chi ospita GdANav: si apre il menu di GdANav (le sue
   /// impostazioni), e torna `false`.
   final ValueNotifier<bool>? apriIlMenu;
 
-  /// Messo a `true` da chi ospita gdanav: si apre «Pianifica i viaggi» (o
+  /// Messo a `true` da chi ospita GdANav: si apre «Pianifica i viaggi» (o
   /// Premium, se è chiuso), sopra la mappa, e torna `false`. GdAHome lo usa
   /// per la voce del suo menu laterale. Vale con la mappa: nella pagina delle
   /// sole impostazioni ([soloImpostazioni]) non si guarda.
@@ -133,7 +133,7 @@ class SchermataPrincipale extends StatefulWidget {
   /// Distributori o colonnine intorno, sulla mappa.
   final GestoreVicini? vicini;
 
-  /// Le persone di casa sulla mappa, quando gdanav sta dentro GdAHome.
+  /// Le persone di casa sulla mappa, quando GdANav sta dentro GdAHome.
   final GestorePersone? persone;
 
   /// Il consumo imparato, da mostrare in «La tua auto».
@@ -202,7 +202,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   }
 
   /// «Pianifica i viaggi»: dal menu, dalla scheda sulla mappa o da chi
-  /// ospita gdanav. Senza Premium, Premium.
+  /// ospita GdANav. Senza Premium, Premium.
   void _pianificatore() {
     final g = widget.pianificati;
     if (g == null) return;
@@ -498,7 +498,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                   auto: widget.auto,
                   onTap: () => vai(LaTuaAuto(auto: widget.auto, posizione: widget.posizione, consumo: widget.consumo)),
                 ),
-                // Le voci di chi ospita gdanav (GdAHome): in cima, sotto l'auto.
+                // Le voci di chi ospita GdANav (GdAHome): in cima, sotto l'auto.
                 if (widget.vociOspite.isNotEmpty)
                   _GruppoMenu(
                     titolo: 'GdAHome',
@@ -1096,7 +1096,7 @@ class _VoceMenu extends StatelessWidget {
   }
 }
 
-/// Una voce del menu di gdanav che mette chi lo ospita.
+/// Una voce del menu di GdANav che mette chi lo ospita.
 class VoceOspite {
   const VoceOspite({required this.icona, required this.titolo, required this.sotto, required this.apri});
 

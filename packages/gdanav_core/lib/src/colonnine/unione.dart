@@ -7,7 +7,7 @@ import 'colonnina.dart';
 ///
 /// [FonteColonnineConRiserva] è una catena: prova la prima, e se risponde si
 /// ferma lì. Va bene quando le fonti dicono la stessa cosa — ma non è così.
-/// Open Charge Map, OpenStreetMap e l'archivio di gdanav hanno ognuno
+/// Open Charge Map, OpenStreetMap e l'archivio di GdANav hanno ognuno
 /// colonnine che gli altri non hanno, e prendendo solo la prima si perde
 /// tutto il resto: intorno a Napoli Open Charge Map ne conosce 143, e da
 /// sola diventava tutto quello che l'app sapeva.

@@ -129,7 +129,7 @@ class GestoreGuida extends ChangeNotifier {
   /// `ArbitroSorgenti.registraConsumo`), e che si riallinea appena l'auto
   /// manda un dato nuovo. Senza nessuna lettura, il piano.
   ///
-  /// Dal campo: l'auto diceva 23% e 95 km, gdanav 21% e 88 km. Una lettura
+  /// Dal campo: l'auto diceva 23% e 95 km, GdANav 21% e 88 km. Una lettura
   /// datata prima della partenza (Home Assistant la data col suo ultimo
   /// cambio, non con l'arrivo) qui non contava: si mostrava il piano dal
   /// chilometro zero, che scende come crede lui e non si riallinea mai, e

@@ -2,7 +2,7 @@ import AppIntents
 import UIKit
 import gdanav_app
 
-// «Ehi Siri, naviga con gdanav»: i comandi vocali, come «Ok Google, naviga
+// «Ehi Siri, naviga con GdANav»: i comandi vocali, come «Ok Google, naviga
 // verso…» su Android Auto. Siri li sente anche in CarPlay; l'app li esegue
 // senza aprirsi sul telefono (il motore Flutter si accende da sé all'avvio),
 // e la guida parte sulla mappa di CarPlay come su quella del telefono.

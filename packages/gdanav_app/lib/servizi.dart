@@ -1,4 +1,4 @@
-/// I servizi esterni di gdanav, cablati qui: chi installa l'app non deve
+/// I servizi esterni di GdANav, cablati qui: chi installa l'app non deve
 /// scrivere indirizzi o chiavi. Per una build diversa si possono cambiare
 /// alla compilazione con `--dart-define=NOME=valore`.
 abstract final class Servizi {
@@ -34,7 +34,7 @@ abstract final class Servizi {
   static const chiaveHere = String.fromEnvironment('GDANAV_HERE_CHIAVE');
 
   /// Le segnalazioni della comunità (incidenti, polizia, pericoli): il relay
-  /// di gdanav su Cloudflare.
+  /// di GdANav su Cloudflare.
   static const segnalazioni = String.fromEnvironment('GDANAV_SEGNALAZIONI', defaultValue: _segnalazioni);
 
   /// Premium sbloccato per tutti, senza negozio:
@@ -55,7 +55,7 @@ abstract final class Servizi {
   static Uri get versioni => Uri.parse(segnalazioni).resolve('v1/versioni');
 }
 
-// Le chiavi di gdanav.
+// Le chiavi di GdANav.
 const _chiaveOcm = '';
 const _chiaveTomTom = '';
 const _segnalazioni = 'https://gdanav.gdahome.org/';

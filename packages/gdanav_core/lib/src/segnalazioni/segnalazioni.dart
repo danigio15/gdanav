@@ -77,7 +77,7 @@ class Segnalazione {
   }
 }
 
-/// Il servizio delle segnalazioni della comunità, sul relay di gdanav.
+/// Il servizio delle segnalazioni della comunità, sul relay di GdANav.
 class ClienteSegnalazioni {
   ClienteSegnalazioni(this.indirizzo, {http.Client? client}) : _http = client ?? http.Client();
 

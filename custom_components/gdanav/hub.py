@@ -409,16 +409,16 @@ class Hub:
                 timeout=aiohttp.ClientTimeout(total=20),
             ) as r:
                 if r.status != 201:
-                    raise HomeAssistantError(f"Il relay di gdanav ha risposto {r.status}")
+                    raise HomeAssistantError(f"Il relay di GdANav ha risposto {r.status}")
         except (aiohttp.ClientError, TimeoutError) as err:
-            raise HomeAssistantError(f"Il relay di gdanav non risponde: {err}") from err
+            raise HomeAssistantError(f"Il relay di GdANav non risponde: {err}") from err
         self._togli_codice()
         self.codice = codice
         self.codice_scade = dt_util.utcnow() + p.DURATA_CODICE
         self._annulla_codice = async_call_later(self.hass, p.DURATA_CODICE, self._codice_scaduto)
         persistent_notification.async_create(
             self.hass,
-            f"Nell'app gdanav: menu → Home Assistant → «Scrivi il codice», e scrivi\n\n"
+            f"Nell'app GdANav: menu → Home Assistant → «Scrivi il codice», e scrivi\n\n"
             f"**{p.mostra_codice(codice)}**\n\nVale dieci minuti, una volta sola.",
             title=f"Codice per collegare {self.entry.title}",
             notification_id=self._id_notifica,

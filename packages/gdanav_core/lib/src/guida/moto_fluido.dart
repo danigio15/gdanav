@@ -4,31 +4,40 @@ import '../geo/geo.dart';
 
 /* ─── L'auto che scorre, fra una posizione e l'altra ────────────────────────
  *
- * Dal campo: «la freccia sulla mappa non è fluida, prende pause e poi
- * cammina». Il GPS dà una posizione al secondo (a volte 1,2 s, a volte 0,8),
- * e lo schermo dell'auto ne riceveva una ogni tanto: fra l'una e l'altra la
- * freccia andava in linea retta fino all'ultima arrivata, in un tempo pari
- * all'intervallo di prima, e lì **si fermava** ad aspettare la prossima. Con
- * una posizione in ritardo, la pausa; con una in anticipo, uno scatto.
+ * Dal campo, la prima volta: «la freccia sulla mappa non è fluida, prende
+ * pause e poi cammina». Il GPS dà una posizione al secondo (a volte 1,2 s, a
+ * volte 0,8), e fra l'una e l'altra la freccia andava fino all'ultima arrivata
+ * e lì si fermava ad aspettare la prossima.
  *
- * Qui il conto, uguale per il telefono, Android Auto e CarPlay (che lo rifanno
- * in Kotlin e Swift, `RendererMappa` e `MappaCarPlay`, coi numeri di qui):
+ * Dal campo, la seconda: «non è ancora fluido il movimento della freccia, ha
+ * ancora dei piccoli frame lag, deve essere continuo con il movimento
+ * dell'auto». La freccia inseguiva un punto previsto avvicinandosi ogni
+ * fotogramma di una parte della distanza, e la parte che sarebbe tornata
+ * indietro lungo la strada si buttava. Ogni posizione nuova un metro dietro la
+ * previsione (succede a ogni frenata, e a ogni lettura un po' in ritardo)
+ * voleva dire un passo zero: la freccia si fermava per qualche fotogramma e
+ * poi ripartiva, tre volte al secondo. Le piccole pause.
  *
- *  - fra due posizioni l'auto **va avanti da sola**: dalla velocità e dalla
- *    direzione dell'ultima, e da quanto stava girando (curva costante:
- *    l'angolo fra le ultime due direzioni diviso il tempo). Mai più in là di
- *    [MotoFluido.oltreAlPiu] dall'ultima posizione: un GPS che tace non deve
- *    far correre la freccia da sola;
- *  - quello che si disegna insegue quel punto **a ogni fotogramma**,
- *    avvicinandosi con una costante di tempo [MotoFluido.tau]: una posizione
- *    nuova un po' diversa dalla previsione diventa una correzione morbida,
- *    non un salto;
- *  - **mai indietro**: andando, la parte della correzione che tornerebbe
- *    indietro lungo la strada si lascia cadere (la freccia rallenta e la
- *    previsione, che va avanti, la raggiunge); di lato invece si corregge;
- *  - da fermi la previsione è la posizione stessa, e quando la freccia ci è
- *    arrivata [MotoFluido.fermo] dice che non servono più fotogrammi: chi
- *    disegna spegne il suo orologio fino alla posizione dopo. */
+ * Adesso la freccia ha una **velocità sua**, che cambia piano:
+ *
+ *  - fra due posizioni l'auto va avanti da sola, come prima: dalla velocità e
+ *    dalla direzione dell'ultima, e da quanto stava girando. Mai più in là di
+ *    [MotoFluido.oltreAlPiu] dall'ultima posizione;
+ *  - **lungo la strada** la freccia va alla velocità dell'auto, più o meno
+ *    quanto serve a recuperare lo scarto dalla previsione in
+ *    [MotoFluido.tauLungo]: davanti di tre metri va un po' più piano, dietro
+ *    un po' più forte. Mai sotto un quarto della velocità dell'auto: andando
+ *    non si ferma, e non torna indietro. Quella velocità poi cambia morbida
+ *    ([MotoFluido.tauVelocita]): una posizione nuova non è uno scatto;
+ *  - **di lato** si corregge con la costante [MotoFluido.tau] (una curva, un
+ *    aggancio alla strada accanto);
+ *  - da fermi (o col GPS muto da troppo) la freccia rallenta fino al punto e
+ *    lì si ferma; se il punto è appena dietro (l'auto si è fermata prima di
+ *    quanto si prevedeva) resta dov'è: solo un punto davvero lontano dietro,
+ *    più di [MotoFluido.indietroAlPiuM], la riporta indietro.
+ *
+ * Il conto è uguale per il telefono, Android Auto e CarPlay (che lo rifanno in
+ * Kotlin e Swift, `MotoAuto.kt` e `MappaCarPlay.swift`, coi numeri di qui). */
 
 /// Dove disegnare l'auto a ogni fotogramma, fra una posizione e l'altra.
 ///
@@ -37,13 +46,23 @@ import '../geo/geo.dart';
 class MotoFluido {
   MotoFluido({
     this.tau = const Duration(milliseconds: 200),
+    this.tauLungo = const Duration(milliseconds: 1000),
+    this.tauVelocita = const Duration(milliseconds: 250),
     this.oltreAlPiu = const Duration(milliseconds: 1500),
     this.saltoM = 120,
   });
 
-  /// Quanto ci mette la freccia a recuperare due terzi della distanza dalla
-  /// previsione.
+  /// Di lato e nella direzione: quanto ci mette la freccia a recuperare due
+  /// terzi dello scarto.
   final Duration tau;
+
+  /// Lungo la strada: in quanto tempo la velocità della freccia vuole
+  /// recuperare lo scarto dalla previsione.
+  final Duration tauLungo;
+
+  /// Quanto ci mette la velocità della freccia a cambiare: senza, una
+  /// posizione nuova cambierebbe la velocità di colpo.
+  final Duration tauVelocita;
 
   /// Oltre questo tempo dall'ultima posizione la previsione si ferma.
   final Duration oltreAlPiu;
@@ -51,13 +70,24 @@ class MotoFluido {
   /// Più lontano di così si salta: un ricalcolo, un GPS che torna.
   final double saltoM;
 
-  /// Sotto questa velocità si è fermi: niente previsione, e la freccia può
-  /// anche tornare un poco indietro (il GPS da fermo balla).
+  /// Sotto questa velocità si è fermi: niente previsione.
   static const fermoSottoMs = 0.5;
 
   /// Quanto si gira al massimo, in gradi al secondo, per la previsione: oltre
   /// è rumore della direzione, non una curva.
   static const giraAlPiuGradiS = 45.0;
+
+  /// Andando, la freccia non va mai più piano di così (una parte della
+  /// velocità dell'auto): rallenta, ma non si ferma.
+  static const almenoDellaVelocita = 0.25;
+
+  /// Da fermi un punto dietro la freccia più vicino di così non la fa tornare
+  /// indietro: si era andati un poco oltre, e lì si resta.
+  static const indietroAlPiuM = 8.0;
+
+  /// Un fotogramma che arriva tardi conta al più tanto: oltre, la freccia
+  /// recupera dopo invece di saltare.
+  static const fotogrammaAlPiuS = 0.25;
 
   Punto? _fix;
   double _rottaFix = 0, _velocita = 0, _gira = 0;
@@ -65,6 +95,7 @@ class MotoFluido {
 
   Punto? _mostrata;
   double _rottaMostrata = 0;
+  double _velocitaMostrata = 0;
   Duration? _ultimoFotogramma;
   var _fermo = true;
 
@@ -73,6 +104,9 @@ class MotoFluido {
 
   /// La direzione della freccia adesso, in gradi da nord.
   double get rottaMostrata => _rottaMostrata;
+
+  /// La velocità della freccia adesso, in m/s.
+  double get velocitaMostrata => _velocitaMostrata;
 
   /// Non servono più fotogrammi finché non arriva una posizione nuova: fermi,
   /// o col GPS muto da più di [oltreAlPiu], e con la freccia già arrivata.
@@ -118,36 +152,79 @@ class MotoFluido {
     final m = _mostrata;
     final ultimo = _ultimoFotogramma;
     _ultimoFotogramma = adesso;
+    final andando = _velocita >= fermoSottoMs && !_oltre(adesso);
     if (m == null || ultimo == null || distanzaM(m, obiettivo.punto) > saltoM) {
       _mostrata = obiettivo.punto;
       _rottaMostrata = obiettivo.rotta;
-      _fermo = _velocita < fermoSottoMs || _oltre(adesso);
+      _velocitaMostrata = andando ? _velocita : 0;
+      _fermo = !andando;
       return (punto: obiettivo.punto, rotta: obiettivo.rotta);
     }
     var dt = (adesso - ultimo).inMicroseconds / 1e6;
     if (dt < 0) dt = 0;
-    // Un fotogramma saltato (l'app dietro, la mappa occupata) non diventa
-    // un salto: al più un decimo di secondo alla volta.
-    if (dt > 0.1) dt = 0.1;
-    final k = 1 - math.exp(-dt / (tau.inMicroseconds / 1e6));
+    if (dt > fotogrammaAlPiuS) dt = fotogrammaAlPiuS;
     final (dx, dy) = _metri(m, obiettivo.punto);
-    var passoEst = dx * k, passoNord = dy * k;
-    if (_velocita >= fermoSottoMs) {
-      // Mai indietro lungo la strada: quella parte del passo si toglie.
-      final r = obiettivo.rotta * math.pi / 180;
-      final ve = math.sin(r), vn = math.cos(r);
-      final lungo = passoEst * ve + passoNord * vn;
-      if (lungo < 0) {
-        passoEst -= lungo * ve;
-        passoNord -= lungo * vn;
-      }
-    }
-    _mostrata = _sposta(m, passoEst, passoNord);
-    _rottaMostrata = versoDiLa(_rottaMostrata, obiettivo.rotta, k);
-    final arrivata =
-        distanzaM(_mostrata!, obiettivo.punto) < 0.3 && diQuantoSiGira(_rottaMostrata, obiettivo.rotta).abs() < 0.5;
-    _fermo = arrivata && (_velocita < fermoSottoMs || _oltre(adesso));
+    final s = _passo(
+      dx: dx,
+      dy: dy,
+      rottaObiettivo: obiettivo.rotta,
+      dt: dt,
+      andando: andando,
+    );
+    _mostrata = _sposta(m, s.est, s.nord);
+    _rottaMostrata = versoDiLa(_rottaMostrata, obiettivo.rotta, s.k);
+    _fermo = !andando && s.arrivata && diQuantoSiGira(_rottaMostrata, obiettivo.rotta).abs() < 0.5;
     return (punto: _mostrata!, rotta: _rottaMostrata);
+  }
+
+  /// Il passo di un fotogramma lungo [dt] secondi, con lo scarto ([dx] verso
+  /// est, [dy] verso nord, in metri) fra la freccia e la previsione.
+  ({double est, double nord, double k, bool arrivata}) _passo({
+    required double dx,
+    required double dy,
+    required double rottaObiettivo,
+    required double dt,
+    required bool andando,
+  }) {
+    final r = rottaObiettivo * math.pi / 180;
+    final ve = math.sin(r), vn = math.cos(r);
+    // Lo scarto lungo la strada (avanti positivo) e di lato (a destra positivo).
+    final lungo = dx * ve + dy * vn;
+    final lato = dx * vn - dy * ve;
+    final k = dt <= 0 ? 0.0 : 1 - math.exp(-dt / _secondi(tau));
+    final kv = dt <= 0 ? 0.0 : 1 - math.exp(-dt / _secondi(tauVelocita));
+    double avanti;
+    var arrivata = false;
+    if (andando) {
+      final minima = _velocita * almenoDellaVelocita;
+      final massima = math.max(_velocita * 2, _velocita + 10);
+      // Lo scarto dopo questo passo, se la freccia tenesse la sua velocità:
+      // la previsione intanto è già andata avanti di un fotogramma.
+      final scarto = lungo - _velocitaMostrata * dt;
+      final voluta = (_velocita + scarto / _secondi(tauLungo)).clamp(minima, massima).toDouble();
+      _velocitaMostrata += (voluta - _velocitaMostrata) * kv;
+      if (_velocitaMostrata < minima) _velocitaMostrata = minima;
+      avanti = _velocitaMostrata * dt;
+    } else if (lungo < 0 && lungo > -indietroAlPiuM) {
+      // Fermi, e il punto è appena dietro: si resta, rallentando di colpo no.
+      _velocitaMostrata = 0;
+      avanti = 0;
+      arrivata = lato.abs() < 0.3;
+    } else if (lungo < 0) {
+      // Molto dietro: il GPS ha corretto davvero, si torna (piano).
+      _velocitaMostrata = 0;
+      avanti = lungo * k;
+    } else {
+      // Fermi (o GPS muto) e il punto davanti: si rallenta fino a lì.
+      final voluta = lungo / _secondi(tauLungo) * 2;
+      _velocitaMostrata += (voluta - _velocitaMostrata) * kv;
+      if (_velocitaMostrata < 0) _velocitaMostrata = 0;
+      avanti = math.min(_velocitaMostrata * dt, lungo);
+      arrivata = lungo - avanti < 0.3 && lato.abs() < 0.3;
+      if (arrivata) _velocitaMostrata = 0;
+    }
+    final diLato = lato * k;
+    return (est: avanti * ve + diLato * vn, nord: avanti * vn - diLato * ve, k: k, arrivata: arrivata);
   }
 
   /// Si ricomincia: la prossima posizione si disegna dov'è, senza inseguirla
@@ -155,9 +232,12 @@ class MotoFluido {
   void dimentica() {
     _mostrata = null;
     _ultimoFotogramma = null;
+    _velocitaMostrata = 0;
   }
 
   bool _oltre(Duration adesso) => adesso - _alle >= oltreAlPiu;
+
+  static double _secondi(Duration d) => d.inMicroseconds / 1e6;
 
   /// Quanti metri verso est e verso nord si fanno in [t] secondi partendo
   /// con [rotta], girando di [gira] gradi al secondo, a [v] m/s.
@@ -180,4 +260,44 @@ class MotoFluido {
     final coslat = math.cos(p.lat * math.pi / 180);
     return Punto(p.lat + nord / _metriPerGrado, p.lon + (coslat.abs() < 1e-9 ? 0 : est / (_metriPerGrado * coslat)));
   }
+}
+
+/* ─── La mappa senza percorso ──────────────────────────────────────────────
+ *
+ * Dal campo: «quando non attivo il percorso ed è in semplice mappa deve
+ * aumentare lo zoom e mostrare 3D ma più vicino, non così lontano». Senza
+ * percorso lo zoom era fisso a 15,5, con l'auto in mezzo allo schermo: in 3D
+ * si vedevano chilometri di quartieri fino all'orizzonte, e l'auto era un
+ * puntino. Adesso è come in guida: vicino (17,5 in città), l'auto più in
+ * basso per vedere la strada davanti, e un poco più lontano solo andando
+ * forte, mai quanto prima. */
+
+/// Come la mappa segue l'auto senza un percorso: lo [zoom], l'[inclinazione]
+/// in gradi e [sopra], la parte dell'altezza libera tenuta sopra l'auto come
+/// margine (l'auto più in basso, la strada davanti in vista).
+typedef TelecameraLibera = ({double zoom, double inclinazione, double sopra});
+
+/// Lo zoom senza percorso fino a [lentoSottoKmh], e quello da [veloceSopraKmh]
+/// in su; in mezzo si passa piano.
+const zoomLiberoLento = 17.5;
+const zoomLiberoVeloce = 16.2;
+const lentoSottoKmh = 30.0;
+const veloceSopraKmh = 110.0;
+
+/// L'inclinazione in 3D, come in guida.
+const inclinazioneLibera = 55.0;
+
+/// La telecamera senza percorso a [velocitaMs]; [tridimensionale] la vista
+/// scelta; [scarto] quanto l'hanno cambiata i tasti + e − (in livelli di zoom).
+TelecameraLibera telecameraLibera({required double velocitaMs, required bool tridimensionale, double scarto = 0}) {
+  final kmh = velocitaMs.isFinite && velocitaMs > 0 ? velocitaMs * 3.6 : 0.0;
+  final t = ((kmh - lentoSottoKmh) / (veloceSopraKmh - lentoSottoKmh)).clamp(0.0, 1.0);
+  // Morbido ai due capi: niente gradino a 30 né a 110 all'ora.
+  final s = t * t * (3 - 2 * t);
+  final zoom = (zoomLiberoLento + (zoomLiberoVeloce - zoomLiberoLento) * s + scarto).clamp(10.0, 19.5).toDouble();
+  return (
+    zoom: zoom,
+    inclinazione: tridimensionale ? inclinazioneLibera : 0.0,
+    sopra: tridimensionale ? 0.3 : 0.0,
+  );
 }

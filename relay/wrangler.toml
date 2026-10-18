@@ -1,4 +1,4 @@
-# Il relay di gdanav: una stanza per auto, dove si incontrano Home Assistant
+# Il relay di GdANav: una stanza per auto, dove si incontrano Home Assistant
 # e l'app. Sta tutto nel piano gratuito di Cloudflare: i Durable Object con
 # SQLite sono gratis, e i WebSocket in ibernazione non consumano tempo
 # mentre nessuno parla.

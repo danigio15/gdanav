@@ -1,10 +1,10 @@
-"""Le costanti di gdanav."""
+"""Le costanti di GdANav."""
 
 from __future__ import annotations
 
 DOMAIN = "gdanav"
 
-# Il relay di gdanav su Cloudflare (vedi relay/ e la CI che lo pubblica).
+# Il relay di GdANav su Cloudflare (vedi relay/ e la CI che lo pubblica).
 RELAY_PREDEFINITO = "wss://gdanav.gdahome.org"
 
 CONF_CHIAVE = "chiave"

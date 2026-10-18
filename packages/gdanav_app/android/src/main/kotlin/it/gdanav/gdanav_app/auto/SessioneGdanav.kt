@@ -18,21 +18,21 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 
 /**
- * Quello che l'app che porta gdanav dentro può aggiungere in auto.
+ * Quello che l'app che porta GdANav dentro può aggiungere in auto.
  *
- * L'app gdanav non aggiunge niente. GdAHome aggiunge la casa: un tasto in
+ * L'app GdANav non aggiunge niente. GdAHome aggiunge la casa: un tasto in
  * alto sulla mappa, e sullo schermo del Premium, che apre i suoi schermi.
  */
 object GdanavInAuto {
-    /** Lo schermo della casa, se chi ospita gdanav ne ha uno. */
+    /** Lo schermo della casa, se chi ospita GdANav ne ha uno. */
     @Volatile var casa: ((CarContext) -> Screen)? = null
 }
 
 /**
- * gdanav su Android Auto: la sessione di un'app di navigazione.
+ * GdANav su Android Auto: la sessione di un'app di navigazione.
  *
  * [accendi] accende il motore Flutter se l'app sul telefono non è aperta:
- * ogni app ha il suo (l'app gdanav il suo `MotoreFlutter`, gdahome il suo).
+ * ogni app ha il suo (l'app GdANav il suo `MotoreFlutter`, gdahome il suo).
  */
 open class SessioneGdanav(private val accendi: (Context) -> Unit) : Session() {
     /*
@@ -89,7 +89,7 @@ open class SessioneGdanav(private val accendi: (Context) -> Unit) : Session() {
         accendi(carContext)
         ascoltaEnergia()
         ascoltaPosizioneDellAuto()
-        // Android Auto fa parte di gdanav Premium (dentro GdAHome senza una
+        // Android Auto fa parte di GdANav Premium (dentro GdAHome senza una
         // casa abbinata si guida base: `PonteAuto.guidaInAuto`).
         if (!PonteAuto.guidaInAuto(carContext)) return SchermoPremium(carContext)
         val schermo = SchermoNavigazione(carContext)
@@ -97,7 +97,7 @@ open class SessioneGdanav(private val accendi: (Context) -> Unit) : Session() {
         return schermo
     }
 
-    /** «Ok Google, naviga verso…» o un'altra app, con gdanav già aperto sull'auto. */
+    /** «Ok Google, naviga verso…» o un'altra app, con GdANav già aperto sull'auto. */
     override fun onNewIntent(intent: Intent) {
         if (intent.action != CarContext.ACTION_NAVIGATE || !PonteAuto.guidaInAuto(carContext)) return
         carContext.getCarService(androidx.car.app.ScreenManager::class.java).popToRoot()
@@ -178,7 +178,7 @@ open class SessioneGdanav(private val accendi: (Context) -> Unit) : Session() {
      * preferisce alle sue finché arrivano. Tante auto non le danno
      * (UNAVAILABLE o UNIMPLEMENTED): allora qui non passa niente e resta il
      * GPS del telefono, come prima. Serve il permesso della posizione, che
-     * gdanav ha già; se manca, o la libreria dell'auto è troppo vecchia, la
+     * GdANav ha già; se manca, o la libreria dell'auto è troppo vecchia, la
      * chiamata fallisce e si va avanti senza.
      */
     private fun ascoltaPosizioneDellAuto() {

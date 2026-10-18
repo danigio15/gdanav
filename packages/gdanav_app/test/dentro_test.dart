@@ -4,12 +4,12 @@ import 'package:gdanav_app/gdanav_app.dart';
 
 import 'aiuti.dart';
 
-/// gdanav dentro un'altra app (GdAHome): il tasto del menu apre il menu di
-/// chi ospita, e il menu di gdanav si apre da fuori.
+/// GdANav dentro un'altra app (GdAHome): il tasto del menu apre il menu di
+/// chi ospita, e il menu di GdANav si apre da fuori.
 void main() {
   setUp(preparaPiattaforma);
 
-  testWidgets('il ☰ apre il menu di gdanav, il tasto accanto quello di chi ospita', (tester) async {
+  testWidgets('il ☰ apre il menu di GdANav, il tasto accanto quello di chi ospita', (tester) async {
     final a = await ambiente(tester);
     var aperto = 0;
     final apriIlMenu = ValueNotifier(false);
@@ -33,7 +33,7 @@ void main() {
     expect(find.byIcon(Icons.cottage), findsOneWidget);
     expect(find.text('La tua auto'), findsNothing);
 
-    // Il menu di gdanav: dal suo ☰, sulla mappa.
+    // Il menu di GdANav: dal suo ☰, sulla mappa.
     await tester.tap(find.byTooltip('Menu'));
     await tester.pumpAndSettle();
     expect(find.text('La tua auto'), findsOneWidget);
@@ -47,7 +47,7 @@ void main() {
     expect(apriIlMenu.value, isFalse);
   });
 
-  testWidgets('da sola, gdanav ha il suo ☰ e basta', (tester) async {
+  testWidgets('da sola, GdANav ha il suo ☰ e basta', (tester) async {
     final a = await ambiente(tester);
     await tester.pumpWidget(a.app());
     await tester.pumpAndSettle();
@@ -70,7 +70,7 @@ void main() {
     expect(find.text('La tua auto'), findsOneWidget);
   });
 
-  testWidgets('le voci di chi ospita stanno nel menu di gdanav', (tester) async {
+  testWidgets('le voci di chi ospita stanno nel menu di GdANav', (tester) async {
     final a = await ambiente(tester);
     var aperta = 0;
     final apriIlMenu = ValueNotifier(true);

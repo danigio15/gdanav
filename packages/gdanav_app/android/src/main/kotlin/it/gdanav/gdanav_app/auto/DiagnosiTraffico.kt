@@ -123,11 +123,23 @@ object DiagnosiTraffico {
         val m = messaggio ?: return
         if (!m.contains("source $SORGENTE") && !m.contains("tomtom", ignoreCase = true)) return
         ultimoErrore = senzaChiave(m).take(240)
+        /* Senza rete gli errori dei riquadri arrivano a decine al secondo: una
+         * scrittura delle preferenze per ciascuno era una coda di scritture su
+         * disco, che Android aspetta sul filo principale quando la sessione
+         * cambia stato. L'errore si tiene in memoria, e si scrive al più ogni
+         * tanto (e a fine sessione, da `RendererMappa`). */
+        val ora = System.currentTimeMillis()
+        if (ora - ultimoSalvato < SALVA_AL_PIU_OGNI_MS) return
+        ultimoSalvato = ora
         salva()
     }
 
+    @Volatile private var ultimoSalvato = 0L
+    private const val SALVA_AL_PIU_OGNI_MS = 10_000L
+    private val CHIAVE_IN_CHIARO = Regex("""key=[^&\s"']+""")
+
     /** Un indirizzo con la chiave dentro diventa un indirizzo senza. */
-    fun senzaChiave(testo: String): String = testo.replace(Regex("""key=[^&\s"']+"""), "key=…")
+    fun senzaChiave(testo: String): String = testo.replace(CHIAVE_IN_CHIARO, "key=…")
 
     fun comeMappa(): Map<String, Any?> {
         val o = if (inizio > 0L) adesso() else letto() ?: return emptyMap()

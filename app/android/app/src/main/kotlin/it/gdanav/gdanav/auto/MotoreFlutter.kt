@@ -7,7 +7,7 @@ import io.flutter.embedding.engine.dart.DartExecutor
 import it.gdanav.gdanav_app.auto.PonteAuto
 
 /**
- * Un solo motore Flutter per il telefono e per l'auto. Se gdanav si apre da
+ * Un solo motore Flutter per il telefono e per l'auto. Se GdANav si apre da
  * Android Auto prima che dal telefono, il motore parte qui: l'app Dart
  * calcola percorsi e guida anche senza schermata sul telefono. Quando poi
  * si apre l'app, MainActivity usa lo stesso motore.

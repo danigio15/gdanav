@@ -175,13 +175,13 @@ final class PonteAuto {
     /// luoghi, opzioni): il resto (posizione, cruscotto) ridisegna solo la mappa.
     private(set) var versioneModello = 0
 
-    /// gdanav Premium: l'app lo dice, l'auto lo ricorda anche a telefono spento.
+    /// GdANav Premium: l'app lo dice, l'auto lo ricorda anche a telefono spento.
     var premium: Bool { UserDefaults.standard.bool(forKey: "gdanav.premium") }
 
-    /// Premium si compra nell'app che ospita gdanav (GdAHome), non in gdanav.
+    /// Premium si compra nell'app che ospita GdANav (GdAHome), non in GdANav.
     var premiumOspite: Bool { UserDefaults.standard.bool(forKey: "gdanav.premium_ospite") }
 
-    /// Questa versione è troppo vecchia: si aggiorna gdanav sul telefono (e
+    /// Questa versione è troppo vecchia: si aggiorna GdANav sul telefono (e
     /// intanto niente Premium).
     var aggiorna: Bool { UserDefaults.standard.bool(forKey: "gdanav.aggiorna") }
 

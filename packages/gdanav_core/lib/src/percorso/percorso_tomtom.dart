@@ -108,7 +108,7 @@ class ClienteTomTom {
       };
 
   /// Col modello di consumo, e se TomTom non lo prende (400) senza: il
-  /// percorso conta più del consumo, che allora lo stima gdanav.
+  /// percorso conta più del consumo, che allora lo stima GdANav.
   Future<Map<String, Object?>> _conConsumo(
     ModelloConsumoTomTom? consumo,
     Future<Map<String, Object?>> Function(ModelloConsumoTomTom? consumo) chiedi,
