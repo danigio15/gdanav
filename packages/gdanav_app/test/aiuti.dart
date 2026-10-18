@@ -155,8 +155,8 @@ class Ambiente {
 /// guardano il GPS tacere gli passano quello finto della prova
 /// (`tester.binding.clock.now`), che va avanti con `pump`. [dove] è dove si
 /// è quando si calcola il viaggio, per le prove che lo vogliono diverso da
-/// [posizione]: un GPS che una volta non risponde, per esempio. [gdahome]:
-/// la fonte dei dati dell'auto quando gdanav gira dentro gdahome.
+/// [posizione]: un GPS che una volta non risponde, per esempio. [GdAHome]:
+/// la fonte dei dati dell'auto quando gdanav gira dentro GdAHome.
 Future<Ambiente> ambiente(
   WidgetTester tester, {
   int km = 500,

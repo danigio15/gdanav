@@ -304,7 +304,7 @@ void main() {
     expect(arrivate, hasLength(2));
   });
 
-  /* Dal campo, CarPlay dentro gdahome: «scelgo un indirizzo, lo schermo
+  /* Dal campo, CarPlay dentro GdAHome: «scelgo un indirizzo, lo schermo
    * sfarfalla e resta sulla pagina iniziale». La meta scelta in auto deve
    * finire o in guida o in un messaggio sull'auto: mai in un errore sul
    * canale che nessuno legge. */

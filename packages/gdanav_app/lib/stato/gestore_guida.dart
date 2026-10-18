@@ -214,7 +214,7 @@ class GestoreGuida extends ChangeNotifier {
   }
 
   /// L'autonomia adesso: quella dell'auto, se la dice (Home Assistant,
-  /// gdahome, Android Auto, OBD), com'è se è recente e altrimenti portata
+  /// GdAHome, Android Auto, OBD), com'è se è recente e altrimenti portata
   /// alla batteria di adesso ([autonomiaDellAuto]); se non la dice, la
   /// batteria di adesso diviso il consumo, quello vero o quello del viaggio
   /// ma mai sotto il riferimento del modello; senza viaggio, la stima di

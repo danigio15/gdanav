@@ -155,7 +155,7 @@ void main() {
     await _scatta(tester, 'premium_codice_regalo');
   });
 
-  _rendi('premium, dentro gdahome', (tester) async {
+  _rendi('premium, dentro GdAHome', (tester) async {
     _telefono(tester);
     preparaPiattaforma();
     final p = GestorePremium(archivio: Archivio(), ospite: ValueNotifier(false), tuttoSbloccato: false);

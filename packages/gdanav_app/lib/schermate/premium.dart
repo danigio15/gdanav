@@ -29,7 +29,7 @@ class PannelloPremium extends StatefulWidget {
     (
       Icons.home_outlined,
       'Home Assistant e batteria letta dall\'auto',
-      'Dall\'auto, dal dongle OBD, da gdahome o da Home Assistant: niente da scrivere a mano',
+      'Dall\'auto, dal dongle OBD, da GdAHome o da Home Assistant: niente da scrivere a mano',
     ),
     (
       Icons.ev_station,
@@ -54,8 +54,8 @@ class _PannelloPremiumState extends State<PannelloPremium> {
   String _stato(GestorePremium p) {
     if (p.daOspite) {
       return p.sbloccato
-          ? 'Premium è attivo con gdahome: tutto sbloccato.'
-          : '${widget.perche ?? 'Questo'} fa parte del Premium di gdahome: attivalo dall\'app gdahome.';
+          ? 'Premium è attivo con GdAHome: tutto sbloccato.'
+          : '${widget.perche ?? 'Questo'} fa parte del Premium di GdAHome: attivalo dall\'app GdAHome.';
     }
     if (p.sbloccato) {
       final l = p.licenza;
@@ -166,7 +166,7 @@ class _PannelloPremiumState extends State<PannelloPremium> {
               TextButton(onPressed: p.inCorso ? null : p.ripristina, child: const Text('Ripristina abbonamento')),
             ],
             // Il codice regalo: gdanav da sola, anche con Premium già attivo
-            // (per allungarlo), mai dentro gdahome (lì si riscatta per la casa).
+            // (per allungarlo), mai dentro GdAHome (lì si riscatta per la casa).
             if (p.codiciRegalo)
               OutlinedButton.icon(
                 key: const Key('codice-regalo'),

@@ -14,7 +14,7 @@ import 'package:http/testing.dart';
 
 import 'aiuti.dart';
 
-/// La coppia **di prova** del contratto (`docs/LICENZE.md` di gdahome): mai
+/// La coppia **di prova** del contratto (`docs/LICENZE.md` di GdAHome): mai
 /// in un file di produzione.
 const pubblicaProva = '6P9sdqQtlHcmH7Ve_SgzmyJmxJS28CNORRJJfjI3rnI';
 const privataProva = 'Q2Iu3eKMxw3Y1GS9MypZjXvjPfHB959KImNldY80xr0';
@@ -96,7 +96,7 @@ void main() {
     Future<GettoneLicenza?> verifica(String g, {String sog = telefono}) =>
         verificaGettone(g, soggetto: sog, chiavePubblica: pubblicaProva, adesso: adesso);
 
-    test('valido: gdanav, e anche gdahome (Premium compreso)', () async {
+    test('valido: gdanav, e anche GdAHome (Premium compreso)', () async {
       final g = await verifica(await firma(payload(telefono)));
       expect(g, isNotNull);
       expect(g!.app, 'gdanav');

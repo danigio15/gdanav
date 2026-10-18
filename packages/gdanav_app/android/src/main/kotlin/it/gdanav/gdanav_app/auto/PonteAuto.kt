@@ -179,7 +179,7 @@ object PonteAuto {
         context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).getBoolean("premium", false)
 
     /**
-     * Se in auto si guida. Di solito è Premium; dentro gdahome, senza una casa
+     * Se in auto si guida. Di solito è Premium; dentro GdAHome, senza una casa
      * abbinata, si guida base. Un'app di prima non lo dice, e allora vale
      * Premium come sempre.
      */
@@ -196,7 +196,7 @@ object PonteAuto {
     fun premiumNoto(context: Context): Boolean =
         context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).contains("premium")
 
-    /** Premium si compra nell'app che ospita gdanav (gdahome), non in gdanav. */
+    /** Premium si compra nell'app che ospita gdanav (GdAHome), non in gdanav. */
     fun premiumOspite(context: Context): Boolean =
         context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).getBoolean("premium_ospite", false)
 

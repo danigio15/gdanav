@@ -1,4 +1,4 @@
-// «Pianifica i viaggi»: dentro gdahome il pianificatore stava solo nel menu,
+// «Pianifica i viaggi»: dentro GdAHome il pianificatore stava solo nel menu,
 // e nessuno lo trovava. Adesso c'è una scheda sulla mappa, la voce del menu
 // col nome nuovo, e chi ospita gdanav lo apre da fuori.
 import 'package:flutter/material.dart';

@@ -84,7 +84,7 @@ spente, e lo fa il relay:
 
 - ogni build della CI conosce il suo numero (`GDANAV_COSTRUZIONE`, lo
   stesso `github.run_number` del `--build-number`);
-- l'app sola (non dentro gdahome, che ha il suo controllo) chiede
+- l'app sola (non dentro GdAHome, che ha il suo controllo) chiede
   `GET https://gdanav.gdahome.org/v1/versioni` → `{"gdanav": {"minima": N}}`
   all'avvio, tornando in primo piano e ogni 6 ore, e ricorda l'ultimo `N`:
   senza rete non si sblocca niente;

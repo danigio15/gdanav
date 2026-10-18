@@ -4,7 +4,7 @@ import 'package:gdanav_app/gdanav_app.dart';
 
 import 'aiuti.dart';
 
-/// gdanav dentro un'altra app (gdahome): il tasto del menu apre il menu di
+/// gdanav dentro un'altra app (GdAHome): il tasto del menu apre il menu di
 /// chi ospita, e il menu di gdanav si apre da fuori.
 void main() {
   setUp(preparaPiattaforma);
@@ -40,7 +40,7 @@ void main() {
     Navigator.of(tester.element(find.text('La tua auto'))).pop();
     await tester.pumpAndSettle();
 
-    // E chiesto da fuori (la tessera di gdahome).
+    // E chiesto da fuori (la tessera di GdAHome).
     apriIlMenu.value = true;
     await tester.pumpAndSettle();
     expect(find.text('La tua auto'), findsOneWidget);

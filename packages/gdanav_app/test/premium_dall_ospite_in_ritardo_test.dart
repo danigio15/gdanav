@@ -1,5 +1,5 @@
 // «La batteria letta dall'auto fa parte di Premium: scrivila a mano», dentro
-// gdahome con la casa Premium. Il Premium della casa arrivava mentre l'auto si
+// GdAHome con la casa Premium. Il Premium della casa arrivava mentre l'auto si
 // accendeva, e l'auto non lo sentiva più.
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';

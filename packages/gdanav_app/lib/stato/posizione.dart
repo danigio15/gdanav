@@ -52,7 +52,7 @@ final _gps = FlussoGps(
 /// nessuno: quando l'attività si stacca dal motore Flutter — l'app tolta
 /// dalle recenti, o Android che la chiude per fare posto — il plugin del GPS
 /// smette di ascoltare e stacca il canale, e al Dart non arriva né un errore
-/// né una fine. Dentro gdahome il motore resta acceso per Android Auto, e da
+/// né una fine. Dentro GdAHome il motore resta acceso per Android Auto, e da
 /// lì la guida restava ferma sulla prima manovra, col tachimetro inchiodato
 /// all'ultima velocità e la mappa immobile. La posizione chiesta una volta
 /// sola passa da un altro canale, e quella funziona ancora. Così una

@@ -526,7 +526,7 @@ ProfiloVeicolo? veicoloPerId(String id) =>
     id == ProfiloVeicolo.esempio.id ? ProfiloVeicolo.esempio : catalogoVeicoli.where((v) => v.id == id).firstOrNull;
 
 /// L'auto del catalogo che corrisponde a una marca e un modello scritti da
-/// qualcun altro: la sezione Auto della plancia di gdahome, per esempio
+/// qualcun altro: la sezione Auto della plancia di GdAHome, per esempio
 /// («Renault», «Zoe R135»), che non conosce i nostri id.
 ///
 /// Vince quella con più parole del modello in comune; a parità, quella con la

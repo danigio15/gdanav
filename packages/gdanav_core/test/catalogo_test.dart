@@ -84,7 +84,7 @@ void main() {
     });
   });
 
-  group('l\'auto scritta da gdahome', () {
+  group('l\'auto scritta da GdAHome', () {
     test('marca e modello come li scrive la plancia', () {
       expect(veicoloPerNome('Renault', 'Zoe R135')?.id, 'renault-zoe-r135');
       expect(veicoloPerNome('Tesla', 'Model 3 Long Range')?.id, 'tesla-model-3-lr');

@@ -64,14 +64,14 @@ class SchermoPremium(
         val ospite = PonteAuto.premiumOspite(carContext)
         val messaggio = MessageTemplate.Builder(
             if (ospite) {
-                "La navigazione in auto è inclusa in gdahome Premium."
+                "La navigazione in auto è inclusa in GdAHome Premium."
             } else {
                 "La navigazione in auto è inclusa in gdanav Premium."
             },
         )
-            .setTitle(if (ospite) "gdahome Premium" else "gdanav Premium")
+            .setTitle(if (ospite) "GdAHome Premium" else "gdanav Premium")
             .setHeaderAction(Action.APP_ICON)
-        // Dentro gdahome la casa non è Premium: ci si arriva anche da qui.
+        // Dentro GdAHome la casa non è Premium: ci si arriva anche da qui.
         GdanavInAuto.casa?.let { casa ->
             messaggio.addAction(
                 Action.Builder().setTitle("Casa").setOnClickListener { screenManager.push(casa(carContext)) }.build(),

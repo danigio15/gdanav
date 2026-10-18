@@ -92,11 +92,11 @@ class SchermataPrincipale extends StatefulWidget {
   /// La «X» della pagina delle impostazioni: la chiude chi l'ha aperta.
   final VoidCallback? chiudiImpostazioni;
 
-  /// Le voci che chi ospita gdanav aggiunge al suo menu (gdahome: i comandi
-  /// rapidi in auto). Stanno sotto «gdahome».
+  /// Le voci che chi ospita gdanav aggiunge al suo menu (GdAHome: i comandi
+  /// rapidi in auto). Stanno sotto «GdAHome».
   final List<VoceOspite> vociOspite;
 
-  /// Dentro un'altra app (gdahome): accanto al menu di gdanav, in alto, un
+  /// Dentro un'altra app (GdAHome): accanto al menu di gdanav, in alto, un
   /// secondo tasto apre il menu di quell'app, come i tre trattini della sua
   /// plancia. Il disegno del tasto e' [iconaOspite] (il suo marchio).
   final VoidCallback? menuOspite;
@@ -107,7 +107,7 @@ class SchermataPrincipale extends StatefulWidget {
   final ValueNotifier<bool>? apriIlMenu;
 
   /// Messo a `true` da chi ospita gdanav: si apre «Pianifica i viaggi» (o
-  /// Premium, se è chiuso), sopra la mappa, e torna `false`. gdahome lo usa
+  /// Premium, se è chiuso), sopra la mappa, e torna `false`. GdAHome lo usa
   /// per la voce del suo menu laterale. Vale con la mappa: nella pagina delle
   /// sole impostazioni ([soloImpostazioni]) non si guarda.
   final ValueNotifier<bool>? apriIlPianificatore;
@@ -133,7 +133,7 @@ class SchermataPrincipale extends StatefulWidget {
   /// Distributori o colonnine intorno, sulla mappa.
   final GestoreVicini? vicini;
 
-  /// Le persone di casa sulla mappa, quando gdanav sta dentro gdahome.
+  /// Le persone di casa sulla mappa, quando gdanav sta dentro GdAHome.
   final GestorePersone? persone;
 
   /// Il consumo imparato, da mostrare in «La tua auto».
@@ -498,10 +498,10 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                   auto: widget.auto,
                   onTap: () => vai(LaTuaAuto(auto: widget.auto, posizione: widget.posizione, consumo: widget.consumo)),
                 ),
-                // Le voci di chi ospita gdanav (gdahome): in cima, sotto l'auto.
+                // Le voci di chi ospita gdanav (GdAHome): in cima, sotto l'auto.
                 if (widget.vociOspite.isNotEmpty)
                   _GruppoMenu(
-                    titolo: 'gdahome',
+                    titolo: 'GdAHome',
                     voci: [
                       for (final v in widget.vociOspite)
                         _VoceMenu(
@@ -612,7 +612,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                           _fonteDatiAuto();
                         },
                       ),
-                    // Dentro gdahome la casa c'è già: niente codice QR per
+                    // Dentro GdAHome la casa c'è già: niente codice QR per
                     // abbinare Home Assistant (vedi `conHomeAssistant`).
                     if (conHomeAssistant(widget.auto))
                     _VoceMenu(
@@ -630,19 +630,19 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                             : SchermataPremium(premium: widget.premium!, perche: 'Home Assistant'),
                       ),
                     ),
-                    // gdahome: l'auto della plancia di gdahome, da sola. Niente
-                    // Premium e niente abbinamento: dentro gdahome la casa c'è già.
+                    // GdAHome: l'auto della plancia di GdAHome, da sola. Niente
+                    // Premium e niente abbinamento: dentro GdAHome la casa c'è già.
                     _VoceMenu(
                       icona: Icons.cottage_rounded,
                       colore: const Color(0xFFEA580C),
-                      titolo: 'gdahome',
-                      // Dentro gdahome, senza Premium, la batteria dalla casa non arriva.
+                      titolo: 'GdAHome',
+                      // Dentro GdAHome, senza Premium, la batteria dalla casa non arriva.
                       sotto: sbloccato || widget.auto.gdahome == null
                           ? riassuntoGdahome(widget.auto)
                           : 'La batteria dalla casa è con Premium',
                       onTap: () {
                         if (!sbloccato && widget.auto.gdahome != null) {
-                          return vai(SchermataPremium(premium: widget.premium!, perche: 'La batteria da gdahome'));
+                          return vai(SchermataPremium(premium: widget.premium!, perche: 'La batteria da GdAHome'));
                         }
                         chiudi();
                         mostraFonteGdahome(context, widget.auto);
@@ -818,7 +818,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                     onPressed: controllo.centra,
                     child: Icon(Icons.near_me_rounded, size: 28, color: Theme.of(context).colorScheme.primary),
                   ),
-                  // Dentro gdahome: dove sono quelli di casa, tutti insieme.
+                  // Dentro GdAHome: dove sono quelli di casa, tutti insieme.
                   if (widget.persone case final persone? when persone.persone.isNotEmpty) ...[
                     const SizedBox(height: 14),
                     _BottoneMappa(

@@ -220,7 +220,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     private fun tasto(id: Int, azione: () -> Unit) =
         Action.Builder().setIcon(icona(id)).setOnClickListener { azione() }.build()
 
-    /** In alto: Cerca, la casa (dentro gdahome) e Menu (in guida anche Fine); appena passata una segnalazione, «C'è ancora?» Sì / No. */
+    /** In alto: Cerca, la casa (dentro GdAHome) e Menu (in guida anche Fine); appena passata una segnalazione, «C'è ancora?» Sì / No. */
     private fun azioni(): ActionStrip {
         val striscia = ActionStrip.Builder()
         // La strada a risparmio, sulle auto senza gli avvisi di Android Auto.
@@ -268,7 +268,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     }
 
     /**
-     * La casa, se chi porta gdanav dentro ne ha una (gdahome): un tasto col
+     * La casa, se chi porta gdanav dentro ne ha una (GdAHome): un tasto col
      * solo disegno. Al massimo quattro tasti, e con Cerca, Menu e Fine ci sta.
      */
     private fun casa(striscia: ActionStrip.Builder) {

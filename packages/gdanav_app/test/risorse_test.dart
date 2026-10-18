@@ -5,7 +5,7 @@ import 'package:gdanav_app/risorse.dart';
 import 'package:gdanav_app/stato/gestore_ztl.dart';
 
 /// Le risorse si leggono col nome del pacchetto davanti: così le trovano sia
-/// l'app gdanav sia gdahome. Se un nome è sbagliato lo si sa qui, e non sul
+/// l'app gdanav sia GdAHome. Se un nome è sbagliato lo si sa qui, e non sul
 /// telefono con la mappa senza colonnine.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

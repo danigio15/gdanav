@@ -28,7 +28,7 @@ HTTPS).
 ### CarPlay, e cosa è diverso da Android Auto
 
 Gli schermi sono gli stessi: la mappa di gdanav, Cerca, la casa (dentro
-gdahome), il Menu (Casa, Lavoro, preferiti e recenti, colonnine o
+GdAHome), il Menu (Casa, Lavoro, preferiti e recenti, colonnine o
 distributori, Segnala, Impostazioni), le opzioni del percorso, la batteria
 all'arrivo, «C'è ancora?» dopo una segnalazione.
 
@@ -56,7 +56,7 @@ mappa**: le colonnine e i distributori si scelgono dagli elenchi del Menu.
 
 1. **Apple Developer Program** (99 $ l'anno), su
    [developer.apple.com/programs](https://developer.apple.com/programs/).
-   L'account è lo stesso per gdanav e gdahome.
+   L'account è lo stesso per gdanav e GdAHome.
 2. **L'identificativo dell'app**: Certificates, Identifiers & Profiles →
    Identifiers → `+` → App IDs → `it.gdanav.gdanav`. Capacità: In-App Purchase
    (c'è già di serie).
@@ -71,7 +71,7 @@ mappa**: le colonnine e i distributori si scelgono dagli elenchi del Menu.
    ridà), e si segnano l'**ID chiave** e l'**ID emittente** scritti in alto.
    L'**ID del team** è in developer.apple.com → Account → Membership.
 5. **I quattro segreti** su GitHub, Settings → Secrets and variables →
-   Actions (gli stessi valori vanno anche in gdahome):
+   Actions (gli stessi valori vanno anche in GdAHome):
 
    | Segreto | Cosa |
    | --- | --- |

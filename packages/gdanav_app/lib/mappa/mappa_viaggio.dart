@@ -80,7 +80,7 @@ class MappaViaggio extends StatefulWidget {
   /// Distributori o colonnine intorno, sulla mappa.
   final GestoreVicini? vicini;
 
-  /// Le persone di casa, quando gdanav sta dentro gdahome.
+  /// Le persone di casa, quando gdanav sta dentro GdAHome.
   final GestorePersone? persone;
 
   /// Le ZTL e le aree pedonali: si disegnano quelle che si vedono, se si

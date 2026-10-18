@@ -103,7 +103,7 @@ ci passi e poi il viaggio prosegue.
   tuo viaggio. Più sotto come si collega.
 
 <p align="center">
-  <img src="docs/immagini/menu.png" alt="Il menu: la tua auto, percorso, ricarica, importa da Google Maps, fonte dati auto, Home Assistant, gdahome, Android Auto" width="260">
+  <img src="docs/immagini/menu.png" alt="Il menu: la tua auto, percorso, ricarica, importa da Google Maps, fonte dati auto, Home Assistant, GdAHome, Android Auto" width="260">
 </p>
 
 ## Come si usa
@@ -114,7 +114,7 @@ ci passi e poi il viaggio prosegue.
    Con l'elettrica cerca il tuo modello; con la termica scegli il carburante.
 3. **La batteria** (solo elettrica): la scrivi tu con il cursore in **Fonte
    dati auto**, e gdanav la stima man mano che guidi. Con Premium la legge da
-   sola: dall'auto con Android Auto, da un dongle OBD Bluetooth, da gdahome o
+   sola: dall'auto con Android Auto, da un dongle OBD Bluetooth, da GdAHome o
    da Home Assistant.
 4. **Pianifica il viaggio**: tocca «Dove andiamo?», scrivi la destinazione,
    guarda arrivo, durata e soste, e premi **Avvia**.
@@ -140,7 +140,7 @@ gdanav si scarica gratis. Non ha pubblicità e non chiede di creare un account.
 | Auto termica: distributori con i prezzi del giorno | ✓ | ✓ |
 | Auto elettrica con la batteria scritta a mano | ✓ | ✓ |
 | Mappe offline, preferiti, Siri e «Ok Google» | ✓ | ✓ |
-| Batteria letta dall'auto: Android Auto, dongle OBD, gdahome, Home Assistant | | ✓ |
+| Batteria letta dall'auto: Android Auto, dongle OBD, GdAHome, Home Assistant | | ✓ |
 | Percorso con le soste di ricarica, colonnine libere o occupate | | ✓ |
 | Home Assistant | | ✓ |
 | Android Auto e CarPlay | | ✓ |
@@ -162,13 +162,13 @@ Store: le ricevute arrivano da Google o da Apple, come per ogni abbonamento.
 `GDA-7KQM-2XRT-9HVB`: menu → **Premium** → **Ho un codice regalo**, lo scrivi
 e premi **Riscatta**. Vale per qualche mese o per sempre, secondo il codice.
 I codici e le licenze gdanav li può dare anche **l'installatore** che ti ha
-montato gdahome.
+montato GdAHome.
 
-**Hai gdahome Premium?** Allora hai già anche **gdanav Premium**: è compreso.
-Dentro l'app gdahome gdanav non ti chiede niente, lo sblocca gdahome.
+**Hai GdAHome Premium?** Allora hai già anche **gdanav Premium**: è compreso.
+Dentro l'app GdAHome gdanav non ti chiede niente, lo sblocca GdAHome.
 
 <p align="center">
-  <img src="docs/immagini/premium_dentro_gdahome.png" alt="Dentro gdahome: Premium si attiva dall'app gdahome" width="260">
+  <img src="docs/immagini/premium_dentro_gdahome.png" alt="Dentro GdAHome: Premium si attiva dall'app GdAHome" width="260">
 </p>
 
 ## Home Assistant

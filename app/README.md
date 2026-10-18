@@ -3,7 +3,7 @@
 Flutter, Android e iOS. Il motore sta in
 [`../packages/gdanav_core`](../packages/gdanav_core); lo schermo — mappa,
 guida, schermate — in [`../packages/gdanav_app`](../packages/gdanav_app), che
-porta gdanav anche dentro gdahome come sezione. Qui resta l'app: l'icona,
+porta gdanav anche dentro GdAHome come sezione. Qui resta l'app: l'icona,
 Android Auto, iOS. Per l'iPhone e CarPlay: [`../docs/ios.md`](../docs/ios.md).
 
     flutter pub get

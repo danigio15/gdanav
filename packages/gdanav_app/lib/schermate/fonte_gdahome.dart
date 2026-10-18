@@ -6,16 +6,16 @@ import '../sorgenti/sorgente_gdahome.dart';
 import '../stato/gestore_auto.dart';
 import 'fonte_dati_auto.dart';
 
-/// Cosa dice il menu della fonte gdahome, in una riga.
+/// Cosa dice il menu della fonte GdAHome, in una riga.
 String riassuntoGdahome(GestoreAuto gestore) {
   final g = gestore.gdahome;
-  if (g == null) return 'Automatica dentro l\'app gdahome';
+  if (g == null) return 'Automatica dentro l\'app GdAHome';
   final auto = g.auto;
-  if (auto == null) return 'Nessuna auto nella plancia di gdahome';
+  if (auto == null) return 'Nessuna auto nella plancia di GdAHome';
   return '${g.collegata ? 'Collegata' : 'In attesa della casa'} · ${auto.etichetta}';
 }
 
-/// La fonte gdahome: l'auto della sezione Auto della plancia, senza codice né
+/// La fonte GdAHome: l'auto della sezione Auto della plancia, senza codice né
 /// QR. Qui si vede cosa arriva; da configurare non c'è niente.
 Future<void> mostraFonteGdahome(BuildContext context, GestoreAuto gestore) {
   return showModalBottomSheet<void>(
@@ -41,11 +41,11 @@ class FonteGdahome extends StatelessWidget {
         builder: (context, _) => ListView(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           children: [
-            Text('gdahome', style: t.titleLarge),
+            Text('GdAHome', style: t.titleLarge),
             const SizedBox(height: 8),
             if (g == null)
               Text(
-                'Se usi gdanav dentro l\'app gdahome, l\'auto che hai nella sezione Auto della plancia arriva qui '
+                'Se usi gdanav dentro l\'app GdAHome, l\'auto che hai nella sezione Auto della plancia arriva qui '
                 'da sola, coi dati in tempo reale dalla tua casa: nessun codice, nessun QR.',
                 style: t.bodyMedium,
               )
@@ -63,7 +63,7 @@ class FonteGdahome extends StatelessWidget {
     final ultima = g.ultima;
     return [
       Text(
-        'L\'auto della sezione Auto della plancia di gdahome, coi dati in tempo reale dalla tua casa. '
+        'L\'auto della sezione Auto della plancia di GdAHome, coi dati in tempo reale dalla tua casa. '
         'Niente da abbinare: la casa è già collegata.',
         style: t.bodyMedium,
       ),
@@ -74,7 +74,7 @@ class FonteGdahome extends StatelessWidget {
         title: Text(auto?.etichetta ?? 'Nessuna auto nella plancia'),
         subtitle: Text(
           auto == null
-              ? 'Aggiungila nella sezione Auto della plancia di gdahome.'
+              ? 'Aggiungila nella sezione Auto della plancia di GdAHome.'
               : [
                   if ('${auto.marca} ${auto.modello}'.trim() != auto.etichetta) '${auto.marca} ${auto.modello}'.trim(),
                   if (auto.kwh case final k?) '${k.toStringAsFixed(k % 1 == 0 ? 0 : 1)} kWh',

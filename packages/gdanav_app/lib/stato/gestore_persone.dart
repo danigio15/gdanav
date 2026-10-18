@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
-/// Una persona di casa sulla mappa: chi la mette (gdahome) sa dov'è.
+/// Una persona di casa sulla mappa: chi la mette (GdAHome) sa dov'è.
 @immutable
 class PersonaSullaMappa {
   const PersonaSullaMappa({required this.id, required this.nome, required this.posizione, this.dove = ''});
 
-  /// Stabile finché la persona è la stessa: `person.anna` in gdahome.
+  /// Stabile finché la persona è la stessa: `person.anna` in GdAHome.
   final String id;
   final String nome;
   final Punto posizione;
@@ -38,7 +38,7 @@ class PersonaSullaMappa {
 
 /// Le persone della casa sulla mappa, e quale far vedere.
 ///
-/// Le mette l'app che ospita gdanav: gdahome sa dove sta chi abita in casa.
+/// Le mette l'app che ospita gdanav: GdAHome sa dove sta chi abita in casa.
 /// gdanav da sola non ne ha, e la mappa resta com'era.
 ///
 /// «Mostra» non è «portami»: la mappa va sulla persona e basta. Il viaggio

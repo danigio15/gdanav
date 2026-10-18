@@ -15,7 +15,7 @@ import UIKit
 /// aprirla senza la schermata del telefono.
 @objc(GdanavCarPlay)
 public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegate, CPMapTemplateDelegate {
-    /// Lo schermo della casa, se chi ospita gdanav ne ha uno (gdahome): un
+    /// Lo schermo della casa, se chi ospita gdanav ne ha uno (GdAHome): un
     /// tasto in alto sulla mappa, e sull'avviso del Premium.
     public static var casa: ((CPInterfaceController) -> CPTemplate)?
 
@@ -23,7 +23,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     public private(set) static weak var attuale: GdanavCarPlay?
 
     /// Chiamata quando CarPlay si collega (`true`) o si scollega (`false`):
-    /// gdahome ci accende gdanav anche se la sua sezione non si è mai aperta.
+    /// GdAHome ci accende gdanav anche se la sua sezione non si è mai aperta.
     public static var alCollegamento: ((Bool) -> Void)?
 
     /// I dati sopra la mappa come su Android Auto (batteria, km, meta,
@@ -211,16 +211,16 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         return b
     }
 
-    /// In alto: Cerca, la casa (dentro gdahome) e Menu (in guida anche Fine);
+    /// In alto: Cerca, la casa (dentro GdAHome) e Menu (in guida anche Fine);
     /// appena passata una segnalazione, «C'è ancora?» Sì / No arriva come avviso.
     private func aggiornaTasti() {
         guard let t = modello, let m = mappa else { return }
         let ponte = PonteAuto.shared
         // A sinistra i dati dell'auto (quelli che Android Auto disegna sulla
         // mappa: CarPlay vuole la mappa pulita, e li tiene in un tasto che
-        // apre il viaggio) e la lente. A destra la casa (dentro gdahome) e il
+        // apre il viaggio) e la lente. A destra la casa (dentro GdAHome) e il
         // Menu; in guida Menu e Fine, e la casa passa nel Menu.
-        // Come su Android Auto: la lente e la casa (dentro gdahome) a
+        // Come su Android Auto: la lente e la casa (dentro GdAHome) a
         // sinistra, Menu e (in guida) Fine a destra. Appena passata una
         // segnalazione, a sinistra «C'è ancora» e «No».
         var sinistra: [CPBarButton] = []
@@ -304,7 +304,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     /// Android Auto, dove Google ha rifiutato l'app per questo). Appena l'app
     /// lo sblocca, l'avviso se ne va da solo.
     ///
-    /// Conta [PonteAuto.guidaInAuto], non Premium da solo: dentro gdahome,
+    /// Conta [PonteAuto.guidaInAuto], non Premium da solo: dentro GdAHome,
     /// senza una casa abbinata, si guida base anche senza Premium (come su
     /// Android Auto). Apre e chiude coi blocchi di fine («I passi fra gli
     /// schermi», in `SchermiCarPlay.swift`): se CarPlay non lo mostra — c'è
@@ -328,7 +328,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                     }
                 },
             ]
-            // Dentro gdahome la casa non è Premium: ci si arriva anche da qui.
+            // Dentro GdAHome la casa non è Premium: ci si arriva anche da qui.
             if GdanavCarPlay.casa != nil {
                 azioni.append(CPAlertAction(title: "Casa", style: .default) { [weak self] _ in
                     guard let self else { return }
@@ -336,7 +336,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                     self.controllore?.chiudiSopra { _ in self.apriCasa() }
                 })
             }
-            // Dentro gdahome Premium si attiva lì, non nel negozio di gdanav.
+            // Dentro GdAHome Premium si attiva lì, non nel negozio di gdanav.
             // Una versione troppo vecchia va prima aggiornata.
             let avviso = CPAlertTemplate(
                 titleVariants: PonteAuto.shared.aggiorna
@@ -346,8 +346,8 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                     ]
                     : PonteAuto.shared.premiumOspite
                     ? [
-                        "La navigazione in auto è inclusa in gdahome Premium.",
-                        "Inclusa in gdahome Premium.",
+                        "La navigazione in auto è inclusa in GdAHome Premium.",
+                        "Inclusa in GdAHome Premium.",
                     ]
                     : [
                         "La navigazione in auto è inclusa in gdanav Premium.",
@@ -369,7 +369,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         guard let t = modello else { return }
         let ponte = PonteAuto.shared
         // Come l'avviso del Premium: conta se in auto si guida, non Premium da
-        // solo (dentro gdahome senza casa abbinata si guida base).
+        // solo (dentro GdAHome senza casa abbinata si guida base).
         guard let g = ponte.guida, ponte.guidaInAuto else {
             if let s = sessione {
                 s.finishTrip()
