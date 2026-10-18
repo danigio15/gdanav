@@ -30,7 +30,7 @@ jobs:
         with:
           flutter-version: 3.47.5
           channel: stable
-      # Lo schermo di gdanav sta nel pacchetto (lo porta dentro anche gdahome):
+      # Lo schermo di gdanav sta nel pacchetto (lo porta dentro anche GdAHome):
       # le prove sono lì. L'app è l'involucro, e basta che compili.
       - run: flutter pub get
         working-directory: packages/gdanav_app
@@ -436,7 +436,7 @@ jobs:
   # L'APK e il pacchetto del Play Store si costruiscono per sapere che stanno
   # in piedi, e basta: **l'app non si pubblica su GitHub**, ne' fra gli
   # artefatti ne' nella release «anteprima». Va solo nei negozi (test interno
-  # e TestFlight), dentro gdahome. Su main, quello che una volta era stato
+  # e TestFlight), dentro GdAHome. Su main, quello che una volta era stato
   # caricato nell'anteprima si toglie.
   apk:
     runs-on: ubuntu-latest
@@ -640,11 +640,11 @@ jobs:
             echo "Fra qualche minuto arriva la notifica di Apple: da TestFlight sull'iPhone si installa."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # gdahome si aggiorna da sola a ogni gdanav nuovo su main: le si dice che
+  # GdAHome si aggiorna da sola a ogni gdanav nuovo su main: le si dice che
   # c'è, e il suo workflow «Aggiorna gdanav» porta il nuovo pacchetto, fa le
   # prove e apre la richiesta di unione. Serve il segreto GDAHOME_TOKEN (un
   # token con permesso Actions e Contents su danigio15/gdahomeapp): senza,
-  # gdahome se ne accorge lo stesso al suo giro di ogni notte.
+  # GdAHome se ne accorge lo stesso al suo giro di ogni notte.
   avvisa-gdahome:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [app, motore]

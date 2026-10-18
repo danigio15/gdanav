@@ -23,7 +23,7 @@ class PuntoToccato {
     this.proprieta = const {},
   });
 
-  /// 'distributore', 'colonnina', 'persona' (di casa, da gdahome) o 'poi'.
+  /// 'distributore', 'colonnina', 'persona' (di casa, da GdAHome) o 'poi'.
   final String tipo;
   final String? id;
   final String nome;

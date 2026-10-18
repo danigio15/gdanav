@@ -46,7 +46,7 @@ Future<void> mostraFonteDatiAuto(
 }
 
 /// Se offrire l'abbinamento con Home Assistant (il codice QR): in gdanav da
-/// sola sì; dentro gdahome no, perché la casa e la sua auto ci sono già. Solo
+/// sola sì; dentro GdAHome no, perché la casa e la sua auto ci sono già. Solo
 /// un abbinamento fatto prima resta, per poterlo vedere e togliere.
 bool conHomeAssistant(GestoreAuto gestore) => gestore.gdahome == null || gestore.abbinamento != null;
 
@@ -84,8 +84,8 @@ class FonteDatiAuto extends StatelessWidget {
         final automatica = gestore.gdahome == null
             ? 'Auto, poi OBD, poi Home Assistant se recente, poi stima'
             : conHa
-            ? 'Auto, poi OBD, poi gdahome e Home Assistant se recenti, poi stima'
-            : 'Auto, poi OBD, poi gdahome se recente, poi stima';
+            ? 'Auto, poi OBD, poi GdAHome e Home Assistant se recenti, poi stima'
+            : 'Auto, poi OBD, poi GdAHome se recente, poi stima';
         return SafeArea(
           child: RadioGroup<TipoSorgente?>(
             groupValue: scelta,
@@ -107,9 +107,9 @@ class FonteDatiAuto extends StatelessWidget {
                 else
                   _Bloccata(titolo: 'Automatica', sotto: automatica, onTap: onPremium),
                 for (final t in _scelte)
-                  // gdahome c'è solo dentro l'app gdahome; Android Auto solo
+                  // GdAHome c'è solo dentro l'app GdAHome; Android Auto solo
                   // su Android (CarPlay la batteria non la dice).
-                  // Dentro gdahome la casa c'è già: Home Assistant a parte no.
+                  // Dentro GdAHome la casa c'è già: Home Assistant a parte no.
                   if ((t != TipoSorgente.gdahome || gestore.gdahome != null) &&
                       (t != TipoSorgente.homeAssistant || conHa) &&
                       (t != TipoSorgente.androidAuto || defaultTargetPlatform != TargetPlatform.iOS))
@@ -176,8 +176,8 @@ class _SoloAMano extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             defaultTargetPlatform == TargetPlatform.iOS
-                ? 'Letta dall\'auto (OBD, gdahome, Home Assistant) è con Premium.'
-                : 'Letta dall\'auto (Android Auto, OBD, gdahome, Home Assistant) è con Premium.',
+                ? 'Letta dall\'auto (OBD, GdAHome, Home Assistant) è con Premium.'
+                : 'Letta dall\'auto (Android Auto, OBD, GdAHome, Home Assistant) è con Premium.',
             style: t.bodySmall?.copyWith(color: s.onSurfaceVariant),
           ),
           if (onPremium != null)

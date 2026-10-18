@@ -10,7 +10,7 @@ import it.gdanav.gdanav_app.auto.SessioniGdanav
 
 /**
  * gdanav su Android Auto: un'app di navigazione. Gli schermi stanno nel
- * pacchetto `gdanav_app`, che li presta anche a gdahome; qui c'è solo il
+ * pacchetto `gdanav_app`, che li presta anche a GdAHome; qui c'è solo il
  * servizio, col motore Flutter di quest'app.
  */
 class GdanavCarAppService : CarAppService() {

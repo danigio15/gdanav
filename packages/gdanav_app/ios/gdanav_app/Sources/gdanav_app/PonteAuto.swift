@@ -178,14 +178,14 @@ final class PonteAuto {
     /// gdanav Premium: l'app lo dice, l'auto lo ricorda anche a telefono spento.
     var premium: Bool { UserDefaults.standard.bool(forKey: "gdanav.premium") }
 
-    /// Premium si compra nell'app che ospita gdanav (gdahome), non in gdanav.
+    /// Premium si compra nell'app che ospita gdanav (GdAHome), non in gdanav.
     var premiumOspite: Bool { UserDefaults.standard.bool(forKey: "gdanav.premium_ospite") }
 
     /// Questa versione è troppo vecchia: si aggiorna gdanav sul telefono (e
     /// intanto niente Premium).
     var aggiorna: Bool { UserDefaults.standard.bool(forKey: "gdanav.aggiorna") }
 
-    /// Se in auto si guida: di solito è Premium, ma dentro gdahome, senza una
+    /// Se in auto si guida: di solito è Premium, ma dentro GdAHome, senza una
     /// casa abbinata, si guida base (`preparaGdanav`, `guida_in_auto`). Era
     /// arrivato solo su Android (`PonteAuto.guidaInAuto` in Kotlin): qui
     /// CarPlay guardava ancora [premium], e con Premium spento la guida

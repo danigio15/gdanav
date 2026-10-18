@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Quello che serve a gdanav sul telefono, in qualunque app stia: si
          unisce da solo al manifesto di chi lo porta dentro (l'app gdanav,
-         gdahome). Android Auto invece lo dichiara l'app. -->
+         GdAHome). Android Auto invece lo dichiara l'app. -->
     <!-- Mappe, percorsi, relay di Home Assistant. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- La posizione per navigare. -->

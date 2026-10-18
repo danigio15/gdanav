@@ -3,7 +3,7 @@ import UIKit
 
 /* ─── I passi fra gli schermi, senza far cadere l'app ──────────────────────
  *
- * Dal campo, su iPhone con CarPlay dentro gdahome: «ogni volta che scelgo un
+ * Dal campo, su iPhone con CarPlay dentro GdAHome: «ogni volta che scelgo un
  * indirizzo e lo confermo, lo schermo sfarfalla per un attimo e resta sulla
  * pagina iniziale del navigatore dove si sceglie la destinazione. Ho provato
  * piu' volte, sempre uguale».
@@ -24,7 +24,7 @@ import UIKit
  * il telefono non calcolava piu' niente, e la meta era persa. Tornare
  * indietro mentre CarPlay sta ancora chiudendo il tocco della ricerca, o
  * mentre si apre un avviso sopra (quello del Premium, o la conferma di un
- * comando di gdahome), e' proprio il caso in cui un passo puo' non riuscire.
+ * comando di GdAHome), e' proprio il caso in cui un passo puo' non riuscire.
  * Da qui non lo si vede (serve l'auto, o il simulatore), ma e' la strada nel
  * codice che spiega lo sfarfallio. Le altre due che lasciavano la mappa
  * ferma senza dire perche' sono sistemate anche loro: la guida base senza
@@ -210,7 +210,7 @@ enum SchermiCarPlay {
         elenco("Menu") { [weak c, weak mappa] in
             let p = PonteAuto.shared
             var vaiA: [CPListItem] = []
-            // Dentro gdahome: la casa, che in guida non ha il suo tasto sulla mappa.
+            // Dentro GdAHome: la casa, che in guida non ha il suo tasto sulla mappa.
             if let casa = GdanavCarPlay.casa {
                 vaiA.append(riga("La tua casa", "Comandi rapidi e dispositivi", icona: icona("house.fill", .systemOrange), sfoglia: true) {
                     guard let c else { return }

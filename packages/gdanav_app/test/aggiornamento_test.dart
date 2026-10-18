@@ -101,7 +101,7 @@ void main() {
     }
   });
 
-  test('dentro gdahome non si controlla: ci pensa lei', () {
+  test('dentro GdAHome non si controlla: ci pensa lei', () {
     final a = Archivio();
     expect(GestoreAggiornamento.per(archivio: a, premiumOspite: ValueNotifier(true)), isNull);
     expect(GestoreAggiornamento.per(archivio: a, senzaPremium: true), isNull);
@@ -213,7 +213,7 @@ void main() {
     final ponte = PonteAuto(viaggio: a.viaggio, guida: a.guida, posizione: a.posizione, canale: canale);
     ponte.premium(true, aggiorna: true);
     ponte.premium(true);
-    // Dentro gdahome senza una casa abbinata: si guida base, senza Premium.
+    // Dentro GdAHome senza una casa abbinata: si guida base, senza Premium.
     ponte.premium(false, ospite: true, guidaInAuto: true);
     // Da aggiornare non si guida, nemmeno base.
     ponte.premium(false, ospite: true, aggiorna: true, guidaInAuto: true);

@@ -19,7 +19,7 @@ import 'archivio.dart';
 /// batteria stimata, coi chilometri per punto dell'auto.
 ///
 /// Anche una lettura vecchia vale. Dal campo: dalla casa 227 km al 53%, e in
-/// guida «421 km». Home Assistant (anche attraverso gdahome) data la lettura
+/// guida «421 km». Home Assistant (anche attraverso GdAHome) data la lettura
 /// con l'ultimo cambio dell'entità, e un'auto ferma in garage non cambia
 /// niente per ore: la lettura sembrava vecchia, e si ripiegava sul consumo del
 /// piano. Ma quanti chilometri fa con un punto di batteria l'auto lo sa meglio
@@ -74,7 +74,7 @@ class GestoreAuto extends ChangeNotifier {
   final ArbitroSorgenti arbitro;
   final manuale = SorgenteManuale();
 
-  /// La fonte gdahome, quando gdanav gira dentro l'app gdahome: si accende da
+  /// La fonte GdAHome, quando gdanav gira dentro l'app GdAHome: si accende da
   /// sola, senza abbinamento. Come le altre fonti automatiche, la sua
   /// batteria vale solo con Premium (lì: la casa è Premium).
   final SorgenteGdahome? gdahome;
@@ -194,9 +194,9 @@ class GestoreAuto extends ChangeNotifier {
       return 'La batteria letta dall\'auto fa parte di Premium: scrivila a mano';
     }
     if (gdahome case final g?) {
-      if (!g.collegata) return 'gdahome non è collegata alla casa';
-      if (g.auto == null) return 'Nella plancia di gdahome non c\'è un\'auto elettrica';
-      if (g.ultima == null) return 'Nella sezione Auto di gdahome manca il sensore della batteria, o non risponde';
+      if (!g.collegata) return 'GdAHome non è collegata alla casa';
+      if (g.auto == null) return 'Nella plancia di GdAHome non c\'è un\'auto elettrica';
+      if (g.ultima == null) return 'Nella sezione Auto di GdAHome manca il sensore della batteria, o non risponde';
     }
     if (abbinamento != null) {
       return switch (_sorgenti[TipoSorgente.homeAssistant]) {
@@ -225,9 +225,9 @@ class GestoreAuto extends ChangeNotifier {
   }
 
   /// In viaggio: che Home Assistant rilegga l'auto e mandi i dati freschi,
-  /// sia dall'integrazione gdanav sia da gdahome (che prima non lo chiedeva
-  /// mai: i dati da gdahome arrivavano solo quando l'integrazione dell'auto
-  /// cambiava un valore, e «Da gdahome · 2 h fa» restava lì).
+  /// sia dall'integrazione gdanav sia da GdAHome (che prima non lo chiedeva
+  /// mai: i dati da GdAHome arrivavano solo quando l'integrazione dell'auto
+  /// cambiava un valore, e «Da GdAHome · 2 h fa» restava lì).
   Future<void> chiediAggiornamento() async {
     _chiestoIl = _ora();
     await Future.wait([
@@ -276,7 +276,7 @@ class GestoreAuto extends ChangeNotifier {
   bool veicoloScelto = false;
 
   /// C'è un'auto elettrica da qualche parte: scelta, nella plancia di
-  /// gdahome, o una fonte della batteria collegata (Home Assistant, il
+  /// GdAHome, o una fonte della batteria collegata (Home Assistant, il
   /// dongle). Senza niente di tutto questo, e senza batteria, il navigatore
   /// non insiste a chiederla: propone l'auto termica.
   bool get elettricaConfigurata => veicoloScelto || gdahome?.auto != null || abbinamento != null || dongle != null;
@@ -322,12 +322,12 @@ class GestoreAuto extends ChangeNotifier {
 
   AppLifecycleListener? _ritorno;
 
-  /// L'auto della plancia di gdahome diventa la tua auto: marca e modello
+  /// L'auto della plancia di GdAHome diventa la tua auto: marca e modello
   /// cercati nel catalogo.
   ///
   /// Quando nella plancia si cambia auto, cambia anche qui, subito. Finché
   /// l'auto della plancia resta la stessa, invece, una scelta fatta a mano in
-  /// «La tua auto» non si tocca: gdahome può aver scritto un modello che il
+  /// «La tua auto» non si tocca: GdAHome può aver scritto un modello che il
   /// catalogo non ha, o una versione vicina.
   Future<void> _autoDaGdahome() async {
     final a = gdahome?.auto;

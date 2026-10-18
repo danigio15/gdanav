@@ -90,7 +90,7 @@ class ErroreViaggio extends StatoViaggio {
 /// Perché un viaggio elettrico non sa quanta batteria c'è.
 enum SenzaBatteria {
   /// Nessuna auto elettrica configurata: né scelta in «La tua auto», né
-  /// nella plancia di gdahome, né una fonte collegata. Prima cosa da
+  /// nella plancia di GdAHome, né una fonte collegata. Prima cosa da
   /// proporre: l'auto termica.
   nessunaElettrica(
     'Non trovo un\'auto elettrica configurata. Passiamo all\'auto termica?',

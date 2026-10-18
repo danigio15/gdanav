@@ -262,7 +262,7 @@ void main() {
     expect(p.sbloccato, isTrue);
   });
 
-  testWidgets('dentro gdahome Premium lo decide gdahome, senza il negozio di gdanav', (tester) async {
+  testWidgets('dentro GdAHome Premium lo decide GdAHome, senza il negozio di gdanav', (tester) async {
     final gdahome = ValueNotifier(false);
     final p = GestorePremium(archivio: Archivio(), ospite: gdahome, tuttoSbloccato: false);
     await tester.runAsync(p.carica);
@@ -274,20 +274,20 @@ void main() {
         home: SchermataPremium(premium: p, perche: 'Home Assistant'),
       ),
     );
-    expect(find.textContaining('fa parte del Premium di gdahome'), findsOneWidget);
+    expect(find.textContaining('fa parte del Premium di GdAHome'), findsOneWidget);
     expect(find.byKey(const Key('compra-premium')), findsNothing);
-    // Il codice regalo di gdahome si riscatta per la casa, nell'app gdahome.
+    // Il codice regalo di GdAHome si riscatta per la casa, nell'app GdAHome.
     expect(find.byKey(const Key('codice-regalo')), findsNothing);
     expect(find.text('Ripristina abbonamento'), findsNothing);
 
-    // Comprato in gdahome: si sblocca tutto, subito.
+    // Comprato in GdAHome: si sblocca tutto, subito.
     gdahome.value = true;
     await tester.pump();
     expect(p.sbloccato, isTrue);
     expect(GestorePremium.attivo.value, isTrue);
-    expect(find.textContaining('Premium è attivo con gdahome'), findsOneWidget);
+    expect(find.textContaining('Premium è attivo con GdAHome'), findsOneWidget);
 
-    // Scaduto in gdahome: si richiude.
+    // Scaduto in GdAHome: si richiude.
     gdahome.value = false;
     await tester.pump();
     expect(p.sbloccato, isFalse);

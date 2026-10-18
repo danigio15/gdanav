@@ -75,11 +75,11 @@ class Archivio {
 
   Future<void> salvaVeicolo(ProfiloVeicolo v) => _p.write(key: _veicolo, value: v.id);
 
-  /// Se un'auto è stata scelta davvero (a mano o dalla plancia di gdahome):
+  /// Se un'auto è stata scelta davvero (a mano o dalla plancia di GdAHome):
   /// finché no, [veicolo] è solo il profilo d'esempio.
   Future<bool> veicoloScelto() async => await _p.read(key: _veicolo) != null;
 
-  /// L'ultima auto vista nella plancia di gdahome (marca, modello, kWh):
+  /// L'ultima auto vista nella plancia di GdAHome (marca, modello, kWh):
   /// quando cambia, cambia anche la tua auto.
   Future<String?> autoGdahome() => _p.read(key: _autoGdahome);
 
@@ -243,7 +243,7 @@ class Archivio {
 
   Future<void> salvaLuoghi(Map<String, Object?> j) => _p.write(key: _luoghi, value: jsonEncode(j));
 
-  /// I viaggi pianificati di gdanav da sola, come JSON (dentro gdahome
+  /// I viaggi pianificati di gdanav da sola, come JSON (dentro GdAHome
   /// stanno nella casa).
   Future<String?> viaggiPianificati() => _p.read(key: _viaggiPianificati);
 

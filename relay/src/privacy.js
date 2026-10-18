@@ -39,8 +39,8 @@ export const PRIVACY = `<!doctype html>
 <p>La foto della tua auto, se la scegli, resta sul telefono. Le foto dei modelli si scaricano da Wikimedia Commons.</p>
 
 <h2>Abbonamento Premium</h2>
-<p>Premium costa 2,99 € al mese o 29,99 € all'anno, con 14 giorni di prova gratuita la prima volta. L'abbonamento si compra e si gestisce con Google Play (Android) o con l'App Store (iPhone): pagamento e dati della carta li tratta Google o Apple, secondo la sua informativa. gdanav riceve dal negozio solo se l'abbonamento è attivo, e lo ricorda sul telefono. Dentro l'app gdahome, Premium è compreso in gdahome Premium.</p>
-<p>Se riscatti un <b>codice regalo</b>, il telefono si presenta al quadro delle licenze di gdahome (quadro.gdahome.org) con un identificativo casuale nato sul telefono (<code>tel_…</code>, non legato a te né al telefono vero) e un segreto: il quadro tiene il codice usato, la licenza e l'impronta del segreto, e ogni 6 ore rinnova la licenza a quello stesso identificativo. Nient'altro: né posizione né dati dell'auto.</p>
+<p>Premium costa 2,99 € al mese o 29,99 € all'anno, con 14 giorni di prova gratuita la prima volta. L'abbonamento si compra e si gestisce con Google Play (Android) o con l'App Store (iPhone): pagamento e dati della carta li tratta Google o Apple, secondo la sua informativa. gdanav riceve dal negozio solo se l'abbonamento è attivo, e lo ricorda sul telefono. Dentro l'app GdAHome, Premium è compreso in GdAHome Premium.</p>
+<p>Se riscatti un <b>codice regalo</b>, il telefono si presenta al quadro delle licenze di GdAHome (quadro.gdahome.org) con un identificativo casuale nato sul telefono (<code>tel_…</code>, non legato a te né al telefono vero) e un segreto: il quadro tiene il codice usato, la licenza e l'impronta del segreto, e ogni 6 ore rinnova la licenza a quello stesso identificativo. Nient'altro: né posizione né dati dell'auto.</p>
 <h2>Cancellazione</h2>
 <p>Tutto quello che gdanav salva è sul telefono: disinstallando l'app si cancella (sul quadro delle licenze, se hai riscattato un codice, resta solo la licenza legata all'identificativo casuale). Scollegando Home Assistant la chiave di abbinamento sparisce.</p>
 

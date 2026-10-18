@@ -10,12 +10,12 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import 'aiuti.dart';
 
-/// La fonte gdahome: l'auto della plancia di gdahome arriva da sola, coi suoi
+/// La fonte GdAHome: l'auto della plancia di GdAHome arriva da sola, coi suoi
 /// dati, senza abbinamento.
 void main() {
   setUp(preparaPiattaforma);
 
-  test('la lettura di gdahome diventa lo stato dell\'auto, e l\'auto della plancia la tua auto', () async {
+  test('la lettura di GdAHome diventa lo stato dell\'auto, e l\'auto della plancia la tua auto', () async {
     final g = SorgenteGdahome()
       ..descrivi(const AutoDiGdahome(nome: 'La Zoe', marca: 'Renault', modello: 'Zoe R135', kwh: 52))
       // Arrivata prima che gdanav si accendesse: non si perde.
@@ -64,7 +64,7 @@ void main() {
 
   testWidgets('nell\'app gdanav da sola la voce dice come si accende', (tester) async {
     final auto = GestoreAuto(archivio: Archivio());
-    expect(riassuntoGdahome(auto), 'Automatica dentro l\'app gdahome');
+    expect(riassuntoGdahome(auto), 'Automatica dentro l\'app GdAHome');
     await tester.pumpWidget(
       MaterialApp(
         theme: temaGdanav(Brightness.light),
@@ -74,7 +74,7 @@ void main() {
     expect(find.textContaining('nessun codice, nessun QR'), findsOneWidget);
   });
 
-  testWidgets('dentro gdahome si vede l\'auto e cosa arriva', (tester) async {
+  testWidgets('dentro GdAHome si vede l\'auto e cosa arriva', (tester) async {
     final g = SorgenteGdahome()
       ..descrivi(const AutoDiGdahome(nome: 'La Zoe', marca: 'Renault', modello: 'Zoe R135', kwh: 52))
       ..collegamento(true)
@@ -94,11 +94,11 @@ void main() {
   });
 
   test('senza dati la scheda dice perché', () async {
-    // Dentro gdahome: casa scollegata, niente auto, auto senza batteria.
+    // Dentro GdAHome: casa scollegata, niente auto, auto senza batteria.
     final g = SorgenteGdahome();
     final auto = GestoreAuto(archivio: Archivio(), gdahome: g);
     await auto.avvia();
-    expect(auto.percheSenzaDati, 'gdahome non è collegata alla casa');
+    expect(auto.percheSenzaDati, 'GdAHome non è collegata alla casa');
     g.collegamento(true);
     expect(auto.percheSenzaDati, contains('non c\'è un\'auto elettrica'));
     g.descrivi(const AutoDiGdahome(marca: 'Leapmotor', modello: 'B10'));
@@ -132,11 +132,11 @@ void main() {
     expect(GestoreAuto.percheHomeAssistant(h), contains('non ha ancora mandato'));
   });
 
-  /* «Elimina dalle impostazioni di gdanav, se presente in gdahome, la
-   * possibilità di integrare con Home Assistant con QR code.» Dentro gdahome
+  /* «Elimina dalle impostazioni di gdanav, se presente in GdAHome, la
+   * possibilità di integrare con Home Assistant con QR code.» Dentro GdAHome
    * la casa c'è già: Home Assistant a parte non si offre, ne' nel menu ne'
    * fra le fonti. In gdanav da sola resta. */
-  testWidgets('dentro gdahome niente abbinamento a Home Assistant col QR', (tester) async {
+  testWidgets('dentro GdAHome niente abbinamento a Home Assistant col QR', (tester) async {
     final daSola = GestoreAuto(archivio: Archivio())..premium = true;
     final dentro = GestoreAuto(archivio: Archivio(), gdahome: SorgenteGdahome())..premium = true;
     expect(conHomeAssistant(daSola), isTrue);

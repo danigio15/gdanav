@@ -200,9 +200,9 @@ class NegozioAppStore implements NegozioPremium {
 ///   altro telefono con lo stesso account; se scade, si torna alla versione
 ///   gratuita;
 /// - un gettone di licenza valido per questo telefono (un codice regalo,
-///   `docs/LICENZE.md` di gdahome), rinnovato dal quadro all'avvio e ogni 6
+///   `docs/LICENZE.md` di GdAHome), rinnovato dal quadro all'avvio e ogni 6
 ///   ore;
-/// - dentro gdahome ([ospite]), il Premium della casa.
+/// - dentro GdAHome ([ospite]), il Premium della casa.
 class GestorePremium extends ChangeNotifier {
   /// Premium attivo adesso, per chi non ha il gestore in mano (il
   /// pianificatore con le soste e le colonnine in tempo reale). Vero finché
@@ -228,7 +228,7 @@ class GestorePremium extends ChangeNotifier {
   /// `null`: nessun negozio (prove, gdahome).
   final NegozioPremium? negozio;
 
-  /// Dentro un'altra app (gdahome) Premium lo decide lei: se lì è stato
+  /// Dentro un'altra app (GdAHome) Premium lo decide lei: se lì è stato
   /// comprato è tutto sbloccato, altrimenti no. Niente negozio di gdanav.
   final ValueListenable<bool>? ospite;
 

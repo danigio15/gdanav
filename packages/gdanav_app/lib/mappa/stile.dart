@@ -21,7 +21,7 @@ const sorgenteCode = 'gdanav-code';
 const sorgenteAlternative = 'gdanav-alternative';
 const sorgenteTappe = 'gdanav-tappe';
 
-/// Le persone di casa, quando gdanav sta dentro gdahome (`GestorePersone`).
+/// Le persone di casa, quando gdanav sta dentro GdAHome (`GestorePersone`).
 const sorgentePersone = 'gdanav-persone';
 
 /// Le ZTL e le aree pedonali intorno (i contorni e, come punti, dove

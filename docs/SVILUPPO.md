@@ -10,7 +10,7 @@ come si prova, come esce una versione e dove sono i pagamenti.
 | Cartella | Cosa | Linguaggio |
 | --- | --- | --- |
 | [`packages/gdanav_core`](../packages/gdanav_core) | Il motore: consumi, soste di ricarica, percorso, colonnine, distributori, traffico, meteo, segnalazioni, sorgenti dei dati dell'auto, protocollo con Home Assistant | Dart puro |
-| [`packages/gdanav_app`](../packages/gdanav_app) | Lo schermo: mappa, guida, Premium, abbinamento con Home Assistant, Android Auto e CarPlay. Lo usano l'app e gdahome | Flutter, Kotlin, Swift |
+| [`packages/gdanav_app`](../packages/gdanav_app) | Lo schermo: mappa, guida, Premium, abbinamento con Home Assistant, Android Auto e CarPlay. Lo usano l'app e GdAHome | Flutter, Kotlin, Swift |
 | [`app`](../app) | L'app Android e iPhone: l'involucro del pacchetto qui sopra ([iPhone e CarPlay](ios.md)) | Flutter |
 | [`custom_components/gdanav`](../custom_components/gdanav) | L'integrazione Home Assistant, da installare con HACS | Python |
 | [`relay`](../relay) | Il punto d'incontro fra Home Assistant e l'app, cifrato end-to-end; le segnalazioni, i codici di abbinamento, la versione minima, la [privacy](https://gdanav.gdahome.org/privacy) | Cloudflare Worker |
@@ -79,13 +79,13 @@ Come si fa, passo per passo, è in
 
 I prezzi (2,99 €/mese, 29,99 €/anno, 14 giorni di prova) stanno nei negozi,
 non nel codice. Le licenze e i codici regalo passano dal quadro delle licenze
-di gdahome (`docs/LICENZE.md` in gdahomeapp): lì anche gli installatori danno
-licenze e codici gdanav, e gdahome Premium comprende gdanav Premium.
+di GdAHome (`docs/LICENZE.md` in gdahomeapp): lì anche gli installatori danno
+licenze e codici gdanav, e GdAHome Premium comprende gdanav Premium.
 
 ## A che punto è
 
 Fatto: tutto quello che c'è nel README, su Android, iPhone, Android Auto e
-CarPlay, da soli e dentro gdahome. I percorsi li calcola per ora il Valhalla
+CarPlay, da soli e dentro GdAHome. I percorsi li calcola per ora il Valhalla
 pubblico di FOSSGIS; le colonnine vengono da Open Charge Map e OpenStreetMap,
 il loro stato da TomTom.
 
