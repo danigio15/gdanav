@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import '../percorso/valhalla.dart';
+import '../veicolo/profilo_veicolo.dart';
+import '../veicolo/stato_auto.dart';
 import 'modello_consumo.dart';
 
 /// Il tipo di strada, dalla velocità media: il consumo cambia molto fra
@@ -151,14 +153,64 @@ class ConsumoImparato {
   static const pesoRiferimentoKm = 50.0;
 
   /// La versione del modello di consumo ([energiaTrattoWh]): 2 da quando
-  /// conta le partenze e le frenate, e misura col clima del piano.
-  static const modelloAttuale = 2;
+  /// conta le partenze e le frenate, e misura col clima del piano; 3 da
+  /// quando misura coi kWh veri dell'auto (la sua capacità, l'energia che
+  /// resta) e col suo riscaldatore. Il fattore di prima, misurato coi punti
+  /// per la capacità del catalogo, si portava dentro anche l'errore della
+  /// capacità: con quella vera lo correggerebbe due volte.
+  static const modelloAttuale = 3;
+
+  /// Quanti km misurati vale il consumo medio dell'auto: vedi [fattoreCon].
+  static const pesoConsumoMedioKm = 50.0;
 
   /// Il correttivo per un tipo di strada: il suo, se misurato abbastanza,
   /// altrimenti quello generale.
   double fattorePer(TipoStrada t) {
     final s = strade[t];
     return s != null && s.affidabile ? s.fattore : fattore;
+  }
+
+  /// Il correttivo generale, tirato verso [fattoreAuto], quello che viene
+  /// dal consumo medio misurato dall'auto ([fattoreDaConsumoMedio]).
+  ///
+  /// Con prudenza: al massimo a metà strada, prima di aver misurato niente,
+  /// e sempre meno man mano che si misura (a 50 km un quarto, a 300 km il
+  /// 7%). Il consumo medio dell'auto è vero, ma di settimane di guida che
+  /// non sono questo viaggio, col clima di quei giorni e con le soste da
+  /// ferma; le misure di gdanav sono di queste strade. Così si parte giusti
+  /// prima del primo viaggio, e dopo decide quello che si misura. Il fattore
+  /// salvato non cambia: questo si rifà a ogni piano.
+  double fattoreCon(double? fattoreAuto) {
+    if (fattoreAuto == null || !fattoreAuto.isFinite) return fattore;
+    final misurati = math.min(kmOsservati, memoriaKm) + (riferimento == null ? 0 : pesoRiferimentoKm);
+    final peso = 0.5 * pesoConsumoMedioKm / (pesoConsumoMedioKm + misurati);
+    return (fattore + (fattoreAuto.clamp(minimo, massimo) - fattore) * peso).clamp(minimo, massimo).toDouble();
+  }
+
+  /// Le condizioni per il pianificatore: il correttivo imparato (dove si è
+  /// misurato abbastanza, quello del tipo di strada), tirato verso il
+  /// consumo medio dell'auto di [s] se lo dice e si sa il [profilo]
+  /// ([fattoreCon]), e il clima e la batteria dell'auto
+  /// ([Condizioni.conAuto]). Senza [conFattore] niente correttivo: è quello
+  /// che il misuratore confronta con la batteria vera.
+  Condizioni condizioni(StatoAuto? s, {ProfiloVeicolo? profilo, bool conFattore = true}) {
+    final medio = s?.consumoMedioKwh100, t = s?.temperaturaEsternaC;
+    final dallAuto = medio == null || profilo == null
+        ? null
+        : fattoreDaConsumoMedio(
+            kwh100: medio,
+            profilo: profilo,
+            condizioni: t == null ? const Condizioni() : Condizioni.daMeteo(temperaturaC: t),
+          );
+    return Condizioni(
+      fattoreConsumo: conFattore ? fattoreCon(dallAuto) : 1,
+      fattoriStrada: conFattore
+          ? {
+              for (final MapEntry(:key, :value) in strade.entries)
+                if (value.affidabile) key: value.fattore,
+            }
+          : const {},
+    ).conAuto(s);
   }
 
   static double _media(double vecchio, double nuovo, double kmPrima, double km) =>
@@ -220,15 +272,16 @@ class MisuraConsumo {
 }
 
 /// Segue il viaggio con i dati veri della batteria: a ogni lettura dice se
-/// c'è una misura nuova del consumo (almeno 2 punti di batteria e un
-/// chilometro dall'ultima), confrontata con quello che il modello prevedeva
-/// per le stesse strade.
+/// c'è una misura nuova del consumo (almeno 2 punti di batteria, o mezzo kWh
+/// se l'auto dice l'energia che resta, e un chilometro dall'ultima),
+/// confrontata con quello che il modello prevedeva per le stesse strade.
 class MisuratoreConsumo {
   MisuratoreConsumo({
     required PercorsoCalcolato percorso,
     required this.capacitaKwh,
     required ProfiloConsumo profilo,
     this.passoPercento = 2,
+    this.passoKwh = 0.5,
   }) {
     // Energia prevista cumulata lungo i tratti, senza correttivo: il fattore
     // lo si vuole misurare, non presupporre.
@@ -252,13 +305,23 @@ class MisuratoreConsumo {
   /// all'1%, sotto i 2 punti l'errore è troppo grande.
   final double passoPercento;
 
+  /// Lo stesso con l'energia che resta, che l'auto dice a un decimo di kWh
+  /// o meglio: mezzo kWh è un punto scarso di una batteria da 60, e su mezzo
+  /// kWh un decimo pesa meno di un punto su due.
+  final double passoKwh;
+
   final _metri = <double>[];
   final _wh = <double>[];
   final _secondi = <double>[];
-  ({double batteria, double metri})? _da;
+
+  /// Le letture sono in kWh (l'energia dell'auto) o in punti di batteria.
+  /// Le due non si mescolano: se l'auto smette di dire l'energia, o comincia,
+  /// si riparte come dopo una ricarica.
+  bool _inKwh = false;
+  ({double livello, double metri})? _da;
 
   /// La prima lettura, finché la batteria non cambia: vedi [registra].
-  ({double batteria, double metri})? _prima;
+  ({double livello, double metri})? _prima;
 
   /// L'energia prevista dall'inizio fino a [metri] lungo il percorso.
   double previstaFinoA(double metri) => _fino(_wh, metri);
@@ -290,31 +353,47 @@ class MisuratoreConsumo {
   /// correttivo imparava come vero. Così la prima lettura (e la prima dopo
   /// una ricarica) aspetta che la batteria cambi, e da lì si misura fra un
   /// cambio e l'altro.
-  MisuraConsumo? registra({required double batteria, required double metri, bool inCarica = false}) {
-    final da = _da;
-    if (inCarica || (da != null && (batteria > da.batteria || metri < da.metri))) {
+  ///
+  /// Con [energiaKwh] (l'auto dice l'energia che resta) si misura in kWh
+  /// veri, senza passare dalla capacità, e bastano [passoKwh]: il calo vero
+  /// si vede dopo pochi chilometri, non dopo due punti. Il resto è uguale.
+  MisuraConsumo? registra({
+    required double batteria,
+    required double metri,
+    bool inCarica = false,
+    double? energiaKwh,
+  }) {
+    final inKwh = energiaKwh != null && energiaKwh.isFinite;
+    final livello = inKwh ? energiaKwh : batteria;
+    if (inKwh != _inKwh) {
+      _inKwh = inKwh;
       _da = null;
-      _prima = inCarica ? null : (batteria: batteria, metri: metri);
+      _prima = null;
+    }
+    final da = _da;
+    if (inCarica || (da != null && (livello > da.livello || metri < da.metri))) {
+      _da = null;
+      _prima = inCarica ? null : (livello: livello, metri: metri);
       return null;
     }
     if (da == null) {
       final prima = _prima;
-      if (prima == null || batteria > prima.batteria || metri < prima.metri) {
-        _prima = (batteria: batteria, metri: metri);
-      } else if (batteria < prima.batteria) {
-        _da = (batteria: batteria, metri: metri);
+      if (prima == null || livello > prima.livello || metri < prima.metri) {
+        _prima = (livello: livello, metri: metri);
+      } else if (livello < prima.livello) {
+        _da = (livello: livello, metri: metri);
       }
       return null;
     }
-    final calo = da.batteria - batteria;
+    final calo = da.livello - livello;
     final percorsi = metri - da.metri;
-    if (calo < passoPercento || percorsi < 1000) return null;
-    _da = (batteria: batteria, metri: metri);
+    if (calo < (inKwh ? passoKwh : passoPercento) || percorsi < 1000) return null;
+    _da = (livello: livello, metri: metri);
     final previsto = previstaFinoA(metri) - previstaFinoA(da.metri);
     final secondi = _fino(_secondi, metri) - _fino(_secondi, da.metri);
     return MisuraConsumo(
       previstoWh: previsto,
-      realeWh: calo / 100 * capacitaKwh * 1000,
+      realeWh: inKwh ? calo * 1000 : calo / 100 * capacitaKwh * 1000,
       km: percorsi / 1000,
       velocitaKmh: secondi > 0 ? percorsi / secondi * 3.6 : null,
     );

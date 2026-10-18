@@ -1,4 +1,5 @@
 import '../colonnine/colonnina.dart';
+import 'stato_auto.dart';
 
 /// Un punto della curva di ricarica: con la batteria a [batteria]% l'auto
 /// accetta al massimo [potenzaKw].
@@ -64,6 +65,34 @@ class ProfiloVeicolo {
   /// Elettronica, luci, pompe: quello che si consuma anche da fermi, senza
   /// clima.
   final double consumoFissoW;
+
+  /// Lo stesso modello con un'altra capacità utile.
+  ProfiloVeicolo conCapacita(double kwh) => ProfiloVeicolo(
+        id: id,
+        marca: marca,
+        modello: modello,
+        potenzaAcKw: potenzaAcKw,
+        nome: nome,
+        massaKg: massaKg,
+        cdA: cdA,
+        crr: crr,
+        capacitaUtileKwh: kwh,
+        curvaRicarica: curvaRicarica,
+        connettori: connettori,
+        rendimentoTrazione: rendimentoTrazione,
+        rendimentoRecupero: rendimentoRecupero,
+        consumoFissoW: consumoFissoW,
+      );
+
+  /// Il modello con la capacità vera dell'auto di [s], se la fa sapere
+  /// ([StatoAuto.capacitaVeraKwh]): ogni conto fra percentuale e kWh (le
+  /// soste, la stima, la misura del consumo, i tempi di ricarica) parte da
+  /// lì. Una batteria invecchiata ha meno kWh di quelli del catalogo, e il
+  /// correttivo imparato non deve più nasconderlo. Senza, questo.
+  ProfiloVeicolo conCapacitaDi(StatoAuto? s) {
+    final kwh = s?.capacitaVeraKwh;
+    return kwh == null || (kwh - capacitaUtileKwh).abs() < 0.05 ? this : conCapacita(kwh);
+  }
 
   /// La potenza massima accettata alla [batteria] data, interpolando la
   /// curva.

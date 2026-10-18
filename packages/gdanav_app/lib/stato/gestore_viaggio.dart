@@ -415,7 +415,7 @@ class GestoreViaggio extends ChangeNotifier {
               tappe: tappe,
               scelto: p,
               batteria: batteria,
-              condizioni: consumo?.condizioni(auto.stato) ?? const Condizioni(),
+              condizioni: consumo?.condizioni(auto.stato, veicolo: auto.veicolo) ?? const Condizioni(),
             )
             .timeout(tempoMassimo);
         piano = v.piano;
@@ -639,17 +639,18 @@ class GestoreViaggio extends ChangeNotifier {
     final calcolo = Calcolo(destinazione);
     _imposta(calcolo);
     try {
-      var condizioni = consumo?.condizioni(auto.stato) ?? const Condizioni();
+      var condizioni = consumo?.condizioni(auto.stato, veicolo: auto.veicolo) ?? const Condizioni();
       if (await stimaMeteo?.call(da, destinazione.posizione) case final m?) {
         // La temperatura dell'auto, se la dice, vale più di quella del meteo
         // (che è della zona, e di un'ora): dal meteo il vento, e la
-        // temperatura quando l'auto non la manda.
+        // temperatura quando l'auto non la manda. Il clima e la batteria
+        // dell'auto restano (`Condizioni.conAuto`).
         condizioni = Condizioni.daMeteo(
-          temperaturaC: auto.stato?.temperaturaEsternaC ?? m.temperaturaC,
+          temperaturaC: m.temperaturaC,
           ventoControMs: m.ventoControMs,
           fattoreConsumo: condizioni.fattoreConsumo,
           fattoriStrada: condizioni.fattoriStrada,
-        );
+        ).conAuto(auto.stato);
       }
       this.condizioni = condizioni;
       final pianificatore = costruisci(impostazioni, auto.veicolo, preferenze, opzioni);
@@ -738,6 +739,10 @@ class GestoreViaggio extends ChangeNotifier {
     final preferenze = _preferenze ??= await archivio.preferenze();
     final pianificatore = costruisci(impostazioni, auto.veicolo, preferenze, opzioni);
     final tappe = [for (final t in _daPassare) t.posizione];
+    // La temperatura e il clima di adesso, non quelli della partenza: in un
+    // viaggio lungo fuori cambia, e il riscaldatore con lei. Il vento resta
+    // quello del meteo.
+    final adesso = (condizioni ?? const Condizioni()).conAuto(auto.stato);
     final ViaggioPronto nuovo;
     try {
       if (prima.soloPercorso || prima.viaggio.piano == null) {
@@ -769,7 +774,7 @@ class GestoreViaggio extends ChangeNotifier {
               arrivo: d.posizione,
               tappe: tappe,
               batteria: carica,
-              condizioni: condizioni ?? const Condizioni(),
+              condizioni: adesso,
               obbligate: {...obbligate, ...soste},
               colonnineNote: note.isEmpty && soste.isNotEmpty ? null : note,
             )
@@ -783,6 +788,7 @@ class GestoreViaggio extends ChangeNotifier {
     // Nel frattempo si è annullato, o scelta un'altra meta: non vale più.
     if (!identical(stato, prima)) return false;
     ultimaPosizione = partenza;
+    condizioni = adesso;
     _imposta(nuovo);
     return true;
   }

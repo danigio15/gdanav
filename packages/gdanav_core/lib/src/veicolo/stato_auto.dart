@@ -44,6 +44,13 @@ class StatoAuto {
     this.velocitaKmh,
     this.potenzaKw,
     this.odometroKm,
+    this.energiaKwh,
+    this.capacitaKwh,
+    this.consumoMedioKwh100,
+    this.potenzaClimaW,
+    this.climaAcceso,
+    this.batteriaInRiscaldamento,
+    this.temperaturaInternaC,
     this.stimataDa,
   });
 
@@ -75,6 +82,30 @@ class StatoAuto {
   /// Il contachilometri: i chilometri veri fra due letture.
   final double? odometroKm;
 
+  /// L'energia che resta nella batteria, in kWh: un decimo di kWh invece
+  /// dell'1%, così il consumo vero si misura dopo pochi km
+  /// ([MisuratoreConsumo]).
+  final double? energiaKwh;
+
+  /// La capacità utile della batteria come la dice l'auto, al posto di
+  /// quella del catalogo: vedi [capacitaVeraKwh].
+  final double? capacitaKwh;
+
+  /// Il consumo medio che l'auto ha misurato nelle ultime settimane, in kWh
+  /// ogni 100 km.
+  final double? consumoMedioKwh100;
+
+  /// La potenza del riscaldatore (abitacolo e batteria), in W.
+  final double? potenzaClimaW;
+
+  final bool? climaAcceso;
+
+  /// La batteria si sta scaldando: costa qualche kWh, e poi si ricarica più
+  /// in fretta.
+  final bool? batteriaInRiscaldamento;
+
+  final double? temperaturaInternaC;
+
   /// Per una [TipoSorgente.stima]: la sorgente della lettura vera da cui la
   /// stima parte (la batteria di Home Assistant, meno quello che si è
   /// consumato dopo). `null` per una lettura vera.
@@ -82,11 +113,28 @@ class StatoAuto {
 
   Duration eta(DateTime ora) => ora.difference(letto);
 
+  /// La capacità utile vera della batteria, in kWh, se l'auto la fa sapere:
+  /// quella che dice, oppure l'energia che resta divisa per la percentuale
+  /// (sopra il 10%, perché sotto un punto di batteria pesa troppo). `null`
+  /// se non la si sa o se il numero non è una batteria d'auto: allora vale
+  /// quella del catalogo.
+  double? get capacitaVeraKwh {
+    bool buona(double? kwh) => kwh != null && kwh.isFinite && kwh >= 10 && kwh <= 250;
+    if (buona(capacitaKwh)) return capacitaKwh;
+    final e = energiaKwh;
+    if (e == null || batteria < 10) return null;
+    final dallEnergia = e / batteria * 100;
+    return buona(dallEnergia) ? dallEnergia : null;
+  }
+
+  /// La stessa lettura con un'altra batteria (la stima dell'arbitro):
+  /// [energiaKwh] scende con lei, se l'auto la dice.
   StatoAuto conBatteria(
     double batteria, {
     TipoSorgente? sorgente,
     DateTime? letto,
     double? autonomiaKm,
+    double? energiaKwh,
     TipoSorgente? stimataDa,
   }) =>
       StatoAuto(
@@ -103,6 +151,13 @@ class StatoAuto {
         velocitaKmh: velocitaKmh,
         potenzaKw: potenzaKw,
         odometroKm: odometroKm,
+        energiaKwh: energiaKwh ?? this.energiaKwh,
+        capacitaKwh: capacitaKwh,
+        consumoMedioKwh100: consumoMedioKwh100,
+        potenzaClimaW: potenzaClimaW,
+        climaAcceso: climaAcceso,
+        batteriaInRiscaldamento: batteriaInRiscaldamento,
+        temperaturaInternaC: temperaturaInternaC,
         stimataDa: stimataDa ?? this.stimataDa,
       );
 

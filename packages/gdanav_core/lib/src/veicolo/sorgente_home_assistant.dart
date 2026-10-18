@@ -71,6 +71,13 @@ class SorgenteHomeAssistant implements SorgenteDatiAuto {
       velocitaKmh: (d['velocita_kmh'] as num?)?.toDouble(),
       potenzaKw: (d['potenza_kw'] as num?)?.toDouble(),
       odometroKm: (d['odometro_km'] as num?)?.toDouble(),
+      energiaKwh: (d['energia_kwh'] as num?)?.toDouble(),
+      capacitaKwh: (d['capacita_kwh'] as num?)?.toDouble(),
+      consumoMedioKwh100: (d['consumo_medio_kwh100'] as num?)?.toDouble(),
+      potenzaClimaW: (d['potenza_clima_w'] as num?)?.toDouble(),
+      climaAcceso: d['clima_acceso'] as bool?,
+      batteriaInRiscaldamento: d['batteria_in_riscaldamento'] as bool?,
+      temperaturaInternaC: (d['temperatura_interna_c'] as num?)?.toDouble(),
     );
   }
 }

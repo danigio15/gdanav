@@ -48,20 +48,10 @@ class GestoreConsumo extends ChangeNotifier {
     if (_veicolo case final v?) await archivio.salvaConsumo(v, imparato);
   }
 
-  /// Le condizioni per il pianificatore: il correttivo imparato e, se l'auto
-  /// la dice, la temperatura esterna (col clima che ne segue).
-  Condizioni condizioni(StatoAuto? s, {bool conFattore = true}) {
-    final f = conFattore ? imparato.fattore : 1.0;
-    // Dove si è misurato abbastanza, il correttivo di quel tipo di strada.
-    final strade = conFattore
-        ? {
-            for (final MapEntry(:key, :value) in imparato.strade.entries)
-              if (value.affidabile) key: value.fattore,
-          }
-        : const <TipoStrada, double>{};
-    final t = s?.temperaturaEsternaC;
-    return t == null
-        ? Condizioni(fattoreConsumo: f, fattoriStrada: strade)
-        : Condizioni.daMeteo(temperaturaC: t, fattoreConsumo: f, fattoriStrada: strade);
-  }
+  /// Le condizioni per il pianificatore: il correttivo imparato (col
+  /// consumo medio dell'auto di [veicolo], se lo dice) e, se l'auto li dice,
+  /// la temperatura esterna e il clima. Il conto è in
+  /// [ConsumoImparato.condizioni].
+  Condizioni condizioni(StatoAuto? s, {bool conFattore = true, ProfiloVeicolo? veicolo}) =>
+      imparato.condizioni(s, profilo: veicolo, conFattore: conFattore);
 }

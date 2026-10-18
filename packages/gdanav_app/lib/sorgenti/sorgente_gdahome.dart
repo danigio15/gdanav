@@ -131,5 +131,12 @@ class SorgenteGdahome extends ChangeNotifier implements SorgenteDatiAuto {
     velocitaKmh: l.velocitaKmh,
     potenzaKw: l.potenzaKw,
     odometroKm: l.odometroKm,
+    energiaKwh: l.energiaKwh,
+    capacitaKwh: l.capacitaKwh,
+    consumoMedioKwh100: l.consumoMedioKwh100,
+    potenzaClimaW: l.potenzaClimaW,
+    climaAcceso: l.climaAcceso,
+    batteriaInRiscaldamento: l.batteriaInRiscaldamento,
+    temperaturaInternaC: l.temperaturaInternaC,
   );
 }

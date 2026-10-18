@@ -76,13 +76,24 @@ class ArbitroSorgenti {
   /// quella rimasta da ieri, vale invece dalla sua ora. E una lettura uguale
   /// alla precedente, rimandata (una sorgente che si riaccende), non cambia
   /// niente: né l'ora, né la stima già fatta dopo di lei.
+  ///
+  /// L'energia che resta conta come la batteria: è la stessa lettura, a un
+  /// decimo di kWh invece che a punti. E una lettura con la stessa batteria
+  /// e la stessa ora ma altri dati nuovi (la temperatura, il clima: Home
+  /// Assistant la data con la batteria) li porta dentro, senza toccare l'ora
+  /// né la stima: prima si buttava via tutta.
   void registra(StatoAuto lettura, {DateTime? ricevuto}) {
     final tipo = lettura.sorgente;
     final precedente = _ultime[tipo];
     if (precedente != null && lettura.letto.isBefore(precedente.letto)) return;
     final diversa = precedente != null &&
-        (precedente.batteria != lettura.batteria || precedente.autonomiaKm != lettura.autonomiaKm);
-    if (precedente != null && !diversa && !lettura.letto.isAfter(precedente.letto)) return;
+        (precedente.batteria != lettura.batteria ||
+            precedente.autonomiaKm != lettura.autonomiaKm ||
+            precedente.energiaKwh != lettura.energiaKwh);
+    if (precedente != null && !diversa && !lettura.letto.isAfter(precedente.letto)) {
+      _ultime[tipo] = lettura;
+      return;
+    }
     _ultime[tipo] = lettura;
     _quando[tipo] = diversa && ricevuto != null && ricevuto.isAfter(lettura.letto) ? ricevuto : lettura.letto;
     _consumoDopo[tipo] = 0;
@@ -123,16 +134,20 @@ class ArbitroSorgenti {
 
   /// La lettura tolto il consumo avvenuto dopo: se non è cambiato niente
   /// resta com'è, con la sua sorgente vera. L'autonomia dell'auto scende con
-  /// lei, coi chilometri per punto che dice l'auto.
+  /// lei, coi chilometri per punto che dice l'auto, e così l'energia che
+  /// resta. I punti si contano con la capacità vera, se l'auto la dice
+  /// ([StatoAuto.capacitaVeraKwh]).
   StatoAuto _aggiornata(StatoAuto l, DateTime ora) {
     final consumo = _consumoDopo[l.sorgente] ?? 0;
     if (consumo == 0) return l;
-    final batteria = (l.batteria - consumo / capacitaUtileKwh * 100).clamp(0, 100).toDouble();
-    final km = l.autonomiaKm;
+    final capacita = l.capacitaVeraKwh ?? capacitaUtileKwh;
+    final batteria = (l.batteria - consumo / capacita * 100).clamp(0, 100).toDouble();
+    final km = l.autonomiaKm, kWh = l.energiaKwh;
     return l.conBatteria(
       batteria,
       sorgente: TipoSorgente.stima,
       autonomiaKm: km != null && l.batteria > 0 ? km * batteria / l.batteria : null,
+      energiaKwh: kWh == null ? null : (kWh - consumo).clamp(0, double.infinity).toDouble(),
       stimataDa: l.sorgente,
     );
   }

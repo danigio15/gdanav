@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import '../veicolo/profilo_veicolo.dart';
+import '../veicolo/stato_auto.dart';
 import 'consumo_imparato.dart';
 
 /* ─── Il modello, in breve ──────────────────────────────────────────────────
@@ -21,7 +22,9 @@ import 'consumo_imparato.dart';
  *    le autostrade;
  *  - **consumi fissi** (elettronica, pompe) e **clima**, in watt per il tempo
  *    del tratto. Il clima solo se la temperatura si sa (dall'auto o dal
- *    meteo): senza, nessun riscaldamento inventato ([Condizioni.daMeteo]);
+ *    meteo): senza, nessun riscaldamento inventato ([Condizioni.daMeteo]).
+ *    Se l'auto dice quanto consuma il suo riscaldatore, conta anche quello
+ *    ([Condizioni.conAuto]);
  *  - tutto per il **correttivo** dell'auto ([Condizioni.fattorePer]): quello
  *    imparato guidando ([ConsumoImparato]) o, prima, quello del «consumo di
  *    riferimento» scritto dall'utente (per esempio quello calibrato di ABRP,
@@ -75,6 +78,8 @@ class Condizioni {
     this.climaW = 0,
     this.fattoreConsumo = 1,
     this.fattoriStrada = const {},
+    this.riscaldamentoBatteriaKwh = 0,
+    this.temperaturaBatteriaC,
   });
 
   /// Il clima stimato dalla temperatura esterna: niente fra 18 e 26 gradi,
@@ -84,15 +89,63 @@ class Condizioni {
     double ventoControMs = 0,
     double fattoreConsumo = 1,
     Map<TipoStrada, double> fattoriStrada = const {},
-  }) {
-    final caldo = math.min(3000.0, math.max(0.0, 18 - temperaturaC) * 150);
-    final freddo = math.min(1500.0, math.max(0.0, temperaturaC - 26) * 100);
+  }) =>
+      Condizioni(
+        temperaturaC: temperaturaC,
+        ventoControMs: ventoControMs,
+        climaW: climaStimatoW(temperaturaC),
+        fattoreConsumo: fattoreConsumo,
+        fattoriStrada: fattoriStrada,
+      );
+
+  /// Il clima che serve a [temperaturaC] fuori, in W: vedi [Condizioni.daMeteo].
+  static double climaStimatoW(double temperaturaC) =>
+      math.min(3000.0, math.max(0.0, 18 - temperaturaC) * 150) +
+      math.min(1500.0, math.max(0.0, temperaturaC - 26) * 100);
+
+  /// Quanto dura, di solito, il riscaldamento della batteria fredda, e con
+  /// che potenza quando l'auto non la dice: una resistenza o la pompa di
+  /// calore da qualche kW per un quarto d'ora, venti minuti.
+  static const durataRiscaldamentoBatteria = Duration(minutes: 20);
+  static const potenzaRiscaldamentoBatteriaW = 3000.0;
+
+  /// Queste condizioni col clima e la batteria come li dice l'auto adesso.
+  ///
+  /// - La **temperatura** dell'auto, se la dice, vale più di questa (che è
+  ///   del meteo, della zona e di un'ora fa); il clima stimato si rifà da lei.
+  /// - **Batteria in riscaldamento**: costa una volta sola, alla partenza
+  ///   ([riscaldamentoBatteriaKwh]), la potenza del riscaldatore (o quella
+  ///   tipica) per [durataRiscaldamentoBatteria]. Non per tutto il viaggio:
+  ///   scaldata la batteria, si spegne. Intanto il riscaldatore scalda lei,
+  ///   e il clima resta quello stimato.
+  /// - **Clima acceso** con la potenza del riscaldatore misurata: metà la
+  ///   misura e metà la stima. La misura è di adesso, e appena accesa
+  ///   l'auto il riscaldatore va al massimo per scaldare l'abitacolo; la
+  ///   stima è quella di quando l'abitacolo è caldo. Una potenza 0 non dice
+  ///   niente (il raffrescamento e la pompa di calore non sono il
+  ///   riscaldatore), e resta la stima.
+  ///
+  /// Senza dati, le condizioni restano queste: niente si inventa.
+  Condizioni conAuto(StatoAuto? s) {
+    if (s == null) return this;
+    final t = s.temperaturaEsternaC ?? temperaturaC;
+    var clima = s.temperaturaEsternaC == null ? climaW : climaStimatoW(t);
+    var batteria = 0.0;
+    final misurata = s.potenzaClimaW;
+    if (s.batteriaInRiscaldamento == true) {
+      final w = misurata != null && misurata > 0 ? misurata : potenzaRiscaldamentoBatteriaW;
+      batteria = w * durataRiscaldamentoBatteria.inSeconds / 3.6e6;
+    } else if (s.climaAcceso == true && misurata != null && misurata > 0) {
+      clima = (climaStimatoW(t) + misurata) / 2;
+    }
     return Condizioni(
-      temperaturaC: temperaturaC,
+      temperaturaC: t,
       ventoControMs: ventoControMs,
-      climaW: caldo + freddo,
+      climaW: clima,
       fattoreConsumo: fattoreConsumo,
       fattoriStrada: fattoriStrada,
+      riscaldamentoBatteriaKwh: batteria,
+      temperaturaBatteriaC: s.temperaturaBatteriaC ?? temperaturaBatteriaC,
     );
   }
 
@@ -102,6 +155,14 @@ class Condizioni {
   final double ventoControMs;
 
   final double climaW;
+
+  /// L'energia per scaldare la batteria, presa una volta alla partenza:
+  /// vedi [conAuto].
+  final double riscaldamentoBatteriaKwh;
+
+  /// La batteria fredda carica piano in continua: vedi
+  /// [PianificatoreSoste]. `null` se non si sa.
+  final double? temperaturaBatteriaC;
 
   /// Quanto la tua auto consuma rispetto al modello: lo impara
   /// [ConsumoImparato] guidando (1,1 = il 10% in più).
@@ -115,8 +176,13 @@ class Condizioni {
   /// perché il correttivo lo si vuole misurare, non presupporre. Il clima
   /// resta: se no il riscaldamento finiva dentro il correttivo e il piano,
   /// che il clima lo conta già dal meteo, lo contava due volte.
-  Condizioni get senzaCorrettivo =>
-      Condizioni(temperaturaC: temperaturaC, ventoControMs: ventoControMs, climaW: climaW);
+  Condizioni get senzaCorrettivo => Condizioni(
+        temperaturaC: temperaturaC,
+        ventoControMs: ventoControMs,
+        climaW: climaW,
+        riscaldamentoBatteriaKwh: riscaldamentoBatteriaKwh,
+        temperaturaBatteriaC: temperaturaBatteriaC,
+      );
 
   double fattorePer(double kmh) => fattoriStrada[TipoStrada.daVelocita(kmh)] ?? fattoreConsumo;
 
@@ -182,4 +248,30 @@ double fattoreDaRiferimento({required double whKm, required double kmh, required
   final modello = consumoMedioWhKm([Tratto(lunghezzaM: 1000, velocitaKmh: kmh)], profilo);
   if (whKm <= 0 || modello <= 0) return 1;
   return (whKm / modello).clamp(ConsumoImparato.minimo, ConsumoImparato.massimo).toDouble();
+}
+
+/// Il correttivo che viene dal consumo medio misurato dall'auto, [kwh100]
+/// kWh ogni 100 km (quello del computer di bordo, delle ultime settimane).
+///
+/// Non è un consumo a velocità costante come il riferimento di ABRP
+/// ([fattoreDaRiferimento]): è guida vera, mista. Si confronta quindi con
+/// quello che il modello dice per una guida mista, un terzo in città a 40
+/// km/h, un terzo fuori a 80 e un terzo in autostrada a 120, con le partenze
+/// e frenate di ciascuna, i consumi fissi e il clima delle [condizioni]
+/// (quelle della temperatura di adesso, che è più o meno quella delle
+/// ultime settimane), senza correttivo. Tenuto fra 0,6 e 1,8 come il
+/// correttivo imparato; quanto conti lo decide [ConsumoImparato.fattoreCon].
+double fattoreDaConsumoMedio({
+  required double kwh100,
+  required ProfiloVeicolo profilo,
+  Condizioni condizioni = const Condizioni(),
+}) {
+  const misto = [
+    Tratto(lunghezzaM: 10000, velocitaKmh: 40),
+    Tratto(lunghezzaM: 10000, velocitaKmh: 80),
+    Tratto(lunghezzaM: 10000, velocitaKmh: 120),
+  ];
+  final modello = consumoMedioWhKm(misto, profilo, condizioni.senzaCorrettivo) / 10;
+  if (!kwh100.isFinite || kwh100 <= 0 || modello <= 0) return 1;
+  return (kwh100 / modello).clamp(ConsumoImparato.minimo, ConsumoImparato.massimo).toDouble();
 }
