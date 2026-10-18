@@ -565,7 +565,7 @@ jobs:
             {
               echo "### L'app per iPhone è compilata, e non è firmata"
               echo ""
-              echo "Per TestFlight servono i quattro segreti di Apple: vedi docs/ios.md."
+              echo "Per TestFlight servono i quattro segreti di Apple."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
       # CarPlay si accende solo quando Apple ha concesso il permesso

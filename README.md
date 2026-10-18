@@ -246,6 +246,3 @@ ripubblicarlo, distribuirlo, modificato o no, né rivenderlo. Chi lo installa
 per i clienti lo fa con l'autorizzazione di CRV Immobiliare S.r.l., a cui si
 chiedono anche gli altri permessi.
 
----
-
-Per chi sviluppa: [docs/SVILUPPO.md](docs/SVILUPPO.md)
