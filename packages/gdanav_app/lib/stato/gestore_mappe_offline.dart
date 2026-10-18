@@ -27,7 +27,7 @@ abstract interface class ArchivioMappe {
 class ArchivioMapLibre implements ArchivioMappe {
   /// Lo stile che MapLibre usa per sapere cosa scaricare: quello di
   /// OpenFreeMap ha la stessa sorgente e gli stessi caratteri del nostro,
-  /// quindi i riquadri servono anche alla mappa di gdanav.
+  /// quindi i riquadri servono anche alla mappa di GdANav.
   static const stileDiRiferimento = 'https://tiles.openfreemap.org/styles/liberty';
 
   @override

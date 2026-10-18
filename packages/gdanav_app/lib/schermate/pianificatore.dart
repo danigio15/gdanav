@@ -12,10 +12,10 @@ import '../tema.dart';
  * l'elenco dei viaggi, un viaggio programmato, un giro a tappe e un viaggio
  * di ogni settimana. Dentro GdAHome i viaggi stanno nella casa, che avvisa
  * quando partire e accende il clima dell'auto; sono gli stessi della pagina
- * gdanav della plancia, da PC. In gdanav da sola stanno nel telefono. In
+ * GdANav della plancia, da PC. In GdANav da sola stanno nel telefono. In
  * auto compaiono in cima a «Dove andiamo?». */
 
-/// Sceglie un posto (la ricerca di gdanav, coi preferiti).
+/// Sceglie un posto (la ricerca di GdANav, coi preferiti).
 typedef ScegliPosto = Future<Luogo?> Function(String titolo);
 
 /// Parte un viaggio pianificato adesso, con le sue tappe.
@@ -384,7 +384,7 @@ class _SchermataPianificatoreState extends State<SchermataPianificatore> {
                         Text(
                           g.fonte.dellaCasa
                               ? 'Scrivi dove devi arrivare e a che ora: ti dico quando partire. Li trovi anche '
-                                    'nella pagina gdanav della plancia, da PC, e in auto.'
+                                    'nella pagina GdANav della plancia, da PC, e in auto.'
                               : 'Scrivi dove devi arrivare e a che ora: ti dico quando partire. Li trovi anche '
                                     'su CarPlay e Android Auto.',
                           textAlign: TextAlign.center,
@@ -785,7 +785,7 @@ class _ModificaViaggioState extends State<ModificaViaggio> {
             ? (v.tipo == TipoViaggioPianificato.settimana
                   ? 'Ogni volta ti dico l\'ora giusta, col traffico di quel giorno'
                   : 'Lo ricalcolo col traffico prima di partire')
-            : 'Lo ricalcolo col traffico quando apri gdanav',
+            : 'Lo ricalcolo col traffico quando apri GdANav',
         null,
       ));
     }
@@ -834,7 +834,7 @@ class _ModificaViaggioState extends State<ModificaViaggio> {
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text(
-                'Il clima dell\'auto e il garage si scelgono nella pagina gdanav della plancia.',
+                'Il clima dell\'auto e il garage si scelgono nella pagina GdANav della plancia.',
                 style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             ),

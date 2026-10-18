@@ -65,7 +65,7 @@ class ArbitroSorgenti {
 
   /// Una lettura da una sorgente. [ricevuto] è quando è arrivata al telefono.
   ///
-  /// Dal campo: l'auto diceva 23% e 95 km, gdanav 21% e 88 km. I dati di Home
+  /// Dal campo: l'auto diceva 23% e 95 km, GdANav 21% e 88 km. I dati di Home
   /// Assistant erano giusti, ma datati col loro ultimo cambio (e
   /// l'integrazione dell'auto, o l'orologio della casa, li data come vuole):
   /// una lettura **nuova**, appena arrivata, sembrava vecchia di un quarto

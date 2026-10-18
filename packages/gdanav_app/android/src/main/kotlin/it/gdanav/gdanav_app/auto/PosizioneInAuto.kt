@@ -31,7 +31,7 @@ import it.gdanav.gdanav_app.R
  * tornava davanti e il GPS ripartiva: era quello, non un caso.
  *
  * Il rimedio è quello che la libreria consiglia, e che fanno i navigatori
- * veri: finché gdanav è sullo schermo dell'auto, un servizio **in primo
+ * veri: finché GdANav è sullo schermo dell'auto, un servizio **in primo
  * piano**, di tipo posizione, tiene l'app «in uso» per il GPS. Non legge
  * niente lui — la posizione la legge il Dart come sempre — ma con lui acceso
  * l'app intera conta come davanti, e il GPS arriva una volta al secondo
@@ -158,7 +158,7 @@ class PosizioneInAuto : Service() {
             }
         }
 
-        /** Lo schermo dell'auto è tornato su gdanav: se prima non era riuscito a mettersi davanti, ci riprova. */
+        /** Lo schermo dell'auto è tornato su GdANav: se prima non era riuscito a mettersi davanti, ci riprova. */
         fun riprova() {
             acceso?.mettiDavanti()
         }

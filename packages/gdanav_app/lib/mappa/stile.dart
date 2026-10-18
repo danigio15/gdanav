@@ -1,4 +1,4 @@
-/// Lo stile della mappa di gdanav, chiaro e scuro, sui dati vettoriali di
+/// Lo stile della mappa di GdANav, chiaro e scuro, sui dati vettoriali di
 /// OpenFreeMap (schema OpenMapTiles). Un solo posto per i colori della
 /// mappa: lo usa l'app, e lo usano le anteprime.
 ///
@@ -21,7 +21,7 @@ const sorgenteCode = 'gdanav-code';
 const sorgenteAlternative = 'gdanav-alternative';
 const sorgenteTappe = 'gdanav-tappe';
 
-/// Le persone di casa, quando gdanav sta dentro GdAHome (`GestorePersone`).
+/// Le persone di casa, quando GdANav sta dentro GdAHome (`GestorePersone`).
 const sorgentePersone = 'gdanav-persone';
 
 /// Le ZTL e le aree pedonali intorno (i contorni e, come punti, dove

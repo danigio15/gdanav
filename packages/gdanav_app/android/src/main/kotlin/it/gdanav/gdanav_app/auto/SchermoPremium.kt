@@ -9,7 +9,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 
 /**
- * Senza gdanav Premium: si dice che in auto la navigazione è Premium, e
+ * Senza GdANav Premium: si dice che in auto la navigazione è Premium, e
  * basta. Appena l'app lo sblocca (o lo ritrova dal Play Store) si passa da sé
  * alla navigazione. Con una versione troppo vecchia ([PonteAuto.aggiorna]) si
  * dice invece che serve un aggiornamento.
@@ -51,13 +51,13 @@ class SchermoPremium(
     override fun onGetTemplate(): Template {
         if (PonteAuto.aggiorna(carContext)) {
             return MessageTemplate.Builder("Questa versione non è più attiva: serve un aggiornamento.")
-                .setTitle("C'è una versione nuova di gdanav")
+                .setTitle("C'è una versione nuova di GdANav")
                 .setHeaderAction(Action.APP_ICON)
                 .build()
         }
         if (!PonteAuto.premiumNoto(carContext)) {
             return MessageTemplate.Builder("Un momento…")
-                .setTitle("gdanav")
+                .setTitle("GdANav")
                 .setHeaderAction(Action.APP_ICON)
                 .build()
         }
@@ -66,10 +66,10 @@ class SchermoPremium(
             if (ospite) {
                 "La navigazione in auto è inclusa in GdAHome Premium."
             } else {
-                "La navigazione in auto è inclusa in gdanav Premium."
+                "La navigazione in auto è inclusa in GdANav Premium."
             },
         )
-            .setTitle(if (ospite) "GdAHome Premium" else "gdanav Premium")
+            .setTitle(if (ospite) "GdAHome Premium" else "GdANav Premium")
             .setHeaderAction(Action.APP_ICON)
         // Dentro GdAHome la casa non è Premium: ci si arriva anche da qui.
         GdanavInAuto.casa?.let { casa ->

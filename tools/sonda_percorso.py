@@ -2,7 +2,7 @@
 
 Oggi `TrafficoTomTom` chiama `calculateRoute` ma gli impone la nostra linea
 con `supportingPoints`: lo usa come cronometro. Qui gliela si chiede davvero,
-per sapere se le sue istruzioni bastano a far girare gdanav — le manovre, i
+per sapere se le sue istruzioni bastano a far girare GdANav — le manovre, i
 nomi delle uscite, i cartelli, le corsie — prima di riscrivere il client.
 
 Due motori: quello di sempre e Orbis, che è il nuovo. Le corsie servono alle

@@ -64,7 +64,7 @@ class _EsploraAutoState extends State<EsploraAuto> {
         padding: const EdgeInsets.all(16),
         children: [
           const Text(
-            "Auto accesa, dongle inserito. gdanav chiede all'auto cosa sa dire: solo letture, non cambia niente "
+            "Auto accesa, dongle inserito. GdANav chiede all'auto cosa sa dire: solo letture, non cambia niente "
             "nelle centraline. Ci vuole circa un minuto. Poi copia il rapporto e mandalo: servirà a scrivere il "
             'profilo del tuo modello (batteria, potenza, temperature).',
           ),

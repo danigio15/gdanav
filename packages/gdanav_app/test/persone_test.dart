@@ -1,5 +1,5 @@
 // «Quando apre il navigatore non deve calcolare il percorso ma mostrare dove
-// è sulla mappa. Se ci sono più persone nella casa, la mappa di gdanav mostra
+// è sulla mappa. Se ci sono più persone nella casa, la mappa di GdANav mostra
 // la posizione delle persone della casa.»
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/gdanav_app.dart';

@@ -23,7 +23,7 @@ import androidx.lifecycle.LifecycleOwner
 import it.gdanav.gdanav_app.R
 
 /**
- * Lo schermo dell'auto: la mappa di gdanav sotto (con velocità, limite e dati
+ * Lo schermo dell'auto: la mappa di GdANav sotto (con velocità, limite e dati
  * dell'auto), sopra la prossima manovra con corsie, svincolo e arrivo nelle
  * schede di Android Auto. In alto Cerca, Menu e Fine; a lato sposta, + e −,
  * 2D/3D e Centra. In guida il viaggio va anche al cruscotto dell'auto e
@@ -117,7 +117,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     }
 
     /**
-     * Questa versione di gdanav è troppo vecchia (lo dice il telefono, vedi
+     * Questa versione di GdANav è troppo vecchia (lo dice il telefono, vedi
      * `GestoreAggiornamento`): la guida si ferma e sopra la mappa resta lo
      * schermo che dice che serve un aggiornamento.
      */
@@ -268,7 +268,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     }
 
     /**
-     * La casa, se chi porta gdanav dentro ne ha una (GdAHome): un tasto col
+     * La casa, se chi porta GdANav dentro ne ha una (GdAHome): un tasto col
      * solo disegno. Al massimo quattro tasti, e con Cerca, Menu e Fine ci sta.
      */
     private fun casa(striscia: ActionStrip.Builder) {

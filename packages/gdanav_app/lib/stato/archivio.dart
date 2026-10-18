@@ -136,7 +136,7 @@ class Archivio {
     }
   }
 
-  /// gdanav Premium comprato: si ricorda anche senza rete (il Play Store lo
+  /// GdANav Premium comprato: si ricorda anche senza rete (il Play Store lo
   /// riconferma all'avvio).
   Future<bool> premium() async => await _p.read(key: _premium) == 'sì';
 
@@ -243,7 +243,7 @@ class Archivio {
 
   Future<void> salvaLuoghi(Map<String, Object?> j) => _p.write(key: _luoghi, value: jsonEncode(j));
 
-  /// I viaggi pianificati di gdanav da sola, come JSON (dentro GdAHome
+  /// I viaggi pianificati di GdANav da sola, come JSON (dentro GdAHome
   /// stanno nella casa).
   Future<String?> viaggiPianificati() => _p.read(key: _viaggiPianificati);
 

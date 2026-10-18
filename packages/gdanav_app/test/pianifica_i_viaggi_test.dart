@@ -1,6 +1,6 @@
 // «Pianifica i viaggi»: dentro GdAHome il pianificatore stava solo nel menu,
 // e nessuno lo trovava. Adesso c'è una scheda sulla mappa, la voce del menu
-// col nome nuovo, e chi ospita gdanav lo apre da fuori.
+// col nome nuovo, e chi ospita GdANav lo apre da fuori.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/schermate/pianifica_i_viaggi.dart';
@@ -173,7 +173,7 @@ void main() {
     expect(find.byType(SchermataPianificatore), findsOneWidget);
   });
 
-  testWidgets('chi ospita gdanav apre il pianificatore da fuori', (tester) async {
+  testWidgets('chi ospita GdANav apre il pianificatore da fuori', (tester) async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
     final a = await ambiente(tester);
     final g = await _gestore(tester, [_lavoro()]);

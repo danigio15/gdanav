@@ -2,10 +2,10 @@
 Pod::Spec.new do |s|
   s.name             = 'gdanav_app'
   s.version          = '0.1.0'
-  s.summary          = 'gdanav su iPhone: Bluetooth per il dongle OBD e CarPlay.'
+  s.summary          = 'GdANav su iPhone: Bluetooth per il dongle OBD e CarPlay.'
   s.homepage         = 'https://github.com/danigio15/gdanav'
   s.license          = { :type => 'Proprietaria' }
-  s.author           = { 'gdanav' => 'gdanav@gdahome.org' }
+  s.author           = { 'GdANav' => 'gdanav@gdahome.org' }
   s.source           = { :path => '.' }
   s.source_files     = 'gdanav_app/Sources/gdanav_app/**/*.swift'
   s.dependency 'Flutter'

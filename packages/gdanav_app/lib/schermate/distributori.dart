@@ -169,7 +169,7 @@ class _ElencoState extends State<_Elenco> {
               ),
             ],
             if (qui == null)
-              messaggio('Non so dove sei: attiva la posizione per gdanav.')
+              messaggio('Non so dove sei: attiva la posizione per GdANav.')
             else if (s.connectionState != ConnectionState.done)
               const Padding(
                 padding: EdgeInsets.all(32),

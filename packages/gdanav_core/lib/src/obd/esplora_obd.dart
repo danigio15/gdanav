@@ -4,7 +4,7 @@ import 'elm327.dart';
 /// OBD-II standard e quali centraline rispondono. Non scrive niente e non
 /// apre sessioni diagnostiche: solo richieste di lettura.
 ///
-/// Il rapporto si manda a chi sviluppa gdanav per scrivere il profilo PID
+/// Il rapporto si manda a chi sviluppa GdANav per scrivere il profilo PID
 /// del modello, come si fa per ABRP.
 class EsploraObd {
   EsploraObd(this.elm, {void Function(String riga)? onRiga}) : _onRiga = onRiga;
@@ -25,7 +25,7 @@ class EsploraObd {
   static const centraline = ['7E0', '7E1', '7E2', '7E3', '7E4', '7E5', '7E6', '7E7', '7C6', '7B3', '744', '7A0'];
 
   Future<String> esegui() async {
-    _scrivi('# gdanav · esplorazione OBD (sola lettura)');
+    _scrivi('# GdANav · esplorazione OBD (sola lettura)');
     for (final c in ['ATI', 'AT@1', 'ATRV']) {
       await _comando(c);
     }

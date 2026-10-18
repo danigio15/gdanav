@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 
 /// Lo stesso viaggio confrontato con ABRP: Leapmotor B10 56 kWh, 18 km fra
 /// città e tangenziale in 21 minuti, partenza al 63%. ABRP diceva 59%
-/// all'arrivo (−4%), gdanav 57% (−6%) con 15,6 kWh/100 km.
+/// all'arrivo (−4%), GdANav 57% (−6%) con 15,6 kWh/100 km.
 void main() {
   final b10 = catalogoVeicoli.firstWhere((v) => v.id == 'leapmotor-b10-56');
 

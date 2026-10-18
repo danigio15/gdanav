@@ -18,7 +18,7 @@ void main() {
   test('la lettura di GdAHome diventa lo stato dell\'auto, e l\'auto della plancia la tua auto', () async {
     final g = SorgenteGdahome()
       ..descrivi(const AutoDiGdahome(nome: 'La Zoe', marca: 'Renault', modello: 'Zoe R135', kwh: 52))
-      // Arrivata prima che gdanav si accendesse: non si perde.
+      // Arrivata prima che GdANav si accendesse: non si perde.
       ..manda(StatoAuto(sorgente: TipoSorgente.homeAssistant, letto: DateTime.now(), batteria: 72, autonomiaKm: 250));
     final auto = GestoreAuto(archivio: Archivio(), gdahome: g);
     await auto.avvia();
@@ -62,7 +62,7 @@ void main() {
     dopo.dispose();
   });
 
-  testWidgets('nell\'app gdanav da sola la voce dice come si accende', (tester) async {
+  testWidgets('nell\'app GdANav da sola la voce dice come si accende', (tester) async {
     final auto = GestoreAuto(archivio: Archivio());
     expect(riassuntoGdahome(auto), 'Automatica dentro l\'app GdAHome');
     await tester.pumpWidget(
@@ -121,7 +121,7 @@ void main() {
     expect(GestoreAuto.percheHomeAssistant(h), contains('Non raggiungo il relay'));
     r.collegato = true;
     r.casa = false;
-    expect(GestoreAuto.percheHomeAssistant(h), contains('integrazione gdanav'));
+    expect(GestoreAuto.percheHomeAssistant(h), contains('integrazione GdANav'));
     r.casa = true;
     r.scartate = 3;
     expect(GestoreAuto.percheHomeAssistant(h), contains('non si aprono'));
@@ -132,10 +132,10 @@ void main() {
     expect(GestoreAuto.percheHomeAssistant(h), contains('non ha ancora mandato'));
   });
 
-  /* «Elimina dalle impostazioni di gdanav, se presente in GdAHome, la
+  /* «Elimina dalle impostazioni di GdANav, se presente in GdAHome, la
    * possibilità di integrare con Home Assistant con QR code.» Dentro GdAHome
    * la casa c'è già: Home Assistant a parte non si offre, ne' nel menu ne'
-   * fra le fonti. In gdanav da sola resta. */
+   * fra le fonti. In GdANav da sola resta. */
   testWidgets('dentro GdAHome niente abbinamento a Home Assistant col QR', (tester) async {
     final daSola = GestoreAuto(archivio: Archivio())..premium = true;
     final dentro = GestoreAuto(archivio: Archivio(), gdahome: SorgenteGdahome())..premium = true;

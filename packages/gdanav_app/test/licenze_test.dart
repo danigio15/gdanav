@@ -96,7 +96,7 @@ void main() {
     Future<GettoneLicenza?> verifica(String g, {String sog = telefono}) =>
         verificaGettone(g, soggetto: sog, chiavePubblica: pubblicaProva, adesso: adesso);
 
-    test('valido: gdanav, e anche GdAHome (Premium compreso)', () async {
+    test('valido: GdANav, e anche GdAHome (Premium compreso)', () async {
       final g = await verifica(await firma(payload(telefono)));
       expect(g, isNotNull);
       expect(g!.app, 'gdanav');
@@ -147,7 +147,7 @@ void main() {
     expect(b, a);
   });
 
-  group('i codici regalo di gdanav da sola', () {
+  group('i codici regalo di GdANav da sola', () {
     late QuadroFinto quadro;
     late IdentitaTelefono io;
 

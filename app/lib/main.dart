@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gdanav_app/gdanav_app.dart';
 
-/// L'app gdanav: il pacchetto `gdanav_app`, a tutto schermo e con Android
+/// L'app GdANav: il pacchetto `gdanav_app`, a tutto schermo e con Android
 /// Auto. Lo stesso pacchetto sta anche dentro GdAHome, come sezione.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

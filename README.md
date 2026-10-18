@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/immagini/banner.jpg" alt="gdanav" width="720">
+  <img src="docs/immagini/banner.jpg" alt="GdANav" width="720">
 </p>
 
 <h3 align="center">Il navigatore per chi guida un'auto elettrica.<br>E va bene anche per la termica.</h3>
@@ -38,7 +38,7 @@ quella con cui arrivi.
 Nel percorso si possono aggiungere **tappe**, e nelle opzioni si sceglie come
 guidare (più veloce, equilibrato, risparmio) e cosa evitare: **pedaggi,
 autostrade, traghetti**. Se il **traffico** cambia e c'è una strada più
-veloce, gdanav te la propone.
+veloce, GdANav te la propone.
 
 ### Segnalazioni della comunità, come Waze
 
@@ -57,7 +57,7 @@ senza rete.
 
 ### Con l'auto elettrica: consumi e soste
 
-gdanav calcola quanto consumi **tratto per tratto**: velocità, salite e
+GdANav calcola quanto consumi **tratto per tratto**: velocità, salite e
 discese, vento, temperatura esterna e clima acceso. Ti dice con quanta
 batteria arrivi e, se non basta, **dove fermarti e quanto caricare**, con le
 colonnine libere o occupate in quel momento.
@@ -71,11 +71,11 @@ Il grafico mostra la batteria lungo tutto il viaggio: dove scende, dove ricarich
 </p>
 
 In **La tua auto** scegli il modello fra più di 400 auto elettriche: batteria,
-potenza di ricarica e presa li sa già gdanav.
+potenza di ricarica e presa li sa già GdANav.
 
 ### Con l'auto termica: distributori e prezzi
 
-Scegli **Termica** in La tua auto e il carburante che fai. gdanav diventa un
+Scegli **Termica** in La tua auto e il carburante che fai. GdANav diventa un
 navigatore normale, senza batteria e colonnine, e con il tasto arancione ti
 mostra i **distributori vicini con i prezzi del giorno**, presi
 dall'Osservaprezzi carburanti del Ministero (MIMIT): dal più vicino o dal più
@@ -93,8 +93,8 @@ ci passi e poi il viaggio prosegue.
   dei consumi.
 - **Android Auto e CarPlay**: mappa, guida, segnalazioni e soste sullo
   schermo dell'auto.
-- **Siri e «Ok Google»**: «Ehi Siri, portami a casa con gdanav», oppure «Ok
-  Google, naviga verso…» scegliendo gdanav.
+- **Siri e «Ok Google»**: «Ehi Siri, portami a casa con GdANav», oppure «Ok
+  Google, naviga verso…» scegliendo GdANav.
 - **Mappe offline**: scarichi le regioni che ti servono e la mappa c'è anche
   senza rete.
 - **Casa, Lavoro e preferiti**, anche importati dai posti salvati di Google
@@ -103,17 +103,17 @@ ci passi e poi il viaggio prosegue.
   tuo viaggio. Più sotto come si collega.
 
 <p align="center">
-  <img src="docs/immagini/menu.png" alt="Il menu: la tua auto, percorso, ricarica, importa da Google Maps, fonte dati auto, Home Assistant, GdAHome, Android Auto" width="260">
+  <img src="docs/immagini/menu.png" alt="Il menu: la tua auto, percorso, avvisi in guida, ricarica, importa da Google Maps, fonte dati auto, Home Assistant, GdAHome" width="260">
 </p>
 
 ## Come si usa
 
-1. **Installa gdanav** dal **Play Store** (Android) o dall'**App Store**
+1. **Installa GdANav** dal **Play Store** (Android) o dall'**App Store**
    (iPhone).
 2. Apri il menu (☰) → **La tua auto**: scegli **Elettrica** o **Termica**.
    Con l'elettrica cerca il tuo modello; con la termica scegli il carburante.
 3. **La batteria** (solo elettrica): la scrivi tu con il cursore in **Fonte
-   dati auto**, e gdanav la stima man mano che guidi. Con Premium la legge da
+   dati auto**, e GdANav la stima man mano che guidi. Con Premium la legge da
    sola: dall'auto con Android Auto, da un dongle OBD Bluetooth, da GdAHome o
    da Home Assistant.
 4. **Pianifica il viaggio**: tocca «Dove andiamo?», scrivi la destinazione,
@@ -122,16 +122,16 @@ ci passi e poi il viaggio prosegue.
 <p align="center">
   <img src="docs/immagini/fonte_dati_auto.png" alt="Fonte dati auto: la batteria scritta a mano, le altre fonti con Premium" width="260">
   &nbsp;
-  <img src="docs/immagini/viaggio_senza_soste.png" alt="Un viaggio senza Premium: gdanav ti porta a destinazione ma non sceglie le soste" width="260">
+  <img src="docs/immagini/viaggio_senza_soste.png" alt="Un viaggio senza Premium: GdANav ti porta a destinazione ma non sceglie le soste" width="260">
 </p>
 
-Senza Premium, con l'elettrica gdanav ti porta a destinazione con la batteria
+Senza Premium, con l'elettrica GdANav ti porta a destinazione con la batteria
 che hai scritto, ma non sceglie dove fermarti a caricare: te lo dice nella
 scheda del viaggio.
 
 ## Prezzi
 
-gdanav si scarica gratis. Non ha pubblicità e non chiede di creare un account.
+GdANav si scarica gratis. Non ha pubblicità e non chiede di creare un account.
 
 | | Gratis | Premium |
 | --- | :---: | :---: |
@@ -161,11 +161,11 @@ Store: le ricevute arrivano da Google o da Apple, come per ogni abbonamento.
 **Codice regalo.** Se qualcuno ti ha regalato Premium hai un codice come
 `GDA-7KQM-2XRT-9HVB`: menu → **Premium** → **Ho un codice regalo**, lo scrivi
 e premi **Riscatta**. Vale per qualche mese o per sempre, secondo il codice.
-I codici e le licenze gdanav li può dare anche **l'installatore** che ti ha
+I codici e le licenze GdANav li può dare anche **l'installatore** che ti ha
 montato GdAHome.
 
-**Hai GdAHome Premium?** Allora hai già anche **gdanav Premium**: è compreso.
-Dentro l'app GdAHome gdanav non ti chiede niente, lo sblocca GdAHome.
+**Hai GdAHome Premium?** Allora hai già anche **GdANav Premium**: è compreso.
+Dentro l'app GdAHome, GdANav non ti chiede niente: lo sblocca GdAHome.
 
 <p align="center">
   <img src="docs/immagini/premium_dentro_gdahome.png" alt="Dentro GdAHome: Premium si attiva dall'app GdAHome" width="260">
@@ -173,7 +173,7 @@ Dentro l'app GdAHome gdanav non ti chiede niente, lo sblocca GdAHome.
 
 ## Home Assistant
 
-Con Home Assistant gdanav legge la batteria della tua auto dalla casa, e la
+Con Home Assistant GdANav legge la batteria della tua auto dalla casa, e la
 casa sa del tuo viaggio: dove vai, quando arrivi, con quanta batteria. Serve
 Premium.
 
@@ -182,15 +182,15 @@ Premium.
 1. In Home Assistant apri **HACS** → i tre puntini in alto → **Repository
    personalizzati**. Incolla `https://github.com/danigio15/gdanav`, categoria
    **Integrazione**.
-2. Cerca **gdanav** in HACS, installalo e **riavvia** Home Assistant.
-3. **Impostazioni → Dispositivi e servizi → Aggiungi integrazione → gdanav.**
-   Scegli il dispositivo della tua auto: gdanav riconosce da solo batteria,
+2. Cerca **GdANav** in HACS, installalo e **riavvia** Home Assistant.
+3. **Impostazioni → Dispositivi e servizi → Aggiungi integrazione → GdANav.**
+   Scegli il dispositivo della tua auto: GdANav riconosce da solo batteria,
    autonomia, ricarica e il resto. Controlla e conferma: serve solo la
    batteria.
 
 **Collegare l'app**
 
-4. In Home Assistant apri il dispositivo **gdanav «la tua auto»**: c'è un
+4. In Home Assistant apri il dispositivo **GdANav «la tua auto»**: c'è un
    **QR di abbinamento**.
 5. Nell'app: menu → **Home Assistant** → inquadra il QR. Se non puoi
    inquadrarlo, in Home Assistant premi **Nuovo codice di abbinamento** e
@@ -227,7 +227,7 @@ telefono e la tua Home Assistant. Non devi aprire nessuna porta di casa.
 
 ## I tuoi dati
 
-Niente account, niente pubblicità, niente statistiche d'uso: gdanav non
+Niente account, niente pubblicità, niente statistiche d'uso: GdANav non
 raccoglie dati per profilarti e non li vende. Cosa esce dal telefono, e
 verso chi, è scritto nell'informativa:
 **[gdanav.gdahome.org/privacy](https://gdanav.gdahome.org/privacy)**.
@@ -240,7 +240,7 @@ MIMIT (prezzi dei carburanti).
 
 Il codice è pubblico perché chiunque possa controllare cosa fa con l'auto, la
 posizione e i dati di chi lo usa. Non è open source: vale la
-[Licenza d'uso di gdanav](LICENSE), in italiano con la traduzione inglese.
+[Licenza d'uso di GdANav](LICENSE), in italiano con la traduzione inglese.
 Puoi installarlo e usarlo, per te o per la tua attività; non puoi
 ripubblicarlo, distribuirlo, modificato o no, né rivenderlo. Chi lo installa
 per i clienti lo fa con l'autorizzazione di CRV Immobiliare S.r.l., a cui si

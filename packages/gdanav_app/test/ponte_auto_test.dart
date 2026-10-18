@@ -381,7 +381,7 @@ void main() {
       final p = await prepara(tester, dove: () async => null);
       expect(await p.dallAuto('vai', meta), isFalse);
       expect(p.a.guida.attiva, isFalse);
-      expect(messaggi(p.chiamate), contains('Non so dove sei: attiva la posizione per gdanav.'));
+      expect(messaggi(p.chiamate), contains('Non so dove sei: attiva la posizione per GdANav.'));
     });
 
     testWidgets("una meta che non si capisce: no, e niente si muove", (tester) async {

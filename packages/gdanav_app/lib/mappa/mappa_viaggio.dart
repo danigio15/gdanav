@@ -38,7 +38,7 @@ import 'dati_viaggio.dart';
 import 'segnaposto.dart';
 import 'stile.dart';
 
-/// La mappa vera: MapLibre con lo stile di gdanav (chiaro o scuro come il
+/// La mappa vera: MapLibre con lo stile di GdANav (chiaro o scuro come il
 /// telefono), gli edifici in 3D quando è inclinata, e il viaggio sopra.
 class MappaViaggio extends StatefulWidget {
   const MappaViaggio({
@@ -80,7 +80,7 @@ class MappaViaggio extends StatefulWidget {
   /// Distributori o colonnine intorno, sulla mappa.
   final GestoreVicini? vicini;
 
-  /// Le persone di casa, quando gdanav sta dentro GdAHome.
+  /// Le persone di casa, quando GdANav sta dentro GdAHome.
   final GestorePersone? persone;
 
   /// Le ZTL e le aree pedonali: si disegnano quelle che si vedono, se si
@@ -546,7 +546,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
    * si fermava. Il risultato era una mappa a scatti e un secondo indietro.
    * Lineare e lunga quanto l'intervallo, la mappa arriva quando arriva la
    * posizione dopo, e il moto resta continuo (come sull'auto). */
-  /// Ogni quanto la mappa del telefono segue l'auto quando gdanav è sullo
+  /// Ogni quanto la mappa del telefono segue l'auto quando GdANav è sullo
   /// schermo dell'auto.
   static const _conLAutoOgni = Duration(seconds: 2);
 
@@ -565,7 +565,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
       tilt: _inclinata ? _inclinazione : 0,
       bearing: _inclinata || widget.guida != null ? rotta : 0,
     );
-    /* Con gdanav sullo schermo dell'auto, la mappa che scorre è quella: il
+    /* Con GdANav sullo schermo dell'auto, la mappa che scorre è quella: il
      * telefono nel supporto, con lo schermo acceso, ridisegnava la sua a ogni
      * fotogramma in più, ed era metà del calore. Qui si sposta ogni due
      * secondi, senza animazione: chi guarda guarda l'auto. */

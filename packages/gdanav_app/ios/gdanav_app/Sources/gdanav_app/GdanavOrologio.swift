@@ -1,13 +1,13 @@
 import Foundation
 
-/// La guida per l'Apple Watch dell'app che ospita gdanav (GdAHome).
+/// La guida per l'Apple Watch dell'app che ospita GdANav (GdAHome).
 ///
-/// L'orologio non parla con gdanav: parla col telefono, e il telefono gli
+/// L'orologio non parla con GdANav: parla col telefono, e il telefono gli
 /// passa quello che serve guardando il polso — la prossima manovra, quanto
 /// manca, quando si arriva. Qui si mette in una notifica, senza che l'app
 /// ospite debba vedere `PonteAuto` (che resta interno), e senza che debba
 /// conoscere questo file per compilare: si parlano per nome. Un'app ospite
-/// costruita con un gdanav di prima semplicemente non riceve niente.
+/// costruita con un GdANav di prima semplicemente non riceve niente.
 ///
 /// - `gdanav.orologio.guida` (da qui): `userInfo` è la fotografia della guida,
 ///   vedi `fotografia()`. Parte a ogni cambio; chi la ascolta ne tiene una al

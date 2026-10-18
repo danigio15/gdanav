@@ -13,8 +13,8 @@ import 'gestore_premium.dart';
  * Tre modi di pianificare, come nelle fotografie approvate: un viaggio per
  * un giorno («arrivo entro le 9:00 domani»), uno di ogni settimana («Casa –
  * Lavoro, lun – ven») e un giro a tappe. Sono gli stessi viaggi della pagina
- * gdanav della plancia: dentro GdAHome stanno nella casa (`ponte/viaggi/…`),
- * che manda l'avviso quando partire e accende il clima dell'auto; in gdanav
+ * GdANav della plancia: dentro GdAHome stanno nella casa (`ponte/viaggi/…`),
+ * che manda l'avviso quando partire e accende il clima dell'auto; in GdANav
  * da sola stanno nel telefono.
  *
  * Il JSON è quello della casa (`ponte/src/viaggi.js`), campo per campo: un
@@ -593,7 +593,7 @@ abstract class FonteViaggi {
 }
 
 /// I viaggi della casa, attraverso GdAHome: `ponte/viaggi/*`. [chiedi] lo
-/// mette chi ospita gdanav (vedi `SorgenteGdahome.chiedi`): manda il comando
+/// mette chi ospita GdANav (vedi `SorgenteGdahome.chiedi`): manda il comando
 /// alla casa e torna il risultato, o lancia l'errore.
 ///
 /// La casa li tiene per chi li ha scritti: ognuno vede solo i suoi.
@@ -645,7 +645,7 @@ class FonteViaggiDellaCasa implements FonteViaggi {
   }
 }
 
-/// I viaggi di gdanav da sola, nel telefono: niente casa che avvisa, e la
+/// I viaggi di GdANav da sola, nel telefono: niente casa che avvisa, e la
 /// prossima volta si calcola qui.
 class FonteViaggiDelTelefono implements FonteViaggi {
   FonteViaggiDelTelefono(this.archivio, {DateTime Function()? orologio, math.Random? caso})

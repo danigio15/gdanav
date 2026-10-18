@@ -1,6 +1,6 @@
 {
   "domain": "gdanav",
-  "name": "gdanav",
+  "name": "GdANav",
   "codeowners": ["@danigio15"],
   "config_flow": true,
   "dependencies": [],

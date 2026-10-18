@@ -814,9 +814,9 @@ class AvvisoSosteConPremium extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       batteria > 0
-                          ? 'Parti col ${batteria.round()}% scritto a mano: gdanav ti porta a destinazione, '
+                          ? 'Parti col ${batteria.round()}% scritto a mano: GdANav ti porta a destinazione, '
                                 'ma non sceglie dove fermarti a caricare.'
-                          : 'gdanav ti porta a destinazione, ma non sceglie dove fermarti a caricare.',
+                          : 'GdANav ti porta a destinazione, ma non sceglie dove fermarti a caricare.',
                       style: t.bodySmall?.copyWith(color: s.onSurfaceVariant),
                     ),
                   ],

@@ -71,7 +71,7 @@ void main() {
     expect(a.statoAttuale(ora), isNull);
   });
 
-  group('i dati dell\'auto contro la stima (dal campo: auto 23% e 95 km, gdanav 21% e 88 km)', () {
+  group('i dati dell\'auto contro la stima (dal campo: auto 23% e 95 km, GdANav 21% e 88 km)', () {
     StatoAuto daCasa(double batteria, double km, Duration fa) => StatoAuto(
           sorgente: TipoSorgente.gdahome,
           letto: ora.subtract(fa),

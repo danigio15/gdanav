@@ -5,8 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../risorse.dart';
 import '../stato/gestore_aggiornamento.dart';
 
-/// Questa versione di gdanav non va più: si può solo aggiornarla. Prende
-/// tutto lo schermo al posto del navigatore di gdanav (`GdanavApp`): sotto
+/// Questa versione di GdANav non va più: si può solo aggiornarla. Prende
+/// tutto lo schermo al posto del navigatore di GdANav (`GdanavApp`): sotto
 /// non c'è niente da riaprire.
 class SchermataAggiorna extends StatelessWidget {
   const SchermataAggiorna({super.key, this.apri = _apri});
@@ -14,7 +14,7 @@ class SchermataAggiorna extends StatelessWidget {
   /// Apre il primo indirizzo che si apre (nelle prove: finto).
   final Future<void> Function(List<Uri> indirizzi) apri;
 
-  static const titolo = 'C\'è una versione nuova di gdanav: aggiornala per continuare';
+  static const titolo = 'C\'è una versione nuova di GdANav: aggiornala per continuare';
 
   static Future<void> _apri(List<Uri> indirizzi) async {
     for (final u in indirizzi) {

@@ -2,7 +2,7 @@
 
 La Piattaforma Unica Nazionale (MASE + GSE + RSE) mappa oltre 32.000 punti
 di ricarica: operatore, potenza, stato. E' esattamente quello che manca a
-gdanav, ed e' raccolto per obbligo di legge.
+GdANav, ed e' raccolto per obbligo di legge.
 
 Il primo giro di sonda aveva provato a indovinare gli indirizzi OCPI e
 aveva trovato solo la pagina del sito. Questo giro non indovina: apre il

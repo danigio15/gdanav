@@ -45,7 +45,7 @@ class FonteGdahome extends StatelessWidget {
             const SizedBox(height: 8),
             if (g == null)
               Text(
-                'Se usi gdanav dentro l\'app GdAHome, l\'auto che hai nella sezione Auto della plancia arriva qui '
+                'Se usi GdANav dentro l\'app GdAHome, l\'auto che hai nella sezione Auto della plancia arriva qui '
                 'da sola, coi dati in tempo reale dalla tua casa: nessun codice, nessun QR.',
                 style: t.bodyMedium,
               )
@@ -94,7 +94,7 @@ class FonteGdahome extends StatelessWidget {
       ListTile(
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.directions_car_filled_outlined),
-        title: const Text('In gdanav'),
+        title: const Text('In GdANav'),
         subtitle: Text(
           gestore.veicolo.id == ProfiloVeicolo.esempio.id
               ? 'Modello non riconosciuto: sceglilo in «La tua auto»'

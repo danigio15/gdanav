@@ -30,7 +30,7 @@ jobs:
         with:
           flutter-version: 3.47.5
           channel: stable
-      # Lo schermo di gdanav sta nel pacchetto (lo porta dentro anche GdAHome):
+      # Lo schermo di GdANav sta nel pacchetto (lo porta dentro anche GdAHome):
       # le prove sono lì. L'app è l'involucro, e basta che compili.
       - run: flutter pub get
         working-directory: packages/gdanav_app
@@ -203,7 +203,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
+          gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "GdANav · anteprima" --notes "anteprima"
           for f in prezzi_napoli.json colonnine_utrecht.json; do
             [ -s "$f" ] && gh release upload anteprima "$f" --clobber
           done
@@ -216,7 +216,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "gdanav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app non sta su GitHub, solo nei negozi."
+          gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "GdANav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app non sta su GitHub, solo nei negozi."
           for f in anteprima.json anteprima_tappa.json percorso_motori.txt colonnine_fonti.txt pun_prezzi.txt; do
             [ -s "$f" ] && gh release upload lavoro "$f" --clobber
           done
@@ -275,7 +275,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls tomtom-*.png > /dev/null 2>&1 || exit 0
-          gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "gdanav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app non sta su GitHub, solo nei negozi."
+          gh release view lavoro > /dev/null 2>&1 || gh release create lavoro --prerelease --title "GdANav · dati per le anteprime (non è l'app)" --notes "Solo dati per le anteprime: l'app non sta su GitHub, solo nei negozi."
           gh release upload lavoro tomtom-*.png --clobber
           ls percorso-*.json > /dev/null 2>&1 && gh release upload lavoro percorso-*.json --clobber
           [ -s colonnine_sonda.txt ] && gh release upload lavoro colonnine_sonda.txt --clobber
@@ -307,7 +307,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
+          gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "GdANav · anteprima" --notes "anteprima"
           gh release upload anteprima foto_auto.json foto_auto.tsv --clobber
 
   # Le colonnine per l'archivio dentro l'app, dagli estratti completi di
@@ -383,7 +383,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
+          gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "GdANav · anteprima" --notes "anteprima"
           gh release upload anteprima colonnine.json autovelox.json colonnine-rapide.json.gz --clobber
 
   # Le ZTL e le aree pedonali per l'archivio dentro l'app, dall'estratto
@@ -430,7 +430,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "gdanav · anteprima" --notes "anteprima"
+          gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "GdANav · anteprima" --notes "anteprima"
           gh release upload anteprima ztl.json --clobber
 
   # L'APK e il pacchetto del Play Store si costruiscono per sapere che stanno
@@ -635,13 +635,13 @@ jobs:
             -authenticationKeyID "$CHIAVE_ID" \
             -authenticationKeyIssuerID "$EMITTENTE"
           {
-            echo "### gdanav ${{ github.run_number }} su TestFlight"
+            echo "### GdANav ${{ github.run_number }} su TestFlight"
             echo ""
             echo "Fra qualche minuto arriva la notifica di Apple: da TestFlight sull'iPhone si installa."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # GdAHome si aggiorna da sola a ogni gdanav nuovo su main: le si dice che
-  # c'è, e il suo workflow «Aggiorna gdanav» porta il nuovo pacchetto, fa le
+  # GdAHome si aggiorna da sola a ogni GdANav nuovo su main: le si dice che
+  # c'è, e il suo workflow «Aggiorna GdANav» porta il nuovo pacchetto, fa le
   # prove e apre la richiesta di unione. Serve il segreto GDAHOME_TOKEN (un
   # token con permesso Actions e Contents su danigio15/gdahomeapp): senza,
   # GdAHome se ne accorge lo stesso al suo giro di ogni notte.

@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:cryptography/cryptography.dart';
 import 'package:http/http.dart' as http;
 
-/// Le licenze di gdanav da sola (del telefono), come le rilascia il quadro di
+/// Le licenze di GdANav da sola (del telefono), come le rilascia il quadro di
 /// GdAHome: il contratto è `docs/LICENZE.md` di GdAHome. Qui servono per i
 /// **codici regalo**; l'abbonamento comprato nel negozio resta controllato dal
 /// telefono, senza il quadro.
@@ -27,10 +27,10 @@ class GettoneLicenza {
   /// Il gettone com'è arrivato, da ricordare.
   final String testo;
 
-  /// `gdanav` o `gdahome` (che comprende gdanav).
+  /// `gdanav` o `gdahome` (che comprende GdANav).
   final String app;
 
-  /// `tel_…` per gdanav da sola.
+  /// `tel_…` per GdANav da sola.
   final String soggetto;
   final String licenza;
 
@@ -54,7 +54,7 @@ List<int>? _base64url(String s) {
 
 /// Verifica [gettone] come dice il contratto: firma giusta con [chiavePubblica],
 /// `v == 1`, `sog == soggetto`, `fino > adesso`, `scade` nullo o futuro, `app`
-/// gdanav o GdAHome. `null` se una sola cosa non torna, o se la chiave è vuota
+/// GdANav o GdAHome. `null` se una sola cosa non torna, o se la chiave è vuota
 /// (le licenze non sono ancora accese).
 Future<GettoneLicenza?> verificaGettone(
   String gettone, {
@@ -96,7 +96,7 @@ Future<GettoneLicenza?> verificaGettone(
 }
 
 /// Fra i gettoni della risposta del quadro, quello che vale per questo
-/// telefono (gdanav o GdAHome), il più lungo.
+/// telefono (GdANav o GdAHome), il più lungo.
 Future<GettoneLicenza?> gettoneMigliore(
   Iterable<String> gettoni, {
   required String soggetto,

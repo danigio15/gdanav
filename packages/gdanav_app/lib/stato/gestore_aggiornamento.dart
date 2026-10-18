@@ -8,11 +8,11 @@ import 'package:http/http.dart' as http;
 import '../servizi.dart';
 import 'archivio.dart';
 
-/// L'app gdanav sul Play Store: lo stesso `applicationId` di
+/// L'app GdANav sul Play Store: lo stesso `applicationId` di
 /// `app/android/app/build.gradle.kts`.
 const idPlayStore = 'it.gdanav.gdanav';
 
-/// L'ID numerico di gdanav sull'App Store (App Store Connect → l'app →
+/// L'ID numerico di GdANav sull'App Store (App Store Connect → l'app →
 /// Informazioni sull'app → Apple ID, per esempio `6740000000`). **Da
 /// scrivere** quando l'app è pubblicata: finché è vuoto il bottone apre
 /// solo l'App Store.
@@ -60,7 +60,7 @@ class GestoreAggiornamento extends ChangeNotifier {
        debug = debug ?? kDebugMode,
        _ora = orologio ?? DateTime.now;
 
-  /// Solo per gdanav da sola: dentro un'altra app (GdAHome, che passa
+  /// Solo per GdANav da sola: dentro un'altra app (GdAHome, che passa
   /// [premiumOspite], [GdAHome] o [senzaPremium] a `preparaGdanav`) il
   /// controllo lo fa lei, e qui non si chiede niente.
   static GestoreAggiornamento? per({

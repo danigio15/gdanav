@@ -1,4 +1,4 @@
-"""Il protocollo fra Home Assistant e l'app gdanav.
+"""Il protocollo fra Home Assistant e l'app GdANav.
 
 È lo specchio di ``packages/gdanav_core/lib/src/protocollo``: stesse
 derivazioni, stessa busta, stessi nomi. Non importa niente di Home
@@ -67,7 +67,7 @@ class Abbinamento:
     def da_uri(cls, testo: str) -> Abbinamento:
         uri = urlparse(testo)
         if uri.scheme != "gdanav" or uri.netloc != "abbina":
-            raise ErroreProtocollo("Non è un QR di gdanav")
+            raise ErroreProtocollo("Non è un QR di GdANav")
         q = {k: v[0] for k, v in parse_qs(uri.query).items()}
         if q.get("v") != "1":
             raise ErroreProtocollo(f"Versione di abbinamento non supportata: {q.get('v')}")

@@ -31,13 +31,13 @@ class AutoDiGdahome {
   int get hashCode => Object.hash(nome, marca, modello, kwh);
 }
 
-/// La fonte «GdAHome»: i dati dell'auto dalla casa, quando gdanav gira dentro
+/// La fonte «GdAHome»: i dati dell'auto dalla casa, quando GdANav gira dentro
 /// l'app GdAHome.
 ///
 /// Niente codice né QR: GdAHome è già collegata alla sua casa, sa quale auto
 /// c'è nella sezione Auto della plancia e quali sensori la raccontano, e
 /// manda qui ogni lettura appena Home Assistant la cambia ([manda]). Chi ospita
-/// gdanav la crea e la passa a `preparaGdanav`; l'app gdanav da sola non ce
+/// GdANav la crea e la passa a `preparaGdanav`; l'app GdANav da sola non ce
 /// l'ha.
 class SorgenteGdahome extends ChangeNotifier implements SorgenteDatiAuto {
   final _letture = StreamController<StatoAuto>.broadcast();
@@ -68,16 +68,16 @@ class SorgenteGdahome extends ChangeNotifier implements SorgenteDatiAuto {
   }
 
   /// Come si chiede alla casa di rileggere l'auto adesso: lo mette chi
-  /// ospita gdanav (GdAHome chiama `homeassistant.update_entity` sui sensori
+  /// ospita GdANav (GdAHome chiama `homeassistant.update_entity` sui sensori
   /// dell'auto). Senza, i dati arrivano solo quando l'integrazione dell'auto
   /// li aggiorna da sé, che per alcune vuol dire ogni mezz'ora o più.
   Future<void> Function()? aggiorna;
 
   /// Come si manda un comando alla casa e se ne aspetta la risposta: lo
-  /// mette chi ospita gdanav (GdAHome, sul suo filo con la casa). Serve ai
+  /// mette chi ospita GdANav (GdAHome, sul suo filo con la casa). Serve ai
   /// viaggi pianificati, che dentro GdAHome stanno nella casa
   /// (`ponte/viaggi/*`): la casa sa chi chiede, e ognuno vede solo i suoi.
-  /// `null` in gdanav da sola, o finché GdAHome non ha una casa.
+  /// `null` in GdANav da sola, o finché GdAHome non ha una casa.
   Future<Object?> Function(Map<String, Object?> comando)? get chiedi => _chiedi;
   Future<Object?> Function(Map<String, Object?> comando)? _chiedi;
   set chiedi(Future<Object?> Function(Map<String, Object?> comando)? c) {
