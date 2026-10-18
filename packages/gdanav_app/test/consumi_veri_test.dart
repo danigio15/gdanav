@@ -29,6 +29,54 @@ void main() {
     auto.dispose();
   });
 
+  test('i dati del consumo di GdAHome entrano nelle letture, coi nomi del contratto', () async {
+    final g = SorgenteGdahome();
+    final arrivate = <StatoAuto>[];
+    final iscrizione = g.letture.listen(arrivate.add);
+    g.manda(StatoAuto(sorgente: TipoSorgente.gdahome, letto: DateTime.now(), batteria: 64));
+    expect(g.ultima!.energiaKwh, isNull);
+
+    // Cambiano solo i dati del consumo: l'ultima lettura riparte subito, con loro.
+    g.datiDelConsumo = {
+      'energia_kwh': 35.2,
+      'capacita_kwh': 55,
+      'consumo_medio_kwh100': 15.8,
+      'potenza_clima_w': 1200,
+      'clima_acceso': true,
+      'batteria_in_riscaldamento': false,
+      'temperatura_interna_c': 21.5,
+    };
+    await pumpEventQueue();
+    final u = g.ultima!;
+    expect(u.batteria, 64);
+    expect(u.energiaKwh, 35.2);
+    expect(u.capacitaKwh, 55);
+    expect(u.consumoMedioKwh100, 15.8);
+    expect(u.potenzaClimaW, 1200);
+    expect(u.climaAcceso, isTrue);
+    expect(u.batteriaInRiscaldamento, isFalse);
+    expect(u.temperaturaInternaC, 21.5);
+    expect(arrivate, hasLength(2));
+
+    // Gli stessi dati non rimandano niente; quelli della lettura vincono.
+    g.datiDelConsumo = {
+      'energia_kwh': 35.2,
+      'capacita_kwh': 55,
+      'consumo_medio_kwh100': 15.8,
+      'potenza_clima_w': 1200,
+      'clima_acceso': true,
+      'batteria_in_riscaldamento': false,
+      'temperatura_interna_c': 21.5,
+    };
+    expect(arrivate, hasLength(2));
+    g.manda(StatoAuto(sorgente: TipoSorgente.gdahome, letto: DateTime.now(), batteria: 63, energiaKwh: 34.6));
+    await pumpEventQueue();
+    expect(g.ultima!.energiaKwh, 34.6);
+    expect(g.ultima!.consumoMedioKwh100, 15.8);
+    expect(arrivate, hasLength(3));
+    await iscrizione.cancel();
+  });
+
   test('una casa che non risponde non rompe niente', () async {
     final g = SorgenteGdahome()..aggiorna = () async => throw StateError('filo caduto');
     await g.chiediAggiornamento();

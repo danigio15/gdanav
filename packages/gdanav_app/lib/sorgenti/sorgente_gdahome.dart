@@ -61,11 +61,29 @@ class SorgenteGdahome extends ChangeNotifier implements SorgenteDatiAuto {
 
   /// Una lettura nuova dalla casa.
   void manda(StatoAuto lettura) {
-    final s = lettura.sorgente == tipo ? lettura : _conSorgente(lettura);
+    final s = lettura.sorgente == tipo && _consumo.isEmpty ? lettura : _conSorgente(lettura, _consumo);
     ultima = s;
     _letture.add(s);
     notifyListeners();
   }
+
+  /// I dati del consumo che GdAHome legge dai sensori dell'auto, coi nomi
+  /// del messaggio `stato_auto` di Home Assistant (`energia_kwh`,
+  /// `capacita_kwh`, `consumo_medio_kwh100`, `potenza_clima_w`,
+  /// `clima_acceso`, `batteria_in_riscaldamento`, `temperatura_interna_c`:
+  /// il contratto di GdAAuto, `docs/DATI-AUTO.md`). Vanno nelle letture
+  /// che li hanno vuoti; uno che cambia rimanda subito l'ultima lettura.
+  ///
+  /// È una mappa e non campi di [StatoAuto] perché GdAHome la manda anche a
+  /// un GdANav di prima, che semplicemente non ha questo metodo.
+  set datiDelConsumo(Map<String, Object?> dati) {
+    final nuovi = Map<String, Object?>.unmodifiable(dati);
+    if (mapEquals(nuovi, _consumo)) return;
+    _consumo = nuovi;
+    if (ultima case final u?) manda(u);
+  }
+
+  Map<String, Object?> _consumo = const {};
 
   /// Come si chiede alla casa di rileggere l'auto adesso: lo mette chi
   /// ospita GdANav (GdAHome chiama `homeassistant.update_entity` sui sensori
@@ -117,7 +135,9 @@ class SorgenteGdahome extends ChangeNotifier implements SorgenteDatiAuto {
   @override
   Future<void> ferma() async {}
 
-  static StatoAuto _conSorgente(StatoAuto l) => StatoAuto(
+  static double? _numero(Map<String, Object?> d, String nome) => (d[nome] as num?)?.toDouble();
+
+  static StatoAuto _conSorgente(StatoAuto l, Map<String, Object?> d) => StatoAuto(
     sorgente: TipoSorgente.gdahome,
     letto: l.letto,
     batteria: l.batteria,
@@ -131,12 +151,12 @@ class SorgenteGdahome extends ChangeNotifier implements SorgenteDatiAuto {
     velocitaKmh: l.velocitaKmh,
     potenzaKw: l.potenzaKw,
     odometroKm: l.odometroKm,
-    energiaKwh: l.energiaKwh,
-    capacitaKwh: l.capacitaKwh,
-    consumoMedioKwh100: l.consumoMedioKwh100,
-    potenzaClimaW: l.potenzaClimaW,
-    climaAcceso: l.climaAcceso,
-    batteriaInRiscaldamento: l.batteriaInRiscaldamento,
-    temperaturaInternaC: l.temperaturaInternaC,
+    energiaKwh: l.energiaKwh ?? _numero(d, 'energia_kwh'),
+    capacitaKwh: l.capacitaKwh ?? _numero(d, 'capacita_kwh'),
+    consumoMedioKwh100: l.consumoMedioKwh100 ?? _numero(d, 'consumo_medio_kwh100'),
+    potenzaClimaW: l.potenzaClimaW ?? _numero(d, 'potenza_clima_w'),
+    climaAcceso: l.climaAcceso ?? d['clima_acceso'] as bool?,
+    batteriaInRiscaldamento: l.batteriaInRiscaldamento ?? d['batteria_in_riscaldamento'] as bool?,
+    temperaturaInternaC: l.temperaturaInternaC ?? _numero(d, 'temperatura_interna_c'),
   );
 }
