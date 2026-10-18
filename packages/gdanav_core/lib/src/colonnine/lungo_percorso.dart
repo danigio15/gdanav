@@ -42,11 +42,15 @@ List<ColonninaSulPercorso> colonnineSulPercorso(
     }
     final p = percorso.proietta(c.posizione);
     if (!obbligata && p.lontanoM > distanzaMassimaM) continue;
+    final potenza = funzionante > 0 ? funzionante : nominale;
     out.add(ColonninaSulPercorso(
       id: c.id,
       nome: c.nome,
       distanzaM: p.lungoM,
-      potenzaKw: funzionante > 0 ? funzionante : nominale,
+      potenzaKw: potenza,
+      // In alternata solo se nessuna presa in continua dà quella potenza.
+      alternata: !c.connettori
+          .any((q) => compatibili.contains(q.tipo) && q.tipo != TipoConnettore.tipo2 && q.potenzaKw >= potenza),
       // In linea d'aria è troppo ottimista: le strade girano.
       deviazioneM: p.lontanoM * fattoreDeviazione,
       disponibilita: c.disponibilitaPer(compatibili, minimaKw: soglia),

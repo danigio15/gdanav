@@ -117,8 +117,12 @@ class GestoreAuto extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// L'auto dell'utente: da lei dipendono consumi, soste e prese.
-  ProfiloVeicolo veicolo = ProfiloVeicolo.esempio;
+  /// L'auto dell'utente: da lei dipendono consumi, soste e prese. È il
+  /// modello scelto nel catalogo ([_scheda]) con la capacità vera della
+  /// batteria, quando l'auto la dice (`ProfiloVeicolo.conCapacitaDi`).
+  ProfiloVeicolo get veicolo => _veicolo;
+  ProfiloVeicolo _veicolo = ProfiloVeicolo.esempio;
+  ProfiloVeicolo _scheda = ProfiloVeicolo.esempio;
   StatoAuto? stato;
 
   /// Lo switch come l'ha messo l'utente. Senza Premium l'arbitro usa
@@ -282,7 +286,7 @@ class GestoreAuto extends ChangeNotifier {
   bool get elettricaConfigurata => veicoloScelto || gdahome?.auto != null || abbinamento != null || dongle != null;
 
   Future<void> avvia() async {
-    veicolo = await archivio.veicolo();
+    _scheda = _veicolo = await archivio.veicolo();
     veicoloScelto = await archivio.veicoloScelto();
     elettrica = await archivio.elettrica();
     carburante = await archivio.carburante();
@@ -344,7 +348,8 @@ class GestoreAuto extends ChangeNotifier {
   String? _autoGdahomeVista;
 
   Future<void> scegliVeicolo(ProfiloVeicolo v) async {
-    veicolo = v;
+    _scheda = v;
+    _veicolo = v.conCapacitaDi(stato);
     veicoloScelto = true;
     arbitro.capacitaUtileKwh = v.capacitaUtileKwh;
     await archivio.salvaVeicolo(v);
@@ -479,6 +484,7 @@ class GestoreAuto extends ChangeNotifier {
 
   void _aggiorna() {
     stato = arbitro.statoAttuale(DateTime.now());
+    _veicolo = _scheda.conCapacitaDi(stato);
     if (stato?.velocitaKmh case final v?) _velocita(v, notifica: false);
     notifyListeners();
   }

@@ -539,7 +539,12 @@ class GestoreGuida extends ChangeNotifier {
     final p = pronto, s = auto.stato, ora = batteriaOra;
     if (!attiva || p == null || p.soloPercorso || s == null || ora == null || !ora.misurata) return;
     final metri = avanzamento?.percorsiM ?? 0;
-    final misura = _misuratore?.registra(batteria: s.batteria, metri: metri, inCarica: s.inCarica == true);
+    final misura = _misuratore?.registra(
+      batteria: s.batteria,
+      metri: metri,
+      inCarica: s.inCarica == true,
+      energiaKwh: s.energiaKwh,
+    );
     if (misura != null) {
       _kmMisurati += misura.km;
       _whMisurati += misura.realeWh;

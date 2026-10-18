@@ -10,7 +10,8 @@ import pytest
 
 from custom_components.gdanav import protocollo as p
 
-VETTORE = json.loads((Path(__file__).parents[1] / "docs" / "vettore_prova.json").read_text())
+DOCS = Path(__file__).parents[1] / "docs"
+VETTORE = json.loads((DOCS / "vettore_prova.json").read_text())
 CHIAVE = bytes(range(32))
 ORA = datetime(2026, 9, 23, 10, tzinfo=UTC)
 A = p.Abbinamento(CHIAVE, "wss://relay.esempio.dev", "Auto di prova")
@@ -107,3 +108,31 @@ def test_codice_nuovo() -> None:
 )
 def test_indirizzo_codice(relay: str, atteso: str) -> None:
     assert p.indirizzo_codice(relay, "x") == atteso
+
+
+#: Le chiavi di ``stato_auto``: gli stessi nomi di docs/DATI-AUTO.md di GdAAuto, colonna gdanav.
+CHIAVI_STATO_AUTO = {
+    "batteria",
+    "letto",
+    "autonomia_km",
+    "in_carica",
+    "potenza_carica_kw",
+    "temperatura_batteria_c",
+    "temperatura_esterna_c",
+    "temperatura_interna_c",
+    "velocita_kmh",
+    "potenza_kw",
+    "odometro_km",
+    "energia_kwh",
+    "capacita_kwh",
+    "consumo_medio_kwh100",
+    "potenza_clima_w",
+    "clima_acceso",
+    "batteria_in_riscaldamento",
+    "latitudine",
+    "longitudine",
+}
+
+
+def chiavi_stato_auto() -> set[str]:
+    return set(CHIAVI_STATO_AUTO)

@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Collega un'auto a GdANav",
-        "description": "Scegli il dispositivo della tua auto in Home Assistant (per esempio quello della Leapmotor): GdANav riconosce da solo batteria, autonomia, ricarica, temperature, velocità, potenza e contachilometri. Nel passo dopo puoi controllare e correggere. Se l'auto non ha un dispositivo, lascia vuoto e scegli le entità a mano.",
+        "description": "Scegli il dispositivo della tua auto in Home Assistant (per esempio quello della Leapmotor): GdANav riconosce da solo batteria, autonomia, ricarica, temperature, velocità, potenza, contachilometri, energia e clima (con GdAAuto tutto, dalla chiave). Nel passo dopo puoi controllare e correggere. Se l'auto non ha un dispositivo, lascia vuoto e scegli le entità a mano.",
         "data": {
           "dispositivo": "Dispositivo dell'auto"
         }
@@ -23,7 +23,14 @@
           "entita_temperatura_esterna": "Temperatura esterna",
           "entita_velocita": "Velocità",
           "entita_potenza": "Potenza della batteria (in uso)",
-          "entita_odometro": "Contachilometri"
+          "entita_odometro": "Contachilometri",
+          "entita_energia_residua": "Energia residua (kWh)",
+          "entita_capacita_batteria": "Capacità della batteria (kWh)",
+          "entita_consumo_medio": "Consumo medio (kWh/100 km)",
+          "entita_potenza_clima": "Potenza del riscaldatore / clima",
+          "entita_clima_acceso": "Clima acceso",
+          "entita_batteria_in_riscaldamento": "Batteria in riscaldamento",
+          "entita_temperatura_interna": "Temperatura interna"
         },
         "data_description": {
           "relay": "Lascia quello predefinito, a meno di avere un relay tuo."

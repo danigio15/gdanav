@@ -16,6 +16,7 @@ class ColonninaSulPercorso {
     this.deviazioneM = 0,
     this.disponibilita = Disponibilita.sconosciuta,
     this.obbligata = false,
+    this.alternata = false,
     this.dettaglio,
   });
 
@@ -35,6 +36,11 @@ class ColonninaSulPercorso {
 
   /// L'ha scelta l'utente: ci si ferma per forza.
   final bool obbligata;
+
+  /// La potenza è di una presa in alternata (Tipo 2): l'auto la prende col
+  /// suo caricatore di bordo, fino a [ProfiloVeicolo.potenzaAcKw], e non con
+  /// la curva della continua.
+  final bool alternata;
 
   /// La colonnina intera, per la mappa e la scheda.
   final Colonnina? dettaglio;
@@ -141,9 +147,9 @@ class PianificatoreSoste {
     final eSec = [for (final m in posM) prog.secondi(0, m)];
     final devKwh = [for (final c in ordinate) _deviazioneKwh(c.deviazioneM), 0.0];
     final devSec = [for (final c in ordinate) _deviazioneSecondi(c.deviazioneM), 0.0];
-    final ricariche = <(int, int, int), double>{};
-    double ricarica(int da, int a, double kw) =>
-        ricariche.putIfAbsent((da, a, kw.round()), () => _secondiRicarica(da.toDouble(), a.toDouble(), kw));
+    final ricariche = <(int, int, int, bool), double>{};
+    double ricarica(int da, int a, ColonninaSulPercorso c) => ricariche
+        .putIfAbsent((da, a, c.potenzaKw.round(), c.alternata), () => _secondiRicarica(da.toDouble(), a.toDouble(), c));
 
     // Nodi: 0..n-1 le colonnine, n la destinazione. La partenza è a parte.
     final costo = <(int, int), double>{};
@@ -205,7 +211,7 @@ class PianificatoreSoste {
         guida(
           daIndice: i,
           batteria: partenza.toDouble(),
-          secondi: secondi + ricarica(arrivo, partenza, c.potenzaKw) + attesa + tempoFissoSosta.inSeconds,
+          secondi: secondi + ricarica(arrivo, partenza, c) + attesa + tempoFissoSosta.inSeconds,
           indiceDa: i + 1,
           precedente: (i, arrivo, partenza),
         );
@@ -264,7 +270,7 @@ class PianificatoreSoste {
         colonnina: c,
         batteriaArrivo: arrivo.toDouble(),
         batteriaPartenza: partenza.toDouble(),
-        ricarica: Duration(seconds: _secondiRicarica(arrivo.toDouble(), partenza.toDouble(), c.potenzaKw).round()),
+        ricarica: Duration(seconds: _secondiRicarica(arrivo.toDouble(), partenza.toDouble(), c).round()),
       ));
       passo = da[(i, arrivo)];
     }
@@ -313,16 +319,34 @@ class PianificatoreSoste {
   }
 
   /// Si integra la curva a passi di mezzo punto: la potenza è il minimo fra
-  /// quella che l'auto accetta e quella che la colonnina dà.
-  double _secondiRicarica(double da, double a, double potenzaColonnina) {
+  /// quella che l'auto accetta e quella che la colonnina dà. In alternata
+  /// l'auto accetta quella del suo caricatore di bordo, a ogni percentuale;
+  /// prima si contava la curva della continua, e una Tipo 2 da 22 kW
+  /// sembrava dare 22 kW anche a un'auto che ne prende 11.
+  double _secondiRicarica(double da, double a, ColonninaSulPercorso c) {
     const passo = 0.5;
     final kWhPerPasso = profilo.capacitaUtileKwh * passo / 100;
+    final freddo = c.alternata ? 1.0 : riduzioneAFreddo(condizioni.temperaturaBatteriaC);
     var s = 0.0;
     for (var b = da; b < a; b += passo) {
-      final kw = math.min(profilo.potenzaRicaricaKw(b + passo / 2), potenzaColonnina);
+      final auto = c.alternata ? profilo.potenzaAcKw : profilo.potenzaRicaricaKw(b + passo / 2) * freddo;
+      final kw = math.min(auto, c.potenzaKw);
       s += kWhPerPasso / kw * 3600;
     }
     return s;
+  }
+
+  /// Quanto della curva in continua accetta una batteria a [gradi]: tutta
+  /// sopra i 15 °C, poi il 3% in meno per grado, mai sotto il 40%. Fredda
+  /// la batteria limita la corrente per non rovinarsi: a 0 °C si carica a
+  /// poco più di metà potenza, e i numeri veri di molte auto stanno lì
+  /// intorno. Il conto è prudente: in viaggio la batteria si scalda un po'
+  /// guidando, e di più col precondizionamento; la temperatura è quella di
+  /// quando si pianifica, e si ripianifica man mano. Senza temperatura, la
+  /// curva intera.
+  static double riduzioneAFreddo(double? gradi) {
+    if (gradi == null || gradi >= 15) return 1;
+    return (1 - (15 - gradi) * 0.03).clamp(0.4, 1.0).toDouble();
   }
 
   double _deviazioneKwh(double m) => m <= 0
@@ -339,10 +363,13 @@ class _Progressivo {
     _m.add(0);
     _kWh.add(0);
     _s.add(0);
+    // La batteria che si scalda costa una volta, alla partenza: nel primo tratto.
+    var extra = c.riscaldamentoBatteriaKwh;
     for (final t in tratti) {
       _m.add(_m.last + t.lunghezzaM);
-      _kWh.add(_kWh.last + energiaTrattoWh(t, p, c) / 1000);
+      _kWh.add(_kWh.last + energiaTrattoWh(t, p, c) / 1000 + extra);
       _s.add(_s.last + t.secondi);
+      extra = 0;
     }
   }
 

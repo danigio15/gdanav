@@ -29,23 +29,31 @@ from . import protocollo as p
 from .const import (
     CONF_AUTONOMIA,
     CONF_BATTERIA,
+    CONF_BATTERIA_IN_RISCALDAMENTO,
+    CONF_CAPACITA_BATTERIA,
     CONF_CHIAVE,
+    CONF_CLIMA_ACCESO,
     CONF_COMANDI,
+    CONF_CONSUMO_MEDIO,
+    CONF_ENERGIA_RESIDUA,
     CONF_IN_CARICA,
     CONF_NOME_AUTO,
     CONF_ODOMETRO,
     CONF_POSIZIONE,
     CONF_POTENZA,
     CONF_POTENZA_CARICA,
+    CONF_POTENZA_CLIMA,
     CONF_RELAY,
     CONF_TEMPERATURA_BATTERIA,
     CONF_TEMPERATURA_ESTERNA,
+    CONF_TEMPERATURA_INTERNA,
     CONF_VELOCITA,
     ENTITA_AUTO,
     EVENTI_APP,
     EVENTO,
     segnale_aggiornamento,
 )
+from .riconosci import CONSUMI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -78,28 +86,62 @@ def _numero(stato: State | None) -> float | None:
         return None
 
 
-# Le unità che l'app vuole, da quelle che Home Assistant può avere.
+# Le unità che l'app vuole, da quelle che Home Assistant può avere. Il
+# consumo si scrive senza spazi e minuscolo, come lo confronta riconosci.
+_MIGLIO = 1.609344
 _CONVERSIONI: dict[str, float] = {
     "W": 0.001,
     "kW": 1.0,
-    "mph": 1.609344,
+    "mph": _MIGLIO,
     "km/h": 1.0,
     "m/s": 3.6,
-    "mi": 1.609344,
+    "mi": _MIGLIO,
     "km": 1.0,
     "m": 0.001,
+    "Wh": 0.001,
+    "kWh": 1.0,
+    "kwh/100km": 1.0,
+    "wh/km": 0.1,
+    "kwh/km": 100.0,
+    "kwh/100mi": 1 / _MIGLIO,
+    "wh/mi": 0.1 / _MIGLIO,
 }
+
+# Stati di un sensore della ricarica (non binario) che vogliono dire «carica».
+_IN_CARICA = {"on", "charging", "in_carica", "in_ricarica", "in_charge", "charge_in_progress", "ladend", "en_charge"}
 
 
 def _misura(stato: State | None) -> float | None:
-    """Il numero nell'unità dell'app: kW, km/h, km, °C."""
+    """Il numero nell'unità dell'app: kW, km/h, km, kWh, kWh/100 km, °C."""
     valore = _numero(stato)
     if valore is None or stato is None:
         return None
     unita = stato.attributes.get("unit_of_measurement")
     if unita == "°F":
         return round((valore - 32) * 5 / 9, 2)
+    if unita == "K":
+        return round(valore - 273.15, 2)
+    if isinstance(unita, str) and unita.replace(" ", "").lower() in CONSUMI:
+        unita = unita.replace(" ", "").lower()
+    # Il consumo al contrario: chilometri con un kWh.
+    if unita in ("km/kwh", "mi/kwh"):
+        km = valore * (_MIGLIO if unita == "mi/kwh" else 1)
+        return round(100 / km, 4) if km > 0 else None
     return round(valore * _CONVERSIONI.get(unita, 1.0), 4)
+
+
+def _watt(stato: State | None) -> float | None:
+    """La potenza in W, come il clima la dice. Senza unità, già in W."""
+    valore = _misura(stato)
+    if valore is None or stato is None or stato.attributes.get("unit_of_measurement") not in ("W", "kW"):
+        return valore
+    return round(valore * 1000, 1)
+
+
+def _acceso(stato: State | None) -> bool | None:
+    if stato is None or stato.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+        return None
+    return stato.state == STATE_ON
 
 
 def _data(testo: Any) -> datetime | None:
@@ -199,23 +241,36 @@ class Hub:
         if batteria is not None:
             letto = getattr(batteria, "last_reported", None) or batteria.last_updated
             dati["letto"] = letto.isoformat()
-        if CONF_AUTONOMIA in e:
-            dati["autonomia_km"] = _numero(get(e[CONF_AUTONOMIA]))
         s = get(e[CONF_IN_CARICA]) if CONF_IN_CARICA in e else None
         if s is not None and s.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
-            dati["in_carica"] = s.state in (STATE_ON, "charging")
-        if CONF_POTENZA_CARICA in e:
-            dati["potenza_carica_kw"] = _numero(get(e[CONF_POTENZA_CARICA]))
-        if CONF_TEMPERATURA_BATTERIA in e:
-            dati["temperatura_batteria_c"] = _numero(get(e[CONF_TEMPERATURA_BATTERIA]))
+            # Un sensore dello stato della ricarica dice «Charging», «in_carica»,
+            # «Charge in progress»: tutti «in carica».
+            dati["in_carica"] = s.state.strip().lower().replace(" ", "_").replace("-", "_") in _IN_CARICA
+        # Tutto nell'unità dell'app: un'autonomia in miglia, una potenza in W
+        # o una temperatura in °F o K arrivano già convertite.
         for conf, chiave in (
+            (CONF_AUTONOMIA, "autonomia_km"),
+            (CONF_POTENZA_CARICA, "potenza_carica_kw"),
+            (CONF_TEMPERATURA_BATTERIA, "temperatura_batteria_c"),
             (CONF_TEMPERATURA_ESTERNA, "temperatura_esterna_c"),
             (CONF_VELOCITA, "velocita_kmh"),
             (CONF_POTENZA, "potenza_kw"),
             (CONF_ODOMETRO, "odometro_km"),
+            (CONF_ENERGIA_RESIDUA, "energia_kwh"),
+            (CONF_CAPACITA_BATTERIA, "capacita_kwh"),
+            (CONF_CONSUMO_MEDIO, "consumo_medio_kwh100"),
+            (CONF_TEMPERATURA_INTERNA, "temperatura_interna_c"),
         ):
             if conf in e:
                 dati[chiave] = _misura(get(e[conf]))
+        if CONF_POTENZA_CLIMA in e:
+            dati["potenza_clima_w"] = _watt(get(e[CONF_POTENZA_CLIMA]))
+        for conf, chiave in (
+            (CONF_CLIMA_ACCESO, "clima_acceso"),
+            (CONF_BATTERIA_IN_RISCALDAMENTO, "batteria_in_riscaldamento"),
+        ):
+            if conf in e:
+                dati[chiave] = _acceso(get(e[conf]))
         if CONF_POSIZIONE in e and (s := get(e[CONF_POSIZIONE])) is not None:
             dati["latitudine"] = s.attributes.get("latitude")
             dati["longitudine"] = s.attributes.get("longitude")

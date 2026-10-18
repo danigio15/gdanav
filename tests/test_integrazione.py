@@ -16,21 +16,32 @@ from custom_components.gdanav import protocollo as p
 from custom_components.gdanav.const import (
     CONF_AUTONOMIA,
     CONF_BATTERIA,
+    CONF_BATTERIA_IN_RISCALDAMENTO,
+    CONF_CAPACITA_BATTERIA,
     CONF_CHIAVE,
+    CONF_CLIMA_ACCESO,
     CONF_COMANDI,
+    CONF_CONSUMO_MEDIO,
     CONF_DISPOSITIVO,
+    CONF_ENERGIA_RESIDUA,
     CONF_IN_CARICA,
     CONF_NOME_AUTO,
     CONF_ODOMETRO,
     CONF_POSIZIONE,
     CONF_POTENZA,
+    CONF_POTENZA_CARICA,
+    CONF_POTENZA_CLIMA,
     CONF_RELAY,
+    CONF_TEMPERATURA_BATTERIA,
     CONF_TEMPERATURA_ESTERNA,
+    CONF_TEMPERATURA_INTERNA,
     CONF_VELOCITA,
     DOMAIN,
     EVENTO,
 )
 from custom_components.gdanav.hub import Hub
+
+from .test_protocollo import chiavi_stato_auto
 
 CHIAVE = bytes(range(32))
 RELAY = "wss://relay.esempio.dev"
@@ -153,6 +164,70 @@ async def test_dal_dispositivo_le_entita_si_propongono_da_sole(hass: HomeAssista
     assert fatto["data"][CONF_BATTERIA] == "sensor.leapmotor_battery"
 
 
+async def test_un_auto_gdaauto_si_riconosce_dalla_chiave(hass: HomeAssistant, senza_relay: None) -> None:
+    """Come la crea GdAAuto: piattaforma ``gdaauto``, ``translation_key`` uguale
+    alla chiave di docs/DATI-AUTO.md, e il nome dell'auto scelto dall'utente."""
+    voce_auto = MockConfigEntry(domain="gdaauto")
+    voce_auto.add_to_hass(hass)
+    dispositivo = dr.async_get(hass).async_get_or_create(
+        config_entry_id=voce_auto.entry_id, identifiers={("gdaauto", "VIN1")}, name="La rossa"
+    )
+    registro = er.async_get(hass)
+    for dominio, chiave, stato, attributi in [
+        ("sensor", "batteria", "64", {"unit_of_measurement": "%", "device_class": "battery"}),
+        ("sensor", "autonomia", "280", {"unit_of_measurement": "km"}),
+        ("binary_sensor", "in_carica", "off", {"device_class": "battery_charging"}),
+        ("sensor", "energia_residua", "41.2", {"unit_of_measurement": "kWh"}),
+        ("sensor", "energia_oggi_clima", "1.1", {"unit_of_measurement": "kWh"}),
+        ("sensor", "capacita_batteria", "64.4", {"unit_of_measurement": "kWh"}),
+        ("sensor", "consumo_medio", "16.2", {"unit_of_measurement": "kWh/100 km"}),
+        ("sensor", "potenza_riscaldatore", "800", {"unit_of_measurement": "W"}),
+        ("binary_sensor", "clima_acceso", "on", {}),
+        ("binary_sensor", "batteria_in_riscaldamento", "off", {}),
+        ("sensor", "temperatura_interna", "19", {"unit_of_measurement": "°C"}),
+    ]:
+        e = registro.async_get_or_create(
+            dominio,
+            "gdaauto",
+            f"VIN1_{chiave}",
+            suggested_object_id=f"la_rossa_{chiave}",
+            device_id=dispositivo.id,
+            original_name=chiave.replace("_", " ").title(),
+            translation_key=chiave,
+            config_entry=voce_auto,
+        )
+        hass.states.async_set(e.entity_id, stato, attributi)
+
+    flusso = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    flusso = await hass.config_entries.flow.async_configure(flusso["flow_id"], {CONF_DISPOSITIVO: dispositivo.id})
+    proposti = {str(k): k.description["suggested_value"] for k in flusso["data_schema"].schema if k.description}
+    assert proposti == {
+        CONF_NOME_AUTO: "La rossa",
+        CONF_BATTERIA: "sensor.la_rossa_batteria",
+        CONF_AUTONOMIA: "sensor.la_rossa_autonomia",
+        CONF_IN_CARICA: "binary_sensor.la_rossa_in_carica",
+        CONF_ENERGIA_RESIDUA: "sensor.la_rossa_energia_residua",
+        CONF_CAPACITA_BATTERIA: "sensor.la_rossa_capacita_batteria",
+        CONF_CONSUMO_MEDIO: "sensor.la_rossa_consumo_medio",
+        CONF_POTENZA_CLIMA: "sensor.la_rossa_potenza_riscaldatore",
+        CONF_CLIMA_ACCESO: "binary_sensor.la_rossa_clima_acceso",
+        CONF_BATTERIA_IN_RISCALDAMENTO: "binary_sensor.la_rossa_batteria_in_riscaldamento",
+        CONF_TEMPERATURA_INTERNA: "sensor.la_rossa_temperatura_interna",
+    }
+
+    fatto = await hass.config_entries.flow.async_configure(flusso["flow_id"], {**proposti, CONF_RELAY: RELAY})
+    assert fatto["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    stato = fatto["result"].runtime_data.stato_auto()
+    assert stato["energia_kwh"] == 41.2
+    assert stato["capacita_kwh"] == 64.4
+    assert stato["consumo_medio_kwh100"] == 16.2
+    assert stato["potenza_clima_w"] == 800
+    assert stato["clima_acceso"] is True
+    assert stato["batteria_in_riscaldamento"] is False
+    assert stato["temperatura_interna_c"] == 19
+
+
 async def test_entita_create(hass: HomeAssistant, senza_relay: None) -> None:
     await _installa(hass)
     for entity_id in (
@@ -199,6 +274,121 @@ async def test_dati_per_il_consumo_con_le_unita_giuste(hass: HomeAssistant, senz
     assert abs(stato["velocita_kmh"] - 96.56) < 0.01
     assert stato["potenza_kw"] == 15.2
     assert abs(stato["odometro_km"] - 16093.44) < 0.01
+
+
+async def _con_entita(hass: HomeAssistant, **entita: str) -> Hub:
+    voce = _voce()
+    voce = MockConfigEntry(domain=DOMAIN, title=voce.title, unique_id=voce.unique_id, data={**voce.data, **entita})
+    voce.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(voce.entry_id)
+    await hass.async_block_till_done()
+    return voce.runtime_data
+
+
+async def test_ogni_dato_nell_unita_dell_app(hass: HomeAssistant, senza_relay: None) -> None:
+    """Prima l'autonomia in miglia, la potenza della ricarica in W e la
+    temperatura della batteria in °F passavano così com'erano, e i kelvin mai."""
+    hass.states.async_set("sensor.auto_batteria", "72", {"device_class": "battery", "unit_of_measurement": "%"})
+    hass.states.async_set("sensor.auto_autonomia", "100", {"unit_of_measurement": "mi"})
+    hass.states.async_set("sensor.ricarica", "7400", {"unit_of_measurement": "W"})
+    hass.states.async_set("sensor.batteria_temp", "41", {"unit_of_measurement": "°F"})
+    hass.states.async_set("sensor.fuori", "278.15", {"unit_of_measurement": "K"})
+    hass.states.async_set("sensor.dentro", "70", {"unit_of_measurement": "°F"})
+    hass.states.async_set("sensor.energia", "41250", {"unit_of_measurement": "Wh"})
+    hass.states.async_set("sensor.capacita", "64.5", {"unit_of_measurement": "kWh"})
+    hass.states.async_set("sensor.consumo", "6.25", {"unit_of_measurement": "km/kWh"})
+    hass.states.async_set("sensor.riscaldatore", "1.5", {"unit_of_measurement": "kW"})
+    hass.states.async_set("switch.clima", "on")
+    hass.states.async_set("binary_sensor.batteria_scalda", "unavailable")
+    hub = await _con_entita(
+        hass,
+        **{
+            CONF_POTENZA_CARICA: "sensor.ricarica",
+            CONF_TEMPERATURA_BATTERIA: "sensor.batteria_temp",
+            CONF_TEMPERATURA_ESTERNA: "sensor.fuori",
+            CONF_TEMPERATURA_INTERNA: "sensor.dentro",
+            CONF_ENERGIA_RESIDUA: "sensor.energia",
+            CONF_CAPACITA_BATTERIA: "sensor.capacita",
+            CONF_CONSUMO_MEDIO: "sensor.consumo",
+            CONF_POTENZA_CLIMA: "sensor.riscaldatore",
+            CONF_CLIMA_ACCESO: "switch.clima",
+            CONF_BATTERIA_IN_RISCALDAMENTO: "binary_sensor.batteria_scalda",
+        },
+    )
+    stato = hub.stato_auto()
+    assert abs(stato["autonomia_km"] - 160.93) < 0.01
+    assert stato["potenza_carica_kw"] == 7.4
+    assert stato["temperatura_batteria_c"] == 5
+    assert stato["temperatura_esterna_c"] == 5
+    assert abs(stato["temperatura_interna_c"] - 21.11) < 0.01
+    assert stato["energia_kwh"] == 41.25
+    assert stato["capacita_kwh"] == 64.5
+    assert stato["consumo_medio_kwh100"] == 16
+    assert stato["potenza_clima_w"] == 1500
+    assert stato["clima_acceso"] is True
+    # Non disponibile: non si dice, invece di dire «spento».
+    assert "batteria_in_riscaldamento" not in stato
+
+
+async def test_stato_auto_con_tutto_e_come_dice_il_protocollo(hass: HomeAssistant, senza_relay: None) -> None:
+    hass.states.async_set("sensor.auto_batteria", "72", {"unit_of_measurement": "%"})
+    entita = {
+        CONF_POTENZA_CARICA: ("sensor.ricarica", "0", "kW"),
+        CONF_TEMPERATURA_BATTERIA: ("sensor.batteria_temp", "20", "°C"),
+        CONF_TEMPERATURA_ESTERNA: ("sensor.fuori", "12", "°C"),
+        CONF_TEMPERATURA_INTERNA: ("sensor.dentro", "19", "°C"),
+        CONF_VELOCITA: ("sensor.velocita", "0", "km/h"),
+        CONF_POTENZA: ("sensor.potenza", "0", "kW"),
+        CONF_ODOMETRO: ("sensor.odometro", "12345", "km"),
+        CONF_ENERGIA_RESIDUA: ("sensor.energia", "46", "kWh"),
+        CONF_CAPACITA_BATTERIA: ("sensor.capacita", "64", "kWh"),
+        CONF_CONSUMO_MEDIO: ("sensor.consumo", "16", "kWh/100 km"),
+        CONF_POTENZA_CLIMA: ("sensor.riscaldatore", "0", "W"),
+        CONF_CLIMA_ACCESO: ("binary_sensor.clima", "off", None),
+        CONF_BATTERIA_IN_RISCALDAMENTO: ("binary_sensor.batteria_scalda", "off", None),
+    }
+    for entity_id, stato, unita in entita.values():
+        hass.states.async_set(entity_id, stato, {"unit_of_measurement": unita} if unita else {})
+    hub = await _con_entita(hass, **{conf: v[0] for conf, v in entita.items()})
+    hass.states.async_set("sensor.auto_autonomia", "300", {"unit_of_measurement": "km"})
+    hass.states.async_set("binary_sensor.auto_in_carica", "off")
+    hass.states.async_set("device_tracker.auto", "home", {"latitude": 45.46, "longitude": 9.19})
+    assert set(hub.stato_auto()) == chiavi_stato_auto()
+
+
+@pytest.mark.parametrize(
+    ("unita", "valore", "atteso"),
+    [("kWh/100 km", "15.5", 15.5), ("kWh/100km", "15.5", 15.5), ("Wh/km", "155", 15.5), ("kWh/100 mi", "24.94", 15.5)],
+)
+async def test_il_consumo_medio_in_kwh_ogni_100_km(
+    hass: HomeAssistant, senza_relay: None, unita: str, valore: str, atteso: float
+) -> None:
+    hass.states.async_set("sensor.consumo", valore, {"unit_of_measurement": unita})
+    hub = await _con_entita(hass, **{CONF_CONSUMO_MEDIO: "sensor.consumo"})
+    hass.states.async_set("sensor.auto_batteria", "72")
+    assert abs(hub.stato_auto()["consumo_medio_kwh100"] - atteso) < 0.01
+
+
+@pytest.mark.parametrize(
+    ("stato", "in_carica"),
+    [
+        ("Charging", True),
+        ("in_carica", True),
+        ("Charge in progress", True),
+        ("charging", True),
+        ("on", True),
+        ("not_charging", False),
+        ("non_in_carica", False),
+        ("completata", False),
+    ],
+)
+async def test_in_carica_da_un_sensore_dello_stato(
+    hass: HomeAssistant, senza_relay: None, stato: str, in_carica: bool
+) -> None:
+    hass.states.async_set("sensor.stato_ricarica", stato)
+    hub = await _con_entita(hass, **{CONF_IN_CARICA: "sensor.stato_ricarica"})
+    hass.states.async_set("sensor.auto_batteria", "72")
+    assert hub.stato_auto()["in_carica"] is in_carica
 
 
 async def test_stato_auto(hass: HomeAssistant, senza_relay: None) -> None:

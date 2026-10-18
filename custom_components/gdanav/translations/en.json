@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Connect a car to GdANav",
-        "description": "Pick your car's device in Home Assistant (for example the Leapmotor one): GdANav recognises battery, range, charging, temperatures, speed, power and odometer by itself. You can check and fix everything in the next step. If the car has no device, leave it empty and pick the entities by hand.",
+        "description": "Pick your car's device in Home Assistant (for example the Leapmotor one): GdANav recognises battery, range, charging, temperatures, speed, power, odometer, energy and climate by itself (all of them with GdAAuto, by key). You can check and fix everything in the next step. If the car has no device, leave it empty and pick the entities by hand.",
         "data": {
           "dispositivo": "Car device"
         }
@@ -23,7 +23,14 @@
           "entita_temperatura_esterna": "Outside temperature",
           "entita_velocita": "Speed",
           "entita_potenza": "Battery power (in use)",
-          "entita_odometro": "Odometer"
+          "entita_odometro": "Odometer",
+          "entita_energia_residua": "Remaining energy (kWh)",
+          "entita_capacita_batteria": "Battery capacity (kWh)",
+          "entita_consumo_medio": "Average consumption (kWh/100 km)",
+          "entita_potenza_clima": "Heater / climate power",
+          "entita_clima_acceso": "Climate on",
+          "entita_batteria_in_riscaldamento": "Battery heating",
+          "entita_temperatura_interna": "Interior temperature"
         },
         "data_description": {
           "relay": "Keep the default unless you run your own relay."

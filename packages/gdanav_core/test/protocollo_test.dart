@@ -96,6 +96,36 @@ void main() {
     expect(s.letto, DateTime.utc(2026, 9, 23, 9, 50));
   });
 
+  test('stato_auto porta i dati di GdAAuto per il consumo', () {
+    final s = SorgenteHomeAssistant.statoDaMessaggio(Messaggio(tipo: TipoMessaggio.statoAuto, dati: {
+      'batteria': 64,
+      'energia_kwh': 41.2,
+      'capacita_kwh': 64.4,
+      'consumo_medio_kwh100': 16.2,
+      'potenza_clima_w': 800,
+      'clima_acceso': true,
+      'batteria_in_riscaldamento': false,
+      'temperatura_interna_c': 19.5,
+      'temperatura_batteria_c': 8,
+    }))!;
+    expect(s.energiaKwh, 41.2);
+    expect(s.capacitaKwh, 64.4);
+    expect(s.consumoMedioKwh100, 16.2);
+    expect(s.potenzaClimaW, 800);
+    expect(s.climaAcceso, isTrue);
+    expect(s.batteriaInRiscaldamento, isFalse);
+    expect(s.temperaturaInternaC, 19.5);
+    expect(s.temperaturaBatteriaC, 8);
+    // La stima dell'arbitro li tiene.
+    final stimata = s.conBatteria(60, sorgente: TipoSorgente.stima);
+    expect((stimata.capacitaKwh, stimata.consumoMedioKwh100, stimata.potenzaClimaW), (64.4, 16.2, 800));
+    expect((stimata.climaAcceso, stimata.batteriaInRiscaldamento, stimata.temperaturaInternaC), (true, false, 19.5));
+    // Un'app vecchia, o una casa vecchia: i dati che mancano restano null.
+    final vecchio =
+        SorgenteHomeAssistant.statoDaMessaggio(Messaggio(tipo: TipoMessaggio.statoAuto, dati: {'batteria': 64}))!;
+    expect((vecchio.energiaKwh, vecchio.capacitaKwh, vecchio.climaAcceso), (null, null, null));
+  });
+
   test('senza batteria non inventa niente', () {
     expect(SorgenteHomeAssistant.statoDaMessaggio(Messaggio(tipo: TipoMessaggio.statoAuto, dati: {'in_carica': true})),
         isNull);

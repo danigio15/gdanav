@@ -13,18 +13,25 @@ from . import protocollo as p
 from .const import (
     CONF_AUTONOMIA,
     CONF_BATTERIA,
+    CONF_BATTERIA_IN_RISCALDAMENTO,
+    CONF_CAPACITA_BATTERIA,
     CONF_CHIAVE,
+    CONF_CLIMA_ACCESO,
     CONF_COMANDI,
+    CONF_CONSUMO_MEDIO,
     CONF_DISPOSITIVO,
+    CONF_ENERGIA_RESIDUA,
     CONF_IN_CARICA,
     CONF_NOME_AUTO,
     CONF_ODOMETRO,
     CONF_POSIZIONE,
     CONF_POTENZA,
     CONF_POTENZA_CARICA,
+    CONF_POTENZA_CLIMA,
     CONF_RELAY,
     CONF_TEMPERATURA_BATTERIA,
     CONF_TEMPERATURA_ESTERNA,
+    CONF_TEMPERATURA_INTERNA,
     CONF_VELOCITA,
     DOMAIN,
     RELAY_PREDEFINITO,
@@ -53,6 +60,13 @@ SCHEMA = vol.Schema(
         vol.Optional(CONF_VELOCITA): _entita("sensor"),
         vol.Optional(CONF_POTENZA): _entita("sensor"),
         vol.Optional(CONF_ODOMETRO): _entita("sensor"),
+        vol.Optional(CONF_ENERGIA_RESIDUA): _entita("sensor"),
+        vol.Optional(CONF_CAPACITA_BATTERIA): _entita("sensor"),
+        vol.Optional(CONF_CONSUMO_MEDIO): _entita("sensor"),
+        vol.Optional(CONF_POTENZA_CLIMA): _entita("sensor"),
+        vol.Optional(CONF_CLIMA_ACCESO): _entita("binary_sensor", "switch"),
+        vol.Optional(CONF_BATTERIA_IN_RISCALDAMENTO): _entita("binary_sensor"),
+        vol.Optional(CONF_TEMPERATURA_INTERNA): _entita("sensor"),
         vol.Required(CONF_RELAY, default=RELAY_PREDEFINITO): selector.TextSelector(
             selector.TextSelectorConfig(type=selector.TextSelectorType.URL)
         ),
@@ -92,6 +106,8 @@ class GdanavConfigFlow(ConfigFlow, domain=DOMAIN):
                     nome=voce.name or voce.original_name or (stato.name if stato else ""),
                     unita=attributi.get("unit_of_measurement") or voce.unit_of_measurement,
                     classe=attributi.get("device_class") or voce.device_class or voce.original_device_class,
+                    piattaforma=voce.platform,
+                    chiave=voce.translation_key,
                 )
             )
         proposta: dict[str, Any] = dict(proponi(entita))

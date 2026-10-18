@@ -121,4 +121,45 @@ void main() {
       expect(s.batteria, closeTo(22, 1e-9));
     });
   });
+
+  group("i dati nuovi dell'auto (GdAAuto)", () {
+    StatoAuto daCasa(double batteria, Duration fa, {double? fuori, double? energia, double? capacita}) => StatoAuto(
+          sorgente: TipoSorgente.homeAssistant,
+          letto: ora.subtract(fa),
+          batteria: batteria,
+          temperaturaEsternaC: fuori,
+          energiaKwh: energia,
+          capacitaKwh: capacita,
+        );
+
+    test('la stessa batteria con altri dati li porta dentro, senza toccare la stima', () {
+      final a = nuovo()..registra(daCasa(50, const Duration(minutes: 30), fuori: 12));
+      a.registraConsumo(0.6, ora: ora); // un punto
+      // Home Assistant la data con la batteria: stessa ora, ma fuori fa più freddo.
+      a.registra(daCasa(50, const Duration(minutes: 30), fuori: 4), ricevuto: ora);
+      final s = a.statoAttuale(ora)!;
+      expect(s.temperaturaEsternaC, 4);
+      expect(s.sorgente, TipoSorgente.stima);
+      expect(s.batteria, closeTo(49, 1e-9));
+    });
+
+    test("l'energia che resta conta come la batteria: un decimo di kWh è una lettura nuova", () {
+      final a = nuovo()..registra(daCasa(50, const Duration(minutes: 30), energia: 30.0));
+      a.registraConsumo(0.6, ora: ora);
+      a.registra(daCasa(50, const Duration(minutes: 30), energia: 29.7), ricevuto: ora);
+      final s = a.statoAttuale(ora)!;
+      expect(s.sorgente, TipoSorgente.homeAssistant);
+      expect(s.energiaKwh, 29.7);
+    });
+
+    test('la stima conta i punti con la capacità vera, e scala anche l\'energia', () {
+      final a = nuovo()..registra(daCasa(50, const Duration(hours: 1), energia: 20, capacita: 40));
+      a.registraConsumo(4, ora: ora); // 4 kWh su 40 sono dieci punti, non sei e mezzo
+      final s = a.statoAttuale(ora)!;
+      expect(s.sorgente, TipoSorgente.stima);
+      expect(s.batteria, closeTo(40, 1e-9));
+      expect(s.energiaKwh, closeTo(16, 1e-9));
+      expect(s.capacitaKwh, 40);
+    });
+  });
 }
