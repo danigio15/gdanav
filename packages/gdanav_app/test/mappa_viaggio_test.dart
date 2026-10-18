@@ -424,7 +424,8 @@ void main() {
       final (camera, _, moto) = m.seguite.last;
       expect(camera.tilt, 58);
       expect(camera.bearing, closeTo(90, 1));
-      expect(camera.zoom, inInclusiveRange(16, 17));
+      // Vicina come in guida (`telecameraLibera`): a 43 km/h poco sotto 17,5.
+      expect(camera.zoom, inInclusiveRange(17, 17.5));
       expect(moto, CameraAnimationInterpolation.linear);
       await via(tester);
     });

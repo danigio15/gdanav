@@ -2,9 +2,9 @@ package it.gdanav.gdanav_app.auto
 
 import android.app.Presentation
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Point
-import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.RectF
 import android.hardware.display.DisplayManager
@@ -26,19 +26,23 @@ import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.sources.GeoJsonSource
+import java.util.concurrent.Executors
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.ln
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 /**
  * Disegna la mappa di gdanav sullo schermo dell'auto: una MapView di
  * MapLibre dentro una Presentation su un display virtuale che scrive sulla
- * superficie data da Android Auto, con sopra il cruscotto. Stesso stile,
- * stessi dati e stesso segnaposto del telefono. Si sposta e si ingrandisce
- * col dito (o la manopola): dopo un po' torna da sola sull'auto.
+ * superficie data da Android Auto, con sopra il segnaposto ([FrecciaAuto]) e
+ * il cruscotto. Stesso stile, stessi dati e stesso segnaposto del telefono. Si
+ * sposta e si ingrandisce col dito (o la manopola): dopo un po' torna da sola
+ * sull'auto.
+ *
+ * Tutto quello che tocca la mappa sta sul filo principale (MapLibre lo vuole),
+ * e il filo principale è anche quello che risponde ad Android Auto: qui niente
+ * che possa aspettare a lungo. Vedi «L'app non risponde» più sotto.
  */
 class RendererMappa(
     private val carContext: CarContext,
@@ -49,11 +53,12 @@ class RendererMappa(
     private var presentazione: Presentation? = null
     private var mappaView: MapView? = null
     private var pannello: PannelloAuto? = null
+    private var freccia: FrecciaAuto? = null
     private var mappa: MapLibreMap? = null
     private var stile: Style? = null
     private var stileCaricato: String? = null
     private var inclinataOra: Boolean? = null
-    private var immaginiCaricate = 0
+    private var immaginiCaricate: Map<String, Bitmap>? = null
     private var larghezza = 0
     private var altezza = 0
     private var densita = 1f
@@ -72,9 +77,16 @@ class RendererMappa(
     var tridimensionale: Boolean = preferenze.getBoolean("auto_3d", true)
         private set
 
-    /** Lo zoom quando segue l'auto: i tasti + e − lo cambiano. */
+    /** Lo zoom quando segue l'auto in guida: i tasti + e − lo cambiano. */
     private var zoomGuida = preferenze.getFloat("auto_zoom_guida", 16.5f).toDouble()
-    private var zoomFermo = preferenze.getFloat("auto_zoom_fermo", 15.5f).toDouble()
+
+    /*
+     * Senza percorso lo zoom non è più uno solo (prima `auto_zoom_fermo`, 15,5
+     * o quello lasciato coi tasti): lo dà la velocità ([zoomLibero]), e i tasti
+     * + e − lo spostano di qualche livello, che si ricorda. Il valore di prima
+     * non si legge più: era quello che teneva la mappa così lontana.
+     */
+    private var scartoLibero = preferenze.getFloat("auto_zoom_libero_scarto", 0f).toDouble()
 
     private val torna = Runnable { segui() }
 
@@ -104,10 +116,12 @@ class RendererMappa(
         val p = Presentation(carContext, d.display)
         val contenuto = FrameLayout(p.context)
         val vista = MapView(p.context)
+        val segnaposto = FrecciaAuto(p.context)
         val sopra = if (soloMappa) null else PannelloAuto(p.context, contenitore.dpi / 160f)
         sopra?.area = areaVisibile
         val tutto = FrameLayout.LayoutParams.MATCH_PARENT
         contenuto.addView(vista, FrameLayout.LayoutParams(tutto, tutto))
+        contenuto.addView(segnaposto, FrameLayout.LayoutParams(tutto, tutto))
         sopra?.let { contenuto.addView(it, FrameLayout.LayoutParams(tutto, tutto)) }
         p.setContentView(contenuto)
         // Il traffico che arriva sull'auto, da leggere poi sul telefono. Solo
@@ -118,13 +132,11 @@ class RendererMappa(
                 DiagnosiTraffico.riquadro(operazione, sorgente)
             }
         }
-        /* Il calore in auto. La mappa si ridisegnava a ogni fotogramma dello
-         * schermo, sessanta al secondo, finché si guida: lo scorrere fra due
-         * posizioni non si ferma mai. Sessanta fotogrammi di una mappa 3D, e
-         * Android Auto che li codifica tutti in video per l'auto, scaldano il
-         * telefono come un videogioco. Trenta sono il tetto; lo scorrere
-         * stesso ne chiede venticinque (vedi [FOTOGRAMMA_MS]). */
+        /* Il calore in auto: trenta fotogrammi al secondo sono il tetto, e lo
+         * scorrere ne usa al più tanti (vedi «L'auto che scorre»). */
         vista.setMaximumFps(FPS_MASSIMI)
+        vista.addOnDidFinishRenderingFrameListener(dopoIlDisegno)
+        vista.addOnCameraIsChangingListener(cameraCheCambia)
         vista.onCreate(null)
         vista.onStart()
         vista.onResume()
@@ -138,15 +150,17 @@ class RendererMappa(
         presentazione = p
         mappaView = vista
         pannello = sopra
-        if (!soloMappa) principale.postDelayed(contaTraffico, 10_000)
+        freccia = segnaposto
+        caricaSegnaposto(segnaposto)
+        if (!soloMappa) principale.postDelayed(contaTraffico, CONTA_TRAFFICO_MS)
     }
 
-    /** Ogni dieci secondi, quanti tratti di coda ci sono sullo schermo. */
+    /** Ogni tanto, quanti tratti di coda ci sono sullo schermo: solo se la mappa disegna. */
     private val contaTraffico: Runnable = object : Runnable {
         override fun run() {
             val m = mappa
-            if (m != null && stile != null) DiagnosiTraffico.contaTratti(m, larghezza, altezza)
-            if (mappaView != null) principale.postDelayed(this, 10_000)
+            if (m != null && stile != null && disegnoVivo()) DiagnosiTraffico.contaTratti(m, larghezza, altezza)
+            if (mappaView != null) principale.postDelayed(this, CONTA_TRAFFICO_MS)
         }
     }
 
@@ -165,11 +179,17 @@ class RendererMappa(
             alCambio()
         }
         if (!soloMappa) DiagnosiTraffico.salva()
+        // Prima di tutto si smette di chiedere fotogrammi: nessun passo in coda
+        // deve toccare una mappa che si sta chiudendo.
         spegniFotogrammi()
-        mostrata = null
-        obiettivo = null
+        inVolo = false
+        inAttesaDaMs = 0L
+        moto.dimentica()
+        cameraPronta = false
         sorgentiCaricate.clear()
         mappaView?.let {
+            it.removeOnDidFinishRenderingFrameListener(dopoIlDisegno)
+            it.removeOnCameraIsChangingListener(cameraCheCambia)
             it.onPause()
             it.onStop()
             it.onDestroy()
@@ -180,11 +200,12 @@ class RendererMappa(
         presentazione = null
         display = null
         pannello = null
+        freccia = null
         mappa = null
         stile = null
         stileCaricato = null
         inclinataOra = null
-        immaginiCaricate = 0
+        immaginiCaricate = null
     }
 
     /** L'area non coperta dalle schede di Android Auto. */
@@ -227,6 +248,10 @@ class RendererMappa(
         // inattesa, non deve mai abbattere la sessione dell'auto.
         try {
             val m = mappa ?: return
+            // Chiedere alla mappa cosa c'è sotto il dito vuol dire aspettare il
+            // filo che disegna: se è bloccato, si aspetterebbe con lui (vedi
+            // «L'app non risponde»). Meglio un tocco a vuoto.
+            if (!disegnoVivo()) return
             val raggio = 28f
             val trovati = m.queryRenderedFeatures(
                 RectF(x - raggio, y - raggio, x + raggio, y + raggio),
@@ -281,7 +306,7 @@ class RendererMappa(
         }
     }
 
-    /** I tasti + e −: seguendo l'auto cambiano lo zoom della guida (e si ricorda). */
+    /** I tasti + e −: seguendo l'auto cambiano lo zoom (in guida, o lo scarto senza percorso), e si ricorda. */
     fun zoom(passo: Double) {
         val m = mappa ?: return
         if (libera) {
@@ -293,8 +318,8 @@ class RendererMappa(
             zoomGuida = (zoomGuida + passo).coerceIn(12.0, 19.0)
             preferenze.edit().putFloat("auto_zoom_guida", zoomGuida.toFloat()).apply()
         } else {
-            zoomFermo = (zoomFermo + passo).coerceIn(8.0, 19.0)
-            preferenze.edit().putFloat("auto_zoom_fermo", zoomFermo.toFloat()).apply()
+            scartoLibero = (scartoLibero + passo).coerceIn(SCARTO_LIBERO_MIN, SCARTO_LIBERO_MAX)
+            preferenze.edit().putFloat("auto_zoom_libero_scarto", scartoLibero.toFloat()).apply()
         }
         aggiorna()
     }
@@ -422,7 +447,7 @@ class RendererMappa(
             stileCaricato = json
             stile = null
             inclinataOra = null
-            immaginiCaricate = 0
+            immaginiCaricate = null
             sorgentiCaricate.clear()
             m.setStyle(Style.Builder().fromJson(json)) { s ->
                 stile = s
@@ -430,7 +455,9 @@ class RendererMappa(
                     DiagnosiTraffico.strato = s.getSource(DiagnosiTraffico.SORGENTE) != null &&
                         s.getLayer(DiagnosiTraffico.SORGENTE) != null
                 }
-                caricaSegnaposto(s)
+                // Il segnaposto lo disegna [FrecciaAuto], sopra la mappa: la
+                // sorgente dello stile resta vuota.
+                s.getSourceAs<GeoJsonSource>(SORGENTE_IO)?.setGeoJson(VUOTA)
                 aggiornaDati(m, s)
                 accendi(s)
             }
@@ -439,6 +466,8 @@ class RendererMappa(
         stile?.let { aggiornaDati(m, it) }
     }
 
+    private val sorgentiCaricate = HashMap<String, String>()
+
     private fun aggiornaDati(m: MapLibreMap, s: Style) {
         // Solo le sorgenti cambiate: rileggere il percorso a ogni novità del
         // cruscotto fa perdere fotogrammi.
@@ -446,11 +475,17 @@ class RendererMappa(
             if (sorgentiCaricate[id] === dati) continue
             s.getSourceAs<GeoJsonSource>(id)?.setGeoJson(dati)
             sorgentiCaricate[id] = dati
+            richiesta()
         }
+        // Le icone delle segnalazioni: solo quelle nuove o cambiate. Prima si
+        // ricaricavano tutte appena ne cambiava il numero.
         val immagini = PonteAuto.immagini
-        if (immagini.size != immaginiCaricate) {
-            immaginiCaricate = immagini.size
-            for ((nome, bitmap) in immagini) s.addImage(nome, bitmap)
+        if (immagini !== immaginiCaricate) {
+            val prima = immaginiCaricate
+            for ((nome, bitmap) in immagini) {
+                if (prima?.get(nome) !== bitmap) s.addImage(nome, bitmap)
+            }
+            immaginiCaricate = immagini
         }
         // In 3D anche senza guida: la vista scelta è una, guidando o no.
         val inclinata = tridimensionale
@@ -459,314 +494,442 @@ class RendererMappa(
             s.getLayer("edifici")?.setProperties(PropertyFactory.visibility(if (inclinata) Property.NONE else Property.VISIBLE))
             s.getLayer("edifici-3d")?.setProperties(PropertyFactory.visibility(if (inclinata) Property.VISIBLE else Property.NONE))
         }
-        muovi(m, s)
+        muovi(m)
     }
 
     // --- l'auto che scorre -----------------------------------------------
 
     /*
-     * Dal campo: «la freccia sulla mappa non è fluida, prende pause e poi
-     * cammina». A ogni posizione dal telefono (una al secondo, col GPS) si
-     * partiva da dov'era la freccia verso la posizione nuova, in un tempo pari
-     * all'intervallo di prima, e lì ci si fermava ad aspettare la prossima:
-     * con una posizione in ritardo, la pausa; con una in anticipo, lo scatto.
+     * Dal campo, due volte. La prima: «la freccia sulla mappa non è fluida,
+     * prende pause e poi cammina». La seconda, dopo la prima correzione: «ha
+     * ancora dei piccoli frame lag, deve essere continuo con il movimento
+     * dell'auto». Tre cause, e tre rimedi:
      *
-     * Adesso è il conto di `MotoFluido` (gdanav_core, con le sue prove), rifatto
-     * qui coi suoi numeri: fra una posizione e l'altra l'auto va avanti da sola
-     * con la velocità che manda il telefono (`velocita_ms`) e girando come
-     * stava girando, al più per [OLTRE_AL_PIU_MS]; quello che si disegna la
-     * insegue a ogni fotogramma con la costante di tempo [TAU_S], mai indietro
-     * lungo la strada; da fermi, arrivata, i fotogrammi si spengono fino alla
-     * posizione dopo.
+     * 1. Il ritmo. I fotogrammi li dava un Handler ogni 40 ms (25 al secondo),
+     *    la mappa ne disegna al più 30: un fotogramma su sei mostrava la stessa
+     *    posizione del precedente, cinque piccoli intoppi al secondo, più
+     *    quelli del filo principale in ritardo. Adesso il passo dopo lo chiede
+     *    la mappa stessa, appena ha finito di disegnare il fotogramma
+     *    ([dopoIlDisegno]): un passo per ogni fotogramma disegnato, mai due
+     *    nello stesso, mai uno saltato. Se la mappa non disegna (niente da
+     *    cambiare, o è ferma), un Handler di riserva.
      *
-     * I fotogrammi li dà un `Handler` ogni [FOTOGRAMMA_MS], non il vsync del
-     * telefono: la mappa va sullo schermo dell'auto (un display virtuale che
-     * Android Auto codifica in video), e col telefono in tasca a schermo
-     * spento il vsync del telefono non c'è. Venticinque al secondo, sotto il
-     * tetto di [FPS_MASSIMI]: di più scalda e basta.
+     * 2. Le piccole pause del conto: vedi [MotoAuto] (e `MotoFluido` in
+     *    gdanav_core). La freccia ha una velocità sua, che cambia piano, e
+     *    andando non si ferma più a ogni posizione un po' indietro.
+     *
+     * 3. La freccia in ritardo sulla mappa: era un punto GeoJSON riscritto a
+     *    ogni fotogramma, che MapLibre mostra qualche fotogramma dopo la
+     *    telecamera. Adesso la disegna [FrecciaAuto], sopra la mappa, dove la
+     *    telecamera mette l'auto. E niente più testo JSON da comporre e
+     *    rileggere trenta volte al secondo.
      */
 
-    /**
-     * Quello che si vede adesso: latitudine, longitudine, rotta della mappa,
-     * rotta del segnaposto, zoom, inclinazione e i quattro margini.
-     */
-    private var mostrata: DoubleArray? = null
+    private val moto = MotoAuto()
 
-    /** L'ultima posizione dal telefono, con zoom e margini di adesso. */
-    private var obiettivo: DoubleArray? = null
+    /** La telecamera che si vuole (dall'ultima novità) e quella che si vede. */
+    private var zoomVoluto = 16.5
+    private var inclinazioneVoluta = 0.0
+    private var bussolaInclinata = false
+    private val marginiVoluti = DoubleArray(4)
+    private var zoomMostrato = 16.5
+    private var inclinazioneMostrata = 0.0
+    private var bussolaMostrata = 0.0
+    private val marginiMostrati = DoubleArray(4)
+    private var cameraPronta = false
 
-    /** Quando è arrivata l'ultima posizione, a che velocità (m/s) e quanto si girava (gradi al secondo). */
-    private var fixAlle = 0L
-    private var fixVelocita = 0.0
-    private var fixGira = 0.0
-    private var ultimoFotogramma = 0L
     private var scorrendo = false
+    private var inVolo = false
     private var eraLibera = false
-    private val sorgentiCaricate = HashMap<String, String>()
+    private var ultimoPassoNs = 0L
 
-    private val fotogramma = object : Runnable {
-        override fun run() {
-            if (!scorrendo) return
-            val m = mappa
-            val s = stile
-            if (m == null || s == null || !passo(m, s)) {
-                scorrendo = false
-                return
-            }
-            principale.postDelayed(this, FOTOGRAMMA_MS)
+    /** L'icona del segnaposto, letta una volta per nome: niente stringhe nuove a ogni fotogramma. */
+    private var iconaLetta: String? = null
+    private var nomeIcona = "freccia"
+
+    private val passo = Runnable { fotogramma() }
+
+    /** La mappa ha finito un fotogramma: il prossimo passo, subito. */
+    private val dopoIlDisegno = MapView.OnDidFinishRenderingFrameListener { _, _, _ ->
+        inAttesaDaMs = 0L
+        if (scorrendo) {
+            principale.removeCallbacks(passo)
+            principale.post(passo)
         }
+    }
+
+    /** La mappa spostata col dito, o in volo: il segnaposto la segue. */
+    private val cameraCheCambia = MapView.OnCameraIsChangingListener {
+        if (libera || inVolo) mettiFreccia()
     }
 
     private fun accendiFotogrammi() {
         if (scorrendo) return
         scorrendo = true
-        ultimoFotogramma = SystemClock.uptimeMillis()
-        principale.postDelayed(fotogramma, FOTOGRAMMA_MS)
+        ultimoPassoNs = 0L
+        principale.post(passo)
     }
 
     private fun spegniFotogrammi() {
         scorrendo = false
-        principale.removeCallbacks(fotogramma)
+        principale.removeCallbacks(passo)
     }
 
-    private fun muovi(m: MapLibreMap, s: Style) {
+    /** Una novità dal telefono: la posizione, e la telecamera che si vuole. */
+    private fun muovi(m: MapLibreMap) {
         val qui = PonteAuto.qui
         if (qui == null) {
             spegniFotogrammi()
-            mostrata = null
-            obiettivo = null
-            s.getSourceAs<GeoJsonSource>("gdanav-io")?.setGeoJson(VUOTA)
+            moto.dimentica()
+            freccia?.nascondi()
             return
         }
-        val guida = PonteAuto.guida != null
-        /* Il 3D anche senza una meta, come sul telefono: prima la vista 3D
-         * valeva solo in guida, e fuori la mappa tornava piatta e col nord in
-         * su qualunque cosa si fosse scelto. Adesso la mappa segue l'auto girata come va (la rotta che il
-         * telefono manda anche fuori guida) e inclinata; lo zoom resta quello
-         * scelto coi tasti per la mappa senza guida. */
+        val guida = PonteAuto.guida
         val inclinata = tridimensionale
-        // L'auto al centro dell'area libera; in guida, o in 3D, più in basso,
-        // per vedere la strada davanti.
         val a = areaLibera()
-        val sopra = if (guida) (a.height() * 0.3) else if (inclinata) (a.height() * 0.2) else 0.0
-        val nuovo = doubleArrayOf(
-            qui[0], qui[1],
-            if (inclinata) PonteAuto.rotta else 0.0,
-            PonteAuto.rottaIo,
-            if (guida) zoomGuida + zoomInSvolta(PonteAuto.guida) else zoomFermo,
-            if (inclinata) 55.0 else 0.0,
-            a.left.toDouble(),
-            a.top.toDouble() + sopra,
-            (larghezza - a.right).toDouble().coerceAtLeast(0.0),
-            (altezza - a.bottom).toDouble().coerceAtLeast(0.0),
-        )
-        val ora = SystemClock.uptimeMillis()
+        /* Senza percorso, come in guida: vicina, in 3D, con l'auto più in
+         * basso. Prima era a 15,5 con l'auto in mezzo, e in 3D si vedeva fino
+         * all'orizzonte (e la mappa disegnava chilometri di palazzi). */
+        val sopra: Double
+        if (guida != null) {
+            zoomVoluto = zoomGuida + zoomInSvolta(guida)
+            sopra = 0.3
+        } else {
+            zoomVoluto = zoomLibero(PonteAuto.velocita, scartoLibero)
+            sopra = if (inclinata) 0.3 else 0.0
+        }
+        inclinazioneVoluta = if (inclinata) INCLINAZIONE else 0.0
+        bussolaInclinata = inclinata
+        marginiVoluti[0] = a.left.toDouble()
+        marginiVoluti[1] = a.top + a.height() * sopra
+        marginiVoluti[2] = (larghezza - a.right).toDouble().coerceAtLeast(0.0)
+        marginiVoluti[3] = (altezza - a.bottom).toDouble().coerceAtLeast(0.0)
+        val ora = System.nanoTime()
+        if (!moto.stessaPosizione(qui[0], qui[1])) {
+            moto.posizione(qui[0], qui[1], PonteAuto.rottaIo, PonteAuto.rotta, PonteAuto.velocita, ora)
+        }
         // Tornando a seguire l'auto dopo averla spostata col dito: un volo.
         if (eraLibera && !libera) {
             eraLibera = false
-            spegniFotogrammi()
-            mostrata = nuovo
-            obiettivo = nuovo
-            fixAlle = ora
-            fixVelocita = 0.0
-            fixGira = 0.0
-            disegna(m, s, nuovo, sposta = false)
-            m.animateCamera(CameraUpdateFactory.newCameraPosition(camera(nuovo)), 700)
+            vola(m, ora)
             return
         }
         eraLibera = libera
-        val prima = obiettivo
-        if (prima != null && prima.contentEquals(nuovo)) return
-        // Una posizione nuova (non solo zoom o margini, che cambiano di
-        // continuo avvicinandosi a una svolta): da qui riparte la previsione.
-        if (prima == null || prima[0] != nuovo[0] || prima[1] != nuovo[1]) {
-            val passo = (ora - fixAlle) / 1000.0
-            val v = PonteAuto.velocita
-            fixGira = if (prima != null && v >= 2.0 && passo >= 0.2 && passo <= 3.0) {
-                (giro(prima[3], nuovo[3]) / passo).coerceIn(-GIRA_AL_PIU, GIRA_AL_PIU)
-            } else if (prima == null || passo > 0.2) {
-                0.0
-            } else {
-                fixGira
-            }
-            fixAlle = ora
-            fixVelocita = if (v.isFinite() && v > 0.0) v else 0.0
-        }
-        obiettivo = nuovo
-        val da = mostrata
-        // Troppo lontano (prima volta, salto del GPS, ricalcolo): subito lì.
-        if (da == null || distanzaM(da[0], da[1], nuovo[0], nuovo[1]) > SALTO_M) {
-            mostrata = nuovo.copyOf()
-            disegna(m, s, nuovo)
-            ultimoFotogramma = ora
-            if (fixVelocita < FERMO_SOTTO_MS) return
-        }
         accendiFotogrammi()
     }
 
-    /** Dove l'auto dovrebbe essere adesso: l'ultima posizione portata avanti. */
-    private fun previsione(o: DoubleArray, ora: Long): DoubleArray {
-        val v = o.copyOf()
-        if (fixVelocita < FERMO_SOTTO_MS) return v
-        val t = ((ora - fixAlle) / 1000.0).coerceIn(0.0, OLTRE_AL_PIU_MS / 1000.0)
-        val r0 = Math.toRadians(o[3])
-        val w = Math.toRadians(fixGira)
-        val est: Double
-        val nord: Double
-        if (abs(w) < 1e-4) {
-            est = fixVelocita * t * sin(r0)
-            nord = fixVelocita * t * cos(r0)
+    /** Il volo di ritorno sull'auto: dove sarà quando il volo finisce. */
+    private fun vola(m: MapLibreMap, ora: Long) {
+        moto.salta(ora + VOLO_MS * 1_000_000L)
+        prendiVoluta()
+        inVolo = true
+        accendiFotogrammi()
+        m.animateCamera(
+            CameraUpdateFactory.newCameraPosition(camera()),
+            VOLO_MS.toInt(),
+            object : MapLibreMap.CancelableCallback {
+                override fun onFinish() {
+                    inVolo = false
+                }
+
+                override fun onCancel() {
+                    inVolo = false
+                }
+            },
+        )
+    }
+
+    /** La telecamera mostrata diventa subito quella voluta. */
+    private fun prendiVoluta() {
+        zoomMostrato = zoomVoluto
+        inclinazioneMostrata = inclinazioneVoluta
+        bussolaMostrata = if (bussolaInclinata) moto.rottaMappa else 0.0
+        System.arraycopy(marginiVoluti, 0, marginiMostrati, 0, 4)
+        cameraPronta = true
+    }
+
+    /** Un passo: uno per fotogramma disegnato. */
+    private fun fotogramma() {
+        principale.removeCallbacks(passo)
+        if (!scorrendo) return
+        val m = mappa
+        if (m == null || stile == null) {
+            scorrendo = false
+            return
+        }
+        val ora = System.nanoTime()
+        val dt = if (ultimoPassoNs == 0L) 0.0 else ((ora - ultimoPassoNs) / 1e9).coerceIn(0.0, MotoAuto.FOTOGRAMMA_AL_PIU_S)
+        ultimoPassoNs = ora
+        val primo = !moto.mostrata
+        if (!moto.fotogramma(ora)) {
+            scorrendo = false
+            return
+        }
+        if (primo || !cameraPronta) {
+            prendiVoluta()
         } else {
-            val r1 = r0 + w * t
-            est = fixVelocita / w * (cos(r0) - cos(r1))
-            nord = fixVelocita / w * (sin(r1) - sin(r0))
+            val kz = 1 - exp(-dt / TAU_ZOOM_S)
+            val kc = 1 - exp(-dt / TAU_CAMERA_S)
+            zoomMostrato += (zoomVoluto - zoomMostrato) * kz
+            inclinazioneMostrata += (inclinazioneVoluta - inclinazioneMostrata) * kc
+            for (i in 0 until 4) marginiMostrati[i] += (marginiVoluti[i] - marginiMostrati[i]) * kc
+            bussolaMostrata = MotoAuto.verso(bussolaMostrata, if (bussolaInclinata) moto.rottaMappa else 0.0, kc)
         }
-        v[0] = o[0] + nord / METRI_PER_GRADO
-        v[1] = o[1] + est / (METRI_PER_GRADO * cos(Math.toRadians(o[0])))
-        v[3] = ((o[3] + fixGira * t) % 360.0 + 360.0) % 360.0
-        return v
+        // Con la mappa che non disegna da un po' non le si riempie la coda: la
+        // telecamera riparte da dov'è l'auto appena torna a disegnare. Dopo
+        // qualche secondo si riprova comunque (un fotogramma perso per strada
+        // non deve fermare la telecamera per sempre).
+        if (inAttesaDaMs != 0L && SystemClock.uptimeMillis() - inAttesaDaMs > RIPROVA_MS) inAttesaDaMs = 0L
+        if (!libera && !inVolo && disegnoVivo()) {
+            m.moveCamera(CameraUpdateFactory.newCameraPosition(camera()))
+            richiesta()
+        }
+        mettiFreccia()
+        val ferma = moto.fermo && cameraArrivata()
+        if (ferma && !inVolo) {
+            scorrendo = false
+            return
+        }
+        // Il prossimo lo chiede la mappa, appena ha disegnato questo. Se non
+        // disegna (spostata col dito: la telecamera non cambia), ogni
+        // fotogramma da qui.
+        principale.postDelayed(passo, if (libera || inVolo) FOTOGRAMMA_LIBERA_MS else RISERVA_MS)
     }
 
-    /** Un fotogramma: un passo verso la previsione. `false` quando non ne servono altri. */
-    private fun passo(m: MapLibreMap, s: Style): Boolean {
-        val o = obiettivo ?: return false
-        val da = mostrata ?: return false
-        val ora = SystemClock.uptimeMillis()
-        // Un fotogramma saltato non diventa un salto: al più un decimo di secondo.
-        val dt = ((ora - ultimoFotogramma) / 1000.0).coerceIn(0.0, 0.1)
-        ultimoFotogramma = ora
-        val p = previsione(o, ora)
-        val k = 1 - exp(-dt / TAU_S)
-        val coslat = cos(Math.toRadians(da[0]))
-        var est = (p[1] - da[1]) * METRI_PER_GRADO * coslat * k
-        var nord = (p[0] - da[0]) * METRI_PER_GRADO * k
-        if (fixVelocita >= FERMO_SOTTO_MS) {
-            // Mai indietro lungo la strada: quella parte del passo si toglie.
-            val r = Math.toRadians(p[3])
-            val ve = sin(r)
-            val vn = cos(r)
-            val lungo = est * ve + nord * vn
-            if (lungo < 0) {
-                est -= lungo * ve
-                nord -= lungo * vn
-            }
-        }
-        val v = DoubleArray(o.size) { i ->
-            when (i) {
-                0 -> da[0] + nord / METRI_PER_GRADO
-                1 -> da[1] + est / (METRI_PER_GRADO * coslat)
-                2, 3 -> angolo(da[i], p[i], k)
-                else -> da[i] + (p[i] - da[i]) * k
-            }
-        }
-        mostrata = v
-        disegna(m, s, v)
-        var arrivata = distanzaM(v[0], v[1], p[0], p[1]) < 0.3
-        for (i in 2 until v.size) {
-            val scarto = if (i == 2 || i == 3) abs(giro(v[i], p[i])) else abs(v[i] - p[i])
-            if (scarto > 0.05) arrivata = false
-        }
-        val ferma = fixVelocita < FERMO_SOTTO_MS || ora - fixAlle >= OLTRE_AL_PIU_MS
-        return !(arrivata && ferma)
+    private fun cameraArrivata(): Boolean {
+        if (abs(zoomVoluto - zoomMostrato) > 0.01 || abs(inclinazioneVoluta - inclinazioneMostrata) > 0.1) return false
+        for (i in 0 until 4) if (abs(marginiVoluti[i] - marginiMostrati[i]) > 0.5) return false
+        return abs(MotoAuto.giro(bussolaMostrata, if (bussolaInclinata) moto.rottaMappa else 0.0)) < 0.1
     }
 
-    /**
-     * Quanto si avvicina la mappa arrivando a una svolta, un'uscita, una
-     * rotonda: da 600 metri si comincia, a 150 si è vicini di un livello e
-     * mezzo, e passata la manovra si torna allo zoom di prima. Lo scorrere
-     * fra due posizioni lo rende un movimento, non un salto.
-     */
-    private fun zoomInSvolta(g: PonteAuto.Guida?): Double {
-        g ?: return 0.0
-        if (g.tipo !in 9..27 && g.tipo != 37 && g.tipo != 38) return 0.0
-        return ZOOM_IN_SVOLTA * ((INIZIO_SVOLTA_M - g.distanzaM) / (INIZIO_SVOLTA_M - VICINO_SVOLTA_M)).coerceIn(0.0, 1.0)
-    }
-
-    private fun camera(v: DoubleArray) = CameraPosition.Builder()
-        .target(LatLng(v[0], v[1]))
-        .bearing(v[2])
-        .zoom(v[4])
-        .tilt(v[5])
-        .padding(v[6], v[7], v[8], v[9])
+    private fun camera() = CameraPosition.Builder()
+        .target(LatLng(moto.lat, moto.lon))
+        .bearing(bussolaMostrata)
+        .zoom(zoomMostrato)
+        .tilt(inclinazioneMostrata)
+        .padding(marginiMostrati[0], marginiMostrati[1], marginiMostrati[2], marginiMostrati[3])
         .build()
 
-    private fun disegna(m: MapLibreMap, s: Style, v: DoubleArray, sposta: Boolean = true) {
-        val icona = PonteAuto.icona.replace("\"", "")
-        s.getSourceAs<GeoJsonSource>("gdanav-io")?.setGeoJson(
-            "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\"," +
-                "\"geometry\":{\"type\":\"Point\",\"coordinates\":[${v[1]},${v[0]}]}," +
-                "\"properties\":{\"icona\":\"$icona\",\"rotta\":${v[3]}}}]}",
+    /** Il segnaposto dove la mappa mette l'auto. */
+    private fun mettiFreccia() {
+        val f = freccia ?: return
+        val m = mappa ?: return
+        if (!moto.mostrata) {
+            f.nascondi()
+            return
+        }
+        val icona = PonteAuto.icona
+        if (icona !== iconaLetta) {
+            iconaLetta = icona
+            nomeIcona = icona.replace("\"", "")
+        }
+        val x: Float
+        val y: Float
+        val bussola: Double
+        val zoom: Double
+        val inclinazione: Double
+        if (!libera && !inVolo) {
+            // Seguendo l'auto, la telecamera la mette nel mezzo dell'area dentro i margini.
+            x = (marginiMostrati[0] + (larghezza - marginiMostrati[0] - marginiMostrati[2]) / 2).toFloat()
+            y = (marginiMostrati[1] + (altezza - marginiMostrati[1] - marginiMostrati[3]) / 2).toFloat()
+            bussola = bussolaMostrata
+            zoom = zoomMostrato
+            inclinazione = inclinazioneMostrata
+        } else {
+            val c = m.cameraPosition
+            val s = m.projection.toScreenLocation(LatLng(moto.lat, moto.lon))
+            x = s.x
+            y = s.y
+            bussola = c.bearing
+            zoom = c.zoom
+            inclinazione = c.tilt
+        }
+        // Grande come la disegnava MapLibre: l'immagine alla sua densità,
+        // per la densità dello schermo dell'auto, per `icon-size` dello stile.
+        val densitaImmagine = f.densitaImmagine().takeIf { it > 0 } ?: 160
+        val scala = (dimensioneIcona(zoom) * densita * 160.0 / densitaImmagine).toFloat()
+        f.metti(
+            nomeIcona,
+            x,
+            y,
+            MotoAuto.giro(bussola, moto.rotta).toFloat(),
+            scala,
+            cos(Math.toRadians(inclinazione)).toFloat(),
         )
-        if (sposta && !libera) m.moveCamera(CameraUpdateFactory.newCameraPosition(camera(v)))
     }
 
-    /** Di quanto si gira da [da] ad [a], fra -180 e 180. */
-    private fun giro(da: Double, a: Double): Double = ((a - da + 540.0) % 360.0 + 360.0) % 360.0 - 180.0
+    // --- «L'app non risponde» ---------------------------------------------
 
-    /** Metri fra due punti vicini. */
-    private fun distanzaM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val nord = (lat2 - lat1) * METRI_PER_GRADO
-        val est = (lon2 - lon1) * METRI_PER_GRADO * cos(Math.toRadians(lat1))
-        return sqrt(nord * nord + est * est)
-    }
-
-    /** Da un angolo all'altro per la via più corta. */
-    private fun angolo(da: Double, a: Double, t: Double): Double {
-        var d = (a - da) % 360.0
-        if (d > 180) d -= 360.0
-        if (d < -180) d += 360.0
-        return ((da + d * t) % 360.0 + 360.0) % 360.0
-    }
+    /*
+     * Dal campo: in guida, all'improvviso, sull'auto «L'app gdahome non
+     * risponde» (Esci / Attendi). Android Auto lo dice quando il filo
+     * principale dell'app non gli risponde per qualche secondo.
+     *
+     * La mappa la disegna un altro filo (quello di OpenGL), ma due chiamate
+     * dal filo principale lo aspettano: `queryRenderedFeatures` (il conteggio
+     * del traffico ogni dieci secondi, su tutto lo schermo, e il tocco su un
+     * punto) chiede al filo che disegna e resta fermo finché non risponde. Se
+     * quel filo è bloccato — un fotogramma 3D pesante (a 15,5 inclinata si
+     * disegnavano chilometri di palazzi fino all'orizzonte), o lo schermo
+     * dell'auto che per un momento non prende più fotogrammi (il video verso
+     * l'auto che si inceppa: il filo che disegna resta fermo ad aspettare un
+     * posto libero) — il filo principale resta fermo con lui, e Android Auto
+     * dopo qualche secondo chiede se chiudere.
+     *
+     * Adesso: si chiede alla mappa solo se ha disegnato da poco quello che le
+     * si è chiesto ([disegnoVivo]); il conteggio del traffico è ogni trenta
+     * secondi invece di dieci; le immagini si decodificano fuori dal filo
+     * principale (qui e in [PonteAuto]); e i fotogrammi non si accumulano:
+     * il passo dopo lo chiede la mappa quando ha finito, e se la mappa è ferma
+     * si va avanti piano invece di riempirle la coda.
+     */
 
     /**
-     * Le immagini del segnaposto, prese dagli asset dell'app Flutter. gdanav
-     * è un pacchetto: le sue immagini stanno sotto `packages/gdanav_app/`,
-     * sia nell'app gdanav sia dentro gdahome (il posto vecchio resta come
-     * riserva).
+     * Da quando la mappa ha un cambiamento chiesto e non ancora disegnato (0:
+     * nessuno). Lo azzera ogni fotogramma finito.
      */
-    private fun caricaSegnaposto(s: Style) {
-        for (nome in listOf("freccia", "auto_blu", "auto_bianca", "auto_rossa", "auto_nera", "auto_grigia")) {
-            for (cartella in CARTELLE_SEGNAPOSTO) {
-                val bitmap = try {
-                    carContext.assets.open("$cartella/$nome.png").use { BitmapFactory.decodeStream(it) }
-                } catch (e: Exception) {
-                    null
+    private var inAttesaDaMs = 0L
+
+    /** Si è chiesto qualcosa alla mappa (la telecamera, una sorgente): da disegnare. */
+    private fun richiesta() {
+        if (inAttesaDaMs == 0L) inAttesaDaMs = SystemClock.uptimeMillis()
+    }
+
+    /** La mappa disegna: niente in attesa, o in attesa da poco. */
+    private fun disegnoVivo(): Boolean =
+        inAttesaDaMs == 0L || SystemClock.uptimeMillis() - inAttesaDaMs < DISEGNO_VIVO_MS
+
+    /**
+     * Le immagini del segnaposto, prese dagli asset dell'app Flutter, lette e
+     * decodificate fuori dal filo principale (una volta per processo). gdanav
+     * è un pacchetto: le sue immagini stanno sotto `packages/gdanav_app/`, sia
+     * nell'app gdanav sia dentro gdahome (il posto vecchio resta come riserva).
+     */
+    private fun caricaSegnaposto(f: FrecciaAuto) {
+        segnaposti?.let { pronte ->
+            for ((nome, b) in pronte) f.immagine(nome, b)
+            return
+        }
+        val assets = carContext.assets
+        lavoro.execute {
+            val lette = HashMap<String, Bitmap>()
+            for (nome in NOMI_SEGNAPOSTO) {
+                for (cartella in CARTELLE_SEGNAPOSTO) {
+                    val bitmap = try {
+                        assets.open("$cartella/$nome.png").use { BitmapFactory.decodeStream(it) }
+                    } catch (e: Exception) {
+                        null
+                    }
+                    if (bitmap != null) {
+                        lette[nome] = bitmap
+                        break
+                    }
                 }
-                if (bitmap != null) {
-                    s.addImage(nome, bitmap)
-                    break
-                }
+            }
+            principale.post {
+                segnaposti = lette
+                freccia?.let { for ((nome, b) in lette) it.immagine(nome, b) }
+                mettiFreccia()
             }
         }
     }
 
-    private companion object {
-        const val VUOTA = "{\"type\":\"FeatureCollection\",\"features\":[]}"
+    companion object {
+        private const val VUOTA = "{\"type\":\"FeatureCollection\",\"features\":[]}"
+        private const val SORGENTE_IO = "gdanav-io"
 
         /** Il tetto dei fotogrammi della mappa sull'auto. */
-        const val FPS_MASSIMI = 30
+        private const val FPS_MASSIMI = 30
 
-        /** Lo scorrere fra due posizioni: 25 fotogrammi al secondo. */
-        const val FOTOGRAMMA_MS = 40L
+        /** Se la mappa non chiede il passo dopo entro questo tempo, lo si fa da qui. */
+        private const val RISERVA_MS = 100L
 
-        /** I numeri di `MotoFluido` (gdanav_core): inseguimento, previsione, salto, fermi, curva. */
-        const val TAU_S = 0.2
-        const val OLTRE_AL_PIU_MS = 1500L
-        const val SALTO_M = 120.0
-        const val FERMO_SOTTO_MS = 0.5
-        const val GIRA_AL_PIU = 45.0
-        const val METRI_PER_GRADO = 111195.08
+        /** Con la mappa spostata col dito la telecamera non cambia: il segnaposto si muove a questo ritmo. */
+        private const val FOTOGRAMMA_LIBERA_MS = 33L
+
+        /** Il volo di ritorno sull'auto. */
+        private const val VOLO_MS = 700L
+
+        /** Quanto insegue la telecamera: lo zoom piano (cambia con la velocità), il resto come la freccia. */
+        private const val TAU_ZOOM_S = 0.8
+        private const val TAU_CAMERA_S = 0.3
+
+        /** L'inclinazione in 3D, in guida e senza percorso. */
+        private const val INCLINAZIONE = 55.0
+
+        /** Il conteggio del traffico per la diagnosi. */
+        private const val CONTA_TRAFFICO_MS = 30_000L
+
+        /** Oltre questo tempo senza un fotogramma dopo una richiesta, la mappa non disegna. */
+        private const val DISEGNO_VIVO_MS = 800L
+
+        /** Dopo tanto senza fotogrammi la telecamera riprova a muoversi. */
+        private const val RIPROVA_MS = 3_000L
+
+        /** Quanto i tasti + e − spostano lo zoom senza percorso. */
+        private const val SCARTO_LIBERO_MIN = -4.0
+        private const val SCARTO_LIBERO_MAX = 2.0
 
         /** Lo zoom in più vicino a una svolta, e da dove a dove si avvicina. */
-        const val ZOOM_IN_SVOLTA = 1.5
-        const val INIZIO_SVOLTA_M = 600.0
-        const val VICINO_SVOLTA_M = 150.0
+        private const val ZOOM_IN_SVOLTA = 1.5
+        private const val INIZIO_SVOLTA_M = 600.0
+        private const val VICINO_SVOLTA_M = 150.0
 
         /** Il cerchio intorno al punto della scheda aperta (`stile.dart`). */
-        const val SORGENTE_EVIDENZA = "gdanav-evidenza"
-        val CARTELLE_SEGNAPOSTO = listOf(
+        private const val SORGENTE_EVIDENZA = "gdanav-evidenza"
+        private val NOMI_SEGNAPOSTO = listOf("freccia", "auto_blu", "auto_bianca", "auto_rossa", "auto_nera", "auto_grigia")
+        private val CARTELLE_SEGNAPOSTO = listOf(
             "flutter_assets/packages/gdanav_app/assets/segnaposto",
             "flutter_assets/assets/segnaposto",
         )
+
+        /** Le immagini del segnaposto, decodificate una volta. */
+        @Volatile private var segnaposti: Map<String, Bitmap>? = null
+
+        /** Il filo per i lavori lenti (leggere e decodificare immagini), fuori dal principale. */
+        internal val lavoro = Executors.newSingleThreadExecutor { r -> Thread(r, "gdanav-auto-lavoro").apply { isDaemon = true } }
+
+        /*
+         * La mappa senza percorso: il conto di `telecameraLibera` (gdanav_core,
+         * con le sue prove). 17,5 fino a 30 all'ora, 16,2 da 110 in su, e in
+         * mezzo si passa piano; i tasti + e − lo spostano di [scarto].
+         */
+        private const val ZOOM_LIBERO_LENTO = 17.5
+        private const val ZOOM_LIBERO_VELOCE = 16.2
+        private const val LENTO_SOTTO_KMH = 30.0
+        private const val VELOCE_SOPRA_KMH = 110.0
+
+        fun zoomLibero(velocitaMs: Double, scarto: Double): Double {
+            val kmh = if (velocitaMs.isFinite() && velocitaMs > 0) velocitaMs * 3.6 else 0.0
+            val t = ((kmh - LENTO_SOTTO_KMH) / (VELOCE_SOPRA_KMH - LENTO_SOTTO_KMH)).coerceIn(0.0, 1.0)
+            val s = t * t * (3 - 2 * t)
+            return (ZOOM_LIBERO_LENTO + (ZOOM_LIBERO_VELOCE - ZOOM_LIBERO_LENTO) * s + scarto).coerceIn(10.0, 19.5)
+        }
+
+        private val ZOOM_ICONA = doubleArrayOf(10.0, 15.0, 17.0, 19.0)
+        private val DIMENSIONE_ICONA = doubleArrayOf(0.45, 0.6, 0.85, 1.0)
+
+        /** `icon-size` del segnaposto nello stile (`stile.dart`, strato `io`), allo [zoom]. */
+        fun dimensioneIcona(zoom: Double): Double {
+            val z = ZOOM_ICONA
+            val v = DIMENSIONE_ICONA
+            if (zoom <= z[0]) return v[0]
+            for (i in 1 until z.size) {
+                if (zoom <= z[i]) return v[i - 1] + (v[i] - v[i - 1]) * (zoom - z[i - 1]) / (z[i] - z[i - 1])
+            }
+            return v[v.size - 1]
+        }
+
+        /**
+         * Quanto si avvicina la mappa arrivando a una svolta, un'uscita, una
+         * rotonda: da 600 metri si comincia, a 150 si è vicini di un livello e
+         * mezzo, e passata la manovra si torna allo zoom di prima. Lo scorrere
+         * fra due posizioni lo rende un movimento, non un salto.
+         */
+        private fun zoomInSvolta(g: PonteAuto.Guida?): Double {
+            g ?: return 0.0
+            if (g.tipo !in 9..27 && g.tipo != 37 && g.tipo != 38) return 0.0
+            return ZOOM_IN_SVOLTA * ((INIZIO_SVOLTA_M - g.distanzaM) / (INIZIO_SVOLTA_M - VICINO_SVOLTA_M)).coerceIn(0.0, 1.0)
+        }
     }
 }

@@ -10,6 +10,9 @@ import UIKit
 final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     private var mappa: MLNMapView!
     private let pannello = PannelloCarPlay(frame: .zero)
+    /// Il segnaposto, sopra la mappa: vedi «L'auto che scorre».
+    private let freccia = UIImageView(frame: .zero)
+    private var immaginiSegnaposto: [String: UIImage] = [:]
     private var stileCaricato: String?
     private var stilePronto = false
     private var inclinataOra: Bool?
@@ -26,9 +29,12 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     /// 3D (inclinata, girata come vai) o 2D (dall'alto, nord in su): si ricorda.
     private(set) var tridimensionale: Bool
 
-    /// Lo zoom quando segue l'auto: i tasti + e − lo cambiano.
+    /// Lo zoom quando segue l'auto in guida: i tasti + e − lo cambiano.
     private var zoomGuida: Double
-    private var zoomFermo: Double
+    /// Senza percorso lo zoom lo dà la velocità (`MotoCarPlay.zoomLibero`): i
+    /// tasti + e − lo spostano di qualche livello. Lo zoom fisso di prima
+    /// (`auto_zoom_fermo`, 15,5) non si legge più: teneva la mappa lontana.
+    private var scartoLibero: Double
 
     private var torna: Timer?
 
@@ -50,7 +56,7 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         let p = UserDefaults.standard
         tridimensionale = p.object(forKey: "gdanav.auto_3d") as? Bool ?? true
         zoomGuida = p.object(forKey: "gdanav.auto_zoom_guida") as? Double ?? 16.5
-        zoomFermo = p.object(forKey: "gdanav.auto_zoom_fermo") as? Double ?? 15.5
+        scartoLibero = p.object(forKey: "gdanav.auto_zoom_libero_scarto") as? Double ?? 0
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -73,7 +79,10 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         let contenitore = UIView(frame: .zero)
         m.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         pannello.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        freccia.isUserInteractionEnabled = false
+        freccia.isHidden = true
         contenitore.addSubview(m)
+        contenitore.addSubview(freccia)
         contenitore.addSubview(pannello)
         view = contenitore
     }
@@ -140,10 +149,9 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
             zoomGuida = min(max(zoomGuida + passo, 12), 19)
             preferenze.set(zoomGuida, forKey: "gdanav.auto_zoom_guida")
         } else {
-            zoomFermo = min(max(zoomFermo + passo, 8), 19)
-            preferenze.set(zoomFermo, forKey: "gdanav.auto_zoom_fermo")
+            scartoLibero = min(max(scartoLibero + passo, -4), 2)
+            preferenze.set(scartoLibero, forKey: "gdanav.auto_zoom_libero_scarto")
         }
-        obiettivo = nil
         aggiorna()
     }
 
@@ -161,7 +169,6 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
             libera = false
             alCambio()
         }
-        obiettivo = nil
         aggiorna()
     }
 
@@ -169,10 +176,16 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         torna?.invalidate()
         torna = Timer.scheduledTimer(withTimeInterval: 20, repeats: false) { [weak self] _ in self?.segui() }
         if !libera {
+            // I fotogrammi continuano: la telecamera resta dov'è il dito, il
+            // segnaposto va avanti sulla mappa.
             libera = true
-            fermaAnimazione()
             alCambio()
         }
+    }
+
+    /// La mappa spostata (col dito o in volo): il segnaposto la segue.
+    func mapViewRegionIsChanging(_ mapView: MLNMapView) {
+        if libera || inVolo { mettiFreccia() }
     }
 
     // MARK: - I dati dal telefono
@@ -221,7 +234,8 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
             immaginiCaricate = ponte.immagini.count
             for (nome, immagine) in ponte.immagini { s.setImage(immagine, forName: nome) }
         }
-        let inclinata = ponte.guida != nil && tridimensionale
+        // In 3D anche senza percorso, come su Android Auto: la vista scelta è una.
+        let inclinata = tridimensionale
         if inclinata != inclinataOra {
             inclinataOra = inclinata
             s.layer(withIdentifier: "edifici")?.isVisible = !inclinata
@@ -232,41 +246,44 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
 
     // MARK: - L'auto che scorre
 
-    /* Dal campo: «la freccia sulla mappa non è fluida, prende pause e poi
-     * cammina». A ogni posizione dal telefono si partiva da dov'era la
-     * freccia verso la posizione nuova, in un tempo pari all'intervallo di
-     * prima, e lì ci si fermava ad aspettare la prossima.
+    /* Dal campo, due volte: «la freccia sulla mappa non è fluida, prende pause
+     * e poi cammina», e poi «ha ancora dei piccoli frame lag, deve essere
+     * continuo con il movimento dell'auto».
      *
-     * Adesso è il conto di `MotoFluido` (gdanav_core, con le sue prove), come
-     * su Android Auto (`RendererMappa`): fra una posizione e l'altra l'auto va
-     * avanti da sola con la velocità che manda il telefono (`velocita_ms`) e
-     * girando come stava girando, al più per un secondo e mezzo; quello che si
-     * disegna la insegue a ogni fotogramma, mai indietro lungo la strada; da
-     * fermi, arrivata, i fotogrammi si spengono fino alla posizione dopo. */
+     * Il conto è quello di `MotoFluido` (gdanav_core, con le sue prove), in
+     * `MotoCarPlay`: fra una posizione e l'altra l'auto va avanti da sola, e la
+     * freccia ha una velocità sua che cambia piano: andando non si ferma più a
+     * ogni posizione un poco indietro (le piccole pause), e non torna indietro.
+     *
+     * Il segnaposto non è più un punto della sorgente `gdanav-io` riscritto a
+     * ogni fotogramma: MapLibre lo rilegge per conto suo e lo mostra qualche
+     * fotogramma dopo la telecamera, e seguendo l'auto la freccia ballava
+     * avanti e indietro. Adesso è un'immagine sopra la mappa (`freccia`), dove
+     * la telecamera mette l'auto; schiacciata come la mappa inclinata. */
 
-    /// Latitudine, longitudine, rotta della mappa, rotta del segnaposto, zoom,
-    /// inclinazione e i quattro margini: quello che si vede adesso.
-    private var mostrata: [Double]?
-    /// L'ultima posizione dal telefono, con zoom e margini di adesso.
-    private var obiettivo: [Double]?
-    /// Quando è arrivata l'ultima posizione, a che velocità (m/s) e quanto si
-    /// girava (gradi al secondo).
-    private var fixAlle: CFTimeInterval = 0
-    private var fixVelocita = 0.0
-    private var fixGira = 0.0
+    private let moto = MotoCarPlay()
+
+    /// La telecamera che si vuole (dall'ultima novità) e quella che si vede.
+    private var zoomVoluto = 16.5
+    private var inclinazioneVoluta = 0.0
+    private var bussolaInclinata = false
+    private var marginiVoluti = UIEdgeInsets.zero
+    private var zoomMostrato = 16.5
+    private var inclinazioneMostrata = 0.0
+    private var bussolaMostrata = 0.0
+    private var marginiMostrati = UIEdgeInsets.zero
+    private var cameraPronta = false
+
     private var ultimoFotogramma: CFTimeInterval = 0
     private var collegamento: CADisplayLink?
     /// Quando lo schermo dell'auto non si sa ancora: vedi [accendiFotogrammi].
     private var orologio: Timer?
     private var eraLibera = false
+    private var inVolo = false
 
-    /// I numeri di `MotoFluido` (gdanav_core).
-    private static let tau = 0.2
-    private static let oltreAlPiu = 1.5
-    private static let saltoM = 120.0
-    private static let fermoSotto = 0.5
-    private static let giraAlPiu = 45.0
-    private static let metriPerGrado = 111195.08
+    private static let inclinazione = 55.0
+    private static let tauZoom = 0.8
+    private static let tauCamera = 0.3
 
     /// Quanto si avvicina la mappa arrivando a una svolta, un'uscita, una
     /// rotonda: da 600 metri si comincia, a 150 si è vicini di un livello e
@@ -279,74 +296,53 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         return 1.5 * min(max((inizio - g.distanzaM) / (inizio - vicino), 0), 1)
     }
 
+    /// Una novità dal telefono: la posizione, e la telecamera che si vuole.
     private func muovi() {
         let ponte = PonteAuto.shared
         guard let qui = ponte.qui else {
             fermaAnimazione()
-            mostrata = nil
-            obiettivo = nil
-            (mappa.style?.source(withIdentifier: "gdanav-io") as? MLNShapeSource)?.shape = nil
+            moto.dimentica()
+            freccia.isHidden = true
             return
         }
         let guida = ponte.guida != nil
-        let inclinata = guida && tridimensionale
-        // L'auto al centro dell'area libera; in guida più in basso, per
-        // vedere la strada davanti.
+        let inclinata = tridimensionale
         let a = areaSicura
-        let libero = mappa.bounds.height - a.top - a.bottom
-        let sopra = guida ? Double(libero) * 0.3 : 0
-        let nuovo: [Double] = [
-            qui.lat, qui.lon,
-            inclinata ? ponte.rotta : 0,
-            ponte.rottaIo,
-            guida ? zoomGuida + MappaCarPlay.zoomInSvolta(ponte.guida) : zoomFermo,
-            inclinata ? 55 : 0,
-            Double(a.left), Double(a.top) + sopra, Double(a.right), Double(a.bottom),
-        ]
+        let libero = Double(mappa.bounds.height - a.top - a.bottom)
+        /* Senza percorso, come in guida: vicina, in 3D, con l'auto più in
+         * basso. Prima era a 15,5 col nord in su e l'auto in mezzo. */
+        let sopra: Double
+        if guida {
+            zoomVoluto = zoomGuida + MappaCarPlay.zoomInSvolta(ponte.guida)
+            sopra = 0.3
+        } else {
+            zoomVoluto = MotoCarPlay.zoomLibero(velocita: ponte.velocita, scarto: scartoLibero)
+            sopra = inclinata ? 0.3 : 0
+        }
+        inclinazioneVoluta = inclinata ? MappaCarPlay.inclinazione : 0
+        bussolaInclinata = inclinata
+        marginiVoluti = UIEdgeInsets(top: a.top + CGFloat(libero * sopra), left: a.left, bottom: a.bottom, right: a.right)
         let ora = CACurrentMediaTime()
+        if !moto.stessaPosizione(qui.lat, qui.lon) {
+            moto.posizione(lat: qui.lat, lon: qui.lon, rotta: ponte.rottaIo, rottaMappa: ponte.rotta, velocita: ponte.velocita, alle: ora)
+        }
         // Tornando a seguire l'auto dopo averla spostata col dito: un volo.
         if eraLibera && !libera {
             eraLibera = false
-            fermaAnimazione()
-            mostrata = nuovo
-            obiettivo = nuovo
-            fixAlle = ora
-            fixVelocita = 0
-            fixGira = 0
-            disegna(nuovo, animata: true)
+            moto.salta(ora + 0.7)
+            prendiVoluta()
+            inVolo = true
+            disegna(animata: true)
+            accendi()
             return
         }
         eraLibera = libera
-        let prima = obiettivo
-        if let p = prima, p == nuovo { return }
-        // Una posizione nuova (non solo zoom o margini, che cambiano di
-        // continuo avvicinandosi a una svolta): da qui riparte la previsione.
-        if prima == nil || prima![0] != nuovo[0] || prima![1] != nuovo[1] {
-            let passo = ora - fixAlle
-            let v = ponte.velocita
-            if let p = prima, v >= 2, passo >= 0.2, passo <= 3 {
-                fixGira = min(max(MappaCarPlay.giro(p[3], nuovo[3]) / passo, -MappaCarPlay.giraAlPiu), MappaCarPlay.giraAlPiu)
-            } else if prima == nil || passo > 0.2 {
-                fixGira = 0
-            }
-            fixAlle = ora
-            fixVelocita = v.isFinite && v > 0 ? v : 0
-        }
-        obiettivo = nuovo
-        // Troppo lontano (prima volta, salto del GPS, ricalcolo): subito lì.
-        guard let da = mostrata, MappaCarPlay.distanzaM(da[0], da[1], nuovo[0], nuovo[1]) <= MappaCarPlay.saltoM else {
-            mostrata = nuovo
-            disegna(nuovo)
-            ultimoFotogramma = ora
-            if fixVelocita >= MappaCarPlay.fermoSotto { accendi() }
-            return
-        }
         accendi()
     }
 
     private func accendi() {
         if collegamento == nil && orologio == nil {
-            ultimoFotogramma = CACurrentMediaTime()
+            ultimoFotogramma = 0
             accendiFotogrammi()
         }
     }
@@ -365,6 +361,8 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         if let schermo = view.window?.windowScene?.screen ?? view.window?.screen,
            schermo !== UIScreen.main,
            let c = schermo.displayLink(withTarget: self, selector: #selector(fotogramma)) {
+            // Al più trenta al secondo: di più scalda e basta.
+            c.preferredFramesPerSecond = 30
             c.add(to: .main, forMode: .common)
             collegamento = c
             return
@@ -374,61 +372,49 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         orologio = o
     }
 
-    /// Dove l'auto dovrebbe essere adesso: l'ultima posizione portata avanti.
-    private func previsione(_ o: [Double], _ ora: CFTimeInterval) -> [Double] {
-        var v = o
-        if fixVelocita < MappaCarPlay.fermoSotto { return v }
-        let t = min(max(ora - fixAlle, 0), MappaCarPlay.oltreAlPiu)
-        let r0 = o[3] * .pi / 180
-        let w = fixGira * .pi / 180
-        let est: Double, nord: Double
-        if abs(w) < 1e-4 {
-            est = fixVelocita * t * sin(r0)
-            nord = fixVelocita * t * cos(r0)
-        } else {
-            let r1 = r0 + w * t
-            est = fixVelocita / w * (cos(r0) - cos(r1))
-            nord = fixVelocita / w * (sin(r1) - sin(r0))
-        }
-        v[0] = o[0] + nord / MappaCarPlay.metriPerGrado
-        v[1] = o[1] + est / (MappaCarPlay.metriPerGrado * cos(o[0] * .pi / 180))
-        v[3] = ((o[3] + fixGira * t).truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
-        return v
+    /// La telecamera mostrata diventa subito quella voluta.
+    private func prendiVoluta() {
+        zoomMostrato = zoomVoluto
+        inclinazioneMostrata = inclinazioneVoluta
+        bussolaMostrata = bussolaInclinata ? moto.rottaMappa : 0
+        marginiMostrati = marginiVoluti
+        cameraPronta = true
     }
 
     @objc private func fotogramma() {
-        guard let o = obiettivo, let da = mostrata, da.count == o.count else { return fermaAnimazione() }
-        let ora = CACurrentMediaTime()
-        // Un fotogramma saltato non diventa un salto: al più un decimo di secondo.
-        let dt = min(max(ora - ultimoFotogramma, 0), 0.1)
+        // L'ora del fotogramma che si sta preparando, se lo schermo la dice.
+        let ora = collegamento?.targetTimestamp ?? CACurrentMediaTime()
+        let dt = ultimoFotogramma == 0 ? 0 : min(max(ora - ultimoFotogramma, 0), MotoCarPlay.fotogrammaAlPiu)
         ultimoFotogramma = ora
-        let p = previsione(o, ora)
-        let k = 1 - exp(-dt / MappaCarPlay.tau)
-        let coslat = cos(da[0] * .pi / 180)
-        var est = (p[1] - da[1]) * MappaCarPlay.metriPerGrado * coslat * k
-        var nord = (p[0] - da[0]) * MappaCarPlay.metriPerGrado * k
-        if fixVelocita >= MappaCarPlay.fermoSotto {
-            // Mai indietro lungo la strada: quella parte del passo si toglie.
-            let r = p[3] * .pi / 180
-            let lungo = est * sin(r) + nord * cos(r)
-            if lungo < 0 {
-                est -= lungo * sin(r)
-                nord -= lungo * cos(r)
-            }
+        let primo = !moto.mostrata
+        guard moto.fotogramma(ora) else { return fermaAnimazione() }
+        if primo || !cameraPronta {
+            prendiVoluta()
+        } else {
+            let kz = 1 - exp(-dt / MappaCarPlay.tauZoom)
+            let kc = 1 - exp(-dt / MappaCarPlay.tauCamera)
+            zoomMostrato += (zoomVoluto - zoomMostrato) * kz
+            inclinazioneMostrata += (inclinazioneVoluta - inclinazioneMostrata) * kc
+            let c = CGFloat(kc)
+            marginiMostrati = UIEdgeInsets(
+                top: marginiMostrati.top + (marginiVoluti.top - marginiMostrati.top) * c,
+                left: marginiMostrati.left + (marginiVoluti.left - marginiMostrati.left) * c,
+                bottom: marginiMostrati.bottom + (marginiVoluti.bottom - marginiMostrati.bottom) * c,
+                right: marginiMostrati.right + (marginiVoluti.right - marginiMostrati.right) * c
+            )
+            bussolaMostrata = MotoCarPlay.verso(bussolaMostrata, bussolaInclinata ? moto.rottaMappa : 0, kc)
         }
-        var v = da
-        v[0] = da[0] + nord / MappaCarPlay.metriPerGrado
-        v[1] = da[1] + est / (MappaCarPlay.metriPerGrado * coslat)
-        var arrivata = MappaCarPlay.distanzaM(v[0], v[1], p[0], p[1]) < 0.3
-        for i in 2..<o.count {
-            v[i] = (i == 2 || i == 3) ? angolo(da[i], p[i], k) : da[i] + (p[i] - da[i]) * k
-            let scarto = (i == 2 || i == 3) ? abs(MappaCarPlay.giro(v[i], p[i])) : abs(v[i] - p[i])
-            if scarto > 0.05 { arrivata = false }
+        disegna()
+        if moto.fermo && cameraArrivata() && !inVolo { fermaAnimazione() }
+    }
+
+    private func cameraArrivata() -> Bool {
+        if abs(zoomVoluto - zoomMostrato) > 0.01 || abs(inclinazioneVoluta - inclinazioneMostrata) > 0.1 { return false }
+        let m = marginiVoluti, n = marginiMostrati
+        if abs(m.top - n.top) > 0.5 || abs(m.left - n.left) > 0.5 || abs(m.bottom - n.bottom) > 0.5 || abs(m.right - n.right) > 0.5 {
+            return false
         }
-        mostrata = v
-        disegna(v)
-        let ferma = fixVelocita < MappaCarPlay.fermoSotto || ora - fixAlle >= MappaCarPlay.oltreAlPiu
-        if arrivata && ferma { fermaAnimazione() }
+        return abs(MotoCarPlay.giro(bussolaMostrata, bussolaInclinata ? moto.rottaMappa : 0)) < 0.1
     }
 
     private func fermaAnimazione() {
@@ -438,60 +424,78 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         orologio = nil
     }
 
-    /// Di quanto si gira da `da` ad `a`, fra -180 e 180.
-    private static func giro(_ da: Double, _ a: Double) -> Double {
-        ((a - da + 540).truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360) - 180
-    }
-
-    /// Metri fra due punti vicini.
-    private static func distanzaM(_ lat1: Double, _ lon1: Double, _ lat2: Double, _ lon2: Double) -> Double {
-        let nord = (lat2 - lat1) * metriPerGrado
-        let est = (lon2 - lon1) * metriPerGrado * cos(lat1 * .pi / 180)
-        return (nord * nord + est * est).squareRoot()
-    }
-
-    private func disegna(_ v: [Double], animata: Bool = false) {
-        guard let s = mappa.style else { return }
-        let segnaposto = MLNPointFeature()
-        segnaposto.coordinate = CLLocationCoordinate2D(latitude: v[0], longitude: v[1])
-        segnaposto.attributes = ["icona": PonteAuto.shared.icona, "rotta": v[3]]
-        (s.source(withIdentifier: "gdanav-io") as? MLNShapeSource)?.shape = segnaposto
-        guard !libera else { return }
-        let margini = UIEdgeInsets(top: v[7], left: v[6], bottom: v[9], right: v[8])
-        if mappa.contentInset != margini {
-            mappa.setContentInset(margini, animated: false, completionHandler: nil)
+    private func disegna(animata: Bool = false) {
+        guard mappa.style != nil, moto.mostrata else { return }
+        if !libera && (!inVolo || animata) {
+            let margini = marginiMostrati
+            if mappa.contentInset != margini {
+                mappa.setContentInset(margini, animated: false, completionHandler: nil)
+            }
+            // Prima l'inclinazione, poi centro, zoom e rotta: `setCenter` la lascia com'è.
+            if abs(Double(mappa.camera.pitch) - inclinazioneMostrata) > 0.1 {
+                let camera = mappa.camera
+                camera.pitch = CGFloat(inclinazioneMostrata)
+                mappa.setCamera(camera, animated: false)
+            }
+            let centro = CLLocationCoordinate2D(latitude: moto.lat, longitude: moto.lon)
+            if animata {
+                mappa.setCenter(centro, zoomLevel: zoomMostrato, direction: bussolaMostrata, animated: true) { [weak self] in
+                    self?.inVolo = false
+                }
+            } else {
+                mappa.setCenter(centro, zoomLevel: zoomMostrato, direction: bussolaMostrata, animated: false)
+            }
         }
-        // Prima l'inclinazione, poi centro, zoom e rotta: `setCenter` la lascia com'è.
-        if abs(Double(mappa.camera.pitch) - v[5]) > 0.1 {
-            let camera = mappa.camera
-            camera.pitch = CGFloat(v[5])
-            mappa.setCamera(camera, animated: false)
-        }
-        mappa.setCenter(
-            CLLocationCoordinate2D(latitude: v[0], longitude: v[1]),
-            zoomLevel: v[4],
-            direction: v[2],
-            animated: animata
-        )
+        mettiFreccia()
     }
 
-    /// Da un angolo all'altro per la via più corta.
-    private func angolo(_ da: Double, _ a: Double, _ t: Double) -> Double {
-        var d = (a - da).truncatingRemainder(dividingBy: 360)
-        if d > 180 { d -= 360 }
-        if d < -180 { d += 360 }
-        return ((da + d * t).truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
+    /// Il segnaposto dove la mappa mette l'auto.
+    private func mettiFreccia() {
+        guard moto.mostrata, let immagine = immaginiSegnaposto[PonteAuto.shared.icona] ?? immaginiSegnaposto["freccia"] else {
+            freccia.isHidden = true
+            return
+        }
+        let punto: CGPoint
+        let bussola: Double, zoom: Double, inclinazione: Double
+        if !libera && !inVolo {
+            // Seguendo l'auto, la telecamera la mette nel mezzo dell'area dentro i margini.
+            let m = marginiMostrati
+            let b = mappa.bounds
+            punto = CGPoint(x: m.left + (b.width - m.left - m.right) / 2, y: m.top + (b.height - m.top - m.bottom) / 2)
+            bussola = bussolaMostrata
+            zoom = zoomMostrato
+            inclinazione = inclinazioneMostrata
+        } else {
+            punto = mappa.convert(CLLocationCoordinate2D(latitude: moto.lat, longitude: moto.lon), toPointTo: mappa)
+            bussola = mappa.direction
+            zoom = mappa.zoomLevel
+            inclinazione = Double(mappa.camera.pitch)
+        }
+        if freccia.image !== immagine {
+            freccia.image = immagine
+            freccia.bounds = CGRect(origin: .zero, size: immagine.size)
+        }
+        let scala = CGFloat(MotoCarPlay.dimensioneIcona(zoom))
+        let angolo = CGFloat(MotoCarPlay.giro(bussola, moto.rotta) * .pi / 180)
+        freccia.transform = CGAffineTransform(scaleX: scala, y: scala)
+            .concatenating(CGAffineTransform(rotationAngle: angolo))
+            .concatenating(CGAffineTransform(scaleX: 1, y: CGFloat(cos(inclinazione * .pi / 180))))
+        freccia.center = punto
+        freccia.isHidden = false
     }
 
     /// Le immagini del segnaposto, prese dalle risorse dell'app Flutter.
     private func caricaSegnaposto(_ s: MLNStyle) {
+        // Il segnaposto lo disegna `freccia`, sopra la mappa: la sorgente resta vuota.
+        (s.source(withIdentifier: "gdanav-io") as? MLNShapeSource)?.shape = nil
+        guard immaginiSegnaposto.isEmpty else { return }
         for nome in ["freccia", "auto_blu", "auto_bianca", "auto_rossa", "auto_nera", "auto_grigia"] {
             let chiave = FlutterDartProject.lookupKey(forAsset: "assets/segnaposto/\(nome).png", fromPackage: "gdanav_app")
             guard let percorso = Bundle.main.path(forResource: chiave, ofType: nil),
                   let dati = FileManager.default.contents(atPath: percorso),
                   let immagine = UIImage(data: dati, scale: 3)
             else { continue }
-            s.setImage(immagine, forName: nome)
+            immaginiSegnaposto[nome] = immagine
         }
     }
 }

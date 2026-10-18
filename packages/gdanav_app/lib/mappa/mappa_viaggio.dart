@@ -7,7 +7,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:gdanav_core/gdanav_core.dart'
-    show Avanzamento, MotoFluido, Punto, Rettangolo, TipoSegnalazione, TipoZona, Viaggio, diQuantoSiGira, versoDiLa;
+    show
+        Avanzamento,
+        MotoFluido,
+        Punto,
+        Rettangolo,
+        TipoSegnalazione,
+        TipoZona,
+        Viaggio,
+        diQuantoSiGira,
+        distanzaM,
+        telecameraLibera,
+        versoDiLa;
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../componenti/icone_punti.dart';
@@ -353,6 +364,10 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   var _disegnando = false;
   final _moto = MotoFluido();
 
+  /// La stima della guida al fotogramma prima: per sapere se va ancora avanti.
+  Punto? _ultimaStimata;
+  Duration? _ultimaStimataAlle;
+
   /// Il tempo dei fotogrammi: va solo avanti, anche fra uno spegnimento e
   /// l'altro del [Ticker] (che a ogni accensione riparte da zero).
   var _tempo = Duration.zero, _ultimoTick = Duration.zero;
@@ -406,7 +421,16 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     // l'auto è ferma.
     final v = g.velocitaMs ?? 0;
     final primo = _moto.mostrata == null;
-    _moto.posizione(stimata.punto, rotta: stimata.rotta, velocitaMs: v < 1.5 ? 0 : v, alle: adesso);
+    // La stima che non va più avanti come la strada (la guida non la porta
+    // oltre un tanto dalla lettura, col GPS in ritardo): per la freccia è un
+    // punto fermo, da raggiungere e lì restare. Con la velocità della strada
+    // [MotoFluido] la porterebbe oltre, aspettandosi che continui a muoversi.
+    final ultima = _ultimaStimata, quando = _ultimaStimataAlle;
+    final dtStima = quando == null ? 0.0 : (adesso - quando).inMicroseconds / 1e6;
+    final ferma = ultima != null && dtStima > 0 && distanzaM(ultima, stimata.punto) < 0.5 * v * dtStima;
+    _ultimaStimata = stimata.punto;
+    _ultimaStimataAlle = adesso;
+    _moto.posizione(stimata.punto, rotta: stimata.rotta, velocitaMs: v < 1.5 || ferma ? 0 : v, alle: adesso);
     final f = _moto.fotogramma(adesso)!;
     final prima = _ultimoDisegno;
     _ultimoDisegno = adesso;
@@ -500,7 +524,13 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
       await _segui(m, g.letture, qui, zoom: _inclinata ? 17 : 16, rotta: a?.rottaMappa ?? rotta);
     } else if (qui != null && _seguiFuoriGuida) {
       _primaPosizione = false;
-      await _segui(m, widget.posizione.lettoAlle, qui, zoom: 16.5, rotta: rotta);
+      // Senza percorso vicina come in guida, un poco più lontana solo andando
+      // forte (`telecameraLibera`, la stessa dello schermo dell'auto).
+      final zoom = telecameraLibera(
+        velocitaMs: widget.posizione.velocitaAdesso() / 3.6,
+        tridimensionale: _inclinata,
+      ).zoom;
+      await _segui(m, widget.posizione.lettoAlle, qui, zoom: zoom, rotta: rotta);
     } else if (qui != null && _primaPosizione && widget.gestore.stato is! ViaggioPronto) {
       _primaPosizione = false;
       await m.animateCamera(CameraUpdate.newLatLngZoom(LatLng(qui.lat, qui.lon), 15));
