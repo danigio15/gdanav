@@ -626,7 +626,7 @@ class PonteAuto {
 
   /* ─── Una meta scelta in auto, fino alla guida ───────────────────────────
    *
-   * Dal campo, su iPhone con CarPlay dentro gdahome: «ogni volta che scelgo
+   * Dal campo, su iPhone con CarPlay dentro GdAHome: «ogni volta che scelgo
    * un indirizzo e lo confermo, lo schermo sfarfalla un attimo e resta sulla
    * pagina iniziale del navigatore dove si sceglie la destinazione».
    *
@@ -937,13 +937,13 @@ class PonteAuto {
   }
 
   /// Premium sbloccato o no: l'auto lo ricorda anche a telefono spento.
-  /// [ospite]: Premium si compra nell'app che ospita gdanav (gdahome).
+  /// [ospite]: Premium si compra nell'app che ospita gdanav (GdAHome).
   /// [aggiorna]: questa versione è troppo vecchia (`GestoreAggiornamento`):
   /// l'auto resta ferma sullo schermo che dice di aggiornare gdanav sul
   /// telefono, come senza Premium.
   ///
   /// [guidaInAuto]: se in auto si guida, che non è per forza Premium: dentro
-  /// gdahome, senza una casa abbinata, si guida base (`preparaGdanav`). Senza
+  /// GdAHome, senza una casa abbinata, si guida base (`preparaGdanav`). Senza
   /// dirlo vale [sbloccato], come prima.
   void premium(bool sbloccato, {bool ospite = false, bool aggiorna = false, bool? guidaInAuto}) => _manda('premium', {
     'sbloccato': sbloccato && !aggiorna,

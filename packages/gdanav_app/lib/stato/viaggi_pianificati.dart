@@ -13,7 +13,7 @@ import 'gestore_premium.dart';
  * Tre modi di pianificare, come nelle fotografie approvate: un viaggio per
  * un giorno («arrivo entro le 9:00 domani»), uno di ogni settimana («Casa –
  * Lavoro, lun – ven») e un giro a tappe. Sono gli stessi viaggi della pagina
- * gdanav della plancia: dentro gdahome stanno nella casa (`ponte/viaggi/…`),
+ * gdanav della plancia: dentro GdAHome stanno nella casa (`ponte/viaggi/…`),
  * che manda l'avviso quando partire e accende il clima dell'auto; in gdanav
  * da sola stanno nel telefono.
  *
@@ -316,7 +316,7 @@ class ViaggioPianificato {
   final bool avviso;
   final int avvisoMin;
 
-  /// Con gdahome: il clima dell'auto da accendere prima (`climate.*` o un
+  /// Con GdAHome: il clima dell'auto da accendere prima (`climate.*` o un
   /// interruttore) e il garage da proporre nell'avviso (`cover.*`).
   final String? clima;
   final int climaMin;
@@ -578,7 +578,7 @@ class ErroreViaggi implements Exception {
   String toString() => 'ErroreViaggi($codice)';
 }
 
-/// Dove stanno i viaggi: nella casa (gdahome) o nel telefono.
+/// Dove stanno i viaggi: nella casa (GdAHome) o nel telefono.
 abstract class FonteViaggi {
   /// I viaggi, e se il pianificatore è sbloccato.
   Future<({bool sbloccato, List<ViaggioPianificato> viaggi})> elenco();
@@ -592,7 +592,7 @@ abstract class FonteViaggi {
   bool get dellaCasa;
 }
 
-/// I viaggi della casa, attraverso gdahome: `ponte/viaggi/*`. [chiedi] lo
+/// I viaggi della casa, attraverso GdAHome: `ponte/viaggi/*`. [chiedi] lo
 /// mette chi ospita gdanav (vedi `SorgenteGdahome.chiedi`): manda il comando
 /// alla casa e torna il risultato, o lancia l'errore.
 ///

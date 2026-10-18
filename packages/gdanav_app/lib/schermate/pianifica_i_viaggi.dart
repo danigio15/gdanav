@@ -6,7 +6,7 @@ import '../tema.dart';
 
 /* ─── «Pianifica i viaggi», sulla mappa ─────────────────────────────────
  *
- * Il pianificatore stava solo nel menu, sotto «Viaggio»: dentro gdahome
+ * Il pianificatore stava solo nel menu, sotto «Viaggio»: dentro GdAHome
  * nessuno lo trovava. Adesso c'è una scheda sulla mappa, sotto il menu: col
  * prossimo viaggio («Casa – Lavoro» / «Domani · parti alle 7:59 · arrivo
  * entro le 8:30») quando ce n'è uno, e più piccola, con la promessa, quando

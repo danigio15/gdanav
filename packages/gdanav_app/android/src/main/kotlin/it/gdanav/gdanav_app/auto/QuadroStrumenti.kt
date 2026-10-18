@@ -52,7 +52,7 @@ class SchermoQuadro(carContext: CarContext) : Screen(carContext), DefaultLifecyc
 
 /**
  * Per il servizio d'auto di chi porta gdanav dentro (l'app gdanav,
- * gdahome): la sessione giusta per lo schermo che l'auto apre, quello
+ * GdAHome): la sessione giusta per lo schermo che l'auto apre, quello
  * centrale o il quadro strumenti.
  */
 object SessioniGdanav {

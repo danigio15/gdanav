@@ -4,7 +4,7 @@ import PackageDescription
 
 // Il pezzo nativo di gdanav su iPhone: i permessi Bluetooth per il dongle
 // OBD e CarPlay, con la stessa mappa MapLibre del telefono. Lo portano
-// dentro sia l'app gdanav sia gdahome.
+// dentro sia l'app gdanav sia GdAHome.
 let package = Package(
     name: "gdanav_app",
     platforms: [

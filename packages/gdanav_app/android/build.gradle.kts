@@ -10,7 +10,7 @@ group = "it.gdanav.gdanav_app"
 version = "1.0-SNAPSHOT"
 
 // Con AGP 9 Kotlin lo compila Android da sé, salvo dove l'app l'ha spento
-// (`android.builtInKotlin=false`, come gdanav e gdahome): lì si accende qui.
+// (`android.builtInKotlin=false`, come gdanav e GdAHome): lì si accende qui.
 val agpMaggiore = Version.ANDROID_GRADLE_PLUGIN_VERSION.substringBefore('.').toInt()
 val kotlinIncorporato = agpMaggiore >= 9 &&
     (findProperty("android.builtInKotlin")?.toString() ?: "true").toBoolean()

@@ -1,6 +1,6 @@
 /// La chiave pubblica Ed25519 del quadro (32 byte, base64url senza `=`), con
 /// cui si verificano i gettoni delle licenze: vedi `docs/LICENZE.md` di
-/// gdahome.
+/// GdAHome.
 ///
 /// **Di serie è vuota**: nessun gettone vale e Premium arriva solo dal
 /// negozio (Play Store, App Store), come prima dei codici regalo. La scrive

@@ -10,7 +10,7 @@ import '../tema.dart';
  *
  * Le schermate approvate nelle fotografie (`test/foto/pianificatore_foto.dart`):
  * l'elenco dei viaggi, un viaggio programmato, un giro a tappe e un viaggio
- * di ogni settimana. Dentro gdahome i viaggi stanno nella casa, che avvisa
+ * di ogni settimana. Dentro GdAHome i viaggi stanno nella casa, che avvisa
  * quando partire e accende il clima dell'auto; sono gli stessi della pagina
  * gdanav della plancia, da PC. In gdanav da sola stanno nel telefono. In
  * auto compaiono in cima a «Dove andiamo?». */
@@ -800,7 +800,7 @@ class _ModificaViaggioState extends State<ModificaViaggio> {
 
   Widget _avvisi() {
     final sottoAvviso = !dellaCasa
-        ? 'Gli avvisi arrivano con gdahome'
+        ? 'Gli avvisi arrivano con GdAHome'
         : v.avvisoMin == 0
         ? 'Quando è ora di partire'
         : '${v.avvisoMin} minuti prima di partire';
@@ -818,7 +818,7 @@ class _ModificaViaggioState extends State<ModificaViaggio> {
             _Interruttore(
               Icons.ac_unit_rounded,
               'Prepara l\'auto',
-              'Clima acceso ${v.climaMin} min prima (gdahome)',
+              'Clima acceso ${v.climaMin} min prima (GdAHome)',
               true,
               (_) => _cambia(v.copia(clima: () => null)),
             ),
@@ -945,7 +945,7 @@ class _ModificaViaggioState extends State<ModificaViaggio> {
         ),
       ),
       _quandoPartire(c),
-      if (dellaCasa) const _Titoletto('Con gdahome'),
+      if (dellaCasa) const _Titoletto('Con GdAHome'),
       _avvisi(),
     ];
   }

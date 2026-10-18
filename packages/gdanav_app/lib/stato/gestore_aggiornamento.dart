@@ -42,7 +42,7 @@ List<Uri> indirizziNegozio(TargetPlatform piattaforma) => piattaforma == TargetP
 /// Si chiede all'avvio, al ritorno in primo piano e ogni sei ore; l'ultima
 /// risposta si ricorda, così senza rete non si sblocca niente. Non si
 /// blocca mai una build fatta a mano ([Servizi.costruzione] 0) né una di
-/// debug. Dentro gdahome non c'è: vedi [GestoreAggiornamento.per].
+/// debug. Dentro GdAHome non c'è: vedi [GestoreAggiornamento.per].
 class GestoreAggiornamento extends ChangeNotifier {
   GestoreAggiornamento({
     required this.archivio,
@@ -60,8 +60,8 @@ class GestoreAggiornamento extends ChangeNotifier {
        debug = debug ?? kDebugMode,
        _ora = orologio ?? DateTime.now;
 
-  /// Solo per gdanav da sola: dentro un'altra app (gdahome, che passa
-  /// [premiumOspite], [gdahome] o [senzaPremium] a `preparaGdanav`) il
+  /// Solo per gdanav da sola: dentro un'altra app (GdAHome, che passa
+  /// [premiumOspite], [GdAHome] o [senzaPremium] a `preparaGdanav`) il
   /// controllo lo fa lei, e qui non si chiede niente.
   static GestoreAggiornamento? per({
     required Archivio archivio,

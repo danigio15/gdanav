@@ -1,6 +1,6 @@
 import Foundation
 
-/// La guida per l'Apple Watch dell'app che ospita gdanav (gdahome).
+/// La guida per l'Apple Watch dell'app che ospita gdanav (GdAHome).
 ///
 /// L'orologio non parla con gdanav: parla col telefono, e il telefono gli
 /// passa quello che serve guardando il polso — la prossima manovra, quanto

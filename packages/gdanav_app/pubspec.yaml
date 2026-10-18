@@ -1,5 +1,5 @@
 name: gdanav_app
-description: "gdanav, lo schermo: la mappa, la guida e le schermate. Lo usano l'app gdanav e gdahome, che la porta dentro come sezione."
+description: "gdanav, lo schermo: la mappa, la guida e le schermate. Lo usano l'app gdanav e GdAHome, che la porta dentro come sezione."
 version: 0.1.0
 publish_to: none
 
@@ -14,7 +14,7 @@ dependencies:
     path: ../gdanav_core
   maplibre_gl: ^0.27.1
   mobile_scanner: ^7.4.2
-  # Da 9 in su: gdahome è ancora sulla 9 e il suo portachiavi non si tocca
+  # Da 9 in su: GdAHome è ancora sulla 9 e il suo portachiavi non si tocca
   # (dalla 10 Android cambia il modo di cifrare). Le chiamate che usa gdanav ci
   # sono in tutte e tre.
   flutter_secure_storage: ">=9.2.0 <12.0.0"

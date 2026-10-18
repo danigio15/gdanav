@@ -1,4 +1,4 @@
-// «Apri in mappa» sulla scheda di una persona, in gdahome: il punto arriva al
+// «Apri in mappa» sulla scheda di una persona, in GdAHome: il punto arriva al
 // navigatore, e la meta si chiama come la persona.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/gdanav_app.dart';

@@ -1,5 +1,5 @@
 /// Le fotografie dei **prezzi veri**: la Tangenziale di Napoli al suo prezzo
-/// (1,05 €, senza «~») e le impostazioni aperte da gdahome in auto.
+/// (1,05 €, senza «~») e le impostazioni aperte da GdAHome in auto.
 ///
 /// Non è una prova: è un attrezzo per **guardare**, come
 /// `navigatore_foto.dart`. Si lancia a mano:
@@ -106,7 +106,7 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     });
 
-    testWidgets('le impostazioni da gdahome, in auto ($luce)', (tester) async {
+    testWidgets('le impostazioni da GdAHome, in auto ($luce)', (tester) async {
       final a = await pronto(tester);
       await tester.pumpWidget(
         MaterialApp(

@@ -20,7 +20,7 @@ import androidx.lifecycle.LifecycleOwner
 /**
  * Quello che l'app che porta gdanav dentro può aggiungere in auto.
  *
- * L'app gdanav non aggiunge niente. gdahome aggiunge la casa: un tasto in
+ * L'app gdanav non aggiunge niente. GdAHome aggiunge la casa: un tasto in
  * alto sulla mappa, e sullo schermo del Premium, che apre i suoi schermi.
  */
 object GdanavInAuto {
@@ -89,7 +89,7 @@ open class SessioneGdanav(private val accendi: (Context) -> Unit) : Session() {
         accendi(carContext)
         ascoltaEnergia()
         ascoltaPosizioneDellAuto()
-        // Android Auto fa parte di gdanav Premium (dentro gdahome senza una
+        // Android Auto fa parte di gdanav Premium (dentro GdAHome senza una
         // casa abbinata si guida base: `PonteAuto.guidaInAuto`).
         if (!PonteAuto.guidaInAuto(carContext)) return SchermoPremium(carContext)
         val schermo = SchermoNavigazione(carContext)

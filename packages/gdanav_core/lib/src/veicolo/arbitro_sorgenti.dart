@@ -36,7 +36,7 @@ class ArbitroSorgenti {
   ];
 
   /// Oltre questa età una lettura non conta più come fresca. Home Assistant
-  /// (anche quello che arriva da gdahome) ha più margine perché le
+  /// (anche quello che arriva da GdAHome) ha più margine perché le
   /// integrazioni dei costruttori aggiornano piano;
   /// il manuale vale solo come punto di partenza della stima.
   static const freschezzaPredefinita = {

@@ -1,5 +1,5 @@
 /// Le fotografie del confronto con ABRP: la Leapmotor B10, 18 km fra città
-/// e tangenziale, partenza al 63%, i dati dell'auto da gdahome. Il pannello
+/// e tangenziale, partenza al 63%, i dati dell'auto da GdAHome. Il pannello
 /// della guida e «Dati che arrivano dall'auto».
 ///
 /// Non è una prova: è un attrezzo per **guardare**. Si lancia a mano:
@@ -74,7 +74,7 @@ void main() {
     tester.view
       ..physicalSize = const Size(390 * 3, 844 * 3)
       ..devicePixelRatio = 3;
-    // Quello che arriva da gdahome, letto dall'auto due minuti fa.
+    // Quello che arriva da GdAHome, letto dall'auto due minuti fa.
     a.auto.arbitro.registra(
       StatoAuto(
         sorgente: TipoSorgente.gdahome,

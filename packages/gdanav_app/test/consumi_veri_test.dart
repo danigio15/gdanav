@@ -17,7 +17,7 @@ void main() {
   setUp(preparaPiattaforma);
   final b10 = catalogoVeicoli.firstWhere((v) => v.id == 'leapmotor-b10-56');
 
-  test('gdanav chiede dati freschi anche a gdahome: all\'avvio e in viaggio', () async {
+  test('gdanav chiede dati freschi anche a GdAHome: all\'avvio e in viaggio', () async {
     var chieste = 0;
     final g = SorgenteGdahome()..aggiorna = () async => chieste++;
     final auto = GestoreAuto(archivio: Archivio(), gdahome: g);

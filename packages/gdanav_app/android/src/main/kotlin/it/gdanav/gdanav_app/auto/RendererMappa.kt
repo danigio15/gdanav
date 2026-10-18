@@ -721,7 +721,7 @@ class RendererMappa(
     /**
      * Le immagini del segnaposto, prese dagli asset dell'app Flutter. gdanav
      * è un pacchetto: le sue immagini stanno sotto `packages/gdanav_app/`,
-     * sia nell'app gdanav sia dentro gdahome (il posto vecchio resta come
+     * sia nell'app gdanav sia dentro GdAHome (il posto vecchio resta come
      * riserva).
      */
     private fun caricaSegnaposto(s: Style) {
