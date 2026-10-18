@@ -24,6 +24,14 @@ CONF_TEMPERATURA_ESTERNA = "entita_temperatura_esterna"
 CONF_VELOCITA = "entita_velocita"
 CONF_POTENZA = "entita_potenza"
 CONF_ODOMETRO = "entita_odometro"
+# Per contare in kWh veri e col clima misurato (vedi docs/DATI-AUTO.md di GdAAuto).
+CONF_ENERGIA_RESIDUA = "entita_energia_residua"
+CONF_CAPACITA_BATTERIA = "entita_capacita_batteria"
+CONF_CONSUMO_MEDIO = "entita_consumo_medio"
+CONF_POTENZA_CLIMA = "entita_potenza_clima"
+CONF_CLIMA_ACCESO = "entita_clima_acceso"
+CONF_BATTERIA_IN_RISCALDAMENTO = "entita_batteria_in_riscaldamento"
+CONF_TEMPERATURA_INTERNA = "entita_temperatura_interna"
 
 ENTITA_AUTO = (
     CONF_BATTERIA,
@@ -36,6 +44,13 @@ ENTITA_AUTO = (
     CONF_VELOCITA,
     CONF_POTENZA,
     CONF_ODOMETRO,
+    CONF_ENERGIA_RESIDUA,
+    CONF_CAPACITA_BATTERIA,
+    CONF_CONSUMO_MEDIO,
+    CONF_POTENZA_CLIMA,
+    CONF_CLIMA_ACCESO,
+    CONF_BATTERIA_IN_RISCALDAMENTO,
+    CONF_TEMPERATURA_INTERNA,
 )
 
 # Nelle opzioni: gli script e i pulsanti che l'app può premere.
