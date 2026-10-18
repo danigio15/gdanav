@@ -8,7 +8,7 @@ import '../componenti/indicatore_batteria.dart';
 import 'esplora_auto.dart';
 import 'scegli_dongle.dart';
 
-/// Da dove gdanav prende i dati dell'auto: Automatica, o una sorgente fissa.
+/// Da dove GdANav prende i dati dell'auto: Automatica, o una sorgente fissa.
 ///
 /// Questo foglio risponde a **una** domanda: da dove li prendiamo. Cosa sta
 /// leggendo davvero dalla vettura — batteria, autonomia, temperature — sta in
@@ -45,7 +45,7 @@ Future<void> mostraFonteDatiAuto(
   );
 }
 
-/// Se offrire l'abbinamento con Home Assistant (il codice QR): in gdanav da
+/// Se offrire l'abbinamento con Home Assistant (il codice QR): in GdANav da
 /// sola sì; dentro GdAHome no, perché la casa e la sua auto ci sono già. Solo
 /// un abbinamento fatto prima resta, per poterlo vedere e togliere.
 bool conHomeAssistant(GestoreAuto gestore) => gestore.gdahome == null || gestore.abbinamento != null;
@@ -170,7 +170,7 @@ class _SoloAMano extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Senza Premium la batteria si scrive a mano, qui sotto: gdanav la stima man mano che guidi.',
+            'Senza Premium la batteria si scrive a mano, qui sotto: GdANav la stima man mano che guidi.',
             style: t.bodyMedium,
           ),
           const SizedBox(height: 2),
@@ -262,7 +262,7 @@ class _PortaAiDati extends StatelessWidget {
       title: const Text('Dati che arrivano dall\'auto'),
       subtitle: Text(
         s == null
-            ? 'Nessun dato: gdanav stima la batteria'
+            ? 'Nessun dato: GdANav stima la batteria'
             : 'Da ${nomeSorgente(s.sorgente)} · ${eta(DateTime.now().difference(s.letto))} · '
                   '$quanti su $datiPossibili',
       ),
@@ -450,7 +450,7 @@ class DatiUsati extends StatelessWidget {
           Text('Dati che arrivano dall\'auto', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
           Text(
             s == null
-                ? 'Nessun dato: gdanav stima la batteria.'
+                ? 'Nessun dato: GdANav stima la batteria.'
                 : 'Da ${nomeSorgente(s.sorgente)} · ${eta(DateTime.now().difference(s.letto))}',
             style: t.bodySmall?.copyWith(color: muto),
           ),

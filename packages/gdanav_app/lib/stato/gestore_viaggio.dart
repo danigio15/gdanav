@@ -630,7 +630,7 @@ class GestoreViaggio extends ChangeNotifier {
     }
     final da = partenza ?? await posizione();
     if (da == null) {
-      return _imposta(ErroreViaggio('Non so dove sei: attiva la posizione per gdanav.', destinazione: destinazione));
+      return _imposta(ErroreViaggio('Non so dove sei: attiva la posizione per GdANav.', destinazione: destinazione));
     }
     ultimaPosizione = da;
     final preferenze = _preferenze = await archivio.preferenze();
@@ -799,7 +799,7 @@ class GestoreViaggio extends ChangeNotifier {
   }) async {
     partenza ??= await posizione();
     if (partenza == null) {
-      return _imposta(ErroreViaggio('Non so dove sei: attiva la posizione per gdanav.', destinazione: destinazione));
+      return _imposta(ErroreViaggio('Non so dove sei: attiva la posizione per GdANav.', destinazione: destinazione));
     }
     ultimaPosizione = partenza;
     opzioni = await archivio.opzioniPercorso();

@@ -93,7 +93,7 @@ class _LaTuaAutoState extends State<LaTuaAuto> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 6, 20, 14),
                   child: Text(
-                    'Benzina, diesel, GPL o ibrida: gdanav fa il navigatore normale, senza soste di ricarica, '
+                    'Benzina, diesel, GPL o ibrida: GdANav fa il navigatore normale, senza soste di ricarica, '
                     'batteria e colonnine, e ti mostra i distributori vicini coi prezzi. Restano percorso, traffico, '
                     'autovelox, segnalazioni, meteo e Android Auto.',
                     key: const Key('spiega-termica'),
@@ -313,7 +313,7 @@ bool corrisponde(ProfiloVeicolo v, String filtro) {
 }
 
 /// Quanto la tua auto consuma davvero rispetto alla scheda, imparato
-/// guidando con i dati dell'auto. L'impara gdanav da solo: niente numeri da
+/// guidando con i dati dell'auto. L'impara GdANav da solo: niente numeri da
 /// portare da altre app.
 class _ConsumoImparato extends StatelessWidget {
   const _ConsumoImparato({required this.consumo, required this.veicolo});
@@ -333,7 +333,7 @@ class _ConsumoImparato extends StatelessWidget {
         final r = c.riferimento;
         final dettaglio = switch ((km, r)) {
           (0, null) =>
-            'Ancora nessun dato: guida con Home Assistant o Android Auto collegati e gdanav '
+            'Ancora nessun dato: guida con Home Assistant o Android Auto collegati e GdANav '
                 'impara quanto consuma davvero la tua auto.',
           (0, final r?) =>
             'Dal consumo di riferimento: ${r.whKm.round()} Wh/km a ${r.kmh.round()} km/h '

@@ -2,20 +2,20 @@ import CarPlay
 import MapKit
 import UIKit
 
-/// gdanav su CarPlay: la scena di un'app di navigazione, come la sessione di
+/// GdANav su CarPlay: la scena di un'app di navigazione, come la sessione di
 /// Android Auto (`SessioneGdanav.kt` e `SchermoNavigazione.kt`).
 ///
-/// Sotto la mappa di gdanav; sopra la scheda della manovra, i tempi e gli
+/// Sotto la mappa di GdANav; sopra la scheda della manovra, i tempi e gli
 /// avvisi, disegnati da CarPlay. In alto Cerca e Menu (in guida anche Fine); a
 /// lato +, −, 2D/3D o Centra, e sposta.
 ///
-/// Chi porta gdanav dentro la mette nell'Info.plist come delegato della scena
+/// Chi porta GdANav dentro la mette nell'Info.plist come delegato della scena
 /// `CPTemplateApplicationSceneSessionRoleApplication`, col nome
 /// `GdanavCarPlay`. Il motore Flutter lo accende l'app all'avvio: CarPlay può
 /// aprirla senza la schermata del telefono.
 @objc(GdanavCarPlay)
 public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegate, CPMapTemplateDelegate {
-    /// Lo schermo della casa, se chi ospita gdanav ne ha uno (GdAHome): un
+    /// Lo schermo della casa, se chi ospita GdANav ne ha uno (GdAHome): un
     /// tasto in alto sulla mappa, e sull'avviso del Premium.
     public static var casa: ((CPInterfaceController) -> CPTemplate)?
 
@@ -23,7 +23,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     public private(set) static weak var attuale: GdanavCarPlay?
 
     /// Chiamata quando CarPlay si collega (`true`) o si scollega (`false`):
-    /// GdAHome ci accende gdanav anche se la sua sezione non si è mai aperta.
+    /// GdAHome ci accende GdANav anche se la sua sezione non si è mai aperta.
     public static var alCollegamento: ((Bool) -> Void)?
 
     /// I dati sopra la mappa come su Android Auto (batteria, km, meta,
@@ -35,17 +35,17 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     /// Se CarPlay è collegato adesso.
     public static var collegato: Bool { attuale != nil }
 
-    /// Dove si è, come lo sa gdanav.
+    /// Dove si è, come lo sa GdANav.
     public static var posizione: CLLocationCoordinate2D? {
         PonteAuto.shared.qui.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
     }
 
-    /// Dov'è Casa, fra i luoghi di gdanav.
+    /// Dov'è Casa, fra i luoghi di GdANav.
     public static var casaSalvata: CLLocationCoordinate2D? {
         PonteAuto.shared.casa().map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
     }
 
-    /// «Ehi Siri, naviga con gdanav»: [testo] è quello che si è detto (un
+    /// «Ehi Siri, naviga con GdANav»: [testo] è quello che si è detto (un
     /// indirizzo, un posto), [tappa] per aggiungerlo al viaggio in corso.
     /// Come «Ok Google, naviga verso…» su Android Auto: il telefono cerca e
     /// parte, anche con l'app ancora spenta. [fatto] dice se l'app ha
@@ -134,7 +134,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         let t = CPMapTemplate()
         t.mapDelegate = self
         t.automaticallyHidesNavigationBar = false
-        // La scheda di guida col blu di gdanav: la freccia è bianca.
+        // La scheda di guida col blu di GdANav: la freccia è bianca.
         t.guidanceBackgroundColor = UIColor(red: 0.08, green: 0.36, blue: 0.75, alpha: 1)
         t.tripEstimateStyle = .dark
         modello = t
@@ -299,7 +299,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
 
     // MARK: - Premium
 
-    /// Senza gdanav Premium la mappa c'è, ma la navigazione no: lo si dice, e
+    /// Senza GdANav Premium la mappa c'è, ma la navigazione no: lo si dice, e
     /// basta — niente «fallo dal telefono», che guidando non si fa (come su
     /// Android Auto, dove Google ha rifiutato l'app per questo). Appena l'app
     /// lo sblocca, l'avviso se ne va da solo.
@@ -336,12 +336,12 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                     self.controllore?.chiudiSopra { _ in self.apriCasa() }
                 })
             }
-            // Dentro GdAHome Premium si attiva lì, non nel negozio di gdanav.
+            // Dentro GdAHome Premium si attiva lì, non nel negozio di GdANav.
             // Una versione troppo vecchia va prima aggiornata.
             let avviso = CPAlertTemplate(
                 titleVariants: PonteAuto.shared.aggiorna
                     ? [
-                        "C'è una versione nuova di gdanav: questa non è più attiva.",
+                        "C'è una versione nuova di GdANav: questa non è più attiva.",
                         "Serve un aggiornamento.",
                     ]
                     : PonteAuto.shared.premiumOspite
@@ -350,8 +350,8 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                         "Inclusa in GdAHome Premium.",
                     ]
                     : [
-                        "La navigazione in auto è inclusa in gdanav Premium.",
-                        "Inclusa in gdanav Premium.",
+                        "La navigazione in auto è inclusa in GdANav Premium.",
+                        "Inclusa in GdANav Premium.",
                     ],
                 actions: azioni
             )

@@ -1,5 +1,5 @@
 name: gdanav_core
-description: "Il motore di gdanav: consumi EV, soste di ricarica, sorgenti dei dati dell'auto e protocollo con Home Assistant. Dart puro, senza Flutter."
+description: "Il motore di GdANav: consumi EV, soste di ricarica, sorgenti dei dati dell'auto e protocollo con Home Assistant. Dart puro, senza Flutter."
 version: 0.1.0
 publish_to: none
 

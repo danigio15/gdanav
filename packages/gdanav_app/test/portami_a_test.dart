@@ -6,7 +6,7 @@ import 'package:gdanav_app/gdanav_app.dart';
 import 'aiuti.dart';
 
 void main() {
-  testWidgets('un punto da chi ospita gdanav diventa la meta, col suo nome', (tester) async {
+  testWidgets('un punto da chi ospita GdANav diventa la meta, col suo nome', (tester) async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
     final a = await ambiente(tester);
     final app = a.app() as GdanavApp;

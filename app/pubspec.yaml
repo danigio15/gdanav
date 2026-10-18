@@ -34,7 +34,7 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  # Tutto gdanav — schermate, mappa, guida — sta in `packages/gdanav_app`, che
+  # Tutto GdANav — schermate, mappa, guida — sta in `packages/gdanav_app`, che
   # porta dentro anche GdAHome. Qui resta l'app: l'icona, Android Auto, iOS.
   gdanav_app:
     path: ../packages/gdanav_app

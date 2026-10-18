@@ -446,7 +446,7 @@ void main() {
     await tester.tap(find.text('Android Auto'));
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
     await tester.pumpAndSettle();
-    expect(find.text('Se gdanav non compare sull\'auto'), findsOneWidget);
+    expect(find.text('Se GdANav non compare sull\'auto'), findsOneWidget);
   });
 
   testWidgets('in viaggio la batteria vera corregge il consumo e, se si scosta, le soste si ricalcolano', (

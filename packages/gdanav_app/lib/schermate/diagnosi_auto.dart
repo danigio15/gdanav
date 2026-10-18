@@ -6,7 +6,7 @@ import '../tema.dart';
 
 const _canale = MethodChannel('gdanav/diagnosi');
 
-/// «Android Auto» nel menu: cosa vede il telefono, e cosa fare se gdanav
+/// «Android Auto» nel menu: cosa vede il telefono, e cosa fare se GdANav
 /// non compare sull'auto. Su iPhone, «CarPlay»: cosa controllare.
 Future<void> mostraDiagnosiAuto(BuildContext context) async {
   if (defaultTargetPlatform == TargetPlatform.iOS) {
@@ -87,7 +87,7 @@ class DiagnosiAuto extends StatelessWidget {
           ],
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Text('Se gdanav non compare sull\'auto', style: t.titleMedium),
+            child: Text('Se GdANav non compare sull\'auto', style: t.titleMedium),
           ),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 6, 16, 0),
@@ -96,7 +96,7 @@ class DiagnosiAuto extends StatelessWidget {
               '2. Menu ⋮ → Impostazioni sviluppatore → attiva «Origini sconosciute».\n'
               '3. Impostazioni del telefono → App → Android Auto → Arresto forzato.\n'
               '4. Scollega e ricollega il telefono all\'auto.\n'
-              '5. Impostazioni di Android Auto → «Personalizza avvio app»: gdanav deve esserci.',
+              '5. Impostazioni di Android Auto → «Personalizza avvio app»: GdANav deve esserci.',
             ),
           ),
         ],
@@ -112,7 +112,7 @@ class DiagnosiAuto extends StatelessWidget {
 /// arrivano o se sullo schermo non c'era niente da disegnare.
 List<(String, bool?, String)> vociTraffico(Object? dati) {
   if (dati is! Map || dati.isEmpty) {
-    return [('Non ancora visto', null, 'Apri gdanav sull\'auto e guida qualche minuto, poi torna qui.')];
+    return [('Non ancora visto', null, 'Apri GdANav sull\'auto e guida qualche minuto, poi torna qui.')];
   }
   int n(String k) => (dati[k] as num?)?.toInt() ?? 0;
   final arrivati = n('arrivati'), errori = n('errori'), massimo = n('massimo'), inizio = n('inizio');
@@ -154,7 +154,7 @@ List<(String, bool?, String)> vociTraffico(Object? dati) {
 String _ora(DateTime d) =>
     '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')} del ${d.day}/${d.month}';
 
-/// Su iPhone non c'è niente da leggere: CarPlay mostra gdanav da sé, se il
+/// Su iPhone non c'è niente da leggere: CarPlay mostra GdANav da sé, se il
 /// telefono è collegato e l'app è consentita.
 class AiutoCarPlay extends StatelessWidget {
   const AiutoCarPlay({super.key});
@@ -169,14 +169,14 @@ class AiutoCarPlay extends StatelessWidget {
         children: [
           Text('CarPlay', style: t.titleLarge),
           const SizedBox(height: 12),
-          Text('Se gdanav non compare sull\'auto', style: t.titleMedium),
+          Text('Se GdANav non compare sull\'auto', style: t.titleMedium),
           const Padding(
             padding: EdgeInsets.only(top: 6),
             child: Text(
               '1. Impostazioni dell\'iPhone → Generali → CarPlay: l\'auto deve esserci.\n'
-              '2. Tocca l\'auto → Personalizza: gdanav deve essere fra le app mostrate.\n'
+              '2. Tocca l\'auto → Personalizza: GdANav deve essere fra le app mostrate.\n'
               '3. Impostazioni → Tempo di utilizzo → Restrizioni: CarPlay non deve essere bloccato.\n'
-              '4. Impostazioni → gdanav → Posizione: «Sempre», così la guida continua con lo schermo del telefono spento.\n'
+              '4. Impostazioni → GdANav → Posizione: «Sempre», così la guida continua con lo schermo del telefono spento.\n'
               '5. Scollega e ricollega l\'iPhone all\'auto.',
             ),
           ),

@@ -937,9 +937,9 @@ class PonteAuto {
   }
 
   /// Premium sbloccato o no: l'auto lo ricorda anche a telefono spento.
-  /// [ospite]: Premium si compra nell'app che ospita gdanav (GdAHome).
+  /// [ospite]: Premium si compra nell'app che ospita GdANav (GdAHome).
   /// [aggiorna]: questa versione è troppo vecchia (`GestoreAggiornamento`):
-  /// l'auto resta ferma sullo schermo che dice di aggiornare gdanav sul
+  /// l'auto resta ferma sullo schermo che dice di aggiornare GdANav sul
   /// telefono, come senza Premium.
   ///
   /// [guidaInAuto]: se in auto si guida, che non è per forza Premium: dentro

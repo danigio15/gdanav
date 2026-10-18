@@ -6,8 +6,8 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../servizi.dart';
 import '../stato/gestore_auto.dart';
 
-/// Il collegamento con l'integrazione gdanav in Home Assistant: si scrive
-/// il codice (pulsante «Nuovo codice di abbinamento» nel dispositivo gdanav)
+/// Il collegamento con l'integrazione GdANav in Home Assistant: si scrive
+/// il codice (pulsante «Nuovo codice di abbinamento» nel dispositivo GdANav)
 /// oppure si inquadra il QR. Se Home Assistant è aperto sullo stesso
 /// telefono, il codice è l'unico modo.
 class AbbinaHomeAssistant extends StatefulWidget {
@@ -15,7 +15,7 @@ class AbbinaHomeAssistant extends StatefulWidget {
 
   final GestoreAuto gestore;
 
-  /// Dal codice all'abbinamento: sul relay di gdanav, se non si dice altro.
+  /// Dal codice all'abbinamento: sul relay di GdANav, se non si dice altro.
   final Future<Abbinamento> Function(String codice)? daCodice;
 
   /// Nelle prove non c'è una fotocamera.
@@ -73,7 +73,7 @@ class _AbbinaHomeAssistantState extends State<AbbinaHomeAssistant> {
     } on FormatException catch (e) {
       if (mounted) setState(() => _errore = e.message);
     } catch (e) {
-      if (mounted) setState(() => _errore = 'Il relay di gdanav non risponde. Controlla la connessione e riprova.');
+      if (mounted) setState(() => _errore = 'Il relay di GdANav non risponde. Controlla la connessione e riprova.');
     } finally {
       if (mounted) setState(() => _attesa = false);
     }
@@ -101,7 +101,7 @@ class _AbbinaHomeAssistantState extends State<AbbinaHomeAssistant> {
           Text('Scrivi il codice', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
           const Text(
-            'In Home Assistant apri il dispositivo gdanav della tua auto e premi «Nuovo codice di abbinamento». '
+            'In Home Assistant apri il dispositivo GdANav della tua auto e premi «Nuovo codice di abbinamento». '
             'Il codice compare nelle notifiche e vale dieci minuti.',
           ),
           const SizedBox(height: 12),
@@ -148,7 +148,7 @@ class _AbbinaHomeAssistantState extends State<AbbinaHomeAssistant> {
           const SizedBox(height: 28),
           Text('Oppure inquadra il QR', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
-          const Text('Se Home Assistant è aperto su un altro schermo: il «QR di abbinamento» nel dispositivo gdanav.'),
+          const Text('Se Home Assistant è aperto su un altro schermo: il «QR di abbinamento» nel dispositivo GdANav.'),
           const SizedBox(height: 12),
           if (widget.fotocamera)
             ClipRRect(

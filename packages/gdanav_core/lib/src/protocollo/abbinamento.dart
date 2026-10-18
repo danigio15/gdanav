@@ -29,7 +29,7 @@ class Abbinamento {
   static Abbinamento daUri(String testo) {
     final uri = Uri.parse(testo);
     if (uri.scheme != 'gdanav' || uri.host != 'abbina') {
-      throw const FormatException('Non è un QR di gdanav');
+      throw const FormatException('Non è un QR di GdANav');
     }
     final q = uri.queryParameters;
     if (q['v'] != '1') throw FormatException('Versione di abbinamento non supportata: ${q['v']}');

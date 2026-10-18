@@ -1,4 +1,4 @@
-# Valhalla per gdanav, sul server gratuito di Oracle (Ampere A1: 4 core,
+# Valhalla per GdANav, sul server gratuito di Oracle (Ampere A1: 4 core,
 # 24 GB). Valhalla non si espone: davanti c'è Caddy, che fa HTTPS e chiede la
 # chiave dell'app. Istruzioni in README.md.
 services:

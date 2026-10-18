@@ -33,7 +33,7 @@ import kotlin.math.exp
 import kotlin.math.ln
 
 /**
- * Disegna la mappa di gdanav sullo schermo dell'auto: una MapView di
+ * Disegna la mappa di GdANav sullo schermo dell'auto: una MapView di
  * MapLibre dentro una Presentation su un display virtuale che scrive sulla
  * superficie data da Android Auto, con sopra il segnaposto ([FrecciaAuto]) e
  * il cruscotto. Stesso stile, stessi dati e stesso segnaposto del telefono. Si
@@ -801,9 +801,9 @@ class RendererMappa(
 
     /**
      * Le immagini del segnaposto, prese dagli asset dell'app Flutter, lette e
-     * decodificate fuori dal filo principale (una volta per processo). gdanav
+     * decodificate fuori dal filo principale (una volta per processo). GdANav
      * è un pacchetto: le sue immagini stanno sotto `packages/gdanav_app/`, sia
-     * nell'app gdanav sia dentro GdAHome (il posto vecchio resta come riserva).
+     * nell'app GdANav sia dentro GdAHome (il posto vecchio resta come riserva).
      */
     private fun caricaSegnaposto(f: FrecciaAuto) {
         segnaposti?.let { pronte ->

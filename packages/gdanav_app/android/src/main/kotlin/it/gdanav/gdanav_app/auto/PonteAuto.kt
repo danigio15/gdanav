@@ -172,7 +172,7 @@ object PonteAuto {
 
     @Volatile var termica = Termica()
 
-    /** gdanav Premium: l'app lo dice, l'auto lo ricorda anche a telefono spento. */
+    /** GdANav Premium: l'app lo dice, l'auto lo ricorda anche a telefono spento. */
     private var preferenze: SharedPreferences? = null
 
     fun premium(context: Context): Boolean =
@@ -196,7 +196,7 @@ object PonteAuto {
     fun premiumNoto(context: Context): Boolean =
         context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).contains("premium")
 
-    /** Premium si compra nell'app che ospita gdanav (GdAHome), non in gdanav. */
+    /** Premium si compra nell'app che ospita GdANav (GdAHome), non in GdANav. */
     fun premiumOspite(context: Context): Boolean =
         context.getSharedPreferences("gdanav", Context.MODE_PRIVATE).getBoolean("premium_ospite", false)
 

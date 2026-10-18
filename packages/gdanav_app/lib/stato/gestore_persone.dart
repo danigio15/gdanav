@@ -38,8 +38,8 @@ class PersonaSullaMappa {
 
 /// Le persone della casa sulla mappa, e quale far vedere.
 ///
-/// Le mette l'app che ospita gdanav: GdAHome sa dove sta chi abita in casa.
-/// gdanav da sola non ne ha, e la mappa resta com'era.
+/// Le mette l'app che ospita GdANav: GdAHome sa dove sta chi abita in casa.
+/// GdANav da sola non ne ha, e la mappa resta com'era.
 ///
 /// «Mostra» non è «portami»: la mappa va sulla persona e basta. Il viaggio
 /// fin lì lo si chiede dalla sua scheda, toccandola.

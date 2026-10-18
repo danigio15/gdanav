@@ -20,7 +20,7 @@ const pianoAnnuale = 'annuale';
 
 /// Sull'App Store non ci sono i piani base: ogni piano è un prodotto a sé,
 /// nello stesso gruppo di abbonamenti (App Store Connect → Abbonamenti →
-/// gruppo «gdanav Premium»), ciascuno con l'offerta introduttiva gratuita.
+/// gruppo «GdANav Premium»), ciascuno con l'offerta introduttiva gratuita.
 const idAppStore = {pianoMensile: '${idPremium}_mensile', pianoAnnuale: '${idPremium}_annuale'};
 
 /// La prova gratuita configurata su App Store Connect: StoreKit dice se
@@ -190,7 +190,7 @@ class NegozioAppStore implements NegozioPremium {
   Future<void> completa(PurchaseDetails p) => _iap.completePurchase(p);
 }
 
-/// gdanav Premium, in abbonamento (mensile o annuale, con la prova gratuita):
+/// GdANav Premium, in abbonamento (mensile o annuale, con la prova gratuita):
 /// Home Assistant e la batteria letta dall'auto (OBD, Android Auto, gdahome),
 /// il percorso con le soste alle colonnine e il loro stato in tempo reale,
 /// Android Auto e CarPlay. Traffico, autovelox e meteo sono per tutti.
@@ -229,10 +229,10 @@ class GestorePremium extends ChangeNotifier {
   final NegozioPremium? negozio;
 
   /// Dentro un'altra app (GdAHome) Premium lo decide lei: se lì è stato
-  /// comprato è tutto sbloccato, altrimenti no. Niente negozio di gdanav.
+  /// comprato è tutto sbloccato, altrimenti no. Niente negozio di GdANav.
   final ValueListenable<bool>? ospite;
 
-  /// Premium si compra nell'app che ospita gdanav, non qui.
+  /// Premium si compra nell'app che ospita GdANav, non qui.
   bool get daOspite => ospite != null;
 
   /// Le build con GDANAV_TUTTO_SBLOCCATO: le prove a mano, e quelle della CI
@@ -270,7 +270,7 @@ class GestorePremium extends ChangeNotifier {
     return _dalNegozio || (licenza != null && licenza!.fino.isAfter(_ora()));
   }
 
-  /// Si può scrivere un codice regalo: gdanav da sola, con le licenze accese.
+  /// Si può scrivere un codice regalo: GdANav da sola, con le licenze accese.
   bool get codiciRegalo => !daOspite && licenze != null && chiaveLicenze.isNotEmpty;
 
   /// I piani da proporre; vuoto se il negozio non risponde.
@@ -376,7 +376,7 @@ class GestorePremium extends ChangeNotifier {
       _io ??= await archivio.identitaTelefono();
       final g = await _gettoni(await l.riscatta(codice, _io!));
       if (g == null) {
-        erroreCodice = 'Il codice è stato accettato, ma non vale per gdanav su questo telefono.';
+        erroreCodice = 'Il codice è stato accettato, ma non vale per GdANav su questo telefono.';
         return false;
       }
       return true;

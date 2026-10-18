@@ -123,7 +123,7 @@ void main() {
   });
 
   test("senza l'auto si torna al GPS, e da fermi resta fermo", () async {
-    /* gdanav si usa anche a piedi, o con un'auto che la velocita' non la dice:
+    /* GdANav si usa anche a piedi, o con un'auto che la velocita' non la dice:
      * li' decide il GPS, come prima. Con letture a dieci metri e mezzo secondo
      * l'una dall'altra si va a 72 km/h, e allora la direzione si prende. */
     daMandare = [const Lettura(Punto(40.9700, 14.2060)), const Lettura(Punto(40.9700 + _dieciMetri, 14.2060))];

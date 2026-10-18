@@ -8,7 +8,7 @@ import '../geo/geo.dart';
 import 'colonnina.dart';
 import 'overpass.dart';
 
-/// Le colonnine di OpenStreetMap attraverso il relay di gdanav, a riquadri
+/// Le colonnine di OpenStreetMap attraverso il relay di GdANav, a riquadri
 /// di mezzo grado che il relay tiene in cache per una settimana: lo stesso
 /// tratto di strada si chiede a Overpass una volta sola, per tutti.
 class ClienteColonnineRelay implements FonteColonnine {

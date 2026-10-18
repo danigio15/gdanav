@@ -14,7 +14,7 @@ import 'package:gdanav_core/gdanav_core.dart';
 import 'aiuti.dart';
 
 /// Cosa è gratis e cosa è Premium (`docs/LICENZE.md` di GdAHome, riga
-/// gdanav): termica completa, elettrica a mano e senza soste, traffico,
+/// GdANav): termica completa, elettrica a mano e senza soste, traffico,
 /// autovelox e meteo per tutti; batteria letta dall'auto, soste e colonnine in
 /// tempo reale, Android Auto e CarPlay con Premium.
 void main() {

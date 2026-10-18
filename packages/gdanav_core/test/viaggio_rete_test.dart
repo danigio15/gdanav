@@ -484,7 +484,7 @@ void main() {
       File('$cartella/colonnine_fonti.txt').writeAsStringSync([
         'Napoli → Milano, ${(percorso.lunghezzaM / 1000).round()} km',
         '',
-        'relay (OpenStreetMap + archivio gdanav): ${daRelay.length}',
+        'relay (OpenStreetMap + archivio GdANav): ${daRelay.length}',
         'Open Charge Map: ${chiave.isEmpty ? 'senza chiave' : '${daOcm.length}'}',
         'tutte insieme: ${insieme.length}',
         'di cui riconosciute da due fonti: $doppie',

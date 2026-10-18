@@ -220,7 +220,7 @@ quanto_stato_da_ocm()
 #    colonnine e ci sono.» Quante ce ne sono davvero, secondo ogni fonte che
 #    si può interrogare? Senza filtri: tutte, con la potenza scritta accanto,
 #    così si vede anche quante sono lente (che era il motivo per cui non
-#    entravano nei dati di gdanav).
+#    entravano nei dati di GdANav).
 CENTRO_DIREZIONALE = (40.8548, 14.2855)
 RAGGIO_M = 1200
 
@@ -228,7 +228,7 @@ RAGGIO_M = 1200
 def quante_al_centro_direzionale() -> None:
     lat, lon = CENTRO_DIREZIONALE
 
-    # OpenStreetMap, senza nessun filtro. Due tag, non uno: gdanav raccoglie
+    # OpenStreetMap, senza nessun filtro. Due tag, non uno: GdANav raccoglie
     # solo `amenity=charging_station`, ma in OpenStreetMap le singole spine
     # dentro un impianto si mappano anche come `man_made=charge_point`, e
     # quelle non le chiediamo proprio. Qui si contano tutte e due, per sapere
@@ -309,7 +309,7 @@ def quante_al_centro_direzionale() -> None:
             for k, v in tag.items():
                 if k.endswith(":output") or k == "charging_station:output":
                     potenze.append(f"{k.split(':')[-2] if ':' in k else k}={v}")
-        # Quante sarebbero passate con la vecchia regola di gdanav.
+        # Quante sarebbero passate con la vecchia regola di GdANav.
         rapide = [
             e
             for e in elementi

@@ -262,7 +262,7 @@ void main() {
     expect(p.sbloccato, isTrue);
   });
 
-  testWidgets('dentro GdAHome Premium lo decide GdAHome, senza il negozio di gdanav', (tester) async {
+  testWidgets('dentro GdAHome Premium lo decide GdAHome, senza il negozio di GdANav', (tester) async {
     final gdahome = ValueNotifier(false);
     final p = GestorePremium(archivio: Archivio(), ospite: gdahome, tuttoSbloccato: false);
     await tester.runAsync(p.carica);

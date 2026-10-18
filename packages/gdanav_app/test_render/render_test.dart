@@ -129,7 +129,7 @@ void main() {
   setUpAll(_caricaFont);
   tearDown(() => GestorePremium.attivo.value = true);
 
-  _rendi('premium, gdanav da sola', (tester) async {
+  _rendi('premium, GdANav da sola', (tester) async {
     _telefono(tester);
     preparaPiattaforma();
     final p = GestorePremium(

@@ -2,7 +2,7 @@ import Flutter
 import MapLibre
 import UIKit
 
-/// La mappa di gdanav sullo schermo di CarPlay: la copia di `RendererMappa.kt`.
+/// La mappa di GdANav sullo schermo di CarPlay: la copia di `RendererMappa.kt`.
 /// Stesso stile, stessi dati e stesso segnaposto del telefono. Si sposta col
 /// dito o con la manopola (tramite CarPlay): dopo un po' torna da sola
 /// sull'auto. Sopra niente: CarPlay vuole la mappa pulita, e la manovra, i

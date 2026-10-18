@@ -1,4 +1,4 @@
-/// Il motore di gdanav, condiviso fra l'app (Android e iOS) e le prove.
+/// Il motore di GdANav, condiviso fra l'app (Android e iOS) e le prove.
 library;
 
 export 'src/colonnine/colonnina.dart';

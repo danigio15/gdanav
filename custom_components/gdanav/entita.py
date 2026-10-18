@@ -1,4 +1,4 @@
-"""Quello che hanno in comune tutte le entità di gdanav."""
+"""Quello che hanno in comune tutte le entità di GdANav."""
 
 from __future__ import annotations
 
@@ -26,8 +26,8 @@ class EntitaGdanav(Entity):
         self._attr_unique_id = f"{hub.entry.unique_id}_{chiave}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, hub.entry.unique_id or hub.entry.entry_id)},
-            name=f"gdanav {hub.entry.title}",
-            manufacturer="gdanav",
+            name=f"GdANav {hub.entry.title}",
+            manufacturer="GdANav",
             model="Navigatore EV",
         )
 
