@@ -41,6 +41,8 @@ from custom_components.gdanav.const import (
 )
 from custom_components.gdanav.hub import Hub
 
+from .test_protocollo import chiavi_stato_auto
+
 CHIAVE = bytes(range(32))
 RELAY = "wss://relay.esempio.dev"
 
@@ -326,6 +328,32 @@ async def test_ogni_dato_nell_unita_dell_app(hass: HomeAssistant, senza_relay: N
     assert stato["clima_acceso"] is True
     # Non disponibile: non si dice, invece di dire «spento».
     assert "batteria_in_riscaldamento" not in stato
+
+
+async def test_stato_auto_con_tutto_e_come_dice_il_protocollo(hass: HomeAssistant, senza_relay: None) -> None:
+    hass.states.async_set("sensor.auto_batteria", "72", {"unit_of_measurement": "%"})
+    entita = {
+        CONF_POTENZA_CARICA: ("sensor.ricarica", "0", "kW"),
+        CONF_TEMPERATURA_BATTERIA: ("sensor.batteria_temp", "20", "°C"),
+        CONF_TEMPERATURA_ESTERNA: ("sensor.fuori", "12", "°C"),
+        CONF_TEMPERATURA_INTERNA: ("sensor.dentro", "19", "°C"),
+        CONF_VELOCITA: ("sensor.velocita", "0", "km/h"),
+        CONF_POTENZA: ("sensor.potenza", "0", "kW"),
+        CONF_ODOMETRO: ("sensor.odometro", "12345", "km"),
+        CONF_ENERGIA_RESIDUA: ("sensor.energia", "46", "kWh"),
+        CONF_CAPACITA_BATTERIA: ("sensor.capacita", "64", "kWh"),
+        CONF_CONSUMO_MEDIO: ("sensor.consumo", "16", "kWh/100 km"),
+        CONF_POTENZA_CLIMA: ("sensor.riscaldatore", "0", "W"),
+        CONF_CLIMA_ACCESO: ("binary_sensor.clima", "off", None),
+        CONF_BATTERIA_IN_RISCALDAMENTO: ("binary_sensor.batteria_scalda", "off", None),
+    }
+    for entity_id, stato, unita in entita.values():
+        hass.states.async_set(entity_id, stato, {"unit_of_measurement": unita} if unita else {})
+    hub = await _con_entita(hass, **{conf: v[0] for conf, v in entita.items()})
+    hass.states.async_set("sensor.auto_autonomia", "300", {"unit_of_measurement": "km"})
+    hass.states.async_set("binary_sensor.auto_in_carica", "off")
+    hass.states.async_set("device_tracker.auto", "home", {"latitude": 45.46, "longitude": 9.19})
+    assert set(hub.stato_auto()) == chiavi_stato_auto()
 
 
 @pytest.mark.parametrize(

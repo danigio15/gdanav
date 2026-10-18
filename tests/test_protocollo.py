@@ -10,7 +10,8 @@ import pytest
 
 from custom_components.gdanav import protocollo as p
 
-VETTORE = json.loads((Path(__file__).parents[1] / "docs" / "vettore_prova.json").read_text())
+DOCS = Path(__file__).parents[1] / "docs"
+VETTORE = json.loads((DOCS / "vettore_prova.json").read_text())
 CHIAVE = bytes(range(32))
 ORA = datetime(2026, 9, 23, 10, tzinfo=UTC)
 A = p.Abbinamento(CHIAVE, "wss://relay.esempio.dev", "Auto di prova")
@@ -107,3 +108,38 @@ def test_codice_nuovo() -> None:
 )
 def test_indirizzo_codice(relay: str, atteso: str) -> None:
     assert p.indirizzo_codice(relay, "x") == atteso
+
+
+def chiavi_stato_auto() -> set[str]:
+    """Le chiavi di ``stato_auto`` come le elenca docs/protocollo.md."""
+    testo = (DOCS / "protocollo.md").read_text()
+    tabella = testo.split("#### I dati di `stato_auto`", 1)[1].split("\n\n|", 1)[1].split("\n\n", 1)[0]
+    chiavi: set[str] = set()
+    for riga in tabella.splitlines()[2:]:
+        chiavi.update(c.strip("` ") for c in riga.split("|")[1].split(","))
+    return chiavi
+
+
+def test_stato_auto_documentato_coi_nomi_del_contratto() -> None:
+    # Gli stessi nomi di docs/DATI-AUTO.md di GdAAuto, colonna gdanav.
+    assert chiavi_stato_auto() == {
+        "batteria",
+        "letto",
+        "autonomia_km",
+        "in_carica",
+        "potenza_carica_kw",
+        "temperatura_batteria_c",
+        "temperatura_esterna_c",
+        "temperatura_interna_c",
+        "velocita_kmh",
+        "potenza_kw",
+        "odometro_km",
+        "energia_kwh",
+        "capacita_kwh",
+        "consumo_medio_kwh100",
+        "potenza_clima_w",
+        "clima_acceso",
+        "batteria_in_riscaldamento",
+        "latitudine",
+        "longitudine",
+    }
