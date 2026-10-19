@@ -296,6 +296,21 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         return 1.5 * min(max((inizio - g.distanzaM) / (inizio - vicino), 0), 1)
     }
 
+    /// In autostrada, con la prossima manovra lontana, la mappa si allontana:
+    /// fino a due livelli da 110 all'ora e con la manovra oltre 2,5 km, niente
+    /// sotto i 50 all'ora o entro 800 metri. Il conto di `zoomLontanoInGuida`
+    /// (gdanav_core), come su Android Auto (`RendererMappa.zoomLontano`).
+    static func zoomLontano(velocita: Double, allaProssimaM: Double) -> Double {
+        let kmh = velocita.isFinite && velocita > 0 ? velocita * 3.6 : 0
+        func morbido(_ t: Double) -> Double {
+            let x = min(max(t, 0), 1)
+            return x * x * (3 - 2 * x)
+        }
+        let v = morbido((kmh - 50) / (110 - 50))
+        let d = allaProssimaM.isFinite ? morbido((allaProssimaM - 800) / (2500 - 800)) : 1
+        return -2 * v * d
+    }
+
     /// Una novità dal telefono: la posizione, e la telecamera che si vuole.
     private func muovi() {
         let ponte = PonteAuto.shared
@@ -314,6 +329,7 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         let sopra: Double
         if guida {
             zoomVoluto = zoomGuida + MappaCarPlay.zoomInSvolta(ponte.guida)
+                + MappaCarPlay.zoomLontano(velocita: ponte.velocita, allaProssimaM: ponte.guida?.distanzaM ?? 0)
             sopra = 0.3
         } else {
             zoomVoluto = MotoCarPlay.zoomLibero(velocita: ponte.velocita, scarto: scartoLibero)
@@ -324,7 +340,10 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         marginiVoluti = UIEdgeInsets(top: a.top + CGFloat(libero * sopra), left: a.left, bottom: a.bottom, right: a.right)
         let ora = CACurrentMediaTime()
         if !moto.stessaPosizione(qui.lat, qui.lon) {
-            moto.posizione(lat: qui.lat, lon: qui.lon, rotta: ponte.rottaIo, rottaMappa: ponte.rotta, velocita: ponte.velocita, alle: ora)
+            moto.posizione(
+                lat: qui.lat, lon: qui.lon, rotta: ponte.rottaIo, rottaMappa: ponte.rotta, velocita: ponte.velocita,
+                alle: ora, pista: ponte.pista, pistaQui: ponte.pistaQui
+            )
         }
         // Tornando a seguire l'auto dopo averla spostata col dito: un volo.
         if eraLibera && !libera {

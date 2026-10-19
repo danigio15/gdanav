@@ -66,6 +66,14 @@ object PonteAuto {
 
     /** La velocità lungo la strada, in m/s: fra due posizioni la mappa porta avanti l'auto da sola (`RendererMappa`). */
     @Volatile var velocita: Double = 0.0
+
+    /**
+     * In guida, il pezzo di percorso attorno all'auto (a coppie lat, lon) e
+     * dove ci sta l'auto, in metri dal suo inizio: la freccia scorre sopra,
+     * e agli svincoli e nelle rotonde non esce di strada ([MotoAuto]).
+     */
+    @Volatile var pista: DoubleArray? = null
+    @Volatile var pistaQui: Double = 0.0
     @Volatile var icona: String = "freccia"
     @Volatile var guida: Guida? = null
 
@@ -257,6 +265,10 @@ object PonteAuto {
                 rotta = call.argument<Double>("rotta") ?: 0.0
                 rottaIo = call.argument<Double>("rotta_io") ?: rotta
                 velocita = numero(call, "velocita_ms") ?: 0.0
+                pista = (call.argument<List<Any?>>("pista"))
+                    ?.let { l -> DoubleArray(l.size) { (l[it] as? Number)?.toDouble() ?: Double.NaN } }
+                    ?.takeIf { a -> a.size >= 4 && a.size % 2 == 0 && a.none { it.isNaN() } }
+                pistaQui = numero(call, "pista_qui") ?: 0.0
                 call.argument<String>("icona")?.let { icona = it }
             }
             "luoghi" -> {

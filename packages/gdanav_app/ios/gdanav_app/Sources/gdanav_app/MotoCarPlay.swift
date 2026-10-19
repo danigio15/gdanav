@@ -13,6 +13,11 @@ import Foundation
 ///  - di lato e nella direzione insegue con la costante `tau`;
 ///  - da fermi rallenta fino al punto, e se il punto è appena dietro resta.
 ///
+/// In guida, con la posizione arriva un pezzo del percorso (la pista): la
+/// freccia scorre sopra la linea, inseguendo i metri fatti, come
+/// `MotoSullaStrada` in gdanav_core. Agli svincoli e nelle rotonde non esce
+/// più di strada.
+///
 /// I tempi sono secondi di `CACurrentMediaTime`.
 final class MotoCarPlay {
     static let tau = 0.2
@@ -26,6 +31,8 @@ final class MotoCarPlay {
     static let indietroAlPiuM = 8.0
     static let fotogrammaAlPiu = 0.25
     static let metriPerGrado = 111195.08
+    static let ritrovataEntroM = 15.0
+    static let mezzaCordaM = 6.0
 
     /// Dove è disegnata l'auto, e girata come (gradi da nord).
     private(set) var lat = 0.0
@@ -45,9 +52,17 @@ final class MotoCarPlay {
     private var ultimo = 0.0
     private var pLat = 0.0, pLon = 0.0, pRotta = 0.0, pRottaMappa = 0.0
 
+    // La pista, coi metri cumulati; `mostrataM` dove è la freccia, `fixM` l'ultima posizione.
+    private var suPista = false
+    private var pistaLat: [Double] = [], pistaLon: [Double] = [], pistaCum: [Double] = []
+    private var fixM = 0.0, mostrataM = 0.0
+
     func stessaPosizione(_ lat: Double, _ lon: Double) -> Bool { haFix && lat == fixLat && lon == fixLon }
 
-    func posizione(lat: Double, lon: Double, rotta: Double, rottaMappa: Double, velocita: Double, alle: Double) {
+    func posizione(
+        lat: Double, lon: Double, rotta: Double, rottaMappa: Double, velocita: Double, alle: Double,
+        pista: [Double]? = nil, pistaQui: Double = 0
+    ) {
         let passo = alle - fixAlle
         if haFix && velocita >= 2 && passo >= 0.2 && passo <= 3 {
             fixGira = min(max(MotoCarPlay.giro(fixRotta, rotta) / passo, -MotoCarPlay.giraAlPiu), MotoCarPlay.giraAlPiu)
@@ -62,6 +77,90 @@ final class MotoCarPlay {
         fixVelocita = velocita.isFinite && velocita > 0 ? velocita : 0
         fixAlle = alle
         fermo = false
+        guard let pista else {
+            suPista = false
+            return
+        }
+        prendiPista(pista)
+        // La freccia si ritrova sul pezzo nuovo dov'era; se non c'è, si salta.
+        if mostrata && proietta(self.lat, self.lon) > MotoCarPlay.ritrovataEntroM { dimentica() }
+        suPista = true
+        fixM = min(max(pistaQui, 0), pistaCum.last ?? 0)
+    }
+
+    private func prendiPista(_ pista: [Double]) {
+        let n = pista.count / 2
+        pistaLat = (0..<n).map { pista[2 * $0] }
+        pistaLon = (0..<n).map { pista[2 * $0 + 1] }
+        pistaCum = [Double](repeating: 0, count: n)
+        let coslat = cos(pistaLat[0] * .pi / 180)
+        for i in 1..<n {
+            let dx = (pistaLon[i] - pistaLon[i - 1]) * MotoCarPlay.metriPerGrado * coslat
+            let dy = (pistaLat[i] - pistaLat[i - 1]) * MotoCarPlay.metriPerGrado
+            pistaCum[i] = pistaCum[i - 1] + (dx * dx + dy * dy).squareRoot()
+        }
+    }
+
+    /// Proietta un punto sulla pista: mette i metri in `mostrataM`, dà quanto è lontano.
+    private func proietta(_ lat: Double, _ lon: Double) -> Double {
+        let kx = MotoCarPlay.metriPerGrado * cos(lat * .pi / 180)
+        let ky = MotoCarPlay.metriPerGrado
+        var migliore = Double.greatestFiniteMagnitude
+        for i in 1..<pistaLat.count {
+            let ax = (pistaLon[i - 1] - lon) * kx, ay = (pistaLat[i - 1] - lat) * ky
+            let dx = (pistaLon[i] - lon) * kx - ax, dy = (pistaLat[i] - lat) * ky - ay
+            let l2 = dx * dx + dy * dy
+            let t = l2 == 0 ? 0 : min(max(-(ax * dx + ay * dy) / l2, 0), 1)
+            let px = ax + t * dx, py = ay + t * dy
+            let d = (px * px + py * py).squareRoot()
+            if d < migliore {
+                migliore = d
+                mostrataM = pistaCum[i - 1] + t * (pistaCum[i] - pistaCum[i - 1])
+            }
+        }
+        return migliore
+    }
+
+    /// Il punto della pista a `metri`.
+    private func puntoA(_ metri: Double) -> (lat: Double, lon: Double) {
+        let c = pistaCum
+        let m = min(max(metri, 0), c[c.count - 1])
+        var basso = 1, alto = c.count - 1
+        while basso < alto {
+            let mezzo = (basso + alto) / 2
+            if c[mezzo] < m { basso = mezzo + 1 } else { alto = mezzo }
+        }
+        let j = basso
+        let f = c[j] == c[j - 1] ? 0 : min(max((m - c[j - 1]) / (c[j] - c[j - 1]), 0), 1)
+        return (pistaLat[j - 1] + f * (pistaLat[j] - pistaLat[j - 1]), pistaLon[j - 1] + f * (pistaLon[j] - pistaLon[j - 1]))
+    }
+
+    /// La freccia sulla pista a `metri`: il punto, e la direzione della strada lì.
+    private func sullaPista(_ metri: Double) {
+        let l = pistaCum[pistaCum.count - 1]
+        var da = metri - MotoCarPlay.mezzaCordaM, a = metri + MotoCarPlay.mezzaCordaM
+        if a > l {
+            da -= a - l
+            a = l
+        }
+        if da < 0 {
+            a = min(l, a - da)
+            da = 0
+        }
+        let p = puntoA(da), q = puntoA(a)
+        let est = (q.lon - p.lon) * MotoCarPlay.metriPerGrado * cos(p.lat * .pi / 180)
+        let nord = (q.lat - p.lat) * MotoCarPlay.metriPerGrado
+        if est * est + nord * nord > 1e-4 { rotta = MotoCarPlay.norma(atan2(est, nord) * 180 / .pi) }
+        let qui = puntoA(metri)
+        lat = qui.lat
+        lon = qui.lon
+    }
+
+    /// Dove l'auto dovrebbe essere ad `adesso`, in metri sulla pista.
+    private func metaPista(_ adesso: Double) -> Double {
+        if fixVelocita < MotoCarPlay.fermoSotto { return fixM }
+        let t = min(max(adesso - fixAlle, 0), MotoCarPlay.oltreAlPiu)
+        return min(max(fixM + fixVelocita * t, 0), pistaCum[pistaCum.count - 1])
     }
 
     func dimentica() {
@@ -73,9 +172,14 @@ final class MotoCarPlay {
     func salta(_ adesso: Double) {
         guard haFix else { return }
         prevedi(adesso)
-        lat = pLat
-        lon = pLon
-        rotta = pRotta
+        if suPista {
+            mostrataM = metaPista(adesso)
+            sullaPista(mostrataM)
+        } else {
+            lat = pLat
+            lon = pLon
+            rotta = pRotta
+        }
         rottaMappa = pRottaMappa
         velocitaMostrata = andando(adesso) ? fixVelocita : 0
         ultimo = adesso
@@ -115,6 +219,7 @@ final class MotoCarPlay {
     func fotogramma(_ adesso: Double) -> Bool {
         guard haFix else { return false }
         prevedi(adesso)
+        if suPista { return fotogrammaSullaPista(adesso) }
         let coslat = cos(lat * .pi / 180)
         let dx = (pLon - lon) * MotoCarPlay.metriPerGrado * coslat
         let dy = (pLat - lat) * MotoCarPlay.metriPerGrado
@@ -166,6 +271,52 @@ final class MotoCarPlay {
         rottaMappa = MotoCarPlay.verso(rottaMappa, pRottaMappa, k)
         fermo = !vaAvanti && arrivata && abs(MotoCarPlay.giro(rotta, pRotta)) < 0.5
             && abs(MotoCarPlay.giro(rottaMappa, pRottaMappa)) < 0.5
+        return true
+    }
+
+    /// Il fotogramma in guida: lungo la pista, coi conti di sopra su un numero solo.
+    private func fotogrammaSullaPista(_ adesso: Double) -> Bool {
+        let meta = metaPista(adesso)
+        let vaAvanti = andando(adesso)
+        if !mostrata || abs(meta - mostrataM) > MotoCarPlay.saltoM {
+            salta(adesso)
+            fermo = !vaAvanti
+            return true
+        }
+        let dt = min(max(adesso - ultimo, 0), MotoCarPlay.fotogrammaAlPiu)
+        ultimo = adesso
+        let lungo = meta - mostrataM
+        let k = dt <= 0 ? 0 : 1 - exp(-dt / MotoCarPlay.tau)
+        let kv = dt <= 0 ? 0 : 1 - exp(-dt / MotoCarPlay.tauVelocita)
+        var arrivata = false
+        let avanti: Double
+        if vaAvanti {
+            let minima = fixVelocita * MotoCarPlay.almenoDellaVelocita
+            let massima = max(fixVelocita * 2, fixVelocita + 10)
+            let scarto = lungo - velocitaMostrata * dt
+            let voluta = min(max(fixVelocita + scarto / MotoCarPlay.tauLungo, minima), massima)
+            velocitaMostrata += (voluta - velocitaMostrata) * kv
+            if velocitaMostrata < minima { velocitaMostrata = minima }
+            avanti = velocitaMostrata * dt
+        } else if lungo < 0 && lungo > -MotoCarPlay.indietroAlPiuM {
+            velocitaMostrata = 0
+            avanti = 0
+            arrivata = true
+        } else if lungo < 0 {
+            velocitaMostrata = 0
+            avanti = lungo * k
+        } else {
+            let voluta = lungo / MotoCarPlay.tauLungo * 2
+            velocitaMostrata += (voluta - velocitaMostrata) * kv
+            if velocitaMostrata < 0 { velocitaMostrata = 0 }
+            avanti = min(velocitaMostrata * dt, lungo)
+            arrivata = lungo - avanti < 0.3
+            if arrivata { velocitaMostrata = 0 }
+        }
+        mostrataM = min(max(mostrataM + avanti, 0), pistaCum[pistaCum.count - 1])
+        sullaPista(mostrataM)
+        rottaMappa = MotoCarPlay.verso(rottaMappa, pRottaMappa, k)
+        fermo = !vaAvanti && arrivata && abs(MotoCarPlay.giro(rottaMappa, pRottaMappa)) < 0.5
         return true
     }
 

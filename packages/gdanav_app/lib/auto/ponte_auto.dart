@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 import 'package:gdanav_core/gdanav_core.dart';
@@ -870,7 +871,14 @@ class PonteAuto {
     // (zero col GPS muto: l'auto allora non va avanti da sola).
     final velocita = a != null ? guida.velocitaMs ?? 0.0 : posizione.velocitaAdesso() / 3.6;
     // La mappa guarda un po' avanti; la freccia dell'auto segue la strada.
-    // Il segnaposto lo disegna l'auto, che lo fa scorrere fra due posizioni.
+    // Il segnaposto lo disegna l'auto, che lo fa scorrere fra due posizioni:
+    // in guida sopra un pezzo del percorso (`pista`, a coppie lat, lon), dove
+    // l'auto è a `pista_qui` metri dal suo inizio. Agli svincoli e nelle
+    // rotonde non esce di strada (`MotoSullaStrada` in gdanav_core).
+    final strada = stimata == null ? null : guida.strada;
+    final metri = stimata == null ? null : guida.metriStimati();
+    final da = metri == null ? 0.0 : math.max(0.0, metri - pistaIndietroM);
+    final pista = strada == null || metri == null ? null : trattoDiStrada(strada, da, metri + pistaAvantiM);
     _manda('posizione', {
       'lat': qui.lat,
       'lon': qui.lon,
@@ -878,6 +886,10 @@ class PonteAuto {
       'rotta_io': rotta,
       'velocita_ms': velocita.isFinite ? velocita : 0.0,
       'icona': posizione.segnaposto.immagine,
+      if (pista != null && metri != null) ...{
+        'pista': [for (final p in pista) ...[p.lat, p.lon]],
+        'pista_qui': metri - da,
+      },
     });
     _cruscotto();
     unawaited(_zone());
@@ -885,6 +897,11 @@ class PonteAuto {
 
   /// La lettura della guida già mandata all'auto.
   int _lettureMandate = -1;
+
+  /// Il pezzo di percorso mandato con la posizione: un poco dietro l'auto
+  /// (la freccia può essere indietro) e tanto davanti quanto si fa in più
+  /// di un secondo e mezzo anche in autostrada.
+  static const pistaIndietroM = 40.0, pistaAvantiM = 300.0;
 
   /// Quello che sta sopra la mappa dell'auto.
   void _cruscotto() {

@@ -454,15 +454,29 @@ class GestoreGuida extends ChangeNotifier {
   /// se non si è agganciati alla strada (si disegna il punto del GPS).
   ({Punto punto, double rotta})? posizioneStimata() {
     final a = avanzamento, g = _guida, sulla = a?.posizioneSulPercorso, rotta = a?.rotta;
-    if (a == null || g == null || sulla == null || rotta == null) return null;
+    final metri = metriStimati();
+    if (a == null || g == null || sulla == null || rotta == null || metri == null) return null;
+    if (metri == a.percorsiM) return (punto: sulla, rotta: rotta);
+    return g.avanti(metri, 0);
+  }
+
+  /// Come [posizioneStimata], in metri lungo il percorso ([strada]); `null`
+  /// se non si è agganciati alla strada.
+  double? metriStimati() {
+    final a = avanzamento;
+    if (a == null || _guida == null || a.posizioneSulPercorso == null || a.rotta == null) return null;
     final v = _velocitaMs, alle = _lettaAlle;
-    if (v == null || alle == null || v < 1.5) return (punto: sulla, rotta: rotta);
+    if (v == null || alle == null || v < 1.5) return a.percorsiM;
     var eta = _ora().difference(alle);
     if (eta.isNegative) eta = Duration.zero;
     if (eta > const Duration(seconds: 2)) eta = const Duration(seconds: 2);
     final metri = v * (eta + anticipo).inMilliseconds / 1000;
-    return g.avanti(a.percorsiM, metri > avantiAlPiuM ? avantiAlPiuM : metri);
+    return a.percorsiM + (metri > avantiAlPiuM ? avantiAlPiuM : metri);
   }
+
+  /// La linea del percorso che si sta seguendo, su cui la freccia scorre
+  /// ([MotoSullaStrada]): agli svincoli e nelle rotonde non esce di strada.
+  Linea? get strada => _guida?.linea;
 
   Future<void> _posizione(Punto qui) async {
     _ultimaPosizione = qui;
