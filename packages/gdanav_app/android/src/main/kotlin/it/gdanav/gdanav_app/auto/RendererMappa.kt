@@ -592,7 +592,7 @@ class RendererMappa(
          * all'orizzonte (e la mappa disegnava chilometri di palazzi). */
         val sopra: Double
         if (guida != null) {
-            zoomVoluto = zoomGuida + zoomInSvolta(guida)
+            zoomVoluto = zoomGuida + zoomInSvolta(guida) + zoomLontano(PonteAuto.velocita, guida.distanzaM)
             sopra = 0.3
         } else {
             zoomVoluto = zoomLibero(PonteAuto.velocita, scartoLibero)
@@ -926,6 +926,23 @@ class RendererMappa(
          * mezzo, e passata la manovra si torna allo zoom di prima. Lo scorrere
          * fra due posizioni lo rende un movimento, non un salto.
          */
+        /**
+         * In autostrada, con la prossima manovra lontana, la mappa si
+         * allontana: fino a due livelli da 110 all'ora e con la manovra oltre
+         * 2,5 km, niente sotto i 50 all'ora o entro 800 metri. Il conto di
+         * `zoomLontanoInGuida` (gdanav_core, con le sue prove).
+         */
+        fun zoomLontano(velocitaMs: Double, allaProssimaM: Double): Double {
+            val kmh = if (velocitaMs.isFinite() && velocitaMs > 0) velocitaMs * 3.6 else 0.0
+            fun morbido(t: Double): Double {
+                val x = t.coerceIn(0.0, 1.0)
+                return x * x * (3 - 2 * x)
+            }
+            val v = morbido((kmh - 50.0) / (110.0 - 50.0))
+            val d = if (allaProssimaM.isFinite()) morbido((allaProssimaM - 800.0) / (2500.0 - 800.0)) else 1.0
+            return -2.0 * v * d
+        }
+
         private fun zoomInSvolta(g: PonteAuto.Guida?): Double {
             g ?: return 0.0
             if (g.tipo !in 9..27 && g.tipo != 37 && g.tipo != 38) return 0.0

@@ -523,3 +523,40 @@ TelecameraLibera telecameraLibera({required double velocitaMs, required bool tri
     sopra: tridimensionale ? 0.3 : 0.0,
   );
 }
+
+/* ─── In guida, lontano dalla prossima svolta ───────────────────────────────
+ *
+ * Dal campo: «quando sono su autostrada o strade statali, dove la prima
+ * girata è dopo molti chilometri, allunga lo zoom: lo hai messo troppo
+ * zoomato». In guida lo zoom era fisso (17 sul telefono, 16,5 sull'auto) e
+ * si avvicinava solo arrivando a una svolta: a 130 all'ora si vedevano un
+ * paio di centinaia di metri di asfalto. Adesso andando forte e con la
+ * prossima manovra lontana la mappa si allontana, fino a [zoomLontanoAlPiu]
+ * livelli; arrivando alla manovra torna vicina, piano, prima che cominci
+ * l'avvicinamento della svolta (600 metri). */
+
+/// Di quanti livelli al più si allontana la mappa in guida.
+const zoomLontanoAlPiu = 2.0;
+
+/// Sotto questa velocità non ci si allontana; da [lontanoTuttoSopraKmh] del tutto.
+const lontanoDaKmh = 50.0;
+const lontanoTuttoSopraKmh = 110.0;
+
+/// Con la prossima manovra più vicina di così non ci si allontana; da
+/// [lontanoTuttoOltreM] del tutto.
+const lontanoDaM = 800.0;
+const lontanoTuttoOltreM = 2500.0;
+
+/// Quanto togliere allo zoom della guida (un numero da 0 a −[zoomLontanoAlPiu])
+/// a [velocitaMs], con la prossima manovra ad [allaProssimaM] metri.
+double zoomLontanoInGuida({required double velocitaMs, required double allaProssimaM}) {
+  final kmh = velocitaMs.isFinite && velocitaMs > 0 ? velocitaMs * 3.6 : 0.0;
+  double morbido(double t) {
+    final x = t.clamp(0.0, 1.0);
+    return x * x * (3 - 2 * x);
+  }
+
+  final v = morbido((kmh - lontanoDaKmh) / (lontanoTuttoSopraKmh - lontanoDaKmh));
+  final d = allaProssimaM.isFinite ? morbido((allaProssimaM - lontanoDaM) / (lontanoTuttoOltreM - lontanoDaM)) : 1.0;
+  return -zoomLontanoAlPiu * v * d;
+}

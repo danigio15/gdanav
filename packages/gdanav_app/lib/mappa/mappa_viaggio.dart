@@ -17,7 +17,8 @@ import 'package:gdanav_core/gdanav_core.dart'
         Viaggio,
         diQuantoSiGira,
         telecameraLibera,
-        versoDiLa;
+        versoDiLa,
+        zoomLontanoInGuida;
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../componenti/icone_punti.dart';
@@ -376,6 +377,23 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   /// Com'è girata la mappa adesso.
   double _rottaMappaMostrata = 0;
 
+  /// Lo zoom della guida adesso: si allontana piano in autostrada, con la
+  /// prossima manovra lontana ([_zoomInGuida]).
+  double? _zoomMostrato;
+
+  /// Quanto ci mette lo zoom a cambiare: lento, che non sembri un salto.
+  static const _tauZoom = 1500.0;
+
+  /// Lo zoom che si vuole in guida: vicino, e più lontano andando forte con
+  /// la prossima manovra lontana (`zoomLontanoInGuida`, come sull'auto).
+  double _zoomInGuida(GestoreGuida g) =>
+      (_inclinata ? 17.0 : 16.0) +
+      zoomLontanoInGuida(velocitaMs: g.velocitaMs ?? 0, allaProssimaM: _allaProssima(g.avanzamento));
+
+  /// Fin dove non si gira: la prossima manovra, o l'arrivo se non ce ne sono più.
+  static double _allaProssima(Avanzamento? a) =>
+      a == null ? 0 : (a.prossima == null ? a.restantiM : a.allaProssimaM);
+
   /// Se l'auto la muovono i fotogrammi: in guida, con la mappa che la segue,
   /// agganciata alla strada, e senza lo schermo dell'auto acceso (lì la mappa
   /// del telefono si sposta di rado, apposta).
@@ -435,12 +453,17 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     final rottaMappa = a?.rottaMappa ?? f.rotta;
     final prima = _ultimoDisegno;
     _ultimoDisegno = adesso;
+    final zoomVoluto = _zoomInGuida(g);
     if (primo || prima == null) {
       _rottaMappaMostrata = rottaMappa;
+      _zoomMostrato ??= zoomVoluto;
     } else {
       final dt = (adesso - prima).inMicroseconds / 1000;
       _rottaMappaMostrata = versoDiLa(_rottaMappaMostrata, rottaMappa, 1 - math.exp(-dt.clamp(0, 100) / _tauRotta));
+      final z = _zoomMostrato ?? zoomVoluto;
+      _zoomMostrato = z + (zoomVoluto - z) * (1 - math.exp(-dt.clamp(0, 100) / _tauZoom));
     }
+    final zoom = _zoomMostrato ?? zoomVoluto;
     final qui = f.punto;
     _disegnando = true;
     try {
@@ -450,7 +473,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
         CameraUpdate.newCameraPosition(
           CameraPosition(
             target: LatLng(qui.lat, qui.lon),
-            zoom: _inclinata ? 17 : 16,
+            zoom: zoom,
             tilt: _inclinata ? _inclinazione : 0,
             bearing: _rottaMappaMostrata,
           ),
@@ -464,7 +487,11 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
       _disegnando = false;
     }
     // Ferma e arrivata: niente fotogrammi fino alla posizione dopo.
-    if (_moto.fermo && diQuantoSiGira(_rottaMappaMostrata, rottaMappa).abs() < 0.5) _fotogrammi?.stop();
+    if (_moto.fermo &&
+        diQuantoSiGira(_rottaMappaMostrata, rottaMappa).abs() < 0.5 &&
+        (zoom - zoomVoluto).abs() < 0.01) {
+      _fotogrammi?.stop();
+    }
   }
 
   /// Il segnaposto: in guida agganciato al percorso, portato avanti di
@@ -522,7 +549,9 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
       _suTuttaLaStrada = null;
       if (qui == null) return;
       // Guarda un po' avanti: in curva la manovra resta in vista.
-      await _segui(m, g.letture, qui, zoom: _inclinata ? 17 : 16, rotta: a?.rottaMappa ?? rotta);
+      final zoom = _zoomInGuida(g);
+      _zoomMostrato = zoom;
+      await _segui(m, g.letture, qui, zoom: zoom, rotta: a?.rottaMappa ?? rotta);
     } else if (qui != null && _seguiFuoriGuida) {
       _primaPosizione = false;
       // Senza percorso vicina come in guida, un poco più lontana solo andando
