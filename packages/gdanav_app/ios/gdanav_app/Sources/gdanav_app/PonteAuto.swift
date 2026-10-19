@@ -149,6 +149,10 @@ final class PonteAuto {
     /// La velocità lungo la strada, in m/s: fra due posizioni la mappa porta
     /// avanti l'auto da sola (`MappaCarPlay`).
     private(set) var velocita = 0.0
+    /// In guida, il pezzo di percorso attorno all'auto (a coppie lat, lon) e
+    /// dove ci sta l'auto, in metri dal suo inizio (`MotoCarPlay`).
+    private(set) var pista: [Double]?
+    private(set) var pistaQui = 0.0
     private(set) var icona = "freccia"
     private(set) var guida: GuidaAuto?
     private(set) var luoghi: [LuogoAuto] = []
@@ -250,6 +254,13 @@ final class PonteAuto {
             rotta = numero(a["rotta"]) ?? 0
             rottaIo = numero(a["rotta_io"]) ?? rotta
             velocita = numero(a["velocita_ms"]) ?? 0
+            let numeri = (a["pista"] as? [Any])?.compactMap { numero($0) }
+            if let numeri, numeri.count >= 4, numeri.count % 2 == 0, numeri.count == (a["pista"] as? [Any])?.count {
+                pista = numeri
+            } else {
+                pista = nil
+            }
+            pistaQui = numero(a["pista_qui"]) ?? 0
             if let i = a["icona"] as? String { icona = i }
         case "luoghi":
             luoghi = (a["elenco"] as? [[String: Any]] ?? []).compactMap { LuogoAuto($0) }

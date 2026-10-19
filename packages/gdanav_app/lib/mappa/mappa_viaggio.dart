@@ -9,14 +9,13 @@ import 'package:flutter/services.dart';
 import 'package:gdanav_core/gdanav_core.dart'
     show
         Avanzamento,
-        MotoFluido,
+        MotoSullaStrada,
         Punto,
         Rettangolo,
         TipoSegnalazione,
         TipoZona,
         Viaggio,
         diQuantoSiGira,
-        distanzaM,
         telecameraLibera,
         versoDiLa;
 import 'package:maplibre_gl/maplibre_gl.dart';
@@ -340,8 +339,8 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
    *
    * Adesso, come sullo schermo dell'auto, segnaposto e telecamera si muovono
    * insieme a ogni fotogramma: verso dove l'auto è adesso
-   * ([GestoreGuida.posizioneStimata], che va avanti lungo la strada con la
-   * velocità fra una lettura e l'altra), inseguita da [MotoFluido] (in
+   * ([GestoreGuida.metriStimati], che va avanti lungo la strada con la
+   * velocità fra una lettura e l'altra), inseguita da [MotoSullaStrada] (in
    * gdanav_core, con le sue prove): una lettura nuova diventa una correzione
    * morbida, mai un passo indietro lungo la strada.
    *
@@ -351,7 +350,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
    * fermi, o con la mappa dietro un'altra schermata. Adesso li dà lo schermo
    * (un `Ticker`): uno ogni [_fotogrammaMinimo] al più, spento da solo quando
    * la mappa non si vede, e spento da noi quando l'auto è ferma e la freccia
-   * è arrivata ([MotoFluido.fermo]); la posizione dopo lo riaccende ([_io]). */
+   * è arrivata ([MotoSullaStrada.fermo]); la posizione dopo lo riaccende ([_io]). */
 
   /// Al più un fotogramma ogni tanto: trenta al secondo bastano per un moto
   /// continuo, e scaldano la metà dei sessanta (o dei centoventi) dello schermo.
@@ -362,10 +361,11 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
 
   Ticker? _fotogrammi;
   var _disegnando = false;
-  final _moto = MotoFluido();
+  final _moto = MotoSullaStrada();
 
-  /// La stima della guida al fotogramma prima: per sapere se va ancora avanti.
-  Punto? _ultimaStimata;
+  /// La stima della guida al fotogramma prima (in metri lungo il percorso):
+  /// per sapere se va ancora avanti.
+  double? _ultimaStimata;
   Duration? _ultimaStimataAlle;
 
   /// Il tempo dei fotogrammi: va solo avanti, anche fra uno spegnimento e
@@ -412,26 +412,27 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
       _fotogrammi?.stop();
       return;
     }
-    final stimata = g.posizioneStimata();
-    if (stimata == null) return;
+    final strada = g.strada, stimata = g.metriStimati();
+    if (strada == null || stimata == null) return;
     final a = g.avanzamento;
-    final rottaMappa = a?.rottaMappa ?? stimata.rotta;
-    // La guida porta già avanti il punto lungo la strada (anche in curva):
-    // qui lo si insegue. Sotto 1,5 m/s la guida non lo porta avanti, e
-    // l'auto è ferma.
+    // La guida porta già avanti l'auto lungo la strada: qui la si insegue,
+    // sulla linea del percorso (agli svincoli e nelle rotonde non si taglia).
+    // Sotto 1,5 m/s la guida non la porta avanti, e l'auto è ferma.
+    _moto.strada(strada);
     final v = g.velocitaMs ?? 0;
-    final primo = _moto.mostrata == null;
+    final primo = _moto.mostrataM == null;
     // La stima che non va più avanti come la strada (la guida non la porta
     // oltre un tanto dalla lettura, col GPS in ritardo): per la freccia è un
     // punto fermo, da raggiungere e lì restare. Con la velocità della strada
-    // [MotoFluido] la porterebbe oltre, aspettandosi che continui a muoversi.
+    // [MotoSullaStrada] la porterebbe oltre, aspettandosi che continui a muoversi.
     final ultima = _ultimaStimata, quando = _ultimaStimataAlle;
     final dtStima = quando == null ? 0.0 : (adesso - quando).inMicroseconds / 1e6;
-    final ferma = ultima != null && dtStima > 0 && distanzaM(ultima, stimata.punto) < 0.5 * v * dtStima;
-    _ultimaStimata = stimata.punto;
+    final ferma = ultima != null && dtStima > 0 && (stimata - ultima).abs() < 0.5 * v * dtStima;
+    _ultimaStimata = stimata;
     _ultimaStimataAlle = adesso;
-    _moto.posizione(stimata.punto, rotta: stimata.rotta, velocitaMs: v < 1.5 || ferma ? 0 : v, alle: adesso);
+    _moto.posizione(stimata, velocitaMs: v < 1.5 || ferma ? 0 : v, alle: adesso);
     final f = _moto.fotogramma(adesso)!;
+    final rottaMappa = a?.rottaMappa ?? f.rotta;
     final prima = _ultimoDisegno;
     _ultimoDisegno = adesso;
     if (primo || prima == null) {

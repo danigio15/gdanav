@@ -212,6 +212,10 @@ class Guida {
 
   double get lunghezzaM => _linea.lunghezzaM;
 
+  /// La linea del percorso, coi metri da [Avanzamento.percorsiM]: per chi fa
+  /// scorrere l'auto sopra ([MotoSullaStrada]).
+  Linea get linea => _linea;
+
   /// La stessa strada con tempi nuovi (il traffico aggiornato): si resta a
   /// che punto si era, e le manovre già dette non si ripetono.
   Guida conTempi(PercorsoCalcolato nuovo) {

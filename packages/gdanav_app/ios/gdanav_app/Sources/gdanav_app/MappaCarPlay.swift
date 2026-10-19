@@ -324,7 +324,10 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         marginiVoluti = UIEdgeInsets(top: a.top + CGFloat(libero * sopra), left: a.left, bottom: a.bottom, right: a.right)
         let ora = CACurrentMediaTime()
         if !moto.stessaPosizione(qui.lat, qui.lon) {
-            moto.posizione(lat: qui.lat, lon: qui.lon, rotta: ponte.rottaIo, rottaMappa: ponte.rotta, velocita: ponte.velocita, alle: ora)
+            moto.posizione(
+                lat: qui.lat, lon: qui.lon, rotta: ponte.rottaIo, rottaMappa: ponte.rotta, velocita: ponte.velocita,
+                alle: ora, pista: ponte.pista, pistaQui: ponte.pistaQui
+            )
         }
         // Tornando a seguire l'auto dopo averla spostata col dito: un volo.
         if eraLibera && !libera {

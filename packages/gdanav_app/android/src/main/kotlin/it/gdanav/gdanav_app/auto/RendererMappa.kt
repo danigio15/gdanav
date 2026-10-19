@@ -606,7 +606,7 @@ class RendererMappa(
         marginiVoluti[3] = (altezza - a.bottom).toDouble().coerceAtLeast(0.0)
         val ora = System.nanoTime()
         if (!moto.stessaPosizione(qui[0], qui[1])) {
-            moto.posizione(qui[0], qui[1], PonteAuto.rottaIo, PonteAuto.rotta, PonteAuto.velocita, ora)
+            moto.posizione(qui[0], qui[1], PonteAuto.rottaIo, PonteAuto.rotta, PonteAuto.velocita, ora, PonteAuto.pista, PonteAuto.pistaQui)
         }
         // Tornando a seguire l'auto dopo averla spostata col dito: un volo.
         if (eraLibera && !libera) {
