@@ -1,4 +1,5 @@
 import '../percorso/pedaggi.dart';
+import 'energia_del_viaggio.dart';
 
 /// Il viaggio appena finito, da dire all'arrivo.
 ///
@@ -18,6 +19,8 @@ class RiepilogoViaggio {
     this.euroAlKwh,
     this.euroAlLitro,
     this.pedaggio,
+    this.energia,
+    this.soste = const [],
   });
 
   final String destinazione;
@@ -38,6 +41,13 @@ class RiepilogoViaggio {
 
   /// Il pedaggio del viaggio, se se ne paga.
   final CostoPedaggio? pedaggio;
+
+  /// Elettrica: il costo vero dell'energia, fra la carica di casa e le soste
+  /// ([costoDellEnergia]). Senza, i kWh al prezzo delle opzioni.
+  final CostoDellEnergia? energia;
+
+  /// Le ricariche fatte per strada.
+  final List<RicaricaInViaggio> soste;
 
   /// «1 h 12 min», «24 min».
   String get durataTesto {
@@ -65,6 +75,7 @@ class RiepilogoViaggio {
 
   /// Il costo dell'energia (o del carburante), se si sa il prezzo.
   double? get euroEnergia {
+    if (elettrica && energia != null) return energia!.totale;
     final quanto = elettrica ? kwh : litri;
     final prezzo = elettrica ? euroAlKwh : euroAlLitro;
     if (quanto == null || quanto <= 0 || prezzo == null || prezzo <= 0) return null;
@@ -95,6 +106,9 @@ class RiepilogoViaggio {
         ('Durata', durataTesto),
         ('Distanza', distanzaTesto),
         if (consumoTesto case final c?) (elettrica ? 'Energia' : 'Carburante', c),
+        // Da dove veniva l'energia, e quanto è costata.
+        if (energia case final e? when e.kwhDaCasa > 0) ('Da casa', _daCasa(e)),
+        for (final s in soste) ('Ricarica', _sosta(s)),
         // Il totale, e sotto di cosa è fatto: su una riga sola andava a capo.
         ...switch ((euroEnergia, euroPedaggio)) {
           (null, null) => const <(String, String)>[],
@@ -119,6 +133,27 @@ class RiepilogoViaggio {
       if (quanto != null && quanto > 0) '${consumoStimato ? '~' : ''}${_virgola(quanto, 1)} ${elettrica ? 'kWh' : 'l'}',
       if (costo != null) costo,
     ].join(' · ');
+  }
+
+  /// «21,3 kWh · ~1,15 € · 40% dal sole»; col prezzo delle opzioni lo dice.
+  static String _daCasa(CostoDellEnergia e) {
+    final sole = e.quotaSole;
+    return [
+      '${_virgola(e.kwhDaCasa, 1)} kWh',
+      '~${euroItaliani(e.euroCasa)}',
+      if (!e.prezzoCasaVero)
+        'prezzo delle opzioni'
+      else if (sole != null && sole > 0)
+        '${(sole * 100).round()}% dal sole',
+    ].join(' · ');
+  }
+
+  /// «Ionity Arezzo: 28,4 kWh · 17,04 €», «… · ~16,20 € (stima)».
+  static String _sosta(RicaricaInViaggio s) {
+    final euro = s.euro;
+    final prezzo =
+        euro == null ? 'quanto hai speso?' : (s.stimata ? '~${euroItaliani(euro)} (stima)' : euroItaliani(euro));
+    return '${s.dove}: ${_virgola(s.kwh, 1)} kWh · $prezzo';
   }
 
   static String _virgola(double v, int cifre) => v.toStringAsFixed(cifre).replaceAll('.', ',');

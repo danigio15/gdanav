@@ -212,6 +212,13 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                         onNo: () => _avvisi!.rispondi(s, false),
                       ),
                     if (g.proposta case final testo?) _Proposta(testo: testo, onSi: g.ricalcolaOra, onNo: g.lasciaCosi),
+                    // Finita una ricarica per strada: quanto si è speso.
+                    if (g.daChiedere case final i? when i < g.ricaricheInViaggio.length)
+                      QuantoHaiSpeso(
+                        ricarica: g.ricaricheInViaggio[i],
+                        onSalva: (euro) => g.pagaRicarica(i, euro),
+                        onDopo: g.nonOra,
+                      ),
                     const Spacer(),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
@@ -306,7 +313,14 @@ class _SchermataGuidaState extends State<SchermataGuida> {
             ListenableBuilder(
               listenable: g,
               builder: (context, _) => switch (g.riepilogo) {
-                final r? when !g.attiva => RiepilogoArrivo(riepilogo: r, onFine: _fine),
+                final r? when !g.attiva => RiepilogoArrivo(
+                  riepilogo: r,
+                  onFine: _fine,
+                  onRicarica: (i) async {
+                    final euro = await chiediLaSpesa(context, g.ricaricheInViaggio[i]);
+                    if (euro != null) g.pagaRicarica(i, euro);
+                  },
+                ),
                 _ => const SizedBox.shrink(),
               },
             ),
@@ -320,10 +334,14 @@ class _SchermataGuidaState extends State<SchermataGuida> {
 /// Il riepilogo all'arrivo, sopra la mappa: «Sei arrivato», la meta, e
 /// durata, distanza, consumo e costo del viaggio. «Fine» chiude la guida.
 class RiepilogoArrivo extends StatelessWidget {
-  const RiepilogoArrivo({super.key, required this.riepilogo, required this.onFine});
+  const RiepilogoArrivo({super.key, required this.riepilogo, required this.onFine, this.onRicarica});
 
   final RiepilogoViaggio riepilogo;
   final VoidCallback onFine;
+
+  /// Tocco su una ricarica per strada: per dire, o correggere, quanto si è
+  /// pagato (l'indice in [RiepilogoViaggio.soste]).
+  final ValueChanged<int>? onRicarica;
 
   @override
   Widget build(BuildContext context) {
@@ -371,22 +389,25 @@ class RiepilogoArrivo extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 14),
-                      for (final (nome, valore) in riepilogo.righe)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 5),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox(
-                                width: 96,
-                                child: Text(nome, style: t.bodyLarge?.copyWith(color: colori.onSurfaceVariant)),
-                              ),
-                              Expanded(
-                                child: Text(valore, style: t.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
-                              ),
-                            ],
-                          ),
-                        ),
+                      ...() {
+                        // Le ricariche si toccano («quanto hai speso?»): la
+                        // n-esima riga «Ricarica» è la n-esima sosta.
+                        final righe = <Widget>[];
+                        var sosta = 0;
+                        for (final (nome, valore) in riepilogo.righe) {
+                          final quale = nome == 'Ricarica' ? sosta++ : null;
+                          final tocca = onRicarica;
+                          righe.add(
+                            _rigaDelRiepilogo(
+                              context,
+                              nome,
+                              valore,
+                              onTap: quale == null || tocca == null ? null : () => tocca(quale),
+                            ),
+                          );
+                        }
+                        return righe;
+                      }(),
                       if (riepilogo.consumoStimato && riepilogo.consumoTesto != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
@@ -407,6 +428,132 @@ class RiepilogoArrivo extends StatelessWidget {
       ),
     );
   }
+}
+
+Widget _rigaDelRiepilogo(BuildContext context, String nome, String valore, {VoidCallback? onTap}) {
+  final t = Theme.of(context).textTheme;
+  final colori = Theme.of(context).colorScheme;
+  final riga = Padding(
+    padding: const EdgeInsets.symmetric(vertical: 5),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 96,
+          child: Text(nome, style: t.bodyLarge?.copyWith(color: colori.onSurfaceVariant)),
+        ),
+        Expanded(
+          child: Text(valore, style: t.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
+        ),
+        if (onTap != null) Icon(Icons.edit_outlined, size: 18, color: colori.primary),
+      ],
+    ),
+  );
+  return onTap == null ? riga : InkWell(onTap: onTap, borderRadius: BorderRadius.circular(8), child: riga);
+}
+
+/// Finita una ricarica per strada: «Ricarica a Ionity Arezzo: 28,4 kWh.
+/// Quanto hai speso?», con la stima della tariffa se c'è.
+class QuantoHaiSpeso extends StatelessWidget {
+  const QuantoHaiSpeso({super.key, required this.ricarica, required this.onSalva, required this.onDopo});
+
+  final RicaricaInViaggio ricarica;
+  final ValueChanged<double> onSalva;
+  final VoidCallback onDopo;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final stima = ricarica.euroStimati;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Vetro(
+        key: const Key('quanto-hai-speso'),
+        raggio: 20,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.ev_station_rounded, color: Color(0xFF16A34A)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${ricarica.dove}: ${ricarica.kwh.toStringAsFixed(1).replaceAll('.', ',')} kWh. '
+                      'Quanto hai speso?',
+                      style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+              if (stima != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 34, top: 2),
+                  child: Text('Dalla tariffa della colonnina: ~${euroItaliani(stima)}', style: t.bodySmall),
+                ),
+              const SizedBox(height: 8),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 6,
+                children: [
+                  TextButton(onPressed: onDopo, child: const Text('Dopo')),
+                  if (stima != null) OutlinedButton(onPressed: () => onSalva(stima), child: const Text('Giusto così')),
+                  FilledButton(
+                    key: const Key('scrivi-la-spesa'),
+                    onPressed: () async {
+                      final euro = await chiediLaSpesa(context, ricarica);
+                      if (euro != null) onSalva(euro);
+                    },
+                    child: const Text('Scrivi quanto'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Quanto si è pagato una ricarica: un numero in euro, con la stima già
+/// scritta. `null` se si annulla.
+Future<double?> chiediLaSpesa(BuildContext context, RicaricaInViaggio r) {
+  final campo = TextEditingController(text: switch (r.euro) {
+    final e? => e.toStringAsFixed(2).replaceAll('.', ','),
+    null => '',
+  });
+  return showDialog<double>(
+    context: context,
+    builder: (contesto) {
+      void salva() {
+        final euro = double.tryParse(campo.text.trim().replaceAll('€', '').replaceAll(',', '.').trim());
+        if (euro != null && euro >= 0) Navigator.of(contesto).pop(euro);
+      }
+
+      return AlertDialog(
+        title: Text('Ricarica a ${r.dove}'),
+        content: TextField(
+          key: const Key('campo-spesa'),
+          controller: campo,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(
+            labelText: 'Quanto hai speso',
+            suffixText: '€',
+            helperText: '${r.kwh.toStringAsFixed(1).replaceAll('.', ',')} kWh',
+          ),
+          onSubmitted: (_) => salva(),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(contesto).pop(), child: const Text('Annulla')),
+          FilledButton(key: const Key('salva-la-spesa'), onPressed: salva, child: const Text('Salva')),
+        ],
+      );
+    },
+  );
 }
 
 /// «GPS assente», sotto la manovra, finché la posizione non torna.

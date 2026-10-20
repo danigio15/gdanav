@@ -326,8 +326,16 @@ class GestoreGuida extends ChangeNotifier {
     _batteriaInizio = p.batteriaPartenza;
     _kmMisurati = 0;
     _whMisurati = 0;
+    // Il costo vero dell'energia: la ricarica di casa con cui si parte, e le
+    // soste che si faranno.
+    _ricaricaDiCasa = null;
+    _inCarica = null;
+    ricaricheInViaggio.clear();
+    daChiedere = null;
+    unawaited(_prendiLaRicaricaDiCasa());
     _nuovoPiano(p);
     auto.addListener(_datiAuto);
+    auto.addListener(_seguiLeRicariche);
     // Un errore del GPS non deve finire nel vuoto né chiudere la guida: la
     // posizione dopo arriva lo stesso.
     _iscrizione = posizioni().listen(_posizione, onError: (Object e) => debugPrint('posizioni in guida: $e'));
@@ -343,6 +351,7 @@ class GestoreGuida extends ChangeNotifier {
     _giroStrade++;
     risparmio?.lascia();
     auto.removeListener(_datiAuto);
+    auto.removeListener(_seguiLeRicariche);
     _misuratore = null;
     await _iscrizione?.cancel();
     _iscrizione = null;
@@ -511,7 +520,10 @@ class GestoreGuida extends ChangeNotifier {
       // «All'arrivo la navigazione si deve interrompere con scritto arrivo,
       // e un riepilogo del viaggio: durata, consumo e costi.»
       // Resta (anche sull'auto) finché non si preme «Fine» o si riparte.
-      if (pronto case final p?) riepilogo = _ilRiepilogo(p, a);
+      if (pronto case final p?) {
+        _arrivo = (p, a);
+        riepilogo = _ilRiepilogo(p, a);
+      }
       notifyListeners();
       await ferma();
       return;
@@ -567,12 +579,131 @@ class GestoreGuida extends ChangeNotifier {
     _guida = Guida(nuovo);
   }
 
+  /* ─── Le ricariche: quella di casa e quelle per strada ───────────────────
+   *
+   * Dal campo: «per il costo del viaggio, soprattutto se elettrico, considera
+   * se si parte da casa al 100% e verifica l'ultima ricarica a casa, come è
+   * stata caricata; e capisci, o chiedi, quanto si è speso se ci si ferma a
+   * ricaricare in autostrada o per strada. Da lì il conto preciso».
+   *
+   * La ricarica di casa la dice la casa (GdAHome: kWh, quanti col sole, gli
+   * euro di rete); vale se è finita da poco e la batteria alla partenza è
+   * quella che ha lasciato. Le soste le vede l'auto: «in carica» durante il
+   * viaggio, da quanto a quanto. Il prezzo lo stima la tariffa della
+   * colonnina, se il gestore la dice; e finita la ricarica il telefono chiede
+   * quanto si è pagato davvero ([daChiedere]), con la stima già scritta. */
+
+  RicaricaDiCasa? _ricaricaDiCasa;
+
+  /// L'ultima ricarica a casa, se si è partiti con quella.
+  RicaricaDiCasa? get ricaricaDiCasa => _ricaricaDiCasa;
+
+  /// Le ricariche fatte durante questo viaggio.
+  final ricaricheInViaggio = <RicaricaInViaggio>[];
+
+  /// Quale ricarica chiedere a chi guida («quanto hai speso?»), se c'è.
+  int? daChiedere;
+
+  ({double socDa, double socA, double? energiaDa, double? energiaA, double percorsiM})? _inCarica;
+
+  /// L'arrivo, per rifare il riepilogo quando si dice quanto si è pagato.
+  (ViaggioPronto, Avanzamento)? _arrivo;
+
+  Future<void> _prendiLaRicaricaDiCasa() async {
+    final partenza = _partitoAlle ?? _ora();
+    final r = await auto.gdahome?.ricaricaDiCasa();
+    if (r == null || !attiva) return;
+    if (!r.valePer(partenza: partenza, batteriaPartenza: _batteriaInizio)) return;
+    _ricaricaDiCasa = r;
+    notifyListeners();
+  }
+
+  /// A ogni lettura dell'auto: comincia, segue e chiude le ricariche.
+  void _seguiLeRicariche() {
+    final s = auto.stato;
+    if (!attiva || s == null || !_dallAuto(s.sorgente)) return;
+    final c = _inCarica;
+    if (s.inCarica == true) {
+      _inCarica = (
+        socDa: c?.socDa ?? s.batteria,
+        socA: s.batteria,
+        energiaDa: c?.energiaDa ?? s.energiaKwh,
+        energiaA: s.energiaKwh,
+        percorsiM: c?.percorsiM ?? (avanzamento?.percorsiM ?? 0),
+      );
+      return;
+    }
+    if (c == null) return;
+    _inCarica = null;
+    final dallEnergia = c.energiaDa != null && c.energiaA != null ? c.energiaA! - c.energiaDa! : null;
+    final kwh = dallEnergia != null && dallEnergia > 0
+        ? dallEnergia
+        : (c.socA - c.socDa) / 100 * auto.veicolo.capacitaUtileKwh;
+    if (kwh < 1) return;
+    final (nome, stima) = _laColonninaA(c.percorsiM, kwh);
+    ricaricheInViaggio.add(RicaricaInViaggio(dove: nome, kwh: kwh, euroStimati: stima));
+    daChiedere = ricaricheInViaggio.length - 1;
+    _rifaiIlRiepilogo();
+    notifyListeners();
+  }
+
+  /// La colonnina del viaggio dove si è caricato (entro mezzo chilometro sul
+  /// percorso), e il prezzo dalla sua tariffa se il gestore la dice.
+  (String, double?) _laColonninaA(double percorsiM, double kwh) {
+    final p = pronto;
+    ColonninaSulPercorso? vicina;
+    for (final c in p?.viaggio.colonnine ?? const <ColonninaSulPercorso>[]) {
+      final quanto = (c.distanzaM - percorsiM).abs();
+      if (quanto <= 500 && (vicina == null || quanto < (vicina.distanzaM - percorsiM).abs())) vicina = c;
+    }
+    if (vicina == null) return ('Ricarica per strada', null);
+    final corrente = vicina.potenzaKw >= 150
+        ? Corrente.hpc
+        : (vicina.potenzaKw >= 50 ? Corrente.dc : Corrente.ac);
+    final t = vicina.dettaglio?.prezzi?.perCorrente[corrente];
+    final energia = t?.energia;
+    if (energia == null) return (vicina.nome, null);
+    final avvio = t?.avvio;
+    final euro = kwh * (energia.da + energia.a) / 2 + (avvio == null ? 0.0 : (avvio.da + avvio.a) / 2);
+    return (vicina.nome, euro);
+  }
+
+  /// «Quanto hai speso?»: la risposta di chi guida per la ricarica [i].
+  void pagaRicarica(int i, double euro) {
+    if (i < 0 || i >= ricaricheInViaggio.length || euro < 0) return;
+    ricaricheInViaggio[i] = ricaricheInViaggio[i].pagata(euro);
+    if (daChiedere == i) daChiedere = null;
+    _rifaiIlRiepilogo();
+    notifyListeners();
+  }
+
+  /// «Dopo»: la domanda si chiude, la stima resta.
+  void nonOra() {
+    daChiedere = null;
+    notifyListeners();
+  }
+
+  void _rifaiIlRiepilogo() {
+    final arrivo = _arrivo;
+    if (riepilogo != null && arrivo != null) riepilogo = _ilRiepilogo(arrivo.$1, arrivo.$2);
+  }
+
   RiepilogoViaggio _ilRiepilogo(ViaggioPronto p, Avanzamento a) {
     final metri = _metriPrima + a.percorsiM;
     final elettrica = auto.elettrica && !p.termica;
     final o = viaggio.opzioni;
     final pedaggio = _euroPedaggioPrima + o.tariffaPedaggio.stima(p.viaggio.percorso).euro;
     final consumo = elettrica ? _kwhDelViaggio(p, metri) : null;
+    final inizio = _batteriaInizio;
+    final energia = consumo == null
+        ? null
+        : costoDellEnergia(
+            consumatiKwh: consumo.kwh,
+            partenzaKwh: inizio == null ? null : inizio / 100 * auto.veicolo.capacitaUtileKwh,
+            casa: _ricaricaDiCasa,
+            soste: List.of(ricaricheInViaggio),
+            euroAlKwhDiRiserva: o.euroAlKwh,
+          );
     return RiepilogoViaggio(
       destinazione: p.destinazione.nome,
       durata: _ora().difference(_partitoAlle ?? _ora()),
@@ -584,6 +715,8 @@ class GestoreGuida extends ChangeNotifier {
       euroAlKwh: o.euroAlKwh,
       euroAlLitro: o.euroAlLitro,
       pedaggio: pedaggio > 0 ? CostoPedaggio(euro: pedaggio, classe: o.classePedaggio) : null,
+      energia: energia,
+      soste: List.of(ricaricheInViaggio),
     );
   }
 
@@ -594,9 +727,16 @@ class GestoreGuida extends ChangeNotifier {
       return (kwh: _whMisurati / 1000 / _kmMisurati * metri / 1000, stimato: false);
     }
     final inizio = _batteriaInizio, ora = batteriaOra;
-    final ricariche = p.viaggio.piano?.soste.isNotEmpty ?? false;
+    final capacita = auto.veicolo.capacitaUtileKwh;
+    // Con le ricariche viste: quella scesa più quella presa per strada.
+    if (inizio != null && ora != null && ora.misurata && ricaricheInViaggio.isNotEmpty) {
+      final presi = ricaricheInViaggio.fold(0.0, (s, r) => s + r.kwh);
+      final kwh = (inizio - ora.valore) / 100 * capacita + presi;
+      if (kwh > 0) return (kwh: kwh, stimato: false);
+    }
+    final ricariche = (p.viaggio.piano?.soste.isNotEmpty ?? false) || ricaricheInViaggio.isNotEmpty;
     if (inizio != null && ora != null && ora.misurata && !ricariche && inizio > ora.valore) {
-      return (kwh: (inizio - ora.valore) / 100 * auto.veicolo.capacitaUtileKwh, stimato: false);
+      return (kwh: (inizio - ora.valore) / 100 * capacita, stimato: false);
     }
     final tratti = p.viaggio.percorso.tratti;
     final lunghezza = tratti.fold(0.0, (s, t) => s + t.lunghezzaM);
