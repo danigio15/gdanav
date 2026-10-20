@@ -751,15 +751,30 @@ class GestoreGuida extends ChangeNotifier {
       if (!perConsumo && !muto) unawaited(voce.parla('Ricalcolo il percorso.'));
       final qui = _ultimaPosizione;
       final vecchio = pronto;
-      if (!perConsumo && qui != null && vecchio != null) {
-        /* Fuori strada: solo il percorso, dalla posizione che si ha già e col
-         * verso in cui si va (GestoreViaggio.ricalcolaDa). Il viaggio di prima
-         * resta sullo schermo finché non arriva il nuovo; se non arriva resta
-         * lui, e la prossima posizione fuori strada riprova. */
-        final fatto = await viaggio.ricalcolaDa(qui, fattiM: fatti, batteria: batteriaOra?.valore);
+      if (qui != null && vecchio != null) {
+        /* Dalla posizione che si ha già e col verso in cui si va
+         * (GestoreViaggio.ricalcolaDa). Il viaggio di prima resta sullo
+         * schermo finché non arriva il nuovo; se non arriva resta lui, e la
+         * prossima posizione fuori strada riprova.
+         *
+         * Anche per il consumo: prima si rifaceva il viaggio da capo, che
+         * toglie il viaggio mentre calcola. «In autostrada all'improvviso
+         * ricalcola il percorso, non avevo uscite»: era questo — la batteria
+         * scendeva diversa dal previsto, le soste si rifacevano, e intanto
+         * in auto spariva la linea e restava «Calcolo il percorso per…». */
+        final fatto = await viaggio.ricalcolaDa(
+          qui,
+          fattiM: fatti,
+          batteria: batteriaOra?.valore,
+          rifaiLeSoste: perConsumo,
+        );
         if (pronto case final p? when fatto && !identical(p, vecchio)) {
           _guida = Guida(p.viaggio.percorso);
           _nuovoPiano(p);
+          final dopo = p.viaggio.piano?.soste.map((s) => s.colonnina.id).toList();
+          if (perConsumo && !detto && !listEquals(prima, dopo) && !muto) {
+            unawaited(voce.parla('Ho aggiornato le soste in base al consumo reale.'));
+          }
         }
         return;
       }

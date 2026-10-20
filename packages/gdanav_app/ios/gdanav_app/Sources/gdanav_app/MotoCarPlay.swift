@@ -343,7 +343,7 @@ final class MotoCarPlay {
 
     /// `icon-size` del segnaposto nello stile (`stile.dart`, strato `io`), allo `zoom`.
     private static let zoomIcona: [Double] = [10, 15, 17, 19]
-    private static let valoriIcona: [Double] = [0.45, 0.6, 0.85, 1.0]
+    private static let valoriIcona: [Double] = [0.6, 0.8, 1.15, 1.35]
 
     static func dimensioneIcona(_ zoom: Double) -> Double {
         let z = zoomIcona

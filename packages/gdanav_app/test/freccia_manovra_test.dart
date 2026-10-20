@@ -26,10 +26,28 @@ void main() {
     expect((linea.first as List)[1], lessThan(45.003));
     expect((linea.last as List)[0], greaterThan(9.0004));
     expect((linea.last as List)[1], closeTo(45.003, 1e-9));
-    // La punta è un triangolo che punta a est.
-    final punta = (((elementi[1] as Map)['geometry'] as Map)['coordinates'] as List).first as List;
-    expect(punta, hasLength(4));
-    expect(((punta[1] as List)[0] as double), greaterThan((linea.last as List)[0] as double));
+    // La punta è un punto sulla fine del tratto, girato verso est.
+    final punta = (elementi[1] as Map);
+    expect((punta['geometry'] as Map)['type'], 'Point');
+    expect((punta['geometry'] as Map)['coordinates'], linea.last);
+    expect(diQuantoSiGira((punta['properties'] as Map)['rotta'] as double, 90).abs(), lessThan(5));
+  });
+
+  test('dal campo: con un\'altra svolta subito dopo, la freccia si ferma prima', () {
+    // A destra, e dopo trenta metri a sinistra: la freccia non arriva sulla
+    // seconda svolta (la punta, prima, ci finiva sopra e oltre la linea).
+    const seconda = Manovra(istruzione: 'Svolta a sinistra', lunghezzaM: 200, secondi: 20, inizio: 33, tipo: 15);
+    final v = Viaggio(
+      percorso: PercorsoCalcolato(punti: punti, tratti: const [], manovre: const [uscita, seconda]),
+      colonnine: const [],
+      piano: null,
+    );
+    final elementi = datiManovra(v, uscita)['features']! as List;
+    final linea = ((elementi[0] as Map)['geometry'] as Map)['coordinates'] as List;
+    final l = Linea(punti);
+    final fine = l.proietta(Punto((linea.last as List)[1] as double, (linea.last as List)[0] as double)).lungoM;
+    expect(fine, lessThanOrEqualTo(l.cumulate[33] - 20 + 0.5));
+    expect(fine, greaterThanOrEqualTo(l.cumulate[30] + 10 - 0.5));
   });
 
   test('la freccia solo vicino alla manovra, e non per partenza o «prosegui»', () {
@@ -46,6 +64,12 @@ void main() {
     expect((stile['sources']! as Map).containsKey(sorgenteManovra), isTrue);
     final ids = [for (final l in stile['layers']! as List) (l as Map)['id']];
     expect(ids.indexOf('manovra'), greaterThan(ids.indexOf('percorso')));
-    expect(ids, containsAll(['manovra-bordo', 'manovra-punta', 'manovra-punta-bordo']));
+    expect(ids, containsAll(['manovra-bordo', 'manovra-punta']));
+    // Larga quanto la linea del percorso, non di più: in metri sbordava.
+    final strati = {for (final l in stile['layers']! as List) (l as Map)['id']: l};
+    expect(
+      ((strati['manovra-bordo']! as Map)['paint'] as Map)['line-width'],
+      ((strati['percorso']! as Map)['paint'] as Map)['line-width'],
+    );
   });
 }

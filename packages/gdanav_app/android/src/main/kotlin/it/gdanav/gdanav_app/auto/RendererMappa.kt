@@ -907,7 +907,7 @@ class RendererMappa(
         }
 
         private val ZOOM_ICONA = doubleArrayOf(10.0, 15.0, 17.0, 19.0)
-        private val DIMENSIONE_ICONA = doubleArrayOf(0.45, 0.6, 0.85, 1.0)
+        private val DIMENSIONE_ICONA = doubleArrayOf(0.6, 0.8, 1.15, 1.35)
 
         /** `icon-size` del segnaposto nello stile (`stile.dart`, strato `io`), allo [zoom]. */
         fun dimensioneIcona(zoom: Double): Double {

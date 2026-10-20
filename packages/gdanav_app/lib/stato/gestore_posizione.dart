@@ -94,7 +94,7 @@ class GestorePosizione extends ChangeNotifier {
     return t == null || _ora().difference(t) >= d;
   }
 
-  Segnaposto segnaposto = Segnaposto.autoBlu;
+  Segnaposto segnaposto = Segnaposto.freccia;
   StreamSubscription<Lettura>? _iscrizione;
 
   Future<void> carica() async {

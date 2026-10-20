@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 import 'package:geolocator/geolocator.dart' show Position;
 
+import '../componenti/icona_manovra.dart' show puntaManovraPng;
 import '../componenti/icone_punti.dart';
 import '../componenti/icone_segnalazioni.dart';
 import '../componenti/stato_colonnina.dart' show testoDisponibilita;
@@ -150,6 +151,8 @@ class PonteAuto {
           for (final t in TipoSegnalazione.values) nomeIcona(t): await iconaSegnalazionePng(t),
           // Il cartello della ZTL, per l'avviso.
           'segnala-ztl': await cartelloZtlPng(),
+          // La punta della freccia di manovra sul percorso.
+          immaginePuntaManovra: await puntaManovraPng(),
           // Le icone dei punti: categorie, distributori, colonnine.
           ...await iconePunti(),
         },

@@ -1,5 +1,10 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
+
+import '../mappa/stile.dart' show larghezzaPuntaManovra;
 
 /// L'icona di una manovra di Valhalla (il suo campo `type`).
 IconData iconaManovra(int tipo) => switch (tipo) {
@@ -138,4 +143,30 @@ class CartelloSvincolo extends StatelessWidget {
       ),
     );
   }
+}
+
+/// La punta della freccia di manovra sulla mappa ([immaginePuntaManovra]):
+/// un triangolo bianco bordato di blu scuro, la base in basso e la punta in
+/// alto. Larga [larghezzaPuntaManovra] punti, disegnata a [scala].
+Future<Uint8List> puntaManovraPng({double scala = 3}) async {
+  const larga = larghezzaPuntaManovra, alta = larga * 0.8, bordo = 3.0;
+  final registro = ui.PictureRecorder();
+  final c = Canvas(registro)..scale(scala);
+  final punta = Path()
+    ..moveTo(larga / 2, bordo)
+    ..lineTo(larga - bordo, alta - bordo)
+    ..lineTo(bordo, alta - bordo)
+    ..close();
+  c.drawPath(
+    punta,
+    Paint()
+      ..color = const Color(0xFF0B3C78)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = bordo * 2
+      ..strokeJoin = StrokeJoin.round,
+  );
+  c.drawPath(punta, Paint()..color = Colors.white);
+  final img = await registro.endRecording().toImage((larga * scala).round(), (alta * scala).round());
+  final dati = await img.toByteData(format: ui.ImageByteFormat.png);
+  return dati!.buffer.asUint8List();
 }

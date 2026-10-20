@@ -21,6 +21,7 @@ import 'package:gdanav_core/gdanav_core.dart'
         zoomLontanoInGuida;
 import 'package:maplibre_gl/maplibre_gl.dart';
 
+import '../componenti/icona_manovra.dart' show puntaManovraPng;
 import '../componenti/icone_punti.dart';
 import '../componenti/icone_segnalazioni.dart';
 import '../schermate/scheda_punto.dart';
@@ -694,6 +695,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     for (final t in TipoSegnalazione.values) {
       await una(nomeIcona(t), () => iconaSegnalazionePng(t));
     }
+    await una(immaginePuntaManovra, puntaManovraPng);
     try {
       for (final MapEntry(:key, :value) in (await iconePunti()).entries) {
         await una(key, () async => value);

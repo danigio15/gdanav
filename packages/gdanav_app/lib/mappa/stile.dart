@@ -211,6 +211,11 @@ const larghezzaBordo = (12.0, 35.0);
 const larghezzaPercorso = (9.5, 29.0);
 const larghezzaCoda = (5.0, 15.0);
 
+/// L'icona della punta della freccia di manovra, e quanto è larga (in punti)
+/// a grandezza 1: la disegna `puntaManovraPng`.
+const immaginePuntaManovra = 'manovra-punta';
+const larghezzaPuntaManovra = 48.0;
+
 /// Larghezza che cresce con lo zoom, come fanno le strade vere.
 List<Object> _largo(double a12, double a18) => [
   'interpolate',
@@ -802,8 +807,10 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         'paint': {'text-color': '#FFFFFF', 'text-opacity': 0.9},
       },
       // La freccia della prossima manovra, sopra il percorso: bianca col
-      // bordo blu scuro, larga sempre uguale in metri (come la strada), così
-      // allo svincolo si vede esattamente la rampa da prendere.
+      // bordo blu scuro, larga quanto la linea del percorso (in pixel, come
+      // lei: in metri a zoom alto era il doppio e sbordava), così allo
+      // svincolo si vede esattamente la rampa da prendere. La punta è
+      // un'icona ([immaginePuntaManovra]) posata sulla fine del tratto.
       {
         'id': 'manovra-bordo',
         'type': 'line',
@@ -814,21 +821,8 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           ['geometry-type'],
           'LineString',
         ],
-        'layout': {'line-cap': 'round', 'line-join': 'round'},
-        'paint': {'line-color': '#0B3C78', 'line-width': _metri(8.5)},
-      },
-      {
-        'id': 'manovra-punta-bordo',
-        'type': 'line',
-        'source': sorgenteManovra,
-        'minzoom': 13,
-        'filter': [
-          '==',
-          ['geometry-type'],
-          'Polygon',
-        ],
-        'layout': {'line-join': 'round'},
-        'paint': {'line-color': '#0B3C78', 'line-width': _metri(2.9)},
+        'layout': {'line-cap': 'butt', 'line-join': 'round'},
+        'paint': {'line-color': '#0B3C78', 'line-width': _largo(larghezzaPercorso.$1, larghezzaPercorso.$2)},
       },
       {
         'id': 'manovra',
@@ -840,20 +834,38 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           ['geometry-type'],
           'LineString',
         ],
-        'layout': {'line-cap': 'round', 'line-join': 'round'},
-        'paint': {'line-color': '#FFFFFF', 'line-width': _metri(5.6)},
+        'layout': {'line-cap': 'butt', 'line-join': 'round'},
+        'paint': {
+          'line-color': '#FFFFFF',
+          'line-width': _largo(larghezzaPercorso.$1 * 0.62, larghezzaPercorso.$2 * 0.62),
+        },
       },
       {
         'id': 'manovra-punta',
-        'type': 'fill',
+        'type': 'symbol',
         'source': sorgenteManovra,
         'minzoom': 13,
         'filter': [
           '==',
           ['geometry-type'],
-          'Polygon',
+          'Point',
         ],
-        'paint': {'fill-color': '#FFFFFF', 'fill-antialias': true},
+        'layout': {
+          'icon-image': immaginePuntaManovra,
+          'icon-rotate': ['get', 'rotta'],
+          'icon-rotation-alignment': 'map',
+          'icon-pitch-alignment': 'map',
+          // La base della punta sulla fine del tratto: la punta va avanti.
+          'icon-anchor': 'bottom',
+          // Larga una volta e mezza la linea, a ogni zoom (l'icona è larga
+          // [larghezzaPuntaManovra] a grandezza 1).
+          'icon-size': _largo(
+            larghezzaPercorso.$1 * 1.5 / larghezzaPuntaManovra,
+            larghezzaPercorso.$2 * 1.5 / larghezzaPuntaManovra,
+          ),
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+        },
       },
       // Sull'auto, il punto della scheda aperta: un alone e un anello del
       // colore del suo stato, sotto la sua icona.
@@ -1273,18 +1285,23 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'icon-rotate': ['get', 'rotta'],
           'icon-rotation-alignment': 'map',
           'icon-pitch-alignment': 'map',
+          // Un terzo più grande di prima («aumenta ancora la grandezza della
+          // freccia»). Le stesse grandezze le usano Android Auto
+          // (`RendererMappa.dimensioneIcona`) e CarPlay
+          // (`MotoCarPlay.dimensioneIcona`), che il segnaposto lo disegnano
+          // sopra la mappa.
           'icon-size': [
             'interpolate',
             ['linear'],
             ['zoom'],
             10,
-            0.45,
-            15,
             0.6,
+            15,
+            0.8,
             17,
-            0.85,
+            1.15,
             19,
-            1.0,
+            1.35,
           ],
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
