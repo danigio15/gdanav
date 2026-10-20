@@ -10,6 +10,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:io';
 
 import 'package:flutter/services.dart' show rootBundle;
@@ -63,6 +64,29 @@ void main() {
     File('${dove.path}/io.json').writeAsStringSync(jsonEncode({'lon': punti[14].lon, 'lat': punti[14].lat}));
     File('${dove.path}/centro.json').writeAsStringSync(jsonEncode(xy(sposta(a, nord: -40))));
     File('${dove.path}/stile.json').writeAsStringSync(jsonEncode(stileMappa(scuro: false, perAuto: true)));
+    for (final (nome, scuro, perAuto) in [
+      ('chiaro', false, false),
+      ('scuro', true, false),
+      ('auto-chiaro', false, true),
+      ('auto-scuro', true, true),
+    ]) {
+      File('${dove.path}/stile-$nome.json').writeAsStringSync(jsonEncode(stileMappa(scuro: scuro, perAuto: perAuto)));
+    }
+    // L'autostrada: dodici chilometri verso nord-est con una curva larga, e
+    // l'uscita in fondo. Lo zoom è quello della guida lontano dall'uscita.
+    final autostrada = <Punto>[
+      for (var m = 0.0; m <= 12000; m += 100)
+        sposta(partenza, nord: m * 0.8, est: m * 0.6 + 400 * math.sin(m / 3000)),
+    ];
+    File('${dove.path}/autostrada.json').writeAsStringSync(
+      jsonEncode({
+        'percorso': [for (final p in autostrada) xy(p)],
+        'io': xy(autostrada[12]),
+        'rotta': rottaGradi(autostrada[12], autostrada[13]),
+        'zoom_auto': 16.5 + zoomLontanoInGuida(velocitaStradaKmh: 115, allaProssimaM: 10800),
+        'zoom_telefono': 17.0 + zoomLontanoInGuida(velocitaStradaKmh: 115, allaProssimaM: 10800),
+      }),
+    );
     for (final s in ['freccia', 'auto_blu']) {
       final b = await rootBundle.load('assets/segnaposto/$s.png');
       File('${dove.path}/$s.png').writeAsBytesSync(b.buffer.asUint8List());

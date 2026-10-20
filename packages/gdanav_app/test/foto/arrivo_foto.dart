@@ -58,6 +58,28 @@ void main() {
     euroAlLitro: 1.80,
   );
 
+  // Le schede da posare sopra la mappa vera (sfondo trasparente).
+  for (final scuro in [false, true]) {
+    testWidgets('arrivo sulla mappa ${scuro ? 'scuro' : 'chiaro'}', (tester) async {
+      tester.view
+        ..physicalSize = const Size(390 * 3, 844 * 3)
+        ..devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          color: Colors.transparent,
+          theme: temaGdanav(scuro ? Brightness.dark : Brightness.light),
+          home: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: Stack(children: [RiepilogoArrivo(riepilogo: elettrica, onFine: () {})]),
+          ),
+        ),
+      );
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('$dove/scheda-arrivo-${scuro ? 'scuro' : 'chiaro'}.png'));
+    });
+  }
+
   for (final scuro in [false, true]) {
     for (final (nome, r) in [('elettrica', elettrica), ('termica', termica)]) {
       testWidgets('arrivo $nome ${scuro ? 'scuro' : 'chiaro'}', (tester) async {
