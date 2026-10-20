@@ -178,17 +178,6 @@ const _scuro = _Tavolozza(
   arrivo: '#F87171',
 );
 
-/// Una larghezza in metri (alle nostre latitudini): raddoppia a ogni zoom.
-List<Object> _metri(double metri) => [
-  'interpolate',
-  ['exponential', 2],
-  ['zoom'],
-  13,
-  metri / 7,
-  20,
-  metri / 7 * 128,
-];
-
 /// [verde] per la strada che risparmia energia (`eco` nelle proprietà),
 /// [altro] per le altre.
 List<Object> _seEco(String verde, String altro) => [

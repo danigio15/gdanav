@@ -54,6 +54,8 @@ struct GuidaAuto {
     let arrivoBatteria: Double?
     /// Il pedaggio che resta, «Pedaggio ~12,40 €»; `nil` se non se ne paga.
     let pedaggio: String?
+    /// Che strada si fa, dal percorso (la velocità prevista del tratto), per lo zoom.
+    var stradaKmh: Double? = nil
     let uscita: String
     let verso: String
     let rotonda: Int?
@@ -357,6 +359,7 @@ final class PonteAuto {
             destinazioneLon: numero(a["destinazione_lon"]),
             arrivoBatteria: numero(a["arrivo_batteria"]),
             pedaggio: a["pedaggio"] as? String,
+            stradaKmh: numero(a["strada_kmh"]),
             uscita: a["uscita"] as? String ?? "",
             verso: a["verso"] as? String ?? "",
             rotonda: numero(a["rotonda"]).map { Int($0) },

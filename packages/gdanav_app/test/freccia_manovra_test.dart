@@ -67,9 +67,6 @@ void main() {
     expect(ids, containsAll(['manovra-bordo', 'manovra-punta']));
     // Larga quanto la linea del percorso, non di più: in metri sbordava.
     final strati = {for (final l in stile['layers']! as List) (l as Map)['id']: l};
-    expect(
-      ((strati['manovra-bordo']! as Map)['paint'] as Map)['line-width'],
-      ((strati['percorso']! as Map)['paint'] as Map)['line-width'],
-    );
+    expect((strati['manovra-bordo']!['paint'] as Map)['line-width'], (strati['percorso']!['paint'] as Map)['line-width']);
   });
 }

@@ -60,7 +60,7 @@ void main() {
     final pos = chiamate.lastWhere((c) => c.method == 'posizione').arguments as Map;
     expect(pos['lat'], isNotNull);
     // Il segnaposto lo fa scorrere l'auto: arrivano immagine e rotta.
-    expect(pos['icona'], 'auto_blu');
+    expect(pos['icona'], 'freccia');
     expect(pos['rotta_io'], isA<double>());
     // E la velocità, perché fra due posizioni l'auto vada avanti da sola.
     expect(pos['velocita_ms'], isA<double>());

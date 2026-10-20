@@ -784,6 +784,9 @@ class PonteAuto {
       // dell'arrivo di Android Auto («~12,40 € pedaggio»); niente se non se
       // ne paga.
       if (guida.pedaggioDavanti case final c? when !c.senzaPedaggi) 'pedaggio': c.perStima,
+      // Che strada si fa (dal percorso), per lo zoom sull'auto: vedi
+      // `zoomLontanoInGuida`.
+      'strada_kmh': ?a?.velocitaStradaKmh,
       'uscita': m?.uscita ?? '',
       'verso': m?.verso ?? '',
       'rotonda': m?.uscitaRotonda ?? (m != null && m.tipo == 26 ? uscitaDallaFrase(m.istruzione) : null),

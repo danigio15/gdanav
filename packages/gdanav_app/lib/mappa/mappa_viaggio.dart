@@ -385,11 +385,16 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   /// Quanto ci mette lo zoom a cambiare: lento, che non sembri un salto.
   static const _tauZoom = 1500.0;
 
-  /// Lo zoom che si vuole in guida: vicino, e più lontano andando forte con
-  /// la prossima manovra lontana (`zoomLontanoInGuida`, come sull'auto).
+  /// Lo zoom che si vuole in guida: vicino, e più lontano su una strada veloce
+  /// con la prossima manovra lontana (`zoomLontanoInGuida`, come sull'auto).
+  /// La strada la dice il percorso, non il tachimetro: frenando in autostrada
+  /// la mappa non si avvicina.
   double _zoomInGuida(GestoreGuida g) =>
       (_inclinata ? 17.0 : 16.0) +
-      zoomLontanoInGuida(velocitaMs: g.velocitaMs ?? 0, allaProssimaM: _allaProssima(g.avanzamento));
+      zoomLontanoInGuida(
+        velocitaStradaKmh: g.avanzamento?.velocitaStradaKmh ?? 0,
+        allaProssimaM: _allaProssima(g.avanzamento),
+      );
 
   /// Fin dove non si gira: la prossima manovra, o l'arrivo se non ce ne sono più.
   static double _allaProssima(Avanzamento? a) =>

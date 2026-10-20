@@ -20,6 +20,7 @@ class Avanzamento {
     double? rottaMappa,
     this.limiteKmh,
     this.daDire,
+    this.velocitaStradaKmh,
   }) : _rottaMappa = rottaMappa;
 
   final double percorsiM;
@@ -74,6 +75,13 @@ class Avanzamento {
 
   /// Una frase nuova da dire ad alta voce, se è il momento.
   final String? daDire;
+
+  /// Che strada si fa adesso, dal percorso: la velocità media prevista del
+  /// tratto fino alla prossima manovra (un'autostrada sui cento all'ora, la
+  /// città sui trenta). Non cambia finché non si cambia strada: per lo zoom
+  /// ([zoomLontanoInGuida]), che con la velocità dell'auto andava avanti e
+  /// indietro a ogni rallentamento.
+  final double? velocitaStradaKmh;
 }
 
 /// Segue chi guida lungo un percorso di Valhalla: a ogni posizione GPS dice
@@ -327,7 +335,15 @@ class Guida {
       // In fondo a un segmento si è già all'inizio del prossimo.
       limiteKmh: percorso.limiteSul(p.t > 0.999 ? i + 1 : i),
       daDire: arrivato ? _una('arrivo', 'Sei arrivato.') : _annuncio(prossima, alla),
+      velocitaStradaKmh: _velocitaDelTratto(k < 0 ? manovre.lastOrNull : (k > 0 ? manovre[k - 1] : null)),
     );
+  }
+
+  /// La velocità prevista sul tratto della manovra [m] (dalla manovra alla
+  /// prossima): i suoi metri per i suoi secondi.
+  static double? _velocitaDelTratto(Manovra? m) {
+    if (m == null || m.secondi <= 0 || m.lunghezzaM <= 0) return null;
+    return m.lunghezzaM / m.secondi * 3.6;
   }
 
   String? _annuncio(Manovra? m, double alla) {
