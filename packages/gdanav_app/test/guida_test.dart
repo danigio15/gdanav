@@ -50,6 +50,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(a.guida.attiva, isFalse);
     expect(a.voce.frasi, contains('Sei arrivato.'));
+    // «Si deve interrompere con scritto arrivo, e un riepilogo del viaggio.»
+    expect(find.byKey(const Key('riepilogo-arrivo')), findsOneWidget);
+    expect(find.text('Sei arrivato'), findsOneWidget);
+    expect(find.text('Nord'), findsWidgets);
+    for (final riga in ['Durata', 'Distanza', 'Energia', 'Costo']) {
+      expect(find.text(riga), findsOneWidget, reason: riga);
+    }
+    final r = a.guida.riepilogo!;
+    expect(r.metri, closeTo(Linea(punti).lunghezzaM, 30));
+    expect(r.kwh, greaterThan(0));
+    await tester.tap(find.byKey(const Key('fine-arrivo')));
+    await tester.pumpAndSettle();
+    expect(a.guida.riepilogo, isNull);
+    expect(find.byKey(const Key('riepilogo-arrivo')), findsNothing);
   });
 
   testWidgets('uscendo di strada si ricalcola', (tester) async {

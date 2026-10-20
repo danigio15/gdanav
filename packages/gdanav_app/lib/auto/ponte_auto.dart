@@ -466,6 +466,8 @@ class PonteAuto {
         Calcolo(:final destinazione) => 'Calcolo il percorso per ${destinazione.nome}…',
         ErroreViaggio(:final senzaBatteria?) => senzaBatteria.inAuto,
         ErroreViaggio(:final messaggio) => messaggio,
+        // Arrivati: «Sei arrivato a …», col riepilogo del viaggio.
+        _ when !guida.attiva => guida.riepilogo?.perAuto,
         _ => null,
       },
       ...?_propostaTermica(stato),
@@ -749,12 +751,21 @@ class PonteAuto {
 
   PercorsoCalcolato? _percorsoProva;
 
+  /// Il riepilogo dell'arrivo già mandato all'auto.
+  String? _arrivoDetto;
+
   void _guida() {
     _seguiProva();
     final a = guida.avanzamento;
     final p = guida.pronto;
     if (!guida.attiva || p == null) {
       _manda('guida', {'attiva': false});
+      // All'arrivo, al posto della manovra il riepilogo (e via quando si chiude).
+      final arrivo = guida.attiva ? null : guida.riepilogo?.perAuto;
+      if (arrivo != _arrivoDetto) {
+        _arrivoDetto = arrivo;
+        _viaggio();
+      }
       if (_freccia != null) {
         _freccia = null;
         _manda('sorgenti', {

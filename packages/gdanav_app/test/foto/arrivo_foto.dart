@@ -1,0 +1,86 @@
+/// Il riepilogo all'arrivo sul telefono: «Sei arrivato», durata, distanza,
+/// consumo e costo. Con l'elettrica e con la termica, chiaro e scuro.
+///
+/// Non è una prova: si lancia a mano.
+///
+/// ```sh
+/// cd packages/gdanav_app && GDANAV_FOTO=/tmp/foto FLUTTER_ROOT=... flutter test --update-goldens test/foto/arrivo_foto.dart
+/// ```
+library;
+
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FontLoader;
+import 'package:flutter_test/flutter_test.dart';
+import 'package:gdanav_app/schermate/schermata_guida.dart';
+import 'package:gdanav_app/tema.dart';
+import 'package:gdanav_core/gdanav_core.dart';
+
+Future<void> _caratteri() async {
+  final radice = Platform.environment['FLUTTER_ROOT'];
+  if (radice == null || radice.isEmpty) return;
+  final cartella = '$radice/bin/cache/artifacts/material_fonts';
+  Future<ByteData> leggi(String nome) => File('$cartella/$nome').readAsBytes().then((b) => b.buffer.asByteData());
+  for (final famiglia in ['Roboto', 'packages/gdanav_app/Roboto']) {
+    final f = FontLoader(famiglia);
+    for (final peso in ['Regular', 'Medium', 'Bold', 'Black']) {
+      if (File('$cartella/Roboto-$peso.ttf').existsSync()) f.addFont(leggi('Roboto-$peso.ttf'));
+    }
+    await f.load();
+  }
+  if (File('$cartella/MaterialIcons-Regular.otf').existsSync()) {
+    await (FontLoader('MaterialIcons')..addFont(leggi('MaterialIcons-Regular.otf'))).load();
+  }
+}
+
+void main() {
+  setUp(_caratteri);
+  final dove = Platform.environment['GDANAV_FOTO'] ?? '../../../../collaudo/foto/arrivo';
+
+  const elettrica = RiepilogoViaggio(
+    destinazione: 'Napoli, Piazza del Plebiscito',
+    durata: Duration(hours: 2, minutes: 41),
+    metri: 263400,
+    elettrica: true,
+    kwh: 38.1,
+    consumoStimato: false,
+    euroAlKwh: 0.30,
+    pedaggio: CostoPedaggio(euro: 18.6, km: 230),
+  );
+  const termica = RiepilogoViaggio(
+    destinazione: 'Caserta',
+    durata: Duration(minutes: 34),
+    metri: 28700,
+    elettrica: false,
+    litri: 1.9,
+    euroAlLitro: 1.80,
+  );
+
+  for (final scuro in [false, true]) {
+    for (final (nome, r) in [('elettrica', elettrica), ('termica', termica)]) {
+      testWidgets('arrivo $nome ${scuro ? 'scuro' : 'chiaro'}', (tester) async {
+        tester.view
+          ..physicalSize = const Size(390 * 3, 844 * 3)
+          ..devicePixelRatio = 3;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: temaGdanav(scuro ? Brightness.dark : Brightness.light),
+            home: Scaffold(
+              body: Stack(
+                children: [
+                  Positioned.fill(child: ColoredBox(color: scuro ? const Color(0xFF1B2130) : const Color(0xFFE8ECEF))),
+                  RiepilogoArrivo(riepilogo: r, onFine: () {}),
+                ],
+              ),
+            ),
+          ),
+        );
+        await expectLater(find.byType(MaterialApp), matchesGoldenFile('$dove/arrivo-$nome-${scuro ? 'scuro' : 'chiaro'}.png'));
+      });
+    }
+  }
+}

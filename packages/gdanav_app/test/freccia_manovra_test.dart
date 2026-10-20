@@ -46,7 +46,7 @@ void main() {
     final linea = ((elementi[0] as Map)['geometry'] as Map)['coordinates'] as List;
     final l = Linea(punti);
     final fine = l.proietta(Punto((linea.last as List)[1] as double, (linea.last as List)[0] as double)).lungoM;
-    expect(fine, lessThanOrEqualTo(l.cumulate[33] - 20 + 0.5));
+    expect(fine, lessThanOrEqualTo(l.cumulate[33] - 10 + 0.5));
     expect(fine, greaterThanOrEqualTo(l.cumulate[30] + 10 - 0.5));
   });
 
@@ -65,8 +65,11 @@ void main() {
     final ids = [for (final l in stile['layers']! as List) (l as Map)['id']];
     expect(ids.indexOf('manovra'), greaterThan(ids.indexOf('percorso')));
     expect(ids, containsAll(['manovra-bordo', 'manovra-punta']));
-    // Larga quanto la linea del percorso, non di più: in metri sbordava.
+    // Larga quanto la linea del percorso col suo bordo, non di più: in metri sbordava.
     final strati = {for (final l in stile['layers']! as List) (l as Map)['id']: l};
-    expect((strati['manovra-bordo']!['paint'] as Map)['line-width'], (strati['percorso']!['paint'] as Map)['line-width']);
+    expect(
+      (strati['manovra-bordo']!['paint'] as Map)['line-width'],
+      (strati['percorso-bordo']!['paint'] as Map)['line-width'],
+    );
   });
 }

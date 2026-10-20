@@ -811,7 +811,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'LineString',
         ],
         'layout': {'line-cap': 'butt', 'line-join': 'round'},
-        'paint': {'line-color': '#0B3C78', 'line-width': _largo(larghezzaPercorso.$1, larghezzaPercorso.$2)},
+        'paint': {'line-color': '#0B3C78', 'line-width': _largo(larghezzaBordo.$1, larghezzaBordo.$2)},
       },
       {
         'id': 'manovra',
@@ -826,7 +826,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         'layout': {'line-cap': 'butt', 'line-join': 'round'},
         'paint': {
           'line-color': '#FFFFFF',
-          'line-width': _largo(larghezzaPercorso.$1 * 0.62, larghezzaPercorso.$2 * 0.62),
+          'line-width': _largo(larghezzaPercorso.$1 * 0.75, larghezzaPercorso.$2 * 0.75),
         },
       },
       {
@@ -846,11 +846,11 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'icon-pitch-alignment': 'map',
           // La base della punta sulla fine del tratto: la punta va avanti.
           'icon-anchor': 'bottom',
-          // Larga una volta e mezza la linea, a ogni zoom (l'icona è larga
-          // [larghezzaPuntaManovra] a grandezza 1).
+          // Larga poco più del doppio della linea, a ogni zoom (l'icona è
+          // larga [larghezzaPuntaManovra] a grandezza 1).
           'icon-size': _largo(
-            larghezzaPercorso.$1 * 1.5 / larghezzaPuntaManovra,
-            larghezzaPercorso.$2 * 1.5 / larghezzaPuntaManovra,
+            larghezzaPercorso.$1 * 2.2 / larghezzaPuntaManovra,
+            larghezzaPercorso.$2 * 2.2 / larghezzaPuntaManovra,
           ),
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,

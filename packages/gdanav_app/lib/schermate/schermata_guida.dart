@@ -129,6 +129,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
 
   /// «Fine», come in Waze: si torna alla mappa senza viaggio.
   Future<void> _fine() async {
+    widget.guida.chiudiRiepilogo();
     await widget.guida.ferma();
     widget.guida.viaggio.annulla();
     if (mounted) Navigator.of(context).pop();
@@ -300,7 +301,108 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                 );
               },
             ),
+            // All'arrivo la guida si ferma e resta questo: dove si è
+            // arrivati, quanto ci si è messo, quanto si è consumato e speso.
+            ListenableBuilder(
+              listenable: g,
+              builder: (context, _) => switch (g.riepilogo) {
+                final r? when !g.attiva => RiepilogoArrivo(riepilogo: r, onFine: _fine),
+                _ => const SizedBox.shrink(),
+              },
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Il riepilogo all'arrivo, sopra la mappa: «Sei arrivato», la meta, e
+/// durata, distanza, consumo e costo del viaggio. «Fine» chiude la guida.
+class RiepilogoArrivo extends StatelessWidget {
+  const RiepilogoArrivo({super.key, required this.riepilogo, required this.onFine});
+
+  final RiepilogoViaggio riepilogo;
+  final VoidCallback onFine;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final colori = Theme.of(context).colorScheme;
+    return Positioned.fill(
+      child: ColoredBox(
+        color: Colors.black38,
+        child: SafeArea(
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: DecoratedBox(
+                key: const Key('riepilogo-arrivo'),
+                decoration: BoxDecoration(
+                  color: colori.surface,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: const [BoxShadow(color: Color(0x40000000), blurRadius: 24, offset: Offset(0, 8))],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.sports_score, size: 32, color: Color(0xFF16A34A)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Sei arrivato', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                                Text(
+                                  riepilogo.destinazione,
+                                  style: t.titleMedium?.copyWith(color: colori.onSurfaceVariant),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      for (final (nome, valore) in riepilogo.righe)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                width: 96,
+                                child: Text(nome, style: t.bodyLarge?.copyWith(color: colori.onSurfaceVariant)),
+                              ),
+                              Expanded(
+                                child: Text(valore, style: t.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (riepilogo.consumoStimato && riepilogo.consumoTesto != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Consumo stimato dal percorso; i prezzi si cambiano nelle opzioni del percorso.',
+                            style: t.bodySmall?.copyWith(color: colori.onSurfaceVariant),
+                          ),
+                        ),
+                      const SizedBox(height: 14),
+                      FilledButton(key: const Key('fine-arrivo'), onPressed: onFine, child: const Text('Fine')),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

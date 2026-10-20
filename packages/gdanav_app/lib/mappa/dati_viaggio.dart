@@ -295,7 +295,7 @@ const _senzaFreccia = {0, 1, 2, 3, 4, 5, 6, 7, 8};
 /// la fine del tratto, che a un incrocio subito dopo finiva fuori strada.
 /// Adesso la larghezza è quella della linea (vedi lo stile), la punta è
 /// un'icona in pixel posata sulla fine del tratto (un punto con la sua
-/// [rotta]), e il tratto si ferma prima della manovra dopo.
+/// [rotta]), e il tratto si ferma dieci metri prima della manovra dopo.
 Map<String, Object?> datiManovra(Viaggio? v, Manovra? m, {double primaM = 60, double dopoM = 45}) {
   if (v == null || m == null || _senzaFreccia.contains(m.tipo) || v.percorso.punti.length < 2) {
     return _collezione([]);
@@ -327,7 +327,7 @@ Map<String, Object?> datiManovra(Viaggio? v, Manovra? m, {double primaM = 60, do
 }
 
 /// Quanto prima della manovra dopo si ferma il tratto della freccia.
-const _primaDellaDopoM = 20.0;
+const _primaDellaDopoM = 10.0;
 
 /// Il punto del percorso a tanti metri dalla partenza.
 Punto _aMetri(Linea l, double metri) {

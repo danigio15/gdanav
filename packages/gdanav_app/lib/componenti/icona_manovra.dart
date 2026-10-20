@@ -149,7 +149,7 @@ class CartelloSvincolo extends StatelessWidget {
 /// un triangolo bianco bordato di blu scuro, la base in basso e la punta in
 /// alto. Larga [larghezzaPuntaManovra] punti, disegnata a [scala].
 Future<Uint8List> puntaManovraPng({double scala = 3}) async {
-  const larga = larghezzaPuntaManovra, alta = larga * 0.8, bordo = 3.0;
+  const larga = larghezzaPuntaManovra, alta = larga * 0.95, bordo = 3.0;
   final registro = ui.PictureRecorder();
   final c = Canvas(registro)..scale(scala);
   final punta = Path()
