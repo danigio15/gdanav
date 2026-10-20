@@ -15,5 +15,6 @@ void main() {
     final dove = Directory(Platform.environment['GDANAV_FOTO'] ?? 'collaudo/foto/svincolo')..createSync(recursive: true);
     final png = await tester.runAsync(puntaManovraPng);
     File('${dove.path}/manovra-punta.png').writeAsBytesSync(png!);
+    File('${dove.path}/arrivo-bandiera.png').writeAsBytesSync((await tester.runAsync(bandieraArrivoPng))!);
   });
 }

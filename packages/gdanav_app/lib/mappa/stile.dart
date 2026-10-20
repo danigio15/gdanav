@@ -205,6 +205,11 @@ const larghezzaCoda = (5.0, 15.0);
 const immaginePuntaManovra = 'manovra-punta';
 const larghezzaPuntaManovra = 48.0;
 
+/// La bandiera a scacchi sulla meta, e quanto è larga (in punti) a
+/// grandezza 1: la disegna `bandieraArrivoPng`.
+const immagineBandieraArrivo = 'arrivo-bandiera';
+const larghezzaBandieraArrivo = 48.0;
+
 /// Larghezza che cresce con lo zoom, come fanno le strade vere.
 List<Object> _largo(double a12, double a18) => [
   'interpolate',
@@ -1187,14 +1192,28 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         'paint': {'text-color': '#FFFFFF', 'text-halo-color': _seEco('#15803D', t.alternativaBordo), 'text-halo-width': 6},
       },
       {
+        // La meta: una bandiera a scacchi in piedi (anche con la mappa
+        // inclinata), posata con la base dell'asta sul punto. Era un punto
+        // rosso, che in mezzo a tutto il resto non si capiva cosa fosse.
         'id': 'arrivo',
-        'type': 'circle',
+        'type': 'symbol',
         'source': sorgenteArrivo,
-        'paint': {
-          'circle-radius': 11,
-          'circle-color': t.arrivo,
-          'circle-stroke-color': t.contorno,
-          'circle-stroke-width': 3.5,
+        'layout': {
+          'icon-image': immagineBandieraArrivo,
+          'icon-anchor': 'bottom',
+          'icon-size': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            10,
+            1.0,
+            15,
+            1.4,
+            18,
+            1.9,
+          ],
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
         },
       },
       {
