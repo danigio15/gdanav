@@ -552,6 +552,8 @@ object PonteAuto {
     /** Un avviso è già in coda sul filo principale (si tocca solo da lì). */
     private var avvisoInCoda = false
 
+    /** Quando l'auto ha detto la batteria l'ultima volta. */
+    private var energiaLettaMs: Long = 0L
     private var ultimaVelocita: Double? = null
     private var ultimoOdometro: Double? = null
 
@@ -561,6 +563,7 @@ object PonteAuto {
             "batteria" to batteria.toDouble(),
             "autonomia_km" to autonomiaM?.let { it / 1000.0 },
         )
+        energiaLettaMs = System.currentTimeMillis()
         mandaAuto()
     }
 
@@ -598,7 +601,11 @@ object PonteAuto {
         val dati = HashMap<String, Any?>(ultimaEnergia ?: emptyMap())
         dati["velocita_kmh"] = ultimaVelocita
         dati["odometro_km"] = ultimoOdometro
-        dati["letto_ms"] = System.currentTimeMillis()
+        /* L'ora è quella della batteria, non di adesso: velocità e
+         * contachilometri arrivano ogni secondo, e con l'ora di adesso una
+         * batteria detta una volta sola sembrava fresca per sempre. In marcia
+         * restava 54 % mentre GdAHome, dalla casa, diceva gia' 51 %. */
+        dati["letto_ms"] = if (ultimaEnergia != null && energiaLettaMs > 0) energiaLettaMs else System.currentTimeMillis()
         principale.post { sinkEnergia?.success(dati) }
     }
 
