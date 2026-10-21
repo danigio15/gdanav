@@ -104,6 +104,27 @@ class SorgenteGdahome extends ChangeNotifier implements SorgenteDatiAuto {
     notifyListeners();
   }
 
+  /// L'ultima ricarica a casa dell'auto della plancia (`ponte/auto/
+  /// ricariche-di-casa`): quanti kWh, quanti col sole, gli euro di rete,
+  /// fino a che percentuale. Per il costo vero del viaggio. `null` fuori da
+  /// GdAHome, senza casa, o se la casa non ne ha ancora vista una.
+  Future<RicaricaDiCasa?> ricaricaDiCasa() async {
+    final c = _chiedi;
+    if (c == null) return null;
+    try {
+      final r = await c({'type': 'ponte/auto/ricariche-di-casa'}).timeout(const Duration(seconds: 8));
+      final elenco = r is Map ? r['ricariche'] : null;
+      if (elenco is! List || elenco.isEmpty) return null;
+      final voci = elenco.whereType<Map>().toList();
+      final nomi = {_auto?.nome, _auto?.etichetta}..removeWhere((n) => n == null || n.isEmpty);
+      final sua = voci.where((v) => nomi.contains(v['nome'])).firstOrNull ?? (voci.length == 1 ? voci.single : null);
+      return RicaricaDiCasa.daJson(sua);
+    } catch (e) {
+      debugPrint('GdAHome, la ricarica di casa: $e');
+      return null;
+    }
+  }
+
   /// In viaggio, all'avvio e quando si torna nell'app: dati freschi, se chi
   /// ospita sa chiederli. Un errore non si propaga: i dati di prima restano.
   Future<void> chiediAggiornamento() async {

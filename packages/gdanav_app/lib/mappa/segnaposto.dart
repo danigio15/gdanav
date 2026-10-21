@@ -28,7 +28,10 @@ enum Segnaposto {
 
   String get asset => '$radiceRisorse/segnaposto/$immagine.png';
 
-  static Segnaposto perNome(String? nome) => values.where((s) => s.name == nome).firstOrNull ?? autoBlu;
+  /// Senza una scelta, la freccia: arancio, che sulla linea blu del percorso
+  /// si vede. L'auto blu sulla linea blu spariva («crea un colore che vada in
+  /// contrasto con la linea del percorso»).
+  static Segnaposto perNome(String? nome) => values.where((s) => s.name == nome).firstOrNull ?? freccia;
 }
 
 /// I dati della sorgente `gdanav-io`: vuota se non si sa dove sei.

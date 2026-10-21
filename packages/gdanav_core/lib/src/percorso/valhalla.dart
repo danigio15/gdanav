@@ -504,7 +504,14 @@ class OpzioniPercorso {
     this.ricalcoloAutomatico = true,
     this.classePedaggio = ClassePedaggio.a,
     this.euroAlKm = TariffaPedaggio.euroAlKmPredefinito,
+    this.euroAlKwh = euroAlKwhPredefinito,
+    this.euroAlLitro = euroAlLitroPredefinito,
   });
+
+  /// I prezzi di partenza per il costo del viaggio, nel riepilogo all'arrivo:
+  /// l'energia fra casa e colonnine, e un litro di carburante.
+  static const euroAlKwhPredefinito = 0.30;
+  static const euroAlLitroPredefinito = 1.80;
 
   factory OpzioniPercorso.daJson(Map<String, Object?> j) => OpzioniPercorso(
         modo: ModoGuida.values.where((m) => m.name == j['modo']).firstOrNull ?? ModoGuida.veloce,
@@ -516,6 +523,14 @@ class OpzioniPercorso {
         euroAlKm: switch (j['euro_al_km']) {
           final num n when n > 0 => n.toDouble(),
           _ => TariffaPedaggio.euroAlKmPredefinito,
+        },
+        euroAlKwh: switch (j['euro_al_kwh']) {
+          final num n when n > 0 => n.toDouble(),
+          _ => euroAlKwhPredefinito,
+        },
+        euroAlLitro: switch (j['euro_al_litro']) {
+          final num n when n > 0 => n.toDouble(),
+          _ => euroAlLitroPredefinito,
         },
       );
 
@@ -533,6 +548,10 @@ class OpzioniPercorso {
   /// strada.
   final ClassePedaggio classePedaggio;
   final double euroAlKm;
+
+  /// Quanto costano un kWh e un litro, per il costo del viaggio all'arrivo
+  /// (`RiepilogoViaggio`). Non cambiano la strada.
+  final double euroAlKwh, euroAlLitro;
 
   TariffaPedaggio get tariffaPedaggio => TariffaPedaggio(classe: classePedaggio, euroAlKmClasseA: euroAlKm);
 
@@ -552,6 +571,8 @@ class OpzioniPercorso {
     bool? ricalcoloAutomatico,
     ClassePedaggio? classePedaggio,
     double? euroAlKm,
+    double? euroAlKwh,
+    double? euroAlLitro,
   }) =>
       OpzioniPercorso(
         modo: modo ?? this.modo,
@@ -561,6 +582,8 @@ class OpzioniPercorso {
         ricalcoloAutomatico: ricalcoloAutomatico ?? this.ricalcoloAutomatico,
         classePedaggio: classePedaggio ?? this.classePedaggio,
         euroAlKm: euroAlKm ?? this.euroAlKm,
+        euroAlKwh: euroAlKwh ?? this.euroAlKwh,
+        euroAlLitro: euroAlLitro ?? this.euroAlLitro,
       );
 
   Map<String, Object?> toJson() => {
@@ -571,6 +594,8 @@ class OpzioniPercorso {
         'ricalcolo_automatico': ricalcoloAutomatico,
         'classe_pedaggio': classePedaggio.name,
         'euro_al_km': euroAlKm,
+        'euro_al_kwh': euroAlKwh,
+        'euro_al_litro': euroAlLitro,
       };
 
   /// I `costing_options.auto` di Valhalla: 0 vuol dire «solo se non c'è

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 import 'package:geolocator/geolocator.dart' show Position;
 
+import '../componenti/icona_manovra.dart' show bandieraArrivoPng, puntaManovraPng;
 import '../componenti/icone_punti.dart';
 import '../componenti/icone_segnalazioni.dart';
 import '../componenti/stato_colonnina.dart' show testoDisponibilita;
@@ -150,6 +151,10 @@ class PonteAuto {
           for (final t in TipoSegnalazione.values) nomeIcona(t): await iconaSegnalazionePng(t),
           // Il cartello della ZTL, per l'avviso.
           'segnala-ztl': await cartelloZtlPng(),
+          // La punta della freccia di manovra sul percorso.
+          immaginePuntaManovra: await puntaManovraPng(),
+          // La bandiera a scacchi sulla meta.
+          immagineBandieraArrivo: await bandieraArrivoPng(),
           // Le icone dei punti: categorie, distributori, colonnine.
           ...await iconePunti(),
         },
@@ -463,6 +468,8 @@ class PonteAuto {
         Calcolo(:final destinazione) => 'Calcolo il percorso per ${destinazione.nome}…',
         ErroreViaggio(:final senzaBatteria?) => senzaBatteria.inAuto,
         ErroreViaggio(:final messaggio) => messaggio,
+        // Arrivati: «Sei arrivato a …», col riepilogo del viaggio.
+        _ when !guida.attiva => guida.riepilogo?.perAuto,
         _ => null,
       },
       ...?_propostaTermica(stato),
@@ -746,12 +753,21 @@ class PonteAuto {
 
   PercorsoCalcolato? _percorsoProva;
 
+  /// Il riepilogo dell'arrivo già mandato all'auto.
+  String? _arrivoDetto;
+
   void _guida() {
     _seguiProva();
     final a = guida.avanzamento;
     final p = guida.pronto;
     if (!guida.attiva || p == null) {
       _manda('guida', {'attiva': false});
+      // All'arrivo, al posto della manovra il riepilogo (e via quando si chiude).
+      final arrivo = guida.attiva ? null : guida.riepilogo?.perAuto;
+      if (arrivo != _arrivoDetto) {
+        _arrivoDetto = arrivo;
+        _viaggio();
+      }
       if (_freccia != null) {
         _freccia = null;
         _manda('sorgenti', {
@@ -781,6 +797,9 @@ class PonteAuto {
       // dell'arrivo di Android Auto («~12,40 € pedaggio»); niente se non se
       // ne paga.
       if (guida.pedaggioDavanti case final c? when !c.senzaPedaggi) 'pedaggio': c.perStima,
+      // Che strada si fa (dal percorso), per lo zoom sull'auto: vedi
+      // `zoomLontanoInGuida`.
+      'strada_kmh': ?a?.velocitaStradaKmh,
       'uscita': m?.uscita ?? '',
       'verso': m?.verso ?? '',
       'rotonda': m?.uscitaRotonda ?? (m != null && m.tipo == 26 ? uscitaDallaFrase(m.istruzione) : null),

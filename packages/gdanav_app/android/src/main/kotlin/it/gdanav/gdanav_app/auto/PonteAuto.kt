@@ -46,6 +46,8 @@ object PonteAuto {
         val svincolo: Int? = null,
         /** Il pedaggio che resta, per la scheda dell'arrivo: «~12,40 € pedaggio». */
         val pedaggio: String? = null,
+        /** Che strada si fa, dal percorso (la velocità prevista del tratto), per lo zoom. */
+        val stradaKmh: Double? = null,
     )
 
     /** Una corsia prima dello svincolo: le frecce, se è giusta, quale seguire. */
@@ -381,6 +383,7 @@ object PonteAuto {
                         dopoFrasi = frasi(call, "dopo_frasi"),
                         svincolo = numero(call, "svincolo")?.toInt(),
                         pedaggio = call.argument<String>("pedaggio"),
+                        stradaKmh = numero(call, "strada_kmh"),
                     )
                 } else {
                     null

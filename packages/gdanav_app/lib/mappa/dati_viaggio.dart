@@ -288,13 +288,26 @@ const _senzaFreccia = {0, 1, 2, 3, 4, 5, 6, 7, 8};
 /// La freccia della prossima manovra disegnata sul percorso, come nei
 /// navigatori: il tratto da poco prima a poco dopo, bianco e bordato, che
 /// segue esatto la rampa, e la punta dove si va.
+///
+/// «La freccia è grande, va oltre la linea blu»: era larga in metri (otto e
+/// mezzo, la punta sedici) e la linea in pixel, così a zoom alto in città la
+/// freccia era il doppio della linea; e la punta stava tredici metri OLTRE
+/// la fine del tratto, che a un incrocio subito dopo finiva fuori strada.
+/// Adesso la larghezza è quella della linea (vedi lo stile), la punta è
+/// un'icona in pixel posata sulla fine del tratto (un punto con la sua
+/// [rotta]), e il tratto si ferma dieci metri prima della manovra dopo.
 Map<String, Object?> datiManovra(Viaggio? v, Manovra? m, {double primaM = 60, double dopoM = 45}) {
   if (v == null || m == null || _senzaFreccia.contains(m.tipo) || v.percorso.punti.length < 2) {
     return _collezione([]);
   }
   final l = Linea(v.percorso.punti);
   final centro = l.cumulate[m.inizio.clamp(0, l.punti.length - 1)];
-  final fine = math.min(centro + dopoM, l.lunghezzaM);
+  // Mai fin sulla manovra dopo: la punta ci arriverebbe sopra, e sembrerebbe
+  // di dover girare lì.
+  final manovre = v.percorso.manovre;
+  final k = manovre.indexWhere((x) => x.inizio > m.inizio);
+  final dopo = k < 0 ? l.lunghezzaM : l.cumulate[manovre[k].inizio.clamp(0, l.punti.length - 1)];
+  final fine = math.min(math.max(centro + 10, math.min(centro + dopoM, dopo - _primaDellaDopoM)), l.lunghezzaM);
   final tratto = [
     _aMetri(l, math.max(0, centro - primaM)),
     for (var i = 0; i < l.punti.length; i++)
@@ -302,29 +315,19 @@ Map<String, Object?> datiManovra(Viaggio? v, Manovra? m, {double primaM = 60, do
     _aMetri(l, fine),
   ];
   if (tratto.length < 2 || fine - centro < 5) return _collezione([]);
-  // La punta: un triangolo sulla direzione dell'ultimo pezzo.
-  final rotta = rottaGradi(_aMetri(l, fine - 4), tratto.last) * math.pi / 180;
-  final base = tratto.last;
-  final punta = [
-    _sposta(base, rotta - math.pi / 2, 8),
-    _sposta(base, rotta, 13),
-    _sposta(base, rotta + math.pi / 2, 8),
-  ];
+  // La punta guarda come l'ultimo pezzo del tratto.
+  final rotta = rottaGradi(_aMetri(l, fine - 4), tratto.last);
   return _collezione([
     _elemento({
       'type': 'LineString',
       'coordinates': [for (final p in tratto) _xy(p)],
     }, const {}),
-    _elemento({
-      'type': 'Polygon',
-      'coordinates': [
-        [
-          for (final p in [...punta, punta.first]) _xy(p),
-        ],
-      ],
-    }, const {}),
+    _elemento({'type': 'Point', 'coordinates': _xy(tratto.last)}, {'rotta': rotta}),
   ]);
 }
+
+/// Quanto prima della manovra dopo si ferma il tratto della freccia.
+const _primaDellaDopoM = 10.0;
 
 /// Il punto del percorso a tanti metri dalla partenza.
 Punto _aMetri(Linea l, double metri) {
@@ -338,12 +341,6 @@ Punto _aMetri(Linea l, double metri) {
   }
   return l.punti.last;
 }
-
-/// Spostarsi di pochi metri in una direzione (in radianti, da nord).
-Punto _sposta(Punto p, double rotta, double metri) => Punto(
-  p.lat + metri * math.cos(rotta) / 111320,
-  p.lon + metri * math.sin(rotta) / (111320 * math.cos(p.lat * math.pi / 180)),
-);
 
 /// I distributori sulla mappa, col prezzo del [carburante] sotto l'icona.
 Map<String, Object?> datiDistributori(List<Distributore> elenco, Carburante carburante) => _collezione([

@@ -21,6 +21,10 @@ class PannelloOpzioniPercorso extends StatelessWidget {
   /// Mezzo centesimo in più o in meno, senza le briciole della virgola mobile.
   static double _passo(double v, int verso) => ((v * 1000).round() + 5 * verso) / 1000;
 
+  /// «0,30 €», e un centesimo in più o in meno.
+  static String _euro2(double v) => '${v.toStringAsFixed(2).replaceAll('.', ',')} €';
+  static double _passoCent(double v, int verso) => ((v * 100).round() + verso) / 100;
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
@@ -119,6 +123,25 @@ class PannelloOpzioniPercorso extends StatelessWidget {
           style: t.bodySmall,
         ),
         const SizedBox(height: 16),
+        // I prezzi per il costo del viaggio, nel riepilogo all'arrivo.
+        Text('Costo del viaggio', style: t.titleSmall),
+        _Prezzo(
+          chiave: 'kwh',
+          icona: Icons.bolt,
+          titolo: '${_euro2(o.euroAlKwh)} al kWh',
+          spiega: 'Per l\'elettrica: fra casa e colonnine.',
+          onMeno: o.euroAlKwh <= 0.05 ? null : () => onCambia(o.copia(euroAlKwh: _passoCent(o.euroAlKwh, -1))),
+          onPiu: o.euroAlKwh >= 1.2 ? null : () => onCambia(o.copia(euroAlKwh: _passoCent(o.euroAlKwh, 1))),
+        ),
+        _Prezzo(
+          chiave: 'litro',
+          icona: Icons.local_gas_station_outlined,
+          titolo: '${_euro2(o.euroAlLitro)} al litro',
+          spiega: 'Per la termica.',
+          onMeno: o.euroAlLitro <= 0.5 ? null : () => onCambia(o.copia(euroAlLitro: _passoCent(o.euroAlLitro, -1))),
+          onPiu: o.euroAlLitro >= 3.5 ? null : () => onCambia(o.copia(euroAlLitro: _passoCent(o.euroAlLitro, 1))),
+        ),
+        const SizedBox(height: 16),
         Text('In viaggio', style: t.titleSmall),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
@@ -134,6 +157,47 @@ class PannelloOpzioniPercorso extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Un prezzo con «−» e «+».
+class _Prezzo extends StatelessWidget {
+  const _Prezzo({
+    required this.chiave,
+    required this.icona,
+    required this.titolo,
+    required this.spiega,
+    required this.onMeno,
+    required this.onPiu,
+  });
+
+  final String chiave, titolo, spiega;
+  final IconData icona;
+  final VoidCallback? onMeno, onPiu;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    contentPadding: EdgeInsets.zero,
+    leading: Icon(icona),
+    title: Text(titolo),
+    subtitle: Text(spiega),
+    trailing: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          key: Key('prezzo-$chiave-meno'),
+          tooltip: 'Meno',
+          icon: const Icon(Icons.remove_circle_outline),
+          onPressed: onMeno,
+        ),
+        IconButton(
+          key: Key('prezzo-$chiave-piu'),
+          tooltip: 'Più',
+          icon: const Icon(Icons.add_circle_outline),
+          onPressed: onPiu,
+        ),
+      ],
+    ),
+  );
 }
 
 /// Dal menu: le opzioni valgono per i prossimi viaggi (e per quello in corso).

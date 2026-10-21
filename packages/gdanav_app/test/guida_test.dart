@@ -50,6 +50,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(a.guida.attiva, isFalse);
     expect(a.voce.frasi, contains('Sei arrivato.'));
+    // «Si deve interrompere con scritto arrivo, e un riepilogo del viaggio.»
+    expect(find.byKey(const Key('riepilogo-arrivo')), findsOneWidget);
+    expect(find.text('Sei arrivato'), findsOneWidget);
+    expect(find.text('Nord'), findsWidgets);
+    for (final riga in ['Durata', 'Distanza', 'Energia', 'Costo']) {
+      expect(find.text(riga), findsOneWidget, reason: riga);
+    }
+    final r = a.guida.riepilogo!;
+    expect(r.metri, closeTo(Linea(punti).lunghezzaM, 30));
+    expect(r.kwh, greaterThan(0));
+    await tester.tap(find.byKey(const Key('fine-arrivo')));
+    await tester.pumpAndSettle();
+    expect(a.guida.riepilogo, isNull);
+    expect(find.byKey(const Key('riepilogo-arrivo')), findsNothing);
   });
 
   testWidgets('uscendo di strada si ricalcola', (tester) async {
@@ -167,6 +181,49 @@ void main() {
     // Il percorso parte da dove si è, col verso in cui si va.
     expect(tappe.last.first, isA<PuntoInMoto>());
     expect((tappe.last.first as PuntoInMoto).rotta, 90);
+    await tester.runAsync(a.guida.ferma);
+  });
+
+  testWidgets('dal campo: le soste rifatte per il consumo non tolgono il viaggio dallo schermo', (tester) async {
+    // «In autostrada all'improvviso ricalcola il percorso, non avevo uscite»:
+    // il ricalcolo per il consumo rifaceva il viaggio da capo, e intanto in
+    // auto spariva la linea e restava «Calcolo il percorso per…».
+    var chiesteAlGps = 0;
+    final arriva = Completer<void>();
+    var inAttesa = false;
+    final a = await inViaggio(
+      tester,
+      dove: () async {
+        chiesteAlGps++;
+        return const Punto(42, 12);
+      },
+      costruisci: (_, profilo, preferenze, _) => PianificatoreViaggio(
+        percorsi: (t) async {
+          if (inAttesa) await arriva.future;
+          return dritta(20);
+        },
+        colonnine: ColonnineFinte(),
+        profilo: profilo,
+        preferenze: preferenze,
+      ),
+    );
+    await tester.tap(find.text('Avvia'));
+    await tester.pumpAndSettle();
+    final primo = a.viaggio.stato as ViaggioPronto;
+    await vai(tester, a, primo.viaggio.percorso.punti[3]);
+    final gps = chiesteAlGps;
+    inAttesa = true;
+    unawaited(a.guida.ricalcolaOra());
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+    await tester.pump();
+    expect(a.guida.ricalcolando, isTrue);
+    expect(a.viaggio.stato, same(primo), reason: 'mai «Calcolo il percorso» in guida');
+    expect(a.guida.attiva, isTrue);
+    arriva.complete();
+    await finisceIlRicalcolo(tester, a);
+    expect(a.viaggio.stato, isA<ViaggioPronto>());
+    expect(a.viaggio.stato, isNot(same(primo)));
+    expect(chiesteAlGps, gps);
     await tester.runAsync(a.guida.ferma);
   });
 

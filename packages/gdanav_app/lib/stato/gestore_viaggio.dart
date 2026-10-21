@@ -731,7 +731,13 @@ class GestoreViaggio extends ChangeNotifier {
   /// [fattiM]: quanto del viaggio di adesso è già fatto (le soste prima non
   /// valgono più). [batteria]: quella di adesso, se la si sa meglio
   /// dell'auto. `true` se il viaggio nuovo è arrivato.
-  Future<bool> ricalcolaDa(Punto partenza, {double fattiM = 0, double? batteria}) async {
+  ///
+  /// [rifaiLeSoste]: il consumo vero si è allontanato dal piano, e le soste
+  /// si scelgono di nuovo (fra le colonnine già note) invece di restare
+  /// obbligate. Anche questo senza togliere il viaggio dallo schermo: col
+  /// calcolo intero, in autostrada, la linea spariva e in auto restava
+  /// «Calcolo il percorso per…» senza nessuna uscita in vista.
+  Future<bool> ricalcolaDa(Punto partenza, {double fattiM = 0, double? batteria, bool rifaiLeSoste = false}) async {
     final d = destinazione, prima = stato;
     if (d == null || prima is! ViaggioPronto) return false;
     final impostazioni = await archivio.impostazioni();
@@ -762,8 +768,9 @@ class GestoreViaggio extends ChangeNotifier {
         final carica = batteria ?? auto.stato?.batteria ?? prima.batteriaPartenza;
         // Le soste ancora davanti restano: il percorso nuovo ci deve passare.
         final soste = {
-          for (final s in prima.viaggio.piano!.soste)
-            if (s.colonnina.distanzaM > fattiM) s.colonnina.id,
+          if (!rifaiLeSoste)
+            for (final s in prima.viaggio.piano!.soste)
+              if (s.colonnina.distanzaM > fattiM) s.colonnina.id,
         };
         final note = [for (final c in prima.viaggio.colonnine) ?c.dettaglio];
         // Senza i dettagli delle colonnine (un viaggio vecchio) le soste non si

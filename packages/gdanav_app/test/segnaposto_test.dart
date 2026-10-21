@@ -59,18 +59,18 @@ void main() {
     preparaPiattaforma();
     final a = await ambiente(tester);
     await tester.pumpWidget(a.app());
-    expect(a.posizione.segnaposto, Segnaposto.autoBlu);
+    expect(a.posizione.segnaposto, Segnaposto.freccia);
     await tester.tap(find.byTooltip('Menu'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('La tua auto'));
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
     await tester.pumpAndSettle();
     expect(find.text('Come ti vedi sulla mappa'), findsOneWidget);
-    await tester.tap(find.text('Freccia'));
+    await tester.tap(find.text('Auto rossa'));
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
     await tester.pump();
-    expect(a.posizione.segnaposto, Segnaposto.freccia);
+    expect(a.posizione.segnaposto, Segnaposto.autoRossa);
     final ricordato = await tester.runAsync(() => Archivio().segnaposto());
-    expect(ricordato, Segnaposto.freccia);
+    expect(ricordato, Segnaposto.autoRossa);
   });
 }
