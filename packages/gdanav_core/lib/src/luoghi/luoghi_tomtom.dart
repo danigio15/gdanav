@@ -105,3 +105,98 @@ class LuoghiConRiserva implements FonteLuoghi {
     return riserva.cerca(testo, vicinoA: vicinoA);
   }
 }
+
+/// Tutte e due le fonti insieme, e prima quello che si chiama come si e'
+/// scritto.
+///
+/// «Esiste come locale ma non lo trovi»: «nonna ma burger» dava solo la
+/// pizzeria con lo stesso nome davanti. TomTom e OpenStreetMap conoscono
+/// locali diversi — un pub aperto da poco, un ristorante che solo uno dei due
+/// ha — e usarne uno e tenere l'altro di riserva voleva dire perdere quelli
+/// dell'altro. Adesso si chiedono insieme: i risultati si mettono uno dopo
+/// l'altro, quelli doppi (stesso nome, a meno di 150 m) una volta sola, e in
+/// testa vanno quelli col nome che contiene tutte le parole scritte, accenti
+/// e maiuscole a parte. Se una fonte non risponde, resta l'altra.
+class LuoghiInsieme implements FonteLuoghi {
+  const LuoghiInsieme(this.prima, this.seconda, {this.quanti = 12});
+
+  final FonteLuoghi prima;
+  final FonteLuoghi seconda;
+  final int quanti;
+
+  @override
+  Future<List<Luogo>> cerca(String testo, {Punto? vicinoA}) async {
+    Future<List<Luogo>?> da(FonteLuoghi f) async {
+      try {
+        return await f.cerca(testo, vicinoA: vicinoA);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final risposte = await Future.wait([da(prima), da(seconda)]);
+    if (risposte.every((r) => r == null)) {
+      // Nessuna delle due ha risposto: lo dice la seconda, col suo errore.
+      return seconda.cerca(testo, vicinoA: vicinoA);
+    }
+    final tutti = <Luogo>[];
+    for (final l in [...?risposte[0], ...?risposte[1]]) {
+      final doppio =
+          tutti.any((g) => normalizzato(g.nome) == normalizzato(l.nome) && distanzaM(g.posizione, l.posizione) < 150);
+      if (!doppio) tutti.add(l);
+    }
+    return ordinatiPerNome(tutti, testo).take(quanti).toList();
+  }
+
+  /// Minuscole, senza accenti e senza segni: «Nonna Mà» e «nonna ma» sono la
+  /// stessa cosa.
+  static String normalizzato(String s) {
+    const accenti = {
+      'à': 'a',
+      'á': 'a',
+      'â': 'a',
+      'ä': 'a',
+      'è': 'e',
+      'é': 'e',
+      'ê': 'e',
+      'ë': 'e',
+      'ì': 'i',
+      'í': 'i',
+      'î': 'i',
+      'ï': 'i',
+      'ò': 'o',
+      'ó': 'o',
+      'ô': 'o',
+      'ö': 'o',
+      'ù': 'u',
+      'ú': 'u',
+      'û': 'u',
+      'ü': 'u',
+      'ç': 'c',
+      'ñ': 'n'
+    };
+    final minuscolo = s.toLowerCase();
+    final b = StringBuffer();
+    for (final c in minuscolo.split('')) {
+      b.write(accenti[c] ?? c);
+    }
+    return b.toString().replaceAll(RegExp(r"[^a-z0-9]+"), ' ').trim();
+  }
+
+  /// I luoghi in ordine di quante parole scritte hanno nel nome (contano
+  /// anche quelle a meta': «burg» vale «burger»); a parita', l'ordine delle
+  /// fonti, che sanno gia' cosa e' vicino.
+  static List<Luogo> ordinatiPerNome(List<Luogo> luoghi, String testo) {
+    final parole = normalizzato(testo).split(' ').where((p) => p.length >= 2).toList();
+    if (parole.isEmpty) return luoghi;
+    int punti(Luogo l) {
+      final nome = normalizzato(l.nome).split(' ');
+      final trovate = parole.where((p) => nome.any((n) => n.startsWith(p))).length;
+      return trovate == parole.length ? trovate + 100 : trovate;
+    }
+
+    final conPunti = [for (var i = 0; i < luoghi.length; i++) (i, punti(luoghi[i]), luoghi[i])];
+    conPunti.sort((a, b) => b.$2 != a.$2 ? b.$2.compareTo(a.$2) : a.$1.compareTo(b.$1));
+    return [for (final c in conPunti) c.$3];
+  }
+}
