@@ -52,7 +52,9 @@ void main() {
     expect(await ids(), ['lenta', 'plenitude']);
   });
 
-  testWidgets('tutte le colonnine: partono quando le chiede la mappa, e si rifanno se cambia la scelta', (tester) async {
+  testWidgets('tutte le colonnine: partono quando le chiede la mappa, e si rifanno se cambia la scelta', (
+    tester,
+  ) async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
     final a = await ambiente(tester);
     var giri = 0;

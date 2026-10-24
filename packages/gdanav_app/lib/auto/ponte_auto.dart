@@ -174,6 +174,9 @@ class PonteAuto {
       // i dati dell'auto si chiedono freschi anche senza un percorso.
       case 'in_auto':
         auto?.schermoDellAuto(a['si'] == true);
+        // E i viaggi pianificati, letti freschi: quello pianificato poco fa
+        // sul telefono deve esserci in «Dove andiamo?».
+        if (a['si'] == true && pianificati != null) unawaited(pianificati!.carica());
       // Android Auto accende la prova di guida: da qui ogni guida si percorre
       // da sola, e se non c'è ancora una meta se ne sceglie una.
       case 'prova_guida':
@@ -547,7 +550,8 @@ class PonteAuto {
         },
         'tipo': 'autovelox',
         if (t case TutorDavanti(:final metri)) 'metri': metri,
-        if (t case final DentroTutor d) 'testo': 'mancano ${distanzaBreve(d.restantiM)}${d.sopra() ? ' · rallenta' : ''}',
+        if (t case final DentroTutor d)
+          'testo': 'mancano ${distanzaBreve(d.restantiM)}${d.sopra() ? ' · rallenta' : ''}',
         'limite': t.tratto.limiteKmh,
       } else if (z != null) ...{
         'titolo': z.titolo,
@@ -906,7 +910,9 @@ class PonteAuto {
       'velocita_ms': velocita.isFinite ? velocita : 0.0,
       'icona': posizione.segnaposto.immagine,
       if (pista != null && metri != null) ...{
-        'pista': [for (final p in pista) ...[p.lat, p.lon]],
+        'pista': [
+          for (final p in pista) ...[p.lat, p.lon],
+        ],
         'pista_qui': metri - da,
       },
     });

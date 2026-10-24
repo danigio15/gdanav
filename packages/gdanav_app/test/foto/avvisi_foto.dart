@@ -82,7 +82,10 @@ void main() {
       const tratto = TrattoTutor(id: 't', inizio: Punto(44, 11), fine: Punto(44.1, 11), limiteKmh: 130);
       Widget titolo(String t) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-        child: Text(t, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF475569))),
+        child: Text(
+          t,
+          style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+        ),
       );
       await tester.pumpWidget(
         MaterialApp(

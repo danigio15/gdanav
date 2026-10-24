@@ -141,7 +141,9 @@ class RigaPedaggio extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Flexible(child: Text(dettaglio, style: tema.textTheme.bodySmall?.copyWith(color: muto))),
+                    Flexible(
+                      child: Text(dettaglio, style: tema.textTheme.bodySmall?.copyWith(color: muto)),
+                    ),
                     if (onTap != null && costo.conPrezzo) ...[
                       const SizedBox(width: 4),
                       Icon(Icons.info_outline_rounded, size: 16, color: muto),
@@ -293,7 +295,11 @@ class ScelteStrada extends StatelessWidget {
                             nome,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: t.labelSmall?.copyWith(color: colore, fontWeight: FontWeight.w800, letterSpacing: 0.6),
+                            style: t.labelSmall?.copyWith(
+                              color: colore,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.6,
+                            ),
                           ),
                         ),
                       ],

@@ -254,36 +254,37 @@ void main() {
     await tester.pump();
   });
 
-  testWidgets('su iPhone in sottofondo il flusso aperto si tiene: niente chiusure, riaperture né domande; davanti si riprende', (
-    tester,
-  ) async {
-    final finto = GpsFinto();
-    var davanti = false;
-    final gps = FlussoGps(
-      apri: finto.apri,
-      chiedi: finto.chiedi,
-      orologio: () => tester.binding.clock.now(),
-      siPuoRiaprire: () => davanti,
-    );
-    final arrivate = <Position>[];
-    final iscrizione = gps.posizioni.listen(arrivate.add);
-    expect(finto.flussi, hasLength(1));
-    // Telefono bloccato: un minuto di silenzio, e un errore dal flusso.
-    await tester.pump(const Duration(seconds: 60));
-    finto.flussi.first.addError(Exception('posizione chiesta fallita'));
-    await tester.pump(const Duration(seconds: 30));
-    expect(finto.flussi, hasLength(1), reason: 'non si chiude e non si riapre');
-    expect(finto.domande, isEmpty);
-    // Il flusso tenuto aperto continua a portare posizioni.
-    finto.flussi.first.add(_a(45.1));
-    await tester.pump();
-    expect(arrivate.single.latitude, 45.1);
-    // L'app torna davanti: la sentinella riprende a guardare.
-    davanti = true;
-    await tester.pump(const Duration(seconds: 6));
-    expect(finto.domande, hasLength(1));
-    finto.rispondi(45.2);
-    await tester.pump();
-    unawaited(iscrizione.cancel());
-  });
+  testWidgets(
+    'su iPhone in sottofondo il flusso aperto si tiene: niente chiusure, riaperture né domande; davanti si riprende',
+    (tester) async {
+      final finto = GpsFinto();
+      var davanti = false;
+      final gps = FlussoGps(
+        apri: finto.apri,
+        chiedi: finto.chiedi,
+        orologio: () => tester.binding.clock.now(),
+        siPuoRiaprire: () => davanti,
+      );
+      final arrivate = <Position>[];
+      final iscrizione = gps.posizioni.listen(arrivate.add);
+      expect(finto.flussi, hasLength(1));
+      // Telefono bloccato: un minuto di silenzio, e un errore dal flusso.
+      await tester.pump(const Duration(seconds: 60));
+      finto.flussi.first.addError(Exception('posizione chiesta fallita'));
+      await tester.pump(const Duration(seconds: 30));
+      expect(finto.flussi, hasLength(1), reason: 'non si chiude e non si riapre');
+      expect(finto.domande, isEmpty);
+      // Il flusso tenuto aperto continua a portare posizioni.
+      finto.flussi.first.add(_a(45.1));
+      await tester.pump();
+      expect(arrivate.single.latitude, 45.1);
+      // L'app torna davanti: la sentinella riprende a guardare.
+      davanti = true;
+      await tester.pump(const Duration(seconds: 6));
+      expect(finto.domande, hasLength(1));
+      finto.rispondi(45.2);
+      await tester.pump();
+      unawaited(iscrizione.cancel());
+    },
+  );
 }

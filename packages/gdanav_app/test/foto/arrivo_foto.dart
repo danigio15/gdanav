@@ -87,11 +87,16 @@ void main() {
           theme: temaGdanav(scuro ? Brightness.dark : Brightness.light),
           home: Scaffold(
             backgroundColor: Colors.transparent,
-            body: Stack(children: [RiepilogoArrivo(riepilogo: elettrica, onFine: () {})]),
+            body: Stack(
+              children: [RiepilogoArrivo(riepilogo: elettrica, onFine: () {})],
+            ),
           ),
         ),
       );
-      await expectLater(find.byType(MaterialApp), matchesGoldenFile('$dove/scheda-arrivo-${scuro ? 'scuro' : 'chiaro'}.png'));
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('$dove/scheda-arrivo-${scuro ? 'scuro' : 'chiaro'}.png'),
+      );
     });
   }
 
@@ -116,7 +121,10 @@ void main() {
             ),
           ),
         );
-        await expectLater(find.byType(MaterialApp), matchesGoldenFile('$dove/arrivo-$nome-${scuro ? 'scuro' : 'chiaro'}.png'));
+        await expectLater(
+          find.byType(MaterialApp),
+          matchesGoldenFile('$dove/arrivo-$nome-${scuro ? 'scuro' : 'chiaro'}.png'),
+        );
       });
     }
   }
@@ -147,7 +155,10 @@ void main() {
           ),
         ),
       );
-      await expectLater(find.byType(MaterialApp), matchesGoldenFile('$dove/quanto-hai-speso-${scuro ? 'scuro' : 'chiaro'}.png'));
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('$dove/quanto-hai-speso-${scuro ? 'scuro' : 'chiaro'}.png'),
+      );
     });
   }
 }

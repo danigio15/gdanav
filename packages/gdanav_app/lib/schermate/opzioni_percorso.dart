@@ -81,16 +81,16 @@ class PannelloOpzioniPercorso extends StatelessWidget {
         Text('Pedaggio', style: t.titleSmall),
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: Icon(o.classePedaggio == ClassePedaggio.a ? Icons.directions_car_outlined : Icons.local_shipping_outlined),
+          leading: Icon(
+            o.classePedaggio == ClassePedaggio.a ? Icons.directions_car_outlined : Icons.local_shipping_outlined,
+          ),
           title: const Text('Classe del veicolo'),
           subtitle: Text(o.classePedaggio.descrizione),
           trailing: DropdownButton<ClassePedaggio>(
             key: const Key('classe-pedaggio'),
             value: o.classePedaggio,
             underline: const SizedBox.shrink(),
-            items: [
-              for (final c in ClassePedaggio.values) DropdownMenuItem(value: c, child: Text(c.nome)),
-            ],
+            items: [for (final c in ClassePedaggio.values) DropdownMenuItem(value: c, child: Text(c.nome))],
             onChanged: (c) => c == null ? null : onCambia(o.copia(classePedaggio: c)),
           ),
         ),

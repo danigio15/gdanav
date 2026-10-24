@@ -227,10 +227,9 @@ void main() {
     expect(nomi, ['ZTL · attiva fino alle 18', 'Area pedonale']);
     // La sera è spenta fino al mattino dopo.
     final sera = datiZtl([orari], DateTime(2026, 9, 29, 20));
-    expect(
-      [for (final e in (sera['features']! as List).cast<Map<String, Object?>>()) (e['properties']! as Map)['etichetta']],
-      contains('ZTL · non attiva fino alle 6:30'),
-    );
+    expect([
+      for (final e in (sera['features']! as List).cast<Map<String, Object?>>()) (e['properties']! as Map)['etichetta'],
+    ], contains('ZTL · non attiva fino alle 6:30'));
 
     final p = dritta(20);
     final conDomanda = p.conZtl(

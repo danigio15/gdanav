@@ -180,7 +180,9 @@ Map<String, Object?> datiZtl(Iterable<ZonaLimitata> zone, DateTime ora) => _coll
           {
             'type': 'Polygon',
             'coordinates': [
-              [for (final p in [...a, a.first]) _xy(p)],
+              [
+                for (final p in [...a, a.first]) _xy(p),
+              ],
             ],
           },
           {'tipo': z.tipo.name, 'attiva': z.attivaAlle(ora)},
@@ -400,7 +402,8 @@ Map<String, Object?> datiColonnineTutte(List<Colonnina> elenco, Set<TipoConnetto
 /// «Al Centro Direzionale è 1, ma sono 200 prese.» Un'icona è un posto, e un
 /// posto può avere una presa o duecento: contare le icone diceva quanti
 /// posti, non quante auto ci si possono attaccare.
-int preseAdatte(Colonnina c, Set<TipoConnettore> connettori) => c.connettori.where((p) => connettori.contains(p.tipo)).length;
+int preseAdatte(Colonnina c, Set<TipoConnettore> connettori) =>
+    c.connettori.where((p) => connettori.contains(p.tipo)).length;
 
 /// Il riquadro che contiene tutto il percorso: sud-ovest e nord-est.
 (Punto, Punto)? confini(Viaggio v, {List<PercorsoCalcolato> anche = const []}) {

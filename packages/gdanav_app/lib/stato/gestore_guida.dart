@@ -657,9 +657,7 @@ class GestoreGuida extends ChangeNotifier {
       if (quanto <= 500 && (vicina == null || quanto < (vicina.distanzaM - percorsiM).abs())) vicina = c;
     }
     if (vicina == null) return ('Ricarica per strada', null);
-    final corrente = vicina.potenzaKw >= 150
-        ? Corrente.hpc
-        : (vicina.potenzaKw >= 50 ? Corrente.dc : Corrente.ac);
+    final corrente = vicina.potenzaKw >= 150 ? Corrente.hpc : (vicina.potenzaKw >= 50 ? Corrente.dc : Corrente.ac);
     final t = vicina.dettaglio?.prezzi?.perCorrente[corrente];
     final energia = t?.energia;
     if (energia == null) return (vicina.nome, null);

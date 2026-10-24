@@ -761,6 +761,8 @@ class GestoreViaggiPianificati extends ChangeNotifier {
   /// parte.
   void cambiaFonte(FonteViaggi f) {
     if (identical(f, _fonte)) return;
+    _tentativi = 0;
+    _riprova?.cancel();
     _fonte = f;
     viaggi = [];
     _sosteProvate.clear();
@@ -775,15 +777,42 @@ class GestoreViaggiPianificati extends ChangeNotifier {
       sbloccato = r.sbloccato;
       viaggi = r.viaggi;
       errore = null;
+      _tentativi = 0;
     } on ErroreViaggi catch (e) {
       errore = e.messaggio;
+      if (e.codice == 'casa') _riprovaPiuTardi();
     } catch (_) {
       errore = 'Non riesco a leggere i viaggi.';
+      _riprovaPiuTardi();
     } finally {
       caricando = false;
       notifyListeners();
     }
     unawaited(_stimeVecchie());
+  }
+
+  /* «Ho pianificato il viaggio sull'app ma in auto non l'ho trovato.» I
+   * viaggi si leggevano una volta sola, all'avvio: se in quel momento la casa
+   * non rispondeva ancora — l'app aperta da Android Auto con il telefono in
+   * tasca, il collegamento che si alza dopo — l'elenco restava vuoto e
+   * nessuno lo richiedeva piu'. Adesso si riprova: dopo 5 secondi, poi 15,
+   * 30, e poi ogni minuto, finche' la casa risponde. Un «no» della casa (il
+   * Premium, un viaggio sbagliato) non si riprova: e' una risposta. */
+  Timer? _riprova;
+  var _tentativi = 0;
+  static const _attese = [Duration(seconds: 5), Duration(seconds: 15), Duration(seconds: 30), Duration(minutes: 1)];
+
+  void _riprovaPiuTardi() {
+    _riprova?.cancel();
+    final attesa = _attese[math.min(_tentativi, _attese.length - 1)];
+    _tentativi++;
+    _riprova = Timer(attesa, () => unawaited(carica()));
+  }
+
+  @override
+  void dispose() {
+    _riprova?.cancel();
+    super.dispose();
   }
 
   /// Salva e torna il viaggio salvato; l'errore si lancia ([ErroreViaggi]).

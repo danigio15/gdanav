@@ -126,7 +126,8 @@ Future<GdanavApp> preparaGdanav({
   premium.addListener(() {
     if (premium.sbloccato == eraPremium) return;
     eraPremium = premium.sbloccato;
-    if (viaggio.stato is ViaggioPronto && viaggio.destinazione != null) unawaited(viaggio.pianifica(viaggio.destinazione!));
+    if (viaggio.stato is ViaggioPronto && viaggio.destinazione != null)
+      unawaited(viaggio.pianifica(viaggio.destinazione!));
   });
   // Le strade a risparmio: in guida la strada si confronta con le altre, col
   // modello di consumo dell'auto (TomTom).
@@ -210,11 +211,11 @@ Future<GdanavApp> preparaGdanav({
     // Una versione da aggiornare spegne anche l'auto: lì si dice di
     // aggiornare GdANav sul telefono.
     void premiumInAuto() => ponte.premium(
-          premium.sbloccato,
-          ospite: premium.daOspite,
-          aggiorna: aggiornamento?.daAggiornare ?? false,
-          guidaInAuto: premium.sbloccato || (guidaInAutoSenzaPremium?.value ?? false),
-        );
+      premium.sbloccato,
+      ospite: premium.daOspite,
+      aggiorna: aggiornamento?.daAggiornare ?? false,
+      guidaInAuto: premium.sbloccato || (guidaInAutoSenzaPremium?.value ?? false),
+    );
     premiumInAuto();
     premium.addListener(premiumInAuto);
     aggiornamento?.addListener(premiumInAuto);

@@ -145,6 +145,9 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
 
         ascolto = PonteAuto.shared.ascolta { [weak self] in self?.novita() }
         novita()
+        // Come Android Auto: lo schermo dell'auto si è acceso. Il telefono
+        // rilegge i dati dell'auto e i viaggi pianificati.
+        PonteAuto.shared.chiedi("in_auto", ["si": true])
         GdanavCarPlay.alCollegamento?(true)
     }
 
@@ -168,6 +171,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         controllore = nil
         finestra = nil
         if GdanavCarPlay.attuale === self { GdanavCarPlay.attuale = nil }
+        PonteAuto.shared.chiedi("in_auto", ["si": false])
         GdanavCarPlay.alCollegamento?(false)
     }
 

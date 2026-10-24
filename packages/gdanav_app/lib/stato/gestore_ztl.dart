@@ -98,14 +98,27 @@ class GestoreZtl extends ChangeNotifier {
   Map<String, bool> get permessi => {for (final MapEntry(:key, :value) in scelte.permessi.entries) key: value.si};
 
   /// La risposta alla domanda del percorso: si ricorda per quella ZTL.
-  Future<void> rispondi(ZonaLimitata z, bool si) =>
-      _salva(scelte.copia(permessi: {...scelte.permessi, z.chiave: PermessoZtl(si: si, nome: z.etichetta)}));
+  Future<void> rispondi(ZonaLimitata z, bool si) => _salva(
+    scelte.copia(
+      permessi: {
+        ...scelte.permessi,
+        z.chiave: PermessoZtl(si: si, nome: z.etichetta),
+      },
+    ),
+  );
 
   /// L'interruttore dell'elenco: cambiata idea.
   Future<void> cambia(String chiave, bool si) async {
     final p = scelte.permessi[chiave];
     if (p == null || p.si == si) return;
-    await _salva(scelte.copia(permessi: {...scelte.permessi, chiave: PermessoZtl(si: si, nome: p.nome)}));
+    await _salva(
+      scelte.copia(
+        permessi: {
+          ...scelte.permessi,
+          chiave: PermessoZtl(si: si, nome: p.nome),
+        },
+      ),
+    );
   }
 
   /// Via dall'elenco: la prossima volta si richiede.

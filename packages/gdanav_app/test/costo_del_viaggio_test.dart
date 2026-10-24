@@ -34,12 +34,8 @@ void main() {
       };
     };
     final a = await ambiente(tester, km: 20, gdahome: casa);
-    StatoAuto leggo(double batteria, {bool? inCarica}) => StatoAuto(
-      sorgente: TipoSorgente.gdahome,
-      letto: DateTime.now(),
-      batteria: batteria,
-      inCarica: inCarica,
-    );
+    StatoAuto leggo(double batteria, {bool? inCarica}) =>
+        StatoAuto(sorgente: TipoSorgente.gdahome, letto: DateTime.now(), batteria: batteria, inCarica: inCarica);
     casa.manda(leggo(100));
     await tester.pump();
     await tester.runAsync(() => a.viaggio.cambiaOpzioni(const OpzioniPercorso(ricalcoloAutomatico: false)));

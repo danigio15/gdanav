@@ -311,10 +311,7 @@ class _Scheda extends StatelessWidget {
             ),
           ),
         ),
-        if (credito != null) ...[
-          const SizedBox(height: 8),
-          Text(credito, style: t.bodySmall?.copyWith(color: muto)),
-        ],
+        if (credito != null) ...[const SizedBox(height: 8), Text(credito, style: t.bodySmall?.copyWith(color: muto))],
       ],
     );
   }

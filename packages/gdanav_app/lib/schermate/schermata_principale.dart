@@ -615,21 +615,21 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                     // Dentro GdAHome la casa c'è già: niente codice QR per
                     // abbinare Home Assistant (vedi `conHomeAssistant`).
                     if (conHomeAssistant(widget.auto))
-                    _VoceMenu(
-                      icona: Icons.home_rounded,
-                      colore: const Color(0xFF0EA5E9),
-                      titolo: 'Home Assistant',
-                      sotto: !sbloccato
-                          ? 'Premium'
-                          : ha == null
-                          ? 'Non collegata'
-                          : 'Collegata${ha.nomeAuto.isEmpty ? '' : ' a ${ha.nomeAuto}'}',
-                      onTap: () => vai(
-                        sbloccato
-                            ? AbbinaHomeAssistant(gestore: widget.auto)
-                            : SchermataPremium(premium: widget.premium!, perche: 'Home Assistant'),
+                      _VoceMenu(
+                        icona: Icons.home_rounded,
+                        colore: const Color(0xFF0EA5E9),
+                        titolo: 'Home Assistant',
+                        sotto: !sbloccato
+                            ? 'Premium'
+                            : ha == null
+                            ? 'Non collegata'
+                            : 'Collegata${ha.nomeAuto.isEmpty ? '' : ' a ${ha.nomeAuto}'}',
+                        onTap: () => vai(
+                          sbloccato
+                              ? AbbinaHomeAssistant(gestore: widget.auto)
+                              : SchermataPremium(premium: widget.premium!, perche: 'Home Assistant'),
+                        ),
                       ),
-                    ),
                     // GdAHome: l'auto della plancia di GdAHome, da sola. Niente
                     // Premium e niente abbinamento: dentro GdAHome la casa c'è già.
                     _VoceMenu(
@@ -792,7 +792,11 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
             child: ListenableBuilder(
               listenable: _avvisi,
               builder: (context, _) => switch (_avvisi.davanti) {
-                (final s, final m) => AvvisoSegnalazione(key: const Key('avviso-senza-percorso'), segnalazione: s, metri: m),
+                (final s, final m) => AvvisoSegnalazione(
+                  key: const Key('avviso-senza-percorso'),
+                  segnalazione: s,
+                  metri: m,
+                ),
                 null => const SizedBox.shrink(),
               },
             ),

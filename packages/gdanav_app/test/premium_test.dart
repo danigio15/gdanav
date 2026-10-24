@@ -298,7 +298,12 @@ void main() {
     preparaPiattaforma();
     final p = GestorePremium(archivio: Archivio(), tuttoSbloccato: false);
     await tester.runAsync(p.carica);
-    await tester.pumpWidget(MaterialApp(theme: temaGdanav(Brightness.light), home: SchermataPremium(premium: p)));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: temaGdanav(Brightness.light),
+        home: SchermataPremium(premium: p),
+      ),
+    );
     expect(find.text('29,99 €/anno'), findsOneWidget);
     expect(find.text('2,99 €/mese'), findsOneWidget);
     expect(find.text('Risparmi il 16%'), findsOneWidget);

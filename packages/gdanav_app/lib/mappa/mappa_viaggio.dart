@@ -223,12 +223,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
       return;
     }
     final b = await m.getVisibleRegion();
-    final visto = Rettangolo(
-      b.southwest.latitude,
-      b.southwest.longitude,
-      b.northeast.latitude,
-      b.northeast.longitude,
-    );
+    final visto = Rettangolo(b.southwest.latitude, b.southwest.longitude, b.northeast.latitude, b.northeast.longitude);
     final pedonali = zoom >= _zoomPedonali;
     final gia = _zoneDisegnate;
     if (gia != null &&
@@ -239,7 +234,12 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     }
     // Mezzo schermo in più per lato: spostandosi un poco non si rimanda niente.
     final alto = visto.nord - visto.sud, largo = visto.est - visto.ovest;
-    final dove = Rettangolo(visto.sud - alto / 2, visto.ovest - largo / 2, visto.nord + alto / 2, visto.est + largo / 2);
+    final dove = Rettangolo(
+      visto.sud - alto / 2,
+      visto.ovest - largo / 2,
+      visto.nord + alto / 2,
+      visto.est + largo / 2,
+    );
     _zoneDisegnate = dove;
     _zoneConPedonali = pedonali;
     final archivio = await g.zone();
@@ -397,8 +397,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
       );
 
   /// Fin dove non si gira: la prossima manovra, o l'arrivo se non ce ne sono più.
-  static double _allaProssima(Avanzamento? a) =>
-      a == null ? 0 : (a.prossima == null ? a.restantiM : a.allaProssimaM);
+  static double _allaProssima(Avanzamento? a) => a == null ? 0 : (a.prossima == null ? a.restantiM : a.allaProssimaM);
 
   /// Se l'auto la muovono i fotogrammi: in guida, con la mappa che la segue,
   /// agganciata alla strada, e senza lo schermo dell'auto acceso (lì la mappa
@@ -810,7 +809,10 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   Future<void> _segnalazioni() async {
     final m = _mappa, g = widget.segnalazioni;
     if (m == null || !_stileCaricato || g == null) return;
-    await m.setGeoJsonSource(sorgenteSegnalazioni, datiSegnalazioni(g.vicine, widget.guida?.avvisi).cast<String, dynamic>());
+    await m.setGeoJsonSource(
+      sorgenteSegnalazioni,
+      datiSegnalazioni(g.vicine, widget.guida?.avvisi).cast<String, dynamic>(),
+    );
   }
 
   GestoreRisparmio? get _gestoreRisparmio => widget.risparmio ?? widget.guida?.risparmio;

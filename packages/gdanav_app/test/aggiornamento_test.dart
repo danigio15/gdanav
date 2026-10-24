@@ -191,7 +191,11 @@ void main() {
 
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     try {
-      await tester.pumpWidget(MaterialApp(home: SchermataAggiorna(key: UniqueKey(), apri: (u) async => aperti.add(u))));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SchermataAggiorna(key: UniqueKey(), apri: (u) async => aperti.add(u)),
+        ),
+      );
       expect(find.text('Aggiorna dall\'App Store'), findsOneWidget);
       await tester.tap(find.byKey(const Key('aggiorna-negozio')));
       expect(aperti.last.first.scheme, 'itms-apps');

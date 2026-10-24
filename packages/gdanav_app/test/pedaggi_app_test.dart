@@ -42,9 +42,7 @@ void main() {
         preferenze: preferenze,
       );
 
-  testWidgets('le strade come in Waze: il pedaggio di quella che lo ha, «Senza pedaggi» sull\'altra', (
-    tester,
-  ) async {
+  testWidgets('le strade come in Waze: il pedaggio di quella che lo ha, «Senza pedaggi» sull\'altra', (tester) async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
     final a = await ambiente(tester, costruisci: dueStrade());
     await tester.pumpWidget(a.app());
@@ -104,7 +102,11 @@ void main() {
 
     await tester.tap(find.byKey(const Key('riga-pedaggio')));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.byKey(const Key('tariffa-piu')), 200, scrollable: find.byType(Scrollable).last);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('tariffa-piu')),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.byKey(const Key('tariffa-piu')));
     await tester.pumpAndSettle();
     expect(a.viaggio.opzioni.euroAlKm, closeTo(0.085, 1e-9));
@@ -124,10 +126,7 @@ void main() {
 
     expect(a.guida.pedaggioDavanti?.euro, 8.0);
     // Accanto ai km che restano.
-    expect(
-      find.descendant(of: find.byKey(const Key('restanti')), matching: find.text('~8,00 €')),
-      findsOneWidget,
-    );
+    expect(find.descendant(of: find.byKey(const Key('restanti')), matching: find.text('~8,00 €')), findsOneWidget);
 
     // Oltre il km 120 l'autostrada è finita.
     a.posizioni.add(const Punto(42 + 130 * 0.009, 12));

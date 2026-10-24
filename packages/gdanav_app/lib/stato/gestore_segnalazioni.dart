@@ -21,9 +21,7 @@ class GestoreSegnalazioni extends ChangeNotifier {
   }) : _ora = orologio ?? DateTime.now,
        cliente =
            cliente ??
-           ((cablato ?? Servizi.segnalazioni.isNotEmpty)
-               ? ClienteSegnalazioni(Uri.parse(Servizi.segnalazioni))
-               : null);
+           ((cablato ?? Servizi.segnalazioni.isNotEmpty) ? ClienteSegnalazioni(Uri.parse(Servizi.segnalazioni)) : null);
 
   final GestorePosizione posizione;
 

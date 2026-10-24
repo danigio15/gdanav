@@ -26,7 +26,9 @@ void main() {
   Widget scheda(GestoreViaggio v, {VoidCallback? onPremium}) => MaterialApp(
     theme: temaGdanav(Brightness.light),
     home: Scaffold(
-      body: Stack(children: [SchedaViaggio(gestore: v, onAvvia: () {}, onPremium: onPremium)]),
+      body: Stack(
+        children: [SchedaViaggio(gestore: v, onAvvia: () {}, onPremium: onPremium)],
+      ),
     ),
   );
 

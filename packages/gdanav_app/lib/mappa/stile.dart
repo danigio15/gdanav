@@ -932,11 +932,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         ],
         'layout': {
           // Col colore dello stato di tutta Italia, quando si sa.
-          'icon-image': [
-            'concat',
-            'punto-colonnina-',
-            _statoOIgnota(),
-          ],
+          'icon-image': ['concat', 'punto-colonnina-', _statoOIgnota()],
           'icon-size': 0.8,
           'icon-allow-overlap': true,
           'text-field': [
@@ -946,7 +942,10 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
             13,
             [
               'concat',
-              ['to-string', ['get', 'kw']],
+              [
+                'to-string',
+                ['get', 'kw'],
+              ],
               ' kW',
             ],
           ],
@@ -1189,7 +1188,11 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'text-allow-overlap': true,
           'text-ignore-placement': true,
         },
-        'paint': {'text-color': '#FFFFFF', 'text-halo-color': _seEco('#15803D', t.alternativaBordo), 'text-halo-width': 6},
+        'paint': {
+          'text-color': '#FFFFFF',
+          'text-halo-color': _seEco('#15803D', t.alternativaBordo),
+          'text-halo-width': 6,
+        },
       },
       {
         // La meta: una bandiera a scacchi in piedi (anche con la mappa
@@ -1429,12 +1432,7 @@ Map<String, Object> _coda(String id, {required bool principali, required double 
 /// `coloriColonnina` (componenti/icone_punti.dart), che le disegna. Qui e
 /// non dal tema, perché il bollino deve avere il colore dell'icona su cui
 /// sta, che è uguale col chiaro e con lo scuro.
-const _coloriIcona = {
-  'libera': '#16A34A',
-  'piena': '#D97706',
-  'guasta': '#DC2626',
-  'ignota': '#4F46E5',
-};
+const _coloriIcona = {'libera': '#16A34A', 'piena': '#D97706', 'guasta': '#DC2626', 'ignota': '#4F46E5'};
 
 /// Il numero delle prese in un bollino bianco, fuori dall'icona in alto a
 /// destra: «fai vedere il numero all'esterno». Solo dove le prese sono più
@@ -1483,10 +1481,11 @@ List<Map<String, Object>> _bollinoPrese(
   const spostamento = [15, -15];
   final filtro = [
     'all',
-    if (sfusa) [
-      '!',
-      ['has', 'point_count'],
-    ],
+    if (sfusa)
+      [
+        '!',
+        ['has', 'point_count'],
+      ],
     [
       '>',
       ['get', 'prese'],

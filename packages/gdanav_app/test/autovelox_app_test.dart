@@ -106,10 +106,7 @@ void main() {
   testWidgets('il Tutor: si annuncia, dentro la media, sopra il limite «rallenta», poi la fine', (tester) async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
     final autovelox = ArchivioAutovelox.leggi(
-      ArchivioAutovelox.scrivi(
-        const [],
-        tutor: [(strada[5].lat, strada[5].lon, strada[10].lat, strada[10].lon, 110)],
-      ),
+      ArchivioAutovelox.scrivi(const [], tutor: [(strada[5].lat, strada[5].lon, strada[10].lat, strada[10].lon, 110)]),
     );
     final a = await ambiente(tester, km: 20, autovelox: autovelox);
     a.auto.manuale.imposta(90);
@@ -158,7 +155,10 @@ void main() {
 
     // Il riquadro.
     await tester.pumpWidget(
-      MaterialApp(theme: temaGdanav(Brightness.light), home: Scaffold(body: AvvisoTutor(stato: dentro))),
+      MaterialApp(
+        theme: temaGdanav(Brightness.light),
+        home: Scaffold(body: AvvisoTutor(stato: dentro)),
+      ),
     );
     expect(find.textContaining('Tutor · media 14'), findsOneWidget);
     expect(find.textContaining('rallenta'), findsOneWidget);

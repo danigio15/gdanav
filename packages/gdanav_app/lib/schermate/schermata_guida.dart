@@ -86,7 +86,10 @@ class _SchermataGuidaState extends State<SchermataGuida> {
   void _copri(BuildContext context, GestoreGuida g) {
     final alto = _svincolo(g) == null
         ? 0.0
-        : MediaQuery.paddingOf(context).top + 8 + 72 + PopupSvincolo.larghezzaSu(MediaQuery.sizeOf(context).width) * 9 / 16;
+        : MediaQuery.paddingOf(context).top +
+              8 +
+              72 +
+              PopupSvincolo.larghezzaSu(MediaQuery.sizeOf(context).width) * 9 / 16;
     if ((alto - controllo.coperto).abs() < 1) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) controllo.copriAlto(alto);
@@ -521,10 +524,12 @@ class QuantoHaiSpeso extends StatelessWidget {
 /// Quanto si è pagato una ricarica: un numero in euro, con la stima già
 /// scritta. `null` se si annulla.
 Future<double?> chiediLaSpesa(BuildContext context, RicaricaInViaggio r) {
-  final campo = TextEditingController(text: switch (r.euro) {
-    final e? => e.toStringAsFixed(2).replaceAll('.', ','),
-    null => '',
-  });
+  final campo = TextEditingController(
+    text: switch (r.euro) {
+      final e? => e.toStringAsFixed(2).replaceAll('.', ','),
+      null => '',
+    },
+  );
   return showDialog<double>(
     context: context,
     builder: (contesto) {

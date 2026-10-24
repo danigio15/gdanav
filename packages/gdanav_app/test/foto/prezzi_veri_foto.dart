@@ -52,11 +52,19 @@ PercorsoCalcolato _tangenziale() {
   return PercorsoCalcolato(
     punti: punti,
     tratti: [
-      for (var i = 1; i < punti.length; i++) Tratto(lunghezzaM: linea.cumulate[i] - linea.cumulate[i - 1], velocitaKmh: 70),
+      for (var i = 1; i < punti.length; i++)
+        Tratto(lunghezzaM: linea.cumulate[i] - linea.cumulate[i - 1], velocitaKmh: 70),
     ],
     manovre: [
       Manovra(istruzione: 'Prendi Corso Malta', lunghezzaM: 1000, secondi: 80, inizio: 0, strada: 'Corso Malta'),
-      Manovra(istruzione: 'Prendi la Tangenziale', lunghezzaM: 7000, secondi: 360, inizio: 1, strada: 'Tangenziale di Napoli', verso: 'A56'),
+      Manovra(
+        istruzione: 'Prendi la Tangenziale',
+        lunghezzaM: 7000,
+        secondi: 360,
+        inizio: 1,
+        strada: 'Tangenziale di Napoli',
+        verso: 'A56',
+      ),
     ],
     conPedaggi: true,
     conAutostrade: true,
