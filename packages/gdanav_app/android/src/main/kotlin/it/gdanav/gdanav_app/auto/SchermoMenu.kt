@@ -182,7 +182,7 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
                 "Impostazioni" to listOf(
                     riga(
                         "Impostazioni",
-                        "Batteria all'arrivo, vista 3D, voce, percorso",
+                        "Batteria all'arrivo, vista della mappa, voce, percorso",
                         sfoglia = true,
                         icona = icona(R.drawable.icona_impostazioni),
                     ) { screenManager.push(SchermoImpostazioni(carContext, renderer)) },
@@ -201,7 +201,7 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
 class SchermoImpostazioni(carContext: CarContext, private val renderer: RendererMappa) : SchermoAggiornato(carContext) {
     // In pagina: le opzioni, la vista della mappa, Casa e Lavoro.
     override fun firma(): Any? =
-        listOf(PonteAuto.opzioni, renderer.tridimensionale, PonteAuto.casa()?.nome, PonteAuto.lavoro()?.nome)
+        listOf(PonteAuto.opzioni, renderer.vista, PonteAuto.casa()?.nome, PonteAuto.lavoro()?.nome)
 
     override fun schermata(): Template {
         val o = PonteAuto.opzioni
@@ -222,13 +222,17 @@ class SchermoImpostazioni(carContext: CarContext, private val renderer: Renderer
                 } else {
                     null
                 },
-                interruttore(
-                    "Vista 3D",
-                    renderer.tridimensionale,
-                    "Spenta: mappa dall'alto, nord in su",
+                // La vista a tre stati, come l'audio: ogni tocco passa alla dopo.
+                riga(
+                    "Vista: ${renderer.vista.titolo}",
+                    when (renderer.vista) {
+                        Vista.PIATTA -> "Dall'alto, nord in su. Tocca per il 3D"
+                        Vista.INCLINATA -> "Inclinata, con gli edifici. Tocca per l'immersiva"
+                        Vista.IMMERSIVA -> "Da vicino, con le corsie sulla strada. Tocca per il 2D"
+                    },
                     icona = icona(R.drawable.icona_mappa, CarColor.BLUE),
                 ) {
-                    if (it != renderer.tridimensionale) renderer.alternaVista()
+                    renderer.alternaVista()
                     invalidate()
                 },
                 // L'audio a tre stati, come sul telefono: ogni tocco passa al

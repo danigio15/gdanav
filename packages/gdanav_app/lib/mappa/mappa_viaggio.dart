@@ -693,11 +693,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     if (chiave == _frecciaDisegnata) return;
     // Segnata prima, perché chi arriva nel frattempo non la riscriva.
     _frecciaDisegnata = chiave;
-    // Nella vista immersiva, con le corsie sulla strada, la freccia parte
-    // dalla manovra: prima la strada la dicono le corsie, e la freccia sopra
-    // le coprirebbe.
-    final conCorsie = _immersiva && (a?.prossima?.corsieUtili ?? false);
-    final dati = chiave == null ? datiManovra(null, null) : datiManovra(v, a?.prossima, primaM: conCorsie ? 10 : 60);
+    final dati = chiave == null ? datiManovra(null, null) : datiManovra(v, a?.prossima);
     try {
       await m.setGeoJsonSource(sorgenteManovra, dati.cast<String, dynamic>());
       // Le corsie sulla strada: solo la vista immersiva le ha nello stile.

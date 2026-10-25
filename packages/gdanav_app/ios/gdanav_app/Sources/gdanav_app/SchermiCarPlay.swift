@@ -289,13 +289,20 @@ enum SchermiCarPlay {
                     c.spingi(SchermiCarPlay.arrivo(c))
                 })
             }
-            righe.append(interruttore(
-                "Vista 3D",
-                mappa?.tridimensionale ?? true,
-                "Spenta: mappa dall'alto, nord in su",
+            // La vista a tre stati: ogni tocco passa alla dopo.
+            let vista = mappa?.vista ?? .inclinata
+            righe.append(riga(
+                "Vista: \(vista.titolo)",
+                {
+                    switch vista {
+                    case .piatta: return "Dall'alto, nord in su. Tocca per il 3D"
+                    case .inclinata: return "Inclinata, con gli edifici. Tocca per l'immersiva"
+                    case .immersiva: return "Da vicino, con le corsie sulla strada. Tocca per il 2D"
+                    }
+                }(),
                 icona: icona("map.fill", blu)
-            ) { acceso in
-                guard let mappa, acceso != mappa.tridimensionale else { return }
+            ) {
+                guard let mappa else { return }
                 mappa.alternaVista()
                 // La vista non passa dal telefono: l'elenco si rifà da qui.
                 PonteAuto.shared.rinfresca()

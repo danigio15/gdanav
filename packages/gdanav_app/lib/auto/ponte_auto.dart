@@ -101,6 +101,14 @@ class PonteAuto {
     _manda('stili', {
       'chiaro': jsonEncode(stileMappa(scuro: false, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true)),
       'scuro': jsonEncode(stileMappa(scuro: true, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true)),
+      // La vista immersiva ha uno stile suo: le strade in metri, le corsie
+      // sulla strada, gli edifici sopra il percorso.
+      'chiaro_immersiva': jsonEncode(
+        stileMappa(scuro: false, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true, immersiva: true),
+      ),
+      'scuro_immersiva': jsonEncode(
+        stileMappa(scuro: true, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true, immersiva: true),
+      ),
     });
     _immagini();
     viaggio.addListener(_viaggio);
@@ -775,7 +783,10 @@ class PonteAuto {
       if (_freccia != null) {
         _freccia = null;
         _manda('sorgenti', {
-          'dati': {sorgenteManovra: jsonEncode(datiManovra(null, null))},
+          'dati': {
+            sorgenteManovra: jsonEncode(datiManovra(null, null)),
+            sorgenteCorsie: jsonEncode(datiCorsie(null, null)),
+          },
         });
       }
       _cruscotto();
@@ -829,7 +840,12 @@ class PonteAuto {
     if (chiave != _freccia) {
       _freccia = chiave;
       _manda('sorgenti', {
-        'dati': {sorgenteManovra: jsonEncode(datiManovra(chiave == null ? null : p.viaggio, a?.prossima))},
+        'dati': {
+          sorgenteManovra: jsonEncode(datiManovra(chiave == null ? null : p.viaggio, a?.prossima)),
+          // Le corsie sulla strada: le disegna solo la vista immersiva, che
+          // ha la sorgente; l'auto in 2D e in 3D le lascia cadere.
+          sorgenteCorsie: jsonEncode(datiCorsie(chiave == null ? null : p.viaggio, a?.prossima)),
+        },
       });
     }
     // La vista dello svincolo si disegna una volta, poco prima.

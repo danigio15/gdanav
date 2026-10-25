@@ -66,10 +66,12 @@ void main() {
     final immersivo = stileMappa(scuro: false, immersiva: true);
     expect(idDi(normale), isNot(contains(stratoEdificiImmersivi)));
     final strati = idDi(immersivo);
-    // Le corsie sopra il percorso, gli edifici sopra le corsie, le frecce sopra tutto.
+    // Le corsie sopra il percorso e sopra la freccia della manovra, gli
+    // edifici sopra le corsie, il segnaposto sopra tutto.
     expect(strati.indexOf('corsie'), greaterThan(strati.indexOf('percorso')));
+    expect(strati.indexOf('corsie'), greaterThan(strati.indexOf('manovra')));
     expect(strati.indexOf(stratoEdificiImmersivi), greaterThan(strati.indexOf('corsie')));
-    expect(strati.indexOf('percorso-frecce'), greaterThan(strati.indexOf(stratoEdificiImmersivi)));
+    expect(strati.indexOf('io'), greaterThan(strati.indexOf(stratoEdificiImmersivi)));
     expect((immersivo['sources']! as Map).containsKey(sorgenteCorsie), isTrue);
     // L'autostrada larga 14 metri: a zoom 18 sono 14 × pixel per metro.
     final autostrada = (immersivo['layers']! as List).cast<Map>().firstWhere((l) => l['id'] == 'autostrade');

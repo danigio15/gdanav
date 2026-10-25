@@ -245,13 +245,20 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         }
         t.leadingNavigationBarButtons = sinistra
         t.trailingNavigationBarButtons = destra
-        // A lato della mappa: + e −, 2D/3D (o Centra se la si è spostata), sposta;
+        // A lato della mappa: + e −, la vista (o Centra se la si è spostata), sposta;
         // da fermi prima la lente e la casa.
         let vista: CPMapButton
         if m.libera {
             vista = tastoMappa("location.fill") { [weak m] in m?.segui() }
         } else {
-            vista = tastoMappa(m.tridimensionale ? "view.2d" : "view.3d") { [weak self, weak m] in
+            // Il tasto mostra la vista dopo: 3D → immersiva → 2D → 3D.
+            let simbolo: String
+            switch m.vista.dopo {
+            case .piatta: simbolo = "view.2d"
+            case .inclinata: simbolo = "view.3d"
+            case .immersiva: simbolo = "road.lanes"
+            }
+            vista = tastoMappa(simbolo) { [weak self, weak m] in
                 m?.alternaVista()
                 self?.aggiornaTasti()
             }

@@ -891,77 +891,6 @@ Map<String, Object> stileMappa({
           'line-width': _largo(larghezzaCoda.$1, larghezzaCoda.$2),
         },
       },
-      /* La vista immersiva: le corsie della prossima manovra sulla strada
-       * (quella giusta del colore del percorso, le altre grigie, le righe
-       * bianche), poi gli edifici sopra il percorso, un po' trasparenti. */
-      if (immersiva) ...[
-        {
-          'id': 'corsie',
-          'type': 'line',
-          'source': sorgenteCorsie,
-          'filter': [
-            '==',
-            ['get', 'tipo'],
-            'corsia',
-          ],
-          'layout': {'line-cap': 'butt', 'line-join': 'round'},
-          'paint': {
-            // Piene: sotto ci sono la linea del percorso e il grigio della
-            // strada, e una corsia trasparente li lascerebbe vedere.
-            'line-color': [
-              'case',
-              ['get', 'giusta'],
-              t.percorso,
-              t.strada,
-            ],
-            'line-width': _metri(larghezzaCorsia * 0.94),
-            'line-offset': _metriDa('spostamento'),
-          },
-        },
-        {
-          'id': 'corsie-righe',
-          'type': 'line',
-          'source': sorgenteCorsie,
-          'filter': [
-            '==',
-            ['get', 'tipo'],
-            'riga',
-          ],
-          'layout': {'line-cap': 'butt', 'line-join': 'round'},
-          'paint': {
-            'line-color': '#FFFFFF',
-            'line-opacity': 0.9,
-            'line-width': _metri(0.2),
-            'line-dasharray': [3, 3],
-            'line-offset': _metriDa('spostamento'),
-          },
-        },
-        {
-          'id': 'corsie-bordi',
-          'type': 'line',
-          'source': sorgenteCorsie,
-          'filter': [
-            '==',
-            ['get', 'tipo'],
-            'bordo',
-          ],
-          'layout': {'line-cap': 'butt', 'line-join': 'round'},
-          'paint': {
-            'line-color': '#FFFFFF',
-            'line-opacity': 0.9,
-            'line-width': _metri(0.25),
-            'line-offset': _metriDa('spostamento'),
-          },
-        },
-        {
-          'id': stratoEdificiImmersivi,
-          'type': 'fill-extrusion',
-          'source': 'openmaptiles',
-          'source-layer': 'building',
-          'minzoom': 14,
-          'paint': {..._pitturaEdifici(t), 'fill-extrusion-opacity': 0.6},
-        },
-      ],
       {
         'id': 'percorso-frecce',
         'type': 'symbol',
@@ -1049,6 +978,79 @@ Map<String, Object> stileMappa({
           'icon-ignore-placement': true,
         },
       },
+      /* La vista immersiva: le corsie della prossima manovra sulla strada
+       * (quella giusta del colore del percorso, le altre grigie, le righe
+       * bianche), sopra la freccia della manovra: prima dello svincolo la
+       * strada la dicono le corsie, dopo la freccia. Poi gli edifici, sopra
+       * il percorso e un po' trasparenti; i segnaposto restano sopra tutto. */
+      if (immersiva) ...[
+        {
+          'id': 'corsie',
+          'type': 'line',
+          'source': sorgenteCorsie,
+          'filter': [
+            '==',
+            ['get', 'tipo'],
+            'corsia',
+          ],
+          'layout': {'line-cap': 'butt', 'line-join': 'round'},
+          'paint': {
+            // Piene: sotto ci sono la linea del percorso e il grigio della
+            // strada, e una corsia trasparente li lascerebbe vedere.
+            'line-color': [
+              'case',
+              ['get', 'giusta'],
+              t.percorso,
+              t.strada,
+            ],
+            'line-width': _metri(larghezzaCorsia * 0.94),
+            'line-offset': _metriDa('spostamento'),
+          },
+        },
+        {
+          'id': 'corsie-righe',
+          'type': 'line',
+          'source': sorgenteCorsie,
+          'filter': [
+            '==',
+            ['get', 'tipo'],
+            'riga',
+          ],
+          'layout': {'line-cap': 'butt', 'line-join': 'round'},
+          'paint': {
+            'line-color': '#FFFFFF',
+            'line-opacity': 0.9,
+            'line-width': _metri(0.2),
+            'line-dasharray': [3, 3],
+            'line-offset': _metriDa('spostamento'),
+          },
+        },
+        {
+          'id': 'corsie-bordi',
+          'type': 'line',
+          'source': sorgenteCorsie,
+          'filter': [
+            '==',
+            ['get', 'tipo'],
+            'bordo',
+          ],
+          'layout': {'line-cap': 'butt', 'line-join': 'round'},
+          'paint': {
+            'line-color': '#FFFFFF',
+            'line-opacity': 0.9,
+            'line-width': _metri(0.25),
+            'line-offset': _metriDa('spostamento'),
+          },
+        },
+        {
+          'id': stratoEdificiImmersivi,
+          'type': 'fill-extrusion',
+          'source': 'openmaptiles',
+          'source-layer': 'building',
+          'minzoom': 14,
+          'paint': {..._pitturaEdifici(t), 'fill-extrusion-opacity': 0.6},
+        },
+      ],
       // Sull'auto, il punto della scheda aperta: un alone e un anello del
       // colore del suo stato, sotto la sua icona.
       if (perAuto) ...[

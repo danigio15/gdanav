@@ -57,7 +57,7 @@ class RendererMappa(
     private var mappa: MapLibreMap? = null
     private var stile: Style? = null
     private var stileCaricato: String? = null
-    private var inclinataOra: Boolean? = null
+    private var vistaOra: Vista? = null
     private var immaginiCaricate: Map<String, Bitmap>? = null
     private var larghezza = 0
     private var altezza = 0
@@ -73,9 +73,19 @@ class RendererMappa(
 
     private val preferenze = carContext.getSharedPreferences("gdanav", Context.MODE_PRIVATE)
 
-    /** 3D (inclinata, girata come vai) o 2D (dall'alto, nord in su): si ricorda. */
-    var tridimensionale: Boolean = preferenze.getBoolean("auto_3d", true)
+    /**
+     * Come si guarda la mappa, come sul telefono: 2D (dall'alto, nord in su),
+     * 3D (inclinata, girata come vai) o immersiva (più bassa e più vicina, le
+     * strade larghe quanto sono, le corsie sulla strada, il percorso fra le
+     * case). Si ricorda; chi aveva scelto il 2D prima che ci fossero tre viste
+     * resta in 2D.
+     */
+    var vista: Vista = Vista.daNome(preferenze.getString("auto_vista", null))
+        ?: if (preferenze.getBoolean("auto_3d", true)) Vista.INCLINATA else Vista.PIATTA
         private set
+
+    /** Inclinata: in 3D o immersiva. */
+    val tridimensionale: Boolean get() = vista != Vista.PIATTA
 
     /** Lo zoom quando segue l'auto in guida: i tasti + e − lo cambiano. */
     private var zoomGuida = preferenze.getFloat("auto_zoom_guida", 16.5f).toDouble()
@@ -324,10 +334,15 @@ class RendererMappa(
         aggiorna()
     }
 
-    fun alternaVista() {
-        tridimensionale = !tridimensionale
-        preferenze.edit().putBoolean("auto_3d", tridimensionale).apply()
+    /** Il tasto della vista sulla mappa: 3D → immersiva → 2D → 3D. */
+    fun alternaVista() = scegliVista(vista.dopo)
+
+    fun scegliVista(v: Vista) {
+        vista = v
+        preferenze.edit().putString("auto_vista", v.nome).apply()
         segui()
+        // Dentro o fuori dall'immersiva cambia lo stile.
+        aggiorna()
     }
 
     /** «Centra»: di nuovo sull'auto. */
@@ -442,11 +457,17 @@ class RendererMappa(
     fun aggiorna() {
         pannello?.aggiorna()
         val m = mappa ?: return
-        val json = (if (carContext.isDarkMode) PonteAuto.stileScuro else PonteAuto.stileChiaro) ?: return
+        val immersiva = vista == Vista.IMMERSIVA
+        val json = when {
+            carContext.isDarkMode && immersiva -> PonteAuto.stileScuroImmersiva ?: PonteAuto.stileScuro
+            carContext.isDarkMode -> PonteAuto.stileScuro
+            immersiva -> PonteAuto.stileChiaroImmersiva ?: PonteAuto.stileChiaro
+            else -> PonteAuto.stileChiaro
+        } ?: return
         if (json != stileCaricato) {
             stileCaricato = json
             stile = null
-            inclinataOra = null
+            vistaOra = null
             immaginiCaricate = null
             sorgentiCaricate.clear()
             m.setStyle(Style.Builder().fromJson(json)) { s ->
@@ -488,11 +509,15 @@ class RendererMappa(
             immaginiCaricate = immagini
         }
         // In 3D anche senza guida: la vista scelta è una, guidando o no.
-        val inclinata = tridimensionale
-        if (inclinata != inclinataOra) {
-            inclinataOra = inclinata
+        // Nell'immersiva gli edifici sono quelli sopra il percorso, che lo
+        // stile accende da sé.
+        if (vista != vistaOra) {
+            vistaOra = vista
+            val inclinata = vista != Vista.PIATTA
             s.getLayer("edifici")?.setProperties(PropertyFactory.visibility(if (inclinata) Property.NONE else Property.VISIBLE))
-            s.getLayer("edifici-3d")?.setProperties(PropertyFactory.visibility(if (inclinata) Property.VISIBLE else Property.NONE))
+            s.getLayer("edifici-3d")?.setProperties(
+                PropertyFactory.visibility(if (vista == Vista.INCLINATA) Property.VISIBLE else Property.NONE),
+            )
         }
         muovi(m)
     }
@@ -592,13 +617,14 @@ class RendererMappa(
          * all'orizzonte (e la mappa disegnava chilometri di palazzi). */
         val sopra: Double
         if (guida != null) {
-            zoomVoluto = zoomGuida + zoomInSvolta(guida) + zoomLontano(guida.stradaKmh ?: 0.0, guida.distanzaM)
+            zoomVoluto = zoomGuida + zoomInSvolta(guida) + zoomLontano(guida.stradaKmh ?: 0.0, guida.distanzaM) +
+                vista.zoomInPiu
             sopra = 0.3
         } else {
-            zoomVoluto = zoomLibero(PonteAuto.velocita, scartoLibero)
+            zoomVoluto = zoomLibero(PonteAuto.velocita, scartoLibero) + vista.zoomInPiu
             sopra = if (inclinata) 0.3 else 0.0
         }
-        inclinazioneVoluta = if (inclinata) INCLINAZIONE else 0.0
+        inclinazioneVoluta = vista.inclinazione
         bussolaInclinata = inclinata
         marginiVoluti[0] = a.left.toDouble()
         marginiVoluti[1] = a.top + a.height() * sopra
@@ -854,8 +880,6 @@ class RendererMappa(
         private const val TAU_ZOOM_S = 0.8
         private const val TAU_CAMERA_S = 0.3
 
-        /** L'inclinazione in 3D, in guida e senza percorso. */
-        private const val INCLINAZIONE = 55.0
 
         /** Il conteggio del traffico per la diagnosi. */
         private const val CONTA_TRAFFICO_MS = 30_000L
@@ -951,5 +975,26 @@ class RendererMappa(
             if (g.tipo !in 9..27 && g.tipo != 37 && g.tipo != 38) return 0.0
             return ZOOM_IN_SVOLTA * ((INIZIO_SVOLTA_M - g.distanzaM) / (INIZIO_SVOLTA_M - VICINO_SVOLTA_M)).coerceIn(0.0, 1.0)
         }
+    }
+}
+
+/**
+ * Le tre viste della mappa, come sul telefono (`VistaMappa`). [dopo]: quella
+ * che propone il tasto sulla mappa, che le gira tutte e tre.
+ */
+enum class Vista(val nome: String, val inclinazione: Double, val zoomInPiu: Double, val titolo: String) {
+    PIATTA("piatta", 0.0, 0.0, "2D"),
+    INCLINATA("inclinata", 55.0, 0.0, "3D"),
+    IMMERSIVA("immersiva", 60.0, 1.0, "Immersiva");
+
+    val dopo: Vista
+        get() = when (this) {
+            INCLINATA -> IMMERSIVA
+            IMMERSIVA -> PIATTA
+            PIATTA -> INCLINATA
+        }
+
+    companion object {
+        fun daNome(nome: String?): Vista? = entries.firstOrNull { it.nome == nome }
     }
 }
