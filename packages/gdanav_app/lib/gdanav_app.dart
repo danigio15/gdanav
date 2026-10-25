@@ -126,8 +126,9 @@ Future<GdanavApp> preparaGdanav({
   premium.addListener(() {
     if (premium.sbloccato == eraPremium) return;
     eraPremium = premium.sbloccato;
-    if (viaggio.stato is ViaggioPronto && viaggio.destinazione != null)
+    if (viaggio.stato is ViaggioPronto && viaggio.destinazione != null) {
       unawaited(viaggio.pianifica(viaggio.destinazione!));
+    }
   });
   // Le strade a risparmio: in guida la strada si confronta con le altre, col
   // modello di consumo dell'auto (TomTom).
