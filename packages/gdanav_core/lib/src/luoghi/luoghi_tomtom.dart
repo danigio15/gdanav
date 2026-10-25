@@ -267,8 +267,21 @@ class LuoghiInsieme implements FonteLuoghi {
     return parole.isNotEmpty && parole.every((p) => nome.any((n) => n.startsWith(p)));
   }
 
+  /// Senza la forma della societa' in fondo: «Romeo Gestioni S.p.A.» dava
+  /// alberghi e banche di Roma perche' «S.p.A.» pesava quanto il nome.
+  static String senzaSigla(String testo) {
+    final pulito = testo
+        .replaceAll(
+            RegExp(r'[\s,]+(s\.?\s?p\.?\s?a|s\.?\s?r\.?\s?l\.?s?|s\.?\s?n\.?\s?c|s\.?\s?a\.?\s?s)\.?\s*$',
+                caseSensitive: false),
+            '')
+        .trim();
+    return pulito.length >= 3 ? pulito : testo;
+  }
+
   @override
-  Future<List<Luogo>> cerca(String testo, {Punto? vicinoA}) async {
+  Future<List<Luogo>> cerca(String scritto, {Punto? vicinoA}) async {
+    final testo = senzaSigla(scritto);
     Future<List<Luogo>?> da(FonteLuoghi f) async {
       try {
         return await f.cerca(testo, vicinoA: vicinoA);

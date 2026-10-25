@@ -246,4 +246,12 @@ void main() {
     ).cerca('romeo gestioni', vicinoA: napoli);
     expect(l.map((x) => x.nome), ['Romeo Gestioni', 'Romeo Gestioni Milano', 'Alfa Romeo Mec']);
   });
+
+  test('la forma della societa\' in fondo non si cerca', () {
+    expect(LuoghiInsieme.senzaSigla('Romeo Gestioni S.p.A.'), 'Romeo Gestioni');
+    expect(LuoghiInsieme.senzaSigla('rossi srl'), 'rossi');
+    expect(LuoghiInsieme.senzaSigla('Bianchi & C. s.n.c.'), 'Bianchi & C.');
+    expect(LuoghiInsieme.senzaSigla('Spaccanapoli'), 'Spaccanapoli');
+    expect(LuoghiInsieme.senzaSigla('spa'), 'spa');
+  });
 }
