@@ -7,7 +7,7 @@ import 'luoghi.dart';
 
 /// La ricerca di HERE (Discover), con la stessa chiave dei pedaggi.
 ///
-/// «Romeo Gestioni Napoli» non la conoscevano ne' TomTom ne' OpenStreetMap:
+/// «Verdi Servizi Napoli» non la conoscevano ne' TomTom ne' OpenStreetMap:
 /// le aziende che non hanno un negozio o un'insegna stanno nei registri
 /// delle imprese, e HERE li ha. Si chiede accanto alle altre fonti
 /// ([LuoghiInsieme]), mai da sola.
