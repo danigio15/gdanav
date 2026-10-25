@@ -454,7 +454,7 @@ void main() {
       await lettura(tester);
       expect(m.seguite, isEmpty);
 
-      controllo.alternaInclinazione();
+      controllo.scegliVista(VistaMappa.inclinata);
       await tester.pump();
       await lettura(tester);
       expect(m.seguite, isNotEmpty);
@@ -471,22 +471,30 @@ void main() {
     });
   });
 
-  group('la scelta 2D/3D', () {
+  group('la scelta della vista: 2D, 3D, immersiva', () {
     test('si ricorda, e quella letta tardi non cancella quella appena fatta', () async {
-      final salvate = <bool>[];
-      final c = ControlloMappa(salvaInclinazione: (v) async => salvate.add(v));
+      final salvate = <VistaMappa>[];
+      final c = ControlloMappa(salvaVista: (v) async => salvate.add(v));
+      expect(c.vista, VistaMappa.inclinata);
+      await c.carica(Future.value(VistaMappa.piatta));
+      expect(c.inclinata, isFalse);
+      c.scegliVista(VistaMappa.immersiva);
+      expect(salvate, [VistaMappa.immersiva]);
       expect(c.inclinata, isTrue);
-      await c.carica(Future.value(false));
-      expect(c.inclinata, isFalse);
-      c.alternaInclinazione();
-      expect(salvate, [true]);
-      final tardi = Completer<bool>();
+      expect(c.immersiva, isTrue);
+      final tardi = Completer<VistaMappa>();
       final letta = c.carica(tardi.future);
-      c.alternaInclinazione();
-      tardi.complete(true);
+      c.scegliVista(VistaMappa.piatta);
+      tardi.complete(VistaMappa.inclinata);
       await letta;
-      expect(c.inclinata, isFalse);
+      expect(c.vista, VistaMappa.piatta);
       c.dispose();
+    });
+
+    test('la vista salvata si legge dal suo nome; una parola strana vale 3D', () {
+      expect(VistaMappa.daNome('immersiva'), VistaMappa.immersiva);
+      expect(VistaMappa.daNome('piatta'), VistaMappa.piatta);
+      expect(VistaMappa.daNome('boh'), VistaMappa.inclinata);
     });
   });
 }

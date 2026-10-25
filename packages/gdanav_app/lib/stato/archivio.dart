@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
+import '../mappa/controllo_mappa.dart' show VistaMappa;
 import '../mappa/segnaposto.dart';
 import '../servizi.dart';
 import 'gestore_risparmio.dart';
@@ -37,6 +38,7 @@ class Archivio {
   static const _avvisiMuti = 'avvisi_muti';
   static const _avvisiScelti = 'avvisi_scelti';
   static const _vistaPiatta = 'vista_2d';
+  static const _vista = 'vista_mappa';
   static const _viaggiPianificati = 'viaggi_pianificati';
 
   Future<Abbinamento?> abbinamento() async {
@@ -169,13 +171,20 @@ class Archivio {
 
   Future<void> salvaScelteAvvisi(ScelteAvvisi s) => _p.write(key: _avvisiScelti, value: s.aJson());
 
-  /// La mappa in 3D (inclinata, girata come si va) o in 2D. Si ricorda, e
-  /// vale anche fuori dalla guida. Di partenza 3D, come sullo schermo
-  /// dell'auto: si scrive solo chi l'ha voluta piatta.
-  Future<bool> vistaInclinata() async => await _p.read(key: _vistaPiatta) != 'sì';
+  /// Come si guarda la mappa: 2D, 3D o immersiva ([VistaMappa]). Si
+  /// ricorda, e vale anche fuori dalla guida. Di partenza 3D, come sullo
+  /// schermo dell'auto. Prima c'erano solo 2D e 3D, e si scriveva solo chi
+  /// l'aveva voluta piatta: quella scelta vale ancora.
+  Future<VistaMappa> vistaMappa() async {
+    final scritta = await _p.read(key: _vista);
+    if (scritta != null) return VistaMappa.daNome(scritta);
+    return await _p.read(key: _vistaPiatta) == 'sì' ? VistaMappa.piatta : VistaMappa.inclinata;
+  }
 
-  Future<void> salvaVistaInclinata(bool v) =>
-      v ? _p.delete(key: _vistaPiatta) : _p.write(key: _vistaPiatta, value: 'sì');
+  Future<void> salvaVistaMappa(VistaMappa v) async {
+    await _p.write(key: _vista, value: v.name);
+    await _p.delete(key: _vistaPiatta);
+  }
 
   /// L'identità di questo telefono verso il quadro delle licenze (i codici
   /// regalo): nasce una volta sola e resta qui, col suo segreto.

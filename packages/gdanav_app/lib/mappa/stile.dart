@@ -6,6 +6,8 @@
 /// arrivo) con le loro sorgenti vuote: l'app ne cambia solo i dati.
 library;
 
+import 'dart:math' as math;
+
 import 'categorie_poi.dart';
 
 const sorgentePercorso = 'gdanav-percorso';
@@ -14,6 +16,10 @@ const sorgenteArrivo = 'gdanav-arrivo';
 const sorgenteIo = 'gdanav-io';
 const sorgenteSegnalazioni = 'gdanav-segnalazioni';
 const sorgenteManovra = 'gdanav-manovra';
+
+/// Le corsie della prossima manovra disegnate sulla strada (solo nella vista
+/// immersiva): vedi [datiCorsie].
+const sorgenteCorsie = 'gdanav-corsie';
 const sorgenteDistributori = 'gdanav-distributori';
 const sorgenteVicine = 'gdanav-vicine';
 const sorgenteTutte = 'gdanav-tutte';
@@ -60,6 +66,11 @@ const stratiToccabili = [
 /// accendono quelli in 3D e si spengono i piatti.
 const stratoEdifici2d = 'edifici';
 const stratoEdifici3d = 'edifici-3d';
+
+/// Gli edifici della vista immersiva: in 3D come [stratoEdifici3d], ma sopra il
+/// percorso e un po' trasparenti, così la linea passa fra le case e non sopra
+/// i tetti, e dietro l'angolo si intravede.
+const stratoEdificiImmersivi = 'edifici-immersivi';
 
 class _Tavolozza {
   const _Tavolozza({
@@ -233,6 +244,34 @@ Map<String, Object> _strada(String id, List<Object> filtro, String colore, List<
       'paint': {'line-color': colore, 'line-width': larghezza},
     };
 
+/// Come si dipingono gli edifici in 3D: il colore sale con l'altezza, e
+/// crescono da terra fra lo zoom 14 e il 15,5.
+Map<String, Object> _pitturaEdifici(_Tavolozza t) => {
+  'fill-extrusion-color': [
+    'interpolate',
+    ['linear'],
+    ['get', 'render_height'],
+    0,
+    t.edificio,
+    60,
+    t.edificioLato,
+  ],
+  'fill-extrusion-height': [
+    'interpolate',
+    ['linear'],
+    ['zoom'],
+    14,
+    0,
+    15.5,
+    ['get', 'render_height'],
+  ],
+  'fill-extrusion-base': [
+    'coalesce',
+    ['get', 'render_min_height'],
+    0,
+  ],
+};
+
 const _vuota = {'type': 'FeatureCollection', 'features': <Object>[]};
 
 /// I contorni di un tipo di zona («ztl», «pedonale») nella [sorgenteZtl].
@@ -256,7 +295,72 @@ List<Object> _zona(String tipo) => [
 /// Con [chiaveTraffico] (una chiave gratuita di TomTom) sulle strade si
 /// vedono le code, come in Waze: solo dove si va più piano del solito, e
 /// gli incidenti e i lavori.
-Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '', bool perAuto = false}) {
+/* ─── La vista immersiva ─────────────────────────────────────────────────
+ *
+ * Nella vista immersiva le strade sono larghe quanto sono davvero, in metri
+ * e non in pixel: da vicino e inclinata, una strada in pixel resta sottile
+ * come vista dall'alto, e le corsie disegnate sopra (3,5 m l'una) ne
+ * uscirebbero. In Italia il coseno della latitudine sta fra 0,73 e 0,81: si
+ * prende 0,77, e l'errore resta sotto il 6%. */
+const _cosenoItalia = 0.77;
+
+/// Quanti pixel fa un metro allo zoom [z].
+double pixelPerMetro(double z) => 512 * math.pow(2, z) / (40075016.686 * _cosenoItalia);
+
+/// Una larghezza di [metri] metri a ogni zoom.
+List<Object> _metri(double metri) => [
+  'interpolate',
+  ['exponential', 2],
+  ['zoom'],
+  12,
+  metri * pixelPerMetro(12),
+  22,
+  metri * pixelPerMetro(22),
+];
+
+/// Uno spostamento in metri preso dalla proprietà [chiave] di ogni elemento.
+List<Object> _metriDa(String chiave) => [
+  'interpolate',
+  ['exponential', 2],
+  ['zoom'],
+  12,
+  [
+    '*',
+    ['get', chiave],
+    pixelPerMetro(12),
+  ],
+  22,
+  [
+    '*',
+    ['get', chiave],
+    pixelPerMetro(22),
+  ],
+];
+
+/// Le larghezze vere delle strade, in metri: una carreggiata di autostrada
+/// ha tre o quattro corsie (14 m), una strada di città due (7 m).
+const larghezzeVere = {
+  'servizio-bordo': 5.0,
+  'strade-bordo': 8.2,
+  'principali-bordo': 11.5,
+  'autostrade-bordo': 15.5,
+  'servizio': 4.0,
+  'strade': 7.0,
+  'principali': 10.0,
+  'autostrade': 14.0,
+};
+
+/// La larghezza di una corsia, in metri.
+const larghezzaCorsia = 3.5;
+
+/// [immersiva]: la vista immersiva (strade in metri, edifici sopra il
+/// percorso, corsie sulla strada). Si sceglie col tasto 2D · 3D · Immersiva.
+Map<String, Object> stileMappa({
+  required bool scuro,
+  String chiaveTraffico = '',
+  bool perAuto = false,
+  bool immersiva = false,
+}) {
   final traffico = chiaveTraffico.trim();
   final t = scuro ? _scuro : _chiaro;
   final classi = {
@@ -335,6 +439,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
       sorgenteIo: {'type': 'geojson', 'data': _vuota},
       sorgenteSegnalazioni: {'type': 'geojson', 'data': _vuota},
       sorgenteManovra: {'type': 'geojson', 'data': _vuota},
+      sorgenteCorsie: {'type': 'geojson', 'data': _vuota},
       sorgenteDistributori: {'type': 'geojson', 'data': _vuota},
       sorgenteVicine: {'type': 'geojson', 'data': _vuota},
       sorgentePersone: {'type': 'geojson', 'data': _vuota},
@@ -450,14 +555,51 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
       _strada('sentieri', classi['sentiero']!, t.sentiero, _largo(0.4, 2), minzoom: 14),
       _strada('ferrovie', classi['ferrovia']!, t.ferrovia, _largo(0.8, 3)),
       // Prima tutti i bordi, poi tutti i riempimenti: gli incroci restano puliti.
-      _strada('servizio-bordo', classi['servizio']!, t.stradaBordo, _largo(1.2, 12), minzoom: 14),
-      _strada('strade-bordo', classi['strada']!, t.stradaBordo, _largo(2.4, 24)),
-      _strada('principali-bordo', classi['principale']!, t.principaleBordo, _largo(3.6, 32)),
-      _strada('autostrade-bordo', classi['autostrada']!, t.autostradaBordo, _largo(4.6, 38)),
-      _strada('servizio', classi['servizio']!, t.strada, _largo(0.6, 9), minzoom: 14),
-      _strada('strade', classi['strada']!, t.strada, _largo(1.6, 20)),
-      _strada('principali', classi['principale']!, t.principale, _largo(2.6, 27)),
-      _strada('autostrade', classi['autostrada']!, t.autostrada, _largo(3.4, 32)),
+      _strada(
+        'servizio-bordo',
+        classi['servizio']!,
+        t.stradaBordo,
+        immersiva ? _metri(larghezzeVere['servizio-bordo']!) : _largo(1.2, 12),
+        minzoom: 14,
+      ),
+      _strada(
+        'strade-bordo',
+        classi['strada']!,
+        t.stradaBordo,
+        immersiva ? _metri(larghezzeVere['strade-bordo']!) : _largo(2.4, 24),
+      ),
+      _strada(
+        'principali-bordo',
+        classi['principale']!,
+        t.principaleBordo,
+        immersiva ? _metri(larghezzeVere['principali-bordo']!) : _largo(3.6, 32),
+      ),
+      _strada(
+        'autostrade-bordo',
+        classi['autostrada']!,
+        t.autostradaBordo,
+        immersiva ? _metri(larghezzeVere['autostrade-bordo']!) : _largo(4.6, 38),
+      ),
+      _strada(
+        'servizio',
+        classi['servizio']!,
+        t.strada,
+        immersiva ? _metri(larghezzeVere['servizio']!) : _largo(0.6, 9),
+        minzoom: 14,
+      ),
+      _strada('strade', classi['strada']!, t.strada, immersiva ? _metri(larghezzeVere['strade']!) : _largo(1.6, 20)),
+      _strada(
+        'principali',
+        classi['principale']!,
+        t.principale,
+        immersiva ? _metri(larghezzeVere['principali']!) : _largo(2.6, 27),
+      ),
+      _strada(
+        'autostrade',
+        classi['autostrada']!,
+        t.autostrada,
+        immersiva ? _metri(larghezzeVere['autostrade']!) : _largo(3.4, 32),
+      ),
       // Il traffico come in Waze: solo dove si rallenta, arancio se lento e
       // rosso se quasi fermi; da lontano solo sulle strade principali.
       // Sull'auto più spesse: lo schermo si guarda da un braccio di
@@ -481,32 +623,7 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
         'source-layer': 'building',
         'minzoom': 14,
         'layout': {'visibility': 'none'},
-        'paint': {
-          'fill-extrusion-color': [
-            'interpolate',
-            ['linear'],
-            ['get', 'render_height'],
-            0,
-            t.edificio,
-            60,
-            t.edificioLato,
-          ],
-          'fill-extrusion-height': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            14,
-            0,
-            15.5,
-            ['get', 'render_height'],
-          ],
-          'fill-extrusion-base': [
-            'coalesce',
-            ['get', 'render_min_height'],
-            0,
-          ],
-          'fill-extrusion-opacity': 0.94,
-        },
+        'paint': {..._pitturaEdifici(t), 'fill-extrusion-opacity': 0.94},
       },
       // Le ZTL e le aree pedonali (OpenStreetMap), sopra le strade e sotto i
       // loro nomi: la ZTL tratteggiata di rosso, più tenue quando è spenta;
@@ -774,6 +891,81 @@ Map<String, Object> stileMappa({required bool scuro, String chiaveTraffico = '',
           'line-width': _largo(larghezzaCoda.$1, larghezzaCoda.$2),
         },
       },
+      /* La vista immersiva: le corsie della prossima manovra sulla strada
+       * (quella giusta del colore del percorso, le altre grigie, le righe
+       * bianche), poi gli edifici sopra il percorso, un po' trasparenti. */
+      if (immersiva) ...[
+        {
+          'id': 'corsie',
+          'type': 'line',
+          'source': sorgenteCorsie,
+          'filter': [
+            '==',
+            ['get', 'tipo'],
+            'corsia',
+          ],
+          'layout': {'line-cap': 'butt', 'line-join': 'round'},
+          'paint': {
+            'line-color': [
+              'case',
+              ['get', 'giusta'],
+              t.percorso,
+              t.stradaBordo,
+            ],
+            'line-opacity': [
+              'case',
+              ['get', 'giusta'],
+              0.95,
+              0.75,
+            ],
+            'line-width': _metri(larghezzaCorsia * 0.94),
+            'line-offset': _metriDa('spostamento'),
+          },
+        },
+        {
+          'id': 'corsie-righe',
+          'type': 'line',
+          'source': sorgenteCorsie,
+          'filter': [
+            '==',
+            ['get', 'tipo'],
+            'riga',
+          ],
+          'layout': {'line-cap': 'butt', 'line-join': 'round'},
+          'paint': {
+            'line-color': '#FFFFFF',
+            'line-opacity': 0.9,
+            'line-width': _metri(0.2),
+            'line-dasharray': [3, 3],
+            'line-offset': _metriDa('spostamento'),
+          },
+        },
+        {
+          'id': 'corsie-bordi',
+          'type': 'line',
+          'source': sorgenteCorsie,
+          'filter': [
+            '==',
+            ['get', 'tipo'],
+            'bordo',
+          ],
+          'layout': {'line-cap': 'butt', 'line-join': 'round'},
+          'paint': {
+            'line-color': '#FFFFFF',
+            'line-opacity': 0.9,
+            'line-width': _metri(0.25),
+            'line-offset': _metriDa('spostamento'),
+          },
+        },
+        {
+          'id': stratoEdificiImmersivi,
+          'type': 'fill-extrusion',
+          'source': 'openmaptiles',
+          'source-layer': 'building',
+          'minzoom': 14,
+          'paint': {..._pitturaEdifici(t), 'fill-extrusion-opacity': 0.82},
+        },
+      ],
       {
         'id': 'percorso-frecce',
         'type': 'symbol',

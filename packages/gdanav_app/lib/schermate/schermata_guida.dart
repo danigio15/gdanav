@@ -14,6 +14,7 @@ import '../componenti/vista_svincolo.dart';
 import '../componenti/vetro.dart';
 import '../componenti/ztl.dart';
 import '../mappa/controllo_mappa.dart';
+import '../mappa/scelta_vista.dart';
 import '../mappa/mappa_viaggio.dart';
 import '../stato/avvisi_strada.dart';
 import '../stato/avvisi_ztl.dart';
@@ -61,7 +62,7 @@ class SchermataGuida extends StatefulWidget {
 
 class _SchermataGuidaState extends State<SchermataGuida> {
   /// La stessa scelta 2D/3D della mappa senza guida, ricordata.
-  late final controllo = ControlloMappa(salvaInclinazione: widget.guida.archivio?.salvaVistaInclinata);
+  late final controllo = ControlloMappa(salvaVista: widget.guida.archivio?.salvaVistaMappa);
 
   /// Le segnalazioni lungo la strada, condivise con lo schermo dell'auto.
   AvvisiStrada? _avvisi;
@@ -107,7 +108,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
     _battito = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
-    if (widget.guida.archivio case final a?) unawaited(controllo.carica(a.vistaInclinata()));
+    if (widget.guida.archivio case final a?) unawaited(controllo.carica(a.vistaMappa()));
     widget.guida.avvia();
     if (widget.segnalazioni case final seg?) _avvisi = AvvisiStrada.di(widget.guida, seg);
     if (widget.ztl case final z?) _ztl = AvvisiZtl.di(widget.guida, z);
@@ -251,18 +252,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                               children: [
                                 Vetro(
                                   raggio: 28,
-                                  child: SizedBox.square(
-                                    dimension: 56,
-                                    child: TextButton(
-                                      key: const Key('2d-3d'),
-                                      onPressed: controllo.alternaInclinazione,
-                                      style: TextButton.styleFrom(shape: const CircleBorder()),
-                                      child: Text(
-                                        controllo.inclinata ? '2D' : '3D',
-                                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                                      ),
-                                    ),
-                                  ),
+                                  child: SceltaVista(key: const Key('2d-3d'), controllo: controllo),
                                 ),
                                 // Auto termica: un distributore per strada, e poi si prosegue.
                                 if (g.pronto?.termica ?? false) ...[

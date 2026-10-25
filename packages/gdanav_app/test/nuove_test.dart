@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gdanav_app/mappa/controllo_mappa.dart' show VistaMappa;
 import 'package:gdanav_app/stato/archivio.dart';
 import 'package:gdanav_app/stato/gestore_viaggio.dart';
 import 'package:gdanav_core/gdanav_core.dart';
@@ -110,22 +111,33 @@ void main() {
     expect((a.viaggio.stato as ViaggioPronto).viaggio.piano!.soste, isEmpty);
   });
 
-  testWidgets('la mappa parte in 3D; il bottone la mette in 2D, e la scelta si ricorda', (tester) async {
+  testWidgets('la mappa parte in 3D; dal tasto si sceglie 2D, 3D o immersiva, e la scelta si ricorda', (tester) async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
     final a = await ambiente(tester);
     await tester.pumpWidget(a.app());
     await tester.pumpAndSettle();
-    // Il bottone dice dove si va: in 3D propone il 2D.
-    expect(find.text('2D'), findsOneWidget);
-    await tester.tap(find.text('2D'));
-    await tester.pumpAndSettle();
+    // Il tasto dice la vista di adesso, e al tocco le propone tutte e tre.
     expect(find.text('3D'), findsOneWidget);
-    expect(await tester.runAsync(a.archivio.vistaInclinata), isFalse);
+    await tester.tap(find.byKey(const Key('2d-3d')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('vista-piatta')), findsOneWidget);
+    expect(find.byKey(const Key('vista-immersiva')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('vista-piatta')));
+    await tester.pumpAndSettle();
+    expect(find.text('2D'), findsOneWidget);
+    expect(await tester.runAsync(a.archivio.vistaMappa), VistaMappa.piatta);
 
     // Riaperta l'app, la mappa è ancora in 2D.
     await tester.pumpWidget(const SizedBox());
     await tester.pumpWidget(a.app());
     await tester.pumpAndSettle();
-    expect(find.text('3D'), findsOneWidget);
+    expect(find.text('2D'), findsOneWidget);
+
+    // E l'immersiva si ricorda allo stesso modo.
+    await tester.tap(find.byKey(const Key('2d-3d')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('vista-immersiva')));
+    await tester.pumpAndSettle();
+    expect(await tester.runAsync(a.archivio.vistaMappa), VistaMappa.immersiva);
   });
 }
