@@ -670,7 +670,8 @@ void main() {
         'photon': ClientePhoton(),
         if (tomtom.isNotEmpty) 'tomtom': ClienteTomTomLuoghi(tomtom),
         'insieme': LuoghiInsieme(tomtom.isEmpty ? const NessunLuogo() : ClienteTomTomLuoghi(tomtom), ClientePhoton(),
-            categorie: LuoghiPerCategoria()),
+            categorie: LuoghiPerCategoria(), altre: [if (here.isNotEmpty) ClienteHereLuoghi(here)]),
+        if (here.isNotEmpty) 'here': ClienteHereLuoghi(here),
       };
       for (final f in fonti.entries) {
         try {

@@ -23,6 +23,7 @@ export 'src/guida/riepilogo.dart';
 export 'src/luoghi/google.dart';
 export 'src/luoghi/luoghi.dart';
 export 'src/luoghi/luoghi_categorie.dart';
+export 'src/luoghi/luoghi_here.dart';
 export 'src/luoghi/luoghi_tomtom.dart';
 export 'src/mappe/zone.dart';
 export 'src/meteo/meteo.dart';

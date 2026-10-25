@@ -235,10 +235,21 @@ class LuoghiConRiserva implements FonteLuoghi {
 /// ordine di nome, ma di tutti — fino a [quantiPerCategoria] — in ordine di
 /// distanza: chi cerca «pub» vuole i pub vicini, non quelli col nome giusto.
 class LuoghiInsieme implements FonteLuoghi {
-  const LuoghiInsieme(this.prima, this.seconda, {this.categorie, this.quanti = 15, this.quantiPerCategoria = 50});
+  const LuoghiInsieme(
+    this.prima,
+    this.seconda, {
+    this.categorie,
+    this.altre = const [],
+    this.quanti = 15,
+    this.quantiPerCategoria = 50,
+  });
 
   final FonteLuoghi prima;
   final FonteLuoghi seconda;
+
+  /// Le fonti in piu', chieste insieme alle prime due: HERE, che conosce le
+  /// aziende dei registri delle imprese.
+  final List<FonteLuoghi> altre;
 
   /// La fonte delle categorie, se c'e'.
   final FonteLuoghi? categorie;
@@ -267,14 +278,21 @@ class LuoghiInsieme implements FonteLuoghi {
     }
 
     final perCategoria = vicinoA != null && categoriaDi(testo) != null ? categorie : null;
-    final risposte = await Future.wait([da(prima), da(seconda), if (perCategoria != null) da(perCategoria)]);
+    final risposte = await Future.wait([
+      da(prima),
+      da(seconda),
+      for (final f in altre) da(f),
+      if (perCategoria != null) da(perCategoria),
+    ]);
     if (risposte.every((r) => r == null)) {
       // Nessuna ha risposto: lo dice la seconda, col suo errore.
       return seconda.cerca(testo, vicinoA: vicinoA);
     }
+    final dellaCategoria = perCategoria != null ? risposte.last : null;
+    final delleFonti = perCategoria != null ? risposte.sublist(0, risposte.length - 1) : risposte;
     final tutti = <Luogo>[];
     // Prima quelli della categoria, che sono sicuramente quello che si cerca.
-    for (final l in [if (risposte.length > 2) ...?risposte[2], ...?risposte[0], ...?risposte[1]]) {
+    for (final l in [...?dellaCategoria, for (final r in delleFonti) ...?r]) {
       final doppio =
           tutti.any((g) => normalizzato(g.nome) == normalizzato(l.nome) && distanzaM(g.posizione, l.posizione) < 150);
       if (!doppio) tutti.add(l);
