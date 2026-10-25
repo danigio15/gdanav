@@ -686,14 +686,17 @@ void main() {
       // OpenStreetMap per nome, nei dintorni.
       try {
         final nome = q.replaceAll(RegExp(r'\s+napoli$', caseSensitive: false), '').replaceAll('"', '');
-        final r = await http.post(Uri.parse('https://overpass-api.de/api/interpreter'),
-            headers: {'user-agent': 'gdanav (github.com/danigio15/gdanav)'},
-            body: {'data': '[out:json][timeout:20];nwr["name"~"$nome",i](around:30000,40.8518,14.2681);out center tags 20;'});
+        final r = await http.post(Uri.parse('https://overpass-api.de/api/interpreter'), headers: {
+          'user-agent': 'gdanav (github.com/danigio15/gdanav)'
+        }, body: {
+          'data': '[out:json][timeout:20];nwr["name"~"$nome",i](around:30000,40.8518,14.2681);out center tags 20;'
+        });
         final el = ((jsonDecode(utf8.decode(r.bodyBytes)) as Map)['elements'] as List?) ?? const [];
         stdout.writeln('RICERCA [$q] overpass: ${el.length}');
         for (final e in el.take(12)) {
           final t = (e as Map)['tags'] as Map? ?? const {};
-          stdout.writeln('RICERCA [$q] overpass:   ${t['name']} — ${t.entries.where((x) => x.key != 'name').take(6).map((x) => '${x.key}=${x.value}').join(' ')}');
+          stdout.writeln(
+              'RICERCA [$q] overpass:   ${t['name']} — ${t.entries.where((x) => x.key != 'name').take(6).map((x) => '${x.key}=${x.value}').join(' ')}');
         }
       } catch (e) {
         stdout.writeln('RICERCA [$q] overpass: errore $e');
@@ -709,7 +712,8 @@ void main() {
             for (final it in items.take(10)) {
               final m = it as Map;
               final cat = ((m['categories'] as List?)?.firstOrNull as Map?)?['name'];
-              stdout.writeln('RICERCA [$q] here-$servizio:   ${m['title']} — ${m['resultType']} · $cat · ${(m['address'] as Map?)?['label']}');
+              stdout.writeln(
+                  'RICERCA [$q] here-$servizio:   ${m['title']} — ${m['resultType']} · $cat · ${(m['address'] as Map?)?['label']}');
             }
           } catch (e) {
             stdout.writeln('RICERCA [$q] here-$servizio: errore');
