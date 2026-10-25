@@ -233,4 +233,17 @@ void main() {
     expect(ClienteTomTomLuoghi.categoriaInItaliano('company'), 'azienda');
     expect(ClienteTomTomLuoghi.categoriaInItaliano('farmacia'), 'farmacia');
   });
+
+  test("lontano piu' di 300 km resta solo chi si chiama come si e' scritto", () async {
+    const napoli = Punto(40.85, 14.27);
+    const cipro = Luogo(nome: 'Romeo Court', posizione: Punto(34.7, 33.0));
+    const vicino = Luogo(nome: 'Alfa Romeo Mec', descrizione: 'Officina, Napoli', posizione: Punto(40.86, 14.28));
+    const giusto = Luogo(nome: 'Romeo Gestioni', descrizione: 'Azienda, Roma', posizione: Punto(41.9, 12.5));
+    const lontanoGiusto = Luogo(nome: 'Romeo Gestioni Milano', posizione: Punto(45.46, 9.18));
+    final l = await LuoghiInsieme(
+      _Fonte(() async => [cipro, vicino]),
+      _Fonte(() async => [giusto, lontanoGiusto]),
+    ).cerca('romeo gestioni', vicinoA: napoli);
+    expect(l.map((x) => x.nome), ['Romeo Gestioni', 'Romeo Gestioni Milano', 'Alfa Romeo Mec']);
+  });
 }

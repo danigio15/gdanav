@@ -245,6 +245,17 @@ class LuoghiInsieme implements FonteLuoghi {
   final int quanti;
   final int quantiPerCategoria;
 
+  /// Oltre questa distanza un risultato resta solo se si chiama come si e'
+  /// scritto.
+  static const lontanoKm = 300;
+
+  /// Il nome contiene tutte le parole scritte (anche a meta').
+  static bool haTutteLeParole(Luogo l, String testo) {
+    final parole = normalizzato(testo).split(' ').where((p) => p.length >= 2).toList();
+    final nome = normalizzato(l.nome).split(' ');
+    return parole.isNotEmpty && parole.every((p) => nome.any((n) => n.startsWith(p)));
+  }
+
   @override
   Future<List<Luogo>> cerca(String testo, {Punto? vicinoA}) async {
     Future<List<Luogo>?> da(FonteLuoghi f) async {
@@ -273,7 +284,13 @@ class LuoghiInsieme implements FonteLuoghi {
       tutti.sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
       return tutti.take(quantiPerCategoria).toList();
     }
-    return ordinatiPerNome(tutti, testo, vicinoA: vicinoA).take(quanti).toList();
+    // «romeo gestioni» dava anche Cipro, la Spagna e il Canada: Photon cerca
+    // in tutto il mondo. Lontano piu' di [lontanoKm] resta solo chi ha nel
+    // nome tutte le parole scritte (chi cerca un posto preciso lo trova).
+    final vicini = vicinoA == null
+        ? tutti
+        : tutti.where((l) => distanzaM(vicinoA, l.posizione) <= lontanoKm * 1000 || haTutteLeParole(l, testo)).toList();
+    return ordinatiPerNome(vicini, testo, vicinoA: vicinoA).take(quanti).toList();
   }
 
   /// Minuscole, senza accenti e senza segni: «Nonna Mà» e «nonna ma» sono la
