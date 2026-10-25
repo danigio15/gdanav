@@ -84,8 +84,10 @@ void main() {
     expect(await t.cerca('vi'), isEmpty);
     expect(chieste, isEmpty);
     final l = await t.cerca(' via roma 10/b ', vicinoA: const Punto(45, 9));
+    // Le due ricerche rispondono le stesse cose: una volta sola.
     expect(l, hasLength(4));
-    final u = chieste.single;
+    expect(chieste, hasLength(2));
+    final u = chieste.firstWhere((u) => u.path.startsWith('/search/2/search/'));
     expect(u.path, '/search/2/search/via%20roma%2010%20b.json');
     expect(u.queryParameters, {
       'key': 'chiave',
@@ -95,6 +97,69 @@ void main() {
       'lat': '45.0',
       'lon': '9.0',
     });
+    // Accanto, la ricerca delle sole attivita' nei dintorni.
+    final a = chieste.firstWhere((u) => u.path.startsWith('/search/2/poiSearch/'));
+    expect(a.path, '/search/2/poiSearch/via%20roma%2010%20b.json');
+    expect(a.queryParameters, {
+      'key': 'chiave',
+      'language': 'it-IT',
+      'limit': '20',
+      'lat': '45.0',
+      'lon': '9.0',
+      'radius': '50000',
+    });
+  });
+
+  test("l'azienda che la ricerca «mentre scrivi» lascia fuori la trova la ricerca delle attivita'", () async {
+    // La Fuzzy da' le vie che cominciano come il nome; l'azienda c'e' solo
+    // fra le attivita'.
+    final client = MockClient((r) async {
+      if (r.url.path.startsWith('/search/2/poiSearch/')) {
+        return http.Response(
+          jsonEncode({
+            'results': [
+              {
+                'type': 'POI',
+                'poi': {
+                  'name': 'Officine Meccaniche Esposito Srl',
+                  'categories': ['company'],
+                },
+                'address': {'streetName': 'Via Industriale', 'municipality': 'Caivano'},
+                'position': {'lat': 40.95, 'lon': 14.30},
+              },
+            ],
+          }),
+          200,
+        );
+      }
+      return http.Response(
+        jsonEncode({
+          'results': [
+            {
+              'type': 'Street',
+              'address': {'streetName': 'Via Officine', 'municipality': 'Napoli'},
+              'position': {'lat': 40.85, 'lon': 14.27},
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    final l =
+        await ClienteTomTomLuoghi('chiave', client: client).cerca('officine mecc', vicinoA: const Punto(40.9, 14.3));
+    expect(l.map((x) => x.nome), ['Via Officine', 'Officine Meccaniche Esposito Srl']);
+    expect(l.last.descrizione, 'Company, Via Industriale, Caivano');
+  });
+
+  test("se la ricerca delle attivita' non risponde resta l'altra; se non risponde la Fuzzy, si dice", () async {
+    final soloFuzzy = MockClient((r) async => r.url.path.startsWith('/search/2/poiSearch/')
+        ? http.Response('limite', 429)
+        : http.Response(jsonEncode(_risposta), 200));
+    expect(await ClienteTomTomLuoghi('chiave', client: soloFuzzy).cerca('via roma'), hasLength(4));
+    final fuzzyRotta = MockClient((r) async => r.url.path.startsWith('/search/2/poiSearch/')
+        ? http.Response(jsonEncode(_risposta), 200)
+        : http.Response('limite', 429));
+    expect(ClienteTomTomLuoghi('chiave', client: fuzzyRotta).cerca('via roma'), throwsException);
   });
 
   test('se TomTom non risponde, o non trova niente, cerca la riserva', () async {

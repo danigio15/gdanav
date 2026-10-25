@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../geo/geo.dart';
 import 'luoghi.dart';
+import 'luoghi_categorie.dart';
 
 /// La ricerca di TomTom (Fuzzy Search), con la stessa chiave dei percorsi e
 /// del traffico.
@@ -22,12 +23,22 @@ class ClienteTomTomLuoghi implements FonteLuoghi {
   final Uri indirizzo;
   final http.Client _http;
 
+  /// La ricerca delle sole attivita' (`poiSearch`), accanto alla Fuzzy.
+  ///
+  /// «Non mi trova le aziende»: la Fuzzy «mentre scrivi» mette davanti vie e
+  /// indirizzi che cominciano con le stesse lettere, e in dieci risultati
+  /// un'azienda col nome a meta' non entrava. La ricerca delle attivita'
+  /// guarda solo quelle — negozi, locali, aziende, uffici — nei dintorni, e
+  /// i suoi risultati si aggiungono a quelli della Fuzzy.
+  Uri get indirizzoAttivita => indirizzo.resolve('../poiSearch/');
+
   @override
   Future<List<Luogo>> cerca(String testo, {Punto? vicinoA}) async {
     final q = testo.trim();
     if (q.length < 3) return const [];
     // Il testo sta nel percorso: si toglie la barra, che lo spezzerebbe.
-    final uri = indirizzo.resolve('${Uri.encodeComponent(q.replaceAll('/', ' '))}.json').replace(queryParameters: {
+    final pezzo = '${Uri.encodeComponent(q.replaceAll('/', ' '))}.json';
+    final tutto = indirizzo.resolve(pezzo).replace(queryParameters: {
       'key': chiave,
       'language': 'it-IT',
       'limit': '10',
@@ -35,9 +46,37 @@ class ClienteTomTomLuoghi implements FonteLuoghi {
       'typeahead': 'true',
       if (vicinoA != null) ...{'lat': '${vicinoA.lat}', 'lon': '${vicinoA.lon}'},
     });
-    final r = await _http.get(uri);
-    if (r.statusCode != 200) throw Exception('TomTom ricerca: ${r.statusCode}');
-    return leggi(jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>);
+    final attivita = indirizzoAttivita.resolve(pezzo).replace(queryParameters: {
+      'key': chiave,
+      'language': 'it-IT',
+      'limit': '20',
+      if (vicinoA != null) ...{'lat': '${vicinoA.lat}', 'lon': '${vicinoA.lon}', 'radius': '50000'},
+    });
+    Future<List<Luogo>?> chiedi(Uri uri, {required bool obbligatoria}) async {
+      try {
+        final r = await _http.get(uri);
+        if (r.statusCode != 200) throw Exception('TomTom ricerca: ${r.statusCode}');
+        return leggi(jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>);
+      } catch (_) {
+        if (obbligatoria) rethrow;
+        return null;
+      }
+    }
+
+    // Se le attivita' non rispondono resta la Fuzzy; se non risponde la
+    // Fuzzy, l'errore e' suo (e chi chiama passa alle altre fonti).
+    final risposte = await Future.wait([
+      chiedi(tutto, obbligatoria: true),
+      chiedi(attivita, obbligatoria: false),
+    ]);
+    final fuori = <Luogo>[];
+    for (final l in [...?risposte[0], ...?risposte[1]]) {
+      final doppio = fuori.any((g) =>
+          LuoghiInsieme.normalizzato(g.nome) == LuoghiInsieme.normalizzato(l.nome) &&
+          distanzaM(g.posizione, l.posizione) < 150);
+      if (!doppio) fuori.add(l);
+    }
+    return fuori;
   }
 
   /// Legge la risposta della Fuzzy Search.
@@ -117,12 +156,22 @@ class LuoghiConRiserva implements FonteLuoghi {
 /// l'altro, quelli doppi (stesso nome, a meno di 150 m) una volta sola, e in
 /// testa vanno quelli col nome che contiene tutte le parole scritte, accenti
 /// e maiuscole a parte. Se una fonte non risponde, resta l'altra.
+///
+/// «I pub non sono completi»: quando il testo e' una categoria («pub»,
+/// «farmacia», «aziende») e si sa dove si e', si chiede anche la fonte delle
+/// categorie ([LuoghiPerCategoria]) e la lista non e' piu' di dodici in
+/// ordine di nome, ma di tutti — fino a [quantiPerCategoria] — in ordine di
+/// distanza: chi cerca «pub» vuole i pub vicini, non quelli col nome giusto.
 class LuoghiInsieme implements FonteLuoghi {
-  const LuoghiInsieme(this.prima, this.seconda, {this.quanti = 12});
+  const LuoghiInsieme(this.prima, this.seconda, {this.categorie, this.quanti = 15, this.quantiPerCategoria = 50});
 
   final FonteLuoghi prima;
   final FonteLuoghi seconda;
+
+  /// La fonte delle categorie, se c'e'.
+  final FonteLuoghi? categorie;
   final int quanti;
+  final int quantiPerCategoria;
 
   @override
   Future<List<Luogo>> cerca(String testo, {Punto? vicinoA}) async {
@@ -134,16 +183,23 @@ class LuoghiInsieme implements FonteLuoghi {
       }
     }
 
-    final risposte = await Future.wait([da(prima), da(seconda)]);
+    final perCategoria = vicinoA != null && categoriaDi(testo) != null ? categorie : null;
+    final risposte = await Future.wait([da(prima), da(seconda), if (perCategoria != null) da(perCategoria)]);
     if (risposte.every((r) => r == null)) {
-      // Nessuna delle due ha risposto: lo dice la seconda, col suo errore.
+      // Nessuna ha risposto: lo dice la seconda, col suo errore.
       return seconda.cerca(testo, vicinoA: vicinoA);
     }
     final tutti = <Luogo>[];
-    for (final l in [...?risposte[0], ...?risposte[1]]) {
+    // Prima quelli della categoria, che sono sicuramente quello che si cerca.
+    for (final l in [if (risposte.length > 2) ...?risposte[2], ...?risposte[0], ...?risposte[1]]) {
       final doppio =
           tutti.any((g) => normalizzato(g.nome) == normalizzato(l.nome) && distanzaM(g.posizione, l.posizione) < 150);
       if (!doppio) tutti.add(l);
+    }
+    if (perCategoria != null) {
+      final qui = vicinoA!;
+      tutti.sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
+      return tutti.take(quantiPerCategoria).toList();
     }
     return ordinatiPerNome(tutti, testo).take(quanti).toList();
   }
