@@ -148,7 +148,7 @@ void main() {
     final l =
         await ClienteTomTomLuoghi('chiave', client: client).cerca('officine mecc', vicinoA: const Punto(40.9, 14.3));
     expect(l.map((x) => x.nome), ['Via Officine', 'Officine Meccaniche Esposito Srl']);
-    expect(l.last.descrizione, 'Company, Via Industriale, Caivano');
+    expect(l.last.descrizione, 'Azienda, Via Industriale, Caivano');
   });
 
   test("se la ricerca delle attivita' non risponde resta l'altra; se non risponde la Fuzzy, si dice", () async {
@@ -212,5 +212,25 @@ void main() {
     ]);
     expect(LuoghiInsieme.ordinatiPerNome([a, c], 'ANCO').first, c);
     expect(LuoghiInsieme.normalizzato('Nonna Mà  Burger!'), 'nonna ma burger');
+  });
+
+  test("la citta' scritta conta: «romeo gestioni napoli» mette prima quelli di Napoli, poi i piu' vicini", () {
+    const napoli = Punto(40.85, 14.27);
+    const roma = Luogo(nome: 'Pb Gestioni', descrizione: 'Ufficio, Roma', posizione: Punto(41.9, 12.5));
+    const officina = Luogo(nome: 'Alfa Romeo Mec', descrizione: 'Officina, Napoli', posizione: Punto(40.86, 14.28));
+    const vicina =
+        Luogo(nome: 'Alfa Romeo Pit Stop', descrizione: 'Officina, Napoli', posizione: Punto(40.851, 14.271));
+    const giusta = Luogo(nome: 'Romeo Gestioni S.p.A.', descrizione: 'Azienda, Napoli', posizione: Punto(40.86, 14.29));
+    expect(
+      LuoghiInsieme.ordinatiPerNome([roma, officina, vicina, giusta], 'romeo gestioni napoli', vicinoA: napoli)
+          .map((l) => l.nome),
+      ['Romeo Gestioni S.p.A.', 'Alfa Romeo Pit Stop', 'Alfa Romeo Mec', 'Pb Gestioni'],
+    );
+  });
+
+  test('le categorie di TomTom in italiano', () {
+    expect(ClienteTomTomLuoghi.categoriaInItaliano('General car repair servicing'), 'officina');
+    expect(ClienteTomTomLuoghi.categoriaInItaliano('company'), 'azienda');
+    expect(ClienteTomTomLuoghi.categoriaInItaliano('farmacia'), 'farmacia');
   });
 }
