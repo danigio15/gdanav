@@ -143,12 +143,13 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   /// si rimandano solo quando cambiano.
   var _versioneTutte = -1;
 
-  /// Quanto è inclinata la mappa: niente dall'alto, 58° in 3D, 64° nella
-  /// vista immersiva, più bassa, con l'orizzonte appena sopra.
+  /// Quanto è inclinata la mappa: niente dall'alto, 58° in 3D, 60° nella
+  /// vista immersiva (che è anche più vicina). Più di così, da vicino, in
+  /// cima allo schermo finisce la mappa e si vede il vuoto.
   static double _inclinazioneDi(VistaMappa v) => switch (v) {
     VistaMappa.piatta => 0,
     VistaMappa.inclinata => 58,
-    VistaMappa.immersiva => 64,
+    VistaMappa.immersiva => 60,
   };
   double get _inclinazione => _inclinazioneDi(_vista);
 
@@ -692,7 +693,11 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     if (chiave == _frecciaDisegnata) return;
     // Segnata prima, perché chi arriva nel frattempo non la riscriva.
     _frecciaDisegnata = chiave;
-    final dati = chiave == null ? datiManovra(null, null) : datiManovra(v, a?.prossima);
+    // Nella vista immersiva, con le corsie sulla strada, la freccia parte
+    // dalla manovra: prima la strada la dicono le corsie, e la freccia sopra
+    // le coprirebbe.
+    final conCorsie = _immersiva && (a?.prossima?.corsieUtili ?? false);
+    final dati = chiave == null ? datiManovra(null, null) : datiManovra(v, a?.prossima, primaM: conCorsie ? 10 : 60);
     try {
       await m.setGeoJsonSource(sorgenteManovra, dati.cast<String, dynamic>());
       // Le corsie sulla strada: solo la vista immersiva le ha nello stile.

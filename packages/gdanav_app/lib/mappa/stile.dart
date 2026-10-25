@@ -906,17 +906,13 @@ Map<String, Object> stileMappa({
           ],
           'layout': {'line-cap': 'butt', 'line-join': 'round'},
           'paint': {
+            // Piene: sotto ci sono la linea del percorso e il grigio della
+            // strada, e una corsia trasparente li lascerebbe vedere.
             'line-color': [
               'case',
               ['get', 'giusta'],
               t.percorso,
-              t.stradaBordo,
-            ],
-            'line-opacity': [
-              'case',
-              ['get', 'giusta'],
-              0.95,
-              0.75,
+              t.strada,
             ],
             'line-width': _metri(larghezzaCorsia * 0.94),
             'line-offset': _metriDa('spostamento'),
@@ -963,7 +959,7 @@ Map<String, Object> stileMappa({
           'source': 'openmaptiles',
           'source-layer': 'building',
           'minzoom': 14,
-          'paint': {..._pitturaEdifici(t), 'fill-extrusion-opacity': 0.82},
+          'paint': {..._pitturaEdifici(t), 'fill-extrusion-opacity': 0.6},
         },
       ],
       {
