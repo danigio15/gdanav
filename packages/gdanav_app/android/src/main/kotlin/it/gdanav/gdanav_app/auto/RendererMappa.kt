@@ -214,7 +214,7 @@ class RendererMappa(
         mappa = null
         stile = null
         stileCaricato = null
-        inclinataOra = null
+        vistaOra = null
         immaginiCaricate = null
     }
 

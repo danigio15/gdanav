@@ -561,6 +561,15 @@ enum VistaAuto: String {
         }
     }
 
+    /// Sotto la riga «Vista» nelle impostazioni: com'è, e dove porta un tocco.
+    var spiegazione: String {
+        switch self {
+        case .piatta: return "Dall'alto, nord in su. Tocca per il 3D"
+        case .inclinata: return "Inclinata, con gli edifici. Tocca per l'immersiva"
+        case .immersiva: return "Da vicino, con le corsie sulla strada. Tocca per il 2D"
+        }
+    }
+
     var dopo: VistaAuto {
         switch self {
         case .inclinata: return .immersiva

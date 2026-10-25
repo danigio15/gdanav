@@ -293,13 +293,7 @@ enum SchermiCarPlay {
             let vista = mappa?.vista ?? .inclinata
             righe.append(riga(
                 "Vista: \(vista.titolo)",
-                {
-                    switch vista {
-                    case .piatta: return "Dall'alto, nord in su. Tocca per il 3D"
-                    case .inclinata: return "Inclinata, con gli edifici. Tocca per l'immersiva"
-                    case .immersiva: return "Da vicino, con le corsie sulla strada. Tocca per il 2D"
-                    }
-                }(),
+                vista.spiegazione,
                 icona: icona("map.fill", blu)
             ) {
                 guard let mappa else { return }
