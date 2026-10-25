@@ -374,5 +374,4 @@ class _ConsumoImparato extends StatelessWidget {
       },
     );
   }
-
 }

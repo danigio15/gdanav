@@ -45,12 +45,7 @@ List<String> righePrezzi(Prezzi p) {
           Corrente.ac => 'AC',
           Corrente.dc => 'DC',
           Corrente.hpc => 'DC ad alta potenza',
-        }}: ${[
-          if (t.energia case final f?) '${_quanto(f)} €/kWh',
-          if (t.tempo case final f?) '${_quanto(f)} €/min di ricarica',
-          if (t.avvio case final f?) 'avvio ${_quanto(f)} €',
-          if (t.sosta case final f?) 'sosta ${_quanto(f)} €/min',
-        ].join(' · ')}',
+        }}: ${[if (t.energia case final f?) '${_quanto(f)} €/kWh', if (t.tempo case final f?) '${_quanto(f)} €/min di ricarica', if (t.avvio case final f?) 'avvio ${_quanto(f)} €', if (t.sosta case final f?) 'sosta ${_quanto(f)} €/min'].join(' · ')}',
   ];
 }
 
@@ -123,7 +118,10 @@ List<Widget> sezionePrezzo(BuildContext context, Prezzi? prezzi) {
     const SizedBox(height: 12),
     Text('Prezzo', style: t.titleSmall),
     for (final riga in righePrezzi(prezzi))
-      Padding(padding: const EdgeInsets.only(top: 4), child: Text(riga, key: const Key('prezzo'))),
+      Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Text(riga, key: const Key('prezzo')),
+      ),
     Padding(
       padding: const EdgeInsets.only(top: 2),
       child: Text('Come il gestore lo comunica alla PUN', style: t.bodySmall?.copyWith(color: muto)),

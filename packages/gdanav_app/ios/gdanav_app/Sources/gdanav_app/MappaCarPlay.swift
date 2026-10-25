@@ -15,7 +15,7 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     private var immaginiSegnaposto: [String: UIImage] = [:]
     private var stileCaricato: String?
     private var stilePronto = false
-    private var inclinataOra: Bool?
+    private var vistaOra: VistaAuto?
     private var immaginiCaricate = 0
     private var sorgentiCaricate: [String: String] = [:]
     private let preferenze = UserDefaults.standard
@@ -26,8 +26,14 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     /// Chiamata quando `libera` cambia, per mostrare «Centra».
     var alCambio: () -> Void = {}
 
-    /// 3D (inclinata, girata come vai) o 2D (dall'alto, nord in su): si ricorda.
-    private(set) var tridimensionale: Bool
+    /// Come si guarda la mappa, come sul telefono: 2D (dall'alto, nord in su),
+    /// 3D (inclinata, girata come vai) o immersiva (più bassa e più vicina, le
+    /// strade larghe quanto sono, le corsie sulla strada). Si ricorda; chi aveva
+    /// scelto il 2D prima che ci fossero tre viste resta in 2D.
+    private(set) var vista: VistaAuto
+
+    /// Inclinata: in 3D o immersiva.
+    var tridimensionale: Bool { vista != .piatta }
 
     /// Lo zoom quando segue l'auto in guida: i tasti + e − lo cambiano.
     private var zoomGuida: Double
@@ -54,7 +60,8 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     init(soloMappa: Bool = false) {
         self.soloMappa = soloMappa
         let p = UserDefaults.standard
-        tridimensionale = p.object(forKey: "gdanav.auto_3d") as? Bool ?? true
+        vista = VistaAuto(rawValue: p.string(forKey: "gdanav.auto_vista") ?? "")
+            ?? ((p.object(forKey: "gdanav.auto_3d") as? Bool ?? true) ? .inclinata : .piatta)
         zoomGuida = p.object(forKey: "gdanav.auto_zoom_guida") as? Double ?? 16.5
         scartoLibero = p.object(forKey: "gdanav.auto_zoom_libero_scarto") as? Double ?? 0
         super.init(nibName: nil, bundle: nil)
@@ -155,10 +162,15 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         aggiorna()
     }
 
-    func alternaVista() {
-        tridimensionale.toggle()
-        preferenze.set(tridimensionale, forKey: "gdanav.auto_3d")
+    /// Il tasto della vista sulla mappa: 3D → immersiva → 2D → 3D.
+    func alternaVista() { scegliVista(vista.dopo) }
+
+    func scegliVista(_ v: VistaAuto) {
+        vista = v
+        preferenze.set(v.rawValue, forKey: "gdanav.auto_vista")
         segui()
+        // Dentro o fuori dall'immersiva cambia lo stile.
+        aggiorna()
     }
 
     /// «Centra»: di nuovo sull'auto.
@@ -198,11 +210,15 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         pannello.isHidden = soloMappa || !GdanavCarPlay.pannelliSullaMappa
         pannello.aggiorna()
         let ponte = PonteAuto.shared
-        guard let json = (scuro ? ponte.stileScuro : ponte.stileChiaro) ?? ponte.stileChiaro else { return }
+        let immersiva = vista == .immersiva
+        let scelto = immersiva
+            ? (scuro ? ponte.stileScuroImmersiva : ponte.stileChiaroImmersiva)
+            : (scuro ? ponte.stileScuro : ponte.stileChiaro)
+        guard let json = scelto ?? (scuro ? ponte.stileScuro : ponte.stileChiaro) ?? ponte.stileChiaro else { return }
         if json != stileCaricato {
             stileCaricato = json
             stilePronto = false
-            inclinataOra = nil
+            vistaOra = nil
             immaginiCaricate = 0
             sorgentiCaricate.removeAll()
             mappa.styleJSON = json
@@ -235,11 +251,12 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
             for (nome, immagine) in ponte.immagini { s.setImage(immagine, forName: nome) }
         }
         // In 3D anche senza percorso, come su Android Auto: la vista scelta è una.
-        let inclinata = tridimensionale
-        if inclinata != inclinataOra {
-            inclinataOra = inclinata
-            s.layer(withIdentifier: "edifici")?.isVisible = !inclinata
-            s.layer(withIdentifier: "edifici-3d")?.isVisible = inclinata
+        // Nell'immersiva gli edifici sono quelli sopra il percorso, che lo
+        // stile accende da sé.
+        if vista != vistaOra {
+            vistaOra = vista
+            s.layer(withIdentifier: "edifici")?.isVisible = vista == .piatta
+            s.layer(withIdentifier: "edifici-3d")?.isVisible = vista == .inclinata
         }
         muovi()
     }
@@ -281,7 +298,6 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     private var eraLibera = false
     private var inVolo = false
 
-    private static let inclinazione = 55.0
     private static let tauZoom = 0.8
     private static let tauCamera = 0.3
 
@@ -332,12 +348,13 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         if guida {
             zoomVoluto = zoomGuida + MappaCarPlay.zoomInSvolta(ponte.guida)
                 + MappaCarPlay.zoomLontano(stradaKmh: ponte.guida?.stradaKmh ?? 0, allaProssimaM: ponte.guida?.distanzaM ?? 0)
+                + vista.zoomInPiu
             sopra = 0.3
         } else {
-            zoomVoluto = MotoCarPlay.zoomLibero(velocita: ponte.velocita, scarto: scartoLibero)
+            zoomVoluto = MotoCarPlay.zoomLibero(velocita: ponte.velocita, scarto: scartoLibero) + vista.zoomInPiu
             sopra = inclinata ? 0.3 : 0
         }
-        inclinazioneVoluta = inclinata ? MappaCarPlay.inclinazione : 0
+        inclinazioneVoluta = vista.inclinazione
         bussolaInclinata = inclinata
         marginiVoluti = UIEdgeInsets(top: a.top + CGFloat(libero * sopra), left: a.left, bottom: a.bottom, right: a.right)
         let ora = CACurrentMediaTime()
@@ -517,6 +534,47 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
                   let immagine = UIImage(data: dati, scale: 3)
             else { continue }
             immaginiSegnaposto[nome] = immagine
+        }
+    }
+}
+
+/// Le tre viste della mappa, come sul telefono (`VistaMappa`). `dopo`: quella
+/// che propone il tasto sulla mappa, che le gira tutte e tre.
+enum VistaAuto: String {
+    case piatta, inclinata, immersiva
+
+    var inclinazione: Double {
+        switch self {
+        case .piatta: return 0
+        case .inclinata: return 55
+        case .immersiva: return 60
+        }
+    }
+
+    var zoomInPiu: Double { self == .immersiva ? 1 : 0 }
+
+    var titolo: String {
+        switch self {
+        case .piatta: return "2D"
+        case .inclinata: return "3D"
+        case .immersiva: return "Immersiva"
+        }
+    }
+
+    /// Sotto la riga «Vista» nelle impostazioni: com'è, e dove porta un tocco.
+    var spiegazione: String {
+        switch self {
+        case .piatta: return "Dall'alto, nord in su. Tocca per il 3D"
+        case .inclinata: return "Inclinata, con gli edifici. Tocca per l'immersiva"
+        case .immersiva: return "Da vicino, con le corsie sulla strada. Tocca per il 2D"
+        }
+    }
+
+    var dopo: VistaAuto {
+        switch self {
+        case .inclinata: return .immersiva
+        case .immersiva: return .piatta
+        case .piatta: return .inclinata
         }
     }
 }

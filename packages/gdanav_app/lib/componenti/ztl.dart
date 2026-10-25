@@ -61,7 +61,8 @@ class RigaZtl extends StatelessWidget {
   Widget build(BuildContext context) {
     final z = ztl;
     final pastiglie = <Widget>[
-      if (z.metaDentro case final m?) _Pastiglia(rossa: true, testo: '⛔ La meta è nella ${m.titolo}: ti porto al varco'),
+      if (z.metaDentro case final m?)
+        _Pastiglia(rossa: true, testo: '⛔ La meta è nella ${m.titolo}: ti porto al varco'),
       // Quella di cui si chiede il permesso la dice già la domanda.
       for (final e in _unaPerNome(z.evitate))
         if (e.chiave != z.daChiedere?.chiave) _Pastiglia(rossa: true, testo: '⛔ Evita la ${e.titolo}'),
@@ -99,8 +100,14 @@ class _Pastiglia extends StatelessWidget {
   Widget build(BuildContext context) {
     final scuro = Theme.of(context).brightness == Brightness.dark;
     final (fondo, colore) = rossa
-        ? (scuro ? const Color(0xFF4C1D1D) : const Color(0xFFFEE2E2), scuro ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B))
-        : (scuro ? const Color(0xFF374151) : const Color(0xFFE5E7EB), scuro ? const Color(0xFFE5E7EB) : const Color(0xFF374151));
+        ? (
+            scuro ? const Color(0xFF4C1D1D) : const Color(0xFFFEE2E2),
+            scuro ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
+          )
+        : (
+            scuro ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+            scuro ? const Color(0xFFE5E7EB) : const Color(0xFF374151),
+          );
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(color: fondo, borderRadius: BorderRadius.circular(999)),
@@ -155,7 +162,10 @@ class DomandaZtl extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('⛔ ${zona.titolo}, ${_quando(zona, adesso)}', style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+              Text(
+                '⛔ ${zona.titolo}, ${_quando(zona, adesso)}',
+                style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
               const SizedBox(height: 4),
               Text(
                 '${guadagno}Hai il permesso per entrare?',

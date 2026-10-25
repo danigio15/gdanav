@@ -10,6 +10,7 @@ import '../componenti/avvisi_in_guida.dart';
 import '../componenti/scheda_auto.dart';
 import '../componenti/vetro.dart';
 import '../mappa/controllo_mappa.dart';
+import '../mappa/scelta_vista.dart';
 import '../mappa/mappa_viaggio.dart';
 import '../stato/archivio.dart';
 import '../stato/avvisi_strada.dart';
@@ -163,7 +164,7 @@ class SchermataPrincipale extends StatefulWidget {
 
 class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   /// 2D o 3D si ricorda: in 3D la mappa ti segue anche senza una meta.
-  late final controllo = ControlloMappa(salvaInclinazione: widget.archivio.salvaVistaInclinata);
+  late final controllo = ControlloMappa(salvaVista: widget.archivio.salvaVistaMappa);
   PreferenzeRicarica _preferenze = const PreferenzeRicarica();
   late final GestoreLuoghi luoghi = widget.luoghi ?? (GestoreLuoghi(widget.archivio)..carica());
   late final GestoreSegnalazioni segnalazioni = widget.segnalazioni ?? GestoreSegnalazioni(posizione: widget.posizione);
@@ -179,7 +180,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
     _ricaricaPreferenze();
     // Solo le impostazioni: niente mappa, posizione né segnalazioni.
     if (widget.soloImpostazioni) return;
-    unawaited(controllo.carica(widget.archivio.vistaInclinata()));
+    unawaited(controllo.carica(widget.archivio.vistaMappa()));
     widget.chiediPosizione?.call().then((ok) {
       if (ok) widget.posizione.avvia();
     });
@@ -615,21 +616,21 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                     // Dentro GdAHome la casa c'è già: niente codice QR per
                     // abbinare Home Assistant (vedi `conHomeAssistant`).
                     if (conHomeAssistant(widget.auto))
-                    _VoceMenu(
-                      icona: Icons.home_rounded,
-                      colore: const Color(0xFF0EA5E9),
-                      titolo: 'Home Assistant',
-                      sotto: !sbloccato
-                          ? 'Premium'
-                          : ha == null
-                          ? 'Non collegata'
-                          : 'Collegata${ha.nomeAuto.isEmpty ? '' : ' a ${ha.nomeAuto}'}',
-                      onTap: () => vai(
-                        sbloccato
-                            ? AbbinaHomeAssistant(gestore: widget.auto)
-                            : SchermataPremium(premium: widget.premium!, perche: 'Home Assistant'),
+                      _VoceMenu(
+                        icona: Icons.home_rounded,
+                        colore: const Color(0xFF0EA5E9),
+                        titolo: 'Home Assistant',
+                        sotto: !sbloccato
+                            ? 'Premium'
+                            : ha == null
+                            ? 'Non collegata'
+                            : 'Collegata${ha.nomeAuto.isEmpty ? '' : ' a ${ha.nomeAuto}'}',
+                        onTap: () => vai(
+                          sbloccato
+                              ? AbbinaHomeAssistant(gestore: widget.auto)
+                              : SchermataPremium(premium: widget.premium!, perche: 'Home Assistant'),
+                        ),
                       ),
-                    ),
                     // GdAHome: l'auto della plancia di GdAHome, da sola. Niente
                     // Premium e niente abbinamento: dentro GdAHome la casa c'è già.
                     _VoceMenu(
@@ -792,7 +793,11 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
             child: ListenableBuilder(
               listenable: _avvisi,
               builder: (context, _) => switch (_avvisi.davanti) {
-                (final s, final m) => AvvisoSegnalazione(key: const Key('avviso-senza-percorso'), segnalazione: s, metri: m),
+                (final s, final m) => AvvisoSegnalazione(
+                  key: const Key('avviso-senza-percorso'),
+                  segnalazione: s,
+                  metri: m,
+                ),
                 null => const SizedBox.shrink(),
               },
             ),
@@ -804,12 +809,15 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
               listenable: Listenable.merge([controllo, widget.auto, ?widget.persone]),
               builder: (context, _) => Column(
                 children: [
-                  _BottoneMappa(
-                    tooltip: controllo.inclinata ? 'Vista dall\'alto' : 'Vista 3D',
-                    onPressed: controllo.alternaInclinazione,
-                    child: Text(
-                      controllo.inclinata ? '2D' : '3D',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                  Vetro(
+                    forma: BoxShape.circle,
+                    child: SizedBox.square(
+                      dimension: 60,
+                      child: SceltaVista(
+                        key: const Key('2d-3d'),
+                        controllo: controllo,
+                        stile: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 14),

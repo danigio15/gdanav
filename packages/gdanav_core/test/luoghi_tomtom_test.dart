@@ -109,4 +109,43 @@ void main() {
     expect(await LuoghiConRiserva(buona, altra).cerca('via roma'), [qui]);
     expect(altra.chiamate, 0);
   });
+
+  test("le due fonti insieme: il locale che conosce solo l'altra, in testa se si chiama come si e' scritto", () async {
+    // «nonna ma burger»: TomTom conosce la pizzeria, OpenStreetMap il burger.
+    const pizzeria = Luogo(
+      nome: 'Nonna Mà Pizzeria Trattoria',
+      descrizione: 'Italian, Via Biancardi 47, Frattamaggiore',
+      posizione: Punto(40.9410, 14.2740),
+    );
+    const burger = Luogo(nome: 'Nonna Mà Burger', descrizione: 'Frattamaggiore', posizione: Punto(40.9420, 14.2750));
+    // La stessa pizzeria anche in OpenStreetMap: una volta sola.
+    const pizzeriaOsm = Luogo(nome: 'Nonna Ma Pizzeria Trattoria', posizione: Punto(40.94105, 14.27405));
+    final tomtom = _Fonte(() async => [pizzeria]);
+    final osm = _Fonte(() async => [pizzeriaOsm, burger]);
+    final trovati = await LuoghiInsieme(tomtom, osm).cerca('nonna ma burger');
+    expect(trovati.map((l) => l.nome), ['Nonna Mà Burger', 'Nonna Mà Pizzeria Trattoria']);
+    expect(tomtom.chiamate, 1);
+    expect(osm.chiamate, 1);
+  });
+
+  test('le due fonti insieme: se una non risponde resta l\'altra, se nessuna risponde si dice', () async {
+    const qui = Luogo(nome: 'Via Roma 10', posizione: Punto(45.46, 9.18));
+    final rotta = _Fonte(() async => throw Exception('429'));
+    expect(await LuoghiInsieme(rotta, _Fonte(() async => [qui])).cerca('via roma'), [qui]);
+    expect(await LuoghiInsieme(_Fonte(() async => [qui]), rotta).cerca('via roma'), [qui]);
+    expect(LuoghiInsieme(rotta, rotta).cerca('via roma'), throwsException);
+  });
+
+  test("l'ordine per nome: accenti e maiuscole a parte, anche a meta' parola, a parita' come arrivano", () {
+    const a = Luogo(nome: 'Bar Centrale', posizione: Punto(0, 0));
+    const b = Luogo(nome: "Pub L'Ancora", posizione: Punto(0, 0));
+    const c = Luogo(nome: 'Ancora Pub & Grill', posizione: Punto(0, 0));
+    expect(LuoghiInsieme.ordinatiPerNome([a, b, c], 'ancora pub').map((l) => l.nome), [
+      "Pub L'Ancora",
+      'Ancora Pub & Grill',
+      'Bar Centrale',
+    ]);
+    expect(LuoghiInsieme.ordinatiPerNome([a, c], 'ANCO').first, c);
+    expect(LuoghiInsieme.normalizzato('Nonna Mà  Burger!'), 'nonna ma burger');
+  });
 }

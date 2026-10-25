@@ -137,6 +137,9 @@ final class PonteAuto {
 
     var stileChiaro: String?
     var stileScuro: String?
+    /// Gli stili della vista immersiva: strade in metri, corsie, edifici sopra il percorso.
+    var stileChiaroImmersiva: String?
+    var stileScuroImmersiva: String?
 
     /// I GeoJSON delle sorgenti dello stile, come li usa la mappa del telefono.
     private(set) var sorgenti: [String: String] = [:]
@@ -243,6 +246,8 @@ final class PonteAuto {
         case "stili":
             stileChiaro = a["chiaro"] as? String
             stileScuro = a["scuro"] as? String
+            stileChiaroImmersiva = a["chiaro_immersiva"] as? String
+            stileScuroImmersiva = a["scuro_immersiva"] as? String
         case "sorgenti":
             if let dati = a["dati"] as? [String: String] {
                 sorgenti.merge(dati) { _, nuovo in nuovo }

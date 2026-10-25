@@ -255,7 +255,12 @@ void main() {
         await pumpEventQueue();
       });
       addTearDown(p.dispose);
-      await tester.pumpWidget(MaterialApp(theme: temaGdanav(Brightness.light), home: SchermataPremium(premium: p)));
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: temaGdanav(Brightness.light),
+          home: SchermataPremium(premium: p),
+        ),
+      );
       await tester.ensureVisible(find.byKey(const Key('codice-regalo')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('codice-regalo')));

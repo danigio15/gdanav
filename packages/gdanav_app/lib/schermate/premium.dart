@@ -320,7 +320,8 @@ Future<bool> chiediCodiceRegalo(BuildContext context, GestorePremium premium) as
     builder: (_) => _CodiceRegalo(premium: premium),
   );
   if (ok == true && context.mounted) {
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(content: Text('Codice riscattato: Premium è attivo.')));
+    ScaffoldMessenger.maybeOf(context)
+        ?.showSnackBar(const SnackBar(content: Text('Codice riscattato: Premium è attivo.')));
   }
   return ok == true;
 }

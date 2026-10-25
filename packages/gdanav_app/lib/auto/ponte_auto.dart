@@ -101,6 +101,14 @@ class PonteAuto {
     _manda('stili', {
       'chiaro': jsonEncode(stileMappa(scuro: false, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true)),
       'scuro': jsonEncode(stileMappa(scuro: true, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true)),
+      // La vista immersiva ha uno stile suo: le strade in metri, le corsie
+      // sulla strada, gli edifici sopra il percorso.
+      'chiaro_immersiva': jsonEncode(
+        stileMappa(scuro: false, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true, immersiva: true),
+      ),
+      'scuro_immersiva': jsonEncode(
+        stileMappa(scuro: true, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true, immersiva: true),
+      ),
     });
     _immagini();
     viaggio.addListener(_viaggio);
@@ -174,6 +182,9 @@ class PonteAuto {
       // i dati dell'auto si chiedono freschi anche senza un percorso.
       case 'in_auto':
         auto?.schermoDellAuto(a['si'] == true);
+        // E i viaggi pianificati, letti freschi: quello pianificato poco fa
+        // sul telefono deve esserci in «Dove andiamo?».
+        if (a['si'] == true && pianificati != null) unawaited(pianificati!.carica());
       // Android Auto accende la prova di guida: da qui ogni guida si percorre
       // da sola, e se non c'è ancora una meta se ne sceglie una.
       case 'prova_guida':
@@ -547,7 +558,8 @@ class PonteAuto {
         },
         'tipo': 'autovelox',
         if (t case TutorDavanti(:final metri)) 'metri': metri,
-        if (t case final DentroTutor d) 'testo': 'mancano ${distanzaBreve(d.restantiM)}${d.sopra() ? ' · rallenta' : ''}',
+        if (t case final DentroTutor d)
+          'testo': 'mancano ${distanzaBreve(d.restantiM)}${d.sopra() ? ' · rallenta' : ''}',
         'limite': t.tratto.limiteKmh,
       } else if (z != null) ...{
         'titolo': z.titolo,
@@ -771,7 +783,10 @@ class PonteAuto {
       if (_freccia != null) {
         _freccia = null;
         _manda('sorgenti', {
-          'dati': {sorgenteManovra: jsonEncode(datiManovra(null, null))},
+          'dati': {
+            sorgenteManovra: jsonEncode(datiManovra(null, null)),
+            sorgenteCorsie: jsonEncode(datiCorsie(null, null)),
+          },
         });
       }
       _cruscotto();
@@ -825,7 +840,12 @@ class PonteAuto {
     if (chiave != _freccia) {
       _freccia = chiave;
       _manda('sorgenti', {
-        'dati': {sorgenteManovra: jsonEncode(datiManovra(chiave == null ? null : p.viaggio, a?.prossima))},
+        'dati': {
+          sorgenteManovra: jsonEncode(datiManovra(chiave == null ? null : p.viaggio, a?.prossima)),
+          // Le corsie sulla strada: le disegna solo la vista immersiva, che
+          // ha la sorgente; l'auto in 2D e in 3D le lascia cadere.
+          sorgenteCorsie: jsonEncode(datiCorsie(chiave == null ? null : p.viaggio, a?.prossima)),
+        },
       });
     }
     // La vista dello svincolo si disegna una volta, poco prima.
@@ -906,7 +926,9 @@ class PonteAuto {
       'velocita_ms': velocita.isFinite ? velocita : 0.0,
       'icona': posizione.segnaposto.immagine,
       if (pista != null && metri != null) ...{
-        'pista': [for (final p in pista) ...[p.lat, p.lon]],
+        'pista': [
+          for (final p in pista) ...[p.lat, p.lon],
+        ],
         'pista_qui': metri - da,
       },
     });

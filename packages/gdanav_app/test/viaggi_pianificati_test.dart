@@ -196,6 +196,42 @@ void main() {
       await expectLater(telefono.salva(v), throwsA(isA<ErroreViaggi>()));
     });
 
+    testWidgets('la casa che non risponde ancora: si riprova, e il viaggio arriva', (tester) async {
+      // «Ho pianificato il viaggio sull'app ma in auto non l'ho trovato»:
+      // all'avvio la casa non rispondeva, e nessuno richiedeva l'elenco.
+      var risponde = false;
+      final casa = FonteViaggiDellaCasa((c) async {
+        if (!risponde) throw Exception('filo non ancora alzato');
+        return {
+          'sbloccato': true,
+          'viaggi': [_dallaCasa()],
+        };
+      });
+      final g = GestoreViaggiPianificati(casa, orologio: () => giovedi);
+      await g.carica();
+      expect(g.viaggi, isEmpty);
+      expect(g.errore, isNotNull);
+      risponde = true;
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pump();
+      expect(g.viaggi.map((v) => v.id), ['v_1']);
+      expect(g.errore, isNull);
+      g.dispose();
+    });
+
+    testWidgets('un «no» della casa non si riprova', (tester) async {
+      var chieste = 0;
+      final casa = FonteViaggiDellaCasa((c) async {
+        chieste++;
+        throw Exception('premium-richiesto');
+      });
+      final g = GestoreViaggiPianificati(casa, orologio: () => giovedi);
+      await g.carica();
+      await tester.pump(const Duration(minutes: 5));
+      expect(chieste, 1);
+      g.dispose();
+    });
+
     test('il gestore porta alla casa la stima col traffico dei viaggi vicini', () async {
       final stime = <String>[];
       final casa = FonteViaggiDellaCasa((c) async {

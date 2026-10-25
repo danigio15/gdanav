@@ -25,7 +25,8 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('la scena dello svincolo', () async {
-    final dove = Directory(Platform.environment['GDANAV_FOTO'] ?? 'collaudo/foto/svincolo')..createSync(recursive: true);
+    final dove = Directory(Platform.environment['GDANAV_FOTO'] ?? 'collaudo/foto/svincolo')
+      ..createSync(recursive: true);
     // Come nella foto dal campo: verso nord, a sinistra, e dopo trentacinque
     // metri ancora a sinistra (verso sud).
     const partenza = Punto(40.8500, 14.2500);
@@ -75,8 +76,7 @@ void main() {
     // L'autostrada: dodici chilometri verso nord-est con una curva larga, e
     // l'uscita in fondo. Lo zoom è quello della guida lontano dall'uscita.
     final autostrada = <Punto>[
-      for (var m = 0.0; m <= 12000; m += 100)
-        sposta(partenza, nord: m * 0.8, est: m * 0.6 + 400 * math.sin(m / 3000)),
+      for (var m = 0.0; m <= 12000; m += 100) sposta(partenza, nord: m * 0.8, est: m * 0.6 + 400 * math.sin(m / 3000)),
     ];
     File('${dove.path}/autostrada.json').writeAsStringSync(
       jsonEncode({

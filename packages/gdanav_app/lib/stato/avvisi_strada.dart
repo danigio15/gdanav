@@ -187,7 +187,8 @@ class AvvisiStrada extends ChangeNotifier {
 
   static bool _stessoTutor(StatoTutor? a, StatoTutor? b) => switch ((a, b)) {
     (null, null) => true,
-    (TutorDavanti(), TutorDavanti()) => a!.tratto.id == b!.tratto.id && (a as TutorDavanti).metri == (b as TutorDavanti).metri,
+    (TutorDavanti(), TutorDavanti()) =>
+      a!.tratto.id == b!.tratto.id && (a as TutorDavanti).metri == (b as TutorDavanti).metri,
     (final DentroTutor x, final DentroTutor y) =>
       x.tratto.id == y.tratto.id && x.mediaKmh == y.mediaKmh && x.restantiM == y.restantiM,
     _ => false,

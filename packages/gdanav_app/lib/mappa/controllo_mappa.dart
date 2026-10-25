@@ -2,18 +2,53 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-/// I comandi della mappa che stanno fuori dalla mappa: 2D o 3D, «torna su
-/// di me» e la mappa libera.
+/// Come si guarda la mappa.
+///
+/// [piatta]: dall'alto, il nord in su. [inclinata] (3D): inclinata, girata
+/// come si va, con gli edifici in rilievo. [immersiva]: ancora più bassa e
+/// più vicina, le strade larghe quanto sono davvero, il percorso che passa
+/// fra le case, e prima di una manovra le corsie disegnate sulla strada.
+enum VistaMappa {
+  piatta('2D', 'Dall\'alto'),
+  inclinata('3D', '3D'),
+  immersiva('Immersiva', 'Immersiva');
+
+  const VistaMappa(this.sigla, this.nome);
+
+  /// Quello che c'è scritto sul tasto.
+  final String sigla;
+
+  /// Il nome nella scelta.
+  final String nome;
+
+  /// La vista salvata, da una parola; quella di partenza se non si capisce.
+  static VistaMappa daNome(String? nome) =>
+      VistaMappa.values.firstWhere((v) => v.name == nome, orElse: () => VistaMappa.inclinata);
+}
+
+/// I comandi della mappa che stanno fuori dalla mappa: la vista (2D, 3D,
+/// immersiva), «torna su di me» e la mappa libera.
 class ControlloMappa extends ChangeNotifier {
-  ControlloMappa({this.ritornoAutomatico = const Duration(seconds: 20), this.inclinata = true, this.salvaInclinazione});
+  ControlloMappa({
+    this.ritornoAutomatico = const Duration(seconds: 20),
+    bool inclinata = true,
+    VistaMappa? vista,
+    this.salvaVista,
+  }) : vista = vista ?? (inclinata ? VistaMappa.inclinata : VistaMappa.piatta);
 
-  /// 3D: inclinata, girata come si va, e (fuori dalla guida come in guida)
-  /// la mappa segue chi guida. 2D: dall'alto. Di partenza 3D, come sullo
-  /// schermo dell'auto; la scelta si ricorda ([salvaInclinazione], [carica]).
-  bool inclinata;
+  /// Di partenza 3D, come sullo schermo dell'auto; la scelta si ricorda
+  /// ([salvaVista], [carica]).
+  VistaMappa vista;
 
-  /// Dove si ricorda la scelta 2D/3D; `null` nelle prove che non la guardano.
-  final Future<void> Function(bool inclinata)? salvaInclinazione;
+  /// Inclinata (3D o immersiva): girata come si va, e (fuori dalla guida come
+  /// in guida) la mappa segue chi guida. Altrimenti dall'alto.
+  bool get inclinata => vista != VistaMappa.piatta;
+  set inclinata(bool v) => vista = v ? (vista == VistaMappa.piatta ? VistaMappa.inclinata : vista) : VistaMappa.piatta;
+
+  bool get immersiva => vista == VistaMappa.immersiva;
+
+  /// Dove si ricorda la vista; `null` nelle prove che non la guardano.
+  final Future<void> Function(VistaMappa vista)? salvaVista;
 
   var _sceltaQui = false;
   int _centra = 0;
@@ -30,20 +65,22 @@ class ControlloMappa extends ChangeNotifier {
 
   /// La scelta ricordata, appena letta. Se nel frattempo se n'è già fatta
   /// una qui, vale quella.
-  Future<void> carica(Future<bool> ricordata) async {
+  Future<void> carica(Future<VistaMappa> ricordata) async {
     final v = await ricordata;
-    if (_sceltaQui || v == inclinata) return;
-    inclinata = v;
+    if (_sceltaQui || v == vista) return;
+    vista = v;
     notifyListeners();
   }
 
-  /// Il tasto 2D/3D: cambia, si ricorda, e si torna a seguire.
-  void alternaInclinazione() {
-    inclinata = !inclinata;
+  /// La scelta della vista: cambia, si ricorda, e si torna a seguire.
+  void scegliVista(VistaMappa v) {
     _sceltaQui = true;
-    unawaited(salvaInclinazione?.call(inclinata));
     _ritorno?.cancel();
     libera = false;
+    if (v != vista) {
+      vista = v;
+      unawaited(salvaVista?.call(v));
+    }
     notifyListeners();
   }
 

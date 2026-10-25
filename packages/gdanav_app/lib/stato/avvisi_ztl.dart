@@ -185,8 +185,9 @@ class AvvisiZtl extends ChangeNotifier {
     return accanto == null ? null : (accanto, false);
   }
 
-  bool _vicino(ZonaLimitata z, Punto q) =>
-      (_bordi[z.id] ??= [for (final a in z.anelli) Linea([...a, a.first])]).any((l) => l.proietta(q).lontanoM <= accantoM);
+  bool _vicino(ZonaLimitata z, Punto q) => (_bordi[z.id] ??= [
+    for (final a in z.anelli) Linea([...a, a.first]),
+  ]).any((l) => l.proietta(q).lontanoM <= accantoM);
 
   /// Fuori dal percorso: la ZTL attiva, senza permesso, che si ha davanti
   /// nella direzione in cui si va.

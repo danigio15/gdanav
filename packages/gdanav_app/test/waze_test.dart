@@ -306,9 +306,11 @@ void main() {
     expect(c.inclinata, isTrue);
 
     await tester.tap(find.byKey(const Key('2d-3d')));
-    await tester.pump();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('vista-piatta')));
+    await tester.pumpAndSettle();
     expect(c.inclinata, isFalse);
-    expect(find.text('3D'), findsOneWidget);
+    expect(find.text('2D'), findsOneWidget);
 
     // Un dito sposta la mappa: resta lì, e compare «Riprendi».
     c.toccata();

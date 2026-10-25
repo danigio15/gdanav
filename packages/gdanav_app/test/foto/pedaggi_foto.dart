@@ -51,10 +51,17 @@ PercorsoCalcolato _strada(int km, double kmh, String strada, {(double, double)? 
   return PercorsoCalcolato(
     punti: punti,
     tratti: [
-      for (var i = 1; i < punti.length; i++) Tratto(lunghezzaM: linea.cumulate[i] - linea.cumulate[i - 1], velocitaKmh: kmh),
+      for (var i = 1; i < punti.length; i++)
+        Tratto(lunghezzaM: linea.cumulate[i] - linea.cumulate[i - 1], velocitaKmh: kmh),
     ],
     manovre: [
-      Manovra(istruzione: 'Prendi la $strada', lunghezzaM: linea.lunghezzaM, secondi: km / kmh * 3600, inizio: 0, strada: strada),
+      Manovra(
+        istruzione: 'Prendi la $strada',
+        lunghezzaM: linea.lunghezzaM,
+        secondi: km / kmh * 3600,
+        inizio: 0,
+        strada: strada,
+      ),
     ],
     conPedaggi: pedaggio != null,
     conAutostrade: pedaggio != null,

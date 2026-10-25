@@ -214,6 +214,7 @@ class GestoreVicini extends ChangeNotifier {
   }
 
   Distributore? distributore(String id) => distributori.where((d) => d.id == id).firstOrNull;
+
   /// Una colonnina intorno a te, o una qualunque di tutta la mappa.
   Colonnina? colonnina(String id) => colonnine.where((c) => c.id == id).firstOrNull ?? _perId[id];
 

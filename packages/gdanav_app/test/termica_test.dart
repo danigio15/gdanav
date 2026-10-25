@@ -105,7 +105,11 @@ void main() {
   testWidgets("l'ibrida (anche e-Power) si accende sotto il carburante e resta salvata", (tester) async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
     final a = await ambiente(tester);
-    await tester.pumpWidget(MaterialApp(home: LaTuaAuto(auto: a.auto, posizione: a.posizione)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LaTuaAuto(auto: a.auto, posizione: a.posizione),
+      ),
+    );
     expect(find.byKey(const Key('ibrida')), findsNothing, reason: "con l'elettrica non c'è");
     await tester.tap(find.text('Termica'));
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));

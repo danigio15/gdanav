@@ -32,8 +32,7 @@ String testoDisponibilita(Disponibilita d) {
     StatoColonnina.piena => funzionanti == 1 ? 'Occupata' : 'Piena · $funzionanti occupate',
     StatoColonnina.guasta => 'Fuori servizio',
     StatoColonnina.ignota when !GestorePremium.attivo.value => 'Libere/occupate con Premium',
-    StatoColonnina.ignota =>
-      d.totali > 0 ? '${d.totali} ${d.totali == 1 ? 'presa' : 'prese'}' : 'Stato non comunicato',
+    StatoColonnina.ignota => d.totali > 0 ? '${d.totali} ${d.totali == 1 ? 'presa' : 'prese'}' : 'Stato non comunicato',
   };
 }
 

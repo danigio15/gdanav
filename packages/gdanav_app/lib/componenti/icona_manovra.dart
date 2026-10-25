@@ -189,14 +189,22 @@ Future<Uint8List> bandieraArrivoPng({double scala = 3}) async {
   c.drawCircle(Offset(asta, alta - 4), 3.2, Paint()..color = const Color(0xFF1F2937));
   // L'asta, bordata di bianco perché si veda anche sullo scuro.
   const asse = Offset(asta, cima);
-  c.drawLine(asse, Offset(asta, alta - 4), Paint()
-    ..color = Colors.white
-    ..strokeWidth = 5
-    ..strokeCap = StrokeCap.round);
-  c.drawLine(asse, Offset(asta, alta - 4), Paint()
-    ..color = const Color(0xFF1F2937)
-    ..strokeWidth = 2.6
-    ..strokeCap = StrokeCap.round);
+  c.drawLine(
+    asse,
+    Offset(asta, alta - 4),
+    Paint()
+      ..color = Colors.white
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round,
+  );
+  c.drawLine(
+    asse,
+    Offset(asta, alta - 4),
+    Paint()
+      ..color = const Color(0xFF1F2937)
+      ..strokeWidth = 2.6
+      ..strokeCap = StrokeCap.round,
+  );
   // La bandiera a scacchi, un poco mossa, col bordo bianco.
   const x0 = asta + 1.5, y0 = cima + 1;
   Path telo(double dx, double dy, double l) {

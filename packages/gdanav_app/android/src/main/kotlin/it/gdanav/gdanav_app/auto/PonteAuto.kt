@@ -56,6 +56,10 @@ object PonteAuto {
     @Volatile var stileChiaro: String? = null
     @Volatile var stileScuro: String? = null
 
+    /** Gli stili della vista immersiva: strade in metri, corsie, edifici sopra il percorso. */
+    @Volatile var stileChiaroImmersiva: String? = null
+    @Volatile var stileScuroImmersiva: String? = null
+
     /** I GeoJSON delle sorgenti dello stile, come li usa la mappa del telefono. */
     @Volatile var sorgenti: Map<String, String> = emptyMap()
 
@@ -254,6 +258,8 @@ object PonteAuto {
             "stili" -> {
                 stileChiaro = call.argument("chiaro")
                 stileScuro = call.argument("scuro")
+                stileChiaroImmersiva = call.argument("chiaro_immersiva")
+                stileScuroImmersiva = call.argument("scuro_immersiva")
             }
             "sorgenti" -> {
                 val nuove = HashMap(sorgenti)

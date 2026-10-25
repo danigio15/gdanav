@@ -180,7 +180,9 @@ Map<String, Object?> datiZtl(Iterable<ZonaLimitata> zone, DateTime ora) => _coll
           {
             'type': 'Polygon',
             'coordinates': [
-              [for (final p in [...a, a.first]) _xy(p)],
+              [
+                for (final p in [...a, a.first]) _xy(p),
+              ],
             ],
           },
           {'tipo': z.tipo.name, 'attiva': z.attivaAlle(ora)},
@@ -326,6 +328,45 @@ Map<String, Object?> datiManovra(Viaggio? v, Manovra? m, {double primaM = 60, do
   ]);
 }
 
+/// Le corsie della prossima manovra disegnate sulla strada, nella vista
+/// immersiva: negli ultimi [primaM] metri prima della manovra la strada si
+/// divide in tante strisce quante sono le corsie, larghe [larghezzaCorsia],
+/// quella giusta del colore del percorso e le altre grigie, con le righe
+/// bianche tratteggiate fra l'una e l'altra e continue ai bordi.
+///
+/// Le corsie vanno da sinistra a destra e il percorso corre nel mezzo della
+/// carreggiata: la corsia `i` di `n` sta a `(i - (n-1)/2)` corsie dal centro
+/// (a destra il segno è più, come per `line-offset`). Solo quando servono
+/// ([Manovra.corsieUtili]): se vanno bene tutte non c'è niente da dire.
+Map<String, Object?> datiCorsie(Viaggio? v, Manovra? m, {double primaM = 160}) {
+  if (v == null || m == null || !m.corsieUtili || v.percorso.punti.length < 2) return _collezione([]);
+  final l = Linea(v.percorso.punti);
+  final centro = l.cumulate[m.inizio.clamp(0, l.punti.length - 1)];
+  final da = math.max(0.0, centro - primaM);
+  final tratto = [
+    _aMetri(l, da),
+    for (var i = 0; i < l.punti.length; i++)
+      if (l.cumulate[i] > da && l.cumulate[i] < centro) l.punti[i],
+    _aMetri(l, centro),
+  ];
+  if (tratto.length < 2 || centro - da < 20) return _collezione([]);
+  final linea = {
+    'type': 'LineString',
+    'coordinates': [for (final p in tratto) _xy(p)],
+  };
+  final n = m.corsie.length;
+  return _collezione([
+    for (var i = 0; i < n; i++)
+      _elemento(linea, {
+        'tipo': 'corsia',
+        'giusta': m.corsie[i].giusta,
+        'spostamento': (i - (n - 1) / 2) * larghezzaCorsia,
+      }),
+    for (var i = 0; i <= n; i++)
+      _elemento(linea, {'tipo': i == 0 || i == n ? 'bordo' : 'riga', 'spostamento': (i - n / 2) * larghezzaCorsia}),
+  ]);
+}
+
 /// Quanto prima della manovra dopo si ferma il tratto della freccia.
 const _primaDellaDopoM = 10.0;
 
@@ -400,7 +441,8 @@ Map<String, Object?> datiColonnineTutte(List<Colonnina> elenco, Set<TipoConnetto
 /// «Al Centro Direzionale è 1, ma sono 200 prese.» Un'icona è un posto, e un
 /// posto può avere una presa o duecento: contare le icone diceva quanti
 /// posti, non quante auto ci si possono attaccare.
-int preseAdatte(Colonnina c, Set<TipoConnettore> connettori) => c.connettori.where((p) => connettori.contains(p.tipo)).length;
+int preseAdatte(Colonnina c, Set<TipoConnettore> connettori) =>
+    c.connettori.where((p) => connettori.contains(p.tipo)).length;
 
 /// Il riquadro che contiene tutto il percorso: sud-ovest e nord-est.
 (Punto, Punto)? confini(Viaggio v, {List<PercorsoCalcolato> anche = const []}) {

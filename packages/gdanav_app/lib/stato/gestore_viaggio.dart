@@ -265,9 +265,11 @@ final _pedaggiHere = Servizi.chiaveHere.isEmpty ? null : PedaggiHere(Servizi.chi
 final _traffico = Servizi.chiaveTomTom.isEmpty ? null : TrafficoTomTom(Servizi.chiaveTomTom);
 
 /// Dove si cercano le mete: TomTom se c'è la chiave — i numeri civici e le
-/// attività per categoria («farmacia», «benzinaio») — e Photon di riserva.
+/// attività per categoria («farmacia», «benzinaio») — e Photon
+/// (OpenStreetMap) insieme, non solo di riserva: i locali che conosce uno solo
+/// dei due si trovano lo stesso (`LuoghiInsieme`).
 FonteLuoghi luoghiPredefiniti({String chiave = Servizi.chiaveTomTom}) =>
-    chiave.isEmpty ? ClientePhoton() : LuoghiConRiserva(ClienteTomTomLuoghi(chiave), ClientePhoton());
+    chiave.isEmpty ? ClientePhoton() : LuoghiInsieme(ClienteTomTomLuoghi(chiave), ClientePhoton());
 
 class GestoreViaggio extends ChangeNotifier {
   GestoreViaggio({

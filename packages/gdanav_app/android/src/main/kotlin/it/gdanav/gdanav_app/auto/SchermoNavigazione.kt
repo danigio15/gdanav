@@ -277,7 +277,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         }
     }
 
-    /** A lato della mappa: sposta, + e −, e 2D/3D (o Centra se la si è spostata). */
+    /** A lato della mappa: sposta, + e −, e la vista (o Centra se la si è spostata). */
     private fun azioniMappa(): ActionStrip {
         val striscia = ActionStrip.Builder()
         if (carContext.carAppApiLevel >= 2) striscia.addAction(Action.PAN)
@@ -287,7 +287,14 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             striscia.addAction(tasto(R.drawable.auto_centra) { renderer.segui() })
         } else {
             striscia.addAction(
-                tasto(if (renderer.tridimensionale) R.drawable.auto_2d else R.drawable.auto_3d) {
+                // Il tasto mostra la vista dopo: 3D → immersiva → 2D → 3D.
+                tasto(
+                    when (renderer.vista.dopo) {
+                        Vista.PIATTA -> R.drawable.auto_2d
+                        Vista.INCLINATA -> R.drawable.auto_3d
+                        Vista.IMMERSIVA -> R.drawable.auto_immersiva
+                    },
+                ) {
                     renderer.alternaVista()
                     invalidate()
                 },

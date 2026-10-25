@@ -58,7 +58,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await expectLater(find.byType(MaterialApp), matchesGoldenFile('$_dove/la-tua-auto-${scuro ? 'scuro' : 'chiaro'}.png'));
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('$_dove/la-tua-auto-${scuro ? 'scuro' : 'chiaro'}.png'),
+      );
     });
   }
 }

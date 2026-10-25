@@ -99,11 +99,7 @@ class FonteDatiAuto extends StatelessWidget {
                 const _Titoletto('Da dove prendere i dati'),
                 if (!premium) _SoloAMano(onPremium: onPremium),
                 if (premium)
-                  RadioListTile<TipoSorgente?>(
-                    value: null,
-                    title: const Text('Automatica'),
-                    subtitle: Text(automatica),
-                  )
+                  RadioListTile<TipoSorgente?>(value: null, title: const Text('Automatica'), subtitle: Text(automatica))
                 else
                   _Bloccata(titolo: 'Automatica', sotto: automatica, onTap: onPremium),
                 for (final t in _scelte)

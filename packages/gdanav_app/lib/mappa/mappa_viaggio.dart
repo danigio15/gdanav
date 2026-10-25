@@ -129,7 +129,12 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   /// In guida, ogni due secondi: la rete di sicurezza del percorso, e la
   /// telecamera quando il GPS tace (allora nessun altro chiama [_io]).
   Timer? _guardia;
-  var _inclinata = false;
+
+  /// La vista che la mappa sta mostrando (quella del [ControlloMappa] la
+  /// raggiunge in [_comandi]).
+  var _vista = VistaMappa.piatta;
+  bool get _inclinata => _vista != VistaMappa.piatta;
+  bool get _immersiva => _vista == VistaMappa.immersiva;
   var _libera = false;
   var _centrate = 0;
   var _coperto = 0.0;
@@ -138,7 +143,15 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   /// si rimandano solo quando cambiano.
   var _versioneTutte = -1;
 
-  static const _inclinazione = 58.0;
+  /// Quanto è inclinata la mappa: niente dall'alto, 58° in 3D, 60° nella
+  /// vista immersiva (che è anche più vicina). Più di così, da vicino, in
+  /// cima allo schermo finisce la mappa e si vede il vuoto.
+  static double _inclinazioneDi(VistaMappa v) => switch (v) {
+    VistaMappa.piatta => 0,
+    VistaMappa.inclinata => 58,
+    VistaMappa.immersiva => 60,
+  };
+  double get _inclinazione => _inclinazioneDi(_vista);
 
   @override
   void initState() {
@@ -223,12 +236,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
       return;
     }
     final b = await m.getVisibleRegion();
-    final visto = Rettangolo(
-      b.southwest.latitude,
-      b.southwest.longitude,
-      b.northeast.latitude,
-      b.northeast.longitude,
-    );
+    final visto = Rettangolo(b.southwest.latitude, b.southwest.longitude, b.northeast.latitude, b.northeast.longitude);
     final pedonali = zoom >= _zoomPedonali;
     final gia = _zoneDisegnate;
     if (gia != null &&
@@ -239,7 +247,12 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     }
     // Mezzo schermo in più per lato: spostandosi un poco non si rimanda niente.
     final alto = visto.nord - visto.sud, largo = visto.est - visto.ovest;
-    final dove = Rettangolo(visto.sud - alto / 2, visto.ovest - largo / 2, visto.nord + alto / 2, visto.est + largo / 2);
+    final dove = Rettangolo(
+      visto.sud - alto / 2,
+      visto.ovest - largo / 2,
+      visto.nord + alto / 2,
+      visto.est + largo / 2,
+    );
     _zoneDisegnate = dove;
     _zoneConPedonali = pedonali;
     final archivio = await g.zone();
@@ -255,10 +268,18 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   Future<void> _comandi() async {
     final m = _mappa;
     if (m == null) return;
-    if (widget.controllo.inclinata != _inclinata) {
-      _inclinata = widget.controllo.inclinata;
+    if (widget.controllo.vista != _vista) {
+      final eraImmersiva = _immersiva;
+      _vista = widget.controllo.vista;
+      // Dentro o fuori dalla vista immersiva cambia lo stile (le strade in
+      // metri, gli edifici sopra il percorso, le corsie): la mappa si rifà
+      // col suo, e lo stile nuovo si rimette da solo la sua inclinazione.
+      if (eraImmersiva != _immersiva) {
+        if (mounted) setState(() {});
+        return;
+      }
       await _edifici(m);
-      await m.animateCamera(CameraUpdate.tiltTo(_inclinata ? _inclinazione : 0));
+      await m.animateCamera(CameraUpdate.tiltTo(_inclinazione));
       // Tornati in 2D fuori dalla guida: il nord di nuovo in su, come prima
       // che la mappa girasse dietro a chi guida.
       if (!_inclinata && widget.guida == null) await m.animateCamera(CameraUpdate.bearingTo(0));
@@ -295,7 +316,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
       } else if (qui != null) {
         await m.animateCamera(
           CameraUpdate.newCameraPosition(
-            CameraPosition(target: LatLng(qui.lat, qui.lon), zoom: 16, tilt: _inclinata ? _inclinazione : 0),
+            CameraPosition(target: LatLng(qui.lat, qui.lon), zoom: 16, tilt: _inclinazione),
           ),
         );
       }
@@ -390,15 +411,14 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   /// La strada la dice il percorso, non il tachimetro: frenando in autostrada
   /// la mappa non si avvicina.
   double _zoomInGuida(GestoreGuida g) =>
-      (_inclinata ? 17.0 : 16.0) +
+      (_immersiva ? 18.0 : (_inclinata ? 17.0 : 16.0)) +
       zoomLontanoInGuida(
         velocitaStradaKmh: g.avanzamento?.velocitaStradaKmh ?? 0,
         allaProssimaM: _allaProssima(g.avanzamento),
       );
 
   /// Fin dove non si gira: la prossima manovra, o l'arrivo se non ce ne sono più.
-  static double _allaProssima(Avanzamento? a) =>
-      a == null ? 0 : (a.prossima == null ? a.restantiM : a.allaProssimaM);
+  static double _allaProssima(Avanzamento? a) => a == null ? 0 : (a.prossima == null ? a.restantiM : a.allaProssimaM);
 
   /// Se l'auto la muovono i fotogrammi: in guida, con la mappa che la segue,
   /// agganciata alla strada, e senza lo schermo dell'auto acceso (lì la mappa
@@ -480,7 +500,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
           CameraPosition(
             target: LatLng(qui.lat, qui.lon),
             zoom: zoom,
-            tilt: _inclinata ? _inclinazione : 0,
+            tilt: _inclinazione,
             bearing: _rottaMappaMostrata,
           ),
         ),
@@ -562,10 +582,9 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
       _primaPosizione = false;
       // Senza percorso vicina come in guida, un poco più lontana solo andando
       // forte (`telecameraLibera`, la stessa dello schermo dell'auto).
-      final zoom = telecameraLibera(
-        velocitaMs: widget.posizione.velocitaAdesso() / 3.6,
-        tridimensionale: _inclinata,
-      ).zoom;
+      final zoom =
+          telecameraLibera(velocitaMs: widget.posizione.velocitaAdesso() / 3.6, tridimensionale: _inclinata).zoom +
+          (_immersiva ? 1 : 0);
       await _segui(m, widget.posizione.lettoAlle, qui, zoom: zoom, rotta: rotta);
     } else if (qui != null && _primaPosizione && widget.gestore.stato is! ViaggioPronto) {
       _primaPosizione = false;
@@ -598,7 +617,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     final posizione = CameraPosition(
       target: LatLng(qui.lat, qui.lon),
       zoom: zoom,
-      tilt: _inclinata ? _inclinazione : 0,
+      tilt: _inclinazione,
       bearing: _inclinata || widget.guida != null ? rotta : 0,
     );
     /* Con GdANav sullo schermo dell'auto, la mappa che scorre è quella: il
@@ -677,6 +696,11 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     final dati = chiave == null ? datiManovra(null, null) : datiManovra(v, a?.prossima);
     try {
       await m.setGeoJsonSource(sorgenteManovra, dati.cast<String, dynamic>());
+      // Le corsie sulla strada: solo la vista immersiva le ha nello stile.
+      if (_immersiva) {
+        final corsie = chiave == null ? datiCorsie(null, null) : datiCorsie(v, a?.prossima);
+        await m.setGeoJsonSource(sorgenteCorsie, corsie.cast<String, dynamic>());
+      }
     } catch (_) {
       if (_frecciaDisegnata == chiave) _frecciaDisegnata = _frecciaIgnota;
       rethrow;
@@ -810,7 +834,10 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   Future<void> _segnalazioni() async {
     final m = _mappa, g = widget.segnalazioni;
     if (m == null || !_stileCaricato || g == null) return;
-    await m.setGeoJsonSource(sorgenteSegnalazioni, datiSegnalazioni(g.vicine, widget.guida?.avvisi).cast<String, dynamic>());
+    await m.setGeoJsonSource(
+      sorgenteSegnalazioni,
+      datiSegnalazioni(g.vicine, widget.guida?.avvisi).cast<String, dynamic>(),
+    );
   }
 
   GestoreRisparmio? get _gestoreRisparmio => widget.risparmio ?? widget.guida?.risparmio;
@@ -834,7 +861,9 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   Future<void> _edifici(MapLibreMapController m) async {
     if (!_stileCaricato) return;
     await m.setLayerVisibility(stratoEdifici2d, !_inclinata);
-    await m.setLayerVisibility(stratoEdifici3d, _inclinata);
+    // Nella vista immersiva gli edifici sono quelli sopra il percorso, che lo
+    // stile accende da sé.
+    await m.setLayerVisibility(stratoEdifici3d, _inclinata && !_immersiva);
   }
 
   /// Una mappa o uno stile nuovi: le sorgenti sono vuote, e le scritture
@@ -958,19 +987,14 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     const traffico = Servizi.chiaveTomTom;
     final mappa = MapLibreMap(
       // Cambia stile col tema (e col traffico): la chiave rifà la mappa.
-      key: ValueKey((scuro, traffico.isNotEmpty)),
-      styleString: jsonEncode(stileMappa(scuro: scuro, chiaveTraffico: traffico)),
+      // e la vista immersiva, che ha uno stile suo.
+      key: ValueKey((scuro, traffico.isNotEmpty, widget.controllo.immersiva)),
+      styleString: jsonEncode(
+        stileMappa(scuro: scuro, chiaveTraffico: traffico, immersiva: widget.controllo.immersiva),
+      ),
       initialCameraPosition: widget.guida != null
-          ? CameraPosition(
-              target: const LatLng(41.9, 12.5),
-              zoom: 17,
-              tilt: widget.controllo.inclinata ? _inclinazione : 0,
-            )
-          : CameraPosition(
-              target: const LatLng(41.9, 12.5),
-              zoom: 5,
-              tilt: widget.controllo.inclinata ? _inclinazione : 0,
-            ),
+          ? CameraPosition(target: const LatLng(41.9, 12.5), zoom: 17, tilt: _inclinazioneDi(widget.controllo.vista))
+          : CameraPosition(target: const LatLng(41.9, 12.5), zoom: 5, tilt: _inclinazioneDi(widget.controllo.vista)),
       // Il puntino di MapLibre no: il segnaposto lo disegna lo stile.
       myLocationEnabled: false,
       compassEnabled: true,
@@ -998,12 +1022,12 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
         _zoneConPedonali = false;
         _zoneSullaMappa = false;
         if (_mappa case final m?) {
-          _inclinata = widget.controllo.inclinata;
+          _vista = widget.controllo.vista;
           unawaited(_edifici(m).catchError((Object e) => debugPrint('mappa, edifici: $e')));
           // Lo stile nuovo non sa dell'inclinazione: la si rimette.
           unawaited(
             m
-                .animateCamera(CameraUpdate.tiltTo(_inclinata ? _inclinazione : 0))
+                .animateCamera(CameraUpdate.tiltTo(_inclinazione))
                 .then((_) {}, onError: (Object e) => debugPrint('mappa, inclinazione: $e')),
           );
           _seguita = null;
