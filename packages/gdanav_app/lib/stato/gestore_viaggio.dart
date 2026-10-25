@@ -269,12 +269,16 @@ final _traffico = Servizi.chiaveTomTom.isEmpty ? null : TrafficoTomTom(Servizi.c
 /// (OpenStreetMap) insieme, non solo di riserva: i locali che conosce uno solo
 /// dei due si trovano lo stesso (`LuoghiInsieme`). Chi scrive una categoria
 /// («pub», «farmacia», «aziende») ha anche tutti quelli dei dintorni da
-/// OpenStreetMap, in ordine di distanza (`LuoghiPerCategoria`).
-FonteLuoghi luoghiPredefiniti({String chiave = Servizi.chiaveTomTom}) => LuoghiInsieme(
-  chiave.isEmpty ? const NessunLuogo() : ClienteTomTomLuoghi(chiave),
-  ClientePhoton(),
-  categorie: LuoghiPerCategoria(),
-);
+/// OpenStreetMap, in ordine di distanza (`LuoghiPerCategoria`). Con la
+/// chiave di HERE si chiede anche HERE, che conosce le aziende dei registri
+/// delle imprese («Romeo Gestioni Napoli»).
+FonteLuoghi luoghiPredefiniti({String chiave = Servizi.chiaveTomTom, String chiaveHere = Servizi.chiaveHere}) =>
+    LuoghiInsieme(
+      chiave.isEmpty ? const NessunLuogo() : ClienteTomTomLuoghi(chiave),
+      ClientePhoton(),
+      categorie: LuoghiPerCategoria(),
+      altre: [if (chiaveHere.isNotEmpty) ClienteHereLuoghi(chiaveHere)],
+    );
 
 class GestoreViaggio extends ChangeNotifier {
   GestoreViaggio({

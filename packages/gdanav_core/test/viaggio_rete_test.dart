@@ -656,4 +656,73 @@ void main() {
   },
       timeout: const Timeout(Duration(minutes: 4)),
       skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
+
+  // «Continua a non trovare tutto»: un'azienda cercata per nome e citta'
+  // («romeo gestioni napoli») non usciva, e uscivano le officine «Alfa Romeo».
+  // Qui cosa risponde ogni fonte, da sola, e tutte insieme come nell'app.
+  test('la ricerca: cosa trova ogni fonte per un\'azienda', () async {
+    final tomtom = Platform.environment['GDANAV_TOMTOM'] ?? '';
+    final here = Platform.environment['GDANAV_HERE'] ?? '';
+    const napoli = Punto(40.8518, 14.2681);
+    String riga(Luogo l) => '${l.nome} — ${l.descrizione}';
+    for (final q in ['romeo gestioni napoli', 'romeo gestioni', 'Romeo Gestioni S.p.A.']) {
+      final fonti = <String, FonteLuoghi>{
+        'photon': ClientePhoton(),
+        if (tomtom.isNotEmpty) 'tomtom': ClienteTomTomLuoghi(tomtom),
+        'insieme': LuoghiInsieme(tomtom.isEmpty ? const NessunLuogo() : ClienteTomTomLuoghi(tomtom), ClientePhoton(),
+            categorie: LuoghiPerCategoria(), altre: [if (here.isNotEmpty) ClienteHereLuoghi(here)]),
+        if (here.isNotEmpty) 'here': ClienteHereLuoghi(here),
+      };
+      for (final f in fonti.entries) {
+        try {
+          final trovati = await f.value.cerca(q, vicinoA: napoli);
+          stdout.writeln('RICERCA [$q] ${f.key}: ${trovati.length}');
+          for (final l in trovati.take(12)) {
+            stdout.writeln('RICERCA [$q] ${f.key}:   ${riga(l)}');
+          }
+        } catch (e) {
+          stdout.writeln('RICERCA [$q] ${f.key}: errore ${e.toString().replaceAll(tomtom, '***')}');
+        }
+      }
+      // OpenStreetMap per nome, nei dintorni.
+      try {
+        final nome = q.replaceAll(RegExp(r'\s+napoli$', caseSensitive: false), '').replaceAll('"', '');
+        final r = await http.post(Uri.parse('https://overpass-api.de/api/interpreter'), headers: {
+          'user-agent': 'gdanav (github.com/danigio15/gdanav)'
+        }, body: {
+          'data': '[out:json][timeout:20];nwr["name"~"$nome",i](around:30000,40.8518,14.2681);out center tags 20;'
+        });
+        final el = ((jsonDecode(utf8.decode(r.bodyBytes)) as Map)['elements'] as List?) ?? const [];
+        stdout.writeln('RICERCA [$q] overpass: ${el.length}');
+        for (final e in el.take(12)) {
+          final t = (e as Map)['tags'] as Map? ?? const {};
+          stdout.writeln(
+              'RICERCA [$q] overpass:   ${t['name']} — ${t.entries.where((x) => x.key != 'name').take(6).map((x) => '${x.key}=${x.value}').join(' ')}');
+        }
+      } catch (e) {
+        stdout.writeln('RICERCA [$q] overpass: errore $e');
+      }
+      if (here.isNotEmpty) {
+        for (final servizio in ['discover', 'autosuggest']) {
+          try {
+            final host = servizio == 'discover' ? 'discover.search.hereapi.com' : 'autosuggest.search.hereapi.com';
+            final r = await http.get(Uri.https(host, '/v1/$servizio',
+                {'q': q, 'at': '40.8518,14.2681', 'lang': 'it-IT', 'limit': '10', 'apiKey': here}));
+            final items = ((jsonDecode(utf8.decode(r.bodyBytes)) as Map)['items'] as List?) ?? const [];
+            stdout.writeln('RICERCA [$q] here-$servizio: ${r.statusCode} ${items.length}');
+            for (final it in items.take(10)) {
+              final m = it as Map;
+              final cat = ((m['categories'] as List?)?.firstOrNull as Map?)?['name'];
+              stdout.writeln(
+                  'RICERCA [$q] here-$servizio:   ${m['title']} — ${m['resultType']} · $cat · ${(m['address'] as Map?)?['label']}');
+            }
+          } catch (e) {
+            stdout.writeln('RICERCA [$q] here-$servizio: errore');
+          }
+        }
+      }
+    }
+  },
+      timeout: const Timeout(Duration(minutes: 3)),
+      skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 }

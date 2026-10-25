@@ -46,7 +46,9 @@ class ClientePhoton implements FonteLuoghi {
     final uri = indirizzo.replace(queryParameters: {
       'q': q,
       'limit': '10',
-      'lang': 'it',
+      // Niente `lang`: Photon conosce solo «default», en, de e fr, e a «it»
+      // rispondeva 400 a ogni domanda — la ricerca restava a TomTom da solo.
+      // «default» sono i nomi del posto, che in Italia sono gia' italiani.
       if (vicinoA != null) ...{'lat': '${vicinoA.lat}', 'lon': '${vicinoA.lon}'},
     });
     final r = await _http.get(uri, headers: {'user-agent': 'gdanav (github.com/danigio15/gdanav)'});

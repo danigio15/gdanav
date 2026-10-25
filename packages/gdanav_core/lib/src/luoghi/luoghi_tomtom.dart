@@ -98,7 +98,7 @@ class ClienteTomTomLuoghi implements FonteLuoghi {
         nome = poi!['name'] as String;
         final categoria = ((poi['categories'] as List?) ?? const []).whereType<String>().firstOrNull;
         sotto = [
-          if (categoria != null) _maiuscola(categoria),
+          if (categoria != null) _maiuscola(categoriaInItaliano(categoria)),
           viaCivico.isEmpty ? null : viaCivico,
           comune,
         ];
@@ -121,6 +121,78 @@ class ClienteTomTomLuoghi implements FonteLuoghi {
   }
 
   static String _maiuscola(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
+  /// TomTom le categorie le scrive in inglese anche con `language=it-IT`
+  /// («General car repair servicing»): le piu' comuni si dicono in italiano.
+  /// Quelle che non si conoscono restano come arrivano.
+  static String categoriaInItaliano(String categoria) => _categorie[categoria.trim().toLowerCase()] ?? categoria;
+
+  static const _categorie = {
+    'general car repair servicing': 'officina',
+    'car repair': 'officina',
+    'repair facility': 'officina',
+    'automotive dealer': 'concessionario',
+    'tyre services': 'gommista',
+    'car wash': 'autolavaggio',
+    'petrol station': 'distributore',
+    'electric vehicle station': 'colonnina di ricarica',
+    'parking garage': 'parcheggio',
+    'open parking area': 'parcheggio',
+    'company': 'azienda',
+    'government office': 'ufficio',
+    'non governmental organization': 'associazione',
+    'real estate agents': 'agenzia immobiliare',
+    'bank': 'banca',
+    'atm': 'bancomat',
+    'post office': 'ufficio postale',
+    'hotel': 'albergo',
+    'hotel motel': 'albergo',
+    'bed breakfast guest houses': 'bed and breakfast',
+    'apartment': 'appartamento',
+    'restaurant': 'ristorante',
+    'italian': 'ristorante italiano',
+    'pizza': 'pizzeria',
+    'fast food': 'fast food',
+    'cafe': 'bar',
+    'cafe pub': 'bar',
+    'pub': 'pub',
+    'bar': 'bar',
+    'food drinks: food shops': 'alimentari',
+    'food drinks: grocers': 'alimentari',
+    'grocers': 'alimentari',
+    'bakery': 'panetteria',
+    'supermarkets hypermarkets': 'supermercato',
+    'supermarket': 'supermercato',
+    'pharmacy': 'farmacia',
+    'hospital polyclinic': 'ospedale',
+    'hospital': 'ospedale',
+    'health care service': 'servizio sanitario',
+    'doctor': 'medico',
+    'general practitioner': 'medico',
+    'dentist': 'dentista',
+    'veterinarian': 'veterinario',
+    'school': 'scuola',
+    'university': 'università',
+    'church': 'chiesa',
+    'place of worship': 'luogo di culto',
+    'important tourist attraction': 'attrazione turistica',
+    'museum': 'museo',
+    'shop': 'negozio',
+    'clothing shop': 'abbigliamento',
+    'hairdresser': 'parrucchiere',
+    'beauty salon': 'centro estetico',
+    'fitness club center': 'palestra',
+    'sports center': 'centro sportivo',
+    'cinema': 'cinema',
+    'nightlife': 'locale notturno',
+    'railway station': 'stazione',
+    'bus stop': 'fermata dell\'autobus',
+    'airport': 'aeroporto',
+    'police station': 'polizia',
+    'city hall': 'municipio',
+    'lawyer': 'avvocato',
+    'accountant': 'commercialista',
+  };
 }
 
 /// Prima una fonte, poi l'altra se la prima non risponde o non trova niente.
@@ -163,18 +235,53 @@ class LuoghiConRiserva implements FonteLuoghi {
 /// ordine di nome, ma di tutti — fino a [quantiPerCategoria] — in ordine di
 /// distanza: chi cerca «pub» vuole i pub vicini, non quelli col nome giusto.
 class LuoghiInsieme implements FonteLuoghi {
-  const LuoghiInsieme(this.prima, this.seconda, {this.categorie, this.quanti = 15, this.quantiPerCategoria = 50});
+  const LuoghiInsieme(
+    this.prima,
+    this.seconda, {
+    this.categorie,
+    this.altre = const [],
+    this.quanti = 15,
+    this.quantiPerCategoria = 50,
+  });
 
   final FonteLuoghi prima;
   final FonteLuoghi seconda;
+
+  /// Le fonti in piu', chieste insieme alle prime due: HERE, che conosce le
+  /// aziende dei registri delle imprese.
+  final List<FonteLuoghi> altre;
 
   /// La fonte delle categorie, se c'e'.
   final FonteLuoghi? categorie;
   final int quanti;
   final int quantiPerCategoria;
 
+  /// Oltre questa distanza un risultato resta solo se si chiama come si e'
+  /// scritto.
+  static const lontanoKm = 300;
+
+  /// Il nome contiene tutte le parole scritte (anche a meta').
+  static bool haTutteLeParole(Luogo l, String testo) {
+    final parole = normalizzato(testo).split(' ').where((p) => p.length >= 2).toList();
+    final nome = normalizzato(l.nome).split(' ');
+    return parole.isNotEmpty && parole.every((p) => nome.any((n) => n.startsWith(p)));
+  }
+
+  /// Senza la forma della societa' in fondo: «Romeo Gestioni S.p.A.» dava
+  /// alberghi e banche di Roma perche' «S.p.A.» pesava quanto il nome.
+  static String senzaSigla(String testo) {
+    final pulito = testo
+        .replaceAll(
+            RegExp(r'[\s,]+(s\.?\s?p\.?\s?a|s\.?\s?r\.?\s?l\.?s?|s\.?\s?n\.?\s?c|s\.?\s?a\.?\s?s)\.?\s*$',
+                caseSensitive: false),
+            '')
+        .trim();
+    return pulito.length >= 3 ? pulito : testo;
+  }
+
   @override
-  Future<List<Luogo>> cerca(String testo, {Punto? vicinoA}) async {
+  Future<List<Luogo>> cerca(String scritto, {Punto? vicinoA}) async {
+    final testo = senzaSigla(scritto);
     Future<List<Luogo>?> da(FonteLuoghi f) async {
       try {
         return await f.cerca(testo, vicinoA: vicinoA);
@@ -184,14 +291,21 @@ class LuoghiInsieme implements FonteLuoghi {
     }
 
     final perCategoria = vicinoA != null && categoriaDi(testo) != null ? categorie : null;
-    final risposte = await Future.wait([da(prima), da(seconda), if (perCategoria != null) da(perCategoria)]);
+    final risposte = await Future.wait([
+      da(prima),
+      da(seconda),
+      for (final f in altre) da(f),
+      if (perCategoria != null) da(perCategoria),
+    ]);
     if (risposte.every((r) => r == null)) {
       // Nessuna ha risposto: lo dice la seconda, col suo errore.
       return seconda.cerca(testo, vicinoA: vicinoA);
     }
+    final dellaCategoria = perCategoria != null ? risposte.last : null;
+    final delleFonti = perCategoria != null ? risposte.sublist(0, risposte.length - 1) : risposte;
     final tutti = <Luogo>[];
     // Prima quelli della categoria, che sono sicuramente quello che si cerca.
-    for (final l in [if (risposte.length > 2) ...?risposte[2], ...?risposte[0], ...?risposte[1]]) {
+    for (final l in [...?dellaCategoria, for (final r in delleFonti) ...?r]) {
       final doppio =
           tutti.any((g) => normalizzato(g.nome) == normalizzato(l.nome) && distanzaM(g.posizione, l.posizione) < 150);
       if (!doppio) tutti.add(l);
@@ -201,7 +315,13 @@ class LuoghiInsieme implements FonteLuoghi {
       tutti.sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
       return tutti.take(quantiPerCategoria).toList();
     }
-    return ordinatiPerNome(tutti, testo).take(quanti).toList();
+    // «romeo gestioni» dava anche Cipro, la Spagna e il Canada: Photon cerca
+    // in tutto il mondo. Lontano piu' di [lontanoKm] resta solo chi ha nel
+    // nome tutte le parole scritte (chi cerca un posto preciso lo trova).
+    final vicini = vicinoA == null
+        ? tutti
+        : tutti.where((l) => distanzaM(vicinoA, l.posizione) <= lontanoKm * 1000 || haTutteLeParole(l, testo)).toList();
+    return ordinatiPerNome(vicini, testo, vicinoA: vicinoA).take(quanti).toList();
   }
 
   /// Minuscole, senza accenti e senza segni: «Nonna Mà» e «nonna ma» sono la
@@ -240,19 +360,31 @@ class LuoghiInsieme implements FonteLuoghi {
   }
 
   /// I luoghi in ordine di quante parole scritte hanno nel nome (contano
-  /// anche quelle a meta': «burg» vale «burger»); a parita', l'ordine delle
-  /// fonti, che sanno gia' cosa e' vicino.
-  static List<Luogo> ordinatiPerNome(List<Luogo> luoghi, String testo) {
+  /// anche quelle a meta': «burg» vale «burger»), poi nella riga sotto — la
+  /// via, la citta': «romeo gestioni napoli» vuole quelli di Napoli prima di
+  /// quelli di Roma. In cima chi le ha tutte. A parita', il piu' vicino a
+  /// [vicinoA], o l'ordine delle fonti se non si sa dove si e'.
+  static List<Luogo> ordinatiPerNome(List<Luogo> luoghi, String testo, {Punto? vicinoA}) {
     final parole = normalizzato(testo).split(' ').where((p) => p.length >= 2).toList();
     if (parole.isEmpty) return luoghi;
     int punti(Luogo l) {
       final nome = normalizzato(l.nome).split(' ');
-      final trovate = parole.where((p) => nome.any((n) => n.startsWith(p))).length;
-      return trovate == parole.length ? trovate + 100 : trovate;
+      final sotto = normalizzato(l.descrizione).split(' ');
+      bool dentro(List<String> dove, String p) => dove.any((n) => n.startsWith(p));
+      final nelNome = parole.where((p) => dentro(nome, p)).length;
+      final nelSotto = parole.where((p) => !dentro(nome, p) && dentro(sotto, p)).length;
+      if (nelNome == parole.length) return 4000 + nelNome;
+      if (nelNome + nelSotto == parole.length) return 2000 + nelNome * 2;
+      return nelNome * 2 + nelSotto;
     }
 
-    final conPunti = [for (var i = 0; i < luoghi.length; i++) (i, punti(luoghi[i]), luoghi[i])];
-    conPunti.sort((a, b) => b.$2 != a.$2 ? b.$2.compareTo(a.$2) : a.$1.compareTo(b.$1));
-    return [for (final c in conPunti) c.$3];
+    double distanza(Luogo l) => vicinoA == null ? 0 : distanzaM(vicinoA, l.posizione);
+    final conPunti = [for (var i = 0; i < luoghi.length; i++) (i, punti(luoghi[i]), distanza(luoghi[i]), luoghi[i])];
+    conPunti.sort((a, b) {
+      if (b.$2 != a.$2) return b.$2.compareTo(a.$2);
+      if (a.$3 != b.$3) return a.$3.compareTo(b.$3);
+      return a.$1.compareTo(b.$1);
+    });
+    return [for (final c in conPunti) c.$4];
   }
 }
