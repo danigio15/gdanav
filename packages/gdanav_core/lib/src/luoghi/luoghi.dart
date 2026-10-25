@@ -19,6 +19,15 @@ abstract interface class FonteLuoghi {
   Future<List<Luogo>> cerca(String testo, {Punto? vicinoA});
 }
 
+/// Una fonte che non trova mai niente: il posto di una fonte che non c'e'
+/// (TomTom senza chiave).
+class NessunLuogo implements FonteLuoghi {
+  const NessunLuogo();
+
+  @override
+  Future<List<Luogo>> cerca(String testo, {Punto? vicinoA}) async => const [];
+}
+
 /// Photon (di komoot), costruito su OpenStreetMap: gratis, senza chiave,
 /// adatto al «mentre scrivi». Chi lo usa tanto dovrebbe ospitarne uno suo:
 /// l'indirizzo si cambia.
