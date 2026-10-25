@@ -658,14 +658,14 @@ void main() {
       skip: Platform.environment['GDANAV_RETE'] == null ? 'solo con GDANAV_RETE=1' : false);
 
   // «Continua a non trovare tutto»: un'azienda cercata per nome e citta'
-  // («romeo gestioni napoli») non usciva, e uscivano le officine «Alfa Romeo».
+  // («verdi servizi napoli») non usciva, e uscivano le officine «Garage Verdi».
   // Qui cosa risponde ogni fonte, da sola, e tutte insieme come nell'app.
   test('la ricerca: cosa trova ogni fonte per un\'azienda', () async {
     final tomtom = Platform.environment['GDANAV_TOMTOM'] ?? '';
     final here = Platform.environment['GDANAV_HERE'] ?? '';
     const napoli = Punto(40.8518, 14.2681);
     String riga(Luogo l) => '${l.nome} — ${l.descrizione}';
-    for (final q in ['romeo gestioni napoli', 'romeo gestioni', 'Romeo Gestioni S.p.A.']) {
+    for (final q in ['verdi servizi napoli', 'verdi servizi', 'Verdi Servizi S.p.A.']) {
       final fonti = <String, FonteLuoghi>{
         'photon': ClientePhoton(),
         if (tomtom.isNotEmpty) 'tomtom': ClienteTomTomLuoghi(tomtom),

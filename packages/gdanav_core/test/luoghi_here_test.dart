@@ -9,11 +9,11 @@ import 'package:test/test.dart';
 const _risposta = {
   'items': [
     {
-      'title': 'Romeo Gestioni S.p.A.',
+      'title': 'Verdi Servizi S.p.A.',
       'resultType': 'place',
       'position': {'lat': 40.8605, 'lng': 14.2847},
       'address': {
-        'label': 'Romeo Gestioni S.p.A., Napoli',
+        'label': 'Verdi Servizi S.p.A., Napoli',
         'street': 'Centro Direzionale Isola',
         'houseNumber': 'F4',
         'city': 'Napoli'
@@ -36,7 +36,7 @@ void main() {
   test('HERE: il nome, la categoria principale, la via col civico e la citta\'', () {
     final l = ClienteHereLuoghi.leggi(_risposta);
     expect(l, hasLength(2));
-    expect(l.first.nome, 'Romeo Gestioni S.p.A.');
+    expect(l.first.nome, 'Verdi Servizi S.p.A.');
     expect(l.first.descrizione, 'Servizi alle imprese, Centro Direzionale Isola F4, Napoli');
     expect(l.first.posizione.lat, 40.8605);
     expect(l.last.descrizione, 'Napoli');
@@ -50,11 +50,11 @@ void main() {
     });
     final here = ClienteHereLuoghi('k', client: client);
     expect(await here.cerca('ro'), isEmpty);
-    await here.cerca(' romeo gestioni ', vicinoA: const Punto(40.85, 14.27));
-    await here.cerca('romeo gestioni');
+    await here.cerca(' verdi servizi ', vicinoA: const Punto(40.85, 14.27));
+    await here.cerca('verdi servizi');
     expect(chieste, hasLength(2));
     expect(chieste.first.queryParameters, {
-      'q': 'romeo gestioni',
+      'q': 'verdi servizi',
       'at': '40.85,14.27',
       'lang': 'it-IT',
       'limit': '15',
@@ -62,21 +62,21 @@ void main() {
     });
     expect(chieste.last.queryParameters['in'], 'countryCode:ITA');
     expect(
-      ClienteHereLuoghi('k', client: MockClient((_) async => http.Response('', 401))).cerca('romeo'),
+      ClienteHereLuoghi('k', client: MockClient((_) async => http.Response('', 401))).cerca('verdi'),
       throwsException,
     );
   });
 
   test('HERE insieme alle altre: l\'azienda che conosce solo lei arriva in cima', () async {
     final here = ClienteHereLuoghi('k', client: MockClient((_) async => http.Response(jsonEncode(_risposta), 200)));
-    const officina = Luogo(nome: 'Alfa Romeo Mec', descrizione: 'Officina, Napoli', posizione: Punto(40.86, 14.28));
+    const officina = Luogo(nome: 'Garage Verdi Mec', descrizione: 'Officina, Napoli', posizione: Punto(40.86, 14.28));
     final l = await LuoghiInsieme(
       _Fonte(() async => [officina]),
       _Fonte(() async => throw Exception('400')),
       altre: [here],
-    ).cerca('romeo gestioni napoli', vicinoA: const Punto(40.85, 14.27));
-    expect(l.first.nome, 'Romeo Gestioni S.p.A.');
-    expect(l.map((x) => x.nome), contains('Alfa Romeo Mec'));
+    ).cerca('verdi servizi napoli', vicinoA: const Punto(40.85, 14.27));
+    expect(l.first.nome, 'Verdi Servizi S.p.A.');
+    expect(l.map((x) => x.nome), contains('Garage Verdi Mec'));
   });
 }
 

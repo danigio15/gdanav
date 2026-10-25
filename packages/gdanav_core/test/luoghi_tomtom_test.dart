@@ -214,17 +214,17 @@ void main() {
     expect(LuoghiInsieme.normalizzato('Nonna Mà  Burger!'), 'nonna ma burger');
   });
 
-  test("la citta' scritta conta: «romeo gestioni napoli» mette prima quelli di Napoli, poi i piu' vicini", () {
+  test("la citta' scritta conta: «verdi servizi napoli» mette prima quelli di Napoli, poi i piu' vicini", () {
     const napoli = Punto(40.85, 14.27);
-    const roma = Luogo(nome: 'Pb Gestioni', descrizione: 'Ufficio, Roma', posizione: Punto(41.9, 12.5));
-    const officina = Luogo(nome: 'Alfa Romeo Mec', descrizione: 'Officina, Napoli', posizione: Punto(40.86, 14.28));
+    const roma = Luogo(nome: 'Pb Servizi', descrizione: 'Ufficio, Roma', posizione: Punto(41.9, 12.5));
+    const officina = Luogo(nome: 'Garage Verdi Mec', descrizione: 'Officina, Napoli', posizione: Punto(40.86, 14.28));
     const vicina =
-        Luogo(nome: 'Alfa Romeo Pit Stop', descrizione: 'Officina, Napoli', posizione: Punto(40.851, 14.271));
-    const giusta = Luogo(nome: 'Romeo Gestioni S.p.A.', descrizione: 'Azienda, Napoli', posizione: Punto(40.86, 14.29));
+        Luogo(nome: 'Garage Verdi Pit Stop', descrizione: 'Officina, Napoli', posizione: Punto(40.851, 14.271));
+    const giusta = Luogo(nome: 'Verdi Servizi S.p.A.', descrizione: 'Azienda, Napoli', posizione: Punto(40.86, 14.29));
     expect(
-      LuoghiInsieme.ordinatiPerNome([roma, officina, vicina, giusta], 'romeo gestioni napoli', vicinoA: napoli)
+      LuoghiInsieme.ordinatiPerNome([roma, officina, vicina, giusta], 'verdi servizi napoli', vicinoA: napoli)
           .map((l) => l.nome),
-      ['Romeo Gestioni S.p.A.', 'Alfa Romeo Pit Stop', 'Alfa Romeo Mec', 'Pb Gestioni'],
+      ['Verdi Servizi S.p.A.', 'Garage Verdi Pit Stop', 'Garage Verdi Mec', 'Pb Servizi'],
     );
   });
 
@@ -236,22 +236,25 @@ void main() {
 
   test("lontano piu' di 300 km resta solo chi si chiama come si e' scritto", () async {
     const napoli = Punto(40.85, 14.27);
-    const cipro = Luogo(nome: 'Romeo Court', posizione: Punto(34.7, 33.0));
-    const vicino = Luogo(nome: 'Alfa Romeo Mec', descrizione: 'Officina, Napoli', posizione: Punto(40.86, 14.28));
-    const giusto = Luogo(nome: 'Romeo Gestioni', descrizione: 'Azienda, Roma', posizione: Punto(41.9, 12.5));
-    const lontanoGiusto = Luogo(nome: 'Romeo Gestioni Milano', posizione: Punto(45.46, 9.18));
+    const cipro = Luogo(nome: 'Verdi Court', posizione: Punto(34.7, 33.0));
+    const vicino = Luogo(nome: 'Garage Verdi Mec', descrizione: 'Officina, Napoli', posizione: Punto(40.86, 14.28));
+    const giusto = Luogo(nome: 'Verdi Servizi', descrizione: 'Azienda, Roma', posizione: Punto(41.9, 12.5));
+    const lontanoGiusto = Luogo(nome: 'Verdi Servizi Milano', posizione: Punto(45.46, 9.18));
     final l = await LuoghiInsieme(
       _Fonte(() async => [cipro, vicino]),
       _Fonte(() async => [giusto, lontanoGiusto]),
-    ).cerca('romeo gestioni', vicinoA: napoli);
-    expect(l.map((x) => x.nome), ['Romeo Gestioni', 'Romeo Gestioni Milano', 'Alfa Romeo Mec']);
+    ).cerca('verdi servizi', vicinoA: napoli);
+    expect(l.map((x) => x.nome), ['Verdi Servizi', 'Verdi Servizi Milano', 'Garage Verdi Mec']);
   });
 
-  test('la forma della societa\' in fondo non si cerca', () {
-    expect(LuoghiInsieme.senzaSigla('Romeo Gestioni S.p.A.'), 'Romeo Gestioni');
+  test('la forma della societa\' non si cerca', () {
+    expect(LuoghiInsieme.senzaSigla('Verdi Servizi S.p.A.'), 'Verdi Servizi');
     expect(LuoghiInsieme.senzaSigla('rossi srl'), 'rossi');
     expect(LuoghiInsieme.senzaSigla('Bianchi & C. s.n.c.'), 'Bianchi & C.');
     expect(LuoghiInsieme.senzaSigla('Spaccanapoli'), 'Spaccanapoli');
     expect(LuoghiInsieme.senzaSigla('spa'), 'spa');
+    expect(LuoghiInsieme.senzaSigla('verdi servizi spa napoli'), 'verdi servizi napoli');
+    expect(LuoghiInsieme.senzaSigla('Verdi S.p.A., Napoli'), 'Verdi Napoli');
+    expect(LuoghiInsieme.senzaSigla('terme spa napoli'), 'terme spa napoli');
   });
 }

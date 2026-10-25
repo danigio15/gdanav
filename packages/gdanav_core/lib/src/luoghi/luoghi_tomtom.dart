@@ -267,15 +267,24 @@ class LuoghiInsieme implements FonteLuoghi {
     return parole.isNotEmpty && parole.every((p) => nome.any((n) => n.startsWith(p)));
   }
 
-  /// Senza la forma della societa' in fondo: «Romeo Gestioni S.p.A.» dava
-  /// alberghi e banche di Roma perche' «S.p.A.» pesava quanto il nome.
+  /// Le forme della societa', senza punti.
+  static const _sigle = {'spa', 'srl', 'srls', 'snc', 'sas'};
+
+  /// Senza la forma della societa': «Verdi Servizi S.p.A.» dava alberghi e
+  /// banche di Roma perche' «S.p.A.» pesava quanto il nome, e «verdi servizi
+  /// spa napoli» cercava i centri benessere. Si toglie in fondo, scritta coi
+  /// punti, o dopo almeno due parole; «terme spa napoli» resta com'e'.
   static String senzaSigla(String testo) {
-    final pulito = testo
-        .replaceAll(
-            RegExp(r'[\s,]+(s\.?\s?p\.?\s?a|s\.?\s?r\.?\s?l\.?s?|s\.?\s?n\.?\s?c|s\.?\s?a\.?\s?s)\.?\s*$',
-                caseSensitive: false),
-            '')
-        .trim();
+    final parole = testo.trim().split(RegExp(r'\s+'));
+    final tenute = <String>[];
+    for (var i = 0; i < parole.length; i++) {
+      final p = parole[i].toLowerCase();
+      final sigla = _sigle.contains(p.replaceAll(RegExp(r'[.,]'), ''));
+      final siCapisce = i == parole.length - 1 || p.contains('.') || tenute.length >= 2;
+      if (sigla && tenute.isNotEmpty && siCapisce) continue;
+      tenute.add(parole[i]);
+    }
+    final pulito = tenute.join(' ').replaceAll(RegExp(r'[\s,]+$'), '').trim();
     return pulito.length >= 3 ? pulito : testo;
   }
 
@@ -315,7 +324,7 @@ class LuoghiInsieme implements FonteLuoghi {
       tutti.sort((a, b) => distanzaM(qui, a.posizione).compareTo(distanzaM(qui, b.posizione)));
       return tutti.take(quantiPerCategoria).toList();
     }
-    // «romeo gestioni» dava anche Cipro, la Spagna e il Canada: Photon cerca
+    // «verdi servizi» dava anche Cipro, la Spagna e il Canada: Photon cerca
     // in tutto il mondo. Lontano piu' di [lontanoKm] resta solo chi ha nel
     // nome tutte le parole scritte (chi cerca un posto preciso lo trova).
     final vicini = vicinoA == null
@@ -361,7 +370,7 @@ class LuoghiInsieme implements FonteLuoghi {
 
   /// I luoghi in ordine di quante parole scritte hanno nel nome (contano
   /// anche quelle a meta': «burg» vale «burger»), poi nella riga sotto — la
-  /// via, la citta': «romeo gestioni napoli» vuole quelli di Napoli prima di
+  /// via, la citta': «verdi servizi napoli» vuole quelli di Napoli prima di
   /// quelli di Roma. In cima chi le ha tutte. A parita', il piu' vicino a
   /// [vicinoA], o l'ordine delle fonti se non si sa dove si e'.
   static List<Luogo> ordinatiPerNome(List<Luogo> luoghi, String testo, {Punto? vicinoA}) {

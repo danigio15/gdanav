@@ -271,7 +271,7 @@ final _traffico = Servizi.chiaveTomTom.isEmpty ? null : TrafficoTomTom(Servizi.c
 /// («pub», «farmacia», «aziende») ha anche tutti quelli dei dintorni da
 /// OpenStreetMap, in ordine di distanza (`LuoghiPerCategoria`). Con la
 /// chiave di HERE si chiede anche HERE, che conosce le aziende dei registri
-/// delle imprese («Romeo Gestioni Napoli»).
+/// delle imprese («Verdi Servizi Napoli»).
 FonteLuoghi luoghiPredefiniti({String chiave = Servizi.chiaveTomTom, String chiaveHere = Servizi.chiaveHere}) =>
     LuoghiInsieme(
       chiave.isEmpty ? const NessunLuogo() : ClienteTomTomLuoghi(chiave),
