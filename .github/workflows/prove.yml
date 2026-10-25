@@ -193,6 +193,7 @@ jobs:
           GDANAV_PREZZI: ${{ github.workspace }}/prezzi_napoli.json
           GDANAV_COLONNINE: ${{ github.workspace }}/colonnine_utrecht.json
           GDANAV_TOMTOM: ${{ env.CHIAVE_TOMTOM_PROVE }}
+          GDANAV_HERE: ${{ env.CHIAVE_TOMTOM_PROVE && secrets.GDANAV_HERE_CHIAVE || '' }}
           GDANAV_OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
           GDANAV_ANTEPRIME: ${{ github.workspace }}
       # Prezzi veri di Napoli e colonnine vere di Utrecht nella release, per
