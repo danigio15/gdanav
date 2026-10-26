@@ -38,6 +38,7 @@ from custom_components.gdanav.const import (
     CONF_VELOCITA,
     DOMAIN,
     EVENTO,
+    RELAY_PREDEFINITO,
 )
 from custom_components.gdanav.hub import Hub
 
@@ -110,19 +111,17 @@ async def test_configurazione(hass: HomeAssistant, senza_relay: None) -> None:
     flusso = await hass.config_entries.flow.async_configure(flusso["flow_id"], {})
     assert flusso["step_id"] == "entita"
 
-    sbagliato = await hass.config_entries.flow.async_configure(
-        flusso["flow_id"], {CONF_NOME_AUTO: "Kona", CONF_BATTERIA: "sensor.auto_batteria", CONF_RELAY: "https://x"}
-    )
-    assert sbagliato["errors"] == {CONF_RELAY: "relay_non_valido"}
-
+    # Il relay non si chiede: e' quello di GdANav, e finisce nella voce da se'.
+    assert CONF_RELAY not in {str(k) for k in flusso["data_schema"].schema}
     fatto = await hass.config_entries.flow.async_configure(
-        flusso["flow_id"], {CONF_NOME_AUTO: "Kona", CONF_BATTERIA: "sensor.auto_batteria", CONF_RELAY: RELAY}
+        flusso["flow_id"], {CONF_NOME_AUTO: "Kona", CONF_BATTERIA: "sensor.auto_batteria"}
     )
     assert fatto["type"] is FlowResultType.CREATE_ENTRY
     assert fatto["title"] == "Kona"
+    assert fatto["data"][CONF_RELAY] == RELAY_PREDEFINITO
     chiave = p.da_b64(fatto["data"][CONF_CHIAVE])
     assert len(chiave) == 32
-    assert fatto["result"].unique_id == p.Abbinamento(chiave, RELAY).canale
+    assert fatto["result"].unique_id == p.Abbinamento(chiave, RELAY_PREDEFINITO).canale
 
 
 async def test_dal_dispositivo_le_entita_si_propongono_da_sole(hass: HomeAssistant, senza_relay: None) -> None:
@@ -159,7 +158,7 @@ async def test_dal_dispositivo_le_entita_si_propongono_da_sole(hass: HomeAssista
     assert proposti[CONF_ODOMETRO] == "sensor.leapmotor_odometer"
     assert proposti[CONF_TEMPERATURA_ESTERNA] == "sensor.leapmotor_outside_temperature"
 
-    fatto = await hass.config_entries.flow.async_configure(flusso["flow_id"], {**proposti, CONF_RELAY: RELAY})
+    fatto = await hass.config_entries.flow.async_configure(flusso["flow_id"], proposti)
     assert fatto["type"] is FlowResultType.CREATE_ENTRY
     assert fatto["data"][CONF_BATTERIA] == "sensor.leapmotor_battery"
 
@@ -215,7 +214,7 @@ async def test_un_auto_gdaauto_si_riconosce_dalla_chiave(hass: HomeAssistant, se
         CONF_TEMPERATURA_INTERNA: "sensor.la_rossa_temperatura_interna",
     }
 
-    fatto = await hass.config_entries.flow.async_configure(flusso["flow_id"], {**proposti, CONF_RELAY: RELAY})
+    fatto = await hass.config_entries.flow.async_configure(flusso["flow_id"], proposti)
     assert fatto["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()
     stato = fatto["result"].runtime_data.stato_auto()

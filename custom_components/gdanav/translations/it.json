@@ -19,7 +19,6 @@
           "entita_potenza_carica": "Potenza di carica",
           "entita_temperatura_batteria": "Temperatura della batteria",
           "entita_posizione": "Posizione dell'auto",
-          "relay": "Relay",
           "entita_temperatura_esterna": "Temperatura esterna",
           "entita_velocita": "Velocità",
           "entita_potenza": "Potenza della batteria (in uso)",
@@ -31,14 +30,8 @@
           "entita_clima_acceso": "Clima acceso",
           "entita_batteria_in_riscaldamento": "Batteria in riscaldamento",
           "entita_temperatura_interna": "Temperatura interna"
-        },
-        "data_description": {
-          "relay": "Lascia quello predefinito, a meno di avere un relay tuo."
         }
       }
-    },
-    "error": {
-      "relay_non_valido": "Il relay deve iniziare con wss:// (o ws:// per le prove)."
     },
     "abort": {
       "already_configured": "Questa auto è già collegata."

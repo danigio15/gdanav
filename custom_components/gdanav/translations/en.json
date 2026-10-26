@@ -19,7 +19,6 @@
           "entita_potenza_carica": "Charging power",
           "entita_temperatura_batteria": "Battery temperature",
           "entita_posizione": "Car location",
-          "relay": "Relay",
           "entita_temperatura_esterna": "Outside temperature",
           "entita_velocita": "Speed",
           "entita_potenza": "Battery power (in use)",
@@ -31,14 +30,8 @@
           "entita_clima_acceso": "Climate on",
           "entita_batteria_in_riscaldamento": "Battery heating",
           "entita_temperatura_interna": "Interior temperature"
-        },
-        "data_description": {
-          "relay": "Keep the default unless you run your own relay."
         }
       }
-    },
-    "error": {
-      "relay_non_valido": "The relay must start with wss:// (or ws:// for testing)."
     },
     "abort": {
       "already_configured": "This car is already connected."

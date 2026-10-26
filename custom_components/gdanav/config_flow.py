@@ -67,9 +67,6 @@ SCHEMA = vol.Schema(
         vol.Optional(CONF_CLIMA_ACCESO): _entita("binary_sensor", "switch"),
         vol.Optional(CONF_BATTERIA_IN_RISCALDAMENTO): _entita("binary_sensor"),
         vol.Optional(CONF_TEMPERATURA_INTERNA): _entita("sensor"),
-        vol.Required(CONF_RELAY, default=RELAY_PREDEFINITO): selector.TextSelector(
-            selector.TextSelectorConfig(type=selector.TextSelectorType.URL)
-        ),
     }
 )
 
@@ -117,24 +114,21 @@ class GdanavConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_entita(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Secondo passo: le entità, già riempite se si è scelto il dispositivo."""
-        errori: dict[str, str] = {}
         if user_input is not None and CONF_BATTERIA in user_input:
-            relay = user_input[CONF_RELAY].strip()
-            if not relay.startswith(("wss://", "ws://")):
-                errori[CONF_RELAY] = "relay_non_valido"
-            else:
-                # La chiave nasce qui e resta qui: nel QR, e nella voce.
-                abbinamento = p.Abbinamento.nuovo(relay, user_input[CONF_NOME_AUTO])
-                await self.async_set_unique_id(abbinamento.canale)
-                self._abort_if_unique_id_configured()
-                return self.async_create_entry(
-                    title=user_input[CONF_NOME_AUTO],
-                    data={**user_input, CONF_RELAY: relay, CONF_CHIAVE: p.b64(abbinamento.chiave)},
-                )
+            # Il relay e' quello di GdANav, e non si chiede: un indirizzo nel
+            # modulo e' una cosa in piu' da capire, e nessuno ha un relay suo.
+            # Resta scritto nella voce, come sempre: il QR lo porta all'app.
+            # La chiave nasce qui e resta qui: nel QR, e nella voce.
+            abbinamento = p.Abbinamento.nuovo(RELAY_PREDEFINITO, user_input[CONF_NOME_AUTO])
+            await self.async_set_unique_id(abbinamento.canale)
+            self._abort_if_unique_id_configured()
+            return self.async_create_entry(
+                title=user_input[CONF_NOME_AUTO],
+                data={**user_input, CONF_RELAY: RELAY_PREDEFINITO, CONF_CHIAVE: p.b64(abbinamento.chiave)},
+            )
         return self.async_show_form(
             step_id="entita",
             data_schema=self.add_suggested_values_to_schema(SCHEMA, user_input or self._proposta),
-            errors=errori,
             description_placeholders={"trovate": str(len([k for k in self._proposta if k != CONF_NOME_AUTO]))},
         )
 
