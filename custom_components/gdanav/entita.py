@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
@@ -16,6 +17,10 @@ class EntitaGdanav(Entity):
 
     #: sensor, binary_sensor, image: lo dice ogni piattaforma.
     _dominio: str
+
+    def _segnale(self) -> str:
+        """Quando ridisegnarsi: il viaggio e l'abbinamento, di serie."""
+        return segnale_aggiornamento(self.hub.entry.entry_id)
 
     def __init__(self, hub: Hub, chiave: str) -> None:
         self.hub = hub
@@ -32,8 +37,8 @@ class EntitaGdanav(Entity):
         )
 
     async def async_added_to_hass(self) -> None:
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass, segnale_aggiornamento(self.hub.entry.entry_id), self.async_write_ha_state
-            )
-        )
+        self.async_on_remove(async_dispatcher_connect(self.hass, self._segnale(), self._cambiata))
+
+    @callback
+    def _cambiata(self) -> None:
+        self.async_write_ha_state()

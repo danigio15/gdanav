@@ -15,7 +15,6 @@ import logging
 from typing import Any
 
 import aiohttp
-from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State, callback
@@ -52,6 +51,7 @@ from .const import (
     EVENTI_APP,
     EVENTO,
     segnale_aggiornamento,
+    segnale_auto,
 )
 from .riconosci import CONSUMI
 
@@ -331,6 +331,8 @@ class Hub:
 
     @callback
     def _auto_cambiata(self, _event: Event[EventStateChangedData]) -> None:
+        # I sensori «come la vede l'app», sulla scheda del dispositivo.
+        async_dispatcher_send(self.hass, segnale_auto(self.entry.entry_id))
         # Nessuno dall'altra parte: il relay butterebbe il messaggio. Quando
         # l'app arriva, il relay lo dice e lo stato parte tutto (_manda_tutto).
         # L'auto aggiorna anche ogni pochi secondi, e a telefono chiuso —
@@ -443,10 +445,6 @@ class Hub:
 
     # --- il codice al posto del QR ---------------------------------------
 
-    @property
-    def _id_notifica(self) -> str:
-        return f"gdanav_codice_{self.entry.entry_id}"
-
     async def async_nuovo_codice(self) -> str:
         """Un codice nuovo: l'abbinamento cifrato va sul relay per dieci minuti."""
         codice = p.nuovo_codice()
@@ -470,13 +468,9 @@ class Hub:
         self.codice = codice
         self.codice_scade = dt_util.utcnow() + p.DURATA_CODICE
         self._annulla_codice = async_call_later(self.hass, p.DURATA_CODICE, self._codice_scaduto)
-        persistent_notification.async_create(
-            self.hass,
-            f"Nell'app GdANav: menu → Home Assistant → «Scrivi il codice», e scrivi\n\n"
-            f"**{p.mostra_codice(codice)}**\n\nVale dieci minuti, una volta sola.",
-            title=f"Codice per collegare {self.entry.title}",
-            notification_id=self._id_notifica,
-        )
+        # Il codice si legge solo sulla scheda del dispositivo, sotto il
+        # pulsante e dentro il QR: non nelle notifiche, che le vede chiunque
+        # apra Home Assistant, e il codice è la chiave dell'auto.
         self._aggiorna()
         return codice
 
@@ -484,8 +478,6 @@ class Hub:
         if self._annulla_codice:
             self._annulla_codice()
             self._annulla_codice = None
-        if self.codice is not None:
-            persistent_notification.async_dismiss(self.hass, self._id_notifica)
         self.codice = None
         self.codice_scade = None
 

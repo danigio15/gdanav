@@ -290,9 +290,21 @@ pubblica:
 - Il sito di GdAHome (`sito/` in danigio15/gdahomeapp) dice oggi che GdANav
   sta solo dentro GdAHome: quando l'app è nei negozi, lì vanno i due link.
 - L'integrazione Home Assistant resta un repository personalizzato di HACS.
-  Per entrare nell'elenco di serie di HACS serve il logo in
-  [home-assistant/brands](https://github.com/home-assistant/brands) e la
-  richiesta nel repository `hacs/default`: si fa dopo, con l'app nei negozi.
+  Per entrare nell'elenco di serie di HACS serve la richiesta nel repository
+  `hacs/default`: si fa dopo, con l'app nei negozi.
+
+### Il logo dell'integrazione in Home Assistant
+
+Home Assistant non legge il logo dal codice dell'integrazione: lo prende
+da [home-assistant/brands](https://github.com/home-assistant/brands), e
+finché non c'è scrive «icon not available» nella pagina dell'integrazione
+e in HACS. Le immagini sono pronte in `docs/logo/brands/`: `icon.png`
+(256×256), `icon@2x.png` (512×512), `logo.png` e `logo@2x.png`. Si apre una
+pull request su quel repository che le mette in
+`custom_integrations/gdanav/` (la cartella delle integrazioni
+personalizzate, non `core_integrations`), con il nome della cartella uguale
+al dominio, `gdanav`. Dopo l'unione il logo compare da solo, senza toccare
+niente qui: Home Assistant lo scarica da `brands.home-assistant.io`.
 
 ## Il numero di build
 

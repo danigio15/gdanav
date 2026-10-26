@@ -190,11 +190,12 @@ Premium.
 
 **Collegare l'app**
 
-4. In Home Assistant apri il dispositivo **GdANav «la tua auto»**: c'è un
-   **QR di abbinamento**.
+4. In Home Assistant apri il dispositivo **GdANav «la tua auto»**: nella
+   sezione **Configurazione** c'è il **QR di abbinamento**.
 5. Nell'app: menu → **Home Assistant** → inquadra il QR. Se non puoi
-   inquadrarlo, in Home Assistant premi **Nuovo codice di abbinamento** e
-   scrivi nell'app il codice che compare (vale dieci minuti).
+   inquadrarlo, in Home Assistant premi **Abbina un telefono**: sotto il QR
+   compare un codice, e lo scrivi nell'app (vale dieci minuti). Il codice
+   non va nelle notifiche: è la chiave dell'auto, e si vede solo lì.
 
 > Il QR è la chiave della tua auto: chi lo inquadra ne legge i dati.
 > Mostralo solo a chi deve usare l'app.
@@ -211,7 +212,12 @@ Premium.
 | `binary_sensor.gdanav_in_viaggio` | acceso mentre sei in viaggio |
 | `binary_sensor.gdanav_app_collegata` | l'app è collegata adesso |
 
-Con due auto, le entità della seconda finiscono con `_2`.
+Con due auto, le entità della seconda finiscono con `_2`. Sulla scheda del
+dispositivo ci sono anche **i dati dell'auto come li vede l'app** —
+`sensor.gdanav_auto_batteria`, `_autonomia`, `_potenza_carica`,
+`binary_sensor.gdanav_auto_in_carica` e gli altri scelti nella
+configurazione — già nell'unità del navigatore: se un numero è storto, lo
+si vede lì e non in auto.
 
 - **Automazioni**: l'evento `gdanav_evento` arriva con il tipo `partenza`,
   `arrivo`, `arrivo_vicino`, `inizio_ricarica` o `fine_ricarica`. Per esempio:

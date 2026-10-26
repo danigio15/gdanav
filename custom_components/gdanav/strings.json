@@ -10,7 +10,7 @@
       },
       "entita": {
         "title": "The car's entities",
-        "description": "Entities recognised: {trovate}. Check, fix if needed and confirm. Only the battery is required. Then open the GdANav device: scan the QR code with the app, or press «New pairing code» and type the code in the app.",
+        "description": "Entities recognised: {trovate}. Check, fix if needed and confirm. Only the battery is required. Then open the GdANav device: scan the QR code with the app, or press «Pair a phone» and type in the app the code shown below it.",
         "data": {
           "nome_auto": "Car name",
           "entita_batteria": "Battery (%)",
@@ -65,8 +65,44 @@
       "soc_necessario": {
         "name": "Battery needed"
       },
-      "codice": {
-        "name": "Pairing code"
+      "auto_batteria": {
+        "name": "Car battery"
+      },
+      "auto_autonomia": {
+        "name": "Range"
+      },
+      "auto_potenza_carica": {
+        "name": "Charging power"
+      },
+      "auto_temperatura_batteria": {
+        "name": "Battery temperature"
+      },
+      "auto_temperatura_esterna": {
+        "name": "Outside temperature"
+      },
+      "auto_velocita": {
+        "name": "Speed"
+      },
+      "auto_potenza": {
+        "name": "Power in use"
+      },
+      "auto_odometro": {
+        "name": "Odometer"
+      },
+      "auto_energia_residua": {
+        "name": "Remaining energy"
+      },
+      "auto_capacita_batteria": {
+        "name": "Battery capacity"
+      },
+      "auto_consumo_medio": {
+        "name": "Average consumption"
+      },
+      "auto_potenza_clima": {
+        "name": "Climate power"
+      },
+      "auto_temperatura_interna": {
+        "name": "Interior temperature"
       }
     },
     "binary_sensor": {
@@ -79,6 +115,15 @@
       },
       "app_collegata": {
         "name": "App connected"
+      },
+      "auto_in_carica": {
+        "name": "Charging"
+      },
+      "auto_clima_acceso": {
+        "name": "Climate on"
+      },
+      "auto_batteria_in_riscaldamento": {
+        "name": "Battery heating"
       }
     },
     "image": {
@@ -88,7 +133,7 @@
     },
     "button": {
       "nuovo_codice": {
-        "name": "New pairing code"
+        "name": "Pair a phone"
       }
     }
   },

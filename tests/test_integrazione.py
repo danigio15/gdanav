@@ -239,11 +239,47 @@ async def test_entita_create(hass: HomeAssistant, senza_relay: None) -> None:
         "binary_sensor.gdanav_app_collegata",
         "image.gdanav_abbinamento",
         "button.gdanav_nuovo_codice",
-        "sensor.gdanav_codice",
+        # L'auto come la vede l'app: solo le entità scelte.
+        "sensor.gdanav_auto_batteria",
+        "sensor.gdanav_auto_autonomia",
+        "binary_sensor.gdanav_auto_in_carica",
     ):
         assert hass.states.get(entity_id) is not None, entity_id
+    for entity_id in ("sensor.gdanav_auto_velocita", "binary_sensor.gdanav_auto_clima_acceso", "sensor.gdanav_codice"):
+        assert hass.states.get(entity_id) is None, entity_id
     assert hass.states.get("binary_sensor.gdanav_in_viaggio").state == "off"
-    assert hass.states.get("sensor.gdanav_codice").state == "Nessun codice"
+    # Il pulsante e il QR stanno insieme, in «Configurazione» della scheda del dispositivo.
+    registro = er.async_get(hass)
+    assert registro.async_get("button.gdanav_nuovo_codice").entity_category == "config"
+    assert registro.async_get("image.gdanav_abbinamento").entity_category == "config"
+
+
+async def test_l_auto_come_la_vede_l_app(hass: HomeAssistant, senza_relay: None, freezer) -> None:
+    """Sulla scheda del dispositivo, i dati dell'auto già nell'unità dell'app, anche a telefono chiuso."""
+    from datetime import timedelta
+
+    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+    await _installa(hass)
+    batteria = hass.states.get("sensor.gdanav_auto_batteria")
+    assert batteria.state == "72.0"
+    assert batteria.attributes["unit_of_measurement"] == "%"
+    assert batteria.attributes["device_class"] == "battery"
+    assert hass.states.get("sensor.gdanav_auto_autonomia").state == "310.5"
+    assert hass.states.get("binary_sensor.gdanav_auto_in_carica").state == "off"
+    # L'auto in miglia: qui in chilometri, come arriva all'app.
+    hass.states.async_set("sensor.auto_autonomia", "100", {"unit_of_measurement": "mi"})
+    hass.states.async_set("binary_sensor.auto_in_carica", "on")
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.gdanav_auto_autonomia").state == "160.9344"
+    assert hass.states.get("binary_sensor.gdanav_auto_in_carica").state == "on"
+    # Un'entità dell'auto che sparisce: il sensore lo dice.
+    hass.states.async_remove("sensor.auto_batteria")
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.gdanav_auto_batteria").state == "unknown"
+    freezer.tick(timedelta(seconds=3))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
 
 
 async def test_dati_per_il_consumo_con_le_unita_giuste(hass: HomeAssistant, senza_relay: None) -> None:
@@ -540,7 +576,19 @@ async def test_qr(hass: HomeAssistant, senza_relay: None) -> None:
 
     _, hub = await _installa(hass)
     svg = qr_svg(hub.abbinamento.uri)
-    assert svg.startswith((b"<?xml", b"<svg"))
+    assert svg.startswith(b"<svg")
+    assert b"Oppure scrivi" not in svg
+    # Col codice, il codice sta scritto sotto il QR: chi inquadra non lo legge,
+    # chi non può inquadrare lo copia.
+    from datetime import UTC, datetime
+    from xml.etree import ElementTree
+
+    con = qr_svg(hub.abbinamento.uri, "7KQ2M9XAPD", datetime(2026, 10, 26, 14, 6, tzinfo=UTC)).decode()
+    assert "7KQ2M-9XAPD" in con
+    assert con.count("<svg") == 2
+    # XML buono: un attributo doppio e il browser mostra un errore al posto del QR.
+    ElementTree.fromstring(con)
+    ElementTree.fromstring(svg)
 
 
 async def test_pianifica_senza_app(hass: HomeAssistant, senza_relay: None) -> None:
@@ -597,7 +645,10 @@ async def test_codice_al_posto_del_qr(hass: HomeAssistant, senza_relay: None, fr
     from unittest.mock import patch
 
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from homeassistant.util import dt as dt_util
     from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+    from custom_components.gdanav.image import qr_svg
 
     _, hub = await _installa(hass)
     sessione = FintaSessione()
@@ -607,9 +658,15 @@ async def test_codice_al_posto_del_qr(hass: HomeAssistant, senza_relay: None, fr
 
     codice = hub.codice
     assert codice is not None
-    stato = hass.states.get("sensor.gdanav_codice")
-    assert stato.state == p.mostra_codice(codice)
-    assert "scade" in stato.attributes
+    # Il codice non è un sensore e non è una notifica: sta scritto sotto il
+    # QR, nella stessa immagine, che si rinfresca.
+    assert hass.states.get("sensor.gdanav_codice") is None
+    assert not hass.data.get("persistent_notification")
+    immagine = hass.states.get("image.gdanav_abbinamento")
+    assert immagine.state == dt_util.utcnow().isoformat()
+    svg = qr_svg(hub.abbinamento.uri, hub.codice, hub.codice_scade).decode()
+    assert p.mostra_codice(codice) in svg
+    assert "Vale fino alle" in svg
     # Sul relay la busta sta sotto il nome ricavato dal codice; il codice
     # non ci arriva, e col codice la busta si apre.
     ((url, busta),) = sessione.lasciate
@@ -621,11 +678,13 @@ async def test_codice_al_posto_del_qr(hass: HomeAssistant, senza_relay: None, fr
     chiaro = AESGCM(chiave).decrypt(p.da_b64(b["n"]), p.da_b64(b["c"]), b"gdanav/codice/v1")
     assert p.Abbinamento.da_uri(chiaro.decode()) == hub.abbinamento
 
-    # Dopo dieci minuti non vale più.
+    # Dopo dieci minuti non vale più, e il QR torna senza codice.
     freezer.tick(timedelta(minutes=10, seconds=1))
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
-    assert hass.states.get("sensor.gdanav_codice").state == "Nessun codice"
+    assert hub.codice is None
+    assert hass.states.get("image.gdanav_abbinamento").state == dt_util.utcnow().isoformat()
+    assert "Oppure scrivi" not in qr_svg(hub.abbinamento.uri, hub.codice, hub.codice_scade).decode()
 
 
 async def test_codice_usato_quando_l_app_arriva(hass: HomeAssistant, senza_relay: None) -> None:
