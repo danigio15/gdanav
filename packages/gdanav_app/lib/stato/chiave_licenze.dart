@@ -6,4 +6,4 @@
 /// negozio (Play Store, App Store), come prima dei codici regalo. La scrive
 /// `node strumenti/chiave-licenze.mjs --gdanav ../gdanav` prima del rilascio.
 /// La coppia di prova del contratto non va mai qui.
-const chiavePubblicaLicenze = '';
+const chiavePubblicaLicenze = 'nncMs_O8r-wFCWnViI8oN598ee7Ns8JT5G1CFps6rG8';

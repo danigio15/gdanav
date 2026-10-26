@@ -200,8 +200,10 @@ class NegozioAppStore implements NegozioPremium {
 ///   altro telefono con lo stesso account; se scade, si torna alla versione
 ///   gratuita;
 /// - un gettone di licenza valido per questo telefono (un codice regalo,
-///   `docs/LICENZE.md` di GdAHome), rinnovato dal quadro all'avvio e ogni 6
-///   ore;
+///   `docs/LICENZE.md` di GdAHome), richiesto al quadro all'avvio, ogni
+///   quarto d'ora e ogni volta che l'app torna davanti: una licenza tolta
+///   chiude subito, non alla fine del gettone (fino a 8 giorni). Scaduta,
+///   chiude all'ora esatta;
 /// - dentro GdAHome ([ospite]), il Premium della casa.
 class GestorePremium extends ChangeNotifier {
   /// Premium attivo adesso, per chi non ha il gestore in mano (il
@@ -217,7 +219,7 @@ class GestorePremium extends ChangeNotifier {
     this.attesaConferma = const Duration(seconds: 8),
     this.licenze,
     String? chiaveLicenze,
-    this.ogniQuanto = const Duration(hours: 6),
+    this.ogniQuanto = const Duration(minutes: 15),
     DateTime Function()? orologio,
   }) : _tuttoSbloccato = tuttoSbloccato ?? Servizi.tuttoSbloccato,
        chiaveLicenze = chiaveLicenze ?? chiavePubblicaLicenze,
@@ -267,7 +269,15 @@ class GestorePremium extends ChangeNotifier {
   bool get sbloccato {
     if (_tuttoSbloccato) return true;
     if (ospite case final o?) return o.value;
-    return _dalNegozio || (licenza != null && licenza!.fino.isAfter(_ora()));
+    return _dalNegozio || _licenzaVale(licenza);
+  }
+
+  /// Il gettone vale adesso: non oltre la sua fine, e non oltre la fine della
+  /// licenza (un regalo a tempo scade all'ora esatta, anche ad app aperta).
+  bool _licenzaVale(GettoneLicenza? g) {
+    if (g == null) return false;
+    final ora = _ora();
+    return g.fino.isAfter(ora) && (g.scade == null || g.scade!.isAfter(ora));
   }
 
   /// Si può scrivere un codice regalo: GdANav da sola, con le licenze accese.
@@ -290,6 +300,8 @@ class GestorePremium extends ChangeNotifier {
 
   StreamSubscription<List<PurchaseDetails>>? _iscrizione;
   Timer? _rinnovo;
+  Timer? _allaFine;
+  DateTime? _chiestaIl;
   var _confermato = false;
   IdentitaTelefono? _io;
 
@@ -312,6 +324,7 @@ class GestorePremium extends ChangeNotifier {
       _io = await archivio.identitaTelefono();
       if (await archivio.gettoneLicenza() case final g?) {
         licenza = await verificaGettone(g, soggetto: _io!.telefono, chiavePubblica: chiaveLicenze, adesso: _ora());
+        _guardaLaFine();
       }
     }
     notifyListeners();
@@ -331,12 +344,35 @@ class GestorePremium extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// L'app torna davanti: si richiede la licenza, perché in quel tempo
+  /// poteva essere stata tolta. Non più di una volta al minuto.
+  void alRitorno() {
+    if (!codiciRegalo) return;
+    final prima = _chiestaIl;
+    if (prima != null && _ora().difference(prima) < const Duration(minutes: 1)) return;
+    unawaited(rinnovaLicenza());
+  }
+
+  /// Quando il gettone smette di valere si dice a chi guarda, senza
+  /// aspettare il giro dopo.
+  void _guardaLaFine() {
+    _allaFine?.cancel();
+    final g = licenza;
+    if (g == null) return;
+    var fine = g.fino;
+    if (g.scade case final s? when s.isBefore(fine)) fine = s;
+    final manca = fine.difference(_ora());
+    if (manca.isNegative || manca > const Duration(days: 9)) return;
+    _allaFine = Timer(manca + const Duration(seconds: 1), notifyListeners);
+  }
+
   /// Chiede al quadro il gettone di adesso. Senza rete si tiene quello che
   /// c'è (vale fino a `fino`, al massimo 8 giorni); se il quadro risponde
   /// senza gettoni la licenza è stata tolta.
   Future<void> rinnovaLicenza() async {
     final l = licenze, io = _io;
     if (l == null || io == null || chiaveLicenze.isEmpty) return;
+    _chiestaIl = _ora();
     try {
       final gettoni = await l.rinnova(io);
       await _gettoni(gettoni);
@@ -354,6 +390,7 @@ class GestorePremium extends ChangeNotifier {
     final g = await gettoneMigliore(gettoni, soggetto: _io!.telefono, chiavePubblica: chiaveLicenze, adesso: _ora());
     licenza = g;
     await archivio.salvaGettoneLicenza(g?.testo);
+    _guardaLaFine();
     notifyListeners();
     return g;
   }
@@ -477,6 +514,7 @@ class GestorePremium extends ChangeNotifier {
     ospite?.removeListener(_dallOspite);
     _iscrizione?.cancel();
     _rinnovo?.cancel();
+    _allaFine?.cancel();
     super.dispose();
   }
 }
