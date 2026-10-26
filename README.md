@@ -108,8 +108,8 @@ ci passi e poi il viaggio prosegue.
 
 ## Come si usa
 
-1. **Installa GdANav** dal **Play Store** (Android) o dall'**App Store**
-   (iPhone).
+1. **Installa GdANav** dal **[Play Store](https://play.google.com/store/apps/details?id=it.gdanav.gdanav)**
+   (Android) o dall'**App Store** (iPhone).
 2. Apri il menu (☰) → **La tua auto**: scegli **Elettrica** o **Termica**.
    Con l'elettrica cerca il tuo modello; con la termica scegli il carburante.
 3. **La batteria** (solo elettrica): la scrivi tu con il cursore in **Fonte
@@ -190,11 +190,12 @@ Premium.
 
 **Collegare l'app**
 
-4. In Home Assistant apri il dispositivo **GdANav «la tua auto»**: c'è un
-   **QR di abbinamento**.
+4. In Home Assistant apri il dispositivo **GdANav «la tua auto»**: nella
+   sezione **Configurazione** c'è il **QR di abbinamento**.
 5. Nell'app: menu → **Home Assistant** → inquadra il QR. Se non puoi
-   inquadrarlo, in Home Assistant premi **Nuovo codice di abbinamento** e
-   scrivi nell'app il codice che compare (vale dieci minuti).
+   inquadrarlo, in Home Assistant premi **Abbina un telefono**: sotto il QR
+   compare un codice, e lo scrivi nell'app (vale dieci minuti). Il codice
+   non va nelle notifiche: è la chiave dell'auto, e si vede solo lì.
 
 > Il QR è la chiave della tua auto: chi lo inquadra ne legge i dati.
 > Mostralo solo a chi deve usare l'app.
@@ -211,7 +212,12 @@ Premium.
 | `binary_sensor.gdanav_in_viaggio` | acceso mentre sei in viaggio |
 | `binary_sensor.gdanav_app_collegata` | l'app è collegata adesso |
 
-Con due auto, le entità della seconda finiscono con `_2`.
+Con due auto, le entità della seconda finiscono con `_2`. Sulla scheda del
+dispositivo ci sono anche **i dati dell'auto come li vede l'app** —
+`sensor.gdanav_auto_batteria`, `_autonomia`, `_potenza_carica`,
+`binary_sensor.gdanav_auto_in_carica` e gli altri scelti nella
+configurazione — già nell'unità del navigatore: se un numero è storto, lo
+si vede lì e non in auto.
 
 - **Automazioni**: l'evento `gdanav_evento` arriva con il tipo `partenza`,
   `arrivo`, `arrivo_vicino`, `inizio_ricarica` o `fine_ricarica`. Per esempio:
@@ -224,6 +230,14 @@ Con due auto, le entità della seconda finiscono con `_2`.
 
 I dati fra l'app e la casa viaggiano **cifrati**: li leggono solo il tuo
 telefono e la tua Home Assistant. Non devi aprire nessuna porta di casa.
+Home Assistant parla col relay solo quando c'è qualcosa da dire: quando
+l'app è chiusa non manda niente, e i comandi consentiti si cambiano dalle
+opzioni senza riavviare niente.
+
+Se qualcosa non va: **Impostazioni → Dispositivi e servizi → GdANav → ⋮ →
+Scarica diagnostica** dice se la casa è collegata al relay, se l'app c'è e
+cosa riceve dell'auto, senza la chiave dell'abbinamento. È quello da
+allegare a una segnalazione.
 
 ## I tuoi dati
 

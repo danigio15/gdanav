@@ -54,6 +54,8 @@ jobs:
       - run: ruff check custom_components tests
       - run: ruff format --check custom_components tests
       - run: pytest
+      # Le schede dei negozi (docs/negozio/) stanno nelle caselle.
+      - run: python3 tools/scheda.py
 
   relay:
     runs-on: ubuntu-latest
@@ -69,6 +71,9 @@ jobs:
       - run: npm test
       # Che si possa pubblicare: il bundle lo fa wrangler, non node.
       - run: npx wrangler deploy --dry-run --outdir dist
+      # Lo strumento che porta l'app sul Play Console (negozi.yml): si prova
+      # senza Google, e controlla anche che le novita' stiano nella casella.
+      - run: node --test ../tools/porta-nel-negozio.test.mjs
 
   # Il relay su Cloudflare, a ogni push su main, su gdanav.gdahome.org (il
   # dominio è su Cloudflare), con i segreti CLOUDFLARE_API_TOKEN e
@@ -434,11 +439,14 @@ jobs:
           gh release view anteprima > /dev/null 2>&1 || gh release create anteprima --prerelease --title "GdANav · anteprima" --notes "anteprima"
           gh release upload anteprima ztl.json --clobber
 
-  # L'APK e il pacchetto del Play Store si costruiscono per sapere che stanno
-  # in piedi, e basta: **l'app non si pubblica su GitHub**, ne' fra gli
-  # artefatti ne' nella release «anteprima». Va solo nei negozi (test interno
-  # e TestFlight), dentro GdAHome. Su main, quello che una volta era stato
-  # caricato nell'anteprima si toglie.
+  # L'APK e il pacchetto si costruiscono per sapere che stanno in piedi, e
+  # basta: **l'app non si pubblica su GitHub**, ne' fra gli artefatti ne' nella
+  # release «anteprima». Nei negozi la porta «GdANav nei negozi»
+  # (negozi.yml), con la chiave vera. Qui si firma con la chiave d'anteprima
+  # che sta nella repository, e il pacchetto si chiama `it.gdanav.gdanav.prova`:
+  # un'app a parte, che non si installa sopra quella dei negozi (il Gradle si
+  # ferma se non lo si chiede apposta con GDANAV_FIRMA_DI_PROVA=si). Su main,
+  # quello che una volta era stato caricato nell'anteprima si toglie.
   apk:
     runs-on: ubuntu-latest
     needs: [app, motore]
@@ -447,6 +455,8 @@ jobs:
     defaults:
       run:
         working-directory: app
+    env:
+      GDANAV_FIRMA_DI_PROVA: si
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -458,10 +468,12 @@ jobs:
           flutter-version: 3.47.5
           channel: stable
       - run: flutter pub get
+      # Il numero di build sale sempre, anche fra un workflow e l'altro: vedi
+      # tools/numero-di-build.sh.
+      - name: Il numero di build
+        run: echo "NUMERO=$(../tools/numero-di-build.sh)" >> "$GITHUB_ENV"
       # Le chiavi facoltative (TomTom: traffico e colonnine libere/occupate;
       # Open Charge Map) arrivano dai segreti del repository.
-      # Il numero di versione sale a ogni build: il Play Store non accetta due
-      # volte lo stesso.
       #
       # I pagamenti si accendono con la variabile del repository
       # GDANAV_PAGAMENTI = si (Settings → Secrets and variables → Actions →
@@ -473,27 +485,27 @@ jobs:
       # dice che la versione minima e' piu' alta (VERSIONE_MINIMA_APP), l'app
       # chiede di aggiornarla, solo dal Play Store.
       - run: >-
-          flutter build apk --release --build-number=${{ github.run_number }}
+          flutter build apk --release --build-number=$NUMERO
           --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM"
           --dart-define=GDANAV_OCM_CHIAVE="$OCM"
           --dart-define=GDANAV_HERE_CHIAVE="$HERE"
           --dart-define=GDANAV_TUTTO_SBLOCCATO=${{ vars.GDANAV_PAGAMENTI != 'si' }}
-          --dart-define=GDANAV_COSTRUZIONE=${{ github.run_number }}
+          --dart-define=GDANAV_COSTRUZIONE=$NUMERO
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           HERE: ${{ secrets.GDANAV_HERE_CHIAVE }}
           OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
           GDANAV_ANTEPRIME: ${{ github.workspace }}
-      # Il pacchetto per il Play Store (test interno): da lì Android Auto
-      # mostra l'app senza «Origini sconosciute». Premium come nell'APK qui
-      # sopra: sbloccato finche' GDANAV_PAGAMENTI non e' «si».
+      # Anche il bundle, per sapere che si costruisce: quello per il Play
+      # Store lo fa negozi.yml con la chiave vera, questo e' `.prova` e il
+      # negozio non lo prenderebbe.
       - run: >-
-          flutter build appbundle --release --build-number=${{ github.run_number }}
+          flutter build appbundle --release --build-number=$NUMERO
           --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM"
           --dart-define=GDANAV_OCM_CHIAVE="$OCM"
           --dart-define=GDANAV_HERE_CHIAVE="$HERE"
           --dart-define=GDANAV_TUTTO_SBLOCCATO=${{ vars.GDANAV_PAGAMENTI != 'si' }}
-          --dart-define=GDANAV_COSTRUZIONE=${{ github.run_number }}
+          --dart-define=GDANAV_COSTRUZIONE=$NUMERO
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           HERE: ${{ secrets.GDANAV_HERE_CHIAVE }}
@@ -537,15 +549,18 @@ jobs:
           flutter-version: 3.47.5
           channel: stable
       - run: flutter pub get
-      # Il numero sale a ogni build: TestFlight non accetta due volte lo stesso.
+      # Il numero sale a ogni build, anche fra un workflow e l'altro:
+      # TestFlight non accetta due volte lo stesso (tools/numero-di-build.sh).
+      - name: Il numero di build
+        run: echo "NUMERO=$(../tools/numero-di-build.sh)" >> "$GITHUB_ENV"
       - name: Compila (senza firma)
         run: >-
-          flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
+          flutter build ios --release --no-codesign --build-number=$NUMERO
           --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM"
           --dart-define=GDANAV_OCM_CHIAVE="$OCM"
           --dart-define=GDANAV_HERE_CHIAVE="$HERE"
           --dart-define=GDANAV_TUTTO_SBLOCCATO=${{ vars.GDANAV_PAGAMENTI != 'si' }}
-          --dart-define=GDANAV_COSTRUZIONE=${{ github.run_number }}
+          --dart-define=GDANAV_COSTRUZIONE=$NUMERO
         env:
           TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
           HERE: ${{ secrets.GDANAV_HERE_CHIAVE }}
@@ -636,7 +651,7 @@ jobs:
             -authenticationKeyID "$CHIAVE_ID" \
             -authenticationKeyIssuerID "$EMITTENTE"
           {
-            echo "### GdANav ${{ github.run_number }} su TestFlight"
+            echo "### GdANav $NUMERO su TestFlight"
             echo ""
             echo "Fra qualche minuto arriva la notifica di Apple: da TestFlight sull'iPhone si installa."
           } >> "$GITHUB_STEP_SUMMARY"

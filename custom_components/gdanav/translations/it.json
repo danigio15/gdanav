@@ -10,7 +10,7 @@
       },
       "entita": {
         "title": "Le entità dell'auto",
-        "description": "Entità riconosciute: {trovate}. Controlla, correggi se serve e conferma. Serve solo la batteria. Poi apri il dispositivo GdANav: inquadra il QR con l'app, oppure premi «Nuovo codice di abbinamento» e scrivi il codice nell'app.",
+        "description": "Entità riconosciute: {trovate}. Controlla, correggi se serve e conferma. Serve solo la batteria. Poi apri il dispositivo GdANav: inquadra il QR con l'app, oppure premi «Abbina un telefono» e scrivi nell'app il codice che compare sotto.",
         "data": {
           "nome_auto": "Nome dell'auto",
           "entita_batteria": "Batteria (%)",
@@ -19,7 +19,6 @@
           "entita_potenza_carica": "Potenza di carica",
           "entita_temperatura_batteria": "Temperatura della batteria",
           "entita_posizione": "Posizione dell'auto",
-          "relay": "Relay",
           "entita_temperatura_esterna": "Temperatura esterna",
           "entita_velocita": "Velocità",
           "entita_potenza": "Potenza della batteria (in uso)",
@@ -31,14 +30,8 @@
           "entita_clima_acceso": "Clima acceso",
           "entita_batteria_in_riscaldamento": "Batteria in riscaldamento",
           "entita_temperatura_interna": "Temperatura interna"
-        },
-        "data_description": {
-          "relay": "Lascia quello predefinito, a meno di avere un relay tuo."
         }
       }
-    },
-    "error": {
-      "relay_non_valido": "Il relay deve iniziare con wss:// (o ws:// per le prove)."
     },
     "abort": {
       "already_configured": "Questa auto è già collegata."
@@ -72,8 +65,44 @@
       "soc_necessario": {
         "name": "Batteria necessaria"
       },
-      "codice": {
-        "name": "Codice di abbinamento"
+      "auto_batteria": {
+        "name": "Batteria dell'auto"
+      },
+      "auto_autonomia": {
+        "name": "Autonomia"
+      },
+      "auto_potenza_carica": {
+        "name": "Potenza di ricarica"
+      },
+      "auto_temperatura_batteria": {
+        "name": "Temperatura della batteria"
+      },
+      "auto_temperatura_esterna": {
+        "name": "Temperatura esterna"
+      },
+      "auto_velocita": {
+        "name": "Velocità"
+      },
+      "auto_potenza": {
+        "name": "Potenza in uso"
+      },
+      "auto_odometro": {
+        "name": "Contachilometri"
+      },
+      "auto_energia_residua": {
+        "name": "Energia residua"
+      },
+      "auto_capacita_batteria": {
+        "name": "Capacità della batteria"
+      },
+      "auto_consumo_medio": {
+        "name": "Consumo medio"
+      },
+      "auto_potenza_clima": {
+        "name": "Potenza del clima"
+      },
+      "auto_temperatura_interna": {
+        "name": "Temperatura interna"
       }
     },
     "binary_sensor": {
@@ -86,6 +115,15 @@
       },
       "app_collegata": {
         "name": "App collegata"
+      },
+      "auto_in_carica": {
+        "name": "In carica"
+      },
+      "auto_clima_acceso": {
+        "name": "Clima acceso"
+      },
+      "auto_batteria_in_riscaldamento": {
+        "name": "Batteria in riscaldamento"
       }
     },
     "image": {
@@ -95,7 +133,7 @@
     },
     "button": {
       "nuovo_codice": {
-        "name": "Nuovo codice di abbinamento"
+        "name": "Abbina un telefono"
       }
     }
   },

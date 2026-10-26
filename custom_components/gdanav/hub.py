@@ -15,7 +15,6 @@ import logging
 from typing import Any
 
 import aiohttp
-from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State, callback
@@ -52,6 +51,7 @@ from .const import (
     EVENTI_APP,
     EVENTO,
     segnale_aggiornamento,
+    segnale_auto,
 )
 from .riconosci import CONSUMI
 
@@ -60,6 +60,12 @@ _LOGGER = logging.getLogger(__name__)
 ATTESE = (1, 2, 5, 10, 30, 60)
 RITARDO_INVIO = 2.0
 AGGIORNA_OGNI = timedelta(seconds=30)
+# Il relay chiude così la casa di prima quando ne arriva un'altra con lo
+# stesso abbinamento (relay/src/index.js): due Home Assistant con la stessa
+# voce — quella vera e una copia di prova — si scalzerebbero a vicenda ogni
+# secondo. Chi viene scalzato aspetta un bel po', e lo scrive nel registro.
+CHIUSURA_SOSTITUITA = 4000
+ATTESA_SOSTITUITA = 120
 
 
 @dataclass
@@ -165,6 +171,15 @@ class Hub:
         self._ws: aiohttp.ClientWebSocketResponse | None = None
         self._attivo = False
         self._annulla_invio: Any = None
+        # Com'è messo il filo col relay, per la diagnostica: si legge da
+        # Impostazioni → Dispositivi → GdANav → Scarica diagnostica.
+        self.collegato = False
+        self.collegato_da: datetime | None = None
+        self.tentativi = 0
+        self.ultimo_errore: str | None = None
+        self.inviati = 0
+        self.ricevuti = 0
+        self.scartati = 0
         # Il codice da scrivere nell'app al posto del QR, finché vale.
         self._ultimo_aggiornamento: datetime | None = None
         self.codice: str | None = None
@@ -200,10 +215,14 @@ class Hub:
         sessione = async_get_clientsession(self.hass)
         tentativi = 0
         while self._attivo:
+            sostituita = False
             try:
                 async with sessione.ws_connect(self.abbinamento.indirizzo_relay("casa"), heartbeat=30) as ws:
                     self._ws = ws
                     tentativi = 0
+                    self.collegato = True
+                    self.collegato_da = dt_util.utcnow()
+                    self.ultimo_errore = None
                     _LOGGER.debug("Collegato al relay")
                     await self._manda_tutto()
                     async for msg in ws:
@@ -211,15 +230,34 @@ class Hub:
                             await self.async_ricevi(msg.data)
                         elif msg.type in (aiohttp.WSMsgType.ERROR, aiohttp.WSMsgType.CLOSE):
                             break
+                    sostituita = ws.close_code == CHIUSURA_SOSTITUITA
             except (aiohttp.ClientError, TimeoutError) as err:
+                self.ultimo_errore = str(err)
                 _LOGGER.debug("Relay non raggiungibile: %s", err)
             finally:
                 self._ws = None
+                self.collegato = False
                 self._imposta_app(False)
             if not self._attivo:
                 return
-            await asyncio.sleep(ATTESE[min(tentativi, len(ATTESE) - 1)])
-            tentativi += 1
+            if sostituita:
+                self.ultimo_errore = "sostituita da un'altra Home Assistant con lo stesso abbinamento"
+                _LOGGER.warning(
+                    "Un'altra Home Assistant si è collegata al relay con l'abbinamento di «%s»: "
+                    "si riprova fra %s secondi. Se è una copia di prova, toglile GdANav.",
+                    self.entry.title,
+                    ATTESA_SOSTITUITA,
+                )
+                attesa = ATTESA_SOSTITUITA
+            else:
+                attesa = ATTESE[min(tentativi, len(ATTESE) - 1)]
+                tentativi += 1
+            self.tentativi = tentativi
+            await self._aspetta(attesa)
+
+    async def _aspetta(self, secondi: float) -> None:
+        """Fra un tentativo e l'altro. A parte, così le prove non aspettano davvero."""
+        await asyncio.sleep(secondi)
 
     # --- casa → app ------------------------------------------------------
 
@@ -227,7 +265,15 @@ class Hub:
         if self._ws is None or self._ws.closed:
             return False
         await self._ws.send_str(self.busta.chiudi(p.Messaggio(tipo, dati), p.MITTENTE_CASA))
+        self.inviati += 1
         return True
+
+    async def async_opzioni_cambiate(self) -> None:
+        """I comandi consentiti sono cambiati: all'app basta dirglielo.
+
+        Senza riavviare la voce — e quindi senza staccare e riattaccare il
+        filo col relay, e senza far sparire e ricomparire le entità."""
+        await self.async_manda(p.COMANDI_DISPONIBILI, {"comandi": self._elenco_comandi()})
 
     async def _manda_tutto(self) -> None:
         await self.async_manda(p.STATO_AUTO, self.stato_auto())
@@ -285,6 +331,14 @@ class Hub:
 
     @callback
     def _auto_cambiata(self, _event: Event[EventStateChangedData]) -> None:
+        # I sensori «come la vede l'app», sulla scheda del dispositivo.
+        async_dispatcher_send(self.hass, segnale_auto(self.entry.entry_id))
+        # Nessuno dall'altra parte: il relay butterebbe il messaggio. Quando
+        # l'app arriva, il relay lo dice e lo stato parte tutto (_manda_tutto).
+        # L'auto aggiorna anche ogni pochi secondi, e a telefono chiuso —
+        # quasi sempre — non c'è niente da cifrare né da mandare.
+        if not self.viaggio.app_collegata:
+            return
         # Più entità cambiano insieme quando l'integrazione dell'auto
         # aggiorna: si aspetta un attimo e si manda una volta sola.
         if self._annulla_invio is None:
@@ -311,8 +365,10 @@ class Hub:
         try:
             m = self.busta.apri(testo, p.MITTENTE_APP)
         except p.ErroreProtocollo as err:
+            self.scartati += 1
             _LOGGER.debug("Busta scartata: %s", err)
             return
+        self.ricevuti += 1
         self._imposta_app(True)
         await self._gestisci(m)
 
@@ -389,10 +445,6 @@ class Hub:
 
     # --- il codice al posto del QR ---------------------------------------
 
-    @property
-    def _id_notifica(self) -> str:
-        return f"gdanav_codice_{self.entry.entry_id}"
-
     async def async_nuovo_codice(self) -> str:
         """Un codice nuovo: l'abbinamento cifrato va sul relay per dieci minuti."""
         codice = p.nuovo_codice()
@@ -416,13 +468,9 @@ class Hub:
         self.codice = codice
         self.codice_scade = dt_util.utcnow() + p.DURATA_CODICE
         self._annulla_codice = async_call_later(self.hass, p.DURATA_CODICE, self._codice_scaduto)
-        persistent_notification.async_create(
-            self.hass,
-            f"Nell'app GdANav: menu → Home Assistant → «Scrivi il codice», e scrivi\n\n"
-            f"**{p.mostra_codice(codice)}**\n\nVale dieci minuti, una volta sola.",
-            title=f"Codice per collegare {self.entry.title}",
-            notification_id=self._id_notifica,
-        )
+        # Il codice si legge solo sulla scheda del dispositivo, sotto il
+        # pulsante e dentro il QR: non nelle notifiche, che le vede chiunque
+        # apra Home Assistant, e il codice è la chiave dell'auto.
         self._aggiorna()
         return codice
 
@@ -430,8 +478,6 @@ class Hub:
         if self._annulla_codice:
             self._annulla_codice()
             self._annulla_codice = None
-        if self.codice is not None:
-            persistent_notification.async_dismiss(self.hass, self._id_notifica)
         self.codice = None
         self.codice_scade = None
 

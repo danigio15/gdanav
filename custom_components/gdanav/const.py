@@ -64,3 +64,8 @@ SERVIZIO_PIANIFICA = "pianifica_viaggio"
 
 def segnale_aggiornamento(entry_id: str) -> str:
     return f"{DOMAIN}_aggiornamento_{entry_id}"
+
+
+def segnale_auto(entry_id: str) -> str:
+    """L'auto è cambiata: per i sensori che la mostrano come la vede l'app."""
+    return f"{DOMAIN}_auto_{entry_id}"

@@ -38,6 +38,7 @@ from custom_components.gdanav.const import (
     CONF_VELOCITA,
     DOMAIN,
     EVENTO,
+    RELAY_PREDEFINITO,
 )
 from custom_components.gdanav.hub import Hub
 
@@ -110,19 +111,17 @@ async def test_configurazione(hass: HomeAssistant, senza_relay: None) -> None:
     flusso = await hass.config_entries.flow.async_configure(flusso["flow_id"], {})
     assert flusso["step_id"] == "entita"
 
-    sbagliato = await hass.config_entries.flow.async_configure(
-        flusso["flow_id"], {CONF_NOME_AUTO: "Kona", CONF_BATTERIA: "sensor.auto_batteria", CONF_RELAY: "https://x"}
-    )
-    assert sbagliato["errors"] == {CONF_RELAY: "relay_non_valido"}
-
+    # Il relay non si chiede: e' quello di GdANav, e finisce nella voce da se'.
+    assert CONF_RELAY not in {str(k) for k in flusso["data_schema"].schema}
     fatto = await hass.config_entries.flow.async_configure(
-        flusso["flow_id"], {CONF_NOME_AUTO: "Kona", CONF_BATTERIA: "sensor.auto_batteria", CONF_RELAY: RELAY}
+        flusso["flow_id"], {CONF_NOME_AUTO: "Kona", CONF_BATTERIA: "sensor.auto_batteria"}
     )
     assert fatto["type"] is FlowResultType.CREATE_ENTRY
     assert fatto["title"] == "Kona"
+    assert fatto["data"][CONF_RELAY] == RELAY_PREDEFINITO
     chiave = p.da_b64(fatto["data"][CONF_CHIAVE])
     assert len(chiave) == 32
-    assert fatto["result"].unique_id == p.Abbinamento(chiave, RELAY).canale
+    assert fatto["result"].unique_id == p.Abbinamento(chiave, RELAY_PREDEFINITO).canale
 
 
 async def test_dal_dispositivo_le_entita_si_propongono_da_sole(hass: HomeAssistant, senza_relay: None) -> None:
@@ -159,7 +158,7 @@ async def test_dal_dispositivo_le_entita_si_propongono_da_sole(hass: HomeAssista
     assert proposti[CONF_ODOMETRO] == "sensor.leapmotor_odometer"
     assert proposti[CONF_TEMPERATURA_ESTERNA] == "sensor.leapmotor_outside_temperature"
 
-    fatto = await hass.config_entries.flow.async_configure(flusso["flow_id"], {**proposti, CONF_RELAY: RELAY})
+    fatto = await hass.config_entries.flow.async_configure(flusso["flow_id"], proposti)
     assert fatto["type"] is FlowResultType.CREATE_ENTRY
     assert fatto["data"][CONF_BATTERIA] == "sensor.leapmotor_battery"
 
@@ -215,7 +214,7 @@ async def test_un_auto_gdaauto_si_riconosce_dalla_chiave(hass: HomeAssistant, se
         CONF_TEMPERATURA_INTERNA: "sensor.la_rossa_temperatura_interna",
     }
 
-    fatto = await hass.config_entries.flow.async_configure(flusso["flow_id"], {**proposti, CONF_RELAY: RELAY})
+    fatto = await hass.config_entries.flow.async_configure(flusso["flow_id"], proposti)
     assert fatto["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()
     stato = fatto["result"].runtime_data.stato_auto()
@@ -240,11 +239,47 @@ async def test_entita_create(hass: HomeAssistant, senza_relay: None) -> None:
         "binary_sensor.gdanav_app_collegata",
         "image.gdanav_abbinamento",
         "button.gdanav_nuovo_codice",
-        "sensor.gdanav_codice",
+        # L'auto come la vede l'app: solo le entità scelte.
+        "sensor.gdanav_auto_batteria",
+        "sensor.gdanav_auto_autonomia",
+        "binary_sensor.gdanav_auto_in_carica",
     ):
         assert hass.states.get(entity_id) is not None, entity_id
+    for entity_id in ("sensor.gdanav_auto_velocita", "binary_sensor.gdanav_auto_clima_acceso", "sensor.gdanav_codice"):
+        assert hass.states.get(entity_id) is None, entity_id
     assert hass.states.get("binary_sensor.gdanav_in_viaggio").state == "off"
-    assert hass.states.get("sensor.gdanav_codice").state == "Nessun codice"
+    # Il pulsante e il QR stanno insieme, in «Configurazione» della scheda del dispositivo.
+    registro = er.async_get(hass)
+    assert registro.async_get("button.gdanav_nuovo_codice").entity_category == "config"
+    assert registro.async_get("image.gdanav_abbinamento").entity_category == "config"
+
+
+async def test_l_auto_come_la_vede_l_app(hass: HomeAssistant, senza_relay: None, freezer) -> None:
+    """Sulla scheda del dispositivo, i dati dell'auto già nell'unità dell'app, anche a telefono chiuso."""
+    from datetime import timedelta
+
+    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+    await _installa(hass)
+    batteria = hass.states.get("sensor.gdanav_auto_batteria")
+    assert batteria.state == "72.0"
+    assert batteria.attributes["unit_of_measurement"] == "%"
+    assert batteria.attributes["device_class"] == "battery"
+    assert hass.states.get("sensor.gdanav_auto_autonomia").state == "310.5"
+    assert hass.states.get("binary_sensor.gdanav_auto_in_carica").state == "off"
+    # L'auto in miglia: qui in chilometri, come arriva all'app.
+    hass.states.async_set("sensor.auto_autonomia", "100", {"unit_of_measurement": "mi"})
+    hass.states.async_set("binary_sensor.auto_in_carica", "on")
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.gdanav_auto_autonomia").state == "160.9344"
+    assert hass.states.get("binary_sensor.gdanav_auto_in_carica").state == "on"
+    # Un'entità dell'auto che sparisce: il sensore lo dice.
+    hass.states.async_remove("sensor.auto_batteria")
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.gdanav_auto_batteria").state == "unknown"
+    freezer.tick(timedelta(seconds=3))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
 
 
 async def test_dati_per_il_consumo_con_le_unita_giuste(hass: HomeAssistant, senza_relay: None) -> None:
@@ -504,6 +539,18 @@ async def test_cambio_batteria_manda_stato(hass: HomeAssistant, senza_relay: Non
     _, hub = await _installa(hass)
     ws = FintoWs()
     hub._ws = ws
+    # A telefono chiuso l'auto cambia e non parte niente: il relay lo
+    # butterebbe, e cifrare per nessuno è lavoro buttato.
+    hass.states.async_set("sensor.auto_batteria", "73")
+    freezer.tick(timedelta(seconds=3))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert ws.inviati == []
+    # L'app arriva: riceve tutto, e da lì ogni cambiamento.
+    await hub.async_ricevi('{"relay":"presente","ruolo":"app"}')
+    assert [m.tipo for m in ws.aperti()] == [p.STATO_AUTO, p.COMANDI_DISPONIBILI]
+    assert ws.aperti()[0].dati["batteria"] == 73
+    ws.inviati.clear()
     hass.states.async_set("sensor.auto_batteria", "71")
     hass.states.async_set("sensor.auto_autonomia", "305")
     await hass.async_block_till_done()
@@ -514,6 +561,14 @@ async def test_cambio_batteria_manda_stato(hass: HomeAssistant, senza_relay: Non
     (m,) = ws.aperti()
     assert m.dati["batteria"] == 71
     assert m.dati["autonomia_km"] == 305
+    # L'app se ne va: di nuovo niente.
+    ws.inviati.clear()
+    await hub.async_ricevi('{"relay":"assente","ruolo":"app"}')
+    hass.states.async_set("sensor.auto_batteria", "70")
+    freezer.tick(timedelta(seconds=3))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert ws.inviati == []
 
 
 async def test_qr(hass: HomeAssistant, senza_relay: None) -> None:
@@ -521,7 +576,19 @@ async def test_qr(hass: HomeAssistant, senza_relay: None) -> None:
 
     _, hub = await _installa(hass)
     svg = qr_svg(hub.abbinamento.uri)
-    assert svg.startswith((b"<?xml", b"<svg"))
+    assert svg.startswith(b"<svg")
+    assert b"Oppure scrivi" not in svg
+    # Col codice, il codice sta scritto sotto il QR: chi inquadra non lo legge,
+    # chi non può inquadrare lo copia.
+    from datetime import UTC, datetime
+    from xml.etree import ElementTree
+
+    con = qr_svg(hub.abbinamento.uri, "7KQ2M9XAPD", datetime(2026, 10, 26, 14, 6, tzinfo=UTC)).decode()
+    assert "7KQ2M-9XAPD" in con
+    assert con.count("<svg") == 2
+    # XML buono: un attributo doppio e il browser mostra un errore al posto del QR.
+    ElementTree.fromstring(con)
+    ElementTree.fromstring(svg)
 
 
 async def test_pianifica_senza_app(hass: HomeAssistant, senza_relay: None) -> None:
@@ -578,7 +645,10 @@ async def test_codice_al_posto_del_qr(hass: HomeAssistant, senza_relay: None, fr
     from unittest.mock import patch
 
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from homeassistant.util import dt as dt_util
     from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+    from custom_components.gdanav.image import qr_svg
 
     _, hub = await _installa(hass)
     sessione = FintaSessione()
@@ -588,9 +658,15 @@ async def test_codice_al_posto_del_qr(hass: HomeAssistant, senza_relay: None, fr
 
     codice = hub.codice
     assert codice is not None
-    stato = hass.states.get("sensor.gdanav_codice")
-    assert stato.state == p.mostra_codice(codice)
-    assert "scade" in stato.attributes
+    # Il codice non è un sensore e non è una notifica: sta scritto sotto il
+    # QR, nella stessa immagine, che si rinfresca.
+    assert hass.states.get("sensor.gdanav_codice") is None
+    assert not hass.data.get("persistent_notification")
+    immagine = hass.states.get("image.gdanav_abbinamento")
+    assert immagine.state == dt_util.utcnow().isoformat()
+    svg = qr_svg(hub.abbinamento.uri, hub.codice, hub.codice_scade).decode()
+    assert p.mostra_codice(codice) in svg
+    assert "Vale fino alle" in svg
     # Sul relay la busta sta sotto il nome ricavato dal codice; il codice
     # non ci arriva, e col codice la busta si apre.
     ((url, busta),) = sessione.lasciate
@@ -602,11 +678,13 @@ async def test_codice_al_posto_del_qr(hass: HomeAssistant, senza_relay: None, fr
     chiaro = AESGCM(chiave).decrypt(p.da_b64(b["n"]), p.da_b64(b["c"]), b"gdanav/codice/v1")
     assert p.Abbinamento.da_uri(chiaro.decode()) == hub.abbinamento
 
-    # Dopo dieci minuti non vale più.
+    # Dopo dieci minuti non vale più, e il QR torna senza codice.
     freezer.tick(timedelta(minutes=10, seconds=1))
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
-    assert hass.states.get("sensor.gdanav_codice").state == "Nessun codice"
+    assert hub.codice is None
+    assert hass.states.get("image.gdanav_abbinamento").state == dt_util.utcnow().isoformat()
+    assert "Oppure scrivi" not in qr_svg(hub.abbinamento.uri, hub.codice, hub.codice_scade).decode()
 
 
 async def test_codice_usato_quando_l_app_arriva(hass: HomeAssistant, senza_relay: None) -> None:
@@ -657,3 +735,124 @@ async def test_in_viaggio_l_app_chiede_dati_freschi(hass: HomeAssistant, senza_r
     await hub.async_ricevi(_dall_app(p.RICHIEDI_STATO, {}))
     await hass.async_block_till_done()
     assert len(aggiornate) == 2
+
+
+async def test_opzioni_cambiate_senza_riavvio(hass: HomeAssistant, senza_relay: None) -> None:
+    """I comandi consentiti cambiano: l'app lo sa subito, e la voce non si riavvia."""
+    voce, hub = await _installa(hass)
+    ws = FintoWs()
+    hub._ws = ws
+    hass.states.async_set("script.preriscalda_auto", "off", {"friendly_name": "Preriscalda"})
+    hass.config_entries.async_update_entry(voce, options={CONF_COMANDI: ["script.preriscalda_auto"]})
+    await hass.async_block_till_done()
+    assert voce.runtime_data is hub, "la voce non si è riavviata"
+    assert not ws.closed, "il filo col relay è rimasto su"
+    (m,) = ws.aperti()
+    assert m.tipo == p.COMANDI_DISPONIBILI
+    assert m.dati["comandi"] == [{"id": "script.preriscalda_auto", "nome": "Preriscalda"}]
+    # E il comando passa, senza riavvio.
+    chiamate = async_mock_service(hass, "script", "turn_on")
+    await hub.async_ricevi(_dall_app(p.COMANDO, {"comando": "script.preriscalda_auto"}))
+    await hass.async_block_till_done()
+    assert len(chiamate) == 1
+
+
+class FintoWsDelRelay:
+    """Un filo che il relay chiude subito, col codice che si vuole."""
+
+    closed = False
+
+    def __init__(self, close_code: int | None) -> None:
+        self.close_code = close_code
+        self.inviati: list[str] = []
+
+    async def send_str(self, testo: str) -> None:
+        self.inviati.append(testo)
+
+    async def close(self) -> None:
+        self.closed = True
+
+    def __aiter__(self) -> FintoWsDelRelay:
+        return self
+
+    async def __anext__(self) -> Any:
+        raise StopAsyncIteration
+
+
+class FintaSessioneRelay:
+    def __init__(self, ws: FintoWsDelRelay) -> None:
+        self.ws = ws
+        self.connessioni = 0
+
+    def ws_connect(self, _url: str, **_kw: Any) -> Any:
+        self.connessioni += 1
+        sessione = self
+
+        class Filo:
+            async def __aenter__(self) -> FintoWsDelRelay:
+                return sessione.ws
+
+            async def __aexit__(self, *_args: Any) -> bool:
+                return False
+
+        return Filo()
+
+
+@pytest.mark.parametrize(
+    ("codice", "attese"),
+    [
+        # Il relay chiude un filo appena aperto: si riprova subito. Le attese
+        # crescenti (fino a un minuto) sono per quando non si riesce ad aprirlo.
+        (1006, [1, 1]),
+        # Scalzati da un'altra Home Assistant: si aspetta un bel po'.
+        (4000, [120, 120]),
+    ],
+)
+async def test_quanto_si_aspetta_prima_di_ricollegarsi(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture, codice: int, attese: list[int]
+) -> None:
+    from unittest.mock import patch
+
+    from custom_components.gdanav.hub import Hub
+
+    sessione = FintaSessioneRelay(FintoWsDelRelay(codice))
+    aspettato: list[float] = []
+
+    async def aspetta(self: Hub, secondi: float) -> None:
+        aspettato.append(secondi)
+        if len(aspettato) >= 2:
+            self._attivo = False
+
+    with (
+        patch("custom_components.gdanav.hub.async_get_clientsession", return_value=sessione),
+        patch.object(Hub, "_aspetta", aspetta),
+    ):
+        _, hub = await _installa(hass)
+        await hass.async_block_till_done(wait_background_tasks=True)
+    assert sessione.connessioni == 2
+    assert aspettato == attese
+    assert hub.collegato is False
+    # Appena collegata la casa manda tutto, anche se l'app non c'è ancora.
+    assert [m.tipo for m in FintoWs.aperti(sessione.ws)] == [p.STATO_AUTO, p.COMANDI_DISPONIBILI] * 2
+    assert ("si è collegata al relay con l'abbinamento" in caplog.text) == (codice == 4000)
+    assert (hub.ultimo_errore or "").startswith("sostituita") == (codice == 4000)
+
+
+async def test_diagnostica(hass: HomeAssistant, senza_relay: None, hass_client) -> None:
+    from pytest_homeassistant_custom_component.components.diagnostics import get_diagnostics_for_config_entry
+
+    voce, hub = await _installa(hass)
+    hub._ws = FintoWs()
+    await hub.async_ricevi(_dall_app(p.VIAGGIO, {"in_viaggio": True, "destinazione": {"nome": "Roma"}}))
+    await hub.async_ricevi("spazzatura")
+    await hub.async_ricevi('{"v":1,"n":"AAAAAAAAAAAAAAAA","c":"AAAA"}')
+    diagnostica = await get_diagnostics_for_config_entry(hass, hass_client, voce)
+    assert diagnostica["voce"]["dati"][CONF_CHIAVE] == "**REDACTED**"
+    assert diagnostica["voce"]["dati"][CONF_BATTERIA] == "sensor.auto_batteria"
+    assert diagnostica["relay"]["app_collegata"] is True
+    assert diagnostica["relay"]["ricevuti"] == 1
+    assert diagnostica["relay"]["scartati"] == 1
+    assert diagnostica["stato_auto"]["batteria"] == 72
+    assert diagnostica["viaggio"]["destinazione"] == "Roma"
+    assert CHIAVE.hex() not in str(diagnostica)
+    assert p.b64(CHIAVE) not in str(diagnostica)

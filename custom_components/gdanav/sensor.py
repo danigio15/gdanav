@@ -1,17 +1,85 @@
-"""I sensori del viaggio, riempiti dall'app."""
+"""I sensori del viaggio, riempiti dall'app, e l'auto come la vede l'app."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
-from homeassistant.const import PERCENTAGE
+from homeassistant.const import (
+    PERCENTAGE,
+    UnitOfEnergy,
+    UnitOfLength,
+    UnitOfPower,
+    UnitOfSpeed,
+    UnitOfTemperature,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import GdanavConfigEntry, protocollo as p
+from . import GdanavConfigEntry
+from .const import (
+    CONF_AUTONOMIA,
+    CONF_BATTERIA,
+    CONF_CAPACITA_BATTERIA,
+    CONF_CONSUMO_MEDIO,
+    CONF_ENERGIA_RESIDUA,
+    CONF_ODOMETRO,
+    CONF_POTENZA,
+    CONF_POTENZA_CARICA,
+    CONF_POTENZA_CLIMA,
+    CONF_TEMPERATURA_BATTERIA,
+    CONF_TEMPERATURA_ESTERNA,
+    CONF_TEMPERATURA_INTERNA,
+    CONF_VELOCITA,
+    segnale_auto,
+)
 from .entita import EntitaGdanav
+from .hub import Hub
+
+
+@dataclass(frozen=True)
+class DatoAuto:
+    """Un dato dell'auto come arriva all'app: la chiave in ``stato_auto``, da quale entità."""
+
+    chiave: str
+    conf: str
+    classe: SensorDeviceClass | None = None
+    unita: str | None = None
+    misura: SensorStateClass | None = SensorStateClass.MEASUREMENT
+
+
+GRADI = UnitOfTemperature.CELSIUS
+KM = UnitOfLength.KILOMETERS
+
+DATI_AUTO = (
+    DatoAuto("batteria", CONF_BATTERIA, SensorDeviceClass.BATTERY, PERCENTAGE),
+    DatoAuto("autonomia_km", CONF_AUTONOMIA, SensorDeviceClass.DISTANCE, UnitOfLength.KILOMETERS),
+    DatoAuto("potenza_carica_kw", CONF_POTENZA_CARICA, SensorDeviceClass.POWER, UnitOfPower.KILO_WATT),
+    DatoAuto(
+        "temperatura_batteria_c", CONF_TEMPERATURA_BATTERIA, SensorDeviceClass.TEMPERATURE, UnitOfTemperature.CELSIUS
+    ),
+    DatoAuto(
+        "temperatura_esterna_c", CONF_TEMPERATURA_ESTERNA, SensorDeviceClass.TEMPERATURE, UnitOfTemperature.CELSIUS
+    ),
+    DatoAuto("velocita_kmh", CONF_VELOCITA, SensorDeviceClass.SPEED, UnitOfSpeed.KILOMETERS_PER_HOUR),
+    DatoAuto("potenza_kw", CONF_POTENZA, SensorDeviceClass.POWER, UnitOfPower.KILO_WATT),
+    DatoAuto(
+        "odometro_km",
+        CONF_ODOMETRO,
+        SensorDeviceClass.DISTANCE,
+        UnitOfLength.KILOMETERS,
+        SensorStateClass.TOTAL_INCREASING,
+    ),
+    DatoAuto("energia_kwh", CONF_ENERGIA_RESIDUA, SensorDeviceClass.ENERGY_STORAGE, UnitOfEnergy.KILO_WATT_HOUR),
+    DatoAuto("capacita_kwh", CONF_CAPACITA_BATTERIA, SensorDeviceClass.ENERGY_STORAGE, UnitOfEnergy.KILO_WATT_HOUR),
+    DatoAuto("consumo_medio_kwh100", CONF_CONSUMO_MEDIO, None, "kWh/100 km"),
+    DatoAuto("potenza_clima_w", CONF_POTENZA_CLIMA, SensorDeviceClass.POWER, UnitOfPower.WATT),
+    DatoAuto(
+        "temperatura_interna_c", CONF_TEMPERATURA_INTERNA, SensorDeviceClass.TEMPERATURE, UnitOfTemperature.CELSIUS
+    ),
+)
 
 
 async def async_setup_entry(
@@ -25,14 +93,14 @@ async def async_setup_entry(
             SocArrivo(hub, "soc_arrivo"),
             ProssimaSosta(hub, "prossima_sosta"),
             SocNecessario(hub, "soc_necessario"),
-            Codice(hub, "codice"),
+            # Solo i dati che l'auto ha davvero: le entità scelte nella configurazione.
+            *(SensoreAuto(hub, d) for d in DATI_AUTO if d.conf in hub.entita_auto),
         ]
     )
 
 
 NESSUN_VIAGGIO = "Nessun viaggio"
 NESSUNA_SOSTA = "Nessuna sosta"
-NESSUN_CODICE = "Nessun codice"
 
 
 class SensoreGdanav(EntitaGdanav):
@@ -94,15 +162,22 @@ class SocNecessario(SensoreGdanav, SensorEntity):
         return {"destinazione": per} if per else None
 
 
-class Codice(SensoreGdanav, SensorEntity):
-    """Il codice da scrivere nell'app al posto del QR, finché vale."""
+class SensoreAuto(SensoreGdanav, SensorEntity):
+    """Un dato dell'auto **come arriva all'app**: già nell'unità sua (km, kW,
+    °C), letto dall'entità scelta nella configurazione. Sulla scheda del
+    dispositivo si vede cosa riceve il navigatore, e se un'entità scelta
+    male manda un numero storto lo si vede qui, non in auto."""
 
-    _attr_icon = "mdi:form-textbox-password"
+    def __init__(self, hub: Hub, dato: DatoAuto) -> None:
+        super().__init__(hub, "auto_" + dato.conf.removeprefix("entita_"))
+        self._dato = dato
+        self._attr_device_class = dato.classe
+        self._attr_native_unit_of_measurement = dato.unita
+        self._attr_state_class = dato.misura
+
+    def _segnale(self) -> str:
+        return segnale_auto(self.hub.entry.entry_id)
 
     @property
-    def native_value(self) -> str:
-        return p.mostra_codice(self.hub.codice) if self.hub.codice else NESSUN_CODICE
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any] | None:
-        return {"scade": self.hub.codice_scade.isoformat()} if self.hub.codice_scade else None
+    def native_value(self) -> float | None:
+        return self.hub.stato_auto().get(self._dato.chiave)

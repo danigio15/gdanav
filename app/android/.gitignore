@@ -15,3 +15,7 @@ key.properties
 
 # La chiave degli APK d’anteprima sì: serve alla CI per firmare sempre uguale.
 !app/anteprima.jks
+
+# Dove sta la chiave vera e con che parola si apre: la scrive chi costruisce
+# (il workflow «GdANav nei negozi» dai segreti). Nella repository **mai**.
+chiave.properties

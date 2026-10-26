@@ -6,7 +6,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 import voluptuous as vol
 
@@ -52,6 +52,11 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: GdanavConfigEntry) -> bool:
+    # Fino alla 0.3 il codice era un sensore fra i sensori del viaggio: adesso
+    # sta dentro il QR, e il sensore rimasto nel registro si toglie.
+    registro = er.async_get(hass)
+    if vecchio := registro.async_get_entity_id("sensor", DOMAIN, f"{entry.unique_id}_codice"):
+        registro.async_remove(vecchio)
     hub = Hub(hass, entry)
     entry.runtime_data = hub
     await hass.config_entries.async_forward_entry_setups(entry, PIATTAFORME)
@@ -65,5 +70,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: GdanavConfigEntry) -> b
     return await hass.config_entries.async_unload_platforms(entry, PIATTAFORME)
 
 
-async def _opzioni_cambiate(hass: HomeAssistant, entry: GdanavConfigEntry) -> None:
-    await hass.config_entries.async_reload(entry.entry_id)
+async def _opzioni_cambiate(_hass: HomeAssistant, entry: GdanavConfigEntry) -> None:
+    # Le opzioni sono solo i comandi consentiti: niente riavvio, si avvisa l'app.
+    await entry.runtime_data.async_opzioni_cambiate()
