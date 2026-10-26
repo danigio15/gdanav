@@ -65,5 +65,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: GdanavConfigEntry) -> b
     return await hass.config_entries.async_unload_platforms(entry, PIATTAFORME)
 
 
-async def _opzioni_cambiate(hass: HomeAssistant, entry: GdanavConfigEntry) -> None:
-    await hass.config_entries.async_reload(entry.entry_id)
+async def _opzioni_cambiate(_hass: HomeAssistant, entry: GdanavConfigEntry) -> None:
+    # Le opzioni sono solo i comandi consentiti: niente riavvio, si avvisa l'app.
+    await entry.runtime_data.async_opzioni_cambiate()

@@ -1,0 +1,479 @@
+# Costruisce GdANav e la porta nei negozi: Play Console e TestFlight.
+#
+# **L'app non si pubblica su GitHub.** Ne' una release ne' un pacchetto fra
+# gli artefatti: la repository e' pubblica, e un AAB o un IPA lasciati qui li
+# scarica chiunque, Premium compreso. Si prova dal test interno del Play Store
+# e da TestFlight, e solo da li'.
+#
+# Si accende a mano — Actions → «GdANav nei negozi» → Run workflow — e a ogni
+# versione marcata con un'etichetta (`git tag v1.0.0 && git push --tags`).
+# «Le prove» (prove.yml) resta quello di sempre: compila a ogni push, firmato
+# d'anteprima (`it.gdanav.gdanav.prova`), e su main manda l'iPhone su
+# TestFlight. Qui invece si firma con la chiave vera e si va nel negozio.
+#
+# Cosa serve, e dove si mette, e' scritto in docs/NEGOZI.md.
+name: GdANav nei negozi
+
+on:
+  workflow_dispatch:
+    inputs:
+      negozio:
+        description: >-
+          Su quale pista del Play Console caricarlo: internal, alpha, beta,
+          production. Anche piu' d'una, separate da una virgola
+          (internal,alpha,beta): il pacchetto si carica una volta sola e va su
+          tutte. Vuoto (di serie) vuol dire che nel negozio non ci va.
+        required: false
+        default: ""
+      davvero_in_produzione:
+        description: >-
+          Da spuntare solo per scrivere «production» qui sopra. Quella pista
+          pubblica a tutti quelli che hanno l'app, non ai collaudatori, e non
+          si torna indietro premendo un tasto: senza questa spunta lo
+          strumento si ferma e non carica niente.
+        type: boolean
+        required: false
+        default: false
+      prova_del_negozio:
+        description: >-
+          Fa tutto il giro del negozio e poi butta la modifica, senza
+          pubblicare niente. Si spunta prima di ogni rilascio, lanciando su
+          main: e' l'unico modo di sapere che Google prende il pacchetto
+          senza averci gia' speso un'etichetta.
+        type: boolean
+        required: false
+        default: false
+      testflight:
+        description: >-
+          Manda anche l'app per iPhone su TestFlight (servono i quattro
+          segreti di Apple, vedi docs/NEGOZI.md). Sulle etichette ci va da se'.
+        type: boolean
+        required: false
+        default: false
+      elenca_le_piste:
+        description: >-
+          Non costruisce niente: chiede solo al negozio come si chiamano
+          davvero le sue piste. Una prova chiusa fatta a mano non si chiama
+          «prova chiusa», e indovinarlo non si puo'.
+        type: boolean
+        required: false
+        default: false
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER: 3.47.5
+
+jobs:
+  # Chiedere al negozio come si chiamano le sue piste non vuole ne' l'app
+  # costruita ne' la chiave per firmarla: vuole il credenziale e basta.
+  piste:
+    name: Come si chiamano le piste
+    runs-on: ubuntu-latest
+    if: ${{ inputs.elenca_le_piste }}
+    environment: negozio
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Chiedi al negozio
+        env:
+          NEGOZIO_GOOGLE: ${{ secrets.NEGOZIO_GOOGLE }}
+        run: |
+          if [ -z "$NEGOZIO_GOOGLE" ]; then
+            echo "::error::Chieste le piste ma manca il segreto NEGOZIO_GOOGLE."
+            exit 1
+          fi
+          set -o pipefail
+          node tools/porta-nel-negozio.mjs --piste | tee piste.txt
+          {
+            echo "### Le piste di questa app"
+            echo ""
+            echo '```'
+            cat piste.txt
+            echo '```'
+            echo ""
+            echo "Il negozio elenca **le piste che hanno gia' qualcosa sopra**: una"
+            echo "prova appena aperta, ancora vuota, qui non si vede."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  android:
+    name: Android (Play Console)
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.elenca_le_piste }}
+    # Qui c'e' la chiave che firma e la strada per il Play Store: passa
+    # dall'ambiente `negozio`, che il proprietario protegge nelle impostazioni
+    # della repository.
+    environment: negozio
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+
+      # Il numero di build e il nome della versione.
+      #
+      # Il numero sale sempre, anche rispetto alle corse di «Le prove»
+      # (tools/numero-di-build.sh): il Play Store non accetta due volte lo
+      # stesso versionCode. Il nome, su un'etichetta, e' quello dell'etichetta
+      # (`v1.2.3` → `1.2.3`), cosi' chi ha installato una versione la chiama
+      # con le stesse parole con cui gliel'hanno data; a mano resta quello di
+      # pubspec.yaml.
+      - name: Il numero di build
+        run: |
+          echo "NUMERO=$(../tools/numero-di-build.sh)" >> "$GITHUB_ENV"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "VERSIONE=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSIONE=$(sed -n 's/^version: *\([0-9.]*\).*/\1/p' pubspec.yaml)" >> "$GITHUB_ENV"
+          fi
+
+      # Con quale chiave si firma, e **quale** lo dice il riepilogo.
+      #
+      # Due chiavi, e la differenza conta. Quella d'anteprima sta nel progetto
+      # e non e' un segreto: firma i pacchetti `.prova`. Quella vera sta fuori
+      # da qui, nei segreti di GitHub, e non l'ha mai vista nessuno tranne chi
+      # l'ha fatta (docs/NEGOZI.md dice come si fa).
+      #
+      # Se i segreti non ci sono:
+      #  - **un'etichetta** e' un rilascio, e un rilascio non si firma mai con
+      #    la chiave d'anteprima: qui ci si ferma, in rosso.
+      #  - **a mano** si firma d'anteprima e si va avanti, ma il pacchetto si
+      #    chiama `it.gdanav.gdanav.prova` e nel negozio non ci va.
+      - name: La chiave
+        id: chiave
+        env:
+          CHIAVE: ${{ secrets.CHIAVE_ANDROID }}
+          PAROLA: ${{ secrets.CHIAVE_ANDROID_PASSWORD }}
+          # Un portachiavi ha **due** parole: una apre il portachiavi, l'altra
+          # la chiave che c'e' dentro. Se questo segreto non c'e', vale quella
+          # del portachiavi.
+          PAROLA_DELLA_CHIAVE: ${{ secrets.CHIAVE_ANDROID_KEY_PASSWORD }}
+          COME_SI_CHIAMA: ${{ secrets.CHIAVE_ANDROID_ALIAS }}
+        run: |
+          if [ -z "$CHIAVE" ] || [ -z "$PAROLA" ]; then
+            if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+              echo "::error::Un rilascio si firma solo con la chiave vera, e mancano i segreti CHIAVE_ANDROID e CHIAVE_ANDROID_PASSWORD."
+              exit 1
+            fi
+            echo "vera=no" >> "$GITHUB_OUTPUT"
+            echo "GDANAV_FIRMA_DI_PROVA=si" >> "$GITHUB_ENV"
+            {
+              echo "### Firmato con la chiave d'anteprima"
+              echo ""
+              echo "Si costruisce, ma e' un'app a parte: \`it.gdanav.gdanav.prova\`,"
+              echo "e nel negozio non ci va. Per i negozi, e per ogni etichetta di"
+              echo "versione, serve la chiave vera: i segreti \`CHIAVE_ANDROID\` (il"
+              echo "portachiavi in base64) e \`CHIAVE_ANDROID_PASSWORD\`. Vedi docs/NEGOZI.md."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          dove="$RUNNER_TEMP/chiave.jks"
+          printf '%s' "$CHIAVE" | tr -d '[:space:]' | base64 -d > "$dove"
+          come_si_chiama="${COME_SI_CHIAMA:-gdanav}"
+          parola_della_chiave="${PAROLA_DELLA_CHIAVE:-$PAROLA}"
+          # Tutto quello che Gradle chiedera', guardato adesso e non sei minuti
+          # dopo, con un messaggio che parla d'altro. Tre controlli, tre
+          # ragioni diverse di fallire.
+          if ! keytool -list -keystore "$dove" -storepass "$PAROLA" > /dev/null 2>&1; then
+            echo "::error::CHIAVE_ANDROID non e' un portachiavi, o CHIAVE_ANDROID_PASSWORD non lo apre."
+            exit 1
+          fi
+          if ! keytool -list -keystore "$dove" -storepass "$PAROLA" -alias "$come_si_chiama" > /dev/null 2>&1; then
+            echo "::error::nel portachiavi non c'e' nessuna chiave che si chiama «$come_si_chiama»."
+            echo "::error::I nomi che ci sono si vedono cosi': keytool -list -keystore <il tuo .jks>"
+            echo "::error::Se il tuo si chiama in un altro modo, mettilo nel segreto CHIAVE_ANDROID_ALIAS."
+            exit 1
+          fi
+          if ! keytool -certreq -keystore "$dove" -storepass "$PAROLA" \
+            -alias "$come_si_chiama" -keypass "$parola_della_chiave" > /dev/null 2>&1; then
+            echo "::error::la parola apre il portachiavi ma non apre la chiave «$come_si_chiama» (Cannot recover key)."
+            echo "::error::Se le due parole sono diverse, quella della chiave va nel segreto CHIAVE_ANDROID_KEY_PASSWORD."
+            exit 1
+          fi
+          # Le quattro righe che legge Gradle. Il file sta fuori dalla
+          # repository (android/.gitignore) e la macchina di GitHub si butta.
+          {
+            echo "storeFile=$dove"
+            echo "storePassword=$PAROLA"
+            echo "keyAlias=$come_si_chiama"
+            echo "keyPassword=$parola_della_chiave"
+          } > android/chiave.properties
+          echo "vera=si" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Firmato con la chiave vera"
+            echo ""
+            echo "Questo pacchetto si puo' pubblicare: versione **$VERSIONE** ($NUMERO)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Premium: si compra solo quando la variabile GDANAV_PAGAMENTI e' «si».
+      # Senza, ogni pacchetto esce con Premium sbloccato per tutti — va bene
+      # per il test interno, non per «production»: quella si ferma.
+      - name: Premium
+        env:
+          PAGAMENTI: ${{ vars.GDANAV_PAGAMENTI }}
+          PISTA: ${{ inputs.negozio || vars.PISTA_DEL_NEGOZIO }}
+        run: |
+          if [ "$PAGAMENTI" = "si" ]; then
+            echo "### Premium in vendita" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "::warning::GDANAV_PAGAMENTI non e' «si»: questo pacchetto ha Premium sbloccato per tutti."
+          echo "### ⚠️ Premium sbloccato per tutti (GDANAV_PAGAMENTI non e' «si»)" >> "$GITHUB_STEP_SUMMARY"
+          case ",$PISTA," in
+            *,production,*)
+              echo "::error::Su «production» non si va con Premium sbloccato per tutti: metti la variabile GDANAV_PAGAMENTI = si (Settings → Variables), oppure togli production."
+              exit 1 ;;
+          esac
+
+      # Il pacchetto per il Play Store. Le chiavi dei servizi arrivano dai
+      # segreti; senza quella di TomTom il navigatore esce senza traffico, e lo
+      # si dice.
+      - name: Il pacchetto per il negozio
+        env:
+          TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
+          OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
+          HERE: ${{ secrets.GDANAV_HERE_CHIAVE }}
+          GDANAV_ANTEPRIME: ${{ github.workspace }}
+          SBLOCCATO: ${{ vars.GDANAV_PAGAMENTI != 'si' }}
+        run: |
+          [ -n "$TOMTOM" ] || echo "::warning::Manca il segreto GDANAV_TOMTOM_CHIAVE: il navigatore esce senza traffico e senza colonnine libere/occupate."
+          [ -n "$HERE" ] || echo "::warning::Manca il segreto GDANAV_HERE_CHIAVE: senza aziende nella ricerca e pedaggi veri."
+          flutter build appbundle --release \
+            --build-name="$VERSIONE" --build-number="$NUMERO" \
+            --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM" \
+            --dart-define=GDANAV_OCM_CHIAVE="$OCM" \
+            --dart-define=GDANAV_HERE_CHIAVE="$HERE" \
+            --dart-define=GDANAV_TUTTO_SBLOCCATO="$SBLOCCATO" \
+            --dart-define=GDANAV_COSTRUZIONE="$NUMERO"
+          {
+            echo "### Il pacchetto per il Play Store"
+            echo ""
+            echo "Costruito: $VERSIONE ($NUMERO). Su GitHub non resta: va nel negozio solo con una pista."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # E il pacchetto sul Play Console, senza passare da nessuno: le novita'
+      # stanno in app/negozio/, una per lingua, e le porta su
+      # tools/porta-nel-negozio.mjs.
+      #
+      # **Quando ci va, lo si dice.** Lanciando a mano, si scrive la pista
+      # nella casella «negozio»; a ogni etichetta, se si vuole, si mette la
+      # pista una volta nella variabile PISTA_DEL_NEGOZIO. Niente pista,
+      # niente caricamento. Pista chiesta e credenziale che manca, invece, si
+      # ferma e lo dice.
+      - uses: actions/setup-node@v4
+        if: >-
+          steps.chiave.outputs.vera == 'si' &&
+          (inputs.negozio != '' ||
+           (github.ref_type == 'tag' && vars.PISTA_DEL_NEGOZIO != ''))
+        with:
+          node-version: "22"
+      - name: Nel negozio
+        if: >-
+          steps.chiave.outputs.vera == 'si' &&
+          (inputs.negozio != '' ||
+           (github.ref_type == 'tag' && vars.PISTA_DEL_NEGOZIO != ''))
+        working-directory: .
+        env:
+          NEGOZIO_GOOGLE: ${{ secrets.NEGOZIO_GOOGLE }}
+          PISTA: ${{ inputs.negozio || vars.PISTA_DEL_NEGOZIO }}
+          PROVA: ${{ inputs.prova_del_negozio }}
+          DAVVERO: ${{ inputs.davvero_in_produzione }}
+        run: |
+          if [ -z "$NEGOZIO_GOOGLE" ]; then
+            echo "::error::Chiesta la pista «$PISTA» ma manca il segreto NEGOZIO_GOOGLE."
+            exit 1
+          fi
+          solo=""
+          if [ "$PROVA" = "true" ]; then solo="--prova"; fi
+          if [ "$DAVVERO" = "true" ]; then solo="$solo --davvero"; fi
+          # `pipefail`: lo stato di una catena e' quello dell'ULTIMO comando, e
+          # `tee` riesce sempre. Senza, un 403 del negozio passa per verde.
+          set -o pipefail
+          node tools/porta-nel-negozio.mjs \
+            app/build/app/outputs/bundle/release/app-release.aab \
+            --pista="$PISTA" $solo | tee negozio.txt
+          {
+            echo "### Nel negozio: \`$PISTA\`"
+            echo ""
+            echo '```'
+            cat negozio.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  iphone:
+    name: iPhone (TestFlight)
+    # Un'app per iPhone la costruisce solo un Mac, e i Mac di GitHub costano
+    # dieci volte i minuti degli altri: qui si gira solo per le etichette e
+    # quando lo si chiede.
+    runs-on: macos-15
+    if: ${{ !inputs.elenca_le_piste && (github.ref_type == 'tag' || inputs.testflight) }}
+    environment: negozio
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # L'App Store vuole l'SDK di iOS piu' recente: l'Xcode piu' nuovo che la
+      # macchina ha, scritto nel riepilogo per il giorno che Apple rifiuta.
+      - name: L'Xcode piu' recente
+        run: |
+          xcode="$(ls -d /Applications/Xcode_*.app | grep -v -i beta | sort -V | tail -1)"
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Il numero di build
+        run: |
+          echo "NUMERO=$(../tools/numero-di-build.sh)" >> "$GITHUB_ENV"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "VERSIONE=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSIONE=$(sed -n 's/^version: *\([0-9.]*\).*/\1/p' pubspec.yaml)" >> "$GITHUB_ENV"
+          fi
+
+      # Su un'etichetta servono tutti e quattro i segreti di Apple: un
+      # rilascio a meta' non si fa. A mano, senza, si compila e basta.
+      - name: Ci sono le chiavi di Apple?
+        id: chiavi
+        env:
+          CHIAVE: ${{ secrets.APPLE_CHIAVE_P8 }}
+          CHIAVE_ID: ${{ secrets.APPLE_CHIAVE_ID }}
+          EMITTENTE: ${{ secrets.APPLE_EMITTENTE }}
+          SQUADRA: ${{ secrets.APPLE_SQUADRA }}
+        run: |
+          if [ -n "$CHIAVE" ] && [ -n "$CHIAVE_ID" ] && [ -n "$EMITTENTE" ] && [ -n "$SQUADRA" ]; then
+            echo "ci-sono=si" >> "$GITHUB_OUTPUT"
+          elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "::error::Su un'etichetta servono tutti e quattro i segreti di Apple: APPLE_CHIAVE_P8, APPLE_CHIAVE_ID, APPLE_EMITTENTE, APPLE_SQUADRA (docs/NEGOZI.md)."
+            exit 1
+          else
+            echo "ci-sono=no" >> "$GITHUB_OUTPUT"
+            {
+              echo "### L'app per iPhone si compila, e non e' firmata"
+              echo ""
+              echo "Per TestFlight servono i quattro segreti di Apple (docs/NEGOZI.md)."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Premium
+        env:
+          PAGAMENTI: ${{ vars.GDANAV_PAGAMENTI }}
+        run: |
+          if [ "$PAGAMENTI" = "si" ]; then echo "### Premium in vendita" >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          echo "::warning::GDANAV_PAGAMENTI non e' «si»: questo pacchetto ha Premium sbloccato per tutti."
+          echo "### ⚠️ Premium sbloccato per tutti (GDANAV_PAGAMENTI non e' «si»)" >> "$GITHUB_STEP_SUMMARY"
+
+      # Le chiavi dei servizi si passano qui: l'archivio firmato rifa' la parte
+      # Dart con le definizioni che questo passo scrive in Generated.xcconfig.
+      - name: Compila (senza firma)
+        env:
+          TOMTOM: ${{ secrets.GDANAV_TOMTOM_CHIAVE }}
+          OCM: ${{ secrets.GDANAV_OCM_CHIAVE }}
+          HERE: ${{ secrets.GDANAV_HERE_CHIAVE }}
+          GDANAV_ANTEPRIME: ${{ github.workspace }}
+          SBLOCCATO: ${{ vars.GDANAV_PAGAMENTI != 'si' }}
+        run: |
+          [ -n "$TOMTOM" ] || echo "::warning::Manca il segreto GDANAV_TOMTOM_CHIAVE: il navigatore esce senza traffico, in CarPlay e sul telefono."
+          flutter build ios --release --no-codesign \
+            --build-name="$VERSIONE" --build-number="$NUMERO" \
+            --dart-define=GDANAV_TOMTOM_CHIAVE="$TOMTOM" \
+            --dart-define=GDANAV_OCM_CHIAVE="$OCM" \
+            --dart-define=GDANAV_HERE_CHIAVE="$HERE" \
+            --dart-define=GDANAV_TUTTO_SBLOCCATO="$SBLOCCATO" \
+            --dart-define=GDANAV_COSTRUZIONE="$NUMERO"
+
+      # CarPlay si accende solo quando Apple ha concesso il permesso
+      # (variabile GDANAV_CARPLAY = si): prima, la firma non passerebbe.
+      - name: CarPlay
+        if: vars.GDANAV_CARPLAY == 'si'
+        run: cp ios/Runner/RunnerCarPlay.entitlements ios/Runner/Runner.entitlements
+
+      # L'archivio si fa senza firma: con la firma automatica Xcode lo
+      # firmerebbe «per sviluppo», e quel profilo vuole almeno un iPhone
+      # registrato. La firma per l'App Store la mette l'esportazione: con la
+      # chiave dell'App Store Connect, certificato e profilo li tiene Apple.
+      - name: L'archivio firmato
+        if: steps.chiavi.outputs.ci-sono == 'si'
+        env:
+          CHIAVE: ${{ secrets.APPLE_CHIAVE_P8 }}
+          CHIAVE_ID: ${{ secrets.APPLE_CHIAVE_ID }}
+          SQUADRA: ${{ secrets.APPLE_SQUADRA }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          printf '%s' "$CHIAVE" > ~/.appstoreconnect/private_keys/AuthKey_$CHIAVE_ID.p8
+          xcodebuild -workspace ios/Runner.xcworkspace \
+            -scheme Runner -configuration Release -sdk iphoneos \
+            -archivePath build/gdanav.xcarchive archive \
+            DEVELOPMENT_TEAM="$SQUADRA" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+      # L'archivio e' senza firma, e l'esportazione firma coi permessi che
+      # trova gia' scritti nell'app: senza questo passo CarPlay resterebbe
+      # fuori. Qui l'app si firma «per finta» (ad hoc) col permesso dentro; la
+      # firma vera la rimette l'esportazione, che lo tiene perche' il profilo
+      # di Apple ce l'ha.
+      - name: Il permesso di CarPlay nell'archivio
+        if: steps.chiavi.outputs.ci-sono == 'si' && vars.GDANAV_CARPLAY == 'si'
+        run: |
+          app=$(echo build/gdanav.xcarchive/Products/Applications/*.app)
+          codesign --force --deep --sign - "$app"
+          codesign --force --sign - --entitlements ios/Runner/Runner.entitlements "$app"
+          codesign -d --entitlements - "$app" | tee build/permessi.txt
+          grep -q com.apple.developer.carplay-maps build/permessi.txt
+      - name: Su TestFlight
+        if: steps.chiavi.outputs.ci-sono == 'si'
+        env:
+          CHIAVE_ID: ${{ secrets.APPLE_CHIAVE_ID }}
+          EMITTENTE: ${{ secrets.APPLE_EMITTENTE }}
+          SQUADRA: ${{ secrets.APPLE_SQUADRA }}
+        run: |
+          cat > build/esporta.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>$SQUADRA</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>destination</key><string>upload</string>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath build/gdanav.xcarchive \
+            -exportPath build/ipa \
+            -exportOptionsPlist build/esporta.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_$CHIAVE_ID.p8 \
+            -authenticationKeyID "$CHIAVE_ID" \
+            -authenticationKeyIssuerID "$EMITTENTE"
+          {
+            echo "### GdANav $VERSIONE ($NUMERO) su TestFlight"
+            echo ""
+            echo "Fra qualche minuto arriva la notifica di Apple: da TestFlight sull'iPhone si installa."
+            echo "Da App Store Connect la stessa build si manda in revisione per l'App Store."
+          } >> "$GITHUB_STEP_SUMMARY"

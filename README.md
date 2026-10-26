@@ -108,8 +108,8 @@ ci passi e poi il viaggio prosegue.
 
 ## Come si usa
 
-1. **Installa GdANav** dal **Play Store** (Android) o dall'**App Store**
-   (iPhone).
+1. **Installa GdANav** dal **[Play Store](https://play.google.com/store/apps/details?id=it.gdanav.gdanav)**
+   (Android) o dall'**App Store** (iPhone).
 2. Apri il menu (☰) → **La tua auto**: scegli **Elettrica** o **Termica**.
    Con l'elettrica cerca il tuo modello; con la termica scegli il carburante.
 3. **La batteria** (solo elettrica): la scrivi tu con il cursore in **Fonte
@@ -224,6 +224,14 @@ Con due auto, le entità della seconda finiscono con `_2`.
 
 I dati fra l'app e la casa viaggiano **cifrati**: li leggono solo il tuo
 telefono e la tua Home Assistant. Non devi aprire nessuna porta di casa.
+Home Assistant parla col relay solo quando c'è qualcosa da dire: quando
+l'app è chiusa non manda niente, e i comandi consentiti si cambiano dalle
+opzioni senza riavviare niente.
+
+Se qualcosa non va: **Impostazioni → Dispositivi e servizi → GdANav → ⋮ →
+Scarica diagnostica** dice se la casa è collegata al relay, se l'app c'è e
+cosa riceve dell'auto, senza la chiave dell'abbinamento. È quello da
+allegare a una segnalazione.
 
 ## I tuoi dati
 

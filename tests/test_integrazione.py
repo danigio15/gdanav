@@ -504,6 +504,18 @@ async def test_cambio_batteria_manda_stato(hass: HomeAssistant, senza_relay: Non
     _, hub = await _installa(hass)
     ws = FintoWs()
     hub._ws = ws
+    # A telefono chiuso l'auto cambia e non parte niente: il relay lo
+    # butterebbe, e cifrare per nessuno è lavoro buttato.
+    hass.states.async_set("sensor.auto_batteria", "73")
+    freezer.tick(timedelta(seconds=3))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert ws.inviati == []
+    # L'app arriva: riceve tutto, e da lì ogni cambiamento.
+    await hub.async_ricevi('{"relay":"presente","ruolo":"app"}')
+    assert [m.tipo for m in ws.aperti()] == [p.STATO_AUTO, p.COMANDI_DISPONIBILI]
+    assert ws.aperti()[0].dati["batteria"] == 73
+    ws.inviati.clear()
     hass.states.async_set("sensor.auto_batteria", "71")
     hass.states.async_set("sensor.auto_autonomia", "305")
     await hass.async_block_till_done()
@@ -514,6 +526,14 @@ async def test_cambio_batteria_manda_stato(hass: HomeAssistant, senza_relay: Non
     (m,) = ws.aperti()
     assert m.dati["batteria"] == 71
     assert m.dati["autonomia_km"] == 305
+    # L'app se ne va: di nuovo niente.
+    ws.inviati.clear()
+    await hub.async_ricevi('{"relay":"assente","ruolo":"app"}')
+    hass.states.async_set("sensor.auto_batteria", "70")
+    freezer.tick(timedelta(seconds=3))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert ws.inviati == []
 
 
 async def test_qr(hass: HomeAssistant, senza_relay: None) -> None:
@@ -657,3 +677,124 @@ async def test_in_viaggio_l_app_chiede_dati_freschi(hass: HomeAssistant, senza_r
     await hub.async_ricevi(_dall_app(p.RICHIEDI_STATO, {}))
     await hass.async_block_till_done()
     assert len(aggiornate) == 2
+
+
+async def test_opzioni_cambiate_senza_riavvio(hass: HomeAssistant, senza_relay: None) -> None:
+    """I comandi consentiti cambiano: l'app lo sa subito, e la voce non si riavvia."""
+    voce, hub = await _installa(hass)
+    ws = FintoWs()
+    hub._ws = ws
+    hass.states.async_set("script.preriscalda_auto", "off", {"friendly_name": "Preriscalda"})
+    hass.config_entries.async_update_entry(voce, options={CONF_COMANDI: ["script.preriscalda_auto"]})
+    await hass.async_block_till_done()
+    assert voce.runtime_data is hub, "la voce non si è riavviata"
+    assert not ws.closed, "il filo col relay è rimasto su"
+    (m,) = ws.aperti()
+    assert m.tipo == p.COMANDI_DISPONIBILI
+    assert m.dati["comandi"] == [{"id": "script.preriscalda_auto", "nome": "Preriscalda"}]
+    # E il comando passa, senza riavvio.
+    chiamate = async_mock_service(hass, "script", "turn_on")
+    await hub.async_ricevi(_dall_app(p.COMANDO, {"comando": "script.preriscalda_auto"}))
+    await hass.async_block_till_done()
+    assert len(chiamate) == 1
+
+
+class FintoWsDelRelay:
+    """Un filo che il relay chiude subito, col codice che si vuole."""
+
+    closed = False
+
+    def __init__(self, close_code: int | None) -> None:
+        self.close_code = close_code
+        self.inviati: list[str] = []
+
+    async def send_str(self, testo: str) -> None:
+        self.inviati.append(testo)
+
+    async def close(self) -> None:
+        self.closed = True
+
+    def __aiter__(self) -> FintoWsDelRelay:
+        return self
+
+    async def __anext__(self) -> Any:
+        raise StopAsyncIteration
+
+
+class FintaSessioneRelay:
+    def __init__(self, ws: FintoWsDelRelay) -> None:
+        self.ws = ws
+        self.connessioni = 0
+
+    def ws_connect(self, _url: str, **_kw: Any) -> Any:
+        self.connessioni += 1
+        sessione = self
+
+        class Filo:
+            async def __aenter__(self) -> FintoWsDelRelay:
+                return sessione.ws
+
+            async def __aexit__(self, *_args: Any) -> bool:
+                return False
+
+        return Filo()
+
+
+@pytest.mark.parametrize(
+    ("codice", "attese"),
+    [
+        # Il relay chiude un filo appena aperto: si riprova subito. Le attese
+        # crescenti (fino a un minuto) sono per quando non si riesce ad aprirlo.
+        (1006, [1, 1]),
+        # Scalzati da un'altra Home Assistant: si aspetta un bel po'.
+        (4000, [120, 120]),
+    ],
+)
+async def test_quanto_si_aspetta_prima_di_ricollegarsi(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture, codice: int, attese: list[int]
+) -> None:
+    from unittest.mock import patch
+
+    from custom_components.gdanav.hub import Hub
+
+    sessione = FintaSessioneRelay(FintoWsDelRelay(codice))
+    aspettato: list[float] = []
+
+    async def aspetta(self: Hub, secondi: float) -> None:
+        aspettato.append(secondi)
+        if len(aspettato) >= 2:
+            self._attivo = False
+
+    with (
+        patch("custom_components.gdanav.hub.async_get_clientsession", return_value=sessione),
+        patch.object(Hub, "_aspetta", aspetta),
+    ):
+        _, hub = await _installa(hass)
+        await hass.async_block_till_done(wait_background_tasks=True)
+    assert sessione.connessioni == 2
+    assert aspettato == attese
+    assert hub.collegato is False
+    # Appena collegata la casa manda tutto, anche se l'app non c'è ancora.
+    assert [m.tipo for m in FintoWs.aperti(sessione.ws)] == [p.STATO_AUTO, p.COMANDI_DISPONIBILI] * 2
+    assert ("si è collegata al relay con l'abbinamento" in caplog.text) == (codice == 4000)
+    assert (hub.ultimo_errore or "").startswith("sostituita") == (codice == 4000)
+
+
+async def test_diagnostica(hass: HomeAssistant, senza_relay: None, hass_client) -> None:
+    from pytest_homeassistant_custom_component.components.diagnostics import get_diagnostics_for_config_entry
+
+    voce, hub = await _installa(hass)
+    hub._ws = FintoWs()
+    await hub.async_ricevi(_dall_app(p.VIAGGIO, {"in_viaggio": True, "destinazione": {"nome": "Roma"}}))
+    await hub.async_ricevi("spazzatura")
+    await hub.async_ricevi('{"v":1,"n":"AAAAAAAAAAAAAAAA","c":"AAAA"}')
+    diagnostica = await get_diagnostics_for_config_entry(hass, hass_client, voce)
+    assert diagnostica["voce"]["dati"][CONF_CHIAVE] == "**REDACTED**"
+    assert diagnostica["voce"]["dati"][CONF_BATTERIA] == "sensor.auto_batteria"
+    assert diagnostica["relay"]["app_collegata"] is True
+    assert diagnostica["relay"]["ricevuti"] == 1
+    assert diagnostica["relay"]["scartati"] == 1
+    assert diagnostica["stato_auto"]["batteria"] == 72
+    assert diagnostica["viaggio"]["destinazione"] == "Roma"
+    assert CHIAVE.hex() not in str(diagnostica)
+    assert p.b64(CHIAVE) not in str(diagnostica)
