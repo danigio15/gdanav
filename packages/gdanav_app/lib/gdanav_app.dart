@@ -100,6 +100,8 @@ Future<GdanavApp> preparaGdanav({
       ? GestorePremium(archivio: archivio, ospite: premiumOspite)
       : GestorePremium(archivio: archivio, negozio: negozioDelTelefono(), licenze: ClienteLicenze());
   await premium.carica();
+  // Tornando davanti si richiede la licenza: tolta, chiude subito.
+  AppLifecycleListener(onResume: premium.alRitorno);
   final auto = GestoreAuto(archivio: archivio, gdahome: gdahome)..premium = premium.sbloccato;
   await auto.avvia();
   autoSegueIlPremium(auto, premium);

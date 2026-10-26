@@ -86,10 +86,13 @@ class QuadroFinto {
 void main() {
   tearDown(() => GestorePremium.attivo.value = true);
 
-  test('di serie la chiave è vuota: nessun gettone vale', () async {
-    expect(chiavePubblicaLicenze, isEmpty);
+  test('di serie la chiave è quella vera: un gettone firmato con quella di prova non vale', () async {
+    expect(chiavePubblicaLicenze, isNot(isEmpty));
+    expect(chiavePubblicaLicenze, isNot(pubblicaProva));
     final g = await firma(payload(telefono));
     expect(await verificaGettone(g, soggetto: telefono, chiavePubblica: chiavePubblicaLicenze), isNull);
+    // E con la chiave vuota non vale nessun gettone.
+    expect(await verificaGettone(g, soggetto: telefono, chiavePubblica: '', adesso: adesso), isNull);
   });
 
   group('il gettone, verificato come dice il contratto', () {
@@ -204,6 +207,64 @@ void main() {
       tolta.dispose();
     });
 
+    test('tolta mentre l\'app è aperta: tornando davanti si richiede e Premium si chiude', () async {
+      quadro.codici['GDA-ABCD-EFGH-JKMN'] = await firma({
+        ...payload(io.telefono),
+        'fino': DateTime.now().add(const Duration(days: 8)).millisecondsSinceEpoch,
+      });
+      var ora = DateTime.now();
+      final p = GestorePremium(
+        archivio: Archivio(),
+        tuttoSbloccato: false,
+        licenze: ClienteLicenze(client: MockClient(quadro.risponde)),
+        chiaveLicenze: pubblicaProva,
+        orologio: () => ora,
+      );
+      expect(p.ogniQuanto, const Duration(minutes: 15));
+      await p.carica();
+      await pumpEventQueue();
+      expect(await p.riscattaCodice('GDA-ABCD-EFGH-JKMN'), isTrue);
+
+      // Il gestore la toglie: il quadro risponde senza gettoni.
+      quadro.rinnovo = const [];
+      ora = ora.add(const Duration(minutes: 2));
+      p.alRitorno();
+      await pumpEventQueue();
+      expect(p.sbloccato, isFalse);
+      expect(quadro.chieste.last.$1, '/v1/licenze/telefono');
+
+      // Tornando davanti di nuovo entro un minuto non si richiede.
+      final prima = quadro.chieste.length;
+      ora = ora.add(const Duration(seconds: 20));
+      p.alRitorno();
+      await pumpEventQueue();
+      expect(quadro.chieste.length, prima);
+      p.dispose();
+    });
+
+    test('un regalo a tempo scade all\'ora esatta, anche ad app aperta', () async {
+      final fine = DateTime.now().add(const Duration(hours: 1));
+      quadro.codici['GDA-ABCD-EFGH-JKMN'] = await firma({
+        ...payload(io.telefono, scade: fine.millisecondsSinceEpoch),
+        'fino': DateTime.now().add(const Duration(days: 8)).millisecondsSinceEpoch,
+      });
+      var ora = DateTime.now();
+      final p = GestorePremium(
+        archivio: Archivio(),
+        tuttoSbloccato: false,
+        licenze: ClienteLicenze(client: MockClient(quadro.risponde)),
+        chiaveLicenze: pubblicaProva,
+        orologio: () => ora,
+      );
+      await p.carica();
+      await pumpEventQueue();
+      expect(await p.riscattaCodice('GDA-ABCD-EFGH-JKMN'), isTrue);
+      expect(p.sbloccato, isTrue);
+      ora = fine.add(const Duration(seconds: 1));
+      expect(p.sbloccato, isFalse, reason: 'non alla fine del gettone, otto giorni dopo');
+      p.dispose();
+    });
+
     test('codice che non c\'è, già usato, scritto male, o per un altro telefono', () async {
       quadro.codici['GDA-AAAA-BBBB-CCCC'] = await firma(payload(io.telefono));
       quadro.usati.add('GDA-AAAA-BBBB-CCCC');
@@ -229,12 +290,13 @@ void main() {
       p.dispose();
     });
 
-    test('senza chiave (di serie) i codici non si propongono e i gettoni si ignorano', () async {
+    test('senza chiave i codici non si propongono e i gettoni si ignorano', () async {
       await Archivio().salvaGettoneLicenza(await firma(payload(io.telefono)));
       final p = GestorePremium(
         archivio: Archivio(),
         tuttoSbloccato: false,
         licenze: ClienteLicenze(client: MockClient(quadro.risponde)),
+        chiaveLicenze: '',
       );
       await p.carica();
       await pumpEventQueue();
