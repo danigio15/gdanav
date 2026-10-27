@@ -135,6 +135,36 @@ class RiepilogoViaggio {
     ].join(' · ');
   }
 
+  /// Il riepilogo sullo schermo dell'auto, in righe (titolo, testo).
+  ///
+  /// «All'arrivo non c'è il report dei costi»: la riga sola di [perAuto]
+  /// sull'auto si tagliava dopo il nome della meta, e i costi non si
+  /// vedevano. Qui al più quattro righe — quante ne mostra una scheda di
+  /// Android Auto —, e il costo c'è sempre, se si sa: tempo e strada insieme,
+  /// il consumo, le ricariche, il costo col suo dettaglio.
+  List<(String, String)> get righeAuto {
+    final energia = euroEnergia, casello = euroPedaggio;
+    final ricariche = [
+      if (this.energia case final e? when e.kwhDaCasa > 0) 'Casa ${_daCasa(e)}',
+      for (final s in soste) _sosta(s),
+    ];
+    return [
+      ('Durata e distanza', '$durataTesto · $distanzaTesto'),
+      if (consumoTesto case final c?) (elettrica ? 'Energia' : 'Carburante', c),
+      if (ricariche.isNotEmpty) (ricariche.length == 1 ? 'Ricarica' : 'Ricariche', ricariche.join(' — ')),
+      if (energia != null || casello != null)
+        (
+          'Costo ~${euroItaliani((energia ?? 0) + (casello ?? 0))}',
+          [
+            if (energia != null) '~${euroItaliani(energia)} ${elettrica ? 'energia' : 'carburante'}',
+            if (casello != null) '${pedaggio!.prezzo} pedaggio',
+          ].join(' · '),
+        )
+      else
+        ('Costo', 'Metti i prezzi nelle opzioni per vederlo'),
+    ];
+  }
+
   /// «21,3 kWh · ~1,15 € · 40% dal sole»; col prezzo delle opzioni lo dice.
   static String _daCasa(CostoDellEnergia e) {
     final sole = e.quotaSole;

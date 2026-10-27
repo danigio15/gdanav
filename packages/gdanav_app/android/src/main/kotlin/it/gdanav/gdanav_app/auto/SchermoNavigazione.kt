@@ -40,7 +40,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
      * fermi, la segnalazione appena passata. La mappa sotto si ridisegna per
      * conto suo, che il modello si rifaccia o no.
      */
-    private fun firma(): Any? = listOf(PonteAuto.guida, PonteAuto.messaggio, PonteAuto.avviso.ancoraId, PonteAuto.strada.id, PonteAuto.termica.id)
+    private fun firma(): Any? = listOf(PonteAuto.guida, PonteAuto.messaggio, PonteAuto.avviso.ancoraId, PonteAuto.strada.id, PonteAuto.termica.id, PonteAuto.arrivo)
 
     private var disegnata: Any? = null
     private var daAggiornare = false
@@ -56,6 +56,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             viaggioAlCruscotto()
             proponiStrada()
             proponiTermica()
+            mostraArrivo()
             invalidate()
         }
     }
@@ -97,6 +98,22 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         } catch (e: Exception) {
             // Un'auto che non mostra gli avvisi: restano i tasti in alto.
         }
+    }
+
+    /** Il riepilogo dell'arrivo già aperto ([SchermoArrivo]). */
+    private var arrivoMostrato: PonteAuto.Arrivo? = null
+
+    /**
+     * Arrivati: sopra la mappa la schermata del riepilogo, con i costi e
+     * «Fine». Una volta per arrivo: se il riepilogo cambia (si dice quanto si
+     * è pagato una ricarica) la schermata si rifà da sé.
+     */
+    private fun mostraArrivo() {
+        val a = PonteAuto.arrivo
+        val giaAperto = arrivoMostrato != null
+        arrivoMostrato = a
+        if (a == null || giaAperto || PonteAuto.guida != null) return
+        screenManager.push(SchermoArrivo(carContext))
     }
 
     /** La proposta dell'auto termica già aperta ([SchermoTermica]). */

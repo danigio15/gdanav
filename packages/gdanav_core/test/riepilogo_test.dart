@@ -55,4 +55,25 @@ void main() {
     // Il prezzo non cambia la strada.
     expect(o.stessaStrada(c), isTrue);
   });
+
+  test('sull\'auto il riepilogo sta in righe, e il costo c\'è sempre', () {
+    final r = RiepilogoViaggio(
+      destinazione: 'Roma',
+      durata: const Duration(minutes: 24),
+      metri: 12400,
+      elettrica: false,
+      litri: 0.9,
+      euroAlLitro: 1.80,
+      pedaggio: const CostoPedaggio(euro: 2.4, km: 30, classe: ClassePedaggio.a, stimato: true),
+    );
+    expect(r.righeAuto, [
+      ('Durata e distanza', '24 min · 12,4 km'),
+      ('Carburante', '~0,9 l · 7,3 l/100 km'),
+      ('Costo ~4,02 €', '~1,62 € carburante · ~2,40 € pedaggio'),
+    ]);
+    // Senza prezzi, il costo dice dove metterli.
+    const senza = RiepilogoViaggio(destinazione: 'Napoli', durata: Duration(minutes: 9), metri: 800, elettrica: true);
+    expect(senza.righeAuto.last.$1, 'Costo');
+    expect(senza.righeAuto.length, lessThanOrEqualTo(4));
+  });
 }

@@ -45,6 +45,58 @@ void main() {
     expect((linea.first as List)[1], lessThan(45.0016));
   });
 
+  test("nell'immersiva la freccia della manovra parte dalla corsia giusta, e dopo lo svincolo rientra", () {
+    // Tre corsie, giusta quella di destra: sta una corsia (3,5 m) a destra
+    // della linea del percorso, che va verso nord.
+    final uscita = Manovra(
+      istruzione: 'Esci a destra',
+      lunghezzaM: 300,
+      secondi: 20,
+      inizio: 30,
+      tipo: 20,
+      corsie: [dritta, dritta, giusta],
+    );
+    final elementi = (datiManovra(viaggioCon(uscita), uscita)['features']! as List).cast<Map>();
+    final linee = [
+      for (final e in elementi)
+        if ((e['geometry'] as Map)['type'] == 'LineString') e,
+    ];
+    expect(linee, hasLength(2));
+    // Quella sulla linea resta per le altre viste; l'immersiva prende l'altra.
+    expect((linee.first['properties'] as Map)['sostituibile'], isTrue);
+    expect((linee.last['properties'] as Map)['vista'], 'immersiva');
+    final sulLato = ((linee.last['geometry'] as Map)['coordinates'] as List).cast<List>();
+    final sullaLinea = ((linee.first['geometry'] as Map)['coordinates'] as List).cast<List>();
+    // All'inizio, 3,5 m a est (a destra di chi va a nord).
+    final est = ((sulLato.first[0] as double) - 9) * 111195.08 * 0.7071;
+    expect(est, closeTo(3.5, 0.15));
+    // Alla fine è di nuovo sulla linea, dove sta la punta.
+    expect(sulLato.last[0] as double, closeTo(sullaLinea.last[0] as double, 1e-7));
+    expect(sulLato.last[1] as double, closeTo(sullaLinea.last[1] as double, 1e-7));
+
+    // Con la corsia giusta in mezzo non c'è niente da spostare.
+    final inMezzo = Manovra(
+      istruzione: 'Esci a destra',
+      lunghezzaM: 300,
+      secondi: 20,
+      inizio: 30,
+      tipo: 20,
+      corsie: [dritta, giusta, dritta],
+    );
+    final solo = (datiManovra(viaggioCon(inMezzo), inMezzo)['features']! as List).cast<Map>();
+    expect(solo.where((e) => (e['geometry'] as Map)['type'] == 'LineString'), hasLength(1));
+  });
+
+  test("lo stile: l'immersiva disegna la freccia dalla corsia, le altre quella sulla linea", () {
+    Map strato(bool immersiva, String id) => (stileMappa(scuro: false, immersiva: immersiva)['layers']! as List)
+        .cast<Map>()
+        .firstWhere((l) => l['id'] == id);
+    for (final id in ['manovra', 'manovra-bordo']) {
+      expect(strato(true, id)['filter'].toString(), contains('sostituibile'));
+      expect(strato(false, id)['filter'].toString(), contains('immersiva'));
+    }
+  });
+
   test('se le corsie vanno bene tutte, o non si sanno, non si disegna niente', () {
     final tutte = Manovra(
       istruzione: 'Esci a destra',

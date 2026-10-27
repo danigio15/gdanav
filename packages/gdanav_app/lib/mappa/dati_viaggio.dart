@@ -319,13 +319,84 @@ Map<String, Object?> datiManovra(Viaggio? v, Manovra? m, {double primaM = 60, do
   if (tratto.length < 2 || fine - centro < 5) return _collezione([]);
   // La punta guarda come l'ultimo pezzo del tratto.
   final rotta = rottaGradi(_aMetri(l, fine - 4), tratto.last);
+  final daCorsia = _dallaCorsiaGiusta(l, m, math.max(0, centro - primaM), centro, fine);
   return _collezione([
-    _elemento({
-      'type': 'LineString',
-      'coordinates': [for (final p in tratto) _xy(p)],
-    }, const {}),
+    _elemento(
+      {
+        'type': 'LineString',
+        'coordinates': [for (final p in tratto) _xy(p)],
+      },
+      {if (daCorsia != null) 'sostituibile': true},
+    ),
+    if (daCorsia != null)
+      _elemento(
+        {
+          'type': 'LineString',
+          'coordinates': [for (final p in daCorsia) _xy(p)],
+        },
+        const {'vista': 'immersiva'},
+      ),
     _elemento({'type': 'Point', 'coordinates': _xy(tratto.last)}, {'rotta': rotta}),
   ]);
+}
+
+/// Dopo lo svincolo la freccia torna sul percorso in questi metri.
+const _rientroDallaCorsiaM = 25.0;
+
+/// La freccia della manovra che parte dalla corsia giusta, per la vista
+/// immersiva; `null` se la corsia giusta sta già sulla linea del percorso.
+///
+/// «Agli svincoli le frecce non sono allineate»: nella vista immersiva le
+/// corsie stanno sulla strada vera ([datiCorsie]), centrate sulla linea del
+/// percorso, e quella giusta — tutta a sinistra, per un'uscita a sinistra —
+/// sta di lato. La freccia partiva dalla linea, cioè fra due corsie, accanto
+/// a quella blu. Qui la freccia sta spostata sulla corsia giusta fino alla
+/// manovra, e nei [_rientroDallaCorsiaM] metri dopo rientra sul percorso: esce
+/// dalla corsia blu e prende la rampa.
+List<Punto>? _dallaCorsiaGiusta(Linea l, Manovra m, double da, double centro, double fine) {
+  if (!m.corsieUtili) return null;
+  final n = m.corsie.length;
+  final giuste = [
+    for (var i = 0; i < n; i++)
+      if (m.corsie[i].giusta) i,
+  ];
+  if (giuste.isEmpty) return null;
+  // Di quanto sta la corsia giusta dalla linea (a destra il segno è più).
+  final spostamento = ((giuste.first + giuste.last) / 2 - (n - 1) / 2) * larghezzaCorsia;
+  if (spostamento.abs() < 0.1) return null;
+  // Con la manovra dopo vicina il tratto è corto: si rientra prima, perché
+  // la punta sta sulla linea.
+  final rientro = math.min(_rientroDallaCorsiaM, fine - centro);
+  double quanto(double metri) {
+    if (metri <= centro) return spostamento;
+    if (rientro <= 0) return 0.0;
+    final t = (metri - centro) / rientro;
+    return t >= 1 ? 0.0 : spostamento * (1 - t);
+  }
+
+  // Un punto ogni due metri, e l'ultimo proprio sulla fine del tratto, dove
+  // sta la punta.
+  const passo = 2.0;
+  return [
+    for (var metri = da; metri < fine; metri += passo) _diLato(l, metri, quanto(metri)),
+    _diLato(l, fine, quanto(fine)),
+  ];
+}
+
+/// Il punto del percorso a [metri] dalla partenza, spostato di [lato] metri
+/// a destra (a sinistra se negativo) rispetto a dove va il percorso lì.
+Punto _diLato(Linea l, double metri, double lato) {
+  final p = _aMetri(l, metri);
+  if (lato == 0) return p;
+  final prima = _aMetri(l, math.max(0, metri - 1)), dopo = _aMetri(l, math.min(l.lunghezzaM, metri + 1));
+  const metriPerGrado = 111195.08;
+  final cosLat = math.cos(p.lat * math.pi / 180);
+  final est = (dopo.lon - prima.lon) * metriPerGrado * cosLat, nord = (dopo.lat - prima.lat) * metriPerGrado;
+  final lungo = math.sqrt(est * est + nord * nord);
+  if (lungo == 0) return p;
+  // La destra di chi va lungo (est, nord) è (nord, -est).
+  final versoEst = nord / lungo * lato, versoNord = -est / lungo * lato;
+  return Punto(p.lat + versoNord / metriPerGrado, p.lon + versoEst / (metriPerGrado * cosLat));
 }
 
 /// Le corsie della prossima manovra disegnate sulla strada, nella vista
