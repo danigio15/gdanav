@@ -179,7 +179,7 @@ object PonteAuto {
 
     /**
      * Il riepilogo dell'arrivo: «Sei arrivato a …» e le sue righe (durata e
-     * distanza, consumo, ricariche, costo). Lo mostra [SchermoArrivo]; `null`
+     * distanza, consumo, ricariche, costo). Lo mostra [SchermoRiepilogoArrivo]; `null`
      * in viaggio, e dopo «Fine».
      */
     data class Arrivo(val titolo: String, val righe: List<Pair<String, String>>)

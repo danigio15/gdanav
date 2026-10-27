@@ -21,7 +21,7 @@ import androidx.lifecycle.LifecycleOwner
  * riga. «Fine» chiude il viaggio, come sul telefono; se lo chiude il
  * telefono, la schermata se ne va da sé.
  */
-class SchermoArrivo(carContext: CarContext) : Screen(carContext), DefaultLifecycleObserver {
+class SchermoRiepilogoArrivo(carContext: CarContext) : Screen(carContext), DefaultLifecycleObserver {
     private var mostrato: PonteAuto.Arrivo? = PonteAuto.arrivo
 
     private val controlla: () -> Unit = {

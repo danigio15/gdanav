@@ -100,7 +100,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         }
     }
 
-    /** Il riepilogo dell'arrivo già aperto ([SchermoArrivo]). */
+    /** Il riepilogo dell'arrivo già aperto ([SchermoRiepilogoArrivo]). */
     private var arrivoMostrato: PonteAuto.Arrivo? = null
 
     /**
@@ -113,7 +113,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         val giaAperto = arrivoMostrato != null
         arrivoMostrato = a
         if (a == null || giaAperto || PonteAuto.guida != null) return
-        screenManager.push(SchermoArrivo(carContext))
+        screenManager.push(SchermoRiepilogoArrivo(carContext))
     }
 
     /** La proposta dell'auto termica già aperta ([SchermoTermica]). */
