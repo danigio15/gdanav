@@ -178,6 +178,15 @@ object PonteAuto {
     @Volatile var messaggio: String? = null
 
     /**
+     * Il riepilogo dell'arrivo: «Sei arrivato a …» e le sue righe (durata e
+     * distanza, consumo, ricariche, costo). Lo mostra [SchermoRiepilogoArrivo]; `null`
+     * in viaggio, e dopo «Fine».
+     */
+    data class Arrivo(val titolo: String, val righe: List<Pair<String, String>>)
+
+    @Volatile var arrivo: Arrivo? = null
+
+    /**
      * Manca la batteria (nessuna auto elettrica, o la batteria non si sa): il
      * telefono propone l'auto termica. [primaria]: senza auto elettrica è la
      * proposta principale. Senza id, nessuna proposta.
@@ -281,6 +290,17 @@ object PonteAuto {
             }
             "luoghi" -> {
                 luoghi = (call.argument<List<Map<String, Any?>>>("elenco") ?: emptyList()).mapNotNull(::luogo)
+            }
+            "arrivo" -> {
+                val titolo = call.argument<String>("titolo")
+                arrivo = titolo?.let {
+                    Arrivo(
+                        it,
+                        (call.argument<List<List<String>>>("righe") ?: emptyList())
+                            .filter { r -> r.size == 2 }
+                            .map { r -> r[0] to r[1] },
+                    )
+                }
             }
             "messaggio" -> {
                 messaggio = call.argument<String>("testo")

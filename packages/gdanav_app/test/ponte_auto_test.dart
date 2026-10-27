@@ -91,6 +91,61 @@ void main() {
     expect((chiamate.lastWhere((c) => c.method == 'guida').arguments as Map)['attiva'], isFalse);
   });
 
+  testWidgets("all'arrivo sull'auto il percorso va via e arriva il riepilogo coi costi; «Fine» lo chiude", (
+    tester,
+  ) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final chiamate = <MethodCall>[];
+    final messaggero = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messaggero.setMockMethodCallHandler(canale, (c) async {
+      chiamate.add(c);
+      return null;
+    });
+    addTearDown(() => messaggero.setMockMethodCallHandler(canale, null));
+
+    final a = await ambiente(tester, km: 20);
+    final ponte = PonteAuto(viaggio: a.viaggio, guida: a.guida, posizione: a.posizione, canale: canale)..avvia();
+    addTearDown(ponte.ferma);
+    a.auto.manuale.imposta(90);
+    await tester.runAsync(() => a.viaggio.vaiA(const Luogo(nome: 'Nord', posizione: Punto(42.18, 12))));
+    await tester.pump();
+    a.guida.avvia();
+    final punti = (a.viaggio.stato as ViaggioPronto).viaggio.percorso.punti;
+    a.posizioni.add(punti[3]);
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    // Arrivati.
+    a.posizioni.add(punti.last);
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+    await tester.pump();
+    expect(a.guida.attiva, isFalse);
+    expect(a.guida.riepilogo, isNotNull);
+
+    // La linea del percorso non c'è più sulla mappa dell'auto.
+    final sorgenti = chiamate.lastWhere((c) => c.method == 'sorgenti').arguments as Map;
+    final percorso = jsonDecode((sorgenti['dati'] as Map)['gdanav-percorso'] as String) as Map;
+    expect(percorso['features'] as List, isEmpty);
+    // Il riepilogo in righe, col costo.
+    final arrivo = chiamate.lastWhere((c) => c.method == 'arrivo').arguments as Map;
+    expect(arrivo['titolo'], 'Sei arrivato a Nord');
+    final righe = (arrivo['righe'] as List).cast<List>();
+    expect(righe.first.first, 'Durata e distanza');
+    expect(righe.last.first, startsWith('Costo'));
+    expect((chiamate.lastWhere((c) => c.method == 'messaggio').arguments as Map)['testo'], 'Sei arrivato a Nord');
+
+    // «Fine» sull'auto: il riepilogo si chiude e il viaggio finisce.
+    await tester.runAsync(
+      () => messaggero.handlePlatformMessage(
+        'gdanav/schermo_auto',
+        const StandardMethodCodec().encodeMethodCall(const MethodCall('ferma')),
+        (_) {},
+      ),
+    );
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    await tester.pump();
+    expect(a.guida.riepilogo, isNull);
+    expect((chiamate.lastWhere((c) => c.method == 'arrivo').arguments as Map).containsKey('titolo'), isFalse);
+  });
+
   testWidgets("dall'auto si cerca, si sceglie Casa o un risultato e la guida parte da sola", (tester) async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
     final chiamate = <MethodCall>[];

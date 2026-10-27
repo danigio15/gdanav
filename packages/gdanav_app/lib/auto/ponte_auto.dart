@@ -198,6 +198,8 @@ class PonteAuto {
         await naviga(a['uri'] as String? ?? '');
       // «Fine» premuto sullo schermo dell'auto.
       case 'ferma':
+        // Anche dal riepilogo dell'arrivo: si chiude, come «Fine» sul telefono.
+        guida.chiudiRiepilogo();
         if (guida.attiva) await guida.ferma();
         viaggio.annulla();
       case 'cerca':
@@ -473,19 +475,34 @@ class PonteAuto {
 
   void _viaggio() {
     final stato = viaggio.stato;
+    final arrivati = guida.attiva ? null : guida.riepilogo;
     // Cosa dire sull'auto quando non si guida.
     _manda('messaggio', {
       'testo': switch (stato) {
         Calcolo(:final destinazione) => 'Calcolo il percorso per ${destinazione.nome}…',
         ErroreViaggio(:final senzaBatteria?) => senzaBatteria.inAuto,
         ErroreViaggio(:final messaggio) => messaggio,
-        // Arrivati: «Sei arrivato a …», col riepilogo del viaggio.
-        _ when !guida.attiva => guida.riepilogo?.perAuto,
+        // Arrivati: «Sei arrivato a …»; il riepilogo intero sta nella sua
+        // schermata (`arrivo`, qui sotto).
+        _ when arrivati != null => 'Sei arrivato a ${arrivati.destinazione}',
         _ => null,
       },
       ...?_propostaTermica(stato),
     });
-    final dati = datiViaggio(stato is ViaggioPronto ? stato.viaggio : null);
+    /* «All'arrivo non si blocca il percorso e non c'è il report dei costi.»
+     * La guida si fermava, ma il viaggio restava pronto e la sua linea sulla
+     * mappa dell'auto; e il riepilogo era una riga sola, tagliata dopo il nome
+     * della meta. Adesso, arrivati, la linea va via, e il riepilogo arriva in
+     * righe: l'auto lo apre nella sua schermata, col tasto «Fine». */
+    _manda('arrivo', {
+      if (arrivati != null) ...{
+        'titolo': 'Sei arrivato a ${arrivati.destinazione}',
+        'righe': [
+          for (final (titolo, testo) in arrivati.righeAuto) [titolo, testo],
+        ],
+      },
+    });
+    final dati = datiViaggio(stato is ViaggioPronto && arrivati == null ? stato.viaggio : null);
     _manda('sorgenti', {
       'dati': {for (final MapEntry(:key, :value) in dati.entries) key: jsonEncode(value)},
     });

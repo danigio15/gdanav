@@ -304,6 +304,32 @@ List<Object> _zona(String tipo) => [
  * prende 0,77, e l'errore resta sotto il 6%. */
 const _cosenoItalia = 0.77;
 
+/// Quale tratto della freccia di manovra disegnare: nella vista immersiva
+/// quello che parte dalla corsia giusta, se c'è (vedi `datiManovra`); nelle
+/// altre quello sulla linea del percorso, dove le corsie non si disegnano.
+List<Object> _filtroFrecciaManovra(bool immersiva) => [
+  'all',
+  [
+    '==',
+    ['geometry-type'],
+    'LineString',
+  ],
+  if (immersiva)
+    [
+      '!',
+      [
+        'to-boolean',
+        ['get', 'sostituibile'],
+      ],
+    ]
+  else
+    [
+      '!=',
+      ['get', 'vista'],
+      'immersiva',
+    ],
+];
+
 /// Quanti pixel fa un metro allo zoom [z].
 double pixelPerMetro(double z) => 512 * math.pow(2, z) / (40075016.686 * _cosenoItalia);
 
@@ -927,28 +953,27 @@ Map<String, Object> stileMappa({
         'type': 'line',
         'source': sorgenteManovra,
         'minzoom': 13,
-        'filter': [
-          '==',
-          ['geometry-type'],
-          'LineString',
-        ],
+        'filter': _filtroFrecciaManovra(immersiva),
         'layout': {'line-cap': 'butt', 'line-join': 'round'},
-        'paint': {'line-color': '#0B3C78', 'line-width': _largo(larghezzaBordo.$1, larghezzaBordo.$2)},
+        // Nella vista immersiva larga quanto una corsia, in metri come le
+        // strade: in pixel, da vicino, sbordava dalla corsia giusta.
+        'paint': {
+          'line-color': '#0B3C78',
+          'line-width': immersiva ? _metri(larghezzaCorsia * 0.94) : _largo(larghezzaBordo.$1, larghezzaBordo.$2),
+        },
       },
       {
         'id': 'manovra',
         'type': 'line',
         'source': sorgenteManovra,
         'minzoom': 13,
-        'filter': [
-          '==',
-          ['geometry-type'],
-          'LineString',
-        ],
+        'filter': _filtroFrecciaManovra(immersiva),
         'layout': {'line-cap': 'butt', 'line-join': 'round'},
         'paint': {
           'line-color': '#FFFFFF',
-          'line-width': _largo(larghezzaPercorso.$1 * 0.75, larghezzaPercorso.$2 * 0.75),
+          'line-width': immersiva
+              ? _metri(larghezzaCorsia * 0.6)
+              : _largo(larghezzaPercorso.$1 * 0.75, larghezzaPercorso.$2 * 0.75),
         },
       },
       {
