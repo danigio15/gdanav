@@ -24,10 +24,11 @@ class TrattoTutor {
 /// (`tool/autovelox_osm.dart`), divisi in celle di un decimo di grado per
 /// trovare in fretta quelli vicini. Con i Tutor, i tratti a velocità media.
 ///
-///     {"v":2,"generato":"…","a":[[lat,lon,limite,direzione],…],
-///      "t":[[lat1,lon1,lat2,lon2,limite],…]}
+///     {"v":3,"generato":"…","a":[[lat,lon,limite,direzione],…],
+///      "t":[[lat1,lon1,lat2,lon2,limite],…],"s":[[lat,lon,direzione],…]}
 ///
-/// limite 0: non si sa; direzione -1: non si sa. La versione 1 non ha `t`.
+/// limite 0: non si sa; direzione -1: non si sa. `s` sono i semafori con la
+/// foto. La versione 1 non ha `t`, la 2 non ha `s`.
 class ArchivioAutovelox {
   ArchivioAutovelox(List<Segnalazione> tutti, {this.generato, List<TrattoTutor> tutor = const []}) {
     for (final a in tutti) {
@@ -74,9 +75,10 @@ class ArchivioAutovelox {
     List<(double, double, int?, double?)> autovelox, {
     DateTime? generato,
     List<(double, double, double, double, int?)> tutor = const [],
+    List<(double, double, double?)> semafori = const [],
   }) =>
       jsonEncode({
-        'v': 2,
+        'v': 3,
         'generato': (generato ?? DateTime.now().toUtc()).toIso8601String(),
         'a': [
           for (final (lat, lon, limite, direzione) in autovelox)
@@ -91,11 +93,14 @@ class ArchivioAutovelox {
           for (final (lat1, lon1, lat2, lon2, limite) in tutor)
             [_cinque(lat1), _cinque(lon1), _cinque(lat2), _cinque(lon2), limite ?? 0],
         ],
+        's': [
+          for (final (lat, lon, direzione) in semafori) [_cinque(lat), _cinque(lon), direzione?.round() ?? -1],
+        ],
       });
 
   static ArchivioAutovelox leggi(String testo) {
     final j = jsonDecode(testo) as Map<String, Object?>;
-    if (j['v'] != 1 && j['v'] != 2) throw FormatException('Archivio autovelox: versione ${j['v']}');
+    if (!const [1, 2, 3].contains(j['v'])) throw FormatException('Archivio autovelox: versione ${j['v']}');
     final zero = DateTime.fromMillisecondsSinceEpoch(0);
     final tutti = <Segnalazione>[];
     for (final (i, r) in (j['a'] as List).cast<List>().indexed) {
@@ -107,6 +112,18 @@ class ArchivioAutovelox {
         creata: zero,
         fissa: true,
         limiteKmh: limite > 0 ? limite : null,
+        direzioneGradi: direzione >= 0 ? direzione : null,
+      ));
+    }
+    for (final (i, r) in ((j['s'] as List?) ?? const []).cast<List>().indexed) {
+      final direzione = (r[2] as num).toDouble();
+      tutti.add(Segnalazione(
+        id: 'semaforo-$i',
+        tipo: TipoSegnalazione.autovelox,
+        punto: Punto((r[0] as num).toDouble(), (r[1] as num).toDouble()),
+        creata: zero,
+        fissa: true,
+        semaforo: true,
         direzioneGradi: direzione >= 0 ? direzione : null,
       ));
     }

@@ -228,48 +228,56 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                       padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
                       child: ListenableBuilder(
                         listenable: controllo,
-                        builder: (context, _) => Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                        builder: (context, _) => Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Quella di adesso: col GPS muto da qualche
-                            // secondo è zero, non l'ultima letta.
-                            Tachimetro(
-                              velocitaKmh: widget.posizione.velocitaAdesso(),
-                              limiteKmh: g.avanzamento?.limiteKmh,
-                            ),
-                            const Spacer(),
                             // Mappa spostata o allontanata: si torna sull'auto.
-                            if (controllo.libera)
+                            // Sopra la riga: accanto al tachimetro grande non
+                            // ci sta su un telefono stretto.
+                            if (controllo.libera) ...[
                               FilledButton.icon(
                                 key: const Key('riprendi'),
                                 onPressed: controllo.segui,
                                 icon: const Icon(Icons.navigation),
                                 label: const Text('Riprendi'),
                               ),
-                            const Spacer(),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
+                              const SizedBox(height: 10),
+                            ],
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Vetro(
-                                  raggio: 28,
-                                  child: SceltaVista(key: const Key('2d-3d'), controllo: controllo),
+                                // Quella di adesso: col GPS muto da qualche
+                                // secondo è zero, non l'ultima letta.
+                                Tachimetro(
+                                  velocitaKmh: widget.posizione.velocitaAdesso(),
+                                  limiteKmh: g.avanzamento?.limiteKmh,
                                 ),
-                                // Auto termica: un distributore per strada, e poi si prosegue.
-                                if (g.pronto?.termica ?? false) ...[
-                                  const SizedBox(height: 12),
-                                  BottoneDistributori(
-                                    onTap: () => mostraDistributori(
-                                      context,
-                                      qui: g.avanzamento?.posizioneSulPercorso ?? widget.posizione.qui,
-                                      inGuida: true,
-                                      carburante: g.auto.carburante,
-                                      onScegli: g.passaDa,
+                                const Spacer(),
+                                Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Vetro(
+                                      raggio: 28,
+                                      child: SceltaVista(key: const Key('2d-3d'), controllo: controllo),
                                     ),
-                                  ),
-                                ],
-                                const SizedBox(height: 12),
-                                if (widget.segnalazioni case final seg?)
-                                  BottoneSegnala(onTap: () => mostraSegnala(context, seg)),
+                                    // Auto termica: un distributore per strada, e poi si prosegue.
+                                    if (g.pronto?.termica ?? false) ...[
+                                      const SizedBox(height: 12),
+                                      BottoneDistributori(
+                                        onTap: () => mostraDistributori(
+                                          context,
+                                          qui: g.avanzamento?.posizioneSulPercorso ?? widget.posizione.qui,
+                                          inGuida: true,
+                                          carburante: g.auto.carburante,
+                                          onScegli: g.passaDa,
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(height: 12),
+                                    if (widget.segnalazioni case final seg?)
+                                      BottoneSegnala(onTap: () => mostraSegnala(context, seg)),
+                                  ],
+                                ),
                               ],
                             ),
                           ],
@@ -648,7 +656,7 @@ class _Ancora extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
           child: Row(
             children: [
-              BollinoSegnalazione(segnalazione.tipo, lato: 40),
+              BollinoSegnalazione.di(segnalazione, lato: 40),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(

@@ -100,7 +100,8 @@ class _Nota extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          riga(Icons.record_voice_over_rounded, 'A voce', 'lo dice e lo mostra nel riquadro in guida.'),
+          riga(Icons.record_voice_over_rounded, 'Voce', 'lo dice e lo mostra nel riquadro in guida.'),
+          riga(Icons.notifications_active_rounded, 'Beep', 'un beep al posto delle parole, e il riquadro.'),
           riga(Icons.visibility_rounded, 'Schermo', 'solo il riquadro, senza voce.'),
           riga(
             Icons.notifications_off_rounded,
@@ -166,7 +167,9 @@ class _RigaAvviso extends StatelessWidget {
     final tema = Theme.of(context);
     final scelta = scelte.di(avviso);
     final spento = scelta == ComeAvvisare.spento;
-    final opzioni = avviso.soloVoce ? const [ComeAvvisare.voce, ComeAvvisare.schermo] : ComeAvvisare.values;
+    final opzioni = avviso.soloVoce
+        ? const [ComeAvvisare.voce, ComeAvvisare.beep, ComeAvvisare.schermo]
+        : ComeAvvisare.values;
     return Padding(
       key: Key('avviso-${avviso.name}'),
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
@@ -201,11 +204,7 @@ class _RigaAvviso extends StatelessWidget {
                 for (final c in opzioni)
                   ButtonSegment(
                     value: c,
-                    label: Text(
-                      avviso.soloVoce && c == ComeAvvisare.schermo ? 'No voce' : c.etichetta,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    label: Text(c.etichetta, maxLines: 1, overflow: TextOverflow.ellipsis),
                   ),
               ],
               selected: {scelta},

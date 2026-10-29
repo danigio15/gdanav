@@ -452,19 +452,22 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
      */
     private fun velocita(canvas: Canvas, a: Rect, c: PonteAuto.Cruscotto): RectF? {
         val v = c.velocita ?: return null
+        // Dal campo: «troppo piccoli, su TomTom e Maps sono più grandi».
+        // Quasi il doppio dove c'è posto, un terzo in più sugli schermi bassi.
+        val k = if (a.height() >= dp(320f)) 1.7f else 1.35f
         val margine = dp(10f)
-        val h = dp(54f)
+        val h = dp(54f) * k
         val sinistra = a.left + margine
         val basso = a.bottom - margine
         val cy = basso - h / 2
-        val r = dp(22f)
+        val r = dp(22f) * k
 
         // Da sinistra: velocità, poi il limite.
-        var x = sinistra + dp(5f)
+        var x = sinistra + dp(5f) * k
         val cxVelocita = x + r
-        x += r * 2 + dp(6f)
+        x += r * 2 + dp(6f) * k
         val cxLimite = c.limite?.let { x + r * 0.9f }
-        if (cxLimite != null) x += r * 1.8f + dp(4f)
+        if (cxLimite != null) x += r * 1.8f + dp(4f) * k
         val box = RectF(sinistra, basso - h, x + dp(1f), basso)
         canvas.drawRoundRect(box, h / 2, h / 2, sfondoScheda)
         cxLimite?.let { cartello(canvas, it, cy, r * 0.9f, c.limite!!) }
@@ -472,10 +475,10 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         pieno.color = if (oltre) Color.rgb(229, 57, 53) else Color.WHITE
         canvas.drawCircle(cxVelocita, cy, r, pieno)
         numero.color = if (oltre) Color.WHITE else Color.rgb(32, 38, 51)
-        numero.textSize = dp(19f)
-        canvas.drawText("${v.roundToInt()}", cxVelocita, cy + dp(4f), numero)
-        numero.textSize = dp(8.5f)
-        canvas.drawText("km/h", cxVelocita, cy + dp(15f), numero)
+        numero.textSize = dp(19f) * k
+        canvas.drawText("${v.roundToInt()}", cxVelocita, cy + dp(4f) * k, numero)
+        numero.textSize = dp(8.5f) * k
+        canvas.drawText("km/h", cxVelocita, cy + dp(15f) * k, numero)
         return box
     }
 

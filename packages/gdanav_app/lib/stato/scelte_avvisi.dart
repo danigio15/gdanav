@@ -6,7 +6,7 @@ import 'package:gdanav_core/gdanav_core.dart';
 /// Gli avvisi della guida, uno per uno: le segnalazioni della strada, le ZTL
 /// e il limite di velocità.
 enum Avviso {
-  autovelox('Autovelox', 'Fissi e segnalati'),
+  autovelox('Autovelox', 'Fissi, mobili e semafori con foto'),
   tutor('Tutor', 'La tua media sul tratto controllato'),
   polizia('Polizia', 'Segnalata da chi passa'),
   incidente('Incidenti', 'Segnalati da chi passa'),
@@ -36,7 +36,10 @@ enum Avviso {
 /// Come avvisare.
 enum ComeAvvisare {
   /// Detto a voce e mostrato nel riquadro in guida.
-  voce('A voce'),
+  voce('Voce'),
+
+  /// Un beep, senza parole, e il riquadro in guida.
+  beep('Beep'),
 
   /// Il riquadro in guida, senza voce.
   schermo('Schermo'),
@@ -67,6 +70,7 @@ class ScelteAvvisi extends ChangeNotifier {
   }
 
   bool aVoce(Avviso a) => di(a) == ComeAvvisare.voce;
+  bool colBeep(Avviso a) => di(a) == ComeAvvisare.beep;
   bool spento(Avviso a) => di(a) == ComeAvvisare.spento;
 
   void scegli(Avviso a, ComeAvvisare c) {
@@ -85,9 +89,11 @@ class ScelteAvvisi extends ChangeNotifier {
   String get riassunto {
     final spenti = Avviso.values.where(spento).length;
     final schermo = Avviso.values.where((a) => di(a) == ComeAvvisare.schermo).length;
-    if (spenti == 0 && schermo == 0) return 'Tutti a voce';
+    final beep = Avviso.values.where(colBeep).length;
+    if (spenti == 0 && schermo == 0 && beep == 0) return 'Tutti a voce';
     return [
       if (spenti > 0) spenti == 1 ? '1 spento' : '$spenti spenti',
+      if (beep > 0) beep == 1 ? '1 col beep' : '$beep col beep',
       if (schermo > 0) '$schermo solo a schermo',
     ].join(' · ');
   }

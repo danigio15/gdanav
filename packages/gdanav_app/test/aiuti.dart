@@ -93,6 +93,12 @@ class VoceFinta implements Voce {
 
   @override
   Future<void> zitta() async {}
+
+  /// Quante volte ha fatto il beep.
+  var beep = 0;
+
+  @override
+  Future<void> suona() async => beep++;
 }
 
 class Ambiente {

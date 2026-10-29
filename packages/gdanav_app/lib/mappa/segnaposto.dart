@@ -1,5 +1,6 @@
 import 'package:gdanav_core/gdanav_core.dart';
 
+import '../componenti/icone_segnalazioni.dart';
 import '../risorse.dart';
 import '../stato/scelte_avvisi.dart';
 
@@ -63,7 +64,13 @@ Map<String, Object?> datiSegnalazioni(List<Segnalazione> tutte, [ScelteAvvisi? s
             'type': 'Point',
             'coordinates': [s.punto.lon, s.punto.lat],
           },
-          'properties': {'id': s.id, 'tipo': s.tipo.name},
+          'properties': {
+            'id': s.id,
+            'tipo': s.tipo.name,
+            // L'immagine: per gli autovelox il loro disegno (fisso, mobile,
+            // semaforo) e il cartello del limite accanto, quando ce l'hanno.
+            'icona': nomeIconaDi(s),
+          },
         },
   ],
 };

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,7 @@ import 'package:gdanav_app/stato/archivio.dart';
 import 'package:gdanav_app/stato/gestore_posizione.dart';
 import 'package:gdanav_app/stato/gestore_viaggio.dart';
 import 'package:gdanav_app/stato/scelte_avvisi.dart';
+import 'package:gdanav_app/stato/voce.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import 'aiuti.dart';
@@ -38,6 +40,38 @@ void main() {
     s.scegli(Avviso.autovelox, ComeAvvisare.spento);
     expect(ids(datiSegnalazioni(tutte, s)), ['p']);
     expect(ids(datiSegnalazioni(tutte)), ['a', 'p'], reason: 'senza scelte, tutte');
+  });
+
+  testWidgets('col beep un beep al posto della frase; col silenzio niente', (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final a = await ambiente(tester, km: 20);
+    a.guida.avvisi.scegli(Avviso.autovelox, ComeAvvisare.beep);
+    expect(a.guida.avvisi.riassunto, '1 col beep');
+    a.guida.annunciaAvviso('Autovelox tra 500 metri.', quale: Avviso.autovelox);
+    a.guida.annunciaAvviso('Polizia tra 500 metri.', quale: Avviso.polizia);
+    await tester.pump();
+    expect(a.voce.beep, 1);
+    expect(a.voce.frasi, ['Polizia tra 500 metri.']);
+    // Silenzio: tace anche il beep.
+    while (!a.guida.audio.senzaAvvisi) {
+      a.guida.alternaVoce();
+    }
+    a.guida.annunciaAvviso('Autovelox tra 500 metri.', quale: Avviso.autovelox);
+    await tester.pump();
+    expect(a.voce.beep, 1);
+  });
+
+  test('il beep è un WAV vero: due note brevi, senza file', () {
+    final w = wavDelBeep();
+    expect(String.fromCharCodes(w.sublist(0, 4)), 'RIFF');
+    expect(String.fromCharCodes(w.sublist(8, 12)), 'WAVE');
+    final b = ByteData.sublistView(w);
+    expect(b.getUint32(40, Endian.little), w.length - 44);
+    // Un terzo di secondo circa: un avviso, non una suoneria.
+    final secondi = (w.length - 44) / 2 / b.getUint32(24, Endian.little);
+    expect(secondi, inInclusiveRange(0.2, 0.4));
+    // Entra piano: niente «clic» all'inizio.
+    expect(b.getInt16(44, Endian.little), 0);
   });
 
   test('di partenza tutti a voce; il limite non si spegne, resta il tachimetro', () {
@@ -80,11 +114,16 @@ void main() {
     await tester.tap(find.descendant(of: find.byKey(const Key('avviso-polizia')), matching: find.text('Spento')));
     await tester.pumpAndSettle();
     expect(s.spento(Avviso.polizia), isTrue);
-    // Il limite ha solo «A voce» e «No voce».
+    // Voce, Beep, Schermo, Spento.
+    await tester.tap(find.descendant(of: find.byKey(const Key('avviso-autovelox')), matching: find.text('Beep')));
+    await tester.pumpAndSettle();
+    expect(s.di(Avviso.autovelox), ComeAvvisare.beep);
+    // Il limite non ha «Spento»: il tachimetro c'è sempre.
     final limite = find.byKey(const Key('avviso-limite'));
     await tester.scrollUntilVisible(limite, 200);
     expect(find.descendant(of: limite, matching: find.text('Spento')), findsNothing);
-    final noVoce = find.descendant(of: limite, matching: find.text('No voce'));
+    expect(find.descendant(of: limite, matching: find.text('Beep')), findsOneWidget);
+    final noVoce = find.descendant(of: limite, matching: find.text('Schermo'));
     await tester.ensureVisible(noVoce);
     await tester.pumpAndSettle();
     await tester.tap(noVoce);

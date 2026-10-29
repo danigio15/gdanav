@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:gdanav_core/gdanav_core.dart' show Luogo, Punto;
+import 'package:gdanav_core/gdanav_core.dart' show ClienteValhalla, Luogo, Punto;
 
 import 'auto/ponte_auto.dart';
 import 'schermate/aggiorna_gdanav.dart';
@@ -156,6 +156,20 @@ Future<GdanavApp> preparaGdanav({
     archivio: archivio,
     letture: prova.letture(lettureGps),
     velocitaDellAuto: auto.velocitaAuto,
+    // Il limite anche senza navigazione: dallo stesso server dei percorsi.
+    chiediLimite: (tracciato) async {
+      final i = await archivio.impostazioni();
+      final v = ClienteValhalla(
+        Uri.parse(i.valhalla.endsWith('/') ? i.valhalla : '${i.valhalla}/'),
+        chiave: i.chiaveValhalla.isEmpty ? null : i.chiaveValhalla,
+      );
+      try {
+        return await v.limiteQui(tracciato);
+      } finally {
+        v.chiudi();
+      }
+    },
+    limiteSenzaGuida: () => !guida.attiva,
   );
   await posizione.carica();
   final segnalazioni = GestoreSegnalazioni(posizione: posizione, autovelox: archivioAutovelox());

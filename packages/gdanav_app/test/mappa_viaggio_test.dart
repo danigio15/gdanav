@@ -407,7 +407,7 @@ void main() {
     var n = 0;
     Future<void> lettura(WidgetTester tester) async {
       n++;
-      a.gps.add(Lettura(Punto(42 + n * 0.0001, 12), velocitaMs: 12, rotta: 90));
+      a.gps.add(Lettura(Punto(42 + n * 0.0001, 12), velocitaMs: 12, rotta: 0));
       await tester.pump(const Duration(milliseconds: 1000));
     }
 
@@ -416,35 +416,60 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('segue chi guida: girata come va, inclinata, a ogni posizione', (tester) async {
+    testWidgets('segue chi guida a ogni fotogramma: girata come va, inclinata, dove l\'auto è adesso', (tester) async {
       await senzaGuida(tester);
       await lettura(tester);
-      await lettura(tester);
-      expect(m.seguite, hasLength(2));
-      final (camera, _, moto) = m.seguite.last;
+      final prima = m.spostate.length;
+      final animatePrima = m.seguite.length;
+      final segnapostiPrima = m.scritture.where((s) => s.$1 == sorgenteIo).length;
+      n++;
+      final ultimo = Punto(42 + n * 0.0001, 12);
+      a.gps.add(Lettura(ultimo, velocitaMs: 12, rotta: 0));
+      for (var i = 0; i < 25; i++) {
+        await tester.pump(const Duration(milliseconds: 40));
+      }
+      // Una mossa a fotogramma, non un'animazione a lettura: la mappa scorre.
+      final mosse = m.spostate.sublist(prima);
+      expect(mosse.length, greaterThan(15));
+      expect(m.seguite.length, animatePrima, reason: 'niente animazioni che si rincorrono');
+      // E il segnaposto con lei, non a salti.
+      expect(m.scritture.where((s) => s.$1 == sorgenteIo).length - segnapostiPrima, mosse.length);
+      for (var i = 1; i < mosse.length; i++) {
+        final passo = mosse[i].target.latitude - mosse[i - 1].target.latitude;
+        expect(passo, greaterThanOrEqualTo(-1e-9));
+        expect(passo * 111320, lessThan(6), reason: 'un passo per fotogramma, non 10 m in una volta');
+      }
+      final camera = mosse.last;
       expect(camera.tilt, 58);
-      expect(camera.bearing, closeTo(90, 1));
+      expect(camera.bearing, closeTo(0, 1));
       // Vicina come in guida (`telecameraLibera`): a 43 km/h poco sotto 17,5.
       expect(camera.zoom, inInclusiveRange(17, 17.5));
-      expect(moto, CameraAnimationInterpolation.linear);
+      // Non dove l'ha vista il GPS, ma dove è adesso: un secondo più avanti,
+      // più quanto è vecchia la lettura.
+      expect(camera.target.latitude, greaterThan(ultimo.lat));
+      expect(distanzaM(ultimo, Punto(camera.target.latitude, camera.target.longitude)), closeTo(15, 4));
       await via(tester);
     });
 
     testWidgets('un dito la ferma; «Dove sono» la fa seguire di nuovo', (tester) async {
       await senzaGuida(tester);
       await lettura(tester);
-      final prima = m.seguite.length;
       await tester.drag(find.byType(MappaViaggio), const Offset(0, 120));
       expect(controllo.libera, isTrue);
+      await tester.pump();
+      final prima = m.spostate.length;
       await lettura(tester);
       await lettura(tester);
-      expect(m.seguite, hasLength(prima));
+      expect(m.spostate, hasLength(prima));
 
+      // Si torna sull'auto con un moto, poi la seguono i fotogrammi.
+      final animate = m.seguite.length;
       controllo.centra();
       await tester.pump();
-      expect(m.seguite, hasLength(prima + 1));
+      expect(m.seguite, hasLength(animate + 1));
       await lettura(tester);
-      expect(m.seguite, hasLength(prima + 2));
+      await lettura(tester);
+      expect(m.spostate.length, greaterThan(prima));
       await via(tester);
     });
 

@@ -155,33 +155,38 @@ const _chiaro = _Tavolozza(
 );
 
 // La notte di Waze: blu notte, strade grigio ardesia, nomi chiari.
+//
+// Dal campo: «appena tramontato il sole è troppo scura, non si vede bene la
+// strada». Il fondo era quasi nero e le strade poco più chiare: adesso il
+// fondo è un blu ardesia più chiaro, e le strade spiccano di più (più chiare,
+// col bordo scuro), come le notti di TomTom e Maps.
 const _scuro = _Tavolozza(
-  sfondo: '#1B2130',
-  abitato: '#1F2636',
-  industria: '#252C3C',
-  prato: '#1C3027',
-  bosco: '#1A2E24',
-  acqua: '#1A3656',
-  edificio: '#283042',
-  edificioLato: '#3A4459',
-  edificioBordo: '#2F384B',
-  autostrada: '#56627A',
-  autostradaBordo: '#141925',
-  principale: '#48536A',
-  principaleBordo: '#141925',
-  strada: '#394356',
-  stradaBordo: '#141925',
-  sentiero: '#3A4457',
-  ferrovia: '#3A4457',
-  etichetta: '#D2D8E1',
-  etichettaAlone: '#1B2130',
-  luogo: '#8FB6E8',
-  poi: '#7D8797',
+  sfondo: '#28324A',
+  abitato: '#2D3850',
+  industria: '#333E57',
+  prato: '#26413A',
+  bosco: '#233D34',
+  acqua: '#22496F',
+  edificio: '#36415A',
+  edificioLato: '#4A5672',
+  edificioBordo: '#3F4A63',
+  autostrada: '#8592AD',
+  autostradaBordo: '#1A2132',
+  principale: '#73809B',
+  principaleBordo: '#1A2132',
+  strada: '#5F6B84',
+  stradaBordo: '#1E2537',
+  sentiero: '#56617A',
+  ferrovia: '#56617A',
+  etichetta: '#E8ECF2',
+  etichettaAlone: '#28324A',
+  luogo: '#A5C6F0',
+  poi: '#97A1B3',
   percorso: '#3AB0FF',
   percorsoBordo: '#0B5AA6',
-  alternativa: '#4E6A86',
+  alternativa: '#5D7C9B',
   alternativaBordo: '#2E4459',
-  contorno: '#0F1420',
+  contorno: '#141A28',
   libera: '#4ADE80',
   piena: '#FBBF24',
   guasta: '#F87171',
@@ -630,7 +635,8 @@ Map<String, Object> stileMappa({
       // rosso se quasi fermi; da lontano solo sulle strade principali.
       // Sull'auto più spesse: lo schermo si guarda da un braccio di
       // distanza, di sfuggita, e la mappa è sempre vicina.
-      if (traffico.isNotEmpty) ...[
+      // Nella vista immersiva no: sta sopra il percorso (più giù).
+      if (traffico.isNotEmpty && !immersiva) ...[
         _coda(stratoTraffico, principali: true, minzoom: 7, spessore: perAuto ? 1.6 : 1),
         _coda(stratoTrafficoLocale, principali: false, minzoom: 13, spessore: perAuto ? 1.6 : 1),
       ],
@@ -895,6 +901,22 @@ Map<String, Object> stileMappa({
         'layout': {'line-cap': 'round', 'line-join': 'round'},
         'paint': {'line-color': t.percorso, 'line-width': _largo(larghezzaPercorso.$1, larghezzaPercorso.$2)},
       },
+      /* «Nella visuale immersiva non si vede il traffico: la linea è
+       * sovrapposta da quella del percorso.» Da vicino la strada propria è
+       * quasi tutta coperta dal percorso, e il traffico di TomTom (5 px in
+       * mezzo alla strada) ci finiva sotto. Nell'immersiva si disegna sopra
+       * il percorso, stretto come la striscia della coda: sulla propria
+       * strada un rallentamento si vede in mezzo alla linea, col celeste ai
+       * lati; sulle altre resta in mezzo alla strada, che in metri è larga. */
+      if (traffico.isNotEmpty && immersiva) ...[
+        _coda(stratoTraffico, principali: true, minzoom: 7, larghezza: _largo(larghezzaCoda.$1, larghezzaCoda.$2)),
+        _coda(
+          stratoTrafficoLocale,
+          principali: false,
+          minzoom: 13,
+          larghezza: _largo(larghezzaCoda.$1, larghezzaCoda.$2),
+        ),
+      ],
       // Le code di adesso dentro il percorso: dal giallo (rallenta) al rosso
       // (fermo), bordeaux se è chiusa. Sopra la linea, sotto le frecce.
       {
@@ -1441,22 +1463,48 @@ Map<String, Object> stileMappa({
         'type': 'symbol',
         'source': sorgenteSegnalazioni,
         'layout': {
-          'icon-image': [
-            'concat',
-            'segnala-',
-            ['get', 'tipo'],
-          ],
+          // L'immagine la sceglie chi scrive i dati (`nomeIconaDi`): gli
+          // autovelox col loro disegno, fisso, mobile o semaforo, e il
+          // cartello del limite accanto, come in TomTom.
+          'icon-image': ['get', 'icona'],
           'icon-anchor': 'bottom',
+          // Gli autovelox piu' grandi delle altre: «si devono notare bene».
           'icon-size': [
             'interpolate',
             ['linear'],
             ['zoom'],
             9,
-            0.45,
+            [
+              'match',
+              ['get', 'tipo'],
+              'autovelox',
+              0.7,
+              0.45,
+            ],
             15,
-            0.7,
+            [
+              'match',
+              ['get', 'tipo'],
+              'autovelox',
+              1.0,
+              0.7,
+            ],
             18,
-            0.9,
+            [
+              'match',
+              ['get', 'tipo'],
+              'autovelox',
+              1.2,
+              0.9,
+            ],
+          ],
+          // Gli autovelox sopra le altre segnalazioni.
+          'symbol-sort-key': [
+            'match',
+            ['get', 'tipo'],
+            'autovelox',
+            1,
+            0,
           ],
           'icon-allow-overlap': true,
         },
@@ -1612,7 +1660,14 @@ List<Object> _eUnaGrande() => [
 
 /// Le strade dove TomTom misura una coda: sotto 0,6 si rallenta, sotto 0,3 si
 /// è fermi.
-Map<String, Object> _coda(String id, {required bool principali, required double minzoom, double spessore = 1}) {
+/// [larghezza], se c'è, al posto di quella che cresce con [spessore].
+Map<String, Object> _coda(
+  String id, {
+  required bool principali,
+  required double minzoom,
+  double spessore = 1,
+  List<Object>? larghezza,
+}) {
   return {
     'id': id,
     'type': 'line',
@@ -1627,17 +1682,19 @@ Map<String, Object> _coda(String id, {required bool principali, required double 
     'layout': {'line-cap': 'round', 'line-join': 'round'},
     'paint': {
       'line-color': ['step', _quantoSiVaPiano(), '#E5302A', 0.3, '#F5A623'],
-      'line-width': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        7,
-        1.2 * spessore,
-        12,
-        2.5 * spessore,
-        16,
-        5 * spessore,
-      ],
+      'line-width':
+          larghezza ??
+          [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            7,
+            1.2 * spessore,
+            12,
+            2.5 * spessore,
+            16,
+            5 * spessore,
+          ],
       'line-opacity': 0.9,
     },
   };

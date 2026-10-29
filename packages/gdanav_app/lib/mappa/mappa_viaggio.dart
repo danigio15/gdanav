@@ -9,10 +9,10 @@ import 'package:flutter/services.dart';
 import 'package:gdanav_core/gdanav_core.dart'
     show
         Avanzamento,
+        MotoFluido,
         MotoSullaStrada,
         Punto,
         Rettangolo,
-        TipoSegnalazione,
         TipoZona,
         Viaggio,
         diQuantoSiGira,
@@ -172,7 +172,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     // tutta Italia sulla strada sarebbe solo confusione.
     if (widget.guida == null) widget.vicini?.avviaTutte();
     if (widget.guida != null) _guardia = Timer.periodic(const Duration(seconds: 2), (_) => _giroDiGuardia());
-    if (widget.guida != null) _fotogrammi = createTicker(_alFotogramma);
+    _fotogrammi = createTicker(_alFotogramma);
   }
 
   DateTime _ora() => (widget.orologio ?? DateTime.now)();
@@ -435,7 +435,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   /// Riaccende i fotogrammi, se servono e sono spenti.
   void _accendiFotogrammi() {
     final t = _fotogrammi;
-    if (t == null || t.isActive || !_scorre) return;
+    if (t == null || t.isActive || !(_scorre || _scorreLibero)) return;
     _ultimoTick = Duration.zero;
     t.start();
   }
@@ -443,9 +443,102 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   void _alFotogramma(Duration trascorso) {
     _tempo += trascorso - _ultimoTick;
     _ultimoTick = trascorso;
-    final ultimo = _ultimoDisegno;
+    final libero = !_scorre && _scorreLibero;
+    final ultimo = libero ? _ultimoLibero : _ultimoDisegno;
     if (_disegnando || (ultimo != null && _tempo - ultimo < _fotogrammaMinimo)) return;
-    unawaited(_fotogramma(_tempo));
+    unawaited(libero ? _fotogrammaLibero() : _fotogramma(_tempo));
+  }
+
+  /* ─── Senza guida, l'auto che scorre ────────────────────────────────────
+   *
+   * Dal campo: «l'icona della posizione dell'auto è sempre un po' in
+   * ritardo». Senza guida il segnaposto andava dove diceva l'ultima lettura
+   * del GPS, e la telecamera ci arrivava con un moto lungo quanto
+   * l'intervallo fra due letture: la mappa mostrava dov'era l'auto un
+   * secondo, un secondo e mezzo prima.
+   *
+   * Adesso è come in guida e sullo schermo dell'auto: segnaposto e
+   * telecamera si muovono a ogni fotogramma verso dove l'auto è adesso,
+   * portata avanti dall'ultima lettura con la sua velocità e la sua curva
+   * ([MotoFluido], in gdanav_core, lo stesso dell'auto). La lettura arriva
+   * già un poco vecchia: la si conta [_anticipoLibero] più indietro, e la
+   * freccia sta dove si è, non dove si era. Da fermi un fotogramma solo,
+   * poi niente fino alla lettura dopo. */
+
+  /// Quanto è vecchia una lettura quando arriva, a occhio: come in guida.
+  static const _anticipoLibero = Duration(milliseconds: 300);
+
+  final _motoLibero = MotoFluido();
+
+  /// L'orologio delle letture senza guida: quello della mappa, che va
+  /// avanti anche a fotogrammi spenti, quando le letture arrivano lo stesso.
+  late final _inizio = _ora();
+  Duration get _adessoLibero => _ora().difference(_inizio);
+
+  /// La lettura già data a [_motoLibero]: la stessa non si ridà (riportata
+  /// più tardi farebbe tornare indietro la previsione).
+  DateTime? _lettaLibera;
+  Duration? _ultimoLibero;
+
+  /// Fino a quando i fotogrammi non muovono la telecamera: sta finendo il
+  /// suo moto per tornare sull'auto («Dove sono», «Riprendi»).
+  var _telecameraLiberaDa = Duration.zero;
+
+  /// Se l'auto la muovono i fotogrammi senza la guida: la guida non ha
+  /// ancora una posizione sua, e lo schermo dell'auto è spento (con l'auto
+  /// accesa la mappa del telefono si sposta di rado, apposta).
+  bool get _scorreLibero =>
+      _fotogrammi != null &&
+      !_scorre &&
+      widget.guida?.avanzamento == null &&
+      !widget.gestore.auto.schermoDellAutoAcceso &&
+      widget.posizione.qui != null;
+
+  Future<void> _fotogrammaLibero() async {
+    final m = _mappa;
+    if (m == null || !_stileCaricato || !_scorreLibero) {
+      _motoLibero.dimentica();
+      _ultimoLibero = null;
+      _fotogrammi?.stop();
+      return;
+    }
+    final adesso = _adessoLibero;
+    final f = _motoLibero.fotogramma(adesso);
+    if (f == null) return;
+    final prima = _ultimoLibero;
+    _ultimoLibero = _tempo;
+    final camera = _seguiFuoriGuida && adesso >= _telecameraLiberaDa;
+    _disegnando = true;
+    try {
+      await m.setGeoJsonSource(
+        sorgenteIo,
+        datiIo(f.punto, f.rotta, widget.posizione.segnaposto).cast<String, dynamic>(),
+      );
+      if (camera && identical(m, _mappa) && mounted) {
+        // Lo zoom va piano verso quello della velocità: frenando non salta.
+        final voluto =
+            telecameraLibera(velocitaMs: widget.posizione.velocitaAdesso() / 3.6, tridimensionale: _inclinata).zoom +
+            (_immersiva ? 1 : 0);
+        final z = _zoomMostrato;
+        final dt = prima == null ? 0.0 : (_tempo - prima).inMicroseconds / 1000;
+        final zoom = z == null || prima == null
+            ? voluto
+            : z + (voluto - z) * (1 - math.exp(-dt.clamp(0, 100) / _tauZoom));
+        _zoomMostrato = zoom;
+        await m.moveCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(target: LatLng(f.punto.lat, f.punto.lon), zoom: zoom, tilt: _inclinazione, bearing: f.rotta),
+          ),
+        );
+        _seguita = widget.posizione.lettoAlle;
+        _ultimaCamera = _ora();
+      }
+    } catch (e) {
+      debugPrint('mappa, fotogramma libero: $e');
+    } finally {
+      _disegnando = false;
+    }
+    if (_motoLibero.fermo) _fotogrammi?.stop();
   }
 
   Future<void> _fotogramma(Duration adesso) async {
@@ -540,6 +633,42 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
       } catch (e) {
         debugPrint('mappa, freccia: $e');
       }
+      return;
+    }
+    // Senza guida segnaposto e telecamera li muovono i fotogrammi; qui solo
+    // la lettura nuova, la freccia, e la telecamera quando deve tornare
+    // sull'auto o andarci la prima volta.
+    if (_scorreLibero && stimata == null && a == null && qui != null) {
+      final letta = widget.posizione.lettoAlle;
+      if (letta != null && letta != _lettaLibera) {
+        _lettaLibera = letta;
+        _motoLibero.posizione(
+          qui,
+          rotta: rotta,
+          velocitaMs: widget.posizione.velocitaAdesso() / 3.6,
+          alle: _adessoLibero - _anticipoLibero,
+        );
+      }
+      try {
+        await _freccia(m);
+      } catch (e) {
+        debugPrint('mappa, freccia: $e');
+      }
+      if (!identical(m, _mappa) || !mounted) return;
+      if (!_seguiFuoriGuida || _seguita == null) {
+        if (_seguiFuoriGuida) _telecameraLiberaDa = _adessoLibero + const Duration(milliseconds: 1000);
+        try {
+          await _telecamera(
+            m,
+            a,
+            _motoLibero.mostrata ?? qui,
+            _motoLibero.mostrata == null ? rotta : _motoLibero.rottaMostrata,
+          );
+        } catch (e) {
+          debugPrint('mappa, telecamera: $e');
+        }
+      }
+      _accendiFotogrammi();
       return;
     }
     // Segnaposto e freccia per conto loro: se una sorgente non si scrive, la
@@ -721,8 +850,12 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     for (final s in Segnaposto.values) {
       await una(s.immagine, () async => (await rootBundle.load(s.asset)).buffer.asUint8List());
     }
-    for (final t in TipoSegnalazione.values) {
-      await una(nomeIcona(t), () => iconaSegnalazionePng(t));
+    try {
+      for (final MapEntry(:key, :value) in (await iconeSegnalazioni()).entries) {
+        await una(key, () async => value);
+      }
+    } catch (e) {
+      debugPrint('mappa, icone delle segnalazioni: $e');
     }
     await una(immaginePuntaManovra, puntaManovraPng);
     await una(immagineBandieraArrivo, bandieraArrivoPng);

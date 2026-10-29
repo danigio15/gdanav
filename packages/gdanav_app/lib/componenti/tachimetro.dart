@@ -2,11 +2,17 @@ import 'package:flutter/material.dart';
 
 /// Il tachimetro di Waze in basso a sinistra: la velocità in un cerchio
 /// bianco, rosso se si supera il limite; accanto il cartello del limite.
+///
+/// Dal campo: «troppo piccoli, su TomTom e Maps sono decisamente più grandi».
+/// Erano 84 e 52: adesso 124 e 84, quasi una volta e mezza, da leggere con
+/// un'occhiata.
 class Tachimetro extends StatelessWidget {
   const Tachimetro({super.key, required this.velocitaKmh, this.limiteKmh});
 
   final double velocitaKmh;
   final int? limiteKmh;
+
+  static const lato = 124.0, latoCartello = 84.0;
 
   /// Qualche km/h di tolleranza, come fa l'autovelox.
   bool get oltre => limiteKmh != null && velocitaKmh > limiteKmh! + 3;
@@ -18,14 +24,14 @@ class Tachimetro extends StatelessWidget {
     final fondo = oltre ? const Color(0xFFE5484D) : (scuro ? const Color(0xFF232A38) : Colors.white);
     final testo = oltre ? Colors.white : (scuro ? Colors.white : const Color(0xFF1F2328));
     return SizedBox(
-      width: limiteKmh == null ? 84 : 128,
-      height: 84,
+      width: limiteKmh == null ? lato : lato + latoCartello - 16,
+      height: lato,
       child: Stack(
         children: [
           Container(
             key: const Key('tachimetro'),
-            width: 84,
-            height: 84,
+            width: lato,
+            height: lato,
             decoration: BoxDecoration(
               color: fondo,
               shape: BoxShape.circle,
@@ -36,13 +42,21 @@ class Tachimetro extends StatelessWidget {
               children: [
                 Text(
                   '${velocitaKmh.round()}',
-                  style: t.headlineMedium?.copyWith(fontWeight: FontWeight.w900, color: testo, height: 1),
+                  style: t.headlineMedium?.copyWith(fontSize: 48, fontWeight: FontWeight.w900, color: testo, height: 1),
                 ),
-                Text('km/h', style: t.labelSmall?.copyWith(color: testo.withValues(alpha: 0.75))),
+                Text(
+                  'km/h',
+                  style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: testo.withValues(alpha: 0.75)),
+                ),
               ],
             ),
           ),
-          if (limiteKmh case final l?) Positioned(right: 0, top: 0, child: CartelloLimite(limiteKmh: l)),
+          if (limiteKmh case final l?)
+            Positioned(
+              right: 0,
+              top: 0,
+              child: CartelloLimite(limiteKmh: l, lato: latoCartello),
+            ),
         ],
       ),
     );

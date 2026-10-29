@@ -806,6 +806,43 @@ class ClienteValhalla {
     throw ErrorePercorso('$errore');
   }
 
+  /// Il limite della strada dove si sta andando, senza percorso: le ultime
+  /// posizioni ([tracciato], la più recente per ultima) si appoggiano alle
+  /// strade (`map_snap`), e conta l'ultima strada. `null` se la strada non
+  /// ha un limite noto, o se il server non risponde.
+  Future<int?> limiteQui(List<Punto> tracciato) async {
+    if (tracciato.length < 2) return null;
+    final r = await _http
+        .post(
+          indirizzo.resolve('trace_attributes'),
+          headers: _intestazioni,
+          body: jsonEncode({
+            'shape': [
+              for (final p in tracciato) {'lat': p.lat, 'lon': p.lon},
+            ],
+            'shape_match': 'map_snap',
+            'costing': 'auto',
+            'filters': {
+              'attributes': ['edge.speed_limit'],
+              'action': 'include',
+            },
+          }),
+        )
+        .timeout(const Duration(seconds: 10));
+    if (r.statusCode != 200) return null;
+    return limiteInFondo(jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>);
+  }
+
+  /// Il limite dell'ultima strada di `/trace_attributes`: quella dove si è.
+  /// Quello di una strada di prima non vale: si è girati.
+  static int? limiteInFondo(Map<String, Object?> json) {
+    final strade = ((json['edges'] as List?) ?? const []).cast<Map<String, Object?>>();
+    if (strade.isEmpty) return null;
+    final v = strade.last['speed_limit'];
+    if (v is! num || v <= 0 || v > 200) return null;
+    return v.round();
+  }
+
   /// Perché gli ultimi limiti non sono arrivati (per le prove).
   String? ultimoErroreLimiti;
 
