@@ -44,6 +44,24 @@ void main() {
     expect(nord.riguarda(190), isFalse);
   });
 
+  test('i semafori con la foto: fissi, con la loro voce, e la direzione', () {
+    final a = ArchivioAutovelox.leggi(ArchivioAutovelox.scrivi(
+      [(45.46, 9.19, 50, 90.0)],
+      semafori: [(45.47, 9.19, 0.0)],
+    ));
+    expect(a.quanti, 2);
+    final s = a.vicini(const Punto(45.47, 9.19), 100).single;
+    expect(s.semaforo, isTrue);
+    expect(s.fissa, isTrue);
+    expect(s.tipo, TipoSegnalazione.autovelox);
+    expect(s.avviso, 'Semaforo con foto');
+    expect(s.riguarda(10), isTrue);
+    expect(s.riguarda(180), isFalse);
+    // L'archivio di prima, senza semafori, si legge ancora.
+    final v2 = ArchivioAutovelox.leggi('{"v":2,"generato":"2026-09-28T00:00:00Z","a":[[45,9,50,-1]],"t":[]}');
+    expect(v2.quanti, 1);
+  });
+
   test('i Tutor vanno e tornano, e si trovano da un capo o dall\'altro', () {
     final a = ArchivioAutovelox.leggi(ArchivioAutovelox.scrivi(
       [(45.46, 9.19, 50, 90.0)],
@@ -84,11 +102,16 @@ void main() {
       'n9 v1 dV c1 t2020-01-01T00:00:00Z i1 ugente T x13.0 y40.0001',
       'r13 v1 dV c1 t2020-01-01T00:00:00Z i1 ugente Ttype=enforcement,enforcement=average_speed Mn8@from,n9@to',
       // Un nome con la virgola, scritta come la scrive osmium.
+      // Un apparecchio col suo limite anche al semaforo: resta un autovelox.
       'r14 v1 dV c1 t2020-01-01T00:00:00Z i1 ugente Ttype=enforcement,enforcement=traffic_signals,name=A%2c%%20%B Mn1@device',
+      // Un semaforo con la foto: l'apparecchio, e da dove si arriva.
+      'n15 v1 dV c1 t2020-01-01T00:00:00Z i1 ugente Tman_made=surveillance x14.0 y38.0',
+      'n16 v1 dV c1 t2020-01-01T00:00:00Z i1 ugente T x14.0 y37.999',
+      'r15 v1 dV c1 t2020-01-01T00:00:00Z i1 ugente Ttype=enforcement,enforcement=traffic_signals Mn15@device,n16@from',
     ]) {
       e.leggi(riga);
     }
-    final (autovelox, tutor) = e.risolvi();
+    final (autovelox, tutor, semafori) = e.risolvi();
     expect(autovelox, hasLength(3));
     final controllo = autovelox.firstWhere((a) => a.$2 == 10.0);
     expect(controllo.$1, closeTo(44.0002, 1e-9), reason: 'il punto misurato, sulla strada');
@@ -98,7 +121,10 @@ void main() {
     expect(autovelox.firstWhere((a) => a.$2 == 11.0).$3, 70);
     expect(tutor.single.$5, 130);
     expect((tutor.single.$1, tutor.single.$3), (41.0, 41.1));
-    expect(e.relazioni.last.$1['name'], 'A, B');
+    expect(e.relazioni[e.relazioni.length - 2].$1['name'], 'A, B');
+    expect(semafori, hasLength(1));
+    expect((semafori.single.$1, semafori.single.$2), (38.0, 14.0));
+    expect(semafori.single.$3, closeTo(0, 1), reason: 'da sud a nord');
   });
 
   test('gli estratti della versione di prima, e i doppi al confine', () {

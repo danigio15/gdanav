@@ -156,7 +156,9 @@ class PonteAuto {
     try {
       _manda('immagini', {
         'png': {
-          for (final t in TipoSegnalazione.values) nomeIcona(t): await iconaSegnalazionePng(t),
+          // Le segnalazioni; gli autovelox col loro disegno (fisso, mobile,
+          // semaforo) e il cartello del limite accanto.
+          ...await iconeSegnalazioni(),
           // Il cartello della ZTL, per l'avviso.
           'segnala-ztl': await cartelloZtlPng(),
           // La punta della freccia di manovra sul percorso.
@@ -992,7 +994,8 @@ class PonteAuto {
       // cruscotto si rimanda anche senza posizioni nuove (i dati dell'auto
       // si rileggono ogni cinque secondi), e lì restava la velocità vecchia.
       'velocita': posizione.velocitaAdesso(),
-      'limite': guida.attiva ? a?.limiteKmh : null,
+      // In guida quello del percorso; senza, quello della strada di adesso.
+      'limite': guida.attiva ? a?.limiteKmh : posizione.limiteKmh,
       'arrivo_batteria': p == null || !elettrica ? null : guida.batteriaArrivo,
       // Il pedaggio che resta, breve («~12,40 €»), sulla barra dell'auto.
       if (guida.attiva)

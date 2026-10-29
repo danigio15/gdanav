@@ -23,14 +23,14 @@ class AvvisoSegnalazione extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(10, 10, 16, 10),
           child: Row(
             children: [
-              BollinoSegnalazione(segnalazione.tipo, lato: 44),
+              BollinoSegnalazione.di(segnalazione, lato: 44),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      segnalazione.fissa ? 'Autovelox fisso' : segnalazione.tipo.avviso,
+                      controlloDi(segnalazione)?.nome ?? segnalazione.tipo.avviso,
                       style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                     ),
                     Text(

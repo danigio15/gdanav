@@ -46,8 +46,19 @@ class GestorePosizione extends ChangeNotifier {
     required this.archivio,
     required this.letture,
     this.velocitaDellAuto,
+    Future<int?> Function(List<Punto> tracciato)? chiediLimite,
+    bool Function()? limiteSenzaGuida,
     DateTime Function()? orologio,
-  }) : _ora = orologio ?? DateTime.now;
+  }) : _ora = orologio ?? DateTime.now {
+    if (chiediLimite != null) {
+      _limite = LimiteDellaStrada(chiediLimite, attivo: limiteSenzaGuida, cambiato: notifyListeners);
+    }
+  }
+
+  /// Il limite della strada senza navigazione (in guida lo dà il percorso):
+  /// vedi [LimiteDellaStrada]. `null` se non si chiede, o non si sa.
+  LimiteDellaStrada? _limite;
+  int? get limiteKmh => _limite?.limiteKmh;
 
   final DateTime Function() _ora;
 
@@ -155,6 +166,7 @@ class GestorePosizione extends ChangeNotifier {
     qui = l.punto;
     lettoAlle = ora;
     velocitaKmh = dalGps;
+    _limite?.posizione(l.punto, velocitaMs: vaKmh / 3.6, alle: ora);
     notifyListeners();
   }
 

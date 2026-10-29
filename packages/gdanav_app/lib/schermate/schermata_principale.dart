@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
+import '../componenti/tachimetro.dart';
 import '../componenti/avvisi_in_guida.dart';
 import '../componenti/scheda_auto.dart';
 import '../componenti/vetro.dart';
@@ -890,6 +891,25 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                       right: 16,
                       bottom: schermo * 0.5 + 14,
                       child: BottoneSegnala(onTap: () => mostraSegnala(context, segnalazioni)),
+                    ),
+                  // Senza percorso, andando: la velocità e il limite della
+                  // strada, come in guida. Da fermi niente, la mappa è libera.
+                  if (libero)
+                    Positioned(
+                      left: 16,
+                      bottom: schermo * 0.5 + 14,
+                      child: ListenableBuilder(
+                        listenable: widget.posizione,
+                        builder: (context, _) {
+                          final v = widget.posizione.velocitaAdesso();
+                          if (v < 5) return const SizedBox.shrink();
+                          return Tachimetro(
+                            key: const Key('tachimetro-senza-percorso'),
+                            velocitaKmh: v,
+                            limiteKmh: widget.posizione.limiteKmh,
+                          );
+                        },
+                      ),
                     ),
                   Positioned.fill(
                     child: libero

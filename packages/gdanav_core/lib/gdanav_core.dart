@@ -18,6 +18,7 @@ export 'src/geo/geo.dart';
 export 'src/guida/energia_del_viaggio.dart';
 export 'src/guida/frasi_manovra.dart';
 export 'src/guida/guida.dart';
+export 'src/guida/limite_della_strada.dart';
 export 'src/guida/moto_fluido.dart';
 export 'src/guida/riepilogo.dart';
 export 'src/luoghi/google.dart';

@@ -32,6 +32,7 @@ class Segnalazione {
     this.fissa = false,
     this.limiteKmh,
     this.direzioneGradi,
+    this.semaforo = false,
   });
 
   final String id;
@@ -47,12 +48,20 @@ class Segnalazione {
   /// Il limite che controlla, se si sa.
   final int? limiteKmh;
 
+  /// Un semaforo con la foto (il «T-red»), fisso da OpenStreetMap: non
+  /// controlla la velocita', fotografa chi passa col rosso.
+  final bool semaforo;
+
   /// Verso dove guarda (gradi da nord), se si sa: si avvisa solo chi va in
   /// quella direzione.
   final double? direzioneGradi;
 
   /// Quello che dice la voce, prima di «tra 500 metri».
-  String get avviso => limiteKmh == null ? tipo.avviso : '${tipo.avviso}, limite $limiteKmh';
+  String get avviso => semaforo
+      ? 'Semaforo con foto'
+      : limiteKmh == null
+          ? tipo.avviso
+          : '${tipo.avviso}, limite $limiteKmh';
 
   /// Se riguarda chi va verso [rotta] (gradi da nord): senza direzione sì.
   bool riguarda(double rotta) {

@@ -370,10 +370,16 @@ class GestoreGuida extends ChangeNotifier {
 
   /// Un avviso: autovelox, segnalazioni, ZTL, limite. Si sente anche con la
   /// voce di guida spenta («Solo avvisi»); tace col silenzio, e quando
-  /// [quale] è scelto solo a schermo o spento.
+  /// [quale] è scelto solo a schermo o spento. Scelto col beep, un beep al
+  /// posto della frase.
   void annunciaAvviso(String frase, {Avviso? quale}) {
+    if (audio.senzaAvvisi) return;
+    if (quale != null && avvisi.colBeep(quale)) {
+      unawaited(voce.suona());
+      return;
+    }
     if (quale != null && !avvisi.aVoce(quale)) return;
-    if (!audio.senzaAvvisi) unawaited(voce.parla(frase));
+    unawaited(voce.parla(frase));
   }
 
   /// Il tasto dell'audio: Tutto → Solo avvisi → Silenzio → Tutto.

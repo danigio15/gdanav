@@ -8,7 +8,8 @@
 /// Dagli autovelox (`highway=speed_camera`) e dalle relazioni dei controlli
 /// (`type=enforcement`): `enforcement=maxspeed` aggiunge quelli segnati solo
 /// così, e dice verso dove guardano (da `from` a `to`); `average_speed` sono
-/// i Tutor, da `from` a `to`. `osmium tags-filter` si porta dietro i membri
+/// i Tutor, da `from` a `to`; `traffic_signals` i semafori con la foto (il
+/// «T-red»), all'apparecchio o al punto controllato. `osmium tags-filter` si porta dietro i membri
 /// delle relazioni, coi loro punti.
 ///
 /// Si leggono anche gli estratti in `.geojsonseq` della versione di prima
@@ -46,6 +47,7 @@ double? direzione(Object? v) {
 
 typedef Autovelox = (double, double, int?, double?);
 typedef Tutor = (double, double, double, double, int?);
+typedef Semaforo = (double, double, double?);
 
 /// Quello che serve di un estratto OPL: i punti, le strade (come elenco di
 /// punti) e le relazioni dei controlli.
@@ -105,10 +107,11 @@ class EstrattoOsm {
         ps.map((p) => p.lon).reduce((a, b) => a + b) / ps.length);
   }
 
-  /// Gli autovelox e i Tutor.
-  (List<Autovelox>, List<Tutor>) risolvi() {
+  /// Gli autovelox, i Tutor e i semafori con la foto.
+  (List<Autovelox>, List<Tutor>, List<Semaforo>) risolvi() {
     final autovelox = <Autovelox>[];
     final tutor = <Tutor>[];
+    final semafori = <Semaforo>[];
     // I punti già detti da una relazione: non si ripetono da soli.
     final usati = <int>{};
     for (final (tag, membri) in relazioni) {
@@ -146,13 +149,27 @@ class EstrattoOsm {
           _ => direzione(dispositivi.map((id) => punti[id]?.$2['direction']).nonNulls.firstOrNull),
         };
         autovelox.add((qui.lat, qui.lon, limiteDi(), verso));
+      } else if (quale == 'traffic_signals') {
+        // Un apparecchio col suo limite controlla anche la velocità: resta
+        // un autovelox, col cartello del limite.
+        if (dispositivi.any((id) => limite(punti[id]?.$2['maxspeed']) != null)) continue;
+        final dispositivo = dispositivi.map((id) => punti[id]?.$1).nonNulls.firstOrNull;
+        final da = primo('from'), a = primo('to');
+        final qui = dispositivo ?? a;
+        if (qui == null) continue;
+        usati.addAll(dispositivi);
+        final verso = switch ((da, a ?? dispositivo)) {
+          (final x?, final y?) when distanzaM(x, y) >= 10 => rottaGradi(x, y),
+          _ => direzione(dispositivi.map((id) => punti[id]?.$2['direction']).nonNulls.firstOrNull),
+        };
+        semafori.add((qui.lat, qui.lon, verso));
       }
     }
     for (final MapEntry(key: id, value: (p, tag)) in punti.entries) {
       if (tag['highway'] != 'speed_camera' || usati.contains(id)) continue;
       autovelox.add((p.lat, p.lon, limite(tag['maxspeed']), direzione(tag['direction'])));
     }
-    return (autovelox, tutor);
+    return (autovelox, tutor, semafori);
   }
 }
 
@@ -181,6 +198,7 @@ List<Autovelox> senzaDoppi(List<Autovelox> tutti) {
 Future<void> main(List<String> argomenti) async {
   final autovelox = <Autovelox>[];
   final tutor = <Tutor>[];
+  final semafori = <Semaforo>[];
   for (final percorso in argomenti.skip(1)) {
     final righe = File(percorso).openRead().transform(utf8.decoder).transform(const LineSplitter());
     if (percorso.endsWith('.opl')) {
@@ -188,9 +206,10 @@ Future<void> main(List<String> argomenti) async {
       await for (final riga in righe) {
         estratto.leggi(riga);
       }
-      final (a, t) = estratto.risolvi();
+      final (a, t, s) = estratto.risolvi();
       autovelox.addAll(a);
       tutor.addAll(t);
+      semafori.addAll(s);
     } else {
       await for (final riga in righe) {
         if (daGeojson(riga) case final a?) autovelox.add(a);
@@ -203,12 +222,18 @@ Future<void> main(List<String> argomenti) async {
     for (final t in tutor)
       if (visti.add([t.$1, t.$2, t.$3, t.$4].map((v) => v.toStringAsFixed(4)).join(','))) t,
   ];
-  final testo = ArchivioAutovelox.scrivi(tutti, tutor: tratti);
+  final vistiSemafori = <String>{};
+  final tuttiISemafori = [
+    for (final s in semafori)
+      if (vistiSemafori.add('${s.$1.toStringAsFixed(5)},${s.$2.toStringAsFixed(5)}')) s,
+  ];
+  final testo = ArchivioAutovelox.scrivi(tutti, tutor: tratti, semafori: tuttiISemafori);
   await File(argomenti.first).writeAsString(testo);
   final conLimite = tutti.where((a) => a.$3 != null).length;
   final conDirezione = tutti.where((a) => a.$4 != null).length;
   stdout.writeln('::notice title=Autovelox::${tutti.length} fissi, $conLimite col limite, '
-      '$conDirezione con la direzione, ${tratti.length} Tutor, ${testo.length ~/ 1024} kB');
+      '$conDirezione con la direzione, ${tratti.length} Tutor, ${tuttiISemafori.length} semafori con la foto, '
+      '${testo.length ~/ 1024} kB');
   if (tutti.length < 100) {
     stdout.writeln('::error title=Autovelox::troppo pochi, qualcosa non va');
     exitCode = 1;

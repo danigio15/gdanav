@@ -88,7 +88,7 @@ final class PannelloCarPlay: UIView {
     private func pedaggio(_ a: CGRect, _ tachimetro: CGRect?, _ c: CruscottoAuto) {
         guard let t = c.pedaggio else { return }
         let margine = dp(10)
-        let h = dp(54)
+        let h = tachimetro?.height ?? dp(54)
         let p = dp(16)
         let valore = font(20, colore: UIColor(red: 1, green: 207 / 255, blue: 112 / 255, alpha: 1))
         let etichetta = font(14, grassetto: false, colore: muto)
@@ -263,8 +263,9 @@ final class PannelloCarPlay: UIView {
     /// destra dell'area libera se la scheda è a sinistra, se no a sinistra.
     private func velocitaPiccola(_ a: CGRect, _ c: CruscottoAuto, aDestra: Bool, margine: CGFloat) -> CGRect? {
         guard let v = c.velocita else { return nil }
-        let r: CGFloat = 15
-        let rLimite: CGFloat = 13
+        // Un poco più grandi anche qui: lo schermo è piccolo, ma si legge.
+        let r: CGFloat = 21
+        let rLimite: CGFloat = 19
         let p: CGFloat = 4
         let w = r * 2 + p * 2
         let h = p + r * 2 + (c.limite != nil ? 4 + rLimite * 2 : 0) + p
@@ -277,10 +278,10 @@ final class PannelloCarPlay: UIView {
         (oltre ? UIColor(red: 229 / 255, green: 57 / 255, blue: 53 / 255, alpha: 1) : .white).setFill()
         UIBezierPath(ovalIn: CGRect(x: box.midX - r, y: cy - r, width: r * 2, height: r * 2)).fill()
         let colore: UIColor = oltre ? .white : UIColor(red: 32 / 255, green: 38 / 255, blue: 51 / 255, alpha: 1)
-        let numero: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 14, weight: .bold), .foregroundColor: colore]
-        let unita: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 6.5, weight: .bold), .foregroundColor: colore]
-        centrato("\(Int(v.rounded()))", box.midX, cy + 3, numero)
-        centrato("km/h", box.midX, cy + 11, unita)
+        let numero: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 20, weight: .bold), .foregroundColor: colore]
+        let unita: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 8.5, weight: .bold), .foregroundColor: colore]
+        centrato("\(Int(v.rounded()))", box.midX, cy + 5, numero)
+        centrato("km/h", box.midX, cy + 15, unita)
         if let l = c.limite { cartello(box.midX, cy + r + 4 + rLimite, rLimite, l) }
         return box
     }
@@ -292,18 +293,21 @@ final class PannelloCarPlay: UIView {
     /// scheda dei tempi di CarPlay. Restituisce dove sta.
     private func velocita(_ a: CGRect, _ c: CruscottoAuto) -> CGRect? {
         guard let v = c.velocita else { return nil }
+        // Dal campo: «troppo piccoli, su TomTom e Maps sono più grandi».
+        // Quasi il doppio dove c'è posto, un terzo in più sugli schermi bassi.
+        let k: CGFloat = a.height >= dp(320) ? 1.7 : 1.35
         let margine = dp(10)
-        let h = dp(54)
-        let r = dp(22)
+        let h = dp(54) * k
+        let r = dp(22) * k
         let basso = a.maxY - margine
         let cy = basso - h / 2
-        var x = a.minX + margine + dp(5)
+        var x = a.minX + margine + dp(5) * k
         let cxVelocita = x + r
-        x += r * 2 + dp(6)
+        x += r * 2 + dp(6) * k
         var cxLimite: CGFloat?
         if c.limite != nil {
             cxLimite = x + r * 0.9
-            x += r * 1.8 + dp(5)
+            x += r * 1.8 + dp(5) * k
         }
         let box = CGRect(x: a.minX + margine, y: basso - h, width: x - a.minX - margine + dp(4), height: h)
         fondoScheda.setFill()
@@ -313,8 +317,8 @@ final class PannelloCarPlay: UIView {
         (oltre ? UIColor(red: 229 / 255, green: 57 / 255, blue: 53 / 255, alpha: 1) : .white).setFill()
         UIBezierPath(ovalIn: CGRect(x: cxVelocita - r, y: cy - r, width: r * 2, height: r * 2)).fill()
         let colore: UIColor = oltre ? .white : UIColor(red: 32 / 255, green: 38 / 255, blue: 51 / 255, alpha: 1)
-        centrato("\(Int(v.rounded()))", cxVelocita, cy + dp(4), font(19, colore: colore))
-        centrato("km/h", cxVelocita, cy + dp(15), font(8.5, colore: colore))
+        centrato("\(Int(v.rounded()))", cxVelocita, cy + dp(4) * k, font(19 * k, colore: colore))
+        centrato("km/h", cxVelocita, cy + dp(15) * k, font(8.5 * k, colore: colore))
         return box
     }
 
