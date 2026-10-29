@@ -131,4 +131,25 @@ void main() {
     expect(larghezza[1], ['exponential', 2]);
     expect(larghezza[4], closeTo(14 * pixelPerMetro(12), 1e-9));
   });
+  test("nell'immersiva il traffico sta sopra il percorso, stretto come la coda", () {
+    // «Nella visuale immersiva non si vede il traffico: la linea è sovrapposta
+    // da quella del percorso.»
+    List<Map> strati(bool immersiva) =>
+        (stileMappa(scuro: false, chiaveTraffico: 'CHIAVE', immersiva: immersiva)['layers']! as List).cast<Map>();
+    List<String> idDi(List<Map> s) => [for (final l in s) l['id'] as String];
+    final normale = idDi(strati(false)), immersivo = idDi(strati(true));
+    for (final id in [stratoTraffico, stratoTrafficoLocale]) {
+      // Nelle altre viste resta sotto, con le strade.
+      expect(normale.indexOf(id), lessThan(normale.indexOf('percorso-bordo')));
+      // Nell'immersiva sopra la linea, sotto le code del percorso e le frecce.
+      expect(immersivo.where((x) => x == id), hasLength(1));
+      expect(immersivo.indexOf(id), greaterThan(immersivo.indexOf('percorso')));
+      expect(immersivo.indexOf(id), lessThan(immersivo.indexOf('code')));
+      expect(immersivo.indexOf(id), lessThan(immersivo.indexOf('percorso-frecce')));
+      // Stretto come la striscia della coda: ai lati resta il celeste.
+      final larghezza = (strati(true).singleWhere((l) => l['id'] == id)['paint'] as Map)['line-width'] as List;
+      expect(larghezza[4], larghezzaCoda.$1);
+      expect(larghezza[6], larghezzaCoda.$2);
+    }
+  });
 }

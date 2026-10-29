@@ -635,7 +635,8 @@ Map<String, Object> stileMappa({
       // rosso se quasi fermi; da lontano solo sulle strade principali.
       // Sull'auto più spesse: lo schermo si guarda da un braccio di
       // distanza, di sfuggita, e la mappa è sempre vicina.
-      if (traffico.isNotEmpty) ...[
+      // Nella vista immersiva no: sta sopra il percorso (più giù).
+      if (traffico.isNotEmpty && !immersiva) ...[
         _coda(stratoTraffico, principali: true, minzoom: 7, spessore: perAuto ? 1.6 : 1),
         _coda(stratoTrafficoLocale, principali: false, minzoom: 13, spessore: perAuto ? 1.6 : 1),
       ],
@@ -900,6 +901,22 @@ Map<String, Object> stileMappa({
         'layout': {'line-cap': 'round', 'line-join': 'round'},
         'paint': {'line-color': t.percorso, 'line-width': _largo(larghezzaPercorso.$1, larghezzaPercorso.$2)},
       },
+      /* «Nella visuale immersiva non si vede il traffico: la linea è
+       * sovrapposta da quella del percorso.» Da vicino la strada propria è
+       * quasi tutta coperta dal percorso, e il traffico di TomTom (5 px in
+       * mezzo alla strada) ci finiva sotto. Nell'immersiva si disegna sopra
+       * il percorso, stretto come la striscia della coda: sulla propria
+       * strada un rallentamento si vede in mezzo alla linea, col celeste ai
+       * lati; sulle altre resta in mezzo alla strada, che in metri è larga. */
+      if (traffico.isNotEmpty && immersiva) ...[
+        _coda(stratoTraffico, principali: true, minzoom: 7, larghezza: _largo(larghezzaCoda.$1, larghezzaCoda.$2)),
+        _coda(
+          stratoTrafficoLocale,
+          principali: false,
+          minzoom: 13,
+          larghezza: _largo(larghezzaCoda.$1, larghezzaCoda.$2),
+        ),
+      ],
       // Le code di adesso dentro il percorso: dal giallo (rallenta) al rosso
       // (fermo), bordeaux se è chiusa. Sopra la linea, sotto le frecce.
       {
@@ -1643,7 +1660,14 @@ List<Object> _eUnaGrande() => [
 
 /// Le strade dove TomTom misura una coda: sotto 0,6 si rallenta, sotto 0,3 si
 /// è fermi.
-Map<String, Object> _coda(String id, {required bool principali, required double minzoom, double spessore = 1}) {
+/// [larghezza], se c'è, al posto di quella che cresce con [spessore].
+Map<String, Object> _coda(
+  String id, {
+  required bool principali,
+  required double minzoom,
+  double spessore = 1,
+  List<Object>? larghezza,
+}) {
   return {
     'id': id,
     'type': 'line',
@@ -1658,17 +1682,19 @@ Map<String, Object> _coda(String id, {required bool principali, required double 
     'layout': {'line-cap': 'round', 'line-join': 'round'},
     'paint': {
       'line-color': ['step', _quantoSiVaPiano(), '#E5302A', 0.3, '#F5A623'],
-      'line-width': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        7,
-        1.2 * spessore,
-        12,
-        2.5 * spessore,
-        16,
-        5 * spessore,
-      ],
+      'line-width':
+          larghezza ??
+          [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            7,
+            1.2 * spessore,
+            12,
+            2.5 * spessore,
+            16,
+            5 * spessore,
+          ],
       'line-opacity': 0.9,
     },
   };
