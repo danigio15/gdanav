@@ -465,8 +465,9 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
    * freccia sta dove si è, non dove si era. Da fermi un fotogramma solo,
    * poi niente fino alla lettura dopo. */
 
-  /// Quanto è vecchia una lettura quando arriva, a occhio: come in guida.
-  static const _anticipoLibero = Duration(milliseconds: 300);
+  /// Quanto è vecchia una lettura quando arriva, a occhio: come in guida
+  /// ([GestoreGuida.anticipo]), il disegno più il ritardo del GPS.
+  static const _anticipoLibero = GestoreGuida.anticipo;
 
   final _motoLibero = MotoFluido();
 
