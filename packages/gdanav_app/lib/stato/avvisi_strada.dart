@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/foundation.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -30,15 +28,11 @@ class AvvisiStrada extends ChangeNotifier {
   final GestoreGuida guida;
   final GestoreSegnalazioni segnalazioni;
 
-  /// Quanto prima si avvisa, almeno.
-  static const avvisoM = 800.0;
-
-  /// E quanti secondi prima, andando forte: a 130 all'ora più di un
-  /// chilometro.
-  static const avvisoSecondi = 30;
-
-  /// Mai più di così.
-  static const avvisoMassimoM = 1500.0;
+  /// Quanto prima si avvisa, alla velocità di adesso, sulla strada col
+  /// limite [limiteKmh] (se si sa): una quindicina di secondi in città (mai
+  /// più di 300 m), venti fuori (300–600 m), trenta in autostrada
+  /// (600–1200 m). Vedi [distanzaAvvisoM].
+  static double avvisoAlla(double kmh, {int? limiteKmh}) => distanzaAvvisoM(kmh, limiteKmh: limiteKmh);
 
   /// Sopra il limite dell'autovelox di tanto, «rallenta».
   static const oltreKmh = 3;
@@ -48,9 +42,6 @@ class AvvisiStrada extends ChangeNotifier {
 
   /// Senza percorso si avvisa solo in macchina: sopra questa velocità.
   static const senzaPercorsoDaKmh = 25.0;
-
-  /// Quanto prima si avvisa, alla velocità di adesso.
-  static double avvisoAlla(double kmh) => (kmh / 3.6 * avvisoSecondi).clamp(avvisoM, avvisoMassimoM);
 
   /// La prossima davanti, entro l'avviso, con i metri che mancano.
   (Segnalazione, double)? davanti;
@@ -84,7 +75,7 @@ class AvvisiStrada extends ChangeNotifier {
         _linea = Linea(punti);
       }
       final linea = _linea!;
-      (primo, dietro) = _sulPercorso(linea, a.percorsiM, tutte);
+      (primo, dietro) = _sulPercorso(linea, a.percorsiM, a.limiteKmh, tutte);
       nuovoTutor = _tutor(linea, a.percorsiM);
     } else if (!guida.attiva) {
       primo = _senzaPercorso(tutte);
@@ -102,45 +93,41 @@ class AvvisiStrada extends ChangeNotifier {
   }
 
   /// Sul percorso: la prima davanti entro l'avviso, e quella appena passata.
-  ((Segnalazione, double)?, Segnalazione?) _sulPercorso(Linea linea, double percorsiM, List<Segnalazione> tutte) {
-    final entro = avvisoAlla(_kmh);
+  /// Conta la distanza lungo il percorso, non in linea d'aria: vedi
+  /// [sulPercorso].
+  ((Segnalazione, double)?, Segnalazione?) _sulPercorso(
+    Linea linea,
+    double percorsiM,
+    int? limiteKmh,
+    List<Segnalazione> tutte,
+  ) {
+    final entro = avvisoAlla(_kmh, limiteKmh: limiteKmh);
+    final percorso = guida.pronto?.viaggio.percorso;
     (Segnalazione, double)? primo;
     Segnalazione? dietro;
     for (final s in tutte) {
       // Gli avvisi scelti spenti non si mostrano e non si dicono.
       if (guida.avvisi.spento(Avviso.diSegnalazione(s.tipo))) continue;
-      final p = linea.proietta(s.punto);
-      // Un autovelox fisso sta sul bordo della strada: più vicino, e solo
-      // se guarda chi va nella nostra direzione (non l'altra carreggiata).
-      if (p.lontanoM > (s.fissa ? 30 : 40)) continue;
-      if (s.fissa) {
-        final i = p.segmento.clamp(0, linea.punti.length - 2);
-        if (!s.riguarda(rottaGradi(linea.punti[i], linea.punti[i + 1]))) continue;
-      }
-      final avanti = p.lungoM - percorsiM;
-      if (avanti > 0 && avanti <= entro && (primo == null || avanti < primo.$2)) primo = (s, avanti);
-      if (!s.fissa && avanti <= 0 && avanti > -250 && !_chieste.contains(s.id)) dietro = s;
+      final avanti = sulPercorso(linea, percorsiM, s, finoM: entro, limiteSul: percorso?.limiteSul);
+      if (avanti == null) continue;
+      if (avanti > 0 && (primo == null || avanti < primo.$2)) primo = (s, avanti);
+      if (!s.fissa && avanti <= 0 && !_chieste.contains(s.id)) dietro = s;
     }
     return (primo, dietro);
   }
 
   /// Senza percorso: quelle che si hanno davanti, nella direzione in cui si
-  /// va, a meno di una trentina di metri dalla linea dritta. Su una curva se
-  /// ne perde qualcuna, mai se ne inventa.
+  /// va, in una striscia stretta lungo la linea dritta. Su una curva se ne
+  /// perde qualcuna, mai se ne inventa. Vedi [davantiSenzaPercorso].
   (Segnalazione, double)? _senzaPercorso(List<Segnalazione> tutte) {
     final p = segnalazioni.posizione, qui = p.qui;
     if (qui == null || !p.rottaConosciuta || _kmh < senzaPercorsoDaKmh) return null;
-    final rotta = p.rotta, entro = avvisoAlla(_kmh);
+    final limite = p.limiteKmh, entro = avvisoAlla(_kmh, limiteKmh: limite);
     (Segnalazione, double)? primo;
     for (final s in tutte) {
       if (guida.avvisi.spento(Avviso.diSegnalazione(s.tipo))) continue;
-      final d = distanzaM(qui, s.punto);
-      if (d > entro || d < 5) continue;
-      final angolo = (rottaGradi(qui, s.punto) - rotta) * math.pi / 180;
-      final avanti = d * math.cos(angolo), accanto = (d * math.sin(angolo)).abs();
-      if (avanti <= 0 || accanto > (s.fissa ? 30 : 40)) continue;
-      if (s.fissa && !s.riguarda(rotta)) continue;
-      if (primo == null || avanti < primo.$2) primo = (s, avanti);
+      final avanti = davantiSenzaPercorso(qui, p.rotta, s, finoM: entro, limiteStradaKmh: limite);
+      if (avanti != null && (primo == null || avanti < primo.$2)) primo = (s, avanti);
     }
     return primo;
   }

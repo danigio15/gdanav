@@ -158,7 +158,7 @@ void main() {
     a.guida.avvisi.scegli(Avviso.incidente, ComeAvvisare.schermo);
     await tester.tap(find.text('Avvia'));
     await tester.pumpAndSettle();
-    a.posizioni.add(Punto(punti[4].lat + 0.003, punti[4].lon)); // ~700 m prima
+    a.posizioni.add(Punto(punti[4].lat + 0.0078, punti[4].lon)); // ~130 m prima: in città si avvisa poco prima
     await aspetta(tester);
     expect(find.text('Incidente segnalato'), findsOneWidget);
     expect(a.voce.frasi.where((f) => f.startsWith('Incidente')), isEmpty);
@@ -212,7 +212,7 @@ void main() {
     await aspetta(tester, 60);
     await tester.tap(find.text('Avvia'));
     await tester.pumpAndSettle();
-    a.posizioni.add(Punto(punti[4].lat + 0.003, punti[4].lon));
+    a.posizioni.add(Punto(punti[4].lat + 0.0078, punti[4].lon));
     await aspetta(tester);
 
     String mappa() {
