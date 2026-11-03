@@ -1,0 +1,13 @@
+09:28:17 inizio
+google/sdk_gphone64_x86_64/emu64xa:14/UE1A.230829.036.A4/12096271:user/release-keys
+GdANav: it.gdanav.gdanav.prova
+--- Android Auto nel telefono?
+package:com.android.carrierconfig.auto_generated_rro_vendor__
+package:com.android.carrierconfig.auto_generated_rro_product__
+package:com.android.carrierdefaultapp
+package:com.google.android.projection.gearhead
+package:com.android.carrierconfig
+    versionName=1.2.531830-stub
+    User 0: ceDataInode=319502 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false
+Starting service: Intent { cmp=com.google.android.projection.gearhead/.headunit.HeadUnitServerService }
+Error: Not found; no service started.
