@@ -11,6 +11,9 @@ set -uo pipefail
 
 nome="$1"
 app="$2"
+# La stessa app com'è uscita da flutter, senza la firma ad hoc: se quella
+# firmata non parte, si prova questa, per capire se è colpa della firma.
+originale="${4:-}"
 out="$3"
 mkdir -p "$out"
 qui="$(cd "$(dirname "$0")" && pwd)"
@@ -22,8 +25,10 @@ udid="$(xcrun simctl list devices available -j | python3 -c '
 import json, sys
 d = json.load(sys.stdin)["devices"]
 tutti = [(k, x) for k, v in d.items() if "iOS" in k for x in v if x["name"].startswith("iPhone")]
-tutti.sort(key=lambda kx: kx[0])
-print(tutti[-1][1]["udid"])
+ultimo = max(k for k, _ in tutti)
+nuovi = [x for k, x in tutti if k == ultimo]
+pro = [x for x in nuovi if "Pro" in x["name"] and "Max" not in x["name"]]
+print((pro or nuovi)[0]["udid"])
 ')"
 echo "iPhone: $udid"
 xcrun simctl boot "$udid" 2>/dev/null || true
@@ -36,8 +41,45 @@ xcrun simctl install "$udid" "$app"
 xcrun simctl privacy "$udid" grant location-always "$pacchetto" || true
 xcrun simctl privacy "$udid" grant location "$pacchetto" || true
 xcrun simctl location "$udid" set 42.478,12.39 || true
-xcrun simctl launch "$udid" "$pacchetto"
-sleep 20
+# Perché un'app non è partita: il rapporto del crash, in breve.
+crash() {
+  echo "--- crash di Runner"
+  for f in ~/Library/Logs/DiagnosticReports/Runner*.ips; do
+    [ -f "$f" ] || continue
+    echo "$f"
+    python3 - "$f" <<'PY' || head -c 3000 "$f"
+import json, sys
+testo = open(sys.argv[1]).read()
+corpo = json.loads(testo.split("\n", 1)[1])
+print("eccezione:", corpo.get("exception"))
+print("termine:", corpo.get("termination"))
+print("asl:", corpo.get("asi"))
+fili = corpo.get("threads", [])
+immagini = corpo.get("usedImages", [])
+for t in fili:
+    if not t.get("triggered"):
+        continue
+    for fr in t.get("frames", [])[:25]:
+        nome = immagini[fr["imageIndex"]].get("name", "?") if fr.get("imageIndex", -1) < len(immagini) else "?"
+        print("  ", nome, fr.get("symbol", ""), fr.get("symbolLocation", ""))
+PY
+    rm -f "$f"
+  done
+}
+parte() {
+  xcrun simctl launch "$udid" "$pacchetto" && sleep 15 && xcrun simctl spawn "$udid" launchctl list | grep -q "$pacchetto"
+}
+if ! parte; then
+  echo "::warning::GdANav firmata ad hoc non parte"
+  crash
+  if [ -n "$originale" ]; then
+    xcrun simctl uninstall "$udid" "$pacchetto" || true
+    xcrun simctl install "$udid" "$originale"
+    xcrun simctl privacy "$udid" grant location-always "$pacchetto" || true
+    parte || { echo "::warning::neanche quella di flutter parte"; crash; }
+  fi
+fi
+sleep 10
 xcrun simctl io "$udid" screenshot "$out/$nome-telefono.png"
 
 # Lo schermo CarPlay: Simulator › I/O › External Displays › CarPlay. Si
@@ -103,4 +145,5 @@ xcrun simctl io "$udid" screenshot --display=external "$out/$nome-carplay-guida-
 xcrun simctl io "$udid" screenshot "$out/$nome-telefono-guida.png" || true
 xcrun simctl spawn "$udid" log show --last 3m --predicate 'process == "Runner"' --style compact \
   >"$out/$nome-log.txt" 2>&1 || true
+crash
 ls -la "$out"

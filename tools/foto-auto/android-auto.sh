@@ -16,21 +16,24 @@ apk="$2"
 out="$3"
 mkdir -p "$out"
 rapporto="$out/$nome-android-auto.txt"
+# Nessun comando di adb resta appeso per sempre.
+a() { timeout 240 adb "$@"; }
+echo "$(date -u +%T) inizio" >"$rapporto"
 
-adb wait-for-device
-adb shell getprop ro.build.fingerprint | tee "$rapporto"
-adb install -r -g "$apk"
-pacchetto="$(adb shell pm list packages | tr -d '\r' | sed -n 's/^package://p' | grep '^it\.gdanav\.gdanav' | head -1)"
+timeout 600 adb wait-for-device
+a shell getprop ro.build.fingerprint | tee -a "$rapporto"
+a install -r -g "$apk"
+pacchetto="$(a shell pm list packages | tr -d '\r' | sed -n 's/^package://p' | grep '^it\.gdanav\.gdanav' | head -1)"
 echo "GdANav: $pacchetto" | tee -a "$rapporto"
-adb shell pm grant "$pacchetto" android.permission.ACCESS_FINE_LOCATION || true
-adb emu geo fix 12.39 42.478 || true
-adb shell monkey -p "$pacchetto" -c android.intent.category.LAUNCHER 1
+a shell pm grant "$pacchetto" android.permission.ACCESS_FINE_LOCATION || true
+a emu geo fix 12.39 42.478 || true
+a shell monkey -p "$pacchetto" -c android.intent.category.LAUNCHER 1
 sleep 30
-adb exec-out screencap -p >"$out/$nome-telefono.png"
+a exec-out screencap -p >"$out/$nome-telefono.png"
 
 echo "--- Android Auto nel telefono?" | tee -a "$rapporto"
-adb shell pm list packages | tr -d '\r' | grep -i -E 'gearhead|projection|android\.car|templates' | tee -a "$rapporto" || true
-if ! adb shell pm list packages | grep -q com.google.android.projection.gearhead; then
+a shell pm list packages | tr -d '\r' | grep -i -E 'gearhead|projection|android\.car|templates' | tee -a "$rapporto" || true
+if ! a shell pm list packages | grep -q com.google.android.projection.gearhead; then
   {
     echo "NO: com.google.android.projection.gearhead (Android Auto) non c'è in questa immagine dell'emulatore."
     echo "La DHU mostra solo quello che manda Android Auto del telefono: senza, niente schermo dell'auto."
@@ -40,19 +43,21 @@ if ! adb shell pm list packages | grep -q com.google.android.projection.gearhead
 fi
 
 # C'è: il server della head unit e la DHU.
-adb shell dumpsys package com.google.android.projection.gearhead | grep -E 'versionName|enabled=' | head -5 | tee -a "$rapporto"
-adb shell am start-foreground-service -n com.google.android.projection.gearhead/.headunit.HeadUnitServerService \
+a shell dumpsys package com.google.android.projection.gearhead | grep -E 'versionName|enabled=' | head -5 | tee -a "$rapporto"
+a shell am start-foreground-service -n com.google.android.projection.gearhead/.headunit.HeadUnitServerService \
   2>&1 | tee -a "$rapporto" || true
-adb forward tcp:5277 tcp:5277
+a forward tcp:5277 tcp:5277
 dhu="$ANDROID_SDK_ROOT/extras/google/auto/desktop-head-unit"
 if [ ! -x "$dhu" ]; then
   echo "NO: la DHU non c'è in $dhu" | tee -a "$rapporto"
   exit 0
 fi
 export DISPLAY=:99
-(Xvfb :99 -screen 0 1920x1080x24 &)
+(Xvfb :99 -screen 0 1920x1080x24 >/dev/null 2>&1 &)
 sleep 3
 ("$dhu" >"$out/$nome-dhu.txt" 2>&1 &)
 sleep 40
 import -window root "$out/$nome-android-auto.png" || true
-adb exec-out screencap -p >"$out/$nome-telefono-dopo.png"
+a exec-out screencap -p >"$out/$nome-telefono-dopo.png"
+pkill -f desktop-head-unit || true
+pkill Xvfb || true

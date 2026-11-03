@@ -21,8 +21,9 @@ concurrency:
   group: foto-auto-${{ github.ref }}
   cancel-in-progress: true
 
+# Scrivere serve solo a consegnare le foto su refs/foto-auto/* (consegna.sh).
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   carplay:
@@ -58,16 +59,21 @@ jobs:
       - name: Firma ad hoc col permesso di CarPlay
         run: |
           app=build/ios/iphonesimulator/Runner.app
+          cp -R "$app" build/ios/iphonesimulator/Runner-flutter.app
           codesign --force --sign - --entitlements ios/Runner/RunnerCarPlay.entitlements "$app"
-          codesign -d --entitlements - "$app" 2>&1 | tail -5
+          codesign -d --entitlements - "$app" 2>&1 | grep -i carplay
+          codesign --verify --deep --strict "$app" && echo "firma valida"
       - name: Le foto
-        run: ../tools/foto-auto/carplay.sh ${{ matrix.dimostrazione }} build/ios/iphonesimulator/Runner.app "$GITHUB_WORKSPACE/foto"
+        run: ../tools/foto-auto/carplay.sh ${{ matrix.dimostrazione }} build/ios/iphonesimulator/Runner.app "$GITHUB_WORKSPACE/foto" build/ios/iphonesimulator/Runner-flutter.app
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: carplay-${{ matrix.dimostrazione }}
           path: foto
           if-no-files-found: warn
+      - name: Le foto anche fuori dagli artefatti
+        if: always()
+        run: ../tools/foto-auto/consegna.sh "$GITHUB_WORKSPACE/foto" "${{ github.run_id }}-carplay-${{ matrix.dimostrazione }}"
 
   android-auto:
     runs-on: ubuntu-latest
@@ -104,6 +110,8 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 30
+        continue-on-error: true
         with:
           api-level: 34
           target: google_apis_playstore
@@ -117,3 +125,6 @@ jobs:
           name: android-auto-${{ matrix.dimostrazione }}
           path: foto
           if-no-files-found: warn
+      - name: Le foto anche fuori dagli artefatti
+        if: always()
+        run: tools/foto-auto/consegna.sh "$GITHUB_WORKSPACE/foto" "${{ github.run_id }}-android-auto-${{ matrix.dimostrazione }}"
