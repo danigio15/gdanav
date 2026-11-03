@@ -42,8 +42,18 @@ if ! a shell pm list packages | grep -q com.google.android.projection.gearhead; 
   exit 0
 fi
 
-# C'è: il server della head unit e la DHU.
-a shell dumpsys package com.google.android.projection.gearhead | grep -E 'versionName|enabled=' | head -5 | tee -a "$rapporto"
+# C'è, ma nelle immagini dell'emulatore è solo il «segnaposto» (versione
+# «-stub»): l'app vera arriva dal Play Store, con un account Google.
+versione="$(a shell dumpsys package com.google.android.projection.gearhead | tr -d '\r' | sed -n 's/.*versionName=//p' | head -1)"
+echo "Android Auto: $versione" | tee -a "$rapporto"
+if [[ "$versione" == *stub* ]]; then
+  {
+    echo "NO: Android Auto nell'emulatore è il segnaposto ($versione), senza la proiezione."
+    echo "La DHU si collega ma nessuno le risponde («Failed to read from transport»)."
+    echo "Serve l'app vera dal Play Store (account Google) o un telefono vero collegato."
+  } | tee -a "$rapporto"
+  echo "::warning::Android Auto nell'emulatore è solo il segnaposto ($versione)"
+fi
 a shell am start-foreground-service -n com.google.android.projection.gearhead/.headunit.HeadUnitServerService \
   2>&1 | tee -a "$rapporto" || true
 a forward tcp:5277 tcp:5277

@@ -102,41 +102,54 @@ xcrun simctl io "$udid" screenshot --display=external "$out/$nome-carplay-casa.p
 # L'icona di GdANav sulla schermata di CarPlay: la si cerca per la scritta e
 # la si tocca. Prima sulla foto di tutto il Mac (punti dello schermo), poi
 # sulla foto di CarPlay riportata sulla sua finestra.
+# Dove sta la finestra di CarPlay sul Mac: «x y larghezza altezza».
+finestra() {
+  osascript -e 'tell application "Simulator" to activate' -e 'tell application "System Events" to tell process "Simulator"
+    repeat with w in windows
+      if name of w contains "CarPlay" then
+        perform action "AXRaise" of w
+        set p to position of w
+        set s to size of w
+        return ((item 1 of p) as text) & " " & ((item 2 of p) as text) & " " & ((item 1 of s) as text) & " " & ((item 2 of s) as text)
+      end if
+    end repeat
+  end tell'
+}
+# Ancora sulla schermata delle app di CarPlay?
+acasa() {
+  xcrun simctl io "$udid" screenshot --display=external "$out/.prova.png" >/dev/null 2>&1
+  tocca trova "$out/.prova.png" "Now Playing" >/dev/null 2>&1
+}
 apri() {
-  if xy="$(tocca trova "$out/$nome-mac-1.png" GdANav)"; then
-    read -r fx fy <<<"$xy"
-    read -r lw lh <<<"$(tocca schermo)"
-    x="$(python3 -c "print($fx*$lw)")"
-    y="$(python3 -c "print($fy*$lh)")"
-    echo "GdANav sul Mac in $x,$y"
-    tocca clic "$x" "$y"
-    return 0
-  fi
-  if xy="$(tocca trova "$out/$nome-carplay-casa.png" GdANav)"; then
-    read -r fx fy <<<"$xy"
-    finestra="$(osascript -e 'tell application "System Events" to tell process "Simulator"
-      repeat with w in windows
-        if name of w contains "CarPlay" then
-          set p to position of w
-          set s to size of w
-          return ((item 1 of p) as text) & " " & ((item 2 of p) as text) & " " & ((item 1 of s) as text) & " " & ((item 2 of s) as text)
-        end if
-      end repeat
-    end tell' || true)"
-    echo "finestra CarPlay: $finestra"
-    [ -n "$finestra" ] || return 1
-    read -r wx wy ww wh <<<"$finestra"
-    # La barra del titolo in alto, alta 28 punti.
-    x="$(python3 -c "print($wx + $fx*$ww)")"
-    y="$(python3 -c "print($wy + 28 + $fy*($wh-28))")"
-    echo "GdANav nella finestra CarPlay in $x,$y"
-    tocca clic "$x" "$y"
-    osascript -e "tell application \"System Events\" to click at {$x, $y}" || true
-    return 0
-  fi
+  xy="$(tocca trova "$out/$nome-carplay-casa.png" GdANav)" || return 1
+  read -r fx fy <<<"$xy"
+  f="$(finestra)" || return 1
+  echo "finestra CarPlay: $f"
+  read -r wx wy ww wh <<<"$f"
+  # Lo schermo di CarPlay è 800×480: alto 0,6 della larghezza; sopra, la
+  # barra del titolo. L'icona sta sopra la scritta, di 0,18 dello schermo.
+  read -r x y <<<"$(python3 -c "
+alto = $ww * 0.6
+titolo = $wh - alto
+print($wx + $fx * $ww, $wy + titolo + ($fy - 0.18) * alto)")"
+  echo "l'icona di GdANav sul Mac: $x,$y"
+  for modo in cgevent cliclick systemevents; do
+    case $modo in
+      cgevent) tocca clic "$x" "$y"; sleep 1; tocca clic "$x" "$y" ;;
+      cliclick) command -v cliclick >/dev/null || brew install -q cliclick >/dev/null 2>&1
+        cliclick "c:${x%.*},${y%.*}" ;;
+      systemevents) osascript -e "tell application \"System Events\" to click at {${x%.*}, ${y%.*}}" ;;
+    esac
+    sleep 8
+    if ! acasa; then
+      echo "ESITO: GdANav aperta in CarPlay ($modo)"
+      return 0
+    fi
+    echo "con $modo ancora la schermata delle app"
+  done
   return 1
 }
-apri || echo "::warning::l'icona di GdANav non si trova"
+apri || echo "::warning::ESITO: GdANav non si apre in CarPlay"
 sleep 20
 screencapture -x "$out/$nome-mac-2.png" || true
 xcrun simctl io "$udid" screenshot --display=external "$out/$nome-carplay-guida.png" || true
@@ -146,4 +159,5 @@ xcrun simctl io "$udid" screenshot "$out/$nome-telefono-guida.png" || true
 xcrun simctl spawn "$udid" log show --last 3m --predicate 'process == "Runner"' --style compact \
   >"$out/$nome-log.txt" 2>&1 || true
 crash
+rm -f "$out/.prova.png"
 ls -la "$out"
