@@ -1,0 +1,928 @@
+getpwuid_r did not find a match for uid 501
+Timestamp               Ty Process[PID:TID]
+2026-11-03 10:02:03.156 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:03.160 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000213b930> {UUID: 55CD9C06-C919-412B-93FA-8E2416B7A675, enabled: YES}"
+)
+2026-11-03 10:02:03.160 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000213ba70> {UUID: 48D78938-B6B5-4F99-9910-29BF503C2098, enabled: YES}",
+    "<CPBarButton: 0x60000213b980> {UUID: 3DC1B4B5-670B-4EBC-A0A0-23903266565D, enabled: YES}"
+)
+2026-11-03 10:02:05.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:05.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:02:05.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:05.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:02:05.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:05.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:05.605 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:05.605 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:05.608 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:02:05.609 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:05.609 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:05.609 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:05.609 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:05.613 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:05.621 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002295d60> {UUID: 1045F9E4-E7E9-4A65-8EEB-D5BEE0DE364D, enabled: YES}"
+)
+2026-11-03 10:02:05.621 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002295cc0> {UUID: 3DC25A4C-093F-4C88-8533-39A34608D088, enabled: YES}",
+    "<CPBarButton: 0x600002295ef0> {UUID: CA312EF8-C542-463F-9BB3-CA3A5F213A98, enabled: YES}"
+)
+2026-11-03 10:02:08.155 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:08.157 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002144fa0> {UUID: 82613047-686C-4BD1-A92E-21C0284A39C2, enabled: YES}"
+)
+2026-11-03 10:02:08.157 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002144d20> {UUID: 42944754-4108-4646-91B0-A92F8D085B58, enabled: YES}",
+    "<CPBarButton: 0x600002147ac0> {UUID: FF626226-74C8-4907-8F42-E09DBD7D4A76, enabled: YES}"
+)
+2026-11-03 10:02:11.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:11.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:02:11.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:11.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:02:11.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:11.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:11.603 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:11.603 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:11.605 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:02:11.605 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:11.605 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:11.605 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:11.605 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:11.607 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:11.611 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002145b30> {UUID: 7A043C05-7E52-4A26-9F58-5E07A68A43DC, enabled: YES}"
+)
+2026-11-03 10:02:11.611 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002147a70> {UUID: 16E5800D-F6E5-4949-9982-E38F4229DBEA, enabled: YES}",
+    "<CPBarButton: 0x600002146850> {UUID: 19B32155-2CFF-4C53-BAF9-ECA1B6C0D021, enabled: YES}"
+)
+2026-11-03 10:02:13.157 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:13.162 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000022968f0> {UUID: C9D90F46-F665-4597-8DB8-63A3A4354824, enabled: YES}"
+)
+2026-11-03 10:02:13.162 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000022954f0> {UUID: 48DD88CD-85C1-44F6-A17E-D08A473EEA77, enabled: YES}",
+    "<CPBarButton: 0x600002295590> {UUID: BD607E76-B043-4E29-B6C5-FCDA63D10BFF, enabled: YES}"
+)
+2026-11-03 10:02:17.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:17.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:02:17.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:17.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:02:17.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:17.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:17.605 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:17.605 A  Runner[14339:c463] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:17.608 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:02:17.608 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:17.608 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:17.608 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:17.608 A  Runner[14339:c463] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:17.615 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:17.621 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021aca50> {UUID: 36ECC549-2342-4DC9-BE8A-C08234967501, enabled: YES}"
+)
+2026-11-03 10:02:17.621 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021ac9b0> {UUID: 33BF6E40-73D3-4B9B-99B6-C683BB341EAA, enabled: YES}",
+    "<CPBarButton: 0x6000021ac500> {UUID: 771C830C-B7F1-40ED-ACDD-2D00E2B67A2D, enabled: YES}"
+)
+2026-11-03 10:02:18.157 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:18.161 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021abe80> {UUID: 8BA15376-EFFC-4AE5-8B47-FAF7EF455E3F, enabled: YES}"
+)
+2026-11-03 10:02:18.161 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021abc00> {UUID: 69B1975A-6ADA-4776-A94E-027961C3FD75, enabled: YES}",
+    "<CPBarButton: 0x6000021aacb0> {UUID: 2035AFE4-BB34-4100-93A7-3E0281E4F2FE, enabled: YES}"
+)
+2026-11-03 10:02:23.158 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:23.162 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021aab70> {UUID: E392EE82-3705-4058-A4CF-91F149167FD9, enabled: YES}"
+)
+2026-11-03 10:02:23.162 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021abbb0> {UUID: DD692EC5-6648-45A6-80C6-2ED543F3C6C0, enabled: YES}",
+    "<CPBarButton: 0x6000021ab890> {UUID: AE291BC9-FD05-4FAF-BE2A-A45E0C2F7DD3, enabled: YES}"
+)
+2026-11-03 10:02:23.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:23.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:02:23.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:23.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:02:23.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:23.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:23.602 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:23.603 A  Runner[14339:c467] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:23.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:02:23.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:23.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:23.604 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:23.604 A  Runner[14339:c467] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:23.607 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:23.611 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000022927b0> {UUID: 33998956-DDE9-402B-AD5D-63214E87D778, enabled: YES}"
+)
+2026-11-03 10:02:23.612 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002291130> {UUID: AE833B28-D87E-4264-A893-E2F54CB5EAAB, enabled: YES}",
+    "<CPBarButton: 0x6000022938e0> {UUID: 557FD8D7-25B7-4268-8290-6C5C7C25ED1D, enabled: YES}"
+)
+2026-11-03 10:02:28.157 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:28.162 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021ab930> {UUID: 47E39677-EB1F-4CBE-956F-A5DD8EB17241, enabled: YES}"
+)
+2026-11-03 10:02:28.162 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021ab1b0> {UUID: 4E3FAD22-EF8C-415F-B4DE-073F85C98CCE, enabled: YES}",
+    "<CPBarButton: 0x6000021ab2a0> {UUID: 7AD7B178-3569-4E3B-9C32-BD229F93ABF9, enabled: YES}"
+)
+2026-11-03 10:02:29.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:29.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:02:29.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:29.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:02:29.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:29.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:29.605 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:29.605 A  Runner[14339:c463] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:29.607 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:02:29.608 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:29.608 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:29.608 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:29.608 A  Runner[14339:c463] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:29.613 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:29.617 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021e8e60> {UUID: 39015AD9-E5A0-4D06-93BD-15EBA6A7C4EE, enabled: YES}"
+)
+2026-11-03 10:02:29.617 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021e8910> {UUID: 468A5878-5902-499F-A8DB-2C592EDA44A4, enabled: YES}",
+    "<CPBarButton: 0x6000021ead00> {UUID: 5AAABE10-98DD-49D0-8926-F922D8CDED0F, enabled: YES}"
+)
+2026-11-03 10:02:33.160 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:33.166 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021acc30> {UUID: 4DEB9566-6E87-4581-91C5-64F54F8CF0F7, enabled: YES}"
+)
+2026-11-03 10:02:33.166 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021ac820> {UUID: 71F2E716-9DBA-4AC8-B518-A9EE02B25A69, enabled: YES}",
+    "<CPBarButton: 0x6000021aca00> {UUID: 12C53327-FFD9-4174-8370-91B74E0E6827, enabled: YES}"
+)
+2026-11-03 10:02:35.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:35.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:02:35.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:35.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:02:35.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:35.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:35.604 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:35.605 A  Runner[14339:c463] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:35.607 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:02:35.607 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:35.607 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:35.607 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:35.608 A  Runner[14339:c463] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:35.611 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:35.615 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002159630> {UUID: 710102E0-1DC2-42AB-881B-960345C1D1D6, enabled: YES}"
+)
+2026-11-03 10:02:35.615 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000215be30> {UUID: E87B8C44-909F-4F0D-9FD6-10EBA2787B8B, enabled: YES}",
+    "<CPBarButton: 0x6000021594f0> {UUID: A1C42DD8-78FC-47BC-BFAE-BCC5BFB5A6E2, enabled: YES}"
+)
+2026-11-03 10:02:38.158 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:38.163 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b5450> {UUID: CBBF4C35-4510-4D01-8CCA-03DE7CC302A5, enabled: YES}"
+)
+2026-11-03 10:02:38.163 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b5860> {UUID: C0471A01-652D-46CE-ADB0-F76232D504BD, enabled: YES}",
+    "<CPBarButton: 0x6000021b59a0> {UUID: BB769846-0F43-4D03-9619-78A4FD91EB11, enabled: YES}"
+)
+2026-11-03 10:02:41.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:41.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:02:41.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:41.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:02:41.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:41.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:41.603 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:41.604 A  Runner[14339:c467] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:41.610 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:02:41.610 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:41.610 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:41.610 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:41.610 A  Runner[14339:c467] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:41.617 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:41.624 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b4cd0> {UUID: 8D951DBC-DDB3-45EC-983A-00CBF4B05478, enabled: YES}"
+)
+2026-11-03 10:02:41.624 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b42d0> {UUID: DDA66537-769F-4343-8F5B-455C8E754388, enabled: YES}",
+    "<CPBarButton: 0x6000021b4370> {UUID: 1F2D0454-8A9D-42D6-A9A7-3E18AD0A8533, enabled: YES}"
+)
+2026-11-03 10:02:43.160 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:43.174 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b5bd0> {UUID: 7DCFDF17-6521-4973-B402-185609BACC57, enabled: YES}"
+)
+2026-11-03 10:02:43.175 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b43c0> {UUID: 59C07705-0012-40D0-9A18-A52CA35E6E8F, enabled: YES}",
+    "<CPBarButton: 0x6000021b5c70> {UUID: DF1C3B8F-6AEA-42FC-9BF9-51B8330D32E3, enabled: YES}"
+)
+2026-11-03 10:02:47.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:47.606 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:02:47.610 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:47.610 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:02:47.610 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:47.610 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:47.614 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:47.615 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:47.623 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:02:47.624 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:47.624 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:47.624 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:47.624 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:47.630 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:47.652 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002160be0> {UUID: 4C731CD7-23D1-484D-8F6C-27B1FF13E3CD, enabled: YES}"
+)
+2026-11-03 10:02:47.652 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002163d90> {UUID: 23D85C02-0585-44D0-B984-113C85EC37ED, enabled: YES}",
+    "<CPBarButton: 0x600002160af0> {UUID: D07EC8AE-5DDB-4A3F-A595-88D6D2E95B48, enabled: YES}"
+)
+2026-11-03 10:02:48.155 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:48.161 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b4aa0> {UUID: 7D83F47E-2511-4F99-B1A3-4C1E7CEDDB8A, enabled: YES}"
+)
+2026-11-03 10:02:48.161 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b4cd0> {UUID: 5185D16C-928B-49C3-B3D7-6C32EA7804D3, enabled: YES}",
+    "<CPBarButton: 0x6000021b4c80> {UUID: 7FD8C098-B322-4D2C-BB22-AAE142A94B64, enabled: YES}"
+)
+2026-11-03 10:02:53.159 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:53.169 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002289fe0> {UUID: B845FDFF-B59E-446F-A1FF-3C21DBBA2E98, enabled: YES}"
+)
+2026-11-03 10:02:53.169 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000228bcf0> {UUID: 870E1134-BB94-4EAF-8197-D86EC40CC8BD, enabled: YES}",
+    "<CPBarButton: 0x60000228a8f0> {UUID: BCF90BF0-FCF5-4632-9168-EB5927B81F40, enabled: YES}"
+)
+2026-11-03 10:02:53.605 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:53.605 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:02:53.605 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:53.605 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:02:53.605 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:53.605 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:53.608 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:53.612 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:53.647 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:02:53.648 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:53.648 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:53.648 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:53.648 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:53.660 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:53.667 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002289b30> {UUID: B1E45D00-49AB-4D81-93A8-FAB687AB5829, enabled: YES}"
+)
+2026-11-03 10:02:53.667 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002289040> {UUID: D2567A2B-6AC7-4107-A49C-EEE1C427B0B8, enabled: YES}",
+    "<CPBarButton: 0x600002288ff0> {UUID: 3C36B921-9976-4271-90B5-ABEF6CBBE4CF, enabled: YES}"
+)
+2026-11-03 10:02:58.160 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:58.167 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000215bd90> {UUID: 8BE31FA7-7D49-45EE-ABDE-7B3D8E6253D3, enabled: YES}"
+)
+2026-11-03 10:02:58.167 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000215a940> {UUID: 559D281D-E6A0-459C-8367-D7E3429AB04A, enabled: YES}",
+    "<CPBarButton: 0x60000215bca0> {UUID: 2AD548BD-B21B-44FC-BE86-9E83307F5407, enabled: YES}"
+)
+2026-11-03 10:02:59.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:59.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:02:59.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:59.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:02:59.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:59.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:59.605 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:59.605 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:59.609 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:02:59.610 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:02:59.610 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:02:59.610 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:02:59.610 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:02:59.614 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:02:59.618 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002161720> {UUID: 315094EB-63A9-40B9-8D46-361C83BFE284, enabled: YES}"
+)
+2026-11-03 10:02:59.618 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002160af0> {UUID: 8A33E6EC-0AC3-4B49-AE9E-28DB1255CE2B, enabled: YES}",
+    "<CPBarButton: 0x600002160870> {UUID: E4AB6039-BF8E-43EB-9824-87D448ADB443, enabled: YES}"
+)
+2026-11-03 10:03:03.158 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:03.166 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002138870> {UUID: E7C0FB35-D774-400F-A6D0-C214237EE10E, enabled: YES}"
+)
+2026-11-03 10:03:03.167 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002107e30> {UUID: 8BB8AC16-141B-4874-9790-88B301A5E4E0, enabled: YES}",
+    "<CPBarButton: 0x600002160fa0> {UUID: 104EF4B9-4D53-495A-8F11-64CA102B5363, enabled: YES}"
+)
+2026-11-03 10:03:05.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:05.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:03:05.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:05.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:03:05.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:05.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:05.602 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:05.602 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:05.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:03:05.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:05.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:05.604 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:05.604 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:05.605 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:05.608 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b59a0> {UUID: 5F333E1C-0625-4E00-A275-680EA35281DC, enabled: YES}"
+)
+2026-11-03 10:03:05.609 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b4280> {UUID: 3E998892-B8F2-46BD-AE79-C4F9F8366597, enabled: YES}",
+    "<CPBarButton: 0x6000021b5720> {UUID: 6207F064-54B0-444C-BAE1-70BBD52DF581, enabled: YES}"
+)
+2026-11-03 10:03:08.163 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:08.165 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000213ba20> {UUID: 5B920CBF-10B8-4AA7-AAE9-A3A2B7B8C496, enabled: YES}"
+)
+2026-11-03 10:03:08.165 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002139400> {UUID: C778B164-463F-4F6A-AF43-F636F7527B94, enabled: YES}",
+    "<CPBarButton: 0x6000021386e0> {UUID: 7B1F7D65-C9ED-4599-8256-907BD42FC84B, enabled: YES}"
+)
+2026-11-03 10:03:11.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:11.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:03:11.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:11.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:03:11.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:11.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:11.603 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:11.604 A  Runner[14339:c469] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:11.605 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:03:11.606 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:11.606 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:11.606 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:11.606 A  Runner[14339:c469] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:11.613 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:11.615 Df Runner[14339:10282] [com.apple.network:path] nw_path_libinfo_path_check [2ED6F185-63CE-4E2E-B6FE-25A1925013ED Hostname#bba29006:0 tcp, legacy-socket, attribution: developer]
+	libinfo check path: satisfied (Path is satisfied), interface: en0
+2026-11-03 10:03:11.621 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002160aa0> {UUID: D05A05B6-CB25-4C6C-920D-5C4D72333127, enabled: YES}"
+)
+2026-11-03 10:03:11.622 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002163e80> {UUID: F4BCD861-80FA-42E2-8E65-F7E4D1616313, enabled: YES}",
+    "<CPBarButton: 0x600002160500> {UUID: 5298149E-AD58-45D2-89BC-AAD45B1037B8, enabled: YES}"
+)
+2026-11-03 10:03:11.655 Df Runner[14339:10282] [com.apple.network:path] nw_path_libinfo_path_check [0A1F0E97-0AC9-49C4-AA69-07DC3050D544 Hostname#bba29006:0 tcp, legacy-socket, attribution: developer]
+	libinfo check path: satisfied (Path is satisfied), interface: en0
+2026-11-03 10:03:11.692 A  Runner[14339:10283] (Security) SecTrustEvaluateIfNecessary
+2026-11-03 10:03:11.693 Df Runner[14339:10283] [com.apple.xpc:connection] [0x11be76f70] activating connection: mach=true listener=false peer=false name=com.apple.trustd
+2026-11-03 10:03:11.714 Df Runner[14339:10283] [com.apple.xpc:connection] [0x11be76f70] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+2026-11-03 10:03:11.916 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:13.155 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:13.159 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000230f5c0> {UUID: FCC1C4AF-1270-4741-B518-D1034664FDC5, enabled: YES}"
+)
+2026-11-03 10:03:13.160 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000230f160> {UUID: 1F026736-42DF-4BBF-A10C-915E8F905392, enabled: YES}",
+    "<CPBarButton: 0x60000230f1b0> {UUID: 9C036BEA-88B3-417E-ABD9-5CFDA2849710, enabled: YES}"
+)
+2026-11-03 10:03:17.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:17.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:03:17.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:17.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:03:17.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:17.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:17.603 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:17.604 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:17.608 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:03:17.612 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:17.612 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:17.612 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:17.612 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:17.620 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:17.634 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000022cdae0> {UUID: 57388C32-9AF7-4622-A9E1-4A6A965F3A39, enabled: YES}"
+)
+2026-11-03 10:03:17.635 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000022cd4f0> {UUID: E7CA42E8-A58E-4141-BEDB-227D1911E29E, enabled: YES}",
+    "<CPBarButton: 0x6000022cd540> {UUID: F37563E9-1564-4C32-8B3F-58991580AA72, enabled: YES}"
+)
+2026-11-03 10:03:18.154 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:18.157 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000022cdc20> {UUID: 03CEA2C4-5AB0-498A-B68B-D78B4ACE8FC6, enabled: YES}"
+)
+2026-11-03 10:03:18.157 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000022cdcc0> {UUID: 8F91F74A-A4E9-4C99-97D3-5AA389335E83, enabled: YES}",
+    "<CPBarButton: 0x6000022ce030> {UUID: 16B433FF-86EA-453A-8425-2A37F355D305, enabled: YES}"
+)
+2026-11-03 10:03:23.157 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:23.168 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000022c5360> {UUID: C359DA38-3F31-4682-8830-E9DCEBF1A0B3, enabled: YES}"
+)
+2026-11-03 10:03:23.169 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000022c48c0> {UUID: 4BB5913C-059C-4B69-AE33-0E523215FDA6, enabled: YES}",
+    "<CPBarButton: 0x6000022c4910> {UUID: 898C1313-6A6D-4F6F-919C-23729E6330D2, enabled: YES}"
+)
+2026-11-03 10:03:23.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:23.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:03:23.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:23.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:03:23.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:23.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:23.608 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:23.608 A  Runner[14339:c469] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:23.612 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:03:23.613 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:23.613 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:23.613 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:23.613 A  Runner[14339:c469] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:23.617 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:23.624 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000022cd4a0> {UUID: A174BC7F-F858-4C60-8195-233490B14E76, enabled: YES}"
+)
+2026-11-03 10:03:23.625 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000022ce080> {UUID: B86F7C59-F256-4B6D-B284-F84DA87F7FD7, enabled: YES}",
+    "<CPBarButton: 0x6000022cd040> {UUID: EB4911C2-8D85-4A36-98F1-52E3FA5DE830, enabled: YES}"
+)
+2026-11-03 10:03:28.157 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:28.176 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021eb390> {UUID: A0B92513-CB07-4C9E-93B4-ADA35485CA5A, enabled: YES}"
+)
+2026-11-03 10:03:28.176 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021eb340> {UUID: 89E0F65E-EF6F-4C74-99E2-5B451001B8AF, enabled: YES}",
+    "<CPBarButton: 0x6000021eadf0> {UUID: BFE4A6D6-1956-4572-A4D2-DF202A75CF11, enabled: YES}"
+)
+2026-11-03 10:03:29.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:29.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:03:29.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:29.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:03:29.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:29.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:29.606 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:29.606 A  Runner[14339:c467] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:29.609 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:03:29.609 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:29.609 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:29.610 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:29.610 A  Runner[14339:c467] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:29.616 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:29.632 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021ea170> {UUID: FE4BDF76-CEA2-45CD-A02C-A5F7A8074FFB, enabled: YES}"
+)
+2026-11-03 10:03:29.632 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021eb430> {UUID: F1928712-F174-438A-BB83-429AC6E1AB40, enabled: YES}",
+    "<CPBarButton: 0x6000021eb3e0> {UUID: 8A63C25F-0487-446F-AAE4-10EA46552895, enabled: YES}"
+)
+2026-11-03 10:03:33.160 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:33.171 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021c8a50> {UUID: 955CB9C2-35E7-4E11-A09E-FABDAB2E15F9, enabled: YES}"
+)
+2026-11-03 10:03:33.172 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021c8690> {UUID: 32AA36A1-6962-450A-BD9F-47F0B5021E7F, enabled: YES}",
+    "<CPBarButton: 0x6000021c8af0> {UUID: 694E7643-51FE-4728-A57D-BEFC0F1B4365, enabled: YES}"
+)
+2026-11-03 10:03:35.606 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:35.607 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:03:35.607 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:35.607 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:03:35.607 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:35.607 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:35.612 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:35.615 A  Runner[14339:c467] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:35.624 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:03:35.625 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:35.625 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:35.625 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:35.625 A  Runner[14339:c467] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:35.632 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:35.642 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021c8870> {UUID: 079E5608-F5F8-48E7-B988-6377569CD206, enabled: YES}"
+)
+2026-11-03 10:03:35.643 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021c8820> {UUID: D7F5372E-9C43-43EA-8539-07ECB53F4AC2, enabled: YES}",
+    "<CPBarButton: 0x6000021cb430> {UUID: EF28301C-6C2C-47AF-8483-D055402CE016, enabled: YES}"
+)
+2026-11-03 10:03:38.161 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:38.165 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021c6f80> {UUID: 8EC1C2B3-D3D2-45FC-AFC6-92E78CEC6F7F, enabled: YES}"
+)
+2026-11-03 10:03:38.165 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021c64e0> {UUID: BB0ACD53-2DFF-4FD6-BA63-A8224F6E73D6, enabled: YES}",
+    "<CPBarButton: 0x6000021c6f30> {UUID: D231A0B0-1F7D-4FB8-B705-002C7A75D39D, enabled: YES}"
+)
+2026-11-03 10:03:41.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:41.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:03:41.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:41.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:03:41.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:41.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:41.604 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:41.605 A  Runner[14339:c469] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:41.608 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:03:41.610 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:41.610 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:41.611 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:41.611 A  Runner[14339:c469] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:41.628 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:41.643 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021c6bc0> {UUID: B5F00861-5030-48D3-B1B4-E4D2C4F947F0, enabled: YES}"
+)
+2026-11-03 10:03:41.644 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021c63f0> {UUID: C5125C50-740F-4C13-B0BE-85F50B641D3C, enabled: YES}",
+    "<CPBarButton: 0x6000021c65d0> {UUID: 4FD8E74F-9A20-4A17-BF20-A8ECBC8D583B, enabled: YES}"
+)
+2026-11-03 10:03:43.156 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:43.161 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021c6940> {UUID: EFD1DC11-B1F6-4D77-A797-907C780BE13B, enabled: YES}"
+)
+2026-11-03 10:03:43.162 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021c4960> {UUID: 031DA1FD-B302-4B9A-BCBE-9A4F548243C6, enabled: YES}",
+    "<CPBarButton: 0x6000021c4780> {UUID: 077C1859-6070-4C34-BC38-EAB361B7705E, enabled: YES}"
+)
+2026-11-03 10:03:47.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:47.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:03:47.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:47.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:03:47.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:47.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:47.605 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:47.606 A  Runner[14339:c469] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:47.624 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:03:47.624 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:47.624 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:47.624 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:47.625 A  Runner[14339:c469] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:47.630 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:47.642 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000022c1590> {UUID: 0703B469-B6A1-49F0-91EE-7F24F14662A1, enabled: YES}"
+)
+2026-11-03 10:03:47.643 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000022c1f90> {UUID: 046D1469-46DC-4934-AA60-23189CE0BEED, enabled: YES}",
+    "<CPBarButton: 0x6000022c1bd0> {UUID: 51772CC8-F357-48DE-832E-A21C9E23D927, enabled: YES}"
+)
+2026-11-03 10:03:48.157 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:48.161 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002160000> {UUID: E5321717-007B-4240-B274-D4DE046D0D9D, enabled: YES}"
+)
+2026-11-03 10:03:48.161 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002161680> {UUID: 763FF0C8-6E42-45AA-BA80-2E51BE79D6B2, enabled: YES}",
+    "<CPBarButton: 0x6000021614f0> {UUID: 87505458-43A3-4DD6-B97A-6C6FD3538A18, enabled: YES}"
+)
+2026-11-03 10:03:53.158 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:53.167 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002161590> {UUID: C93B18D4-6C31-4EFA-937C-9BD8E68F99AC, enabled: YES}"
+)
+2026-11-03 10:03:53.169 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002160cd0> {UUID: 88CA3917-665C-48BF-A39B-D2F57884554E, enabled: YES}",
+    "<CPBarButton: 0x600002161450> {UUID: 7806F721-3E8B-4A9B-8B8B-36661DE1E15A, enabled: YES}"
+)
+2026-11-03 10:03:53.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:53.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:03:53.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:53.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:03:53.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:53.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:53.604 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:53.604 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:53.606 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:03:53.607 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:53.607 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:53.607 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:53.607 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:53.611 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:53.617 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002161810> {UUID: 54A14626-1C90-47BB-975F-104C78A45B93, enabled: YES}"
+)
+2026-11-03 10:03:53.617 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002160b90> {UUID: AD923AA8-228E-46FD-8139-153E49B1087F, enabled: YES}",
+    "<CPBarButton: 0x6000021617c0> {UUID: CF1CC0FA-4421-45CE-B554-084CBFE1C1CE, enabled: YES}"
+)
+2026-11-03 10:03:58.159 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:58.174 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002132fd0> {UUID: 559A8835-2CE2-47E6-AE57-3629E30B39E4, enabled: YES}"
+)
+2026-11-03 10:03:58.175 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002132940> {UUID: 5EFCEBF3-5379-452D-8657-2525379586DF, enabled: YES}",
+    "<CPBarButton: 0x6000021323a0> {UUID: F7AC06BC-990D-41E4-9EF9-F113B6B7844D, enabled: YES}"
+)
+2026-11-03 10:03:59.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:59.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:03:59.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:59.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:03:59.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:59.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:59.605 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:59.608 A  Runner[14339:c467] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:59.612 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:03:59.612 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:03:59.612 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:03:59.613 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:03:59.613 A  Runner[14339:c467] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:03:59.619 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:03:59.623 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000022c0320> {UUID: 6D94F03F-8A9A-4305-A351-F72D30C0FE99, enabled: YES}"
+)
+2026-11-03 10:03:59.623 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000022c1ae0> {UUID: E3F932C4-CD94-4793-AA90-E44FAAC66F75, enabled: YES}",
+    "<CPBarButton: 0x6000022c0050> {UUID: 20E516A2-4317-4DB0-9475-9D3081E4D482, enabled: YES}"
+)
+2026-11-03 10:04:03.156 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:03.165 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000022c1360> {UUID: 34E05EF3-42E9-4A9B-A717-CFA30F035A31, enabled: YES}"
+)
+2026-11-03 10:04:03.166 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000022c1fe0> {UUID: E6502572-584B-454A-BD77-9F794097B873, enabled: YES}",
+    "<CPBarButton: 0x6000022c11d0> {UUID: AF578F6B-FCE7-4660-AE1F-B56FBC5DF9D9, enabled: YES}"
+)
+2026-11-03 10:04:05.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:05.602 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:04:05.602 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:05.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:04:05.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:05.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:05.604 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:05.604 A  Runner[14339:c467] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:05.612 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:04:05.613 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:05.613 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:05.613 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:05.613 A  Runner[14339:c467] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:05.619 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:05.623 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000228b160> {UUID: 0EEF39E0-685B-4CE7-AE93-11C9E3CE45BF, enabled: YES}"
+)
+2026-11-03 10:04:05.623 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000228a120> {UUID: 5FC5A98D-8D39-48C7-AC36-4C87B367C9F3, enabled: YES}",
+    "<CPBarButton: 0x6000022891d0> {UUID: 385AA483-3975-4C54-BCC8-5FDB1A361511, enabled: YES}"
+)
+2026-11-03 10:04:08.157 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:08.160 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002221590> {UUID: CE38E5D6-B592-42AB-A328-662D1F839F13, enabled: YES}"
+)
+2026-11-03 10:04:08.161 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002221ef0> {UUID: D70F84DF-2F51-40CE-B408-56A18C50528B, enabled: YES}",
+    "<CPBarButton: 0x600002221130> {UUID: B81F2A3F-7198-4BEB-A3E0-CE5F2FE4E4CC, enabled: YES}"
+)
+2026-11-03 10:04:11.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:11.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:04:11.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:11.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:04:11.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:11.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:11.605 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:11.605 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:11.612 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:04:11.613 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:11.613 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:11.613 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:11.613 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:11.618 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:11.623 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000022c2800> {UUID: B1AD6215-9201-454A-963F-5FC252755680, enabled: YES}"
+)
+2026-11-03 10:04:11.623 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000022c0be0> {UUID: 407F1823-C9B0-4D2B-9A66-6E8D65E3A943, enabled: YES}",
+    "<CPBarButton: 0x6000022c2760> {UUID: 129F0017-5230-46D0-80B3-CA5CF62D6DB5, enabled: YES}"
+)
+2026-11-03 10:04:13.156 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:13.161 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002197750> {UUID: 0DF1C4E3-D534-4A57-9507-4961AE2E0CE8, enabled: YES}"
+)
+2026-11-03 10:04:13.162 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002197250> {UUID: 2696343C-CE6A-4259-81DD-ADCA08F32614, enabled: YES}",
+    "<CPBarButton: 0x600002196530> {UUID: 93A8E9B3-5459-4127-8D04-3E52BEC8F81E, enabled: YES}"
+)
+2026-11-03 10:04:17.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:17.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:04:17.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:17.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:04:17.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:17.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:17.605 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:17.605 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:17.606 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:04:17.607 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:17.607 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:17.607 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:17.607 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:17.609 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:17.613 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021bfac0> {UUID: A0AA8998-0D4F-4758-A13F-FE5278D4148F, enabled: YES}"
+)
+2026-11-03 10:04:17.613 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021bfb10> {UUID: 6631CC1C-BA0C-47F9-81B0-0EAE04795D66, enabled: YES}",
+    "<CPBarButton: 0x6000021bfb60> {UUID: 5AA5DC3C-8E08-411E-9F85-90902B30901D, enabled: YES}"
+)
+2026-11-03 10:04:18.155 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:18.158 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000022995e0> {UUID: E6AD95B9-10E5-4E07-8F13-474D369D97DA, enabled: YES}"
+)
+2026-11-03 10:04:18.158 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002299d10> {UUID: 5645E971-7FDB-45BB-A487-B6C869B210B4, enabled: YES}",
+    "<CPBarButton: 0x60000229a260> {UUID: D8FE74D7-4B38-48E8-9A55-5C7479DE3138, enabled: YES}"
+)
+2026-11-03 10:04:23.155 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:23.159 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021615e0> {UUID: ABDCBAAE-52CD-4C02-A2BB-56D9C61F5634, enabled: YES}"
+)
+2026-11-03 10:04:23.159 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002160910> {UUID: BF80E530-BBB0-4222-BAB7-6370DDBC5367, enabled: YES}",
+    "<CPBarButton: 0x600002160640> {UUID: E3F5A068-A2B6-4B99-99F5-9B21A3F26286, enabled: YES}"
+)
+2026-11-03 10:04:23.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:23.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:04:23.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:23.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:04:23.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:23.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:23.603 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:23.604 A  Runner[14339:c469] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:23.606 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:04:23.606 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:23.606 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:23.606 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:23.606 A  Runner[14339:c469] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:23.608 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:23.612 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000229b480> {UUID: 0189A2CA-F476-4119-8D93-6E83F4B0E839, enabled: YES}"
+)
+2026-11-03 10:04:23.612 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000229b520> {UUID: 0D2D0C53-D20F-4E0F-969D-BC7D90024EE5, enabled: YES}",
+    "<CPBarButton: 0x600002299b80> {UUID: E085FC67-3236-4CDE-B651-0730D8482B23, enabled: YES}"
+)
+2026-11-03 10:04:28.160 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:28.165 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000022937f0> {UUID: E85F24FE-4150-42DF-8E74-0E33A4F5D8CF, enabled: YES}"
+)
+2026-11-03 10:04:28.165 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002291b30> {UUID: C8FCAD6A-B81A-4212-8642-D1B363591D0E, enabled: YES}",
+    "<CPBarButton: 0x600002292bc0> {UUID: 9661AEE5-F01F-4739-A876-1AAA8D431CA7, enabled: YES}"
+)
+2026-11-03 10:04:29.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:29.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:04:29.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:29.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:04:29.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:29.603 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:29.604 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:29.605 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:29.608 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:04:29.608 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:29.608 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:29.608 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:29.608 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:29.611 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:29.620 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000022932a0> {UUID: 17D7D900-8356-437E-BA7E-4E97E84EF610, enabled: YES}"
+)
+2026-11-03 10:04:29.621 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002292d00> {UUID: 12B04E75-BFCF-46F2-AD11-96EDCEDEBAAD, enabled: YES}",
+    "<CPBarButton: 0x600002293de0> {UUID: 7FCEE897-1883-4E78-92BD-4FA83BA3EA15, enabled: YES}"
+)
+2026-11-03 10:04:33.155 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:33.158 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000022000f0> {UUID: C714CE77-FB8A-474F-A9D8-91396C6EA4B0, enabled: YES}"
+)
+2026-11-03 10:04:33.158 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000022013b0> {UUID: 6FF325E0-4076-4B72-A0A9-7D2E4DA0F1A9, enabled: YES}",
+    "<CPBarButton: 0x600002201b30> {UUID: 10050DED-61D1-43A0-B642-32298DA97129, enabled: YES}"
+)
+2026-11-03 10:04:35.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:35.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:04:35.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:35.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:04:35.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:35.604 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:35.605 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:35.605 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:35.608 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:04:35.608 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:35.608 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:35.608 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:35.608 A  Runner[14339:c468] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:35.613 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:35.617 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002293570> {UUID: 41E5925F-E0AE-4BB4-B472-02434BBD8380, enabled: YES}"
+)
+2026-11-03 10:04:35.618 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000022927b0> {UUID: 58BDC330-69CB-42F3-802F-FA1ED2DAC856, enabled: YES}",
+    "<CPBarButton: 0x6000022936b0> {UUID: 5ADC8864-2273-4633-B417-F99966AF992F, enabled: YES}"
+)
+2026-11-03 10:04:38.157 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:38.164 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021c70c0> {UUID: 5CEB0294-A880-419C-8EEB-062F0C576570, enabled: YES}"
+)
+2026-11-03 10:04:38.164 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021c48c0> {UUID: 37A5AECD-D085-4B3E-A976-67DFAABD3656, enabled: YES}",
+    "<CPBarButton: 0x6000021c77a0> {UUID: DCDD5F1D-CFDE-44C8-ACD9-C8F648BFF2DF, enabled: YES}"
+)
+2026-11-03 10:04:41.603 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:41.605 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:04:41.605 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:41.605 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:04:41.605 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:41.605 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:41.606 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:41.606 A  Runner[14339:c469] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:41.608 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:04:41.609 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:41.609 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:41.609 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:41.609 A  Runner[14339:c469] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:41.612 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:41.620 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002292760> {UUID: F93252F0-A8B3-4B3F-80B6-84CE5F875F18, enabled: YES}"
+)
+2026-11-03 10:04:41.620 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002291860> {UUID: E565ED38-59D0-46B3-A6A2-B8ADAAB405A5, enabled: YES}",
+    "<CPBarButton: 0x600002291b30> {UUID: 832F336D-5E4F-4B04-BD97-8BF76F71EB60, enabled: YES}"
+)
+2026-11-03 10:04:43.158 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:43.166 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000228e1c0> {UUID: 4448A84E-D63D-49A2-80D9-E78ABC92BBDF, enabled: YES}"
+)
+2026-11-03 10:04:43.166 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000228f390> {UUID: 476D92C7-EA02-4C4F-B4E5-AE7DBA36A937, enabled: YES}",
+    "<CPBarButton: 0x60000228d860> {UUID: F5FE92C2-5CCF-4C71-A913-ED4B14BF5F28, enabled: YES}"
+)
+2026-11-03 10:04:47.604 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:47.605 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:04:47.605 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:47.605 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:04:47.605 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:47.605 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:47.609 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:47.610 A  Runner[14339:c467] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:47.612 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:04:47.613 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:47.613 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:47.613 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:47.613 A  Runner[14339:c467] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:47.620 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:47.641 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000228eb70> {UUID: BAD54590-8E15-4E77-98B8-CED6CCDABCDD, enabled: YES}"
+)
+2026-11-03 10:04:47.641 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000228ee40> {UUID: 8DD8DD33-9D97-4A6D-B264-51D715E9A950, enabled: YES}",
+    "<CPBarButton: 0x60000228ead0> {UUID: 28E7F2EC-1E9D-4C35-AC06-07D27194609B, enabled: YES}"
+)
+2026-11-03 10:04:48.155 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:48.157 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000215b660> {UUID: CC653113-7342-43C6-BA8F-CA16787D451F, enabled: YES}"
+)
+2026-11-03 10:04:48.157 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000215a350> {UUID: 8D3F9666-54AB-4EA7-9B3D-2353D4FEB435, enabled: YES}",
+    "<CPBarButton: 0x60000215b700> {UUID: E2BF6DB1-2483-40EC-8367-88C6D6C2CAEA, enabled: YES}"
+)
+2026-11-03 10:04:53.158 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:53.165 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000228ead0> {UUID: 47A8E847-2B18-4CBA-B171-9BC2C818F4F3, enabled: YES}"
+)
+2026-11-03 10:04:53.166 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000228d4f0> {UUID: 9D28AB15-E7E9-43B2-A8B6-4C160626193E, enabled: YES}",
+    "<CPBarButton: 0x60000228fd90> {UUID: 5BA6763D-78BD-4BBC-8A09-995802024B53, enabled: YES}"
+)
+2026-11-03 10:04:53.606 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:53.607 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:04:53.607 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:53.608 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:04:53.608 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:53.608 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:53.615 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:53.615 A  Runner[14339:c467] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:53.618 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:04:53.619 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:53.619 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:53.619 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:53.619 A  Runner[14339:c467] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:53.625 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:53.629 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000228edf0> {UUID: 63C9E8E7-0836-4E27-8DAA-865544BE3577, enabled: YES}"
+)
+2026-11-03 10:04:53.629 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000228f520> {UUID: 239C1A27-3677-4519-977D-ED3DD597C88C, enabled: YES}",
+    "<CPBarButton: 0x60000228e8f0> {UUID: 6890BF7A-5982-4744-AF1A-EDA4BE2D0306, enabled: YES}"
+)
+2026-11-03 10:04:58.163 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:58.171 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000022883c0> {UUID: 383040EE-EE5A-4B05-8F05-5D4BF72A97B3, enabled: YES}"
+)
+2026-11-03 10:04:58.174 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000228b160> {UUID: 7F791ED1-A837-4FEA-808B-49E19AF00567, enabled: YES}",
+    "<CPBarButton: 0x60000228b430> {UUID: E2681952-C840-41B6-8452-C16109E7EDBF, enabled: YES}"
+)
+2026-11-03 10:04:59.605 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:59.606 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000024e00", "accuracy":"-2.000000"}
+2026-11-03 10:04:59.611 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:59.611 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000024e00", "distance":"-1.000000"}
+2026-11-03 10:04:59.611 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:59.611 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:59.617 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:59.618 A  Runner[14339:c469] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:59.625 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000024e00", "delegate":"0x600001732980", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 10:04:59.628 A  Runner[14339:c44e] (CoreLocation) CL: CLLocationManager
+2026-11-03 10:04:59.628 Df Runner[14339:c44e] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000024e00"}
+2026-11-03 10:04:59.629 A  Runner[14339:c44e] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 10:04:59.629 A  Runner[14339:c469] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 10:04:59.638 Df Runner[14339:c44e] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-03 10:04:59.658 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002100280> {UUID: AC12EAFB-4B0C-4980-AB10-B112F24A3275, enabled: YES}"
+)
+2026-11-03 10:04:59.658 Df Runner[14339:c44e] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003786100> <identifier: 063F44DE-C218-4A58-ADB7-66F9E1E0B0F2, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002107e30> {UUID: 58B1B2B3-57CD-4F2D-AF01-349C8B5C13B3, enabled: YES}",
+    "<CPBarButton: 0x6000021098b0> {UUID: C683F552-EDB7-414B-A471-C364BF97BA21, enabled: YES}"
+)
