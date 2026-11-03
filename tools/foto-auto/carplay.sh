@@ -44,6 +44,13 @@ defaults write "$preferenze" AppleLanguages -array it || true
 defaults write "$preferenze" AppleLocale -string it_IT || true
 xcrun simctl boot "$udid" 2>/dev/null || true
 entro 600 xcrun simctl bootstatus "$udid" -b || echo "::warning::l'iPhone ci mette troppo ad accendersi"
+# Scritte prima dell'accensione non bastano a CarPlay («arrival»): si
+# riscrivono da dentro e si riaccende l'iPhone una volta.
+xcrun simctl spawn "$udid" defaults write -g AppleLanguages -array it || true
+xcrun simctl spawn "$udid" defaults write -g AppleLocale -string it_IT || true
+entro 180 xcrun simctl shutdown "$udid" || true
+xcrun simctl boot "$udid" 2>/dev/null || true
+entro 600 xcrun simctl bootstatus "$udid" -b || echo "::warning::l'iPhone ci mette troppo a riaccendersi"
 open -a Simulator --args -CurrentDeviceUDID "$udid"
 sleep 10
 

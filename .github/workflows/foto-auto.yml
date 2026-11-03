@@ -16,6 +16,7 @@ on:
       - tools/foto-auto/**
       - packages/gdanav_app/lib/stato/dimostrazione.dart
       - packages/gdanav_app/ios/gdanav_app/Sources/**
+      - packages/gdanav_app/lib/gdanav_app.dart
   workflow_dispatch:
 
 concurrency:
@@ -29,7 +30,7 @@ permissions:
 jobs:
   carplay:
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -61,7 +62,7 @@ jobs:
       - name: Il permesso di CarPlay c'è?
         run: codesign -d --entitlements - build/ios/iphonesimulator/Runner.app 2>&1 | grep -i carplay || true
       - name: Le foto
-        timeout-minutes: 20
+        timeout-minutes: 35
         run: ../tools/foto-auto/carplay.sh ${{ matrix.dimostrazione }} build/ios/iphonesimulator/Runner.app "$GITHUB_WORKSPACE/foto"
       - uses: actions/upload-artifact@v4
         if: always()
