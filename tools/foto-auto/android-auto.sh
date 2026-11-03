@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Le foto vere di Android Auto (foto-auto.yml), dentro l'emulatore acceso da
+# android-emulator-runner.
+#
+#   tools/foto-auto/android-auto.sh <nome> <app.apk> <cartella delle foto>
+#
+# Lo schermo dell'auto lo disegna l'app Android Auto del telefono
+# (com.google.android.projection.gearhead) e lo mostra la Desktop Head Unit
+# (DHU) dell'SDK, collegata con `adb forward tcp:5277`. Se l'app Android Auto
+# nell'emulatore non c'è, lo si scrive e ci si ferma: senza di lei la DHU
+# resta nera.
+set -uo pipefail
+
+nome="$1"
+apk="$2"
+out="$3"
+mkdir -p "$out"
+rapporto="$out/$nome-android-auto.txt"
+
+adb wait-for-device
+adb shell getprop ro.build.fingerprint | tee "$rapporto"
+adb install -r -g "$apk"
+pacchetto="$(adb shell pm list packages | tr -d '\r' | sed -n 's/^package://p' | grep '^it\.gdanav\.gdanav' | head -1)"
+echo "GdANav: $pacchetto" | tee -a "$rapporto"
+adb shell pm grant "$pacchetto" android.permission.ACCESS_FINE_LOCATION || true
+adb emu geo fix 12.39 42.478 || true
+adb shell monkey -p "$pacchetto" -c android.intent.category.LAUNCHER 1
+sleep 30
+adb exec-out screencap -p >"$out/$nome-telefono.png"
+
+echo "--- Android Auto nel telefono?" | tee -a "$rapporto"
+adb shell pm list packages | tr -d '\r' | grep -i -E 'gearhead|projection|android\.car|templates' | tee -a "$rapporto" || true
+if ! adb shell pm list packages | grep -q com.google.android.projection.gearhead; then
+  {
+    echo "NO: com.google.android.projection.gearhead (Android Auto) non c'è in questa immagine dell'emulatore."
+    echo "La DHU mostra solo quello che manda Android Auto del telefono: senza, niente schermo dell'auto."
+  } | tee -a "$rapporto"
+  echo "::warning::Android Auto non c'è nell'emulatore: niente foto dello schermo dell'auto"
+  exit 0
+fi
+
+# C'è: il server della head unit e la DHU.
+adb shell dumpsys package com.google.android.projection.gearhead | grep -E 'versionName|enabled=' | head -5 | tee -a "$rapporto"
+adb shell am start-foreground-service -n com.google.android.projection.gearhead/.headunit.HeadUnitServerService \
+  2>&1 | tee -a "$rapporto" || true
+adb forward tcp:5277 tcp:5277
+dhu="$ANDROID_SDK_ROOT/extras/google/auto/desktop-head-unit"
+if [ ! -x "$dhu" ]; then
+  echo "NO: la DHU non c'è in $dhu" | tee -a "$rapporto"
+  exit 0
+fi
+export DISPLAY=:99
+(Xvfb :99 -screen 0 1920x1080x24 &)
+sleep 3
+("$dhu" >"$out/$nome-dhu.txt" 2>&1 &)
+sleep 40
+import -window root "$out/$nome-android-auto.png" || true
+adb exec-out screencap -p >"$out/$nome-telefono-dopo.png"

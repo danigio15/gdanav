@@ -1,0 +1,119 @@
+# Le foto vere dello schermo dell'auto: GdANav in guida, col traffico, su
+# CarPlay (il simulatore dell'iPhone col suo schermo CarPlay) e su Android Auto
+# (l'emulatore con la Desktop Head Unit, se l'emulatore ha Android Auto).
+#
+# L'app si compila in dimostrazione (GDANAV_DIMOSTRAZIONE, vedi
+# lib/stato/dimostrazione.dart): un viaggio finto di 40 km con una coda
+# (+7 min) o due (+18 min), e la guida che parte da sola. Le foto sono negli
+# artefatti della corsa. Niente firma, niente negozi, niente segreti.
+name: Le foto dell'auto
+
+on:
+  push:
+    branches: ["claude/**"]
+    paths:
+      - .github/workflows/foto-auto.yml
+      - tools/foto-auto/**
+      - packages/gdanav_app/lib/stato/dimostrazione.dart
+  workflow_dispatch:
+
+concurrency:
+  group: foto-auto-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  carplay:
+    runs-on: macos-15
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        dimostrazione: [traffico7, traffico18]
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - name: L'Xcode più recente
+        run: |
+          xcode="$(ls -d /Applications/Xcode_*.app | grep -v -i beta | sort -V | tail -1)"
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+      - run: flutter pub get
+      # CarPlay solo con il suo permesso nell'app: nel simulatore basta la
+      # firma «ad hoc» che lo porta.
+      - run: cp ios/Runner/RunnerCarPlay.entitlements ios/Runner/Runner.entitlements
+      - name: Compila per il simulatore, in dimostrazione
+        run: >-
+          flutter build ios --simulator --debug
+          --dart-define=GDANAV_DIMOSTRAZIONE=${{ matrix.dimostrazione }}
+          --dart-define=GDANAV_TUTTO_SBLOCCATO=true
+      - name: Firma ad hoc col permesso di CarPlay
+        run: |
+          app=build/ios/iphonesimulator/Runner.app
+          codesign --force --sign - --entitlements ios/Runner/RunnerCarPlay.entitlements "$app"
+          codesign -d --entitlements - "$app" 2>&1 | tail -5
+      - name: Le foto
+        run: ../tools/foto-auto/carplay.sh ${{ matrix.dimostrazione }} build/ios/iphonesimulator/Runner.app "$GITHUB_WORKSPACE/foto"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: carplay-${{ matrix.dimostrazione }}
+          path: foto
+          if-no-files-found: warn
+
+  android-auto:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        dimostrazione: [traffico7]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+      - name: Compila l'APK, in dimostrazione
+        working-directory: app
+        run: >-
+          flutter pub get &&
+          flutter build apk --debug
+          --dart-define=GDANAV_DIMOSTRAZIONE=${{ matrix.dimostrazione }}
+          --dart-define=GDANAV_TUTTO_SBLOCCATO=true
+      - name: La Desktop Head Unit e Xvfb
+        run: |
+          sudo apt-get update -q && sudo apt-get install -yq xvfb imagemagick libc++1 >/dev/null
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "extras;google;auto" >/dev/null || true
+          ls -la "$ANDROID_SDK_ROOT/extras/google/auto" || true
+      - name: KVM per l'emulatore
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis_playstore
+          arch: x86_64
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: bash tools/foto-auto/android-auto.sh ${{ matrix.dimostrazione }} app/build/app/outputs/flutter-apk/app-debug.apk "$GITHUB_WORKSPACE/foto"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-auto-${{ matrix.dimostrazione }}
+          path: foto
+          if-no-files-found: warn

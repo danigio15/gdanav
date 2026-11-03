@@ -9,6 +9,7 @@ import 'auto/ponte_auto.dart';
 import 'schermate/aggiorna_gdanav.dart';
 import 'schermate/schermata_principale.dart';
 import 'stato/archivio.dart';
+import 'stato/dimostrazione.dart';
 import 'stato/scelte_avvisi.dart';
 import 'stato/gestore_aggiornamento.dart';
 import 'stato/gestore_auto.dart';
@@ -84,6 +85,9 @@ Future<GdanavApp> preparaGdanav({
   GestorePersone? persone,
 }) async {
   final archivio = Archivio(portachiavi);
+  // Solo nelle build per le foto della CI (GDANAV_DIMOSTRAZIONE): un viaggio
+  // finto con le code. Nelle altre è `null` e non cambia niente.
+  final dimostrazione = Dimostrazione.daCompilazione;
   final aggiornamento = GestoreAggiornamento.per(
     archivio: archivio,
     premiumOspite: premiumOspite,
@@ -117,7 +121,8 @@ Future<GdanavApp> preparaGdanav({
   final viaggio = GestoreViaggio(
     archivio: archivio,
     auto: auto,
-    posizione: posizioneAttuale,
+    posizione: dimostrazione?.posizione ?? posizioneAttuale,
+    costruisci: dimostrazione?.pianificatore ?? pianificatoreVero,
     consumo: consumo,
     ztl: ztl,
   );
@@ -138,7 +143,7 @@ Future<GdanavApp> preparaGdanav({
   await risparmio.carica();
   GestoreRisparmio.attuale = risparmio;
   // La prova di guida di Android Auto: posizioni finte al posto del GPS.
-  final prova = ProvaDiGuida();
+  final prova = ProvaDiGuida(acceleratore: dimostrazione == null ? 1 : Dimostrazione.acceleratore);
   final guida = GestoreGuida(
     viaggio: viaggio,
     auto: auto,
@@ -237,6 +242,9 @@ Future<GdanavApp> preparaGdanav({
     premium.addListener(premiumInAuto);
     aggiornamento?.addListener(premiumInAuto);
     guidaInAutoSenzaPremium?.addListener(premiumInAuto);
+  }
+  if (dimostrazione != null) {
+    unawaited(dimostrazione.avvia(auto: auto, viaggio: viaggio, guida: guida, prova: prova));
   }
   return GdanavApp(
     archivio: archivio,
