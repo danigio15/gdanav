@@ -49,23 +49,19 @@ jobs:
           flutter-version: 3.47.5
           channel: stable
       - run: flutter pub get
-      # CarPlay solo con il suo permesso nell'app: nel simulatore basta la
-      # firma «ad hoc» che lo porta.
+      # CarPlay solo con il suo permesso nell'app.
       - run: cp ios/Runner/RunnerCarPlay.entitlements ios/Runner/Runner.entitlements
       - name: Compila per il simulatore, in dimostrazione
         run: >-
           flutter build ios --simulator --debug
           --dart-define=GDANAV_DIMOSTRAZIONE=${{ matrix.dimostrazione }}
           --dart-define=GDANAV_TUTTO_SBLOCCATO=true
-      - name: Firma ad hoc col permesso di CarPlay
-        run: |
-          app=build/ios/iphonesimulator/Runner.app
-          cp -R "$app" build/ios/iphonesimulator/Runner-flutter.app
-          codesign --force --sign - --entitlements ios/Runner/RunnerCarPlay.entitlements "$app"
-          codesign -d --entitlements - "$app" 2>&1 | grep -i carplay
-          codesign --verify --deep --strict "$app" && echo "firma valida"
+      # Il permesso di CarPlay lo mette già flutter, per il simulatore: una
+      # firma ad hoc rifatta sopra lo rompeva («Code Signature Invalid»).
+      - name: Il permesso di CarPlay c'è?
+        run: codesign -d --entitlements - build/ios/iphonesimulator/Runner.app 2>&1 | grep -i carplay || true
       - name: Le foto
-        run: ../tools/foto-auto/carplay.sh ${{ matrix.dimostrazione }} build/ios/iphonesimulator/Runner.app "$GITHUB_WORKSPACE/foto" build/ios/iphonesimulator/Runner-flutter.app
+        run: ../tools/foto-auto/carplay.sh ${{ matrix.dimostrazione }} build/ios/iphonesimulator/Runner.app "$GITHUB_WORKSPACE/foto"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

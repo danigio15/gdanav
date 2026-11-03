@@ -31,6 +31,8 @@ pro = [x for x in nuovi if "Pro" in x["name"] and "Max" not in x["name"]]
 print((pro or nuovi)[0]["udid"])
 ')"
 echo "iPhone: $udid"
+# Niente finestre «Runner quit unexpectedly» sul Mac: coprirebbero CarPlay.
+defaults write com.apple.CrashReporter DialogType none || true
 xcrun simctl boot "$udid" 2>/dev/null || true
 xcrun simctl bootstatus "$udid" -b
 open -a Simulator --args -CurrentDeviceUDID "$udid"
@@ -123,6 +125,7 @@ acasa() {
 apri() {
   xy="$(tocca trova "$out/$nome-carplay-casa.png" GdANav)" || return 1
   read -r fx fy <<<"$xy"
+  killall UserNotificationCenter 2>/dev/null || true
   f="$(finestra)" || return 1
   echo "finestra CarPlay: $f"
   read -r wx wy ww wh <<<"$f"
