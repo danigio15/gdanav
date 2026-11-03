@@ -9,6 +9,7 @@ import '../componenti/indicatore_batteria.dart' show eta;
 import '../componenti/itinerario.dart' show BadgePedaggio;
 import '../componenti/icone_segnalazioni.dart';
 import '../componenti/risparmio.dart';
+import '../componenti/striscia_traffico.dart';
 import '../componenti/tachimetro.dart';
 import '../componenti/vista_svincolo.dart';
 import '../componenti/vetro.dart';
@@ -223,7 +224,24 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                         onSalva: (euro) => g.pagaRicarica(i, euro),
                         onDopo: g.nonOra,
                       ),
-                    const Spacer(),
+                    // Lo spazio libero sopra il tachimetro: di lato, la
+                    // striscia del traffico, se davanti c'è qualche coda. Il
+                    // resto lascia passare i tocchi alla mappa.
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: switch (g.pronto?.viaggio.percorso) {
+                          final p? => switch (strisciaTraffico(p, percorsiM: g.avanzamento?.percorsiM ?? 0)) {
+                            final s? => Padding(
+                              padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
+                              child: StrisciaTrafficoLaterale(striscia: s),
+                            ),
+                            _ => const SizedBox.shrink(),
+                          },
+                          _ => const SizedBox.shrink(),
+                        },
+                      ),
+                    ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
                       child: ListenableBuilder(
@@ -847,9 +865,16 @@ class _Fondo extends StatelessWidget {
                                   children: [
                                     Icon(Icons.traffic_rounded, size: 17, color: coloreTraffico),
                                     const SizedBox(width: 4),
-                                    Text(
-                                      testoRitardoTraffico(traffico),
-                                      style: t.titleSmall?.copyWith(color: coloreTraffico, fontWeight: FontWeight.w800),
+                                    Flexible(
+                                      child: Text(
+                                        testoRitardoTraffico(traffico),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: t.titleSmall?.copyWith(
+                                          color: coloreTraffico,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
