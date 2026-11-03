@@ -1,0 +1,133 @@
+getpwuid_r did not find a match for uid 501
+Timestamp               Ty Process[PID:TID]
+2026-11-03 09:29:23.491 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:23.491 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000028590", "accuracy":"-2.000000"}
+2026-11-03 09:29:23.491 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:23.491 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000028590", "distance":"-1.000000"}
+2026-11-03 09:29:23.491 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:23.491 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:29:23.491 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:29:23.492 A  Runner[16091:d73a] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:29:23.494 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000028590", "delegate":"0x60000171ee80", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 09:29:23.494 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:23.494 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:29:23.495 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:29:23.495 A  Runner[16091:d73a] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:29:29.490 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:29.490 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000028590", "accuracy":"-2.000000"}
+2026-11-03 09:29:29.490 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:29.490 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000028590", "distance":"-1.000000"}
+2026-11-03 09:29:29.490 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:29.490 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:29:29.491 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:29:29.491 A  Runner[16091:d739] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:29:29.493 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000028590", "delegate":"0x60000171ee80", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 09:29:29.494 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:29.494 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:29:29.494 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:29:29.494 A  Runner[16091:d739] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:29:35.490 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:35.490 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000028590", "accuracy":"-2.000000"}
+2026-11-03 09:29:35.490 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:35.490 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000028590", "distance":"-1.000000"}
+2026-11-03 09:29:35.490 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:35.490 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:29:35.490 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:29:35.490 A  Runner[16091:d739] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:29:35.493 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000028590", "delegate":"0x60000171ee80", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 09:29:35.494 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:35.494 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:29:35.495 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:29:35.495 A  Runner[16091:d739] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:29:41.491 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:41.491 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000028590", "accuracy":"-2.000000"}
+2026-11-03 09:29:41.491 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:41.491 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000028590", "distance":"-1.000000"}
+2026-11-03 09:29:41.491 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:41.491 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:29:41.496 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:29:41.497 A  Runner[16091:d740] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:29:41.500 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000028590", "delegate":"0x60000171ee80", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 09:29:41.501 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:41.501 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:29:41.501 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:29:41.501 A  Runner[16091:d740] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:29:44.271 Df Runner[16091:d718] [com.apple.KeyboardArbiter:Client] RX sceneBecameFocused:(null)
+2026-11-03 09:29:47.493 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:47.493 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000028590", "accuracy":"-2.000000"}
+2026-11-03 09:29:47.494 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:47.494 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000028590", "distance":"-1.000000"}
+2026-11-03 09:29:47.494 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:47.494 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:29:47.494 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:29:47.495 A  Runner[16091:d739] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:29:47.535 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000028590", "delegate":"0x60000171ee80", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 09:29:47.536 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:47.536 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:29:47.536 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:29:47.536 A  Runner[16091:d739] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:29:53.489 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:53.489 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000028590", "accuracy":"-2.000000"}
+2026-11-03 09:29:53.489 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:53.489 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000028590", "distance":"-1.000000"}
+2026-11-03 09:29:53.489 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:53.489 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:29:53.489 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:29:53.489 A  Runner[16091:d73a] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:29:53.495 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000028590", "delegate":"0x60000171ee80", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 09:29:53.496 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:53.496 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:29:53.496 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:29:53.496 A  Runner[16091:d73a] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:29:59.490 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:59.490 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000028590", "accuracy":"-2.000000"}
+2026-11-03 09:29:59.490 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:59.490 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000028590", "distance":"-1.000000"}
+2026-11-03 09:29:59.490 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:59.490 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:29:59.493 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:29:59.493 A  Runner[16091:d739] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:29:59.495 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000028590", "delegate":"0x60000171ee80", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 09:29:59.495 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:29:59.495 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:29:59.495 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:29:59.495 A  Runner[16091:d739] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:30:05.491 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:30:05.491 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000028590", "accuracy":"-2.000000"}
+2026-11-03 09:30:05.491 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:30:05.491 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000028590", "distance":"-1.000000"}
+2026-11-03 09:30:05.491 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:30:05.491 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:30:05.492 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:30:05.493 A  Runner[16091:d73f] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:30:05.495 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000028590", "delegate":"0x60000171ee80", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 09:30:05.496 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:30:05.496 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:30:05.496 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:30:05.496 A  Runner[16091:d73f] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:30:11.489 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:30:11.490 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000028590", "accuracy":"-2.000000"}
+2026-11-03 09:30:11.490 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:30:11.490 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000028590", "distance":"-1.000000"}
+2026-11-03 09:30:11.490 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:30:11.490 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:30:11.492 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:30:11.492 A  Runner[16091:d73f] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:30:11.495 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000028590", "delegate":"0x60000171ee80", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 09:30:11.495 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:30:11.495 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:30:11.495 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:30:11.495 A  Runner[16091:d73f] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:30:17.489 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:30:17.490 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDesiredAccuracy:, "self":"0x600000028590", "accuracy":"-2.000000"}
+2026-11-03 09:30:17.490 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:30:17.490 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDistanceFilter:, "self":"0x600000028590", "distance":"-1.000000"}
+2026-11-03 09:30:17.490 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:30:17.490 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":startUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:30:17.491 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:30:17.491 A  Runner[16091:d73f] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-03 09:30:17.493 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000028590", "delegate":"0x60000171ee80", "selector":locationManager:didUpdateLocations:, "location":<private>, "eventType":kCLConnectionMessageLocation}
+2026-11-03 09:30:17.493 A  Runner[16091:d718] (CoreLocation) CL: CLLocationManager
+2026-11-03 09:30:17.493 Df Runner[16091:d718] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000028590"}
+2026-11-03 09:30:17.493 A  Runner[16091:d718] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-03 09:30:17.493 A  Runner[16091:d73f] (LocationSupport) CL: CLConnection::sendMessage
