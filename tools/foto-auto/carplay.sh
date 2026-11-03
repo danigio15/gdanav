@@ -33,14 +33,17 @@ print((pro or nuovi)[0]["udid"])
 echo "iPhone: $udid"
 # Niente finestre «Runner quit unexpectedly» sul Mac: coprirebbero CarPlay.
 defaults write com.apple.CrashReporter DialogType none || true
+# Un comando che non resta appeso per sempre (su macOS non c'è `timeout`).
+entro() { perl -e 'alarm shift; exec @ARGV' "$@"; }
+# In italiano, come in macchina da noi: lingua e paese si scrivono prima di
+# accendere l'iPhone, nelle sue preferenze.
+xcrun simctl shutdown "$udid" 2>/dev/null || true
+preferenze="$HOME/Library/Developer/CoreSimulator/Devices/$udid/data/Library/Preferences/.GlobalPreferences.plist"
+mkdir -p "$(dirname "$preferenze")"
+defaults write "$preferenze" AppleLanguages -array it || true
+defaults write "$preferenze" AppleLocale -string it_IT || true
 xcrun simctl boot "$udid" 2>/dev/null || true
-xcrun simctl bootstatus "$udid" -b
-# In italiano, come in macchina da noi: lingua e paese si leggono all'avvio.
-xcrun simctl spawn "$udid" defaults write -g AppleLanguages -array it
-xcrun simctl spawn "$udid" defaults write -g AppleLocale it_IT
-xcrun simctl shutdown "$udid"
-xcrun simctl boot "$udid"
-xcrun simctl bootstatus "$udid" -b
+entro 600 xcrun simctl bootstatus "$udid" -b || echo "::warning::l'iPhone ci mette troppo ad accendersi"
 open -a Simulator --args -CurrentDeviceUDID "$udid"
 sleep 10
 

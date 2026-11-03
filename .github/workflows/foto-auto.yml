@@ -61,6 +61,7 @@ jobs:
       - name: Il permesso di CarPlay c'è?
         run: codesign -d --entitlements - build/ios/iphonesimulator/Runner.app 2>&1 | grep -i carplay || true
       - name: Le foto
+        timeout-minutes: 20
         run: ../tools/foto-auto/carplay.sh ${{ matrix.dimostrazione }} build/ios/iphonesimulator/Runner.app "$GITHUB_WORKSPACE/foto"
       - uses: actions/upload-artifact@v4
         if: always()
