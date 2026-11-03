@@ -218,8 +218,9 @@ Future<GdanavApp> preparaGdanav({
   // Le segnalazioni servono anche con l'app aperta solo sull'auto.
   segnalazioni.avvia();
   // Lo schermo dell'auto: solo dove Android Auto è di GdANav.
+  PonteAuto? ponteAuto;
   if (conLAuto) {
-    final ponte = PonteAuto(
+    final ponte = ponteAuto = PonteAuto(
       viaggio: viaggio,
       guida: guida,
       posizione: posizione,
@@ -248,7 +249,13 @@ Future<GdanavApp> preparaGdanav({
     guidaInAutoSenzaPremium?.addListener(premiumInAuto);
   }
   if (dimostrazione != null) {
-    unawaited(dimostrazione.avvia(auto: auto, viaggio: viaggio, guida: guida, prova: prova));
+    unawaited(
+      dimostrazione
+          .avvia(auto: auto, viaggio: viaggio, guida: guida, prova: prova)
+          // La posizione finta la tiene accesa il ponte dell'auto, come nella
+          // prova di guida: se no, al primo cambio della guida la spegne.
+          .then((_) => ponteAuto?.provaDiGuida()),
+    );
   }
   return GdanavApp(
     archivio: archivio,
