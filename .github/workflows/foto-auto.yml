@@ -15,6 +15,7 @@ on:
       - .github/workflows/foto-auto.yml
       - tools/foto-auto/**
       - packages/gdanav_app/lib/stato/dimostrazione.dart
+      - packages/gdanav_app/ios/gdanav_app/Sources/**
   workflow_dispatch:
 
 concurrency:

@@ -210,7 +210,9 @@ Future<GdanavApp> preparaGdanav({
   await fotoAuto.carica();
   // Aperta da Android Auto la schermata del telefono non c'è: la posizione
   // parte subito, se il permesso è già stato dato.
-  if (await haPosizione()) posizione.avvia();
+  // Nella dimostrazione le posizioni sono finte: il segnaposto e il
+  // tachimetro le seguono anche senza il permesso del GPS.
+  if (dimostrazione != null || await haPosizione()) posizione.avvia();
   // Le segnalazioni servono anche con l'app aperta solo sull'auto.
   segnalazioni.avvia();
   // Lo schermo dell'auto: solo dove Android Auto è di GdANav.

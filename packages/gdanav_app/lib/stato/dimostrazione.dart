@@ -76,7 +76,6 @@ enum Dimostrazione {
         Manovra(
           istruzione: 'Prendi l\'uscita Orvieto',
           tipo: 20,
-          uscita: 'Orvieto',
           verso: 'Orvieto',
           lunghezzaM: metri(uscita, lunghezzaKm),
           secondi: secondi(uscita, lunghezzaKm),

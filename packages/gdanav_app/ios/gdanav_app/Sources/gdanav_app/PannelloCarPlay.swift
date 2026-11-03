@@ -77,7 +77,8 @@ final class PannelloCarPlay: UIView {
         // (`CPTravelEstimates` è solo tempo e distanza): il pedaggio sta in
         // una capsula sua sulla riga in basso, accanto al tachimetro, dal lato
         // della scheda dei tempi. Nella barra no.
-        pedaggio(a, tachimetro, c)
+        let capsula = pedaggio(a, tachimetro, c)
+        traffico(a, dopo: capsula ?? tachimetro)
         var senza = c
         senza.pedaggio = nil
         barra(a, tachimetro, senza)
@@ -85,8 +86,9 @@ final class PannelloCarPlay: UIView {
 
     /// «pedaggio ~12,40 €» in ambra, in una capsula alta come il tachimetro,
     /// subito alla sua destra (o in basso a sinistra, senza tachimetro).
-    private func pedaggio(_ a: CGRect, _ tachimetro: CGRect?, _ c: CruscottoAuto) {
-        guard let t = c.pedaggio else { return }
+    @discardableResult
+    private func pedaggio(_ a: CGRect, _ tachimetro: CGRect?, _ c: CruscottoAuto) -> CGRect? {
+        guard let t = c.pedaggio else { return nil }
         let margine = dp(10)
         let h = tachimetro?.height ?? dp(54)
         let p = dp(16)
@@ -95,13 +97,61 @@ final class PannelloCarPlay: UIView {
         let spazioEtichetta = larghezza("pedaggio", etichetta) + dp(6)
         let x = tachimetro.map { $0.maxX + dp(8) } ?? (a.minX + margine)
         let w = min(spazioEtichetta + larghezza(t, valore) + p * 2, a.maxX - margine - x)
-        guard w > p * 2 else { return }
+        guard w > p * 2 else { return nil }
         let box = CGRect(x: x, y: a.maxY - margine - h, width: w, height: h)
         fondoScheda.setFill()
         UIBezierPath(roundedRect: box, cornerRadius: h / 2).fill()
         let y = box.midY + dp(7)
         scrivi("pedaggio", box.minX + p, y, etichetta)
         scrivi(taglia(t, valore, w - p * 2 - spazioEtichetta), box.minX + p + spazioEtichetta, y, valore)
+        return box
+    }
+
+    /// Il colore del ritardo del traffico, come sul telefono: arancio, rosso
+    /// da dieci minuti.
+    private func coloreTraffico(_ minuti: Int) -> UIColor {
+        minuti >= 10
+            ? UIColor(red: 1, green: 82 / 255, blue: 82 / 255, alpha: 1)
+            : UIColor(red: 1, green: 167 / 255, blue: 38 / 255, alpha: 1)
+    }
+
+    /// «+7 min traffico» in una capsula come quella del pedaggio, sulla riga
+    /// in basso dopo [dopo] (il pedaggio o il tachimetro). CarPlay non ha un
+    /// posto suo per il traffico: la scheda dei tempi è solo tempo e km.
+    private func traffico(_ a: CGRect, dopo: CGRect?) {
+        guard let m = PonteAuto.shared.guida?.trafficoMinuti, m > 0 else { return }
+        let margine = dp(10)
+        let h = dopo?.height ?? dp(54)
+        let p = dp(16)
+        let testo = "+\(m) min"
+        let valore = font(20, colore: coloreTraffico(m))
+        let etichetta = font(14, grassetto: false, colore: muto)
+        let x = dopo.map { $0.maxX + dp(8) } ?? (a.minX + margine)
+        let w = larghezza(testo, valore) + dp(6) + larghezza("traffico", etichetta) + p * 2
+        guard x + w <= a.maxX - margine else { return }
+        let box = CGRect(x: x, y: a.maxY - margine - h, width: w, height: h)
+        fondoScheda.setFill()
+        UIBezierPath(roundedRect: box, cornerRadius: h / 2).fill()
+        let y = box.midY + dp(7)
+        scrivi(testo, box.minX + p, y, valore)
+        scrivi("traffico", box.minX + p + larghezza(testo, valore) + dp(6), y, etichetta)
+    }
+
+    /// Sullo schermo piccolo: «+7 min» sotto la colonna della velocità (o
+    /// in alto, senza), allineato al suo bordo esterno.
+    private func trafficoPiccolo(_ a: CGRect, sotto colonna: CGRect?, aDestra: Bool, margine: CGFloat) {
+        guard let m = PonteAuto.shared.guida?.trafficoMinuti, m > 0 else { return }
+        let testo = "+\(m) min"
+        let valore: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 12, weight: .bold), .foregroundColor: coloreTraffico(m),
+        ]
+        let h: CGFloat = 22
+        let w = max(colonna?.width ?? 0, larghezza(testo, valore) + 14)
+        let x = aDestra ? (colonna?.maxX ?? a.maxX - margine) - w : (colonna?.minX ?? a.minX + margine)
+        let box = CGRect(x: x, y: (colonna?.maxY ?? a.minY) + 4, width: w, height: h)
+        fondoScheda.setFill()
+        UIBezierPath(roundedRect: box, cornerRadius: h / 2).fill()
+        centrato(testo, box.midX, box.midY + 4.5, valore)
     }
 
     // MARK: - La barra dei dati
@@ -248,6 +298,7 @@ final class PannelloCarPlay: UIView {
         let margine: CGFloat = 6
         let schedaASinistra = area.left >= area.right
         let colonna = velocitaPiccola(a, c, aDestra: schedaASinistra, margine: margine)
+        trafficoPiccolo(a, sotto: colonna, aDestra: schedaASinistra, margine: margine)
         // L'avviso nello spazio che resta accanto alla colonna.
         var sinistra = a.minX + margine
         var destra = a.maxX - margine
