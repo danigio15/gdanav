@@ -125,10 +125,13 @@ class GestoreGuida extends ChangeNotifier {
   /// interi e senza ballare a ogni lettura ([RitardoMostrato]): «+7 min di
   /// traffico» accanto all'arrivo. Prima di partire, quello di tutto il
   /// percorso. Zero: niente da dire.
-  int get minutiDiTraffico {
+  int get minutiDiTraffico => _ritardoMostrato.aggiorna(ritardoDavanti);
+
+  /// Il ritardo del traffico che resta davanti, esatto: quello da cui
+  /// vengono sia [minutiDiTraffico] sia le etichette della striscia.
+  Duration get ritardoDavanti {
     final a = avanzamento, p = pronto;
-    final ritardo = a?.ritardoTraffico ?? p?.viaggio.percorso.ritardoTraffico ?? Duration.zero;
-    return _ritardoMostrato.aggiorna(ritardo);
+    return a?.ritardoTraffico ?? p?.viaggio.percorso.ritardoTraffico ?? Duration.zero;
   }
 
   final _ritardoMostrato = RitardoMostrato();

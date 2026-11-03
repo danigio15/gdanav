@@ -105,4 +105,58 @@ void main() {
       expect(strisciaTraffico(p, percorsiM: 15000)!.code.single.minuti, 6);
     });
   });
+
+  // A 10 km la striscia diceva «+10 min» e sotto «+11 min di traffico».
+  group('le etichette tornano col numero scritto sotto', () {
+    final dueCode = dritta(40).conTraffico([
+      const Coda(daM: 4000, aM: 9000, ritardo: Duration(minutes: 8), livello: 3),
+      const Coda(daM: 20000, aM: 26000, ritardo: Duration(minutes: 10)),
+    ]);
+
+    test('col ritardo tutto nelle code, la somma è il numero scritto sotto', () {
+      for (final km in [0, 6, 10, 15, 22]) {
+        final s = strisciaTraffico(dueCode, percorsiM: km * 1000.0)!;
+        final esatti = s.code.fold(0.0, (t, c) => t + c.secondi);
+        final ritardo = Duration(milliseconds: (esatti * 1000).round());
+        // Lo smorzamento può tenere il numero di prima: un minuto sopra.
+        for (final mostrati in [(esatti / 60).round(), (esatti / 60).round() + 1]) {
+          final allineata = s.allineataA(mostrati, ritardo);
+          expect(allineata.minuti, mostrati, reason: 'a $km km con $mostrati min scritti sotto');
+          expect(allineata.code.map((c) => c.minuti).every((m) => m >= 0), isTrue);
+        }
+      }
+    });
+
+    test('a 10 km: «+11 min» sotto, «+11 min» sulla striscia', () {
+      final s = strisciaTraffico(dueCode, percorsiM: 10000)!;
+      expect(s.code, hasLength(1));
+      final ritardo = Duration(milliseconds: (s.code.single.secondi * 1000).round());
+      expect(s.allineataA(11, ritardo).code.single.minuti, 11);
+    });
+
+    test('i minuti si dividono in proporzione, coi resti più grandi', () {
+      final s = strisciaTraffico(dueCode, percorsiM: 0)!;
+      final secondi = s.code.map((c) => c.secondi).toList();
+      final totale = Duration(milliseconds: (secondi.reduce((a, b) => a + b) * 1000).round());
+      final quindici = s.allineataA(15, totale).code.map((c) => c.minuti).toList();
+      expect(quindici.reduce((a, b) => a + b), 15);
+      expect(quindici.first, lessThan(quindici.last));
+    });
+
+    test('col traffico sparso fuori dalle code, le etichette restano le loro ma non superano quello sotto', () {
+      final s = strisciaTraffico(dueCode, percorsiM: 0)!;
+      final nelleCode = s.code.fold(0.0, (t, c) => t + c.secondi);
+      // Altrettanto ritardo sparso fuori dalle code.
+      final ritardo = Duration(milliseconds: (2 * nelleCode * 1000).round());
+      final mostrati = (2 * nelleCode / 60).round();
+      expect(s.allineataA(mostrati, ritardo).code.map((c) => c.minuti), s.code.map((c) => c.minuti));
+      final pochi = s.allineataA(5, ritardo);
+      expect(pochi.minuti, lessThanOrEqualTo(5));
+    });
+
+    test('niente scritto sotto, niente sulla striscia', () {
+      final s = strisciaTraffico(dueCode, percorsiM: 0)!;
+      expect(s.allineataA(0, Duration.zero).minuti, 0);
+    });
+  });
 }

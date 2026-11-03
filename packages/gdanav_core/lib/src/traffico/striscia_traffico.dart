@@ -28,6 +28,7 @@ class CodaInStriscia {
     required this.minuti,
     required this.distanzaM,
     this.tipo,
+    this.secondi = 0,
   });
 
   /// Dove comincia e dove finisce, da 0 (l'auto) a 1 (la cima).
@@ -46,7 +47,20 @@ class CodaInStriscia {
   /// «Lavori», «Incidente»…, se si sa.
   final String? tipo;
 
+  /// I secondi esatti che fa ancora perdere, prima di arrotondare.
+  final double secondi;
+
   bool get dentro => distanzaM <= 0;
+
+  CodaInStriscia _conMinuti(int m) => CodaInStriscia(
+        da: da,
+        a: a,
+        livello: livello,
+        minuti: m,
+        distanzaM: distanzaM,
+        tipo: tipo,
+        secondi: secondi,
+      );
 
   @override
   String toString() => 'CodaInStriscia(${da.toStringAsFixed(3)}–${a.toStringAsFixed(3)}, '
@@ -69,8 +83,54 @@ class StrisciaTraffico {
   /// Il viaggio continua oltre la cima: in cima la meta non c'è.
   bool get tagliata => restantiM > scalaM + 1;
 
-  /// I minuti di tutte le code ancora davanti, anche oltre la cima.
+  /// I minuti delle code disegnate.
   int get minuti => code.fold(0, (s, c) => s + c.minuti);
+
+  /// Le etichette che tornano col «+N min di traffico» scritto in basso.
+  ///
+  /// A 10 km la striscia diceva «+10 min» e sotto «+11 min di traffico»: la
+  /// scritta in basso è il ritardo che resta, smorzato perché non balli
+  /// ([RitardoMostrato]), e le etichette erano ogni coda arrotondata per
+  /// conto suo. Quando il ritardo che resta sta (quasi) tutto nelle code
+  /// disegnate, i [mostrati] minuti si dividono fra le code in proporzione ai
+  /// loro secondi, col metodo dei resti più grandi: la somma delle etichette
+  /// è esattamente il numero scritto sotto. Quando invece una parte buona del
+  /// ritardo sta fuori dalle code (rallentamento sparso, code oltre la cima)
+  /// le etichette restano le loro, ma mai sopra [mostrati].
+  StrisciaTraffico allineataA(int mostrati, Duration ritardoDavanti) {
+    if (code.isEmpty) return this;
+    final inCode = code.fold(0.0, (s, c) => s + c.secondi);
+    final totale = ritardoDavanti.inMilliseconds / 1000;
+    if (mostrati <= 0) return _con([for (final c in code) c._conMinuti(0)]);
+    if (inCode <= 0) return this;
+    final tutto = totale <= 0 || inCode >= 0.8 * totale;
+    if (!tutto) {
+      // Le loro, ma la somma non supera quello scritto sotto.
+      var resta = mostrati;
+      return _con([
+        for (final c in code)
+          () {
+            final m = math.min(c.minuti, resta);
+            resta -= m;
+            return c._conMinuti(m);
+          }(),
+      ]);
+    }
+    final quote = [for (final c in code) mostrati * c.secondi / inCode];
+    final interi = [for (final q in quote) q.floor()];
+    var mancano = mostrati - interi.fold(0, (s, m) => s + m);
+    final ordine = [for (var i = 0; i < code.length; i++) i]
+      ..sort((x, y) => (quote[y] - interi[y]).compareTo(quote[x] - interi[x]));
+    for (final i in ordine) {
+      if (mancano <= 0) break;
+      interi[i] += 1;
+      mancano -= 1;
+    }
+    return _con([for (var i = 0; i < code.length; i++) code[i]._conMinuti(interi[i])]);
+  }
+
+  StrisciaTraffico _con(List<CodaInStriscia> nuove) =>
+      StrisciaTraffico(code: nuove, scalaM: scalaM, restantiM: restantiM);
 }
 
 /// Le code del [percorso] davanti a chi ha già fatto [percorsiM] metri, in
@@ -113,6 +173,7 @@ StrisciaTraffico? strisciaTraffico(
         minuti: (secondi / 60).round(),
         distanzaM: math.max(0.0, c.daM - fatti),
         tipo: c.tipo,
+        secondi: secondi,
       ),
     );
   }

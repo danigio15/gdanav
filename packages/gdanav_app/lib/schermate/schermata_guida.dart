@@ -231,7 +231,11 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                       child: Align(
                         alignment: Alignment.centerRight,
                         child: switch (g.pronto?.viaggio.percorso) {
-                          final p? => switch (strisciaTraffico(p, percorsiM: g.avanzamento?.percorsiM ?? 0)) {
+                          // Le etichette tornano col «+N min di traffico» in basso.
+                          final p? => switch (strisciaTraffico(
+                            p,
+                            percorsiM: g.avanzamento?.percorsiM ?? 0,
+                          )?.allineataA(g.minutiDiTraffico, g.ritardoDavanti)) {
                             final s? => Padding(
                               padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
                               child: StrisciaTrafficoLaterale(striscia: s),
