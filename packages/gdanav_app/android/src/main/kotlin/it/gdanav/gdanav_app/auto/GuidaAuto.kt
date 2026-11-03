@@ -115,6 +115,13 @@ class GuidaAuto(private val context: Context) {
     fun stima(g: PonteAuto.Guida, conTesto: Boolean = false): TravelEstimate {
         val stima = TravelEstimate.Builder(distanza(g.restantiM), DateTimeWithZone.create(g.arrivoMs, TimeZone.getDefault()))
             .setRemainingTimeSeconds(g.restantiS.coerceAtLeast(0))
+        // Il tempo che resta col colore del traffico, come sul telefono:
+        // arancio con un ritardo, rosso da dieci minuti. L'ora d'arrivo ha
+        // già dentro il ritardo; il colore dice che è per le code.
+        when {
+            g.trafficoMin >= 10 -> stima.setRemainingTimeColor(CarColor.RED)
+            g.trafficoMin >= 1 -> stima.setRemainingTimeColor(CarColor.YELLOW)
+        }
         val pedaggio = g.pedaggio
         if (conTesto && !pedaggio.isNullOrEmpty()) {
             val testo = SpannableString(pedaggio)

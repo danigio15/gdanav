@@ -355,10 +355,12 @@ void main() {
         expect(passo, greaterThanOrEqualTo(-1e-9));
         expect(passo * 111320, lessThan(6), reason: 'un passo per fotogramma, non 25 m in una volta');
       }
-      // 25 m/s per (0,5 s di età + 0,3 s): una ventina di metri più a nord del GPS.
+      // 25 m/s per (0,5 s di età + 0,9 s di anticipo): una trentina di metri
+      // più a nord del GPS. Dal campo: con 0,3 s la freccia arrivava
+      // all'incrocio dopo l'auto.
       final camera = mosse.last;
       final avanti = distanzaM(dopo, Punto(camera.target.latitude, sulla.lon));
-      expect(avanti, closeTo(20, 4));
+      expect(avanti, closeTo(35, 4));
       expect(camera.target.latitude, greaterThan(dopo.lat));
       await tester.runAsync(a.guida.ferma);
       await via(tester);

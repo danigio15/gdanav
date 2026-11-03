@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 
 import '../geo/geo.dart';
+import '../motore/modello_consumo.dart' show Tratto;
 import '../percorso/valhalla.dart';
+import '../traffico/ritardo_traffico.dart';
 
 /// Dove si è lungo il percorso, e cosa viene dopo.
 class Avanzamento {
@@ -9,6 +11,7 @@ class Avanzamento {
     required this.percorsiM,
     required this.restantiM,
     required this.restante,
+    this.ritardoTraffico = Duration.zero,
     required this.lontanoM,
     required this.prossima,
     required this.allaProssimaM,
@@ -26,6 +29,10 @@ class Avanzamento {
   final double percorsiM;
   final double restantiM;
   final Duration restante;
+
+  /// Quanto di [restante] è dovuto al traffico di adesso, sulla strada che
+  /// resta: «+7 min di traffico». Zero senza traffico.
+  final Duration ritardoTraffico;
 
   /// Quanto si è lontani dalla linea del percorso.
   final double lontanoM;
@@ -101,7 +108,12 @@ class Guida {
     this.anticipaDaM = 60,
     this.anticipoGradi = 25,
   }) : _linea = Linea(percorso.punti) {
-    _secondi = _secondiCumulati();
+    _secondi = _secondiCumulati(percorso.tratti);
+    /* I tempi senza traffico sulla stessa strada: la differenza con quelli
+     * col traffico, da qui alla meta, è il ritardo che resta. */
+    final base = percorso.senzaTraffico;
+    _secondiSenzaTraffico =
+        base != null && base.punti.length == percorso.punti.length ? _secondiCumulati(base.tratti) : null;
   }
 
   final PercorsoCalcolato percorso;
@@ -182,6 +194,7 @@ class Guida {
   final double sogliaSgancioM;
   final Linea _linea;
   late final List<double> _secondi;
+  late final List<double>? _secondiSenzaTraffico;
 
   var _segmento = 0;
   var _fuori = 0;
@@ -304,6 +317,7 @@ class Guida {
     final i = p.segmento;
     final secondiQui = _secondi[i] + p.t * (_secondi[math.min(i + 1, _secondi.length - 1)] - _secondi[i]);
     final restante = Duration(seconds: math.max(0, _secondi.last - secondiQui).round());
+    final ritardoTraffico = _ritardoAvanti(i, p.t, percorsi, restante);
 
     final manovre = percorso.manovre;
     var k = manovre.indexWhere((m) => _linea.cumulate[_indice(m)] > percorsi + 1);
@@ -320,6 +334,7 @@ class Guida {
       percorsiM: percorsi,
       restantiM: restanti,
       restante: restante,
+      ritardoTraffico: ritardoTraffico,
       lontanoM: p.lontanoM,
       prossima: prossima,
       allaProssimaM: alla,
@@ -508,8 +523,7 @@ class Guida {
   /// segmento appartiene.
   /// I secondi dall'inizio a ogni punto: dai tempi dei tratti (che hanno
   /// dentro il traffico), o, senza tratti, da quelli delle manovre.
-  List<double> _secondiCumulati() {
-    final tratti = percorso.tratti;
+  List<double> _secondiCumulati(List<Tratto> tratti) {
     final n = _linea.punti.length;
     if (tratti.isNotEmpty && n > 1 && _linea.lunghezzaM > 0) {
       final totale = tratti.fold(0.0, (s, t) => s + t.lunghezzaM);
@@ -531,6 +545,29 @@ class Guida {
       return s;
     }
     return _secondiDaManovre();
+  }
+
+  /// Quanto del ritardo per il traffico sta ancora davanti, da dove si è
+  /// (segmento [i], frazione [t], [percorsiM] metri fatti) alla meta.
+  ///
+  /// Col percorso senza traffico a fianco è la differenza dei tempi che
+  /// restano; senza (TomTom dà già i tempi col traffico) si stima dalle code
+  /// ancora davanti ([ritardoTrafficoAvanti]).
+  Duration _ritardoAvanti(int i, double t, double percorsiM, Duration restante) {
+    if (!percorso.trafficoVero) return Duration.zero;
+    final base = _secondiSenzaTraffico;
+    if (base != null && base.length == _secondi.length) {
+      double qui(List<double> s) => s[i] + t * (s[math.min(i + 1, s.length - 1)] - s[i]);
+      final conTraffico = _secondi.last - qui(_secondi);
+      final senza = base.last - qui(base);
+      return Duration(seconds: math.max(0.0, conTraffico - senza).round());
+    }
+    final totale = _secondi.isEmpty ? 0.0 : _secondi.last;
+    return ritardoTrafficoAvanti(
+      percorso,
+      percorsiM: percorsiM,
+      quotaTempoRestante: totale > 0 ? restante.inMilliseconds / 1000 / totale : 0,
+    );
   }
 
   List<double> _secondiDaManovre() {

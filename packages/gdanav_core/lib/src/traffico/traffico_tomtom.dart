@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../geo/geo.dart';
 import '../percorso/valhalla.dart';
+import 'ritardo_traffico.dart';
 
 /// Il traffico di adesso sul percorso, da TomTom: il percorso di Valhalla
 /// si fa rifare a TomTom passando dagli stessi punti (`supportingPoints`),
@@ -49,7 +50,18 @@ class TrafficoTomTom {
         )
         .timeout(const Duration(seconds: 20));
     if (r.statusCode != 200) throw Exception('TomTom traffico: ${r.statusCode}');
-    return p.conTraffico(codeDa(jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>, p.punti));
+    final json = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>;
+    // Le code per la mappa e i tempi dove sono; il ritardo di tutto il
+    // percorso (code più rallentamento sparso) per l'arrivo.
+    return p.conTraffico(codeDa(json, p.punti), totale: totaleDa(json));
+  }
+
+  /// Quanto si perde in tutto per il traffico, dal sommario della prima
+  /// rotta; `null` se la risposta non ha sommario.
+  static Duration? totaleDa(Map<String, Object?> json) {
+    final rotta = ((json['routes'] as List?) ?? const []).whereType<Map>().firstOrNull;
+    final sommario = (rotta?['summary'] as Map?)?.cast<String, Object?>();
+    return sommario == null ? null : ritardoDalSommario(sommario);
   }
 
   /// Le code della risposta di `calculateRoute`, in metri sul percorso di

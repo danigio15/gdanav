@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
 
@@ -152,6 +153,7 @@ class PercorsoCalcolato {
     this.ritardoTraffico = Duration.zero,
     this.trafficoVero = false,
     this.senzaTraffico,
+    this.ritardoDichiarato,
     this.ztl,
     this.consumoTomTom,
     this.pedaggi = const [],
@@ -185,6 +187,12 @@ class PercorsoCalcolato {
   /// Lo stesso percorso prima del traffico: per rimetterci sopra il traffico
   /// aggiornato (le code sparite non devono restare).
   final PercorsoCalcolato? senzaTraffico;
+
+  /// Quanto ha detto di perdere in tutto chi ha dato il traffico (TomTom,
+  /// dal sommario), code e rallentamento sparso: per rimetterlo uguale
+  /// quando il traffico si riporta su un percorso rifatto. `null` se ha
+  /// dato solo le code.
+  final Duration? ritardoDichiarato;
 
   /// Cosa fa con le ZTL: quali evita, da quali passa, di quale chiedere il
   /// permesso. `null` dove le ZTL non si guardano (Valhalla, le prove).
@@ -232,6 +240,7 @@ class PercorsoCalcolato {
     Duration? ritardoTraffico,
     bool? trafficoVero,
     PercorsoCalcolato? senzaTraffico,
+    Duration? ritardoDichiarato,
     ZtlDelViaggio? ztl,
     List<PagamentoPedaggio>? pagamentiPedaggio,
   }) =>
@@ -247,6 +256,7 @@ class PercorsoCalcolato {
         ritardoTraffico: ritardoTraffico ?? this.ritardoTraffico,
         trafficoVero: trafficoVero ?? this.trafficoVero,
         senzaTraffico: senzaTraffico ?? this.senzaTraffico,
+        ritardoDichiarato: ritardoDichiarato ?? this.ritardoDichiarato,
         ztl: ztl ?? this.ztl,
         consumoTomTom: consumoTomTom,
         pedaggi: pedaggi,
@@ -264,12 +274,23 @@ class PercorsoCalcolato {
   }
 
   /// Col traffico di adesso: dentro ogni coda i tratti vanno piano quanto
-  /// basta a perdere il suo ritardo (o alla velocità della coda, se si
-  /// sa), così arrivo e consumi ne tengono conto. [code] con le distanze
+  /// basta a perdere il suo ritardo (o alla velocità della coda, se è più
+  /// lenta), così arrivo e consumi ne tengono conto. [code] con le distanze
   /// sui [punti] di questo percorso.
-  PercorsoCalcolato conTraffico(List<Coda> code) {
+  ///
+  /// [totale]: quanto dice di perdere in tutto chi dà il traffico (vedi
+  /// [ritardoDalSommario]). La parte che non sta nelle code — il
+  /// rallentamento sparso, i semafori dell'ora di punta — si spalma sul
+  /// resto della strada, al massimo [quotaMassimaSparsa] del tempo senza
+  /// traffico: un numero sballato non deve raddoppiare il viaggio.
+  ///
+  /// [ritardoTraffico] è quanto si perde davvero coi tempi nuovi: prima
+  /// era la somma dei ritardi dichiarati, anche quando la velocità della
+  /// coda ne faceva perdere meno (o di più), e l'arrivo non tornava col
+  /// «+N min» scritto accanto.
+  PercorsoCalcolato conTraffico(List<Coda> code, {Duration? totale}) {
     // Sempre dal percorso senza traffico: le code di prima non si sommano.
-    if (senzaTraffico case final b?) return b.conTraffico(code);
+    if (senzaTraffico case final b?) return b.conTraffico(code, totale: totale);
     final nuovi = List<Tratto>.of(tratti);
     // Dove comincia ogni tratto, in metri.
     final inizio = <double>[];
@@ -282,27 +303,74 @@ class PercorsoCalcolato {
     // sulle lunghezze di Valhalla: si riportano sulla stessa misura.
     final geometrica = Linea(punti).lunghezzaM;
     final k = geometrica > 0 ? m / geometrica : 1.0;
-    var ritardo = Duration.zero;
+    final inCoda = List<bool>.filled(nuovi.length, false);
+    var dichiaratoNelleCode = 0.0;
     for (final c in code) {
+      dichiaratoNelleCode += c.ritardo.inMilliseconds / 1000;
       final da = c.daM * k, a = c.aM * k;
       final dentro = [
         for (var i = 0; i < nuovi.length; i++)
           if (inizio[i] + nuovi[i].lunghezzaM > da && inizio[i] < a) i,
       ];
       if (dentro.isEmpty) continue;
+      for (final i in dentro) {
+        inCoda[i] = true;
+      }
       final secondi = dentro.fold(0.0, (s, i) => s + nuovi[i].secondi);
       final lunghezza = dentro.fold(0.0, (s, i) => s + nuovi[i].lunghezzaM);
-      // La velocità nella coda: quella detta, o quella che fa perdere il ritardo.
-      final kmh = c.velocitaKmh ?? (lunghezza / (secondi + c.ritardo.inSeconds) * 3.6);
+      if (lunghezza <= 0) continue;
+      // La velocità che fa perdere il ritardo dichiarato, e quella detta
+      // della coda: vale la più lenta, perché sono due misure dello stesso
+      // rallentamento e la più prudente è quella che non fa arrivare tardi
+      // senza dirlo.
+      final ritardo = c.ritardo.inMilliseconds / 1000;
+      final perIlRitardo = ritardo > 0 ? lunghezza / (secondi + ritardo) * 3.6 : null;
+      final kmh = switch ((c.velocitaKmh, perIlRitardo)) {
+        (final double v?, final double r?) => math.min(v, r),
+        (final double v?, null) => v,
+        (null, final double r?) => r,
+        _ => null,
+      };
+      if (kmh == null) continue;
       final v = kmh.clamp(3.0, 130.0);
       for (final i in dentro) {
         final t = nuovi[i];
         if (v < t.velocitaKmh) nuovi[i] = Tratto(lunghezzaM: t.lunghezzaM, velocitaKmh: v, dislivelloM: t.dislivelloM);
       }
-      ritardo += c.ritardo;
     }
-    return _copia(tratti: nuovi, code: code, ritardoTraffico: ritardo, trafficoVero: true, senzaTraffico: this);
+    // Il ritardo che non sta nelle code, sul resto della strada.
+    final sparso = (totale?.inMilliseconds ?? 0) / 1000 - dichiaratoNelleCode;
+    if (sparso > 0) {
+      final fuori = [
+        for (var i = 0; i < nuovi.length; i++)
+          if (!inCoda[i]) i,
+      ];
+      final secondiFuori = fuori.fold(0.0, (s, i) => s + nuovi[i].secondi);
+      final senza = tratti.fold(0.0, (s, t) => s + t.secondi);
+      final aggiunti = math.min(sparso, senza * quotaMassimaSparsa);
+      if (secondiFuori > 0 && aggiunti > 0) {
+        final lento = secondiFuori / (secondiFuori + aggiunti);
+        for (final i in fuori) {
+          final t = nuovi[i];
+          nuovi[i] = Tratto(lunghezzaM: t.lunghezzaM, velocitaKmh: t.velocitaKmh * lento, dislivelloM: t.dislivelloM);
+        }
+      }
+    }
+    final prima = tratti.fold(0.0, (s, t) => s + t.secondi);
+    final dopo = nuovi.fold(0.0, (s, t) => s + t.secondi);
+    return _copia(
+      tratti: nuovi,
+      code: code,
+      ritardoTraffico: Duration(seconds: math.max(0.0, dopo - prima).round()),
+      trafficoVero: true,
+      senzaTraffico: this,
+      ritardoDichiarato: totale,
+    );
   }
+
+  /// Quanto del tempo senza traffico si può aggiungere, al più, per il
+  /// rallentamento fuori dalle code.
+  static const quotaMassimaSparsa = 0.5;
 
   /// I metri fatti su ogni strada.
   Map<String, double> get _metriPerStrada {

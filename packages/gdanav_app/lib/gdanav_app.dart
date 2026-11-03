@@ -9,6 +9,7 @@ import 'auto/ponte_auto.dart';
 import 'schermate/aggiorna_gdanav.dart';
 import 'schermate/schermata_principale.dart';
 import 'stato/archivio.dart';
+import 'stato/dimostrazione.dart';
 import 'stato/scelte_avvisi.dart';
 import 'stato/gestore_aggiornamento.dart';
 import 'stato/gestore_auto.dart';
@@ -84,6 +85,9 @@ Future<GdanavApp> preparaGdanav({
   GestorePersone? persone,
 }) async {
   final archivio = Archivio(portachiavi);
+  // Solo nelle build per le foto della CI (GDANAV_DIMOSTRAZIONE): un viaggio
+  // finto con le code. Nelle altre è `null` e non cambia niente.
+  final dimostrazione = Dimostrazione.daCompilazione;
   final aggiornamento = GestoreAggiornamento.per(
     archivio: archivio,
     premiumOspite: premiumOspite,
@@ -117,7 +121,8 @@ Future<GdanavApp> preparaGdanav({
   final viaggio = GestoreViaggio(
     archivio: archivio,
     auto: auto,
-    posizione: posizioneAttuale,
+    posizione: dimostrazione?.posizione ?? posizioneAttuale,
+    costruisci: dimostrazione?.pianificatore ?? pianificatoreVero,
     consumo: consumo,
     ztl: ztl,
   );
@@ -138,11 +143,13 @@ Future<GdanavApp> preparaGdanav({
   await risparmio.carica();
   GestoreRisparmio.attuale = risparmio;
   // La prova di guida di Android Auto: posizioni finte al posto del GPS.
-  final prova = ProvaDiGuida();
+  final prova = ProvaDiGuida(acceleratore: dimostrazione == null ? 1 : Dimostrazione.acceleratore);
   final guida = GestoreGuida(
     viaggio: viaggio,
     auto: auto,
-    posizioni: prova.posizioni(posizioniGuida),
+    // Nella dimostrazione solo le posizioni finte: il GPS vero, senza
+    // permesso, non deve fermare quelle.
+    posizioni: prova.posizioni(dimostrazione == null ? posizioniGuida : Stream<Punto>.empty),
     voce: VoceTelefono(),
     consumo: consumo,
     risparmio: risparmio,
@@ -154,7 +161,7 @@ Future<GdanavApp> preparaGdanav({
   // fermi il segnaposto non deve girare dietro al ballonzolamento del GPS.
   final posizione = GestorePosizione(
     archivio: archivio,
-    letture: prova.letture(lettureGps),
+    letture: prova.letture(dimostrazione == null ? lettureGps : Stream<Lettura>.empty),
     velocitaDellAuto: auto.velocitaAuto,
     // Il limite anche senza navigazione: dallo stesso server dei percorsi.
     chiediLimite: (tracciato) async {
@@ -205,12 +212,15 @@ Future<GdanavApp> preparaGdanav({
   await fotoAuto.carica();
   // Aperta da Android Auto la schermata del telefono non c'è: la posizione
   // parte subito, se il permesso è già stato dato.
-  if (await haPosizione()) posizione.avvia();
+  // Nella dimostrazione le posizioni sono finte: il segnaposto e il
+  // tachimetro le seguono anche senza il permesso del GPS.
+  if (dimostrazione != null || await haPosizione()) posizione.avvia();
   // Le segnalazioni servono anche con l'app aperta solo sull'auto.
   segnalazioni.avvia();
   // Lo schermo dell'auto: solo dove Android Auto è di GdANav.
+  PonteAuto? ponteAuto;
   if (conLAuto) {
-    final ponte = PonteAuto(
+    final ponte = ponteAuto = PonteAuto(
       viaggio: viaggio,
       guida: guida,
       posizione: posizione,
@@ -237,6 +247,15 @@ Future<GdanavApp> preparaGdanav({
     premium.addListener(premiumInAuto);
     aggiornamento?.addListener(premiumInAuto);
     guidaInAutoSenzaPremium?.addListener(premiumInAuto);
+  }
+  if (dimostrazione != null) {
+    unawaited(
+      dimostrazione
+          .avvia(auto: auto, viaggio: viaggio, guida: guida, prova: prova)
+          // La posizione finta la tiene accesa il ponte dell'auto, come nella
+          // prova di guida: se no, al primo cambio della guida la spegne.
+          .then((_) => ponteAuto?.provaDiGuida()),
+    );
   }
   return GdanavApp(
     archivio: archivio,

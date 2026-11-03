@@ -177,7 +177,9 @@ class PianificatoreViaggio {
     if (scelto != null && seguendo != null) {
       try {
         final rifatto = await seguendo!(scelto);
-        p = scelto.trafficoVero ? rifatto.conTraffico(_riporta(scelto, rifatto)) : rifatto;
+        p = scelto.trafficoVero
+            ? rifatto.conTraffico(_riporta(scelto, rifatto), totale: scelto.ritardoDichiarato ?? scelto.ritardoTraffico)
+            : rifatto;
       } catch (_) {}
     }
     final t = traffico;

@@ -121,6 +121,21 @@ class GestoreGuida extends ChangeNotifier {
     return _ora().add(a.restante + ricariche);
   }
 
+  /// Quanti minuti del tempo che resta sono per il traffico di adesso,
+  /// interi e senza ballare a ogni lettura ([RitardoMostrato]): «+7 min di
+  /// traffico» accanto all'arrivo. Prima di partire, quello di tutto il
+  /// percorso. Zero: niente da dire.
+  int get minutiDiTraffico => _ritardoMostrato.aggiorna(ritardoDavanti);
+
+  /// Il ritardo del traffico che resta davanti, esatto: quello da cui
+  /// vengono sia [minutiDiTraffico] sia le etichette della striscia.
+  Duration get ritardoDavanti {
+    final a = avanzamento, p = pronto;
+    return a?.ritardoTraffico ?? p?.viaggio.percorso.ritardoTraffico ?? Duration.zero;
+  }
+
+  final _ritardoMostrato = RitardoMostrato();
+
   /// La batteria quando si è partiti (anche dopo un ricalcolo).
   double? get batteriaPartenza => _batteriaInizio ?? pronto?.batteriaPartenza;
 
@@ -453,8 +468,17 @@ class GestoreGuida extends ChangeNotifier {
    * [avantiAlPiuM]. Fuori dalla strada resta il punto del GPS, com'è. */
 
   /// Quanto si guarda avanti oltre l'età della lettura: il tempo che la
-  /// mappa ci mette a disegnare.
-  static const anticipo = Duration(milliseconds: 300);
+  /// mappa ci mette a disegnare, più il ritardo del GPS stesso.
+  ///
+  /// Dal campo: «arrivi all'incrocio e la freccia non c'è ancora, va in
+  /// ritardo sul percorso». Erano 300 ms, il solo disegno. Ma la posizione
+  /// del telefono è già filtrata (il fornitore della posizione la liscia, e
+  /// liscia vuol dire indietro): a 50 all'ora la freccia restava una decina
+  /// di metri dietro, e all'incrocio si arrivava prima di lei. Si guarda
+  /// avanti di quasi un secondo: frenando prima di una svolta si rischia al
+  /// più qualche metro in avanti, e da fermi (sotto 1,5 m/s) non si
+  /// anticipa niente, la freccia si ferma dove si è.
+  static const anticipo = Duration(milliseconds: 900);
 
   /// Mai più avanti di così: un GPS che tace non deve far correre l'auto da
   /// sola lungo la strada.

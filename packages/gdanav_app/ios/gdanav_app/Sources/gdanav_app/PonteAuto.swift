@@ -71,6 +71,8 @@ struct GuidaAuto {
     let dopoFrasi: [String]
     /// La vista dello svincolo da mostrare, se pronta (vedi `svincoli`).
     let svincolo: Int?
+    /// Quanti minuti dell'arrivo sono traffico: 0, niente traffico.
+    var trafficoMinuti = 0
 }
 
 /// Batteria, velocità e limite, arrivo, sosta, meteo.
@@ -351,7 +353,7 @@ final class PonteAuto {
 
     private func guidaDa(_ a: [String: Any]) -> GuidaAuto {
         let arrivoMs = numero(a["arrivo"]) ?? Date().timeIntervalSince1970 * 1000
-        return GuidaAuto(
+        var g = GuidaAuto(
             tipo: numero(a["tipo"]).map { Int($0) } ?? 8,
             distanzaM: numero(a["distanza"]) ?? 0,
             strada: a["strada"] as? String ?? "",
@@ -382,6 +384,8 @@ final class PonteAuto {
             dopoFrasi: (a["dopo_frasi"] as? [Any] ?? []).compactMap { $0 as? String }.filter { !$0.isEmpty },
             svincolo: numero(a["svincolo"]).map { Int($0) }
         )
+        g.trafficoMinuti = numero(a["traffico_minuti"]).map { Int($0) } ?? 0
+        return g
     }
 
     /// L'avviso nuovo da mostrare, una volta sola.

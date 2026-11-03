@@ -9,6 +9,7 @@ import '../componenti/indicatore_batteria.dart' show eta;
 import '../componenti/itinerario.dart' show BadgePedaggio;
 import '../componenti/icone_segnalazioni.dart';
 import '../componenti/risparmio.dart';
+import '../componenti/striscia_traffico.dart';
 import '../componenti/tachimetro.dart';
 import '../componenti/vista_svincolo.dart';
 import '../componenti/vetro.dart';
@@ -223,7 +224,28 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                         onSalva: (euro) => g.pagaRicarica(i, euro),
                         onDopo: g.nonOra,
                       ),
-                    const Spacer(),
+                    // Lo spazio libero sopra il tachimetro: di lato, la
+                    // striscia del traffico, se davanti c'è qualche coda. Il
+                    // resto lascia passare i tocchi alla mappa.
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: switch (g.pronto?.viaggio.percorso) {
+                          // Le etichette tornano col «+N min di traffico» in basso.
+                          final p? => switch (strisciaTraffico(
+                            p,
+                            percorsiM: g.avanzamento?.percorsiM ?? 0,
+                          )?.allineataA(g.minutiDiTraffico, g.ritardoDavanti)) {
+                            final s? => Padding(
+                              padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
+                              child: StrisciaTrafficoLaterale(striscia: s),
+                            ),
+                            _ => const SizedBox.shrink(),
+                          },
+                          _ => const SizedBox.shrink(),
+                        },
+                      ),
+                    ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
                       child: ListenableBuilder(
@@ -808,6 +830,11 @@ class _Fondo extends StatelessWidget {
     // Il pedaggio che resta da pagare: solo se c'è.
     final pedaggio = guida.pedaggioDavanti;
     final ambra = BadgePedaggio.colori(context, paga: true).$2;
+    // Quanto dell'arrivo è traffico: già dentro l'ora e il tempo, qui detto.
+    final traffico = guida.minutiDiTraffico;
+    final coloreTraffico = gravitaRitardo(traffico) >= 2
+        ? ColoriGdanav.di(context).guasta
+        : ColoriGdanav.di(context).piena;
     return SafeArea(
       top: false,
       child: Padding(
@@ -825,9 +852,37 @@ class _Fondo extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            arrivo == null ? '' : orario(arrivo),
-                            style: t.headlineSmall?.copyWith(color: ColoriGdanav.di(context).libera),
+                          Wrap(
+                            spacing: 10,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                arrivo == null ? '' : orario(arrivo),
+                                style: t.headlineSmall?.copyWith(
+                                  color: traffico >= 1 ? coloreTraffico : ColoriGdanav.di(context).libera,
+                                ),
+                              ),
+                              if (traffico >= 1)
+                                Row(
+                                  key: const Key('traffico-restante'),
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.traffic_rounded, size: 17, color: coloreTraffico),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        testoRitardoTraffico(traffico),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: t.titleSmall?.copyWith(
+                                          color: coloreTraffico,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                            ],
                           ),
                           // Il pedaggio che resta, accanto ai km che restano; se
                           // non ci sta (i tasti a destra), subito sotto.

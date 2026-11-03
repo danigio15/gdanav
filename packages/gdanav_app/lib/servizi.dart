@@ -44,6 +44,11 @@ abstract final class Servizi {
   /// Store e l'App Store chiedono l'abbonamento (o un codice regalo).
   static const tuttoSbloccato = bool.fromEnvironment('GDANAV_TUTTO_SBLOCCATO');
 
+  /// Solo per le foto dello schermo dell'auto fatte dalla CI: `traffico7` o
+  /// `traffico18` fanno partire da sola la guida su un viaggio finto con le
+  /// code (`Dimostrazione`). Vuota in tutte le build vere.
+  static const dimostrazione = String.fromEnvironment('GDANAV_DIMOSTRAZIONE');
+
   /// Il numero della build: la CI passa quello della corsa
   /// (`--dart-define=GDANAV_COSTRUZIONE=${{ github.run_number }}`), lo stesso
   /// del `--build-number`. 0 nelle build fatte a mano, che non si bloccano

@@ -233,7 +233,7 @@ void main() {
     await aspetta(tester);
     expect(find.text('Incidente segnalato'), findsNothing); // ancora 4 km
 
-    a.posizioni.add(Punto(punti[4].lat + 0.003, punti[4].lon)); // ~700 m prima
+    a.posizioni.add(Punto(punti[4].lat + 0.0078, punti[4].lon)); // ~130 m prima: in città si avvisa poco prima
     await aspetta(tester);
     expect(find.text('Incidente segnalato'), findsOneWidget);
     expect(find.textContaining('confermata da 2'), findsOneWidget);
@@ -278,7 +278,9 @@ void main() {
 
     await tester.tap(find.text('Avvia'));
     await tester.pumpAndSettle();
-    a.posizioni.add(Punto(punti[4].lat + 0.003, punti[4].lon)); // ~700 m prima del primo
+    a.posizioni.add(
+      Punto(punti[4].lat + 0.0078, punti[4].lon),
+    ); // ~130 m prima del primo: in città si avvisa poco prima
     await aspetta(tester);
     expect(find.text('Autovelox fisso'), findsOneWidget);
     expect(a.voce.frasi.where((f) => f.startsWith('Autovelox, limite 90 tra')), hasLength(1));

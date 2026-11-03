@@ -25,10 +25,50 @@ void main() {
 
   final strada = dritta(20).punti;
 
-  test('più si va forte, prima si avvisa', () {
-    expect(AvvisiStrada.avvisoAlla(50), AvvisiStrada.avvisoM);
+  test('più si va forte, prima si avvisa; in città poco prima', () {
+    expect(AvvisiStrada.avvisoAlla(50, limiteKmh: 50), closeTo(208, 1));
+    expect(AvvisiStrada.avvisoAlla(30, limiteKmh: 50), 150);
+    expect(AvvisiStrada.avvisoAlla(80, limiteKmh: 90), closeTo(444, 1));
     expect(AvvisiStrada.avvisoAlla(130), closeTo(1083, 1));
-    expect(AvvisiStrada.avvisoAlla(250), AvvisiStrada.avvisoMassimoM);
+    expect(AvvisiStrada.avvisoAlla(250), 1200);
+  });
+
+  testWidgets('in città, a 50 all\'ora, l\'autovelox non si sente a 900 m ma a poco più di 200', (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    // Sulla metà in città della strada, quella col limite a 50.
+    final autovelox = ArchivioAutovelox.leggi(
+      ArchivioAutovelox.scrivi([(strada[5].lat, strada[5].lon + 0.0001, 50, 0)]),
+    );
+    final a = await ambiente(tester, km: 20, autovelox: autovelox);
+    await tester.pumpWidget(a.app());
+    a.auto.manuale.imposta(90);
+    await tester.pump();
+    await tester.runAsync(() => a.viaggio.vaiA(const Luogo(nome: 'Nord', posizione: Punto(42.18, 12))));
+    await tester.pumpAndSettle();
+    final punti = (a.viaggio.stato as ViaggioPronto).viaggio.percorso.punti;
+    a.posizione.avvia();
+    a.gps.add(Lettura(punti[0]));
+    await aspetta(tester, 60);
+    await tester.tap(find.text('Avvia'));
+    await tester.pumpAndSettle();
+
+    Future<void> qui(Punto p) async {
+      a.gps.add(Lettura(p, velocitaMs: 13.9, rotta: 0));
+      a.posizioni.add(p);
+      await aspetta(tester);
+    }
+
+    final avvisi = AvvisiStrada.di(a.guida, a.segnalazioni);
+    // A 900 m, poi a 500: ancora niente.
+    await qui(Punto(punti[5].lat - 0.0081, punti[5].lon));
+    await qui(Punto(punti[5].lat - 0.0045, punti[5].lon));
+    expect(a.voce.frasi.where((f) => f.startsWith('Autovelox')), isEmpty);
+    expect(avvisi.davanti, isNull);
+    // A 200 m sì, una volta.
+    await qui(Punto(punti[5].lat - 0.0018, punti[5].lon));
+    expect(a.voce.frasi.where((f) => f.startsWith('Autovelox, limite 50 tra')), hasLength(1));
+    expect(avvisi.davanti!.$2, closeTo(200, 10));
+    await tester.runAsync(a.guida.ferma);
   });
 
   testWidgets('a 130 all\'ora l\'autovelox da 90 si sente a un chilometro, con «rallenta», e di nuovo vicino', (
@@ -84,15 +124,15 @@ void main() {
     await tester.pumpWidget(a.app());
     await tester.pump();
     a.posizione.avvia();
-    // Verso nord, a 72 all'ora.
+    // Verso nord, a 72 all'ora: si avvisa a meno di 400 m.
     for (var i = 0; i < 4; i++) {
-      a.gps.add(Lettura(Punto(strada[4].lat + 0.003 + 0.0003 * i, strada[4].lon), velocitaMs: 20, rotta: 0));
+      a.gps.add(Lettura(Punto(strada[4].lat + 0.0055 + 0.0003 * i, strada[4].lon), velocitaMs: 20, rotta: 0));
       await aspetta(tester, 40);
     }
     await tester.pumpAndSettle();
     final avvisi = AvvisiStrada.di(a.guida, a.segnalazioni);
     expect(avvisi.davanti?.$1.limiteKmh, 70);
-    expect(avvisi.davanti!.$2, closeTo((strada[5].lat - strada[4].lat - 0.0039) * 111320, 30));
+    expect(avvisi.davanti!.$2, closeTo((strada[5].lat - strada[4].lat - 0.0064) * 111320, 30));
     expect(find.byKey(const Key('avviso-senza-percorso')), findsOneWidget);
     expect(a.voce.frasi.where((f) => f.startsWith('Autovelox, limite 70 tra')), hasLength(1));
 
