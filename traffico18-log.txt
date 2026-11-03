@@ -1,0 +1,15 @@
+getpwuid_r did not find a match for uid 501
+Timestamp               Ty Process[PID:TID]
+2026-11-03 14:10:45.925 Df Runner[22644:187d5] [com.apple.network:path] nw_path_libinfo_path_check [D34F356B-7BCE-4C26-816E-747769B1AEE9 Hostname#4263d58b:0 tcp, legacy-socket, attribution: developer]
+	libinfo check path: satisfied (Path is satisfied), interface: en0
+2026-11-03 14:10:45.982 A  Runner[22644:187d6] (Security) SecTrustEvaluateIfNecessary
+2026-11-03 14:10:45.988 Df Runner[22644:187d6] [com.apple.xpc:connection] [0x102b7d660] activating connection: mach=true listener=false peer=false name=com.apple.trustd
+2026-11-03 14:10:46.007 Df Runner[22644:187d6] [com.apple.xpc:connection] [0x102b7d660] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+2026-11-03 14:12:39.431 Df Runner[22644:120c1] [com.apple.KeyboardArbiter:Client] RX sceneBecameFocused:(null)
+2026-11-03 14:12:45.936 Df Runner[22644:19565] [com.apple.network:path] nw_path_libinfo_path_check [9FF764BD-3D6C-4727-88E2-49CC1CA7766B Hostname#4263d58b:0 tcp, legacy-socket, attribution: developer]
+	libinfo check path: satisfied (Path is satisfied), interface: en0
+2026-11-03 14:12:45.956 Df Runner[22644:19565] [com.apple.network:path] nw_path_libinfo_path_check [607501DA-2F21-4577-961E-C47A15679E22 Hostname#4263d58b:0 tcp, legacy-socket, attribution: developer]
+	libinfo check path: satisfied (Path is satisfied), interface: en0
+2026-11-03 14:12:45.977 A  Runner[22644:19567] (Security) SecTrustEvaluateIfNecessary
+2026-11-03 14:12:45.978 Df Runner[22644:19567] [com.apple.xpc:connection] [0x102b3d370] activating connection: mach=true listener=false peer=false name=com.apple.trustd
+2026-11-03 14:12:46.249 Df Runner[22644:19567] [com.apple.xpc:connection] [0x102b3d370] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
