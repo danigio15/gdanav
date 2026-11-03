@@ -51,6 +51,7 @@ export 'src/segnalazioni/autovelox.dart';
 export 'src/segnalazioni/segnalazioni.dart';
 export 'src/segnalazioni/sulla_strada.dart';
 export 'src/segnalazioni/tutor.dart';
+export 'src/traffico/ritardo_traffico.dart';
 export 'src/traffico/traffico_tomtom.dart';
 export 'src/veicolo/arbitro_sorgenti.dart';
 export 'src/veicolo/catalogo.dart';

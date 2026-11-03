@@ -808,6 +808,11 @@ class _Fondo extends StatelessWidget {
     // Il pedaggio che resta da pagare: solo se c'è.
     final pedaggio = guida.pedaggioDavanti;
     final ambra = BadgePedaggio.colori(context, paga: true).$2;
+    // Quanto dell'arrivo è traffico: già dentro l'ora e il tempo, qui detto.
+    final traffico = guida.minutiDiTraffico;
+    final coloreTraffico = gravitaRitardo(traffico) >= 2
+        ? ColoriGdanav.di(context).guasta
+        : ColoriGdanav.di(context).piena;
     return SafeArea(
       top: false,
       child: Padding(
@@ -825,9 +830,30 @@ class _Fondo extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            arrivo == null ? '' : orario(arrivo),
-                            style: t.headlineSmall?.copyWith(color: ColoriGdanav.di(context).libera),
+                          Wrap(
+                            spacing: 10,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                arrivo == null ? '' : orario(arrivo),
+                                style: t.headlineSmall?.copyWith(
+                                  color: traffico >= 1 ? coloreTraffico : ColoriGdanav.di(context).libera,
+                                ),
+                              ),
+                              if (traffico >= 1)
+                                Row(
+                                  key: const Key('traffico-restante'),
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.traffic_rounded, size: 17, color: coloreTraffico),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      testoRitardoTraffico(traffico),
+                                      style: t.titleSmall?.copyWith(color: coloreTraffico, fontWeight: FontWeight.w800),
+                                    ),
+                                  ],
+                                ),
+                            ],
                           ),
                           // Il pedaggio che resta, accanto ai km che restano; se
                           // non ci sta (i tasti a destra), subito sotto.

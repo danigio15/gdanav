@@ -821,6 +821,9 @@ class PonteAuto {
       'restanti': a?.restantiM ?? p.viaggio.percorso.lunghezzaM,
       'secondi': (a?.restante ?? p.viaggio.percorso.durata).inSeconds,
       'arrivo': (guida.arrivoAlle ?? _ora()).millisecondsSinceEpoch,
+      // Quanti minuti dell'arrivo sono traffico: l'auto colora il tempo
+      // che resta (arancio, rosso da dieci minuti). Zero: niente colore.
+      'traffico_minuti': guida.minutiDiTraffico,
       'destinazione': p.destinazione.nome,
       // Dove si arriva: CarPlay vuole il viaggio con partenza e arrivo.
       'destinazione_lat': p.destinazione.posizione.lat,

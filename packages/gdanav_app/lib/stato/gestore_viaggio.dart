@@ -42,10 +42,17 @@ class ViaggioPronto extends StatoViaggio {
     this.scelte = const [],
     this.scelta = 0,
     this.tappe = const [],
+    this.scartoTraffico = Duration.zero,
   });
   final Luogo destinazione;
   final Viaggio viaggio;
   final double batteriaPartenza;
+
+  /// Quanto il traffico riletto dopo il piano ha allungato (o accorciato)
+  /// la strada: il piano delle soste ha la durata di quando è stato fatto,
+  /// e senza questo l'ora d'arrivo con le soste restava quella di prima
+  /// anche con dieci minuti di coda in più.
+  final Duration scartoTraffico;
 
   /// I percorsi fra cui scegliere (col traffico, se c'è), e quale si sta
   /// usando. Vuota con le tappe o se il server ne dà uno solo.
@@ -73,7 +80,7 @@ class ViaggioPronto extends StatoViaggio {
       ? calcolatoAlle.add(viaggio.percorso.durata)
       : viaggio.piano == null
       ? null
-      : calcolatoAlle.add(viaggio.piano!.durata);
+      : calcolatoAlle.add(viaggio.piano!.durata + scartoTraffico);
 }
 
 class ErroreViaggio extends StatoViaggio {
@@ -469,6 +476,8 @@ class GestoreViaggio extends ChangeNotifier {
       scelte: s.scelte,
       scelta: s.scelta,
       tappe: s.tappe,
+      // Stessa strada, tempi nuovi: la differenza va all'ora d'arrivo.
+      scartoTraffico: s.scartoTraffico + (p.durata - s.viaggio.percorso.durata),
     );
     _imposta(nuovo);
     return nuovo;
@@ -514,6 +523,7 @@ class GestoreViaggio extends ChangeNotifier {
         scelte: _scelte,
         scelta: s.scelta,
         tappe: s.tappe,
+        scartoTraffico: s.scartoTraffico,
       ),
     );
   }

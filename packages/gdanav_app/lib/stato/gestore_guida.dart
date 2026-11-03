@@ -121,6 +121,18 @@ class GestoreGuida extends ChangeNotifier {
     return _ora().add(a.restante + ricariche);
   }
 
+  /// Quanti minuti del tempo che resta sono per il traffico di adesso,
+  /// interi e senza ballare a ogni lettura ([RitardoMostrato]): «+7 min di
+  /// traffico» accanto all'arrivo. Prima di partire, quello di tutto il
+  /// percorso. Zero: niente da dire.
+  int get minutiDiTraffico {
+    final a = avanzamento, p = pronto;
+    final ritardo = a?.ritardoTraffico ?? p?.viaggio.percorso.ritardoTraffico ?? Duration.zero;
+    return _ritardoMostrato.aggiorna(ritardo);
+  }
+
+  final _ritardoMostrato = RitardoMostrato();
+
   /// La batteria quando si è partiti (anche dopo un ricalcolo).
   double? get batteriaPartenza => _batteriaInizio ?? pronto?.batteriaPartenza;
 

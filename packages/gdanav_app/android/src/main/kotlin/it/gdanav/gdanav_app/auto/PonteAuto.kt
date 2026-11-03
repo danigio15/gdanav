@@ -48,6 +48,8 @@ object PonteAuto {
         val pedaggio: String? = null,
         /** Che strada si fa, dal percorso (la velocità prevista del tratto), per lo zoom. */
         val stradaKmh: Double? = null,
+        /** Quanti minuti del tempo che resta sono traffico: colora il tempo (0: niente). */
+        val trafficoMin: Int = 0,
     )
 
     /** Una corsia prima dello svincolo: le frecce, se è giusta, quale seguire. */
@@ -410,6 +412,7 @@ object PonteAuto {
                         svincolo = numero(call, "svincolo")?.toInt(),
                         pedaggio = call.argument<String>("pedaggio"),
                         stradaKmh = numero(call, "strada_kmh"),
+                        trafficoMin = numero(call, "traffico_minuti")?.toInt() ?: 0,
                     )
                 } else {
                     null
