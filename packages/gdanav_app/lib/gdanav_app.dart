@@ -147,7 +147,9 @@ Future<GdanavApp> preparaGdanav({
   final guida = GestoreGuida(
     viaggio: viaggio,
     auto: auto,
-    posizioni: prova.posizioni(posizioniGuida),
+    // Nella dimostrazione solo le posizioni finte: il GPS vero, senza
+    // permesso, non deve fermare quelle.
+    posizioni: prova.posizioni(dimostrazione == null ? posizioniGuida : Stream<Punto>.empty),
     voce: VoceTelefono(),
     consumo: consumo,
     risparmio: risparmio,
@@ -159,7 +161,7 @@ Future<GdanavApp> preparaGdanav({
   // fermi il segnaposto non deve girare dietro al ballonzolamento del GPS.
   final posizione = GestorePosizione(
     archivio: archivio,
-    letture: prova.letture(lettureGps),
+    letture: prova.letture(dimostrazione == null ? lettureGps : Stream<Lettura>.empty),
     velocitaDellAuto: auto.velocitaAuto,
     // Il limite anche senza navigazione: dallo stesso server dei percorsi.
     chiediLimite: (tracciato) async {

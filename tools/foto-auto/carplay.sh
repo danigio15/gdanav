@@ -35,6 +35,12 @@ echo "iPhone: $udid"
 defaults write com.apple.CrashReporter DialogType none || true
 xcrun simctl boot "$udid" 2>/dev/null || true
 xcrun simctl bootstatus "$udid" -b
+# In italiano, come in macchina da noi: lingua e paese si leggono all'avvio.
+xcrun simctl spawn "$udid" defaults write -g AppleLanguages -array it
+xcrun simctl spawn "$udid" defaults write -g AppleLocale it_IT
+xcrun simctl shutdown "$udid"
+xcrun simctl boot "$udid"
+xcrun simctl bootstatus "$udid" -b
 open -a Simulator --args -CurrentDeviceUDID "$udid"
 sleep 10
 
