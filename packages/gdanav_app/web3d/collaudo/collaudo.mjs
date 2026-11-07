@@ -52,6 +52,11 @@ export const CASI = {
     manovra: [2939, 3064],
     code: [[2300, 2600, 2]],
     extra: (r) => [{ nome: 'viadotto-secondo-livello', metri: r.metriMassima - 70 }],
+    // Una tappa e una sosta di ricarica sul viadotto: si disegnano sull'impalcato.
+    puntiInQuota: (r) => [
+      { tipo: 'tappa', metri: r.metriMassima + 5 },
+      { tipo: 'sosta', metri: r.metriMassima + 45 },
+    ],
     orizzontale: true,
   },
   roma: {
@@ -165,7 +170,7 @@ for (const [chiave, caso] of Object.entries(CASI)) {
   rotta.auto = metri;
   rotta.nome = caso.nome;
   fs.writeFileSync(fileP, JSON.stringify(rotta));
-  const c = { ...caso, metri };
+  const c = { ...caso, metri, puntiInQuota: caso.puntiInQuota?.(rotta) };
   for (const notte of soloViste ? [false] : [false, true]) {
     const momento = notte ? 'notte' : 'giorno';
     const nome = `${chiave}-${momento}`;

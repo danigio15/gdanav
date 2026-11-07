@@ -870,7 +870,69 @@ function unisciNastri(parti) {
 const IN_QUOTA = {
   'gdanav-segnalazioni': { immagine: (p) => p.icona, grandezza: (p) => (p.tipo === 'autovelox' ? 1.15 : 0.85) },
   'gdanav-arrivo': { immagine: () => 'arrivo-bandiera', grandezza: () => 1.7 },
+  // Le colonnine (le soste col numero, grandi) e le tappe: cerchi come quelli
+  // di MapLibre, coi colori presi dallo stile.
+  'gdanav-colonnine': {
+    tela: (p) =>
+      p.sosta
+        ? cerchio(14, colore('gdanav-soste', 'circle-color', p), colore('gdanav-soste', 'circle-stroke-color', p), 3, String(p.numero ?? ''), '#FFFFFF', 14)
+        : cerchio(6.5, colore('gdanav-colonnine', 'circle-color', p), colore('gdanav-colonnine', 'circle-stroke-color', p), 2),
+    grandezza: () => 1,
+  },
+  'gdanav-tappe': {
+    tela: (p) => cerchio(12, colore('tappe', 'circle-color', p), colore('tappe', 'circle-stroke-color', p), 3.5, String(p.numero ?? ''), colore('tappe-numeri', 'text-color', p), 13),
+    grandezza: () => 1,
+  },
 };
+
+/** Il colore di uno strato dello stile per un punto (i «match» sullo stato come in stile.dart). */
+function colore(strato, proprieta, p) {
+  let e;
+  try {
+    e = S.mappa?.getPaintProperty(strato, proprieta);
+  } catch {
+    e = null;
+  }
+  if (typeof e === 'string') return e;
+  if (Array.isArray(e) && e[0] === 'match' && Array.isArray(e[1]) && e[1][0] === 'get') {
+    const v = p[e[1][1]];
+    for (let i = 2; i < e.length - 1; i += 2) if (e[i] === v) return e[i + 1];
+    return e[e.length - 1];
+  }
+  return '#8A94A6';
+}
+
+/** Un cerchio col bordo e (se c'è) il numero, disegnato al doppio come le etichette. */
+const teleCerchi = new Map();
+function cerchio(r, riempi, bordo, spessore, testo = '', coloreTesto = '#FFFFFF', corpo = 13) {
+  const chiave = [r, riempi, bordo, spessore, testo, coloreTesto, corpo].join('|');
+  let c = teleCerchi.get(chiave);
+  if (c) return c;
+  const k = 2;
+  const lato = Math.ceil((r + spessore) * 2 * k) + 4;
+  const bmp = document.createElement('canvas');
+  bmp.width = lato;
+  bmp.height = lato;
+  const g = bmp.getContext('2d');
+  g.beginPath();
+  g.arc(lato / 2, lato / 2, (r + spessore / 2) * k, 0, Math.PI * 2);
+  g.fillStyle = riempi;
+  g.fill();
+  g.lineWidth = spessore * k;
+  g.strokeStyle = bordo;
+  g.stroke();
+  if (testo) {
+    g.font = `700 ${corpo * k}px "Noto Sans", Roboto, "Helvetica Neue", Arial, sans-serif`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillStyle = coloreTesto;
+    g.fillText(testo, lato / 2, lato / 2 + k);
+  }
+  c = { bmp, ratio: k, centro: 0.5, chiave };
+  if (teleCerchi.size > 200) teleCerchi.clear();
+  teleCerchi.set(chiave, c);
+  return c;
+}
 
 /** I punti delle sorgenti che stanno in quota (chiave → quota), rifatti in [aggiornaSegni]. */
 const inQuota = new Map();
@@ -922,12 +984,16 @@ function aggiornaSegni(adesso) {
         [x, y] = S.origine.daLonLat(xy[0], xy[1]);
         if (Math.hypot(x - qui[0], y - qui[1]) < 3000) z = quotaDi(x, y);
       }
-      const img = z !== null && z > 2.5 ? S.bitmap.get(regola.immagine(f.properties ?? {})) : null;
+      const pr = f.properties ?? {};
+      const img = z !== null && z > 2.5 ? (regola.tela ? regola.tela(pr) : S.bitmap.get(regola.immagine(pr))) : null;
       if (img) {
         if (!inQuota.has(k)) cambiato = true;
         inQuota.set(k, z);
-        const g = regola.grandezza(f.properties ?? {});
-        segni.push({ chiave: k, x, y, z: z + 0.4, immagine: img.bmp, w: (img.bmp.width / img.ratio) * g, h: (img.bmp.height / img.ratio) * g });
+        const g = regola.grandezza(pr);
+        // La chiave dice anche l'immagine: un punto che cambia (stato, numero) si ridisegna.
+        const segno = { chiave: `${k}|${img.chiave ?? regola.immagine(pr)}`, x, y, z: z + 0.4, immagine: img.bmp, w: (img.bmp.width / img.ratio) * g, h: (img.bmp.height / img.ratio) * g };
+        if (img.centro !== undefined) segno.centro = img.centro;
+        segni.push(segno);
       } else if (inQuota.delete(k)) cambiato = true;
     });
     if (cambiato) scriviSorgente(id, sulSuolo(id, dati));

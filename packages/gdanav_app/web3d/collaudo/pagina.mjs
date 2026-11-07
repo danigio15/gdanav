@@ -96,6 +96,12 @@ export async function apri(browser, { porta, cartella, rotta, caso, notte, largh
   // Un autovelox davanti all'auto, sul percorso.
   const av = lungo(punti, caso.metri + (caso.autovelox ?? 350));
   await manda({ tipo: 'sorgente', id: 'gdanav-segnalazioni', dati: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: av.slice(0, 2) }, properties: { id: 'a1', tipo: 'autovelox', icona: 'autovelox-fisso' } }] } });
+  // Una sosta di ricarica e una tappa (anche su un viadotto: si alzano sull'impalcato).
+  const fc = (features) => ({ type: 'FeatureCollection', features });
+  const punto = (m, properties) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: lungo(punti, m).slice(0, 2) }, properties });
+  const qp = caso.puntiInQuota ?? [];
+  await manda({ tipo: 'sorgente', id: 'gdanav-colonnine', dati: fc(qp.filter((q) => q.tipo === 'sosta').map((q, i) => punto(q.metri, { id: `c${i}`, nome: 'Colonnina', stato: 'libera', sosta: true, numero: i + 1, potenza: 150 }))) });
+  await manda({ tipo: 'sorgente', id: 'gdanav-tappe', dati: fc(qp.filter((q) => q.tipo === 'tappa').map((q, i) => punto(q.metri, { numero: i + 1, nome: 'Tappa' }))) });
   const posizione = async (metri, v, quando = Date.now()) => {
     const p = lungo(punti, metri);
     await manda({ tipo: 'posizione', lat: p[1], lon: p[0], rotta: p[2], metri, velocita: v, zoom: caso.zoom ?? 17.9, quando });
