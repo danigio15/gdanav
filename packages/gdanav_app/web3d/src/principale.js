@@ -1067,6 +1067,7 @@ function muovi(adesso, dt) {
     rottaCamera = pos.rotta;
     S.auto = { x, y, z, s: null };
   }
+  copertaDaUnPonte(x, y, z, dir);
   aggiornaIo();
   const [lon, lat] = S.origine.lonLat(x, y);
   const vista = VISTE[S.vista] ?? VISTE.inclinata;
@@ -1104,6 +1105,33 @@ function muovi(adesso, dt) {
   }
   aggiornaCielo();
   return !(moto.fermo && assestata);
+}
+
+/**
+ * L'auto sta in cima a tutto (anche ai cartelli di MapLibre), tranne quando
+ * un ponte le passa sopra o subito dietro (fra lei e la telecamera): lì si
+ * disegna con la scena, coperta davvero dal ponte, e se ne vede la sagoma.
+ */
+let ultimoCoperta = 0;
+function copertaDaUnPonte(x, y, z, dir) {
+  const ora = performance.now();
+  if (ora - ultimoCoperta < 200) return;
+  ultimoCoperta = ora;
+  const dx = Math.cos(dir);
+  const dy = Math.sin(dir);
+  let coperta = false;
+  for (let d = -40; d <= 6 && !coperta; d += 4) {
+    for (const c of indice.candidati(x + dx * d, y + dy * d, 0, 0, 9)) {
+      if (c.h > z + 3) {
+        coperta = true;
+        break;
+      }
+    }
+  }
+  if (coperta === S.autoCoperta || !scena.auto) return;
+  S.autoCoperta = coperta;
+  scena.autoCoperta = coperta;
+  scena.auto.traverse((o) => o.layers.set(coperta ? 0 : 1));
 }
 
 /** Il segnaposto 2D: si vede solo da lontano (sotto lo zoom del 3D). */
