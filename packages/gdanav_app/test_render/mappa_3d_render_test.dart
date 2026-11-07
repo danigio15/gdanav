@@ -79,11 +79,6 @@ const _destra = [
   Corsia([DirezioneCorsia.dritto]),
   Corsia([DirezioneCorsia.leggeraDestra], giusta: true, consigliata: DirezioneCorsia.leggeraDestra),
 ];
-const _sinistra = [
-  Corsia([DirezioneCorsia.leggeraSinistra], giusta: true, consigliata: DirezioneCorsia.leggeraSinistra),
-  Corsia([DirezioneCorsia.dritto]),
-];
-
 const _casi = {
   'rho': _Caso(
     "Prendi l'uscita a destra verso A8",
@@ -94,38 +89,35 @@ const _casi = {
     meta: 'Milano, viale Certosa',
   ),
   'roma': _Caso(
-    'Mantieni la destra verso A24',
+    'Prosegui sulla rampa verso A24',
     "A24 · L'Aquila · Teramo",
     davanti: 450,
-    tipo: 23,
-    corsie: _destra,
+    tipo: 22,
     meta: 'Roma, Tor Cervara',
   ),
   'bologna': _Caso(
-    'Mantieni la sinistra verso SS569',
+    'Prosegui sulla SS569 verso Vignola',
     'SS569 · Vignola',
     davanti: 420,
-    tipo: 24,
-    corsie: _sinistra,
+    tipo: 22,
     limite: 70,
     kmh: 64,
     meta: 'Casalecchio di Reno',
   ),
   'cavalcavia': _Caso(
-    'Esci a destra verso Casalecchio',
-    'Uscita 1 · Casalecchio',
+    'Prosegui sulla A14 verso Casalecchio',
+    'A14 · Casalecchio',
     davanti: 380,
-    corsie: _destra,
+    tipo: 22,
     limite: 130,
     kmh: 112,
     meta: 'Bologna, Borgo Panigale',
   ),
   'napoli': _Caso(
-    'Mantieni la destra verso la Tangenziale',
+    'Prosegui verso la Tangenziale',
     'Tangenziale · Pozzuoli',
     davanti: 320,
-    tipo: 23,
-    corsie: _destra,
+    tipo: 22,
     limite: 60,
     kmh: 58,
     meta: 'Napoli, Capodichino',
