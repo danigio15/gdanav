@@ -715,6 +715,8 @@ export class Scena {
       g.add(pozza);
     }
     g.scale.setScalar(2.0);
+    // L'auto si disegna nel suo strato, sopra i nomi di MapLibre (livello 1).
+    g.traverse((o) => o.layers.set(1));
     g.visible = vecchia ? vecchia.visible : false;
     if (vecchia) {
       g.position.copy(vecchia.position);

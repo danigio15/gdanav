@@ -317,6 +317,9 @@ function alloStile() {
   for (const img of S.immagini.values()) aggiungiImmagine(img);
   const prima = m.getLayer('nomi-strade') ? 'nomi-strade' : undefined;
   if (!m.getLayer(STRATO_3D)) m.addLayer(strato3d(), prima);
+  // L'auto in cima a tutto, anche ai nomi e ai cartelli di MapLibre (come il
+  // segnaposto di ogni navigatore): un cartello non la copre mai.
+  if (!m.getLayer(STRATO_AUTO)) m.addLayer(stratoAuto());
   S.stileCaricato = true;
   for (const [id, dati] of S.sorgenti) scriviSorgente(id, sulSuolo(id, dati));
   aggiornaIo(true);
@@ -427,6 +430,45 @@ function cartelli(m) {
 
 // ─── Lo strato 3D ────────────────────────────────────────────────────────
 
+/** Lo strato dell'auto: la stessa scena, solo i livelli dell'auto (vedi [Scena.creaAuto]). */
+const STRATO_AUTO = 'gdanav-3d-auto';
+function stratoAuto() {
+  const camera = new THREE.Camera();
+  camera.matrixAutoUpdate = false;
+  camera.matrixWorldAutoUpdate = false;
+  camera.layers.set(1);
+  return {
+    id: STRATO_AUTO,
+    type: 'custom',
+    renderingMode: '3d',
+    render(gl, args) {
+      const renderer = S.renderer;
+      if (!renderer || !S.origine || !scena.auto?.visible || !scena.mondo.visible) return;
+      matriciCamera(camera, args);
+      renderer.resetState();
+      renderer.render(scena.scena, camera);
+    },
+  };
+}
+
+/** La telecamera di three.js dalle matrici di MapLibre (metri della scena → schermo). */
+function matriciCamera(camera, args) {
+  const m = S.mappa;
+  const o = S.origine;
+  const ws = m.transform.worldSize;
+  const Pm = new THREE.Matrix4().fromArray(args.projectionMatrix);
+  const VP = new THREE.Matrix4().fromArray(args.modelViewProjectionMatrix);
+  const V = Pm.clone().invert().multiply(VP);
+  const Mm = new THREE.Matrix4().set(o.s * ws, 0, 0, o.mx * ws, 0, -o.s * ws, 0, o.my * ws, 0, 0, 1, 0, 0, 0, 0, 1);
+  const VM = V.multiply(Mm);
+  camera.projectionMatrix.copy(Pm);
+  camera.projectionMatrixInverse.copy(Pm).invert();
+  camera.matrixWorldInverse.copy(VM);
+  camera.matrixWorld.copy(VM).invert();
+  camera.matrix.copy(camera.matrixWorld);
+  return Pm;
+}
+
 function strato3d() {
   let renderer = null;
   const camera = new THREE.Camera();
@@ -441,10 +483,12 @@ function strato3d() {
       renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true });
       renderer.autoClear = false;
       renderer.outputColorSpace = THREE.SRGBColorSpace;
+      S.renderer = renderer;
     },
     onRemove() {
       renderer?.dispose();
       renderer = null;
+      S.renderer = null;
     },
     render(gl, args) {
       const m = S.mappa;
