@@ -67,3 +67,37 @@ Bologna (Casalecchio).
 ```sh
 NODE_USE_ENV_PROXY=1 node collaudo/collaudo.mjs collaudo/uscita
 ```
+
+## Sull'auto (Android Auto e CarPlay)
+
+Sull'auto la mappa resta quella nativa di MapLibre, con l'**aspetto** della
+mappa 3D (`stileMappa(aspetto3d: true)`, acceso con la «Mappa 3D»): i
+colori del suolo, l'asfalto grigio coi bordi chiari, le corsie tratteggiate
+delle autostrade da vicino, i ponti sollevati (ombra spostata, parapetto di
+cemento, sopra le strade a terra), gli edifici coi colori delle facciate
+(scuri di notte), e l'auto rossa al posto della freccia di partenza. Niente
+animazioni in più. Le immagini le fa `collaudo/auto.mjs`.
+
+Perché non la pagina 3D anche lì:
+
+- **Copiare i fotogrammi** da una WebView fuori schermo alla superficie
+  dell'auto vuol dire leggere ogni fotogramma dalla GPU (`readPixels` o una
+  cattura della vista) e ridisegnarlo: a 1280×720 sono 3,7 MB per
+  fotogramma, e su un telefono di fascia media si sta sotto i 10–15
+  fotogrammi al secondo, col telefono che scalda. Da scartare.
+- **La WebView direttamente sulla superficie** su Android Auto si può: la
+  mappa dell'auto è già una `Presentation` su un `VirtualDisplay` della
+  superficie (`RendererMappa.kt`), e una WebView ci starebbe come la
+  `MapView` di adesso, senza copie. Servirebbe portare i messaggi di
+  `messaggi.js` anche da Kotlin (i dati ci sono già: `PonteAuto.kt`), e su
+  CarPlay una `WKWebView` nella finestra di CarPlay (`MappaCarPlay.swift`).
+  È la strada buona per un passo dopo, ma va provata su un'auto vera: due
+  scene WebGL (telefono e auto) nella memoria del telefono, il contesto
+  WebGL che Android può togliere a una vista non in primo piano, e per
+  CarPlay una vista web come mappa, che Apple non vieta ma che va fatta
+  vedere alla revisione.
+- **Il 3D nativo** di MapLibre Native (Android 13.5.0, iOS 6.28.0) ha solo
+  `fill-extrusion` da poligoni: i ponti nelle tessere sono linee, e non c'è
+  uno strato di modelli 3D. I viadotti in quota nativi vorrebbero un
+  motore di disegno nostro (strato personalizzato in OpenGL/Metal): troppo
+  per l'auto, dove la mappa deve soprattutto restare leggibile.
