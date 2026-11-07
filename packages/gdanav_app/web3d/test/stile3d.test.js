@@ -28,7 +28,7 @@ test('da vicino il 3D al posto di strade, percorso e segnaposto', () => {
 test('i nomi in piedi e non sui ponti; i cartelli; il traffico che si scarica', () => {
   const s = adattaStile(stile, { notte: true });
   const nomi = s.layers.find((l) => l.id === 'nomi-strade');
-  assert.deepEqual(nomi.filter, ['!=', ['get', 'brunnel'], 'bridge']);
+  assert.deepEqual(nomi.filter, ['match', ['coalesce', ['get', 'brunnel'], ''], ['bridge', 'tunnel'], false, true]);
   assert.equal(nomi.layout['text-pitch-alignment'], 'viewport');
   const id = s.layers.map((l) => l.id);
   assert.equal(id[id.indexOf('nomi-strade') + 1], 'scudi');

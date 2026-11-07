@@ -66,7 +66,9 @@ export function adattaStile(stile, { notte = false } = {}) {
     }
     if (l.id === 'corsi-acqua' && l.paint) l.paint['line-color'] = t.acqua;
     if (l.id === 'nomi-strade') {
-      l.filter = ['!=', ['get', 'brunnel'], 'bridge'];
+      // Né i ponti (i loro nomi li scrive il 3D sull'impalcato) né le
+      // gallerie (il nome finirebbe sopra quello che le copre).
+      l.filter = ['match', ['coalesce', ['get', 'brunnel'], ''], ['bridge', 'tunnel'], false, true];
       l.layout = {
         ...l.layout,
         'text-pitch-alignment': 'viewport',
@@ -115,7 +117,7 @@ export function scudi() {
     filter: [
       'all',
       ['has', 'ref'],
-      ['!=', ['get', 'brunnel'], 'bridge'],
+      ['match', ['coalesce', ['get', 'brunnel'], ''], ['bridge', 'tunnel'], false, true],
       ['<=', ['coalesce', ['get', 'ref_length'], 9], 7],
       ['match', ['get', 'class'], ['motorway', 'trunk', 'primary', 'secondary'], true, false],
     ],
