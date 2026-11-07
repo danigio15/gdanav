@@ -243,24 +243,6 @@ for (const [chiave, caso] of Object.entries(CASI)) {
       const media = s / n;
       return { colori: colori.size, deviazione: Math.sqrt(s2 / n - media * media) };
     });
-    // Il moto: l'auto avanza a 25 m/s per otto secondi; si misurano i fotogrammi.
-    const intervalli = await page.evaluate(
-      ([pp, m0]) =>
-        new Promise((fatto) => {
-          const out = [];
-          let ultimo = null;
-          const giro = (t) => {
-            if (ultimo !== null) out.push(t - ultimo);
-            ultimo = t;
-            if (out.length < 400 && t - inizio < 8000) requestAnimationFrame(giro);
-            else fatto(out);
-          };
-          const inizio = performance.now();
-          requestAnimationFrame(giro);
-        }),
-      [punti, caso.metri],
-    ).catch(() => []);
-    // Nel frattempo una posizione al secondo (fuori dalla pagina non si può: si fa prima).
     const dopo = await page.evaluate(() => window.gdanav3d.diagnosi());
     const esito = {
       caso: chiave,
@@ -272,7 +254,6 @@ for (const [chiave, caso] of Object.entries(CASI)) {
       triangoli: dopo.triangoli,
       budget: dopo.budget,
       msDisegno: Math.round(dopo.msDisegno ?? 0),
-      fotogrammiMs: intervalli.length ? Math.round(intervalli.slice().sort((a, b) => a - b)[Math.floor(intervalli.length / 2)]) : null,
       quotaAuto: dopo.auto?.z,
       profiloMax: dopo.profilo?.max,
       tela,
@@ -280,17 +261,36 @@ for (const [chiave, caso] of Object.entries(CASI)) {
       log: dopo.log.filter((r) => /errore|scartato|lavoratore/.test(r)),
       ok: tela.colori > 200 && tela.deviazione > 12 && dopo.triangoli <= dopo.budget && dopo.tessere.length > 0,
     };
-    risultati.push(esito);
-    console.log(JSON.stringify({ ...esito, tessere: esito.tessere.length }));
-    // Anche in movimento: l'auto avanza di 200 m, la telecamera la segue.
-    if (!notte) {
-      for (let k = 1; k <= 4; k++) {
-        await posizione(caso.metri + k * 50, 25);
-        await page.waitForTimeout(600);
-      }
-      await page.waitForTimeout(1500);
-      await page.screenshot({ path: path.join(uscita, `${nome}-200m.png`) });
+    // In movimento: l'auto avanza a 25 m/s per sei secondi, una posizione al
+    // secondo come il GPS; si misurano i fotogrammi che MapLibre disegna
+    // davvero (qui WebGL è in software: su un telefono va molto più svelto).
+    await page.evaluate(() => {
+      window.__fotogrammi = [];
+      let ultimo = null;
+      window.__mappa.on('render', () => {
+        const t = performance.now();
+        if (ultimo !== null) window.__fotogrammi.push(t - ultimo);
+        ultimo = t;
+      });
+    });
+    for (let k = 1; k <= 6; k++) {
+      await posizione(caso.metri + k * 25, 25);
+      await page.waitForTimeout(1000);
     }
+    const fotogrammi = await page.evaluate(() => window.__fotogrammi);
+    const ordinati = fotogrammi.slice().sort((a, b) => a - b);
+    esito.inMoto = {
+      fotogrammi: fotogrammi.length,
+      medianaMs: ordinati.length ? Math.round(ordinati[Math.floor(ordinati.length / 2)]) : null,
+      p90Ms: ordinati.length ? Math.round(ordinati[Math.floor(ordinati.length * 0.9)]) : null,
+      msDisegno3d: Math.round((await page.evaluate(() => window.gdanav3d.diagnosi())).msDisegno ?? 0),
+    };
+    risultati.push(esito);
+    // Scritto a ogni caso: se il collaudo si interrompe, quelli fatti restano.
+    fs.writeFileSync(path.join(uscita, `collaudo-${nome}.json`), JSON.stringify(esito, null, 2));
+    console.log(JSON.stringify({ ...esito, tessere: esito.tessere.length, log: esito.log.length }));
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: path.join(uscita, `${nome}-in-moto.png`) });
     await ctx.close();
   }
 }
