@@ -98,18 +98,16 @@ class PonteAuto {
 
   void avvia() {
     _canale.setMethodCallHandler(_dallAuto);
-    _manda('stili', {
-      'chiaro': jsonEncode(stileMappa(scuro: false, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true)),
-      'scuro': jsonEncode(stileMappa(scuro: true, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true)),
-      // La vista immersiva ha uno stile suo: le strade in metri, le corsie
-      // sulla strada, gli edifici sopra il percorso.
-      'chiaro_immersiva': jsonEncode(
-        stileMappa(scuro: false, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true, immersiva: true),
-      ),
-      'scuro_immersiva': jsonEncode(
-        stileMappa(scuro: true, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true, immersiva: true),
-      ),
-    });
+    _stili();
+    // Con la «Mappa 3D» accesa anche l'auto ne prende l'aspetto, e l'auto rossa.
+    unawaited(
+      guida.archivio?.mappa3d().then((s) {
+        if (!_attivo || s.accesa == _aspetto3d) return;
+        _aspetto3d = s.accesa;
+        _stili();
+        _posizione();
+      }),
+    );
     _immagini();
     viaggio.addListener(_viaggio);
     viaggio.addListener(_opzioni);
@@ -474,6 +472,32 @@ class PonteAuto {
       },
     });
   }
+
+  /// La mappa dell'auto con l'aspetto della mappa 3D del telefono (colori,
+  /// ponti sollevati, corsie, auto rossa): di partenza sì, come la «Mappa 3D».
+  var _aspetto3d = true;
+
+  void _stili() {
+    String stile({required bool scuro, bool immersiva = false}) => jsonEncode(
+      stileMappa(
+        scuro: scuro,
+        chiaveTraffico: Servizi.chiaveTomTom,
+        perAuto: true,
+        immersiva: immersiva,
+        aspetto3d: _aspetto3d,
+      ),
+    );
+    _manda('stili', {
+      'chiaro': stile(scuro: false),
+      'scuro': stile(scuro: true),
+      // La vista immersiva ha uno stile suo: le strade in metri, le corsie
+      // sulla strada, gli edifici sopra il percorso.
+      'chiaro_immersiva': stile(scuro: false, immersiva: true),
+      'scuro_immersiva': stile(scuro: true, immersiva: true),
+    });
+  }
+
+  String get _icona => iconaSullAuto(posizione.segnaposto, aspetto3d: _aspetto3d);
 
   void _viaggio() {
     final stato = viaggio.stato;
@@ -946,7 +970,7 @@ class PonteAuto {
       'rotta': a?.rottaMappa ?? rotta,
       'rotta_io': rotta,
       'velocita_ms': velocita.isFinite ? velocita : 0.0,
-      'icona': posizione.segnaposto.immagine,
+      'icona': _icona,
       if (pista != null && metri != null) ...{
         'pista': [
           for (final p in pista) ...[p.lat, p.lon],
@@ -1066,3 +1090,9 @@ Position? posizioneDellAuto(Map<Object?, Object?> dati) {
     speedAccuracy: 0,
   );
 }
+
+/// Il segnaposto sullo schermo dell'auto: quello scelto; la freccia di
+/// partenza, con l'aspetto della mappa 3D, diventa l'auto rossa (come sul
+/// telefono: sul blu del percorso si vede).
+String iconaSullAuto(Segnaposto s, {required bool aspetto3d}) =>
+    aspetto3d && s == Segnaposto.freccia ? Segnaposto.autoRossa.immagine : s.immagine;

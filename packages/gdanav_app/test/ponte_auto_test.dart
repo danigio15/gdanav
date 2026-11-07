@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/auto/ponte_auto.dart';
+import 'package:gdanav_app/mappa/segnaposto.dart';
 import 'package:gdanav_app/stato/gestore_luoghi.dart';
 import 'package:gdanav_app/stato/gestore_meteo.dart';
 import 'package:gdanav_app/stato/gestore_posizione.dart';
@@ -59,8 +60,9 @@ void main() {
     expect(guida.containsKey('dopo_tipo'), guida.containsKey('dopo_frasi'));
     final pos = chiamate.lastWhere((c) => c.method == 'posizione').arguments as Map;
     expect(pos['lat'], isNotNull);
-    // Il segnaposto lo fa scorrere l'auto: arrivano immagine e rotta.
-    expect(pos['icona'], 'freccia');
+    // Il segnaposto lo fa scorrere l'auto: arrivano immagine e rotta. Con la
+    // «Mappa 3D» accesa (di partenza) la freccia è l'auto rossa, come sul telefono.
+    expect(pos['icona'], 'auto_rossa');
     expect(pos['rotta_io'], isA<double>());
     // E la velocità, perché fra due posizioni l'auto vada avanti da sola.
     expect(pos['velocita_ms'], isA<double>());
@@ -460,5 +462,31 @@ void main() {
     final ponte = PonteAuto(viaggio: a.viaggio, guida: a.guida, posizione: a.posizione)..avvia();
     addTearDown(ponte.ferma);
     await tester.pump();
+  });
+
+  testWidgets("con la «Mappa 3D» spenta l'auto resta com'era: colori di sempre e la freccia", (tester) async {
+    for (final accesa in [true, false]) {
+      preparaPiattaforma(portachiavi: impostazioniComplete);
+      final chiamate = <MethodCall>[];
+      final messaggero = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messaggero.setMockMethodCallHandler(canale, (c) async {
+        chiamate.add(c);
+        return null;
+      });
+      final a = await ambiente(tester, km: 20);
+      await tester.runAsync(() => a.archivio.salvaMappa3d(accesa));
+      final ponte = PonteAuto(viaggio: a.viaggio, guida: a.guida, posizione: a.posizione, canale: canale)..avvia();
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+      await tester.pump();
+      final stili = chiamate.lastWhere((c) => c.method == 'stili').arguments as Map;
+      final strati = ((jsonDecode(stili['chiaro'] as String) as Map)['layers'] as List).map((l) => (l as Map)['id']);
+      expect(strati.contains('ponti-ombra'), accesa, reason: 'i ponti sollevati con la 3D accesa: $accesa');
+      expect(strati.contains('corsie-destra'), accesa);
+      ponte.ferma();
+      messaggero.setMockMethodCallHandler(canale, null);
+      expect(iconaSullAuto(Segnaposto.freccia, aspetto3d: accesa), accesa ? 'auto_rossa' : 'freccia');
+      // Chi ha scelto un'auto la vede sempre.
+      expect(iconaSullAuto(Segnaposto.autoBianca, aspetto3d: accesa), 'auto_bianca');
+    }
   });
 }
