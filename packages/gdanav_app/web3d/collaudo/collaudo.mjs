@@ -210,6 +210,9 @@ for (const [chiave, caso] of Object.entries(CASI)) {
         esito[e.nome] = await autoVisibile(page);
         esito.ok &&= esito[e.nome].visibile;
       }
+      // L'auto torna al punto del caso: le viste libere la inquadrano lì.
+      await posizione(metri, 0);
+      await page.waitForTimeout(1000);
       const [lon, lat, rottaG] = lungo(rotta.punti, metri + 120);
       await vista(page, [lon, lat], 16.15, 56, rottaG - 35);
       await page.waitForTimeout(2000);
