@@ -11,6 +11,7 @@ import '../componenti/avvisi_in_guida.dart';
 import '../componenti/scheda_auto.dart';
 import '../componenti/vetro.dart';
 import '../mappa/controllo_mappa.dart';
+import '../mappa/mappa_3d.dart' show mappa3dPossibile;
 import '../mappa/scelta_vista.dart';
 import '../mappa/mappa_viaggio.dart';
 import '../stato/archivio.dart';
@@ -164,8 +165,14 @@ class SchermataPrincipale extends StatefulWidget {
 }
 
 class _SchermataPrincipaleState extends State<SchermataPrincipale> {
-  /// 2D o 3D si ricorda: in 3D la mappa ti segue anche senza una meta.
-  late final controllo = ControlloMappa(salvaVista: widget.archivio.salvaVistaMappa);
+  /// La vista si ricorda: in 3D la mappa ti segue anche senza una meta. Il
+  /// 3D aumentato, fuori dalla guida, è il 3D; in guida la scena 3D.
+  late final controllo = ControlloMappa(
+    salvaVista: widget.archivio.salvaVistaMappa,
+    aumentataPossibile: mappa3dPossibile,
+    salvaAumentataNonVa: widget.archivio.salvaAumentataNonVa,
+    dimenticaAumentataNonVa: widget.archivio.dimenticaAumentataNonVa,
+  );
   PreferenzeRicarica _preferenze = const PreferenzeRicarica();
   late final GestoreLuoghi luoghi = widget.luoghi ?? (GestoreLuoghi(widget.archivio)..carica());
   late final GestoreSegnalazioni segnalazioni = widget.segnalazioni ?? GestoreSegnalazioni(posizione: widget.posizione);
@@ -175,27 +182,13 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
 
   GestoreViaggio get viaggio => widget.viaggio;
 
-  /// La mappa 3D in guida: accesa, spenta, o spenta da sola (vedi [SceltaMappa3d]).
-  final _mappa3d = ValueNotifier(const SceltaMappa3d());
-
-  Future<void> _rileggiMappa3d() async {
-    final s = await widget.archivio.mappa3d();
-    if (mounted) _mappa3d.value = s;
-  }
-
-  Future<void> _scegliMappa3d(bool accesa) async {
-    await widget.archivio.salvaMappa3d(accesa);
-    await _rileggiMappa3d();
-  }
-
   @override
   void initState() {
     super.initState();
     _ricaricaPreferenze();
-    unawaited(_rileggiMappa3d());
     // Solo le impostazioni: niente mappa, posizione né segnalazioni.
     if (widget.soloImpostazioni) return;
-    unawaited(controllo.carica(widget.archivio.vistaMappa()));
+    unawaited(controllo.carica(widget.archivio.vistaMappa(), nonVa: widget.archivio.aumentataNonVa()));
     widget.chiediPosizione?.call().then((ok) {
       if (ok) widget.posizione.avvia();
     });
@@ -262,8 +255,9 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
       ),
     );
     _inGuida = false;
-    // In guida il 3D può essersi spento da solo (il telefono non ce la fa).
-    unawaited(_rileggiMappa3d());
+    // In guida il 3D aumentato può essersi spento da solo (il telefono non
+    // ce la fa): la vista e il perché si rileggono.
+    unawaited(controllo.ricarica(widget.archivio.vistaMappa(), nonVa: widget.archivio.aumentataNonVa()));
   }
 
   /// La guida partita dall'auto: anche il telefono passa alla guida.
@@ -280,7 +274,6 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
       if (widget.segnalazioni == null) segnalazioni.dispose();
     }
     controllo.dispose();
-    _mappa3d.dispose();
     super.dispose();
   }
 
@@ -493,7 +486,6 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
         widget.viaggio,
         luoghi,
         widget.guida.avvisi,
-        _mappa3d,
         ?widget.premium,
         ?widget.pianificati,
       ]),
@@ -697,15 +689,6 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                           qui: widget.posizione.qui,
                         ),
                       ),
-                    ),
-                    _InterruttoreMenu(
-                      key: const Key('menu-mappa-3d'),
-                      icona: Icons.view_in_ar_rounded,
-                      colore: const Color(0xFF0EA5E9),
-                      titolo: 'Mappa 3D',
-                      sotto: _mappa3d.value.riassunto,
-                      valore: _mappa3d.value.accesa,
-                      onCambia: _scegliMappa3d,
                     ),
                     if (widget.premium case final p?)
                       _VoceMenu(
@@ -1147,44 +1130,6 @@ class _VoceMenu extends StatelessWidget {
       subtitle: Text(sotto, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: Icon(Icons.chevron_right_rounded, color: tema.colorScheme.onSurfaceVariant),
       onTap: onTap,
-    );
-  }
-}
-
-/// Una voce del menu che si accende e si spegne lì, senza aprire niente.
-class _InterruttoreMenu extends StatelessWidget {
-  const _InterruttoreMenu({
-    super.key,
-    required this.icona,
-    required this.colore,
-    required this.titolo,
-    required this.sotto,
-    required this.valore,
-    required this.onCambia,
-  });
-
-  final IconData icona;
-  final Color colore;
-  final String titolo;
-  final String sotto;
-  final bool valore;
-  final ValueChanged<bool> onCambia;
-
-  @override
-  Widget build(BuildContext context) {
-    final tema = Theme.of(context);
-    return SwitchListTile(
-      contentPadding: const EdgeInsets.fromLTRB(12, 4, 8, 4),
-      secondary: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(color: colore, borderRadius: BorderRadius.circular(11)),
-        child: Icon(icona, color: Colors.white, size: 22),
-      ),
-      title: Text(titolo, style: tema.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-      subtitle: Text(sotto, maxLines: 2, overflow: TextOverflow.ellipsis),
-      value: valore,
-      onChanged: onCambia,
     );
   }
 }

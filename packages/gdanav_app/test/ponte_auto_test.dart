@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/auto/ponte_auto.dart';
+import 'package:gdanav_app/mappa/controllo_mappa.dart' show VistaMappa;
 import 'package:gdanav_app/mappa/segnaposto.dart';
 import 'package:gdanav_app/stato/gestore_luoghi.dart';
 import 'package:gdanav_app/stato/gestore_meteo.dart';
@@ -60,9 +61,9 @@ void main() {
     expect(guida.containsKey('dopo_tipo'), guida.containsKey('dopo_frasi'));
     final pos = chiamate.lastWhere((c) => c.method == 'posizione').arguments as Map;
     expect(pos['lat'], isNotNull);
-    // Il segnaposto lo fa scorrere l'auto: arrivano immagine e rotta. Con la
-    // «Mappa 3D» accesa (di partenza) la freccia è l'auto rossa, come sul telefono.
-    expect(pos['icona'], 'auto_rossa');
+    // Il segnaposto lo fa scorrere l'auto: arrivano immagine e rotta. Di
+    // partenza (vista 3D sul telefono) la freccia di sempre.
+    expect(pos['icona'], 'freccia');
     expect(pos['rotta_io'], isA<double>());
     // E la velocità, perché fra due posizioni l'auto vada avanti da sola.
     expect(pos['velocita_ms'], isA<double>());
@@ -464,8 +465,13 @@ void main() {
     await tester.pump();
   });
 
-  testWidgets("con la «Mappa 3D» spenta l'auto resta com'era: colori di sempre e la freccia", (tester) async {
-    for (final accesa in [true, false]) {
+  testWidgets("l'aspetto 3D solo col 3D aumentato sul telefono: altrimenti l'auto resta com'era", (tester) async {
+    for (final (vista, accesa) in [
+      (VistaMappa.aumentata, true),
+      (VistaMappa.inclinata, false),
+      (VistaMappa.immersiva, false),
+      (null, false),
+    ]) {
       preparaPiattaforma(portachiavi: impostazioniComplete);
       final chiamate = <MethodCall>[];
       final messaggero = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -474,13 +480,13 @@ void main() {
         return null;
       });
       final a = await ambiente(tester, km: 20);
-      await tester.runAsync(() => a.archivio.salvaMappa3d(accesa));
+      if (vista != null) await tester.runAsync(() => a.archivio.salvaVistaMappa(vista));
       final ponte = PonteAuto(viaggio: a.viaggio, guida: a.guida, posizione: a.posizione, canale: canale)..avvia();
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
       await tester.pump();
       final stili = chiamate.lastWhere((c) => c.method == 'stili').arguments as Map;
       final strati = ((jsonDecode(stili['chiaro'] as String) as Map)['layers'] as List).map((l) => (l as Map)['id']);
-      expect(strati.contains('ponti-ombra'), accesa, reason: 'i ponti sollevati con la 3D accesa: $accesa');
+      expect(strati.contains('ponti-ombra'), accesa, reason: 'i ponti sollevati con la vista $vista');
       expect(strati.contains('corsie-destra'), accesa);
       ponte.ferma();
       messaggero.setMockMethodCallHandler(canale, null);
@@ -488,5 +494,35 @@ void main() {
       // Chi ha scelto un'auto la vede sempre.
       expect(iconaSullAuto(Segnaposto.autoBianca, aspetto3d: accesa), 'auto_bianca');
     }
+  });
+
+  testWidgets("scelto il 3D aumentato sul telefono durante il viaggio, l'auto ne prende l'aspetto", (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final chiamate = <MethodCall>[];
+    final messaggero = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messaggero.setMockMethodCallHandler(canale, (c) async {
+      chiamate.add(c);
+      return null;
+    });
+    final a = await ambiente(tester, km: 20);
+    final ponte = PonteAuto(viaggio: a.viaggio, guida: a.guida, posizione: a.posizione, canale: canale)..avvia();
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    await tester.pump();
+    bool sollevati() {
+      final stili = chiamate.lastWhere((c) => c.method == 'stili').arguments as Map;
+      return ((jsonDecode(stili['chiaro'] as String) as Map)['layers'] as List).any(
+        (l) => (l as Map)['id'] == 'ponti-ombra',
+      );
+    }
+
+    expect(sollevati(), isFalse);
+    await tester.runAsync(() => a.archivio.salvaVistaMappa(VistaMappa.aumentata));
+    await tester.pump();
+    expect(sollevati(), isTrue);
+    await tester.runAsync(() => a.archivio.salvaVistaMappa(VistaMappa.piatta));
+    await tester.pump();
+    expect(sollevati(), isFalse);
+    ponte.ferma();
+    messaggero.setMockMethodCallHandler(canale, null);
   });
 }

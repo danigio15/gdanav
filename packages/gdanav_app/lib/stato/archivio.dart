@@ -40,7 +40,8 @@ class Archivio {
   static const _vistaPiatta = 'vista_2d';
   static const _vista = 'vista_mappa';
   static const _viaggiPianificati = 'viaggi_pianificati';
-  static const _mappa3d = 'mappa_3d';
+  // Perché il 3D aumentato non va su questo telefono (la chiave viene da
+  // quando era l'interruttore «Mappa 3D», e vale ancora).
   static const _mappa3dEsito = 'mappa_3d_esito';
 
   Future<Abbinamento?> abbinamento() async {
@@ -173,39 +174,41 @@ class Archivio {
 
   Future<void> salvaScelteAvvisi(ScelteAvvisi s) => _p.write(key: _avvisiScelti, value: s.aJson());
 
-  /// Come si guarda la mappa: 2D, 3D o immersiva ([VistaMappa]). Si
-  /// ricorda, e vale anche fuori dalla guida. Di partenza 3D, come sullo
-  /// schermo dell'auto. Prima c'erano solo 2D e 3D, e si scriveva solo chi
-  /// l'aveva voluta piatta: quella scelta vale ancora.
+  /// Come si guarda la mappa: 2D, 3D, immersiva o 3D aumentato
+  /// ([VistaMappa]). Si ricorda, e vale anche fuori dalla guida. Di partenza
+  /// 3D, come sullo schermo dell'auto. Prima c'erano solo 2D e 3D, e si
+  /// scriveva solo chi l'aveva voluta piatta: quella scelta vale ancora.
   Future<VistaMappa> vistaMappa() async {
     final scritta = await _p.read(key: _vista);
-    if (scritta != null) return VistaMappa.daNome(scritta);
-    return await _p.read(key: _vistaPiatta) == 'sì' ? VistaMappa.piatta : VistaMappa.inclinata;
+    final v = scritta != null
+        ? VistaMappa.daNome(scritta)
+        : await _p.read(key: _vistaPiatta) == 'sì'
+        ? VistaMappa.piatta
+        : VistaMappa.inclinata;
+    vistaScelta.value = v;
+    return v;
   }
 
   Future<void> salvaVistaMappa(VistaMappa v) async {
     await _p.write(key: _vista, value: v.name);
     await _p.delete(key: _vistaPiatta);
+    vistaScelta.value = v;
   }
 
-  /// La mappa 3D in guida: la scelta di chi guida («si», «no», o mai
-  /// scritta) e come è andata l'ultima volta che il telefono ci ha provato
-  /// (vedi [SceltaMappa3d]).
-  Future<SceltaMappa3d> mappa3d() async => SceltaMappa3d(
-    scelta: await _p.read(key: _mappa3d),
-    esito: await _p.read(key: _mappa3dEsito),
-  );
+  /// L'ultima vista letta o scelta sul telefono, per chi la segue da fuori
+  /// (lo schermo dell'auto prende l'aspetto 3D col 3D aumentato).
+  static final vistaScelta = ValueNotifier<VistaMappa?>(null);
 
-  /// Accesa o spenta a mano. Accesa a mano si riprova anche dove era andata
-  /// male: l'esito di prima si dimentica.
-  Future<void> salvaMappa3d(bool accesa) async {
-    await _p.write(key: _mappa3d, value: accesa ? 'si' : 'no');
-    if (accesa) await _p.delete(key: _mappa3dEsito);
-  }
+  /// Perché il 3D aumentato non va su questo telefono (`null`: va, o non ci
+  /// si è ancora provato): «lento», «webgl2», «software»…
+  Future<String?> aumentataNonVa() => _p.read(key: _mappa3dEsito);
 
-  /// Il 3D su questo telefono non va ([motivo]: WebGL che manca, troppo
-  /// lento…): la prossima volta parte la mappa di sempre.
-  Future<void> salvaMappa3dFallita(String motivo) => _p.write(key: _mappa3dEsito, value: motivo);
+  /// Il 3D aumentato su questo telefono non va ([motivo]): la voce resta
+  /// spenta finché non si riprova a mano.
+  Future<void> salvaAumentataNonVa(String motivo) => _p.write(key: _mappa3dEsito, value: motivo);
+
+  /// «Riprova»: si dimentica che non andava.
+  Future<void> dimenticaAumentataNonVa() => _p.delete(key: _mappa3dEsito);
 
   /// L'identità di questo telefono verso il quadro delle licenze (i codici
   /// regalo): nasce una volta sola e resta qui, col suo segreto.
@@ -322,34 +325,6 @@ class Archivio {
   Future<int> versioneMinima() async => int.tryParse(await _p.read(key: 'versione_minima') ?? '') ?? 0;
 
   Future<void> salvaVersioneMinima(int n) => _p.write(key: 'versione_minima', value: '$n');
-}
-
-/// La mappa 3D in guida, come è scritta: la [scelta] di chi guida («si»,
-/// «no», o `null` se non l'ha mai toccata) e l'[esito] dell'ultima prova
-/// andata male sul telefono (`null` se non è mai andata male).
-///
-/// Di partenza accesa; spenta da sola se il telefono non ce l'ha fatta
-/// (WebGL che manca, o troppo lenta). Chi la riaccende a mano la riprova.
-class SceltaMappa3d {
-  const SceltaMappa3d({this.scelta, this.esito});
-
-  final String? scelta;
-  final String? esito;
-
-  bool get accesa => scelta != 'no' && esito == null;
-
-  /// Spenta perché il telefono non ce la fa (non per scelta).
-  bool get nonCeLaFa => esito != null && scelta != 'no';
-
-  /// Cosa scrivere sotto l'interruttore.
-  String get riassunto {
-    if (scelta == 'no') return 'Spenta: in guida la mappa di sempre';
-    return switch (esito) {
-      null => 'In guida: viadotti, alberi ed edifici in 3D',
-      'lento' => 'Spenta: su questo telefono va a scatti',
-      _ => 'Spenta: questo telefono non la può disegnare',
-    };
-  }
 }
 
 /// Dove stanno i servizi: vedi [Servizi].

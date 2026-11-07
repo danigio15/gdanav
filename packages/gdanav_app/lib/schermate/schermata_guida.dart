@@ -18,7 +18,6 @@ import '../mappa/controllo_mappa.dart';
 import '../mappa/scelta_vista.dart';
 import '../mappa/mappa_3d.dart';
 import '../mappa/mappa_viaggio.dart';
-import '../stato/archivio.dart' show SceltaMappa3d;
 import '../stato/avvisi_strada.dart';
 import '../stato/avvisi_ztl.dart';
 import '../stato/gestore_guida.dart';
@@ -64,8 +63,14 @@ class SchermataGuida extends StatefulWidget {
 }
 
 class _SchermataGuidaState extends State<SchermataGuida> {
-  /// La stessa scelta 2D/3D della mappa senza guida, ricordata.
-  late final controllo = ControlloMappa(salvaVista: widget.guida.archivio?.salvaVistaMappa);
+  /// La stessa scelta della vista della mappa senza guida, ricordata; col 3D
+  /// aumentato, e se questo telefono ce la fa.
+  late final controllo = ControlloMappa(
+    salvaVista: widget.guida.archivio?.salvaVistaMappa,
+    aumentataPossibile: mappa3dPossibile,
+    salvaAumentataNonVa: widget.guida.archivio?.salvaAumentataNonVa,
+    dimenticaAumentataNonVa: widget.guida.archivio?.dimenticaAumentataNonVa,
+  );
 
   /// Le segnalazioni lungo la strada, condivise con lo schermo dell'auto.
   AvvisiStrada? _avvisi;
@@ -75,11 +80,6 @@ class _SchermataGuidaState extends State<SchermataGuida> {
 
   /// Gli svincoli di cui si è chiuso il popup.
   final _svincoliChiusi = <int>{};
-
-  /// La mappa 3D: come l'ha scelta chi guida (`null` finché non si è letto),
-  /// e se in questa guida si è fermata (il telefono non ce la fa).
-  SceltaMappa3d? _scelta3d;
-  var _fermo3d = false;
 
   /// Lo svincolo in arrivo, entro [PopupSvincolo.daMetri], se non chiuso.
   (Manovra, double)? _svincolo(GestoreGuida g) {
@@ -117,14 +117,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
       if (mounted) setState(() {});
     });
     if (widget.guida.archivio case final a?) {
-      unawaited(controllo.carica(a.vistaMappa()));
-      unawaited(
-        a.mappa3d().then((s) {
-          if (mounted) setState(() => _scelta3d = s);
-        }),
-      );
-    } else {
-      _scelta3d = const SceltaMappa3d();
+      unawaited(controllo.carica(a.vistaMappa(), nonVa: a.aumentataNonVa()));
     }
     widget.guida.avvia();
     if (widget.segnalazioni case final seg?) _avvisi = AvvisiStrada.di(widget.guida, seg);
@@ -161,19 +154,18 @@ class _SchermataGuidaState extends State<SchermataGuida> {
     );
   }
 
-  /* La mappa sotto il cruscotto: in 3D (inclinata o immersiva) quella nuova,
-   * se è accesa e il telefono la regge; dall'alto, o se il 3D si ferma, la
-   * mappa di sempre. Il cruscotto sopra è lo stesso. */
+  /* La mappa sotto il cruscotto: col 3D aumentato (se il telefono lo regge)
+   * la scena 3D della WebView; nelle altre viste, o se il 3D aumentato si
+   * ferma, la mappa di sempre. Il cruscotto sopra è lo stesso. */
   Widget _mappa(BuildContext context, GestoreGuida g) {
-    final scelta = _scelta3d;
     // La scelta si legge in un attimo: intanto il colore della mappa, non una
     // mappa che nasce e subito sparisce.
-    if (scelta == null && mappa3dPossibile) {
+    if (!controllo.letta && widget.guida.archivio != null && mappa3dPossibile) {
       return ColoredBox(
         color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D2740) : const Color(0xFFE2EAF1),
       );
     }
-    if (mappa3dPossibile && !_fermo3d && (scelta?.accesa ?? false) && controllo.vista != VistaMappa.piatta) {
+    if (controllo.scenaAumentata) {
       return Mappa3d(
         key: const Key('mappa-3d'),
         gestore: g.viaggio,
@@ -200,13 +192,24 @@ class _SchermataGuidaState extends State<SchermataGuida> {
     );
   }
 
-  /// Il 3D non va: la mappa di sempre, e se il telefono non ce la fa lo si
-  /// ricorda (la prossima volta parte direttamente quella).
+  /// Il 3D aumentato non va: si torna alla vista di prima, lo si dice una
+  /// volta, e se il telefono non ce la fa lo si ricorda (la voce resta
+  /// spenta, col perché e «Riprova»).
   void _nonVa3d(String motivo, {required bool ricorda}) {
-    if (ricorda) unawaited(widget.guida.archivio?.salvaMappa3dFallita(motivo));
     if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() => _fermo3d = true);
+      if (!mounted || controllo.vista != VistaMappa.aumentata) return;
+      controllo.lasciaAumentata(motivo, ricorda: ricorda);
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            key: const Key('aumentato-non-va'),
+            content: Text(avvisoAumentatoNonVa(controllo.vista, ricorda: ricorda)),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+          ),
+        );
     });
   }
 
@@ -234,7 +237,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                   ListenableBuilder(listenable: controllo, builder: (context, _) => _mappa(context, g)),
             ),
             ListenableBuilder(
-              listenable: Listenable.merge([g, widget.posizione, ?_avvisi, ?_ztl, ?g.risparmio]),
+              listenable: Listenable.merge([g, widget.posizione, controllo, ?_avvisi, ?_ztl, ?g.risparmio]),
               builder: (context, _) {
                 _copri(context, g);
                 final risparmio = g.risparmio;

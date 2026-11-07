@@ -146,10 +146,11 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   /// Quanto è inclinata la mappa: niente dall'alto, 58° in 3D, 60° nella
   /// vista immersiva (che è anche più vicina). Più di così, da vicino, in
   /// cima allo schermo finisce la mappa e si vede il vuoto.
-  static double _inclinazioneDi(VistaMappa v) => switch (v) {
+  /// Il 3D aumentato, qui (la mappa di sempre), è il 3D.
+  static double _inclinazioneDi(VistaMappa v) => switch (v.nativa) {
     VistaMappa.piatta => 0,
-    VistaMappa.inclinata => 58,
     VistaMappa.immersiva => 60,
+    _ => 58,
   };
   double get _inclinazione => _inclinazioneDi(_vista);
 
@@ -268,9 +269,9 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   Future<void> _comandi() async {
     final m = _mappa;
     if (m == null) return;
-    if (widget.controllo.vista != _vista) {
+    if (widget.controllo.vista.nativa != _vista) {
       final eraImmersiva = _immersiva;
-      _vista = widget.controllo.vista;
+      _vista = widget.controllo.vista.nativa;
       // Dentro o fuori dalla vista immersiva cambia lo stile (le strade in
       // metri, gli edifici sopra il percorso, le corsie): la mappa si rifà
       // col suo, e lo stile nuovo si rimette da solo la sua inclinazione.
@@ -1156,7 +1157,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
         _zoneConPedonali = false;
         _zoneSullaMappa = false;
         if (_mappa case final m?) {
-          _vista = widget.controllo.vista;
+          _vista = widget.controllo.vista.nativa;
           unawaited(_edifici(m).catchError((Object e) => debugPrint('mappa, edifici: $e')));
           // Lo stile nuovo non sa dell'inclinazione: la si rimette.
           unawaited(

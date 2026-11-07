@@ -13,11 +13,13 @@ import '../componenti/stato_colonnina.dart' show testoDisponibilita;
 import '../componenti/scena_svincolo.dart';
 import '../componenti/vista_svincolo.dart';
 import '../componenti/ztl.dart';
+import '../mappa/controllo_mappa.dart' show VistaMappa;
 import '../mappa/dati_viaggio.dart';
 import '../mappa/segnaposto.dart';
 import '../mappa/stile.dart';
 import '../schermate/scheda_punto.dart';
 import '../servizi.dart';
+import '../stato/archivio.dart' show Archivio;
 import '../stato/avvisi_strada.dart';
 import '../stato/avvisi_ztl.dart';
 import '../stato/distributori.dart';
@@ -99,15 +101,10 @@ class PonteAuto {
   void avvia() {
     _canale.setMethodCallHandler(_dallAuto);
     _stili();
-    // Con la «Mappa 3D» accesa anche l'auto ne prende l'aspetto, e l'auto rossa.
-    unawaited(
-      guida.archivio?.mappa3d().then((s) {
-        if (!_attivo || s.accesa == _aspetto3d) return;
-        _aspetto3d = s.accesa;
-        _stili();
-        _posizione();
-      }),
-    );
+    // Col 3D aumentato scelto sul telefono anche l'auto ne prende l'aspetto
+    // (colori, ponti sollevati, corsie, auto rossa); altrimenti com'era.
+    Archivio.vistaScelta.addListener(_dallaVista);
+    unawaited(guida.archivio?.vistaMappa().then((_) => _dallaVista()));
     _immagini();
     viaggio.addListener(_viaggio);
     viaggio.addListener(_opzioni);
@@ -417,6 +414,7 @@ class PonteAuto {
   }
 
   void ferma() {
+    Archivio.vistaScelta.removeListener(_dallaVista);
     viaggio.removeListener(_viaggio);
     viaggio.removeListener(_opzioni);
     guida.removeListener(_guida);
@@ -474,8 +472,18 @@ class PonteAuto {
   }
 
   /// La mappa dell'auto con l'aspetto della mappa 3D del telefono (colori,
-  /// ponti sollevati, corsie, auto rossa): di partenza sì, come la «Mappa 3D».
-  var _aspetto3d = true;
+  /// ponti sollevati, corsie, auto rossa): solo se sul telefono la vista è
+  /// il 3D aumentato. L'auto ha le sue viste (2D, 3D, immersiva): l'aspetto
+  /// segue il telefono.
+  var _aspetto3d = false;
+
+  void _dallaVista() {
+    final a = Archivio.vistaScelta.value == VistaMappa.aumentata;
+    if (!_attivo || a == _aspetto3d) return;
+    _aspetto3d = a;
+    _stili();
+    _posizione();
+  }
 
   void _stili() {
     String stile({required bool scuro, bool immersiva = false}) => jsonEncode(

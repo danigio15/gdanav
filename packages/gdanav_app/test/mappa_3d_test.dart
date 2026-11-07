@@ -8,6 +8,7 @@ import 'package:gdanav_app/mappa/controllo_mappa.dart';
 import 'package:gdanav_app/mappa/dati_viaggio.dart';
 import 'package:gdanav_app/mappa/mappa_3d.dart';
 import 'package:gdanav_app/mappa/ponte_3d.dart';
+import 'package:gdanav_app/mappa/scelta_vista.dart';
 import 'package:gdanav_app/mappa/segnaposto.dart';
 import 'package:gdanav_app/stato/archivio.dart';
 import 'package:gdanav_core/gdanav_core.dart';
@@ -56,7 +57,10 @@ void main() {
       expect(m['vista'], 'immersiva');
       expect(m['auto'], '#d62a26', reason: 'la freccia di partenza è l’auto rossa, che sul blu si vede');
       expect(m['icona'], 'freccia');
-      expect(msgOpzioni(notte: false, vista: VistaMappa.inclinata, segnaposto: Segnaposto.autoBianca)['auto'], '#f1f3f5');
+      expect(
+        msgOpzioni(notte: false, vista: VistaMappa.inclinata, segnaposto: Segnaposto.autoBianca)['auto'],
+        '#f1f3f5',
+      );
       for (final s in Segnaposto.values) {
         expect(coloreAuto3d(s), matches(RegExp(r'^#[0-9a-f]{6}$')));
       }
@@ -153,7 +157,10 @@ void main() {
       expect(MessaggioDalla3d.leggi('{"tipo":"caricata","versione":1}'), isA<Caricata3d>());
       expect(MessaggioDalla3d.leggi('{"tipo":"pronto"}'), isA<Pronta3d>());
       final e = MessaggioDalla3d.leggi('{"tipo":"errore","motivo":"software","gpu":"SwiftShader"}');
-      expect(e, isA<Errore3d>().having((x) => x.motivo, 'motivo', 'software').having((x) => x.gpu, 'gpu', 'SwiftShader'));
+      expect(
+        e,
+        isA<Errore3d>().having((x) => x.motivo, 'motivo', 'software').having((x) => x.gpu, 'gpu', 'SwiftShader'),
+      );
       final p = MessaggioDalla3d.leggi('{"tipo":"prestazioni","fps":14.5,"p90":90,"lento":true,"triangoli":600000}');
       expect(p, isA<Prestazioni3d>().having((x) => x.lento, 'lento', true).having((x) => x.fps, 'fps', 14.5));
       expect(MessaggioDalla3d.leggi('{"tipo":"toccata"}'), isA<Toccata3d>());
@@ -168,55 +175,166 @@ void main() {
     });
   });
 
-  group('l’impostazione «Mappa 3D»', () {
-    test('di partenza accesa; spenta a mano; spenta da sola se il telefono non ce la fa', () {
-      expect(const SceltaMappa3d().accesa, isTrue);
-      expect(const SceltaMappa3d(scelta: 'no').accesa, isFalse);
-      expect(const SceltaMappa3d(esito: 'lento').accesa, isFalse);
-      expect(const SceltaMappa3d(esito: 'lento').nonCeLaFa, isTrue);
-      expect(const SceltaMappa3d(scelta: 'no', esito: 'lento').nonCeLaFa, isFalse);
-      expect(const SceltaMappa3d(esito: 'lento').riassunto, contains('scatti'));
-      expect(const SceltaMappa3d(esito: 'webgl2').riassunto, contains('non la può disegnare'));
+  group('la vista «3D aumentato»', () {
+    test('è una vista come le altre: si ricorda per nome, e la mappa di sempre la disegna come il 3D', () {
+      expect(VistaMappa.values, [VistaMappa.piatta, VistaMappa.inclinata, VistaMappa.immersiva, VistaMappa.aumentata]);
+      expect(VistaMappa.daNome('aumentata'), VistaMappa.aumentata);
+      expect(VistaMappa.aumentata.nome, '3D aumentato');
+      expect(VistaMappa.aumentata.sigla, '3D+');
+      expect(VistaMappa.aumentata.nativa, VistaMappa.inclinata);
+      for (final v in [VistaMappa.piatta, VistaMappa.inclinata, VistaMappa.immersiva]) {
+        expect(v.nativa, v);
+      }
+      expect(
+        avvisoAumentatoNonVa(VistaMappa.inclinata, ricorda: true),
+        '3D aumentato non è disponibile su questo telefono: torno alla vista 3D',
+      );
+      expect(
+        avvisoAumentatoNonVa(VistaMappa.piatta, ricorda: false),
+        '3D aumentato non è partito: torno alla vista 2D',
+      );
+      expect(spiegaAumentatoNonVa('lento'), contains('scatti'));
+      expect(spiegaAumentatoNonVa('software'), contains('non lo può disegnare'));
     });
 
-    test('si ricorda; riaccesa a mano si riprova anche dove era andata male', () async {
+    test('la scena 3D solo col 3D aumentato scelto e il telefono che ce la fa', () {
+      final c = ControlloMappa(aumentataPossibile: true);
+      expect(c.scenaAumentata, isFalse);
+      c.scegliVista(VistaMappa.aumentata);
+      expect(c.scenaAumentata, isTrue);
+      expect(c.inclinata, isTrue, reason: 'la mappa segue chi guida');
+      c.aumentataNonVa = 'lento';
+      expect(c.scenaAumentata, isFalse);
+      expect(ControlloMappa(vista: VistaMappa.aumentata).scenaAumentata, isFalse, reason: 'senza WebView no');
+    });
+
+    test('se il telefono non ce la fa: si torna alla vista di prima, e lo si ricorda', () async {
+      final salvate = <VistaMappa>[];
+      final nonVa = <String>[];
+      var dimenticato = 0;
+      final c = ControlloMappa(
+        aumentataPossibile: true,
+        salvaVista: (v) async => salvate.add(v),
+        salvaAumentataNonVa: (m) async => nonVa.add(m),
+        dimenticaAumentataNonVa: () async => dimenticato++,
+      );
+      c.scegliVista(VistaMappa.immersiva);
+      c.scegliVista(VistaMappa.aumentata);
+      expect(c.vistaPrima, VistaMappa.immersiva);
+      // Un intoppo di questa volta: si torna indietro senza ricordarlo.
+      c.lasciaAumentata('tempo', ricorda: false);
+      expect(c.vista, VistaMappa.immersiva);
+      expect(c.aumentataNonVa, isNull);
+      expect(nonVa, isEmpty);
+      expect(salvate, [VistaMappa.immersiva, VistaMappa.aumentata]);
+      // Troppo lento: si ricorda, e resta scelta la vista di prima.
+      c.scegliVista(VistaMappa.aumentata);
+      c.lasciaAumentata('lento', ricorda: true);
+      expect(c.vista, VistaMappa.immersiva);
+      expect(c.aumentataNonVa, 'lento');
+      expect(c.aumentataDisponibile, isFalse);
+      expect(nonVa, ['lento']);
+      expect(salvate.last, VistaMappa.immersiva);
+      // «Riprova»: si dimentica e si sceglie di nuovo.
+      c.riprovaAumentata();
+      expect(c.vista, VistaMappa.aumentata);
+      expect(c.aumentataNonVa, isNull);
+      expect(dimenticato, 1);
+      expect(salvate.last, VistaMappa.aumentata);
+    });
+
+    test('ricordato il 3D aumentato su un telefono che non ce la fa, si parte dal 3D', () async {
+      final c = ControlloMappa(aumentataPossibile: true, vista: VistaMappa.piatta);
+      await c.carica(Future.value(VistaMappa.aumentata), nonVa: Future.value('webgl2'));
+      expect(c.vista, VistaMappa.inclinata);
+      expect(c.letta, isTrue);
+      final d = ControlloMappa(aumentataPossibile: true);
+      await d.carica(Future.value(VistaMappa.aumentata), nonVa: Future.value(null));
+      expect(d.vista, VistaMappa.aumentata);
+      expect(d.scenaAumentata, isTrue);
+    });
+
+    test('si ricorda nell’archivio: la vista, e perché non va finché non si riprova', () async {
       preparaPiattaforma();
       final a = Archivio();
-      expect((await a.mappa3d()).accesa, isTrue);
-      await a.salvaMappa3dFallita('lento');
-      expect((await a.mappa3d()).accesa, isFalse);
-      expect((await a.mappa3d()).esito, 'lento');
-      await a.salvaMappa3d(false);
-      expect((await a.mappa3d()).accesa, isFalse);
-      await a.salvaMappa3d(true);
-      final s = await a.mappa3d();
-      expect(s.accesa, isTrue);
-      expect(s.esito, isNull);
+      await a.salvaVistaMappa(VistaMappa.aumentata);
+      expect(await a.vistaMappa(), VistaMappa.aumentata);
+      expect(Archivio.vistaScelta.value, VistaMappa.aumentata);
+      expect(await a.aumentataNonVa(), isNull);
+      await a.salvaAumentataNonVa('lento');
+      expect(await a.aumentataNonVa(), 'lento');
+      await a.dimenticaAumentataNonVa();
+      expect(await a.aumentataNonVa(), isNull);
     });
 
-    testWidgets('nel menu: l’interruttore la spegne e la riaccende', (tester) async {
+    Future<ControlloMappa> scelta(WidgetTester tester, ControlloMappa c) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: ListenableBuilder(
+                listenable: c,
+                builder: (context, _) => SceltaVista(controllo: c),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byType(SceltaVista));
+      await tester.pumpAndSettle();
+      return c;
+    }
+
+    testWidgets('nel tasto della vista: quattro voci, e scelto il tasto dice «3D» con la scintilla', (tester) async {
+      final c = await scelta(tester, ControlloMappa(aumentataPossibile: true));
+      for (final v in VistaMappa.values) {
+        expect(find.byKey(Key('vista-${v.name}')), findsOneWidget);
+      }
+      expect(find.text('3D aumentato'), findsOneWidget);
+      expect(find.text('In guida: viadotti, alberi ed edifici in 3D'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('vista-aumentata')));
+      await tester.pumpAndSettle();
+      expect(c.vista, VistaMappa.aumentata);
+      expect(find.byType(IconaAumentata), findsOneWidget);
+      expect(find.byTooltip('Vista: 3D aumentato'), findsOneWidget);
+    });
+
+    testWidgets('spento perché il telefono non ce la fa: si spiega, e «Riprova» lo riaccende', (tester) async {
+      final c = await scelta(tester, ControlloMappa(aumentataPossibile: true)..aumentataNonVa = 'lento');
+      expect(find.text('Su questo telefono va a scatti'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('vista-aumentata')));
+      await tester.pumpAndSettle();
+      expect(c.vista, VistaMappa.inclinata, reason: 'non si sceglie da solo');
+      expect(find.byKey(const Key('vista-aumentata-spiegazione')), findsOneWidget);
+      expect(find.textContaining('torna da sola'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('vista-aumentata-riprova')));
+      await tester.pumpAndSettle();
+      expect(c.vista, VistaMappa.aumentata);
+      expect(c.aumentataNonVa, isNull);
+    });
+
+    testWidgets('senza WebView (qui nelle prove) si vede spento, e non c’è «Riprova»', (tester) async {
+      final c = await scelta(tester, ControlloMappa());
+      expect(find.text('Non c\'è su questo dispositivo'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('vista-aumentata')));
+      await tester.pumpAndSettle();
+      expect(c.vista, VistaMappa.inclinata);
+      expect(find.byKey(const Key('vista-aumentata-riprova')), findsNothing);
+      await tester.tap(find.text('Chiudi'));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('nel menu non c’è più l’interruttore «Mappa 3D»: si sceglie dalla vista', (tester) async {
       preparaPiattaforma(portachiavi: impostazioniComplete);
       final a = await ambiente(tester);
       await tester.pumpWidget(a.app());
       await tester.tap(find.byTooltip('Menu'));
       await tester.pumpAndSettle();
-      final voce = find.byKey(const Key('menu-mappa-3d'));
-      final interruttore = find.descendant(of: voce, matching: find.byType(SwitchListTile));
-      await tester.scrollUntilVisible(voce, 120, scrollable: find.byType(Scrollable).last);
-      expect(tester.widget<SwitchListTile>(interruttore).value, isTrue);
-      expect(find.text('In guida: viadotti, alberi ed edifici in 3D'), findsOneWidget);
-      await tester.tap(voce);
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-      await tester.pumpAndSettle();
-      expect(tester.widget<SwitchListTile>(interruttore).value, isFalse);
-      expect((await a.archivio.mappa3d()).scelta, 'no');
-      await tester.tap(voce);
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-      await tester.pumpAndSettle();
-      expect(tester.widget<SwitchListTile>(interruttore).value, isTrue);
+      expect(find.byKey(const Key('menu-mappa-3d')), findsNothing);
+      expect(find.text('Mappa 3D'), findsNothing);
     });
 
-    test('nelle prove (e senza WebView) il 3D non si prova: resta la mappa di sempre', () {
+    test('nelle prove (e senza WebView) il 3D aumentato non si prova: resta la mappa di sempre', () {
       expect(mappa3dPossibile, isFalse);
     });
   });
