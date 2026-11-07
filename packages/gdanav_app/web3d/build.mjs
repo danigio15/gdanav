@@ -23,6 +23,28 @@ const comune = { bundle: true, minify: !process.env.LEGGIBILE, target: ['es2020'
 const lavoratore = await esbuild.build({ ...comune, entryPoints: [path.join(qui, 'src', 'lavoratore.js')], format: 'iife', write: false });
 const codiceLavoratore = lavoratore.outputFiles[0].text;
 
+/*
+ * Una correzione a MapLibre 5.6.0: con la mappa molto inclinata le tessere
+ * vicine alla telecamera hanno uno zoom più alto delle altre, e per quelle
+ * `children()` dà un figlio solo; il codice ne leggeva quattro e si
+ * fermava con «Cannot read properties of undefined (reading 'key')»,
+ * perdendo il fotogramma. Qui si guarda quanti figli ci sono davvero (le
+ * versioni nuove hanno riscritto tutto questo pezzo). Se il pezzo non si
+ * trova, il pacchetto non si fa: vuol dire che MapLibre è cambiata.
+ */
+const ERRATO = 'if(o[e[0].key]&&o[e[1].key]&&o[e[2].key]&&o[e[3].key])continue';
+const GIUSTO = 'if(e.every(c=>o[c.key]))continue';
+const correzioneMaplibre = {
+  name: 'gdanav-correzione-maplibre',
+  setup(b) {
+    b.onLoad({ filter: /maplibre-gl[\\/]dist[\\/]maplibre-gl\.js$/ }, ({ path: f }) => {
+      const testo = fs.readFileSync(f, 'utf8');
+      if (testo.split(ERRATO).length !== 2) throw new Error('MapLibre: il pezzo da correggere non c’è (o c’è due volte)');
+      return { contents: testo.replace(ERRATO, GIUSTO), loader: 'js' };
+    });
+  },
+};
+
 const virtuale = {
   name: 'gdanav-lavoratore',
   setup(b) {
@@ -37,7 +59,7 @@ await esbuild.build({
   entryPoints: { gdanav3d: path.join(qui, 'src', 'principale.js') },
   outdir: uscita,
   format: 'iife',
-  plugins: [virtuale],
+  plugins: [virtuale, correzioneMaplibre],
   banner: {
     js: `/* GdANav 3D: file generato da packages/gdanav_app/web3d (node build.mjs), non modificare. maplibre-gl ${pacchetto('maplibre-gl')}, three ${pacchetto('three')}. */`,
     css: '/* GdANav 3D: file generato da packages/gdanav_app/web3d (node build.mjs), non modificare. */',

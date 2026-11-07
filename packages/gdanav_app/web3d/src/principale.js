@@ -270,6 +270,7 @@ function creaMappa(stile) {
   }
   S.mappa = mappa;
   window.__mappa = mappa;
+  window.__scena = scena;
   mappa.addControl(new maplibregl.AttributionControl({ compact: true }), 'top-left');
   mappa.on('style.load', alloStile);
   // L'attribuzione chiusa: si apre toccando la «i».

@@ -94,3 +94,26 @@ test('il sottopasso: un nastro di galleria, gli imbocchi, e i segmenti per il pe
   const zv = Math.min(...[...t.strade.secondary === undefined ? t.strade.primary2.posizioni : t.strade.primary2.posizioni].filter((_, k) => k % 3 === 2));
   assert.ok(zg < zv, `galleria ${zg} sotto la strada ${zv}`);
 });
+
+test('un ponte spezzato in due sopra la strada: niente spalla in mezzo alla carreggiata', () => {
+  const l = cavalcavia();
+  // Lo stesso cavalcavia, ma in due pezzi che si toccano sopra l'autostrada.
+  l.transportation = {
+    ...l.transportation,
+    length: 5,
+    feature: (i) =>
+      i < 2
+        ? cavalcavia().transportation.feature(i === 0 ? 0 : 1)
+        : i === 2
+          ? { type: 2, properties: { class: 'primary', brunnel: 'bridge', layer: 1 }, loadGeometry: () => [[{ x: 2048, y: 2600 }, { x: 2048, y: 2048 }]] }
+          : i === 3
+            ? { type: 2, properties: { class: 'primary', brunnel: 'bridge', layer: 1 }, loadGeometry: () => [[{ x: 2048, y: 2048 }, { x: 2048, y: 1500 }]] }
+            : cavalcavia().transportation.feature(3),
+  };
+  const t = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': l } });
+  // Nessun pezzo di cemento sull'asfalto dell'autostrada (|y| < 6 m) sotto i 4 m.
+  const p = t.opere.posizioni;
+  for (let i = 0; i < p.length; i += 3) {
+    if (Math.abs(p[i + 1]) < 5.5 && p[i + 2] < 4 && Math.abs(p[i]) < 6) assert.fail(`cemento in carreggiata a ${p[i]}, ${p[i + 1]}, ${p[i + 2]}`);
+  }
+});

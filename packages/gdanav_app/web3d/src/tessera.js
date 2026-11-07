@@ -409,6 +409,8 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
             [d[0] + sox * ha2, d[1] + soy * ha2, 0],
             [0, 0, 1],
           );
+          // E sotto, a piombo: sotto un ponte è sempre più scuro.
+          if (f.ponte && ha > 2.5 && hb > 2.5) ombre.quad([a[0], a[1], 0], [b[0], b[1], 0], [c[0], c[1], 0], [d[0], d[1], 0], [0, 0, 1]);
         }
         for (const lato of [1, -1]) {
           const A = lato > 0 ? L : R;
@@ -447,6 +449,23 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           const d = R[k - 1];
           // Il ventre dell'impalcato, scuro: da sotto si capisce che è un ponte.
           opere.quad([a[0], a[1], a[2] - 1.8], [b[0], b[1], b[2] - 1.8], [c[0], c[1], c[2] - 1.8], [d[0], d[1], d[2] - 1.8], [0, 0, -1], ...cSotto);
+        }
+      }
+      // Le spalle: dove il ponte finisce ancora in alto (poi c'è il
+      // terrapieno), un muro di cemento pieno fino a terra.
+      if (f.ponte) {
+        for (const e of [0, n - 1]) {
+          const P = pezzo[e];
+          const capo = e === 0 ? P[5] < 0.5 : P[5] > lungo[n0 - 1] - 0.5;
+          if (!capo || P[2] < 2.5 || !dentro(P[0], P[1])) continue;
+          const dir = e === 0 ? -1 : 1;
+          // Un ponte spezzato in più pezzi può finire sopra una strada: lì niente spalla.
+          const cx0 = P[0] + P[3] * 0.7 * dir;
+          const cy0 = P[1] + P[4] * 0.7 * dir;
+          let sullaStrada = false;
+          for (let q = -1; q <= 1; q += 0.5) if (suStradaATerra(cx0 - P[4] * hw * q, cy0 + P[3] * hw * q, 1)) sullaStrada = true;
+          if (sullaStrada) continue;
+          scatola(P[0] + P[3] * 0.7 * dir, P[1] + P[4] * 0.7 * dir, 0, P[2] + zs - 0.1, P[3], P[4], 0.7, hw + 0.35, cCemento);
         }
       }
       // I piloni: ai due lati di ogni strada che passa sotto (mai sopra), e

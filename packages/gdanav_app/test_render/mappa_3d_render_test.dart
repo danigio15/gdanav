@@ -5,10 +5,11 @@
 //
 //     flutter test test_render/mappa_3d_render_test.dart
 //
-// Legge il percorso e le foto da GDANAV_3D_COLLAUDO (di solito
-// web3d/collaudo/uscita) e scrive i PNG in GDANAV_RENDER, a 390×844 punti
-// con densità 2. La guida è vera: lo stesso percorso della foto (Rho/Pero,
-// A4 → viadotto A52 → A8), l'auto a 1790 m, l'uscita verso l'A8 a 1,2 km.
+// Legge i percorsi e le foto da GDANAV_3D_COLLAUDO (di solito
+// web3d/collaudo/uscita) e scrive i PNG in GDANAV_RENDER: per ogni caso del
+// collaudo il telefono dritto di giorno e di notte (390×844 punti, densità
+// 2), e per Rho/Pero anche di traverso. La guida è vera: lo stesso percorso
+// della foto, l'auto dove la mette il collaudo, una manovra davanti.
 
 import 'dart:convert';
 import 'dart:io';
@@ -40,40 +41,151 @@ Future<void> _caricaFont() async {
   await (FontLoader('MaterialIcons')..addFont(leggi('MaterialIcons-Regular.otf'))).load();
 }
 
-/// Il percorso della foto, con l'uscita verso l'A8 e i limiti.
-PercorsoCalcolato _percorso() {
-  final j = jsonDecode(File('$collaudo/percorso-rho.json').readAsStringSync()) as Map;
+/// La manovra davanti all'auto in ogni caso: dove (metri dall'auto, o
+/// assoluti con [metri]), cosa dice il cartello, le corsie; il limite e la
+/// velocità; e il nome della meta.
+class _Caso {
+  const _Caso(
+    this.istruzione,
+    this.verso, {
+    this.davanti = 600,
+    this.metri,
+    this.tipo = 20,
+    this.corsie = const [],
+    this.limite = 90,
+    this.kmh = 72,
+    this.meta = 'Destinazione',
+  });
+  final String istruzione;
+  final String verso;
+  final double davanti;
+  final double? metri;
+  final int tipo;
+  final List<Corsia> corsie;
+  final int limite;
+  final int kmh;
+  final String meta;
+}
+
+const _destra = [
+  Corsia([DirezioneCorsia.dritto]),
+  Corsia([DirezioneCorsia.leggeraDestra], giusta: true, consigliata: DirezioneCorsia.leggeraDestra),
+];
+const _sinistra = [
+  Corsia([DirezioneCorsia.leggeraSinistra], giusta: true, consigliata: DirezioneCorsia.leggeraSinistra),
+  Corsia([DirezioneCorsia.dritto]),
+];
+
+const _casi = {
+  'rho': _Caso(
+    "Prendi l'uscita a destra verso A8",
+    'A8 · Milano · Varese',
+    metri: 2994,
+    corsie: _destra,
+    limite: 80,
+    meta: 'Milano, viale Certosa',
+  ),
+  'roma': _Caso(
+    'Mantieni la destra verso A24',
+    "A24 · L'Aquila · Teramo",
+    davanti: 450,
+    tipo: 23,
+    corsie: _destra,
+    meta: 'Roma, Tor Cervara',
+  ),
+  'bologna': _Caso(
+    'Mantieni la sinistra verso SS569',
+    'SS569 · Vignola',
+    davanti: 420,
+    tipo: 24,
+    corsie: _sinistra,
+    limite: 70,
+    kmh: 64,
+    meta: 'Casalecchio di Reno',
+  ),
+  'cavalcavia': _Caso(
+    'Esci a destra verso Casalecchio',
+    'Uscita 1 · Casalecchio',
+    davanti: 380,
+    corsie: _destra,
+    limite: 130,
+    kmh: 112,
+    meta: 'Bologna, Borgo Panigale',
+  ),
+  'napoli': _Caso(
+    'Mantieni la destra verso la Tangenziale',
+    'Tangenziale · Pozzuoli',
+    davanti: 320,
+    tipo: 23,
+    corsie: _destra,
+    limite: 60,
+    kmh: 58,
+    meta: 'Napoli, Capodichino',
+  ),
+  'torino': _Caso(
+    'Alla fine della rampa svolta a destra',
+    'Corso Francia · Rivoli',
+    davanti: 210,
+    tipo: 10,
+    limite: 40,
+    kmh: 38,
+    meta: 'Torino, corso Francia',
+  ),
+  'genova': _Caso(
+    'Prosegui sulla A10 verso Aeroporto',
+    'A10 · Genova Aeroporto',
+    davanti: 700,
+    tipo: 22,
+    limite: 80,
+    kmh: 78,
+    meta: 'Genova, Sampierdarena',
+  ),
+  'sottopasso': _Caso(
+    'Prosegui nel sottopasso',
+    'Centro',
+    davanti: 250,
+    tipo: 22,
+    limite: 50,
+    kmh: 46,
+    meta: 'Milano, Isola',
+  ),
+};
+
+/// Il percorso della foto, con la manovra del caso e i limiti.
+(PercorsoCalcolato, double) _percorso(String nome, _Caso c) {
+  final j = jsonDecode(File('$collaudo/percorso-$nome.json').readAsStringSync()) as Map;
   final xy = (j['punti'] as List).cast<num>();
+  final auto = (j['auto'] as num).toDouble();
   final punti = [for (var i = 0; i < xy.length; i += 2) Punto(xy[i + 1].toDouble(), xy[i].toDouble())];
   final linea = Linea(punti);
-  // L'uscita dove la mappa 3D ha la freccia (2994 m, come nel prototipo).
+  final dove = c.metri ?? auto + c.davanti;
   var k = 1;
-  while (k < punti.length - 1 && linea.cumulate[k] < 2994) {
+  while (k < punti.length - 2 && linea.cumulate[k] < dove) {
     k++;
   }
-  return PercorsoCalcolato(
-    punti: punti,
-    tratti: [
-      for (var i = 1; i < punti.length; i++)
-        Tratto(lunghezzaM: linea.cumulate[i] - linea.cumulate[i - 1], velocitaKmh: 66),
-    ],
-    manovre: [
-      const Manovra(istruzione: 'Parti verso nord', lunghezzaM: 0, secondi: 0, inizio: 0, tipo: 1),
-      Manovra(
-        istruzione: "Prendi l'uscita a destra verso A8",
-        lunghezzaM: linea.lunghezzaM - linea.cumulate[k],
-        secondi: 30,
-        inizio: k,
-        tipo: 20,
-        verso: 'A8 · Milano · Varese',
-        corsie: const [
-          Corsia([DirezioneCorsia.dritto]),
-          Corsia([DirezioneCorsia.leggeraDestra], giusta: true, consigliata: DirezioneCorsia.leggeraDestra),
-        ],
-      ),
-      Manovra(istruzione: 'Sei arrivato', lunghezzaM: 0, secondi: 0, inizio: punti.length - 1, tipo: 4),
-    ],
-    limiti: [for (var i = 1; i < punti.length; i++) linea.cumulate[i] < 1900 ? 80 : 90],
+  return (
+    PercorsoCalcolato(
+      punti: punti,
+      tratti: [
+        for (var i = 1; i < punti.length; i++)
+          Tratto(lunghezzaM: linea.cumulate[i] - linea.cumulate[i - 1], velocitaKmh: c.kmh.toDouble()),
+      ],
+      manovre: [
+        const Manovra(istruzione: 'Parti', lunghezzaM: 0, secondi: 0, inizio: 0, tipo: 1),
+        Manovra(
+          istruzione: c.istruzione,
+          lunghezzaM: linea.lunghezzaM - linea.cumulate[k],
+          secondi: 30,
+          inizio: k,
+          tipo: c.tipo,
+          verso: c.verso,
+          corsie: c.corsie,
+        ),
+        Manovra(istruzione: 'Sei arrivato', lunghezzaM: 0, secondi: 0, inizio: punti.length - 1, tipo: 4),
+      ],
+      limiti: [for (var i = 1; i < punti.length; i++) c.limite],
+    ),
+    auto,
   );
 }
 
@@ -93,75 +205,84 @@ final _chiave = GlobalKey();
 void main() {
   setUpAll(_caricaFont);
 
-  for (final notte in [false, true]) {
-    testWidgets('guida con la mappa 3D, ${notte ? 'notte' : 'giorno'}', (tester) async {
-      debugDisableShadows = false;
-      tester.platformDispatcher.platformBrightnessTestValue = notte ? Brightness.dark : Brightness.light;
-      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
-      preparaPiattaforma(portachiavi: impostazioniComplete);
-      final percorso = _percorso();
-      final linea = Linea(percorso.punti);
-      final a = await ambiente(
-        tester,
-        posizione: percorso.punti.first,
-        costruisci: (_, profilo, preferenze, _) => PianificatoreViaggio(
-          percorsi: (_) async => percorso,
-          colonnine: ColonnineFinte(),
-          profilo: profilo,
-          preferenze: preferenze,
-        ),
-      );
-      tester.view.physicalSize = const Size(780, 1688);
-      tester.view.devicePixelRatio = 2;
-      tester.view.padding = const FakeViewPadding(top: 94, bottom: 68);
-      tester.view.viewPadding = const FakeViewPadding(top: 94, bottom: 68);
-      final foto = await tester.runAsync(() => File('$collaudo/rho-${notte ? 'notte' : 'giorno'}.png').readAsBytes());
-      final immagine = MemoryImage(foto!);
-      await tester.pumpWidget(
-        RepaintBoundary(
-          key: _chiave,
-          child: GdanavApp(
-            posizione: a.posizione,
-            archivio: a.archivio,
-            auto: a.auto,
-            viaggio: a.viaggio,
-            guida: a.guida,
-            segnalazioni: a.segnalazioni,
-            // La mappa 3D com'è sul telefono: qui la sua foto dal browser.
-            mappa: (_, _) => Image(image: immagine, fit: BoxFit.cover, gaplessPlayback: true),
-          ),
-        ),
-      );
-      a.auto.manuale.imposta(82);
-      await tester.pump();
-      await tester.runAsync(() => a.viaggio.vaiA(Luogo(nome: 'Milano, viale Certosa', posizione: percorso.punti.last)));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Avvia'));
-      await tester.pumpAndSettle();
-      await tester.runAsync(() => precacheImage(immagine, tester.element(find.byType(Image).first)));
-      // L'auto a 1790 m, a 72 all'ora.
-      final qui = _a(linea, 1790);
-      final rotta = rottaGradi(qui, _a(linea, 1800));
-      a.posizione.avvia();
-      for (var i = 0; i < 3; i++) {
-        a.gps.add(Lettura(qui, rotta: rotta, velocitaMs: 20));
-        a.posizioni.add(qui);
-        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 40)));
-        await tester.pump(const Duration(milliseconds: 300));
+  for (final MapEntry(key: nome, value: c) in _casi.entries) {
+    for (final notte in [false, true]) {
+      for (final traverso in [false, true]) {
+        final momento = notte ? 'notte' : 'giorno';
+        final foto = File('$collaudo/$nome-${traverso ? 'orizzontale' : 'telefono'}-$momento.png');
+        if (!foto.existsSync() || !File('$collaudo/percorso-$nome.json').existsSync()) continue;
+        testWidgets('guida con la mappa 3D: $nome, $momento${traverso ? ', di traverso' : ''}', (tester) async {
+          debugDisableShadows = false;
+          tester.platformDispatcher.platformBrightnessTestValue = notte ? Brightness.dark : Brightness.light;
+          addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+          preparaPiattaforma(portachiavi: impostazioniComplete);
+          final (percorso, auto) = _percorso(nome, c);
+          final linea = Linea(percorso.punti);
+          final a = await ambiente(
+            tester,
+            posizione: percorso.punti.first,
+            costruisci: (_, profilo, preferenze, _) => PianificatoreViaggio(
+              percorsi: (_) async => percorso,
+              colonnine: ColonnineFinte(),
+              profilo: profilo,
+              preferenze: preferenze,
+            ),
+          );
+          tester.view.physicalSize = traverso ? const Size(1688, 780) : const Size(780, 1688);
+          tester.view.devicePixelRatio = 2;
+          final bordo = traverso
+              ? const FakeViewPadding(left: 94, right: 94, bottom: 42)
+              : const FakeViewPadding(top: 94, bottom: 68);
+          tester.view.padding = bordo;
+          tester.view.viewPadding = bordo;
+          final byte = await tester.runAsync(() => foto.readAsBytes());
+          final immagine = MemoryImage(byte!);
+          await tester.pumpWidget(
+            RepaintBoundary(
+              key: _chiave,
+              child: GdanavApp(
+                posizione: a.posizione,
+                archivio: a.archivio,
+                auto: a.auto,
+                viaggio: a.viaggio,
+                guida: a.guida,
+                segnalazioni: a.segnalazioni,
+                // La mappa 3D com'è sul telefono: qui la sua foto dal browser.
+                mappa: (_, _) => Image(image: immagine, fit: BoxFit.cover, gaplessPlayback: true),
+              ),
+            ),
+          );
+          a.auto.manuale.imposta(82);
+          await tester.pump();
+          await tester.runAsync(() => a.viaggio.vaiA(Luogo(nome: c.meta, posizione: percorso.punti.last)));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Avvia'));
+          await tester.pumpAndSettle();
+          await tester.runAsync(() => precacheImage(immagine, tester.element(find.byType(Image).first)));
+          final qui = _a(linea, auto);
+          final rotta = rottaGradi(qui, _a(linea, auto + 10));
+          a.posizione.avvia();
+          for (var i = 0; i < 3; i++) {
+            a.gps.add(Lettura(qui, rotta: rotta, velocitaMs: c.kmh / 3.6));
+            a.posizioni.add(qui);
+            await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 40)));
+            await tester.pump(const Duration(milliseconds: 300));
+          }
+          await tester.pump(const Duration(milliseconds: 500));
+          await tester.runAsync(() async {
+            final confine = _chiave.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+            final img = await confine.toImage(pixelRatio: 2);
+            final dati = await img.toByteData(format: ui.ImageByteFormat.png);
+            final f = File('$cartella/$nome-guida-${traverso ? 'orizzontale' : 'telefono'}-$momento.png');
+            await f.parent.create(recursive: true);
+            await f.writeAsBytes(dati!.buffer.asUint8List());
+            debugPrint('scritto ${f.path}');
+          });
+          // Via la guida dallo schermo: i suoi orologi si fermano con lei.
+          await tester.pumpWidget(const SizedBox());
+          debugDisableShadows = true;
+        });
       }
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.runAsync(() async {
-        final confine = _chiave.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-        final img = await confine.toImage(pixelRatio: 2);
-        final dati = await img.toByteData(format: ui.ImageByteFormat.png);
-        final f = File('$cartella/guida-3d-telefono-${notte ? 'notte' : 'giorno'}.png');
-        await f.parent.create(recursive: true);
-        await f.writeAsBytes(dati!.buffer.asUint8List());
-        debugPrint('scritto ${f.path}');
-      });
-      // Via la guida dallo schermo: i suoi orologi si fermano con lei.
-      await tester.pumpWidget(const SizedBox());
-      debugDisableShadows = true;
-    });
+    }
   }
 }
