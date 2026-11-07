@@ -49,7 +49,7 @@ for (let i = 0; i < fotogrammi; i++) {
       }),
     [t],
   );
-  await page.screenshot({ path: path.join(dir, `f${String(i).padStart(4, '0')}.png`) });
+  await page.screenshot({ path: path.join(dir, `f${String(i).padStart(4, '0')}.png`), timeout: 180000 });
 }
 await browser.close();
 chiudi();

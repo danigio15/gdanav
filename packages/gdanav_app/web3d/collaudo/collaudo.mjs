@@ -108,7 +108,7 @@ const browser = await chromium.launch({ args: ARGOMENTI_CHROMIUM });
 
 /** La foto, e se si vede l'auto e quanto è libera la tela. */
 async function foto(page, file) {
-  await page.screenshot({ path: file });
+  await page.screenshot({ path: file, timeout: 180000 });
   return page.evaluate(() => {
     const c = window.__mappa.getCanvas();
     const t = document.createElement('canvas');
