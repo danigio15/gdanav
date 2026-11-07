@@ -198,18 +198,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
   void _nonVa3d(String motivo, {required bool ricorda}) {
     if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || controllo.vista != VistaMappa.aumentata) return;
-      controllo.lasciaAumentata(motivo, ricorda: ricorda);
-      ScaffoldMessenger.maybeOf(context)
-        ?..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            key: const Key('aumentato-non-va'),
-            content: Text(avvisoAumentatoNonVa(controllo.vista, ricorda: ricorda)),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+      if (mounted) lasciaAumentataConAvviso(context, controllo, motivo, ricorda: ricorda);
     });
   }
 

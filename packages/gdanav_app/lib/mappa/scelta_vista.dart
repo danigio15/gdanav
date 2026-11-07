@@ -117,6 +117,32 @@ class SceltaVista extends StatelessWidget {
   }
 }
 
+/// Il 3D aumentato si è fermato: si torna alla vista di prima
+/// ([ControlloMappa.lasciaAumentata]) e lo si dice, una volta, in fondo.
+void lasciaAumentataConAvviso(BuildContext context, ControlloMappa controllo, String motivo, {required bool ricorda}) {
+  if (controllo.vista != VistaMappa.aumentata) return;
+  controllo.lasciaAumentata(motivo, ricorda: ricorda);
+  ScaffoldMessenger.maybeOf(context)
+    ?..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        key: const Key('aumentato-non-va'),
+        content: Row(
+          children: [
+            const IconaAumentata(
+              dimensione: 22,
+              stile: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(width: 14),
+            Expanded(child: Text(avvisoAumentatoNonVa(controllo.vista, ricorda: ricorda))),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+      ),
+    );
+}
+
 /// Il segno del 3D aumentato: «3D» con una scintilla in alto a destra.
 class IconaAumentata extends StatelessWidget {
   const IconaAumentata({super.key, this.dimensione = 24, this.stile, this.spenta = false});

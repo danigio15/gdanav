@@ -27,6 +27,7 @@ import 'stile.dart';
 /// Si può provare il 3D su questo telefono? Serve una WebView (Android o
 /// iPhone, e il plugin registrato: nelle prove non c'è).
 bool get mappa3dPossibile {
+  if (provaMappa3dPossibile case final p?) return p;
   if (kIsWeb) return false;
   try {
     if (!(Platform.isAndroid || Platform.isIOS)) return false;
@@ -35,6 +36,10 @@ bool get mappa3dPossibile {
   }
   return WebViewPlatform.instance != null;
 }
+
+/// Solo per le prove e le immagini: fa credere che la WebView ci sia (o no).
+@visibleForTesting
+bool? provaMappa3dPossibile;
 
 /// Perché il 3D si è fermato, e se ricordarlo (il telefono non ce la fa) o no
 /// (un intoppo di questa volta).

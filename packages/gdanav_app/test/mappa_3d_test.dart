@@ -324,6 +324,36 @@ void main() {
       await tester.pumpAndSettle();
     });
 
+    testWidgets('il 3D aumentato che si ferma: si torna alla vista di prima e lo si dice una volta', (tester) async {
+      final c = ControlloMappa(aumentataPossibile: true)
+        ..scegliVista(VistaMappa.piatta)
+        ..scegliVista(VistaMappa.aumentata);
+      late BuildContext contesto;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) {
+                contesto = context;
+                return const SizedBox.expand();
+              },
+            ),
+          ),
+        ),
+      );
+      lasciaAumentataConAvviso(contesto, c, 'lento', ricorda: true);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(c.vista, VistaMappa.piatta);
+      expect(find.text('3D aumentato non è disponibile su questo telefono: torno alla vista 2D'), findsOneWidget);
+      // Già tornati indietro: niente secondo avviso.
+      lasciaAumentataConAvviso(contesto, c, 'lento', ricorda: true);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byKey(const Key('aumentato-non-va')), findsOneWidget);
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('aumentato-non-va')), findsNothing);
+    });
+
     testWidgets('nel menu non c’è più l’interruttore «Mappa 3D»: si sceglie dalla vista', (tester) async {
       preparaPiattaforma(portachiavi: impostazioniComplete);
       final a = await ambiente(tester);
