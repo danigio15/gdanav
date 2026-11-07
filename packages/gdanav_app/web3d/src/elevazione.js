@@ -8,8 +8,12 @@
 // pendenza del [PENDENZA] serve per arrivare in quota. È il prototipo
 // approvato (`build.mjs`), fatto una tessera alla volta.
 
-export const ALTEZZA_LIVELLO = 7.0;
+// Otto metri per livello: con l'impalcato spesso [SPESSORE_IMPALCATO] restano
+// quasi sei metri di luce, e da dietro l'auto il vuoto sotto il ponte si vede.
+export const ALTEZZA_LIVELLO = 8.0;
 export const PENDENZA = 0.055;
+/** Lo spessore dell'impalcato di un ponte, dall'asfalto al ventre. */
+export const SPESSORE_IMPALCATO = 1.9;
 const PASSO_FITTO = 6; // metri fra due nodi lungo le strade grandi
 const PASSO_RADO = 12; // e lungo le piccole
 

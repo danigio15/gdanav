@@ -70,9 +70,10 @@ test('due ponti di livello diverso si raccordano', () => {
     { p: { class: 'motorway', brunnel: 'bridge', layer: 2, ramp: 1 }, g: [[300, 0], [700, 0]] },
   ];
   const g = grafoStrade(strade, metri);
-  assert.ok(Math.abs(quotaA(g, 600) - 14) < 0.1);
+  const L = ALTEZZA_LIVELLO;
+  assert.ok(Math.abs(quotaA(g, 600) - 2 * L) < 0.1);
   const giunto = quotaA(g, 300);
-  assert.ok(giunto > 7.5 && giunto < 13.5, `al giunto fra 7 e 14 (${giunto})`);
+  assert.ok(giunto > L + 0.5 && giunto < 2 * L - 0.5, `al giunto fra un livello e due (${giunto})`);
 });
 
 test('i capi tagliati sul bordo delle tessere si uniscono', () => {

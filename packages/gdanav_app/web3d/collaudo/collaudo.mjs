@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ARGOMENTI_CHROMIUM, apri, aspetta, lungo, playwright, rossoAttorno, servitore } from './pagina.mjs';
+import { SPESSORE_IMPALCATO } from '../src/elevazione.js';
 import { daMetriPrototipo, percorso, percorsoAttraverso, percorsoDaTratto } from './strada.mjs';
 
 const qui = path.dirname(fileURLToPath(import.meta.url));
@@ -179,7 +180,7 @@ for (const [chiave, caso] of Object.entries(CASI)) {
     const diag = await page.evaluate(() => window.gdanav3d.diagnosi());
     const quote = await page.evaluate(() => window.gdanav3d.prova.quoteQui());
     const sopra = quote ? quote.strade.filter((h) => h > quote.auto + 3) : [];
-    const luce = sopra.length ? Math.min(...sopra) - 1.8 - quote.auto : null;
+    const luce = sopra.length ? Math.min(...sopra) - SPESSORE_IMPALCATO - quote.auto : null;
     const esito = {
       caso: chiave,
       notte,
@@ -197,7 +198,7 @@ for (const [chiave, caso] of Object.entries(CASI)) {
       errori: errori.length,
     };
     esito.ok =
-      tela.colori > 120 && tela.deviazione > 12 && diag.triangoli <= diag.budget && auto.visibile && (!caso.luce || (luce !== null && luce >= 5));
+      tela.colori > 120 && tela.deviazione > 12 && diag.triangoli <= diag.budget && auto.visibile && (!caso.luce || (luce !== null && luce >= 5.5));
     // Le foto in più, di giorno: altri punti del percorso, la panoramica, da vicino.
     if (!notte) {
       for (const e of soloViste ? [] : (caso.extra?.(rotta) ?? [])) {

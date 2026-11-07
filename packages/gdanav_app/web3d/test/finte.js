@@ -34,6 +34,19 @@ export function cavalcavia() {
   };
 }
 
+/** Il cavalcavia sopra un'autostrada a due carreggiate, con lo spartitraffico in mezzo. */
+export function cavalcaviaDueCarreggiate() {
+  const t = cavalcavia();
+  t.transportation = strato([
+    { p: { class: 'motorway', oneway: 1 }, g: [[[0, 2048], [4096, 2048]]] },
+    { p: { class: 'motorway', oneway: 1 }, g: [[[4096, 2092], [0, 2092]]] },
+    { p: { class: 'primary' }, g: [[[2070, 4096], [2070, 2600]]] },
+    { p: { class: 'primary', brunnel: 'bridge', layer: 1 }, g: [[[2070, 2600], [2070, 1500]]] },
+    { p: { class: 'primary' }, g: [[[2070, 1500], [2070, 0]]] },
+  ]);
+  return t;
+}
+
 /** Un sottopasso: una strada in galleria sotto un viale, con le rampe aperte ai capi. */
 export function sottopasso() {
   return {

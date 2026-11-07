@@ -396,8 +396,21 @@ export class Scena {
     Object.assign(m['strada-galleria'], { transparent: true, opacity: notte ? 0.5 : 0.55, depthWrite: false });
     m['strada-galleria'].color.set(notte ? 0x3a3f4a : 0x5d636c);
     m.opere = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    // Un poco di luce propria, nel colore del cemento: anche il fianco in
+    // ombra di un ponte tiene il cordolo chiaro e la trave scura.
+    const lucePropria = notte ? 0.12 : 0.24;
+    m.opere.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+        totalEmissiveRadiance += diffuseColor.rgb * ${lucePropria.toFixed(2)};`,
+      );
+    };
+    m.opere.customProgramCacheKey = () => 'opere-' + lucePropria;
     // Le ombre vincono sull'asfalto (che ha il suo polygonOffset), non sul resto.
     m.ombre = new THREE.MeshBasicMaterial({ color: 0x0c1220, transparent: true, opacity: P.ombra, depthWrite: true, depthFunc: THREE.LessDepth, fog: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
+    m.ombrePonti = m.ombre.clone();
+    m.ombrePonti.opacity = P.ombraPonte;
     ['residenziale', 'uffici', 'industria'].forEach((s, i) => {
       const [mappa, luci] = trameFacciata(s, 11 + i * 7);
       m['facciata-' + s] = new THREE.MeshLambertMaterial({
@@ -472,6 +485,11 @@ export class Scena {
       const o = new THREE.Mesh(geometria(t.ombre, notte));
       o.position.z = 0.4;
       aggiungi('ombre', o, 2);
+    }
+    if (t.ombrePonti) {
+      const o = new THREE.Mesh(geometria(t.ombrePonti, notte));
+      o.position.z = 0.46;
+      aggiungi('ombrePonti', o, 2);
     }
     if (t.opere) aggiungi('opere', new THREE.Mesh(geometria(t.opere, notte)), 3);
     for (const [s, d] of Object.entries(t.facciate)) aggiungi('facciata-' + s, new THREE.Mesh(geometria(d, notte)), 3);

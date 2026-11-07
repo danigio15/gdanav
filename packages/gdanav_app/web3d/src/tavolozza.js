@@ -25,6 +25,8 @@ export const GIORNO = {
   percorso: '#27A2F8',
   percorsoBordo: '#0A6CC2',
   ombra: 0.32,
+  // L'ombra in più sotto i ponti (alone e nucleo).
+  ombraPonte: 0.2,
 };
 
 export const NOTTE = {
@@ -50,6 +52,7 @@ export const NOTTE = {
   percorso: '#3AB0FF',
   percorsoBordo: '#0B5AA6',
   ombra: 0.2,
+  ombraPonte: 0.16,
 };
 
 /** I colori delle facciate e dei tetti, per stile di edificio. */
