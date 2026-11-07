@@ -18,15 +18,18 @@ la mappa scarica già (OpenFreeMap, schema OpenMapTiles).
   (`src/scena.js`).
 - Un **lavoratore** (`src/lavoratore.js`, un Web Worker) fa le tessere 3D: per
   ogni tessera z14 (con le otto vicine, per le rampe che passano il bordo)
-  il grafo delle strade, le quote (`src/elevazione.js`: ponti a 7 m per
+  il grafo delle strade, le quote (`src/elevazione.js`: ponti a 8 m per
   livello di `layer`, rampe in salita col 5,5%), e le geometrie
   (`src/tessera.js`). Il seme degli alberi è la tessera: tornandoci sono gli
   stessi.
 - **Ponti, cavalcavia, svincoli, gallerie** (`src/tessera.js`): l'asfalto
-  dei ponti è più chiaro di quello a terra; l'impalcato ha il fianco spesso
-  (cordolo chiaro, ombra in basso) e il ventre scuro; sotto ogni ponte la
-  strada è più scura, a piombo, oltre all'ombra del sole; i piloni stanno
-  ai due lati delle strade che passano sotto e mai sopra, e dove un ponte
+  dei ponti è più chiaro di quello a terra; l'impalcato è spesso 1,9 m
+  (cordolo chiaro che sporge, trave scura, ventre scurissimo, parapetto col
+  corrimano scuro) e ha un poco di luce propria, perché anche il fianco in
+  ombra si legga; sotto il ventre restano quasi 6 m di luce. Sotto ogni
+  ponte la strada è più scura, a piombo, con un alone morbido, oltre
+  all'ombra del sole; i piloni stanno ai due lati delle strade che passano
+  sotto (e nello spartitraffico fra due carreggiate) e mai sopra, e dove un ponte
   finisce ancora in alto c'è la spalla. Le gallerie sono un nastro scuro e
   trasparente con gli imbocchi, e il percorso lì dentro è tenue e
   tratteggiato. Un ponte senza `layer` sta al primo livello (al più al
