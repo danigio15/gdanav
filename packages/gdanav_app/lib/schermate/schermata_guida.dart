@@ -16,7 +16,9 @@ import '../componenti/vetro.dart';
 import '../componenti/ztl.dart';
 import '../mappa/controllo_mappa.dart';
 import '../mappa/scelta_vista.dart';
+import '../mappa/mappa_3d.dart';
 import '../mappa/mappa_viaggio.dart';
+import '../stato/archivio.dart' show SceltaMappa3d;
 import '../stato/avvisi_strada.dart';
 import '../stato/avvisi_ztl.dart';
 import '../stato/gestore_guida.dart';
@@ -74,6 +76,11 @@ class _SchermataGuidaState extends State<SchermataGuida> {
   /// Gli svincoli di cui si è chiuso il popup.
   final _svincoliChiusi = <int>{};
 
+  /// La mappa 3D: come l'ha scelta chi guida (`null` finché non si è letto),
+  /// e se in questa guida si è fermata (il telefono non ce la fa).
+  SceltaMappa3d? _scelta3d;
+  var _fermo3d = false;
+
   /// Lo svincolo in arrivo, entro [PopupSvincolo.daMetri], se non chiuso.
   (Manovra, double)? _svincolo(GestoreGuida g) {
     final a = g.avanzamento, m = a?.prossima;
@@ -109,7 +116,16 @@ class _SchermataGuidaState extends State<SchermataGuida> {
     _battito = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
-    if (widget.guida.archivio case final a?) unawaited(controllo.carica(a.vistaMappa()));
+    if (widget.guida.archivio case final a?) {
+      unawaited(controllo.carica(a.vistaMappa()));
+      unawaited(
+        a.mappa3d().then((s) {
+          if (mounted) setState(() => _scelta3d = s);
+        }),
+      );
+    } else {
+      _scelta3d = const SceltaMappa3d();
+    }
     widget.guida.avvia();
     if (widget.segnalazioni case final seg?) _avvisi = AvvisiStrada.di(widget.guida, seg);
     if (widget.ztl case final z?) _ztl = AvvisiZtl.di(widget.guida, z);
@@ -130,6 +146,68 @@ class _SchermataGuidaState extends State<SchermataGuida> {
     await g.ferma();
     await g.viaggio.vaiA(l);
     if (g.viaggio.stato is ViaggioPronto) g.avvia();
+  }
+
+  void _punto(PuntoToccato p) {
+    final g = widget.guida;
+    mostraPunto(
+      context,
+      p,
+      vicini: widget.vicini,
+      qui: g.avanzamento?.posizioneSulPercorso ?? widget.posizione.qui,
+      carburante: g.auto.carburante,
+      vai: (g.pronto?.termica ?? false) ? 'Passa di qui e prosegui' : 'Vai qui',
+      onVai: _vaiDurante,
+    );
+  }
+
+  /* La mappa sotto il cruscotto: in 3D (inclinata o immersiva) quella nuova,
+   * se è accesa e il telefono la regge; dall'alto, o se il 3D si ferma, la
+   * mappa di sempre. Il cruscotto sopra è lo stesso. */
+  Widget _mappa(BuildContext context, GestoreGuida g) {
+    final scelta = _scelta3d;
+    // La scelta si legge in un attimo: intanto il colore della mappa, non una
+    // mappa che nasce e subito sparisce.
+    if (scelta == null && mappa3dPossibile) {
+      return ColoredBox(
+        color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1D2740) : const Color(0xFFE2EAF1),
+      );
+    }
+    if (mappa3dPossibile && !_fermo3d && (scelta?.accesa ?? false) && controllo.vista != VistaMappa.piatta) {
+      return Mappa3d(
+        key: const Key('mappa-3d'),
+        gestore: g.viaggio,
+        controllo: controllo,
+        posizione: widget.posizione,
+        guida: g,
+        segnalazioni: widget.segnalazioni,
+        vicini: widget.vicini,
+        onPunto: _punto,
+        onNonVa: _nonVa3d,
+      );
+    }
+    return MappaViaggio(
+      gestore: g.viaggio,
+      controllo: controllo,
+      posizione: widget.posizione,
+      guida: g,
+      segnalazioni: widget.segnalazioni,
+      onPuntoScelto: (_) {},
+      onColonnina: (_) {},
+      vicini: widget.vicini,
+      ztl: widget.ztl,
+      onPunto: _punto,
+    );
+  }
+
+  /// Il 3D non va: la mappa di sempre, e se il telefono non ce la fa lo si
+  /// ricorda (la prossima volta parte direttamente quella).
+  void _nonVa3d(String motivo, {required bool ricorda}) {
+    if (ricorda) unawaited(widget.guida.archivio?.salvaMappa3dFallita(motivo));
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _fermo3d = true);
+    });
   }
 
   /// «Fine», come in Waze: si torna alla mappa senza viaggio.
@@ -153,26 +231,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
             Positioned.fill(
               child:
                   widget.mappa?.call(context, controllo) ??
-                  MappaViaggio(
-                    gestore: g.viaggio,
-                    controllo: controllo,
-                    posizione: widget.posizione,
-                    guida: g,
-                    segnalazioni: widget.segnalazioni,
-                    onPuntoScelto: (_) {},
-                    onColonnina: (_) {},
-                    vicini: widget.vicini,
-                    ztl: widget.ztl,
-                    onPunto: (p) => mostraPunto(
-                      context,
-                      p,
-                      vicini: widget.vicini,
-                      qui: g.avanzamento?.posizioneSulPercorso ?? widget.posizione.qui,
-                      carburante: g.auto.carburante,
-                      vai: (g.pronto?.termica ?? false) ? 'Passa di qui e prosegui' : 'Vai qui',
-                      onVai: _vaiDurante,
-                    ),
-                  ),
+                  ListenableBuilder(listenable: controllo, builder: (context, _) => _mappa(context, g)),
             ),
             ListenableBuilder(
               listenable: Listenable.merge([g, widget.posizione, ?_avvisi, ?_ztl, ?g.risparmio]),

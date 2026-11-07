@@ -1,0 +1,224 @@
+/// I messaggi fra l'app e la mappa 3D (la pagina di `assets/web3d`, nella
+/// WebView). Solo dati, niente WebView: così si provano da soli.
+///
+/// Verso la mappa: un oggetto `{v: 1, tipo, …}` passato a
+/// `gdanav3d.ricevi(…)` (vedi [chiamata3d]). Dalla mappa: una stringa JSON
+/// `{tipo, …}` sul canale `Gdanav3d` (vedi [MessaggioDalla3d]). Lo stesso
+/// formato lo controlla `web3d/src/messaggi.js`, con le sue prove.
+library;
+
+import 'dart:convert';
+import 'dart:math' as math;
+import 'dart:typed_data';
+
+import 'package:gdanav_core/gdanav_core.dart';
+
+import 'controllo_mappa.dart';
+import 'dati_viaggio.dart' show trattoManovraM;
+import 'segnaposto.dart';
+
+/// La versione dei messaggi: la pagina scarta quelli di un'altra.
+const versionePonte3d = 1;
+
+/// Il canale su cui la pagina risponde.
+const canale3d = 'Gdanav3d';
+
+/// La pagina della mappa 3D, fra le risorse del pacchetto.
+const paginaMappa3d = 'packages/gdanav_app/assets/web3d/index.html';
+
+/// Il JavaScript che consegna [m] alla pagina. Il JSON è anche JavaScript
+/// valido: niente da sfuggire.
+String chiamata3d(Map<String, Object?> m) => 'window.gdanav3d&&window.gdanav3d.ricevi(${jsonEncode(m)});';
+
+Map<String, Object?> _m(String tipo, Map<String, Object?> dati) => {'v': versionePonte3d, 'tipo': tipo, ...dati};
+
+/// Sei decimali: dieci centimetri, e il JSON di un percorso lungo resta piccolo.
+double _sei(double x) => (x * 1e6).roundToDouble() / 1e6;
+
+/// Giorno o notte, la vista, il colore dell'auto e il segnaposto (per la
+/// mappa vista da lontano, dove l'auto 3D non si vede).
+Map<String, Object?> msgOpzioni({required bool notte, required VistaMappa vista, required Segnaposto segnaposto}) =>
+    _m('opzioni', {
+      'notte': notte,
+      'vista': vista == VistaMappa.immersiva ? 'immersiva' : 'inclinata',
+      'auto': coloreAuto3d(segnaposto),
+      'icona': segnaposto.immagine,
+    });
+
+/// Lo stile di sempre (`stileMappa`): la pagina lo adatta al 3D da sé.
+Map<String, Object?> msgStile(Map<String, Object> stile) => _m('stile', {'stile': stile});
+
+/// Un'immagine dello stile (icone, bandiera, autovelox), come PNG.
+Map<String, Object?> msgImmagine(String nome, Uint8List png, {double ratio = 3}) =>
+    _m('immagine', {'nome': nome, 'png': base64Encode(png), 'ratio': ratio});
+
+/// I dati di una sorgente GeoJSON dello stile (colonnine, meta, segnalazioni…).
+Map<String, Object?> msgSorgente(String id, Map<String, Object?> dati) => _m('sorgente', {'id': id, 'dati': dati});
+
+/// Il percorso: i punti (longitudine, latitudine), i loro metri dalla
+/// partenza e le code, in metri lungo il percorso come [Coda]. Senza
+/// viaggio, `punti: null`.
+Map<String, Object?> msgPercorso(Viaggio? v) {
+  final punti = v?.percorso.punti ?? const <Punto>[];
+  final buoni = [
+    for (final p in punti)
+      if (p.lat.isFinite && p.lon.isFinite) p,
+  ];
+  if (buoni.length < 2) return _m('percorso', {'punti': null});
+  // I metri di ogni punto come li conta la guida: la posizione, le code e la
+  // freccia arrivano in questi metri, e in pianta (Mercatore) un percorso
+  // lungo da nord a sud li sbaglierebbe di qualche per cento.
+  final cumulate = Linea(buoni).cumulate;
+  return _m('percorso', {
+    'punti': [
+      for (final p in buoni) ...[_sei(p.lon), _sei(p.lat)],
+    ],
+    'metri': [for (final m in cumulate) (m * 10).roundToDouble() / 10],
+    'code': [
+      for (final c in v!.percorso.code)
+        if (c.daM.isFinite && c.aM.isFinite && c.aM > c.daM) [c.daM.roundToDouble(), c.aM.roundToDouble(), c.livello],
+    ],
+  });
+}
+
+/// La freccia della prossima manovra: da dove a dove (metri lungo il
+/// percorso), come `datiManovra`; o niente.
+Map<String, Object?> msgManovra(Viaggio? v, Manovra? m) {
+  final t = trattoManovraM(v, m);
+  return _m('manovra', {'da': t?.$1, 'a': t?.$2});
+}
+
+/// La strada proposta in guida (verde), o niente.
+Map<String, Object?> msgRisparmio(PropostaStrada? p) {
+  final punti = p?.percorso.punti ?? const <Punto>[];
+  if (punti.length < 2) return _m('risparmio', {'punti': null});
+  return _m('risparmio', {
+    'punti': [
+      for (final q in punti)
+        if (q.lat.isFinite && q.lon.isFinite) ...[_sei(q.lon), _sei(q.lat)],
+    ],
+  });
+}
+
+/// Dove si è: il punto, la rotta, i metri lungo il percorso (o `null` fuori
+/// dal percorso), la velocità in m/s, lo zoom voluto e quando è stata letta
+/// (ms dall'epoca: la pagina la porta avanti fino ad adesso).
+Map<String, Object?> msgPosizione({
+  required Punto qui,
+  required double rotta,
+  required double? metri,
+  required double velocitaMs,
+  required double zoom,
+  required DateTime quando,
+}) => _m('posizione', {
+  'lat': _sei(qui.lat),
+  'lon': _sei(qui.lon),
+  'rotta': ((rotta % 360) * 10).roundToDouble() / 10,
+  'metri': metri == null || !metri.isFinite ? null : (metri * 10).roundToDouble() / 10,
+  'velocita': velocitaMs.isFinite ? math.max(0.0, (velocitaMs * 10).roundToDouble() / 10) : 0.0,
+  'zoom': (zoom * 100).roundToDouble() / 100,
+  'quando': quando.millisecondsSinceEpoch,
+});
+
+/// Come si muove la telecamera.
+enum ModoCamera3d { segui, libera, panoramica }
+
+/// La telecamera: segue l'auto, è libera (un dito l'ha spostata), o mostra
+/// tutta la strada ([riquadro]: sud, ovest, nord, est). [sopra]: quanto alto
+/// copre un popup (in punti).
+Map<String, Object?> msgCamera(ModoCamera3d modo, {double sopra = 0, (Punto, Punto)? riquadro}) => _m('camera', {
+  'modo': modo.name,
+  'sopra': sopra,
+  if (riquadro case (final so, final ne)?) 'riquadro': [so.lat, so.lon, ne.lat, ne.lon],
+});
+
+/// L'app va in secondo piano (o torna): la mappa smette di disegnare.
+Map<String, Object?> msgPausa(bool si) => _m('pausa', {'si': si});
+
+/// Il colore dell'auto 3D. La freccia (la scelta di partenza) è l'auto rossa:
+/// «crea un colore che vada in contrasto con la linea del percorso». Le
+/// altre auto hanno il loro colore, la blu un blu più scuro del percorso.
+String coloreAuto3d(Segnaposto s) => switch (s) {
+  Segnaposto.freccia || Segnaposto.autoRossa => '#d62a26',
+  Segnaposto.autoBlu => '#1e3a8a',
+  Segnaposto.autoBianca => '#f1f3f5',
+  Segnaposto.autoNera => '#22252b',
+  Segnaposto.autoGrigia => '#8a9099',
+};
+
+/// Lo zoom della mappa 3D in guida: vicino come il prototipo approvato, più
+/// lontano su una strada veloce con la prossima manovra lontana
+/// ([zoomLontanoInGuida], lo stesso della mappa di sempre e dell'auto).
+double zoom3d(VistaMappa vista, {required double velocitaStradaKmh, required double allaProssimaM}) =>
+    (vista == VistaMappa.immersiva ? 18.3 : 17.9) +
+    zoomLontanoInGuida(velocitaStradaKmh: velocitaStradaKmh, allaProssimaM: allaProssimaM);
+
+/// Un messaggio dalla pagina.
+sealed class MessaggioDalla3d {
+  const MessaggioDalla3d();
+
+  /// Il messaggio in [testo]; `null` se non si capisce.
+  static MessaggioDalla3d? leggi(String testo) {
+    final Object? j;
+    try {
+      j = jsonDecode(testo);
+    } on FormatException {
+      return null;
+    }
+    if (j is! Map) return null;
+    return switch (j['tipo']) {
+      'caricata' => const Caricata3d(),
+      'pronto' => const Pronta3d(),
+      'errore' => Errore3d('${j['motivo'] ?? 'sconosciuto'}', gpu: j['gpu'] as String?),
+      'prestazioni' => Prestazioni3d(
+        fps: (j['fps'] as num?)?.toDouble() ?? 0,
+        lento: j['lento'] == true,
+        triangoli: (j['triangoli'] as num?)?.toInt() ?? 0,
+      ),
+      'toccata' => const Toccata3d(),
+      'tocco' => Tocco3d([
+        for (final e in (j['elementi'] as List?) ?? const [])
+          if (e is Map) e.cast<Object?, Object?>(),
+      ]),
+      _ => null,
+    };
+  }
+}
+
+/// La pagina è caricata: si può mandare lo stile.
+class Caricata3d extends MessaggioDalla3d {
+  const Caricata3d();
+}
+
+/// Lo stile è pronto: la mappa disegna.
+class Pronta3d extends MessaggioDalla3d {
+  const Pronta3d();
+}
+
+/// Il 3D non parte ([motivo]: `webgl2`, `software`, `trame`, `memoria`,
+/// `contesto`, `mappa`, `script`…): si torna alla mappa di sempre.
+class Errore3d extends MessaggioDalla3d {
+  const Errore3d(this.motivo, {this.gpu});
+  final String motivo;
+  final String? gpu;
+}
+
+/// Quanti fotogrammi al secondo fa davvero, nei primi secondi di guida.
+class Prestazioni3d extends MessaggioDalla3d {
+  const Prestazioni3d({required this.fps, required this.lento, required this.triangoli});
+  final double fps;
+  final bool lento;
+  final int triangoli;
+}
+
+/// Un dito ha spostato la mappa.
+class Toccata3d extends MessaggioDalla3d {
+  const Toccata3d();
+}
+
+/// Un tocco su qualcosa (colonnina, distributore, punto): gli elementi come
+/// li dà MapLibre (`properties`, `geometry`).
+class Tocco3d extends MessaggioDalla3d {
+  const Tocco3d(this.elementi);
+  final List<Map<Object?, Object?>> elementi;
+}
