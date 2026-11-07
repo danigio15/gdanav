@@ -18,7 +18,7 @@ const controlla = process.argv.includes('--controlla');
 const uscita = controlla ? fs.mkdtempSync(path.join(os.tmpdir(), 'web3d-')) : destinazione;
 const pacchetto = (nome) => JSON.parse(fs.readFileSync(path.join(qui, 'node_modules', nome, 'package.json'), 'utf8')).version;
 
-const comune = { bundle: true, minify: true, target: ['es2020', 'chrome90', 'safari15'], legalComments: 'eof', logLevel: 'warning' };
+const comune = { bundle: true, minify: !process.env.LEGGIBILE, target: ['es2020', 'chrome90', 'safari15'], legalComments: 'eof', logLevel: 'warning' };
 
 const lavoratore = await esbuild.build({ ...comune, entryPoints: [path.join(qui, 'src', 'lavoratore.js')], format: 'iife', write: false });
 const codiceLavoratore = lavoratore.outputFiles[0].text;

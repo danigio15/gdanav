@@ -161,7 +161,7 @@ for (const [chiave, caso] of Object.entries(CASI)) {
     page.on('console', (m) => {
       if (m.type() === 'error') console.log(`[${nome}]`, m.text().slice(0, 300));
     });
-    page.on('pageerror', (e) => console.log(`[${nome}] errore`, e.message));
+    page.on('pageerror', (e) => console.log(`[${nome}] errore`, e.message, (e.stack ?? '').split('\n').slice(0, 4).join(' | ')));
     await page.exposeFunction('__ascolta', (t) => messaggi.push(JSON.parse(t)));
     await page.goto(`http://127.0.0.1:${porta}/index.html?prova=1&software=1`);
     const manda = (m) => page.evaluate((x) => window.gdanav3d.ricevi(x), { v: 1, ...m });

@@ -866,7 +866,7 @@ function muovi(adesso, dt) {
     c.quota = smorza(c.quota, z, dt, 300);
     c.pitch = smorza(c.pitch, vista.pitch, dt, 600);
     const H = m.getCanvas().clientHeight;
-    let voluta = { center: [lon, lat], zoom: c.zoom, pitch: c.pitch, bearing: c.rotta, elevation: c.quota, padding: { top: H * 0.12 + S.camera.sopra * 0.8, bottom: 0, left: 0, right: 0 } };
+    let voluta = { center: [lon, lat], zoom: c.zoom, pitch: c.pitch, bearing: c.rotta, padding: { top: H * 0.12 + S.camera.sopra * 0.8, bottom: 0, left: 0, right: 0 } };
     const tr = S.transizione;
     if (tr) {
       tr.partenza ??= { center: m.getCenter().toArray(), zoom: m.getZoom(), pitch: m.getPitch(), bearing: m.getBearing() };
