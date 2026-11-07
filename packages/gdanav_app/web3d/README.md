@@ -22,6 +22,22 @@ la mappa scarica già (OpenFreeMap, schema OpenMapTiles).
   livello di `layer`, rampe in salita col 5,5%), e le geometrie
   (`src/tessera.js`). Il seme degli alberi è la tessera: tornandoci sono gli
   stessi.
+- **Ponti, cavalcavia, svincoli, gallerie** (`src/tessera.js`): l'asfalto
+  dei ponti è più chiaro di quello a terra; l'impalcato ha il fianco spesso
+  (cordolo chiaro, ombra in basso) e il ventre scuro; sotto ogni ponte la
+  strada è più scura, a piombo, oltre all'ombra del sole; i piloni stanno
+  ai due lati delle strade che passano sotto e mai sopra, e dove un ponte
+  finisce ancora in alto c'è la spalla. Le gallerie sono un nastro scuro e
+  trasparente con gli imbocchi, e il percorso lì dentro è tenue e
+  tratteggiato. Un ponte senza `layer` sta al primo livello (al più al
+  quinto), le rampe salgono da sole verso il ponte a cui si attaccano.
+- **L'auto e il percorso non si perdono mai**: dove un ponte o un edificio
+  ci passa davanti si vedono in trasparenza (la sagoma rossa, il percorso
+  tenue). L'auto sta sopra i cartelli e i nomi di MapLibre, tranne sotto un
+  ponte, dove il ponte la copre davvero.
+- **Icone e nomi sui viadotti**: autovelox, meta e nomi dei ponti stanno
+  all'altezza dell'impalcato (`aggiornaSegni` in `src/principale.js`); i
+  nomi e i numeri delle strade su ponti e gallerie MapLibre non li scrive.
 - Il **percorso** sta all'altezza della strada su cui passa
   (`src/percorso.js`): ogni pochi metri le quote delle strade sotto, e la
   sequenza più continua (chi è sul viadotto ci resta).
@@ -65,8 +81,26 @@ Rho/Pero (A4 → viadotto A52 → A8, il prototipo), Roma (GRA, svincolo A24),
 Bologna (Casalecchio).
 
 ```sh
-NODE_USE_ENV_PROXY=1 node collaudo/collaudo.mjs collaudo/uscita
+NODE_USE_ENV_PROXY=1 node collaudo/collaudo.mjs collaudo/uscita [caso…]
+NODE_USE_ENV_PROXY=1 node collaudo/video.mjs collaudo/uscita rho 1700 2150 70
+NODE_USE_ENV_PROXY=1 node collaudo/auto.mjs collaudo/uscita
 ```
+
+I casi: Rho/Pero (rampa sul viadotto A52 e cavalcavia di secondo livello),
+Roma (GRA/A24), Bologna (Casalecchio), un cavalcavia sopra l'auto in
+autostrada (Borgo Panigale), tre livelli (Napoli, Capodichino), il
+quadrifoglio (Torino, corso Francia), il viadotto San Giorgio (Genova), un
+sottopasso (Milano). Per ognuno: il telefono di giorno e di notte, la
+panoramica, la foto da vicino; i controlli dicono anche se l'auto si vede
+(sotto il cavalcavia compreso) e quanta luce c'è sotto il ponte (almeno 5
+m). `video.mjs` fa un video MP4 della guida un fotogramma alla volta;
+`auto.mjs` le immagini di Android Auto e CarPlay (prima e dopo) e del
+telefono com'è oggi. Le immagini col cruscotto vero di Flutter sopra le
+foto le fa `test_render/mappa_3d_render_test.dart`.
+
+Una correzione a MapLibre 5.6.0 si fa impacchettando (`build.mjs`): con la
+mappa molto inclinata `_updateRetainedTiles` leggeva quattro tessere figlie
+dove ce n'era una e perdeva il fotogramma.
 
 ## Sull'auto (Android Auto e CarPlay)
 
