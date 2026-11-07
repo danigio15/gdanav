@@ -1,0 +1,21 @@
+{
+  "name": "gdanav-web3d",
+  "private": true,
+  "version": "1.0.0",
+  "description": "La mappa 3D di GdANav in guida: MapLibre GL JS e three.js, impacchettati dentro l'app.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "controlla": "node build.mjs --controlla",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@mapbox/vector-tile": "2.0.3",
+    "maplibre-gl": "5.6.0",
+    "pbf": "4.0.1",
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.5"
+  }
+}
