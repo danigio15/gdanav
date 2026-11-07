@@ -1,4 +1,10 @@
-# La mappa 3D di GdANav in guida
+# Il «3D aumentato» di GdANav in guida
+
+Una vista della mappa, accanto a 2D, 3D e immersiva: si sceglie dal tasto
+della vista (il segno «3D» con la scintilla; `VistaMappa.aumentata` in
+`lib/mappa/controllo_mappa.dart`) e si ricorda come le altre. Le altre tre
+restano la mappa di sempre (MapLibre Native); fuori dalla guida anche il 3D
+aumentato la usa, come il 3D.
 
 La mappa sotto il cruscotto della guida, in 3D: i viadotti alla loro altezza
 con le rampe che salgono, i piloni e le ombre, le righe delle corsie, gli
@@ -55,8 +61,12 @@ la mappa scarica già (OpenFreeMap, schema OpenMapTiles).
 L'app parla con la pagina coi messaggi di `src/messaggi.js` (lo stesso
 formato di `lib/mappa/ponte_3d.dart`); la WebView è in
 `lib/mappa/mappa_3d.dart`. Se WebGL manca, o nei primi secondi di guida va
-sotto i 20 fotogrammi al secondo, la pagina lo dice e l'app torna alla mappa
-di sempre (e se lo ricorda: «Mappa 3D» nel menu).
+sotto i 20 fotogrammi al secondo, o lo disegna solo in software, la pagina lo
+dice e l'app torna alla vista di prima, con un avviso («3D aumentato non è
+disponibile su questo telefono: torno alla vista 3D»), e se lo ricorda: nel
+tasto della vista la voce resta spenta col perché, e toccandola «Riprova».
+Un intoppo di una volta (la pagina che non risponde) fa tornare indietro
+senza ricordarlo.
 
 ## Impacchettare
 
@@ -108,7 +118,8 @@ dove ce n'era una e perdeva il fotogramma.
 ## Sull'auto (Android Auto e CarPlay)
 
 Sull'auto la mappa resta quella nativa di MapLibre, con l'**aspetto** della
-mappa 3D (`stileMappa(aspetto3d: true)`, acceso con la «Mappa 3D»): i
+mappa 3D (`stileMappa(aspetto3d: true)`, solo quando sul telefono la vista è
+il 3D aumentato; altrimenti com'era): i
 colori del suolo, l'asfalto grigio coi bordi chiari, le corsie tratteggiate
 delle autostrade da vicino, i ponti sollevati (ombra spostata, parapetto di
 cemento, sopra le strade a terra), gli edifici coi colori delle facciate
