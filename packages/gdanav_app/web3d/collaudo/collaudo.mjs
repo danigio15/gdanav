@@ -20,6 +20,8 @@ import { daMetriPrototipo, percorso, percorsoAttraverso, percorsoDaTratto } from
 const qui = path.dirname(fileURLToPath(import.meta.url));
 const uscita = path.resolve(process.argv[2] ?? path.join(qui, 'uscita'));
 const scelti = process.argv.slice(3);
+/** SOLO_VISTE=1: solo la panoramica e la foto da vicino (per rifarle in fretta). */
+const soloViste = process.env.SOLO_VISTE === '1';
 fs.mkdirSync(uscita, { recursive: true });
 
 /** I casi: come si fa il percorso, dove sta l'auto, le foto in più. */
@@ -163,7 +165,7 @@ for (const [chiave, caso] of Object.entries(CASI)) {
   rotta.nome = caso.nome;
   fs.writeFileSync(fileP, JSON.stringify(rotta));
   const c = { ...caso, metri };
-  for (const notte of [false, true]) {
+  for (const notte of soloViste ? [false] : [false, true]) {
     const momento = notte ? 'notte' : 'giorno';
     const nome = `${chiave}-${momento}`;
     const { page, ctx, posizione, errori } = await apri(browser, { porta, cartella: uscita, rotta, caso: c, notte, nome });
@@ -172,7 +174,7 @@ for (const [chiave, caso] of Object.entries(CASI)) {
     await page.waitForTimeout(2500);
     await posizione(metri, 0);
     await page.waitForTimeout(1500);
-    const tela = await foto(page, path.join(uscita, `${chiave}-telefono-${momento}.png`));
+    const tela = await foto(page, path.join(uscita, soloViste ? `${chiave}-prova.png` : `${chiave}-telefono-${momento}.png`));
     const auto = await autoVisibile(page);
     const diag = await page.evaluate(() => window.gdanav3d.diagnosi());
     const quote = await page.evaluate(() => window.gdanav3d.prova.quoteQui());
@@ -198,7 +200,7 @@ for (const [chiave, caso] of Object.entries(CASI)) {
       tela.colori > 120 && tela.deviazione > 12 && diag.triangoli <= diag.budget && auto.visibile && (!caso.luce || (luce !== null && luce >= 5));
     // Le foto in più, di giorno: altri punti del percorso, la panoramica, da vicino.
     if (!notte) {
-      for (const e of caso.extra?.(rotta) ?? []) {
+      for (const e of soloViste ? [] : (caso.extra?.(rotta) ?? [])) {
         await posizione(e.metri, 0);
         await page.waitForTimeout(2500);
         await aspetta(page);
@@ -212,14 +214,15 @@ for (const [chiave, caso] of Object.entries(CASI)) {
       await vista(page, [lon, lat], 16.15, 56, rottaG - 35);
       await page.waitForTimeout(2000);
       await foto(page, path.join(uscita, `${chiave}-panoramica.png`));
-      const [lon2, lat2] = lungo(rotta.punti, metri + 40);
-      await vista(page, [lon2, lat2], 17.35, 62, rottaG + 55);
+      // Da vicino: di lato all'auto, che le rampe e i piloni si vedano di profilo.
+      const [lon2, lat2, rottaV] = lungo(rotta.punti, metri + 25);
+      await vista(page, [lon2, lat2], 17.55, 64, rottaV + 90);
       await page.waitForTimeout(2000);
       await foto(page, path.join(uscita, `${chiave}-da-vicino.png`));
     }
     await ctx.close();
     // Il telefono di traverso.
-    if (caso.orizzontale) {
+    if (caso.orizzontale && !soloViste) {
       const o = await apri(browser, { porta, cartella: uscita, rotta, caso: c, notte, nome: `${nome}-orizzontale`, larghezza: 844, altezza: 390 });
       await o.posizione(metri, 0);
       await aspetta(o.page);
@@ -230,7 +233,7 @@ for (const [chiave, caso] of Object.entries(CASI)) {
       await o.ctx.close();
     }
     risultati.push(esito);
-    fs.writeFileSync(path.join(uscita, `collaudo-${chiave}-${momento}.json`), JSON.stringify(esito, null, 2));
+    if (!soloViste) fs.writeFileSync(path.join(uscita, `collaudo-${chiave}-${momento}.json`), JSON.stringify(esito, null, 2));
     console.log(JSON.stringify(esito));
   }
 }

@@ -19,10 +19,10 @@ const segnaposto = path.join(qui, '..', '..', 'assets', 'segnaposto');
 const maplibre = path.join(qui, '..', 'node_modules', 'maplibre-gl', 'dist');
 const { chromium } = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.js').then((m) => m.default ?? m);
 
-function stile(scuro, aspetto3d) {
-  const f = path.join(uscita, `stile-auto-${scuro ? 'scuro' : 'chiaro'}${aspetto3d ? '-3d' : ''}.json`);
+function stile(scuro, aspetto3d, perAuto = true) {
+  const f = path.join(uscita, `stile-${perAuto ? 'auto' : 'telefono'}-${scuro ? 'scuro' : 'chiaro'}${aspetto3d ? '-3d' : ''}.json`);
   if (!fs.existsSync(f)) {
-    const a = [path.join(qui, 'stile.dart'), f, scuro ? 'scuro' : 'chiaro', 'auto', ...(aspetto3d ? ['3d'] : [])];
+    const a = [path.join(qui, 'stile.dart'), f, scuro ? 'scuro' : 'chiaro', ...(perAuto ? ['auto'] : []), ...(aspetto3d ? ['3d'] : [])];
     execFileSync('dart', ['run', ...a], { cwd: path.join(qui, '..', '..'), stdio: 'ignore' });
   }
   return JSON.parse(fs.readFileSync(f, 'utf8'));
@@ -53,12 +53,14 @@ const rotta = JSON.parse(fs.readFileSync(path.join(uscita, 'percorso-rho.json'),
 for (const [schermo, w, h] of [
   ['android-auto', 1280, 720],
   ['carplay', 1280, 720],
+  // Il telefono com'è oggi (la mappa nativa inclinata), per il prima e dopo.
+  ['telefono', 390, 844],
 ]) {
   for (const scuro of [false, true]) {
     for (const aspetto3d of [false, true]) {
-      // Android Auto di giorno e di notte, CarPlay come lo vuole Apple: lo si mostra di notte.
-      if (schermo === 'carplay' && !scuro) continue;
-      const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1.5 });
+      const telefono = schermo === 'telefono';
+      if (telefono && aspetto3d) continue;
+      const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: telefono ? 2 : 1.5 });
       await ctx.route(/https:\/\/tiles\.openfreemap\.org\/.*/, async (route) => {
         const r = await scarica(route.request().url());
         await route.fulfill({ status: r.stato, body: r.corpo, headers: { 'content-type': r.tipo, 'access-control-allow-origin': '*' } });
@@ -66,7 +68,7 @@ for (const [schermo, w, h] of [
       const page = await ctx.newPage();
       await page.goto(`http://127.0.0.1:${porta}/`);
       await page.evaluate(
-        async ([s, punti, icona]) => {
+        async ([s, punti, icona, telefono, metriAuto]) => {
           // L'auto a 1790 m lungo il percorso, e da lì il pezzo che resta.
           const c = [];
           let m = 0;
@@ -76,8 +78,8 @@ for (const [schermo, w, h] of [
             const dx = (punti[i] - punti[i - 2]) * 111320 * Math.cos((punti[i + 1] * Math.PI) / 180);
             const dy = (punti[i + 1] - punti[i - 1]) * 110540;
             const d = Math.hypot(dx, dy);
-            if (!qui && m + d >= 1790) {
-              const t = (1790 - m) / d;
+            if (!qui && m + d >= metriAuto) {
+              const t = (metriAuto - m) / d;
               qui = [punti[i - 2] + (punti[i] - punti[i - 2]) * t, punti[i - 1] + (punti[i + 1] - punti[i - 1]) * t];
               rotta = ((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360;
               c.push(qui);
@@ -85,7 +87,7 @@ for (const [schermo, w, h] of [
             if (qui) c.push([punti[i], punti[i + 1]]);
             m += d;
           }
-          const mappa = new maplibregl.Map({ container: 'm', style: s, center: qui, zoom: 16.6, pitch: 60, bearing: rotta, attributionControl: false, fadeDuration: 0, canvasContextAttributes: { preserveDrawingBuffer: true } });
+          const mappa = new maplibregl.Map({ container: 'm', style: s, center: qui, zoom: telefono ? 17.0 : 16.6, pitch: telefono ? 58 : 60, bearing: rotta, attributionControl: false, fadeDuration: 0, canvasContextAttributes: { preserveDrawingBuffer: true } });
           window.__m = mappa;
           await new Promise((r) => mappa.on('load', r));
           const img = new Image();
@@ -94,7 +96,7 @@ for (const [schermo, w, h] of [
           mappa.addImage(icona, img, { pixelRatio: 3 });
           mappa.getSource('gdanav-percorso').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: c }, properties: {} });
           mappa.getSource('gdanav-io').setData({ type: 'Feature', geometry: { type: 'Point', coordinates: qui }, properties: { icona, rotta } });
-          mappa.setPadding({ top: 0, bottom: 0, left: 420, right: 0 });
+          mappa.setPadding(telefono ? { top: 0, bottom: 0, left: 0, right: 0 } : { top: 0, bottom: 0, left: 420, right: 0 });
           mappa.jumpTo({ center: qui });
           if (mappa.getLayer('edifici-3d')) mappa.setLayoutProperty('edifici-3d', 'visibility', 'visible');
           if (mappa.getLayer('edifici')) mappa.setLayoutProperty('edifici', 'visibility', 'none');
@@ -107,10 +109,12 @@ for (const [schermo, w, h] of [
             }, 300);
           });
         },
-        [stile(scuro, aspetto3d), rotta.punti, aspetto3d ? 'auto_rossa' : 'freccia'],
+        [stile(scuro, aspetto3d, !telefono), rotta.punti, aspetto3d ? 'auto_rossa' : 'freccia', telefono, rotta.auto ?? 1790],
       );
       await page.waitForTimeout(1500);
-      const f = path.join(uscita, `${schermo}-${scuro ? 'notte' : 'giorno'}-${aspetto3d ? 'aspetto-3d' : 'prima'}.png`);
+      const f = telefono
+        ? path.join(uscita, `rho-telefono-prima-${scuro ? 'notte' : 'giorno'}.png`)
+        : path.join(uscita, `${schermo}-${scuro ? 'notte' : 'giorno'}-${aspetto3d ? 'dopo' : 'prima'}.png`);
       await page.screenshot({ path: f });
       console.log('scritto', f);
       await ctx.close();

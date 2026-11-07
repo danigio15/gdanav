@@ -55,6 +55,8 @@ class _Caso {
     this.limite = 90,
     this.kmh = 72,
     this.meta = 'Destinazione',
+    this.percorso,
+    this.foto,
   });
   final String istruzione;
   final String verso;
@@ -65,6 +67,12 @@ class _Caso {
   final int limite;
   final int kmh;
   final String meta;
+
+  /// Il percorso di un altro caso (per il «prima», la mappa di oggi).
+  final String? percorso;
+
+  /// Il nome della foto della mappa, se non è quella del caso.
+  final String? foto;
 }
 
 const _destra = [
@@ -140,6 +148,17 @@ const _casi = {
     kmh: 78,
     meta: 'Genova, Sampierdarena',
   ),
+  // La stessa guida di Rho con la mappa di oggi (MapLibre nativa inclinata).
+  'rho-prima': _Caso(
+    "Prendi l'uscita a destra verso A8",
+    'A8 · Milano · Varese',
+    metri: 2994,
+    corsie: _destra,
+    limite: 80,
+    meta: 'Milano, viale Certosa',
+    percorso: 'rho',
+    foto: 'rho-telefono-prima',
+  ),
   'sottopasso': _Caso(
     'Prosegui nel sottopasso',
     'Centro',
@@ -153,7 +172,7 @@ const _casi = {
 
 /// Il percorso della foto, con la manovra del caso e i limiti.
 (PercorsoCalcolato, double) _percorso(String nome, _Caso c) {
-  final j = jsonDecode(File('$collaudo/percorso-$nome.json').readAsStringSync()) as Map;
+  final j = jsonDecode(File('$collaudo/percorso-${c.percorso ?? nome}.json').readAsStringSync()) as Map;
   final xy = (j['punti'] as List).cast<num>();
   final auto = (j['auto'] as num).toDouble();
   final punti = [for (var i = 0; i < xy.length; i += 2) Punto(xy[i + 1].toDouble(), xy[i].toDouble())];
@@ -209,8 +228,16 @@ void main() {
     for (final notte in [false, true]) {
       for (final traverso in [false, true]) {
         final momento = notte ? 'notte' : 'giorno';
-        final foto = File('$collaudo/$nome-${traverso ? 'orizzontale' : 'telefono'}-$momento.png');
-        if (!foto.existsSync() || !File('$collaudo/percorso-$nome.json').existsSync()) continue;
+        final foto = File(
+          c.foto == null
+              ? '$collaudo/$nome-${traverso ? 'orizzontale' : 'telefono'}-$momento.png'
+              : '$collaudo/${c.foto}-$momento.png',
+        );
+        if ((c.foto != null && traverso) ||
+            !foto.existsSync() ||
+            !File('$collaudo/percorso-${c.percorso ?? nome}.json').existsSync()) {
+          continue;
+        }
         testWidgets('guida con la mappa 3D: $nome, $momento${traverso ? ', di traverso' : ''}', (tester) async {
           debugDisableShadows = false;
           tester.platformDispatcher.platformBrightnessTestValue = notte ? Brightness.dark : Brightness.light;
