@@ -289,6 +289,9 @@ export class Scena {
     const az = (SOLE.azimut * Math.PI) / 180;
     const el = (SOLE.altezza * Math.PI) / 180;
     this.sole.position.set(Math.sin(az) * Math.cos(el), Math.cos(az) * Math.cos(el), Math.sin(el));
+    // Le luci valgono anche per lo strato dell'auto (livello 1, sopra i nomi).
+    this.emisferica.layers.enableAll();
+    this.sole.layers.enableAll();
     this.scena.add(this.emisferica, this.sole);
     this.scena.fog = new THREE.Fog(0xe2eaf1, 400, 3000);
     // La foschia lontana sopra il suolo di MapLibre.
