@@ -282,16 +282,18 @@ Map<String, Object> _pitturaEdifici3d(bool scuro) => {
       ['get', 'render_height'],
       8,
     ],
+    // Di notte scuri come le case della mappa 3D a luci spente: sull'auto
+    // di notte niente che abbagli.
     0,
-    scuro ? '#8C8378' : '#E6D6B9',
+    scuro ? '#3E4659' : '#E4DCCB',
     10,
-    scuro ? '#806155' : '#D2B892',
+    scuro ? '#444A5B' : '#D9CDB4',
     18,
-    scuro ? '#7D6A5F' : '#CC9273',
+    scuro ? '#4A4954' : '#CFAE95',
     30,
-    scuro ? '#7A828C' : '#C9CED4',
+    scuro ? '#465166' : '#C9CED4',
     60,
-    scuro ? '#6F7987' : '#A9B8C6',
+    scuro ? '#4D5A72' : '#A9B8C6',
   ],
   'fill-extrusion-height': [
     'interpolate',
