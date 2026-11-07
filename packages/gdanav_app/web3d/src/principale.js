@@ -54,7 +54,8 @@ const S = {
   costruite: new Map(),
   lavoro: null,
   numeroLavoro: 0,
-  sporco: { profilo: true, traffico: true },
+  sporco: { profilo: true, traffico: true, segni: true },
+  bitmap: new Map(),
   intervalli: [],
   sondato: false,
   log: [],
@@ -136,7 +137,8 @@ const GESTORI = {
   },
   sorgente(m) {
     S.sorgenti.set(m.id, m.dati);
-    scriviSorgente(m.id, m.dati);
+    if (IN_QUOTA[m.id]) S.sporco.segni = true;
+    scriviSorgente(m.id, sulSuolo(m.id, m.dati));
   },
   percorso(m) {
     if (m.punti === null) {
@@ -194,6 +196,29 @@ const GESTORI = {
 window.gdanav3d = {
   ricevi,
   diagnosi,
+  /** Per il collaudo: un tempo finto (i video, un fotogramma alla volta) e dove sta l'auto. */
+  prova: {
+    passo(t, dt = 40) {
+      S.orologioProva = t;
+      aggiornaPercorso(t);
+      aggiornaTraffico(t);
+      aggiornaSegni(t);
+      muovi(t, dt);
+      S.mappa?.triggerRepaint();
+    },
+    /** L'auto sullo schermo (in punti), col tetto un metro e mezzo sopra la strada. */
+    schermoAuto() {
+      if (!S.auto || !S.camera3d) return null;
+      const v = new THREE.Vector3(S.auto.x, S.auto.y, S.auto.z + 2.5).project(S.camera3d);
+      const c = S.mappa.getCanvas();
+      return { x: ((v.x + 1) / 2) * c.clientWidth, y: ((1 - v.y) / 2) * c.clientHeight, dietro: v.z > 1 };
+    },
+    /** Le quote delle strade sopra e sotto l'auto, per la luce sotto i cavalcavia. */
+    quoteQui() {
+      if (!S.auto) return null;
+      return { auto: S.auto.z, strade: indice.candidati(S.auto.x, S.auto.y, 0, 0, 12).map((c) => c.h) };
+    },
+  },
   /** Per le prove: fra quanto è tutto pronto (tessere fatte, niente in corso). */
   pronta: () => S.stileCaricato && !S.lavoro && S.costruite.size > 0 && (S.mappa?.areTilesLoaded() ?? false),
 };
@@ -292,7 +317,7 @@ function alloStile() {
   const prima = m.getLayer('nomi-strade') ? 'nomi-strade' : undefined;
   if (!m.getLayer(STRATO_3D)) m.addLayer(strato3d(), prima);
   S.stileCaricato = true;
-  for (const [id, dati] of S.sorgenti) scriviSorgente(id, dati);
+  for (const [id, dati] of S.sorgenti) scriviSorgente(id, sulSuolo(id, dati));
   aggiornaIo(true);
   const coda = S.coda;
   S.coda = [];
@@ -314,6 +339,8 @@ async function aggiungiImmagine({ nome, png, ratio }) {
     const bmp = await createImageBitmap(new Blob([byte], { type: 'image/png' }));
     const m = S.mappa;
     if (!m || !S.stileCaricato) return;
+    S.bitmap.set(nome, { bmp, ratio: ratio ?? 3 });
+    S.sporco.segni = true;
     if (m.hasImage(nome)) m.removeImage(nome);
     m.addImage(nome, bmp, { pixelRatio: ratio ?? 3 });
   } catch (e) {
@@ -443,8 +470,10 @@ function strato3d() {
       scena.materialeFoschia.uniforms.uNear.value = P.nebbiaDa * 0.8 * ppm;
       scena.materialeFoschia.uniforms.uFar.value = P.nebbiaA * 1.1 * ppm;
       if (scena.mat.bagliore) scena.mat.bagliore.size = 9 * ppm;
+      scena.scalaSegni(Pm.elements[5], m.getCanvas().clientHeight);
       renderer.resetState();
       renderer.render(scena.scena, camera);
+      S.camera3d = camera;
       const ora = performance.now();
       S.msDisegno = smorza(S.msDisegno ?? ora - t0, ora - t0, 1, 10);
       // La sonda: gli intervalli fra i fotogrammi mentre la mappa si muove.
@@ -618,6 +647,7 @@ function allaTessera({ id, tessera, errore }) {
   annota('tessera', tessera.chiave, tessera.dettaglio, JSON.stringify(tessera.conti), Math.round(performance.now() - lavoro.da) + 'ms');
   S.sporco.profilo = true;
   S.sporco.traffico = true;
+  S.sporco.segni = true;
   S.ultimaTessera = performance.now();
   S.mappa?.triggerRepaint();
   sveglia();
@@ -674,6 +704,7 @@ function aggiornaPercorso(adesso) {
     const a = Math.min(p.linea.lunghezza, da + FINESTRA_AVANTI);
     p.da = da;
     p.profilo = profiloDi(p.linea, da, a, indice);
+    S.sporco.segni = true;
     scena.impostaNastro('alone', nastro(p.linea, p.profilo, da, a, 15, 0.55), 'alone', 4);
     scena.impostaNastro('percorso', nastro(p.linea, p.profilo, da, a, 4.6, 0.62, { code: p.code }), 'percorso', 5);
     aggiornaFreccia();
@@ -785,6 +816,139 @@ function unisciNastri(parti) {
   return out;
 }
 
+// ─── I segni in quota: icone e nomi sui viadotti ─────────────────────────
+
+/**
+ * Le sorgenti con punti che possono stare su un viadotto, e come disegnarli:
+ * l'immagine (dalla proprietà o fissa) e quanto è grande (come in stile.dart).
+ */
+const IN_QUOTA = {
+  'gdanav-segnalazioni': { immagine: (p) => p.icona, grandezza: (p) => (p.tipo === 'autovelox' ? 1.15 : 0.85) },
+  'gdanav-arrivo': { immagine: () => 'arrivo-bandiera', grandezza: () => 1.7 },
+};
+
+/** I punti delle sorgenti che stanno in quota (chiave → quota), rifatti in [aggiornaSegni]. */
+const inQuota = new Map();
+
+/** I dati per MapLibre senza i punti che disegna il 3D in quota. */
+function sulSuolo(id, dati) {
+  if (!IN_QUOTA[id] || !dati?.features) return dati;
+  return { ...dati, features: dati.features.filter((f, i) => !inQuota.has(`${id}#${i}`)) };
+}
+
+/**
+ * La quota di un punto: quella del percorso se ci sta sopra (entro 15 m),
+ * altrimenti quella della strada sotto, se lì c'è una strada sola; `null`
+ * se è a terra o non si sa (allora lo disegna MapLibre come sempre).
+ */
+function quotaDi(x, y) {
+  const p = S.percorso;
+  if (p?.profilo) {
+    const q = p.linea.proietta(x, y, p.profilo.s0, p.profilo.s1);
+    if (q.d < 15) return p.profilo.quota(q.s);
+  }
+  const c = indice.candidati(x, y, 0, 0, 10);
+  if (!c.length) return null;
+  const alte = c.filter((v) => v.h > 2.5);
+  return alte.length === c.length ? Math.max(...alte.map((v) => v.h)) : null;
+}
+
+let ultimiSegni = 0;
+let segniDa = null;
+function aggiornaSegni(adesso) {
+  const qui = doveGuardo();
+  const lontano = qui && segniDa ? Math.hypot(qui[0] - segniDa[0], qui[1] - segniDa[1]) : Infinity;
+  if (!S.origine || !qui || (!S.sporco.segni && lontano < 100) || adesso - ultimiSegni < 1500) return;
+  ultimiSegni = adesso;
+  segniDa = qui;
+  S.sporco.segni = false;
+  const segni = [];
+  for (const [id, regola] of Object.entries(IN_QUOTA)) {
+    const dati = S.sorgenti.get(id);
+    if (!dati?.features) continue;
+    let cambiato = false;
+    dati.features.forEach((f, i) => {
+      const k = `${id}#${i}`;
+      const xy = f.geometry?.type === 'Point' ? f.geometry.coordinates : null;
+      let z = null;
+      let x = 0;
+      let y = 0;
+      if (xy) {
+        [x, y] = S.origine.daLonLat(xy[0], xy[1]);
+        if (Math.hypot(x - qui[0], y - qui[1]) < 3000) z = quotaDi(x, y);
+      }
+      const img = z !== null && z > 2.5 ? S.bitmap.get(regola.immagine(f.properties ?? {})) : null;
+      if (img) {
+        if (!inQuota.has(k)) cambiato = true;
+        inQuota.set(k, z);
+        const g = regola.grandezza(f.properties ?? {});
+        segni.push({ chiave: k, x, y, z: z + 0.4, immagine: img.bmp, w: (img.bmp.width / img.ratio) * g, h: (img.bmp.height / img.ratio) * g });
+      } else if (inQuota.delete(k)) cambiato = true;
+    });
+    if (cambiato) scriviSorgente(id, sulSuolo(id, dati));
+  }
+  // I nomi dei ponti vicini, scritti sull'impalcato.
+  const nomi = [];
+  for (const c of S.costruite.values()) {
+    const v = scena.tessere.get(c.chiave);
+    for (const e of v?.dati.etichette ?? []) {
+      const x = c.cx + e.x * c.scala;
+      const y = c.cy + e.y * c.scala;
+      const d = Math.hypot(x - qui[0], y - qui[1]);
+      if (d < 1600) nomi.push({ ...e, x, y, d });
+    }
+  }
+  nomi.sort((a, b) => a.d - b.d);
+  const messi = [];
+  for (const e of nomi) {
+    const testo = e.nome || e.ref;
+    if (messi.length >= 8 || messi.some((m) => m.testo === testo && Math.hypot(m.x - e.x, m.y - e.y) < 250)) continue;
+    messi.push({ ...e, testo });
+    const tela = etichetta(testo, !e.nome);
+    segni.push({ chiave: `nome:${testo}:${Math.round(e.x)}:${Math.round(e.y)}`, x: e.x, y: e.y, z: e.h + 1.2, immagine: tela, w: tela.width / 2, h: tela.height / 2, centro: 0.5 });
+  }
+  scena.impostaSegni(segni);
+}
+
+/** Il nome di un ponte, come quelli di MapLibre: scritta scura con l'alone chiaro (o un cartello per i numeri). */
+const teleEtichette = new Map();
+function etichetta(testo, cartello) {
+  const chiave = `${S.notte}|${cartello}|${testo}`;
+  let c = teleEtichette.get(chiave);
+  if (c) return c;
+  c = document.createElement('canvas');
+  const g = c.getContext('2d');
+  const font = '700 28px "Noto Sans", Roboto, "Helvetica Neue", Arial, sans-serif';
+  g.font = font;
+  const w = Math.ceil(g.measureText(testo).width);
+  c.width = w + (cartello ? 34 : 18);
+  c.height = cartello ? 46 : 40;
+  g.font = font;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  if (cartello) {
+    g.fillStyle = '#FFFFFF';
+    g.beginPath();
+    g.roundRect(1, 1, c.width - 2, c.height - 2, 10);
+    g.fill();
+    g.fillStyle = '#0B7A3E';
+    g.beginPath();
+    g.roundRect(4, 4, c.width - 8, c.height - 8, 8);
+    g.fill();
+    g.fillStyle = '#FFFFFF';
+    g.fillText(testo, c.width / 2, c.height / 2 + 1);
+  } else {
+    g.lineJoin = 'round';
+    g.lineWidth = 7;
+    g.strokeStyle = S.notte ? '#28324A' : '#FFFFFF';
+    g.strokeText(testo, c.width / 2, c.height / 2);
+    g.fillStyle = S.notte ? '#E8ECF2' : '#3E434A';
+    g.fillText(testo, c.width / 2, c.height / 2);
+  }
+  teleEtichette.set(chiave, c);
+  return c;
+}
+
 // ─── L'auto e la telecamera, a ogni fotogramma ───────────────────────────
 
 let richiesta = null;
@@ -798,7 +962,8 @@ function sveglia() {
 
 function fotogramma(adesso) {
   richiesta = null;
-  if (S.pausa || !S.mappa || !S.stileCaricato) return;
+  // Col tempo delle prove (i video) i fotogrammi li chiede il collaudo.
+  if (S.pausa || !S.mappa || !S.stileCaricato || S.orologioProva !== undefined) return;
   if (adesso - ultimoFotogramma < FOTOGRAMMA_MS - 2) {
     richiesta = requestAnimationFrame(fotogramma);
     return;
@@ -807,6 +972,7 @@ function fotogramma(adesso) {
   ultimoFotogramma = adesso;
   aggiornaPercorso(adesso);
   aggiornaTraffico(adesso);
+  aggiornaSegni(adesso);
   const ancora = muovi(adesso, dt);
   S.anima = ancora;
   if (ancora) richiesta = requestAnimationFrame(fotogramma);
@@ -815,7 +981,7 @@ function fotogramma(adesso) {
 /** Muove auto e telecamera; dice se c'è ancora da muovere. */
 function muovi(adesso, dt) {
   const m = S.mappa;
-  const pos = moto.passo(Date.now());
+  const pos = moto.passo(S.orologioProva ?? Date.now());
   const p = S.percorso;
   if (!pos || !S.origine || (pos.s !== undefined && !p)) {
     aggiornaCielo();
@@ -839,6 +1005,8 @@ function muovi(adesso, dt) {
     rottaCamera = 90 - (p.linea.direzione(s + 20, 26) * 180) / Math.PI;
     S.auto = { x, y, z, s };
     if (scena.mat.percorso) scena.uniformiPercorso.uInizio.value = s + 1.5;
+    // Il fantasma comincia oltre il muso dell'auto (lunga nove metri, in scala).
+    scena.uniformiFantasma.uInizio.value = s + 6;
     if (S.manovra && S.frecciaDa !== undefined && s + 6 > S.frecciaDa + 4) aggiornaFreccia();
   } else {
     x = pos.x;

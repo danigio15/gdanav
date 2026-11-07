@@ -26,6 +26,15 @@ import earcut from 'earcut';
 /** I tipi di nastro d'asfalto (ognuno con la sua trama di righe). */
 export const TIPI_STRADA = ['motorway', 'trunk', 'ramp', 'primary1', 'primary2', 'tertiary', 'plain', 'rail'];
 
+/**
+ * Tutti i nastri: i tipi a terra, gli stessi sui ponti (`-ponte`, un asfalto
+ * più chiaro, che l'impalcato si distingua dalle strade sotto) e le gallerie.
+ */
+export const NASTRI = [...TIPI_STRADA, ...TIPI_STRADA.map((t) => t + '-ponte'), 'galleria'];
+
+/** Quanto sotto passa una galleria (sopra c'è la strada che la copre). */
+const SOPRA_GALLERIA = 0.06;
+
 /** Metri di strada per una ripetizione della trama. */
 export const PERIODO_STRADA = 12;
 export const PIANO = 3.2;
@@ -119,8 +128,10 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   const tGrafo = Date.now() - t0;
 
   // ── I nastri delle strade ─────────────────────────────────────────────
+  // Anche le gallerie: un nastro scuro con gli imbocchi (non più niente, col
+  // percorso che sembrava passare sopra la strada).
   const visibili = feats.filter(
-    (f) => !f.galleria && !(f.cls === 'service' && ['parking_aisle', 'driveway', 'drive-through'].includes(f.sv)),
+    (f) => !(f.galleria && f.cls === 'rail') && !(f.cls === 'service' && ['parking_aisle', 'driveway', 'drive-through'].includes(f.sv)),
   );
   const ek = (p) => Math.round(p[0] * 10) + ',' + Math.round(p[1] * 10);
   const linee = visibili.map((f) => f.nodi.map((i) => [nodi[i].x, nodi[i].y, nodi[i].h]));
@@ -199,15 +210,44 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   };
   const dentro = (px, py, m = 0) => px >= -meta - m && px <= meta + m && py >= -meta - m && py <= meta + m;
 
-  const nastri = Object.fromEntries(TIPI_STRADA.map((t) => [t, new Costruttore({ uv: true })]));
+  const nastri = Object.fromEntries(NASTRI.map((t) => [t, new Costruttore({ uv: true })]));
   const opere = new Costruttore({ colori: true });
   const ombre = new Costruttore();
   const [sox, soy] = spostamentoOmbra();
   const piloni = [];
   const lampioni = [];
   const segmenti = [];
-  const cCemento = [rgb('#d6d3cc'), rgb('#59606c')];
-  const cTrave = [rgb('#b9b6ae'), rgb('#3f4550')];
+  // Il cemento: un colore di giorno e uno di notte, più scuro in basso (gli
+  // angoli in ombra), più chiaro sul cordolo in cima all'impalcato.
+  const tinta = (c, k) => c.map((v) => Math.min(255, Math.round(v * k)));
+  const CEM = [rgb('#d6d3cc'), rgb('#59606c')];
+  const TRAVE = [rgb('#c2beb6'), rgb('#4a505c')];
+  const SOTTO = [rgb('#8d8982'), rgb('#2b2f37')];
+  /** Quattro colori per un quadrilatero a-b (in basso), c-d (in alto). */
+  const sfuma = (c, basso, alto) => [
+    [tinta(c[0], basso), tinta(c[0], basso), tinta(c[0], alto), tinta(c[0], alto)],
+    [tinta(c[1], basso), tinta(c[1], basso), tinta(c[1], alto), tinta(c[1], alto)],
+  ];
+  const cCemento = CEM;
+  const cSotto = SOTTO;
+  const cBuio = [rgb('#15181e'), rgb('#07080b')];
+  /** Una scatola (cinque facce, senza il fondo) in [opere]. */
+  const scatola = (cx, cy, z0, z1, ux, uy, lu, lv, colore) => {
+    const vx = -uy;
+    const vy = ux;
+    const P = (a, b, z) => [cx + ux * a * lu + vx * b * lv, cy + uy * a * lu + vy * b * lv, z];
+    // Ogni faccia con la sua normale verso fuori.
+    const facce = [
+      [[-1, -1], [1, -1], [uy, -ux]],
+      [[1, -1], [1, 1], [ux, uy]],
+      [[1, 1], [-1, 1], [-uy, ux]],
+      [[-1, 1], [-1, -1], [-ux, -uy]],
+    ];
+    for (const [[a0, b0], [a1, b1], nn] of facce) {
+      opere.quad(P(a0, b0, z0), P(a1, b1, z0), P(a1, b1, z1), P(a0, b0, z1), [nn[0], nn[1], 0], ...sfuma(colore, 0.7, 1));
+    }
+    opere.quad(P(-1, -1, z1), P(1, -1, z1), P(1, 1, z1), P(-1, 1, z1), [0, 0, 1], ...colore);
+  };
 
   linee.forEach((tutta, fi) => {
     const f = visibili[fi];
@@ -254,7 +294,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     // [x, y, h, tx, ty, s]: si taglia sulla tessera e tutto si interpola.
     const ricca = tutta.map((p, k) => [p[0], p[1], p[2], tang[k][0], tang[k][1], lungo[k]]);
     const semePezzo = mescola(Math.round(tutta[0][0] * 7), Math.round(tutta[0][1] * 7));
-    const zs = (SOPRA[f.cls] ?? 0.15) + (fi % 7) * 0.002;
+    const zs = f.galleria ? SOPRA_GALLERIA : (SOPRA[f.cls] ?? 0.15) + (fi % 7) * 0.002;
 
     // I segmenti con le quote, un poco oltre il bordo (per il percorso).
     if (f.cls !== 'rail') {
@@ -263,15 +303,42 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         for (let k = 1; k < pezzo.length; k++) {
           const a = pezzo[k - 1];
           const b = pezzo[k];
-          segmenti.push(a[0], a[1], a[2] + zs, b[0], b[1], b[2] + zs, f.w, codice + (f.rampa ? 16 : 0) + (f.ponte ? 32 : 0));
+          segmenti.push(a[0], a[1], a[2] + zs, b[0], b[1], b[2] + zs, f.w, codice + (f.rampa ? 16 : 0) + (f.ponte ? 32 : 0) + (f.galleria ? 64 : 0));
         }
+      }
+    }
+
+    // Gli imbocchi delle gallerie, dove la galleria incontra la strada aperta:
+    // due spalle, l'architrave, il buio dentro e un pezzo di volta.
+    if (f.galleria) {
+      for (const e of [0, n0 - 1]) {
+        const nodo = nodi[f.nodi[e]];
+        if (!nodo.feats.some((j) => !feats[j].galleria) || !dentro(nodo.x, nodo.y)) continue;
+        const [ux, uy] = versoFuori(tutta, e);
+        const vx = -uy;
+        const vy = ux;
+        const hw = f.w / 2;
+        const h0 = nodo.h;
+        for (const lato of [1, -1]) scatola(nodo.x + vx * (hw + 0.45) * lato, nodo.y + vy * (hw + 0.45) * lato, h0, h0 + 5.2, ux, uy, 0.5, 0.45, cCemento);
+        scatola(nodo.x, nodo.y, h0 + 4.4, h0 + 5.4, ux, uy, 0.5, hw + 0.9, cCemento);
+        scatola(nodo.x - ux * 4.6, nodo.y - uy * 4.6, h0 + 4.6, h0 + 5.4, ux, uy, 4.1, hw + 0.9, cCemento);
+        const mx = nodo.x - ux * 0.7;
+        const my = nodo.y - uy * 0.7;
+        opere.quad(
+          [mx + vx * hw, my + vy * hw, h0],
+          [mx - vx * hw, my - vy * hw, h0],
+          [mx - vx * hw, my - vy * hw, h0 + 4.4],
+          [mx + vx * hw, my + vy * hw, h0 + 4.4],
+          [ux, uy, 0],
+          ...cBuio,
+        );
       }
     }
 
     for (const pezzo of ritagliaLinea(ricca, -meta, -meta, meta, meta)) {
       const n = pezzo.length;
       const hw = f.w / 2;
-      const gb = nastri[tipoDi(f)];
+      const gb = nastri[f.galleria ? 'galleria' : tipoDi(f) + (f.ponte ? '-ponte' : '')];
       const L = [];
       const R = [];
       for (let k = 0; k < n; k++) {
@@ -320,7 +387,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           gb.tri(l0, l1, r1);
         }
       }
-      if (f.cls === 'rail' && !f.ponte) continue;
+      if (f.galleria || (f.cls === 'rail' && !f.ponte)) continue;
 
       // In quota: parapetti, travi, muri; e l'ombra sul terreno.
       for (let k = 1; k < n; k++) {
@@ -358,18 +425,19 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
             const b0 = fuori(b, on1, 0.12);
             const a1 = fuori(a, on0, -0.23);
             const b1 = fuori(b, on1, -0.23);
-            opere.quad([a0[0], a0[1], a[2] - 0.1], [b0[0], b0[1], b[2] - 0.1], [b0[0], b0[1], b[2] + ph], [a0[0], a0[1], a[2] + ph], nrm, ...cCemento);
-            opere.quad([a0[0], a0[1], a[2] + ph], [b0[0], b0[1], b[2] + ph], [b1[0], b1[1], b[2] + ph], [a1[0], a1[1], a[2] + ph], [0, 0, 1], ...cCemento);
-            opere.quad([a1[0], a1[1], a[2]], [b1[0], b1[1], b[2]], [b1[0], b1[1], b[2] + ph], [a1[0], a1[1], a[2] + ph], inr, ...cCemento);
+            opere.quad([a0[0], a0[1], a[2] - 0.1], [b0[0], b0[1], b[2] - 0.1], [b0[0], b0[1], b[2] + ph], [a0[0], a0[1], a[2] + ph], nrm, ...sfuma(cCemento, 0.82, 1.04));
+            opere.quad([a0[0], a0[1], a[2] + ph], [b0[0], b0[1], b[2] + ph], [b1[0], b1[1], b[2] + ph], [a1[0], a1[1], a[2] + ph], [0, 0, 1], ...sfuma(cCemento, 1.08, 1.08));
+            opere.quad([a1[0], a1[1], a[2]], [b1[0], b1[1], b[2]], [b1[0], b1[1], b[2] + ph], [a1[0], a1[1], a[2] + ph], inr, ...sfuma(cCemento, 0.7, 0.95));
           }
           if (f.ponte) {
             const a0 = fuori(a, on0, 0.12);
             const b0 = fuori(b, on1, 0.12);
-            opere.quad([a0[0], a0[1], a[2] - 1.6], [b0[0], b0[1], b[2] - 1.6], [b0[0], b0[1], b[2] - 0.1], [a0[0], a0[1], a[2] - 0.1], nrm, ...cTrave);
+            // Il fianco dell'impalcato: spesso, chiaro in alto (il cordolo), scuro sotto.
+            opere.quad([a0[0], a0[1], a[2] - 1.8], [b0[0], b0[1], b[2] - 1.8], [b0[0], b0[1], b[2] - 0.1], [a0[0], a0[1], a[2] - 0.1], nrm, ...sfuma(TRAVE, 0.62, 1.05));
           } else {
             const a0 = fuori(a, on0, 0.1);
             const b0 = fuori(b, on1, 0.1);
-            opere.quad([a0[0], a0[1], 0], [b0[0], b0[1], 0], [b0[0], b0[1], b[2]], [a0[0], a0[1], a[2]], nrm, ...cCemento);
+            opere.quad([a0[0], a0[1], 0], [b0[0], b0[1], 0], [b0[0], b0[1], b[2]], [a0[0], a0[1], a[2]], nrm, ...sfuma(cCemento, 0.66, 0.98));
           }
         }
         if (f.ponte) {
@@ -377,33 +445,73 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           const b = L[k];
           const c = R[k];
           const d = R[k - 1];
-          opere.quad([a[0], a[1], a[2] - 1.6], [b[0], b[1], b[2] - 1.6], [c[0], c[1], c[2] - 1.6], [d[0], d[1], d[2] - 1.6], [0, 0, -1], ...cTrave);
+          // Il ventre dell'impalcato, scuro: da sotto si capisce che è un ponte.
+          opere.quad([a[0], a[1], a[2] - 1.8], [b[0], b[1], b[2] - 1.8], [c[0], c[1], c[2] - 1.8], [d[0], d[1], d[2] - 1.8], [0, 0, -1], ...cSotto);
         }
       }
-      // I piloni, ogni trenta metri sotto i ponti.
+      // I piloni: ai due lati di ogni strada che passa sotto (mai sopra), e
+      // ogni trenta metri nel resto del ponte.
       if (f.ponte) {
+        const aS = (sv) => {
+          let k = 1;
+          while (k < n - 1 && pezzo[k][5] < sv) k++;
+          const t = Math.max(0, Math.min(1, (sv - pezzo[k - 1][5]) / Math.max(1e-6, pezzo[k][5] - pezzo[k - 1][5])));
+          return [0, 1, 2, 3, 4].map((j) => pezzo[k - 1][j] + (pezzo[k][j] - pezzo[k - 1][j]) * t);
+        };
+        const vietati = [];
+        const appoggi = [];
+        for (let k = 1; k < n; k++) {
+          const P0 = pezzo[k - 1];
+          const P1 = pezzo[k];
+          const dx = P1[0] - P0[0];
+          const dy = P1[1] - P0[1];
+          const visti = new Set();
+          for (let cx = Math.floor(Math.min(P0[0], P1[0]) / GRIGLIA) - 1; cx <= Math.floor(Math.max(P0[0], P1[0]) / GRIGLIA) + 1; cx++) {
+            for (let cy = Math.floor(Math.min(P0[1], P1[1]) / GRIGLIA) - 1; cy <= Math.floor(Math.max(P0[1], P1[1]) / GRIGLIA) + 1; cy++) {
+              for (const g of aTerra.get(cx + ',' + cy) || []) {
+                if (visti.has(g)) continue;
+                visti.add(g);
+                const [a, b, ghw] = g;
+                const ex = b[0] - a[0];
+                const ey = b[1] - a[1];
+                const den = dx * ey - dy * ex;
+                if (Math.abs(den) < 1e-9) continue;
+                const t = ((a[0] - P0[0]) * ey - (a[1] - P0[1]) * ex) / den;
+                const u = ((a[0] - P0[0]) * dy - (a[1] - P0[1]) * dx) / den;
+                if (t < 0 || t > 1 || u < -0.05 || u > 1.05) continue;
+                const seno = Math.abs(den) / (Math.hypot(dx, dy) * Math.hypot(ex, ey));
+                if (seno < 0.25) continue;
+                const sv = P0[5] + (P1[5] - P0[5]) * t;
+                const meta2 = ghw / seno;
+                vietati.push([sv - meta2 - 1.2, sv + meta2 + 1.2]);
+                appoggi.push(sv - meta2 - 2.4, sv + meta2 + 2.4);
+              }
+            }
+          }
+        }
+        const libero = (sv) => !vietati.some(([a, b]) => sv > a && sv < b);
+        const metti = (sv) => {
+          if (sv < pezzo[0][5] || sv > pezzo[n - 1][5] || !libero(sv)) return false;
+          const [px, py, h, tx, ty] = aS(sv);
+          if (h < 2.5) return false;
+          const tl = Math.hypot(tx, ty) || 1;
+          const offs = f.w > 9 ? [-f.w * 0.27, f.w * 0.27] : [0];
+          for (const o of offs) if (suStradaATerra(px - (ty / tl) * o, py + (tx / tl) * o, 0.8)) return false;
+          piloni.push({ x: px, y: py, h: h + zs - 1.8, ang: Math.atan2(ty, tx), w: f.w, offs });
+          return true;
+        };
+        const fatti = [];
+        for (const sv of appoggi.sort((a, b) => a - b)) {
+          if (fatti.some((q) => Math.abs(q - sv) < 6)) continue;
+          if (metti(sv)) fatti.push(sv);
+        }
         let prossimo = 12 + Math.floor(semePezzo * 5) * 3;
         // Si conta dall'inizio della strada intera: le due tessere ai lati
         // del bordo mettono i piloni negli stessi punti.
         while (prossimo < pezzo[0][5]) prossimo += 30;
-        for (let k = 1; k < n; k++) {
-          while (pezzo[k][5] >= prossimo) {
-            const s0 = pezzo[k - 1][5];
-            const s1 = pezzo[k][5];
-            const t = (prossimo - s0) / Math.max(1e-6, s1 - s0);
-            const px = pezzo[k - 1][0] + (pezzo[k][0] - pezzo[k - 1][0]) * t;
-            const py = pezzo[k - 1][1] + (pezzo[k][1] - pezzo[k - 1][1]) * t;
-            const h = pezzo[k - 1][2] + (pezzo[k][2] - pezzo[k - 1][2]) * t;
-            const tx = pezzo[k][3];
-            const ty = pezzo[k][4];
-            if (h > 2.5) {
-              const offs = f.w > 9 ? [-f.w * 0.27, f.w * 0.27] : [0];
-              let ok = true;
-              for (const o of offs) if (suStradaATerra(px - ty * o, py + tx * o, 0.6)) ok = false;
-              if (ok) piloni.push({ x: px, y: py, h: h + zs - 1.6, ang: Math.atan2(ty, tx), w: f.w, offs });
-            }
-            prossimo += 30;
-          }
+        for (; prossimo <= pezzo[n - 1][5]; prossimo += 30) {
+          if (fatti.some((q) => Math.abs(q - prossimo) < 10)) continue;
+          metti(prossimo);
         }
       }
       // I lampioni delle strade grandi.
@@ -503,6 +611,40 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   }
   // I più grandi per primi: se non ci stanno tutti, restano fuori i piccoli.
   edificiOut.sort((a, b) => b.area - a.area);
+  // Un edificio sotto un viadotto (le mappe a volte li sovrappongono) non
+  // buca l'impalcato: si ferma un poco sotto il ventre, o non si fa.
+  const GQ = 20;
+  const inQuota = new Map();
+  linee.forEach((pts, i) => {
+    if (visibili[i].galleria) return;
+    for (const p of pts) {
+      if (p[2] < 2.5) continue;
+      const key = Math.floor(p[0] / GQ) + ',' + Math.floor(p[1] / GQ);
+      if (!inQuota.has(key)) inQuota.set(key, []);
+      inQuota.get(key).push([p[0], p[1], p[2] - 1.8]);
+    }
+  });
+  const sottoIlPonte = (anelli) => {
+    let minx = 1e9;
+    let miny = 1e9;
+    let maxx = -1e9;
+    let maxy = -1e9;
+    for (const [px, py] of anelli[0]) {
+      minx = Math.min(minx, px);
+      maxx = Math.max(maxx, px);
+      miny = Math.min(miny, py);
+      maxy = Math.max(maxy, py);
+    }
+    let basso = Infinity;
+    for (let cx = Math.floor(minx / GQ); cx <= Math.floor(maxx / GQ); cx++) {
+      for (let cy = Math.floor(miny / GQ); cy <= Math.floor(maxy / GQ); cy++) {
+        for (const [px, py, hb] of inQuota.get(cx + ',' + cy) || []) {
+          if (hb < basso && puntoDentroPoligono(px, py, anelli)) basso = hb;
+        }
+      }
+    }
+    return basso;
+  };
   const STILI = ['residenziale', 'uffici', 'industria'];
   const facciate = Object.fromEntries(STILI.map((s) => [s, new Costruttore({ uv: true, colori: true })]));
   const tetti = new Costruttore({ colori: true });
@@ -512,8 +654,10 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   for (const [bi, b] of edificiOut.entries()) {
     if (triEdifici > lim.triangoliEdifici) break;
     const r = generatore(seme ^ Math.imul(bi + 1, 2654435761));
-    const h = b.h;
+    const ventre = sottoIlPonte(b.anelli.map((a) => a.pts));
+    const h = Math.min(b.h, ventre - 0.6);
     const m0 = b.mh;
+    if (h < 2.5 || h <= m0 + 0.5) continue;
     const stile = b.area > 2500 && h <= 22 ? 'industria' : h >= 34 ? 'uffici' : b.area > 1400 && h < 14 ? 'industria' : 'residenziale';
     const pal = FACCIATE[stile];
     const scelta = Math.floor(r() * pal.giorno.length);
@@ -598,7 +742,74 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     luci.set([l.hx, l.hy, l.z + 9.85], 3 * i);
   });
 
-  const fatti = Object.fromEntries(TIPI_STRADA.filter((t) => nastri[t].triangoli).map((t) => [t, nastri[t].fatto()]));
+  // I nomi dei ponti (e i numeri delle strade sui ponti), con la quota
+  // dell'impalcato: la mappa li scrive lassù, non a terra sotto il viadotto.
+  const etichette = [];
+  const TN = centro.transportation_name;
+  if (TN) {
+    const nodiPonte = [];
+    for (const f of feats) if (f.ponte) for (const i of f.nodi) nodiPonte.push(nodi[i]);
+    const gp = new Map();
+    for (const nn of nodiPonte) {
+      const key = Math.floor(nn.x / GQ) + ',' + Math.floor(nn.y / GQ);
+      if (!gp.has(key)) gp.set(key, []);
+      gp.get(key).push(nn);
+    }
+    for (let i = 0; i < TN.length && etichette.length < 60; i++) {
+      const f = TN.feature(i);
+      const p = f.properties;
+      if (f.type !== 2 || p.brunnel !== 'bridge' || !(p.name || p.ref)) continue;
+      let meglio = null;
+      for (const linea of f.loadGeometry()) {
+        for (const pezzo of ritagliaLinea(
+          linea.map((q) => sys.metri(x * ESTENSIONE + q.x, y * ESTENSIONE + q.y)),
+          -meta,
+          -meta,
+          meta,
+          meta,
+        )) {
+          let L = 0;
+          for (let k = 1; k < pezzo.length; k++) L += Math.hypot(pezzo[k][0] - pezzo[k - 1][0], pezzo[k][1] - pezzo[k - 1][1]);
+          if (!meglio || L > meglio.L) meglio = { L, pezzo };
+        }
+      }
+      if (!meglio || meglio.L < 40) continue;
+      // Il punto a metà del pezzo, e la quota del ponte più vicino lì.
+      let resta = meglio.L / 2;
+      let px = 0;
+      let py = 0;
+      let dir = 0;
+      for (let k = 1; k < meglio.pezzo.length; k++) {
+        const [ax, ay] = meglio.pezzo[k - 1];
+        const [bx, by] = meglio.pezzo[k];
+        const d = Math.hypot(bx - ax, by - ay);
+        if (d >= resta) {
+          px = ax + ((bx - ax) * resta) / d;
+          py = ay + ((by - ay) * resta) / d;
+          dir = Math.atan2(by - ay, bx - ax);
+          break;
+        }
+        resta -= d;
+      }
+      let h = null;
+      let bd = 18;
+      for (let ax = -1; ax <= 1; ax++) {
+        for (let ay = -1; ay <= 1; ay++) {
+          for (const nn of gp.get(Math.floor(px / GQ) + ax + ',' + (Math.floor(py / GQ) + ay)) || []) {
+            const d = Math.hypot(nn.x - px, nn.y - py);
+            if (d < bd) {
+              bd = d;
+              h = nn.h;
+            }
+          }
+        }
+      }
+      if (h === null || h < 2) continue;
+      etichette.push({ x: px, y: py, h: h + 0.25, dir, nome: p.name ?? '', ref: p.ref ?? '', cls: p.class });
+    }
+  }
+
+  const fatti = Object.fromEntries(NASTRI.filter((t) => nastri[t].triangoli).map((t) => [t, nastri[t].fatto()]));
   const out = {
     chiave: `${z}/${x}/${y}`,
     dettaglio,
@@ -615,6 +826,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     teste,
     luci,
     segmenti: new Float32Array(segmenti),
+    etichette,
   };
   const triStrade = Object.values(nastri).reduce((s, g) => s + g.triangoli, 0);
   out.conti = {

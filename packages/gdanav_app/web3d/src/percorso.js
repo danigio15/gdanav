@@ -123,7 +123,7 @@ export class IndiceSegmenti {
             if (d > w / 2 + 4 || d > raggio) continue;
             const coseno = dx || dy ? Math.abs((sx * dx + sy * dy) / Math.sqrt(l2) / (Math.hypot(dx, dy) || 1)) : 1;
             if (coseno < 0.7) continue;
-            out.push({ h: s[o + 2] + (s[o + 5] - s[o + 2]) * u, d, codice: s[o + 7] });
+            out.push({ h: s[o + 2] + (s[o + 5] - s[o + 2]) * u, d, codice: s[o + 7], galleria: (s[o + 7] & 64) !== 0 });
           }
         }
       }
@@ -155,12 +155,15 @@ export function quote(punti, indice) {
         if (costo < g.costo) {
           g.costo = costo;
           g.h = c.h;
+          g.galleria = c.galleria;
         }
-      } else gruppi.push({ h: c.h, costo });
+      } else gruppi.push({ h: c.h, costo, galleria: c.galleria });
     }
     cand[i] = gruppi;
   }
   const h = new Float64Array(n).fill(NaN);
+  // Quali punti passano in galleria (sotto qualcosa): il nastro lì è «dentro».
+  h.galleria = new Uint8Array(n);
   // Viterbi su ogni tratto di punti che hanno candidati.
   let i = 0;
   while (i < n) {
@@ -197,6 +200,7 @@ export function quote(punti, indice) {
     for (let k = 1; k < ultimi.length; k++) if (ultimi[k] < ultimi[q]) q = k;
     for (let k = j - 1; k >= i; k--) {
       h[k] = cand[k][q].h;
+      h.galleria[k] = cand[k][q].galleria ? 1 : 0;
       q = da[k - i][q];
     }
     i = j;
@@ -301,10 +305,29 @@ export class Linea {
 
 /** Il profilo delle quote di un tratto della linea: un campione ogni [passo] metri. */
 export class Profilo {
-  constructor(s0, passo, h) {
+  constructor(s0, passo, h, galleria = null) {
     this.s0 = s0;
     this.passo = passo;
     this.h = h;
+    this.galleria = galleria;
+  }
+  /** I tratti in galleria, in metri: `[da, a]`. */
+  get gallerie() {
+    const out = [];
+    const g = this.galleria;
+    if (!g) return out;
+    let i = 0;
+    while (i < g.length) {
+      if (!g[i]) {
+        i++;
+        continue;
+      }
+      let j = i;
+      while (j < g.length && g[j]) j++;
+      out.push([this.s0 + Math.max(0, i - 0.5) * this.passo, this.s0 + Math.min(g.length - 1, j - 0.5) * this.passo]);
+      i = j;
+    }
+    return out;
   }
   get s1() {
     return this.s0 + (this.h.length - 1) * this.passo;
@@ -328,7 +351,8 @@ export function profiloDi(linea, s0, s1, indice, passo = 4) {
     const p = linea.a(s0 + k * passo);
     punti.push([p[0], p[1]]);
   }
-  return new Profilo(s0, passo, riempiQuote(quote(punti, indice)));
+  const grezze = quote(punti, indice);
+  return new Profilo(s0, passo, riempiQuote(grezze), grezze.galleria);
 }
 
 /**
@@ -337,17 +361,20 @@ export function profiloDi(linea, s0, s1, indice, passo = 4) {
  * uv: u attraverso (0..1), v i metri; e per ogni vertice il livello della
  * coda (0 niente, 1 rallenta … 4 chiusa).
  */
-export function nastro(linea, profilo, s0, s1, largo, sopra, { passo = 2, code = [] } = {}) {
+export function nastro(linea, profilo, s0, s1, largo, sopra, { passo = 2, code = [], gallerie = profilo?.gallerie ?? [] } = {}) {
   const tagli = new Set();
   for (let s = s0; s < s1; s += passo) tagli.add(+s.toFixed(3));
   tagli.add(s1);
-  for (const [da, a] of code) {
+  for (const [da, a] of [...code, ...gallerie]) {
     for (const v of [da, a]) if (v > s0 && v < s1) tagli.add(v);
   }
   const ss = [...tagli].filter((s) => s >= s0 && s <= s1).sort((a, b) => a - b);
+  // Il livello della coda, più 10 nei tratti in galleria (lo shader li fa «dentro»).
   const livelloA = (s) => {
-    for (const [da, a, l] of code) if (s >= da && s < a) return l;
-    return 0;
+    let l = 0;
+    for (const [da, a, lv] of code) if (s >= da && s < a) l = lv;
+    for (const [da, a] of gallerie) if (s >= da && s < a) l += 10;
+    return l;
   };
   // Le stazioni: a ogni cambio di coda due (stesso punto, livello di prima e
   // di dopo), così il colore cambia netto e non sfuma lungo il nastro.

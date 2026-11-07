@@ -1,139 +1,152 @@
 // Il collaudo della mappa 3D in un browser vero (Chromium senza schermo,
-// WebGL in software): la pagina impacchettata (assets/web3d) con un ponte
-// finto al posto dell'app, che manda lo stile vero (`stile.dart`), un
-// percorso, la posizione dell'auto che avanza. Per ogni caso: una foto, e le
-// misure (triangoli, tempo di disegno, tela non vuota).
+// WebGL in software): la pagina impacchettata con un'app finta (vedi
+// `pagina.mjs`), un percorso vero per ogni caso, e per ognuno le foto
+// (telefono di giorno e di notte, dall'alto in panoramica, da vicino) e i
+// controlli: la tela non vuota, i triangoli nel budget, l'auto che si vede
+// (anche sotto un cavalcavia), la luce sotto i cavalcavia.
 //
 //   NODE_USE_ENV_PROXY=1 node collaudo/collaudo.mjs [cartella] [caso…]
 //
-// I casi: rho (Rho/Pero, A4 → viadotto A52 → A8, il prototipo), roma (GRA,
-// svincolo A24), bologna (Casalecchio). Le tessere scaricate restano in
-// CACHE_TESSERE. Serve Playwright (PLAYWRIGHT: dove sta) e `dart` per lo stile.
-import { execFileSync } from 'node:child_process';
+// Le tessere scaricate restano in CACHE_TESSERE. Serve Playwright
+// (PLAYWRIGHT: dove sta) e `dart` per lo stile. Ogni caso scrive il suo
+// esito (`collaudo-<caso>.json`) appena fatto, e il percorso
+// (`percorso-<caso>.json`) per le immagini col cruscotto di Flutter.
 import fs from 'node:fs';
-import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { daMetriPrototipo, percorso, percorsoDaRampa, scarica } from './strada.mjs';
+import { ARGOMENTI_CHROMIUM, apri, aspetta, lungo, playwright, rossoAttorno, servitore } from './pagina.mjs';
+import { daMetriPrototipo, percorso, percorsoAttraverso, percorsoDaTratto } from './strada.mjs';
 
 const qui = path.dirname(fileURLToPath(import.meta.url));
-const pagine = path.join(qui, '..', '..', 'assets', 'web3d');
 const uscita = path.resolve(process.argv[2] ?? path.join(qui, 'uscita'));
 const scelti = process.argv.slice(3);
 fs.mkdirSync(uscita, { recursive: true });
 
-const { chromium } = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.js').then((m) => m.default ?? m);
-
-// ── I casi ──────────────────────────────────────────────────────────────
-const CASI = {
+/** I casi: come si fa il percorso, dove sta l'auto, le foto in più. */
+export const CASI = {
   rho: {
-    nome: 'Rho/Pero (MI): A4 Fiera Est → viadotto A52 → A8',
+    nome: 'Rho/Pero (MI): A4 Fiera Est → rampa sul viadotto A52 → cavalcavia di secondo livello → A8',
     centro: [9.087, 45.5172],
-    via: [
-      [1500, -235.9, 'motorway', false],
-      [1100, -252.7, undefined, true],
-      [330, -293, undefined, true],
-      [38, -275, undefined, true],
-      [426, 1010, undefined, undefined],
-      [540, 1193, undefined, true],
-      [750, 1229, undefined, true],
-    ].map(([x, y, cls, rampa]) => {
-      const [lon, lat] = daMetriPrototipo(x, y);
-      return { lon, lat, cls, rampa };
-    }),
-    // Dove sta l'auto nelle foto: sulla rampa che sale, prima dell'uscita (il prototipo: 1790 m).
-    metri: 1790,
+    percorso: () =>
+      percorso(
+        [9.087, 45.5172],
+        [
+          [1500, -235.9, 'motorway', false],
+          [1100, -252.7, undefined, true],
+          [330, -293, undefined, true],
+          [38, -275, undefined, true],
+          [426, 1010, undefined, undefined],
+          [540, 1193, undefined, true],
+          [750, 1229, undefined, true],
+        ].map(([x, y, cls, rampa]) => {
+          const [lon, lat] = daMetriPrototipo(x, y);
+          return { lon, lat, cls, rampa };
+        }),
+        1,
+      ),
+    // Sulla rampa che sale verso il viadotto (il prototipo: 1790 m).
+    metri: () => 1790,
     manovra: [2939, 3064],
     code: [[2300, 2600, 2]],
+    extra: (r) => [{ nome: 'viadotto-secondo-livello', metri: r.metriMassima - 70 }],
+    orizzontale: true,
   },
   roma: {
-    nome: 'Roma, GRA: svincolo A24 (rampa in viadotto)',
+    nome: 'Roma, GRA: svincolo A24, la rampa in viadotto',
     centro: [12.6, 41.917],
-    rampa: [[12.6123, 41.91944], [12.6123, 41.92175]],
-    metri: 560,
-    code: [],
+    percorso: () => percorsoDaTratto([12.6, 41.917], [12.6123, 41.91944], [12.6123, 41.92175]),
+    metri: (r) => r.metriTratto + 60,
   },
   bologna: {
-    nome: 'Bologna, Casalecchio: tangenziale e A1',
+    nome: 'Bologna, Casalecchio: tangenziale, A1 e la rampa sul cavalcavia',
     centro: [11.252, 44.488],
-    rampa: [[11.24528, 44.49018], [11.2467, 44.49107]],
-    metri: 560,
+    percorso: () => percorsoDaTratto([11.252, 44.488], [11.24528, 44.49018], [11.2467, 44.49107]),
+    metri: (r) => r.metriTratto + 60,
     code: [[700, 900, 1]],
+  },
+  cavalcavia: {
+    nome: 'Bologna, Borgo Panigale: in autostrada sotto un cavalcavia',
+    centro: [11.272, 44.502],
+    percorso: () => percorsoAttraverso([11.272, 44.502], [11.27196, 44.50218], { prima: 500, dopo: 450 }),
+    // L'auto proprio sotto il ponte: deve vedersi lo stesso.
+    metri: (r) => r.metriPunto + 3,
+    extra: (r) => [{ nome: 'prima-del-cavalcavia', metri: r.metriPunto - 70 }],
+    luce: true,
+  },
+  napoli: {
+    nome: 'Napoli, Capodichino: svincolo su tre livelli',
+    centro: [14.276, 40.865],
+    percorso: () => percorsoDaTratto([14.276, 40.865], [14.2758, 40.86368], [14.27554, 40.86549]),
+    metri: (r) => r.metriTratto + 110,
+  },
+  torino: {
+    nome: 'Torino, corso Francia: il quadrifoglio',
+    centro: [7.58, 45.096],
+    percorso: () => percorsoDaTratto([7.58, 45.096], [7.57714, 45.0985], [7.57742, 45.0989], { ponte: false, rampa: true }),
+    metri: (r) => r.metriTratto + 150,
+  },
+  genova: {
+    nome: 'Genova, viadotto San Giorgio sulla valle del Polcevera',
+    centro: [8.887, 44.426],
+    percorso: () => percorsoDaTratto([8.887, 44.426], [8.89189, 44.42457], [8.88152, 44.4278], { ponte: true, rampa: false, prima: 500, dopo: 500 }),
+    metri: (r) => r.metriTratto + 300,
+  },
+  sottopasso: {
+    nome: 'Milano: il sottopasso, in galleria sotto il viale',
+    centro: [9.208, 45.49],
+    percorso: () => percorsoDaTratto([9.208, 45.49], [9.20946, 45.48949], [9.20738, 45.49054], { ponte: false, rampa: false, galleria: true, prima: 450, dopo: 400 }),
+    metri: (r) => r.metriTratto - 50,
+    extra: (r) => [{ nome: 'dentro-la-galleria', metri: r.metriTratto + 60 }],
   },
 };
 
-// ── Lo stile vero dell'app ──────────────────────────────────────────────
-function stile(scuro) {
-  const f = path.join(uscita, `stile-${scuro ? 'scuro' : 'chiaro'}.json`);
-  if (!fs.existsSync(f)) {
-    execFileSync('dart', ['run', path.join(qui, 'stile.dart'), f, scuro ? 'scuro' : 'chiaro'], { cwd: path.join(qui, '..', '..'), stdio: 'inherit' });
-  }
-  return JSON.parse(fs.readFileSync(f, 'utf8'));
+const { chromium } = await playwright();
+const { porta, chiudi } = await servitore();
+const browser = await chromium.launch({ args: ARGOMENTI_CHROMIUM });
+
+/** La foto, e se si vede l'auto e quanto è libera la tela. */
+async function foto(page, file) {
+  await page.screenshot({ path: file });
+  return page.evaluate(() => {
+    const c = window.__mappa.getCanvas();
+    const t = document.createElement('canvas');
+    t.width = 120;
+    t.height = 260;
+    const g = t.getContext('2d');
+    g.drawImage(c, 0, 0, 120, 260);
+    const d = g.getImageData(0, 0, 120, 260).data;
+    const colori = new Set();
+    let s = 0;
+    let s2 = 0;
+    const n = d.length / 4;
+    for (let i = 0; i < d.length; i += 4) {
+      const l = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
+      s += l;
+      s2 += l * l;
+      colori.add((d[i] >> 4) * 256 + (d[i + 1] >> 4) * 16 + (d[i + 2] >> 4));
+    }
+    const media = s / n;
+    return { colori: colori.size, deviazione: Math.round(Math.sqrt(s2 / n - media * media)) };
+  });
 }
 
-// ── Un servitore per la pagina impacchettata ────────────────────────────
-const TIPI = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
-const servitore = http.createServer((req, res) => {
-  const p = path.join(pagine, decodeURIComponent(req.url.split('?')[0]));
-  if (!p.startsWith(pagine) || !fs.existsSync(p) || fs.statSync(p).isDirectory()) {
-    res.writeHead(404);
-    return res.end();
-  }
-  res.writeHead(200, { 'Content-Type': TIPI[path.extname(p)] ?? 'application/octet-stream' });
-  fs.createReadStream(p).pipe(res);
-});
-await new Promise((r) => servitore.listen(0, '127.0.0.1', r));
-const porta = servitore.address().port;
+async function autoVisibile(page) {
+  const a = await page.evaluate(() => window.gdanav3d.prova.schermoAuto());
+  if (!a) return { visibile: false };
+  return { ...a, rossi: await rossoAttorno(page, a.x, a.y), visibile: (await rossoAttorno(page, a.x, a.y)) > 12 };
+}
 
-const browser = await chromium.launch({
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'],
-});
-
-/** Le icone che l'app manda (qui disegnate al volo): bandiera e autovelox. */
-async function icone(page) {
-  return page.evaluate(() => {
-    const png = (w, h, disegna) => {
-      const c = document.createElement('canvas');
-      c.width = w;
-      c.height = h;
-      disegna(c.getContext('2d'));
-      return c.toDataURL('image/png').split(',')[1];
-    };
-    return {
-      'arrivo-bandiera': png(96, 120, (g) => {
-        g.fillStyle = '#333';
-        g.fillRect(14, 10, 6, 108);
-        for (let i = 0; i < 6; i++) for (let j = 0; j < 4; j++) {
-          g.fillStyle = (i + j) % 2 ? '#111' : '#fff';
-          g.fillRect(20 + i * 12, 12 + j * 12, 12, 12);
-        }
-        g.strokeStyle = '#111';
-        g.strokeRect(20, 12, 72, 48);
+/** Una vista libera (senza seguire l'auto): panoramica o da vicino. */
+async function vista(page, centro, zoom, pitch, bearing) {
+  await page.evaluate(
+    ([c, z, p, b]) =>
+      new Promise((fatto) => {
+        window.gdanav3d.ricevi({ v: 1, tipo: 'camera', modo: 'libera' });
+        window.__mappa.jumpTo({ center: c, zoom: z, pitch: p, bearing: b, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
+        window.__mappa.once('idle', fatto);
       }),
-      'autovelox-fisso': png(120, 132, (g) => {
-        g.fillStyle = '#fff';
-        g.beginPath();
-        g.roundRect(6, 6, 108, 100, 24);
-        g.fill();
-        g.fillStyle = '#E53935';
-        g.beginPath();
-        g.roundRect(14, 14, 92, 84, 18);
-        g.fill();
-        g.fillStyle = '#fff';
-        g.fillRect(36, 42, 48, 30);
-        g.fillStyle = '#E53935';
-        g.beginPath();
-        g.arc(60, 57, 10, 0, 7);
-        g.fill();
-        g.fillStyle = '#fff';
-        g.beginPath();
-        g.moveTo(48, 104);
-        g.lineTo(72, 104);
-        g.lineTo(60, 128);
-        g.fill();
-      }),
-    };
-  });
+    [centro, zoom, pitch, bearing],
+  );
 }
 
 const risultati = [];
@@ -141,162 +154,88 @@ for (const [chiave, caso] of Object.entries(CASI)) {
   if (scelti.length && !scelti.includes(chiave)) continue;
   const fileP = path.join(uscita, `percorso-${chiave}.json`);
   if (!fs.existsSync(fileP)) {
-    const r = caso.rampa ? await percorsoDaRampa(caso.centro, ...caso.rampa) : await percorso(caso.centro, caso.via, 1);
-    fs.writeFileSync(fileP, JSON.stringify({ punti: r.punti, lunghezza: r.lunghezza, quotaMassima: r.quotaMassima }));
+    const r = await caso.percorso();
+    fs.writeFileSync(fileP, JSON.stringify(r));
   }
   const rotta = JSON.parse(fs.readFileSync(fileP, 'utf8'));
+  const metri = caso.metri(rotta);
+  rotta.auto = metri;
+  rotta.nome = caso.nome;
+  fs.writeFileSync(fileP, JSON.stringify(rotta));
+  const c = { ...caso, metri };
   for (const notte of [false, true]) {
-    const nome = `${chiave}-${notte ? 'notte' : 'giorno'}`;
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
-    await ctx.route(/https:\/\/(tiles\.openfreemap\.org|api\.tomtom\.com)\/.*/, async (route) => {
-      try {
-        const r = await scarica(route.request().url());
-        await route.fulfill({ status: r.stato === 200 ? 200 : r.stato, body: r.corpo, headers: { 'content-type': r.tipo, 'access-control-allow-origin': '*' } });
-      } catch {
-        await route.fulfill({ status: 503, body: '' });
-      }
-    });
-    const page = await ctx.newPage();
-    const messaggi = [];
-    page.on('console', (m) => {
-      if (m.type() === 'error') console.log(`[${nome}]`, m.text().slice(0, 300));
-    });
-    page.on('pageerror', (e) => console.log(`[${nome}] errore`, e.message, (e.stack ?? '').split('\n').slice(0, 4).join(' | ')));
-    await page.exposeFunction('__ascolta', (t) => messaggi.push(JSON.parse(t)));
-    await page.goto(`http://127.0.0.1:${porta}/index.html?prova=1&software=1`);
-    const manda = (m) => page.evaluate((x) => window.gdanav3d.ricevi(x), { v: 1, ...m });
-    await manda({ tipo: 'opzioni', notte, vista: 'inclinata', auto: '#d62a26' });
-    await manda({ tipo: 'stile', stile: stile(notte) });
-    for (const [n, png] of Object.entries(await icone(page))) await manda({ tipo: 'immagine', nome: n, png, ratio: 3 });
-    const punti = rotta.punti;
-    const fine = [punti.at(-2), punti.at(-1)];
-    await manda({ tipo: 'percorso', punti, code: caso.code });
-    if (caso.manovra) await manda({ tipo: 'manovra', da: caso.manovra[0], a: caso.manovra[1] });
-    await manda({ tipo: 'sorgente', id: 'gdanav-arrivo', dati: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: fine }, properties: {} }] } });
-    // Un autovelox 350 m davanti all'auto, sul percorso.
-    const davanti = await page.evaluate(([pp, m]) => {
-      let s = 0;
-      for (let i = 2; i < pp.length; i += 2) {
-        const dx = (pp[i] - pp[i - 2]) * 111320 * Math.cos((pp[i + 1] * Math.PI) / 180);
-        const dy = (pp[i + 1] - pp[i - 1]) * 110540;
-        const d = Math.hypot(dx, dy);
-        if (s + d >= m) {
-          const t = (m - s) / d;
-          return [pp[i - 2] + (pp[i] - pp[i - 2]) * t, pp[i - 1] + (pp[i + 1] - pp[i - 1]) * t, (Math.atan2(dx, dy) * 180) / Math.PI];
-        }
-        s += d;
-      }
-      return [pp.at(-2), pp.at(-1), 0];
-    }, [punti, caso.metri + 350]);
-    await manda({ tipo: 'sorgente', id: 'gdanav-segnalazioni', dati: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: davanti.slice(0, 2) }, properties: { id: 'a1', tipo: 'autovelox', icona: 'autovelox-fisso' } }] } });
-    const posizione = async (metri, v) => {
-      const p = await page.evaluate(([pp, m]) => {
-        let s = 0;
-        for (let i = 2; i < pp.length; i += 2) {
-          const dx = (pp[i] - pp[i - 2]) * 111320 * Math.cos((pp[i + 1] * Math.PI) / 180);
-          const dy = (pp[i + 1] - pp[i - 1]) * 110540;
-          const d = Math.hypot(dx, dy);
-          if (s + d >= m) {
-            const t = (m - s) / d;
-            return [pp[i - 2] + (pp[i] - pp[i - 2]) * t, pp[i - 1] + (pp[i + 1] - pp[i - 1]) * t, ((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360];
-          }
-          s += d;
-        }
-        return [pp.at(-2), pp.at(-1), 0];
-      }, [punti, metri]);
-      await manda({ tipo: 'posizione', lat: p[1], lon: p[0], rotta: p[2], metri, velocita: v, zoom: 17.9, quando: Date.now() });
-    };
-    await manda({ tipo: 'camera', modo: 'segui', sopra: 0 });
-    await posizione(caso.metri, 0);
-    const t0 = Date.now();
-    let diag = null;
-    for (;;) {
-      diag = await page.evaluate(() => window.gdanav3d.diagnosi());
-      const vicine = diag.tessere.filter((t) => t.visibile).length;
-      if ((diag.pronta && vicine >= 3 && diag.profilo) || Date.now() - t0 > 240000) break;
-      await page.waitForTimeout(1500);
-    }
+    const momento = notte ? 'notte' : 'giorno';
+    const nome = `${chiave}-${momento}`;
+    const { page, ctx, posizione, errori } = await apri(browser, { porta, cartella: uscita, rotta, caso: c, notte, nome });
+    await posizione(metri, 0);
+    await aspetta(page);
     await page.waitForTimeout(2500);
-    await posizione(caso.metri, 0);
-    await page.waitForTimeout(1200);
-    const foto = path.join(uscita, `${nome}.png`);
-    await page.screenshot({ path: foto });
-    // La tela non è vuota: quanti colori diversi, e quanto variano.
-    const tela = await page.evaluate(() => {
-      const c = window.__mappa.getCanvas();
-      const t = document.createElement('canvas');
-      t.width = 120;
-      t.height = 260;
-      const g = t.getContext('2d');
-      g.drawImage(c, 0, 0, 120, 260);
-      const d = g.getImageData(0, 0, 120, 260).data;
-      const colori = new Set();
-      let s = 0;
-      let s2 = 0;
-      const n = d.length / 4;
-      for (let i = 0; i < d.length; i += 4) {
-        const l = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
-        s += l;
-        s2 += l * l;
-        colori.add((d[i] >> 4) * 256 + (d[i + 1] >> 4) * 16 + (d[i + 2] >> 4));
-      }
-      const media = s / n;
-      return { colori: colori.size, deviazione: Math.sqrt(s2 / n - media * media) };
-    });
-    const dopo = await page.evaluate(() => window.gdanav3d.diagnosi());
+    await posizione(metri, 0);
+    await page.waitForTimeout(1500);
+    const tela = await foto(page, path.join(uscita, `${chiave}-telefono-${momento}.png`));
+    const auto = await autoVisibile(page);
+    const diag = await page.evaluate(() => window.gdanav3d.diagnosi());
+    const quote = await page.evaluate(() => window.gdanav3d.prova.quoteQui());
+    const sopra = quote ? quote.strade.filter((h) => h > quote.auto + 3) : [];
+    const luce = sopra.length ? Math.min(...sopra) - 1.8 - quote.auto : null;
     const esito = {
       caso: chiave,
       notte,
       nome: caso.nome,
-      foto,
       lunghezza: Math.round(rotta.lunghezza),
-      tessere: dopo.tessere.map((t) => ({ chiave: t.chiave, dettaglio: t.dettaglio, triangoli: t.triangoli, visibile: t.visibile, ms: t.conti?.ms })),
-      triangoli: dopo.triangoli,
-      budget: dopo.budget,
-      msDisegno: Math.round(dopo.msDisegno ?? 0),
-      quotaAuto: dopo.auto?.z,
-      profiloMax: dopo.profilo?.max,
+      metri: Math.round(metri),
+      tessere: diag.tessere.length,
+      triangoli: diag.triangoli,
+      budget: diag.budget,
+      quotaAuto: +(quote?.auto ?? 0).toFixed(2),
+      quotaMassima: diag.profilo?.max,
+      luceSottoIlPonte: luce === null ? null : +luce.toFixed(2),
       tela,
-      messaggi: messaggi.map((m) => m.tipo),
-      log: dopo.log.filter((r) => /errore|scartato|lavoratore/.test(r)),
-      ok: tela.colori > 200 && tela.deviazione > 12 && dopo.triangoli <= dopo.budget && dopo.tessere.length > 0,
+      auto,
+      errori: errori.length,
     };
-    // In movimento: l'auto avanza a 25 m/s per sei secondi, una posizione al
-    // secondo come il GPS; si misurano i fotogrammi che MapLibre disegna
-    // davvero (qui WebGL è in software: su un telefono va molto più svelto).
-    await page.evaluate(() => {
-      window.__fotogrammi = [];
-      let ultimo = null;
-      window.__mappa.on('render', () => {
-        const t = performance.now();
-        if (ultimo !== null) window.__fotogrammi.push(t - ultimo);
-        ultimo = t;
-      });
-    });
-    for (let k = 1; k <= 6; k++) {
-      await posizione(caso.metri + k * 25, 25);
-      await page.waitForTimeout(1000);
+    esito.ok =
+      tela.colori > 120 && tela.deviazione > 12 && diag.triangoli <= diag.budget && auto.visibile && (!caso.luce || (luce !== null && luce >= 5));
+    // Le foto in più, di giorno: altri punti del percorso, la panoramica, da vicino.
+    if (!notte) {
+      for (const e of caso.extra?.(rotta) ?? []) {
+        await posizione(e.metri, 0);
+        await page.waitForTimeout(2500);
+        await aspetta(page);
+        await posizione(e.metri, 0);
+        await page.waitForTimeout(1500);
+        await foto(page, path.join(uscita, `${chiave}-telefono-${e.nome}.png`));
+        esito[e.nome] = await autoVisibile(page);
+        esito.ok &&= esito[e.nome].visibile;
+      }
+      const [lon, lat, rottaG] = lungo(rotta.punti, metri + 120);
+      await vista(page, [lon, lat], 16.15, 56, rottaG - 35);
+      await page.waitForTimeout(2000);
+      await foto(page, path.join(uscita, `${chiave}-panoramica.png`));
+      const [lon2, lat2] = lungo(rotta.punti, metri + 40);
+      await vista(page, [lon2, lat2], 17.35, 62, rottaG + 55);
+      await page.waitForTimeout(2000);
+      await foto(page, path.join(uscita, `${chiave}-da-vicino.png`));
     }
-    const fotogrammi = await page.evaluate(() => window.__fotogrammi);
-    const ordinati = fotogrammi.slice().sort((a, b) => a - b);
-    esito.inMoto = {
-      fotogrammi: fotogrammi.length,
-      medianaMs: ordinati.length ? Math.round(ordinati[Math.floor(ordinati.length / 2)]) : null,
-      p90Ms: ordinati.length ? Math.round(ordinati[Math.floor(ordinati.length * 0.9)]) : null,
-      msDisegno3d: Math.round((await page.evaluate(() => window.gdanav3d.diagnosi())).msDisegno ?? 0),
-    };
-    risultati.push(esito);
-    // Scritto a ogni caso: se il collaudo si interrompe, quelli fatti restano.
-    fs.writeFileSync(path.join(uscita, `collaudo-${nome}.json`), JSON.stringify(esito, null, 2));
-    console.log(JSON.stringify({ ...esito, tessere: esito.tessere.length, log: esito.log.length }));
-    await page.waitForTimeout(1200);
-    await page.screenshot({ path: path.join(uscita, `${nome}-in-moto.png`) });
     await ctx.close();
+    // Il telefono di traverso.
+    if (caso.orizzontale) {
+      const o = await apri(browser, { porta, cartella: uscita, rotta, caso: c, notte, nome: `${nome}-orizzontale`, larghezza: 844, altezza: 390 });
+      await o.posizione(metri, 0);
+      await aspetta(o.page);
+      await o.page.waitForTimeout(2500);
+      await o.posizione(metri, 0);
+      await o.page.waitForTimeout(1500);
+      await foto(o.page, path.join(uscita, `${chiave}-orizzontale-${momento}.png`));
+      await o.ctx.close();
+    }
+    risultati.push(esito);
+    fs.writeFileSync(path.join(uscita, `collaudo-${chiave}-${momento}.json`), JSON.stringify(esito, null, 2));
+    console.log(JSON.stringify(esito));
   }
 }
-fs.writeFileSync(path.join(uscita, 'collaudo.json'), JSON.stringify(risultati, null, 2));
 await browser.close();
-servitore.close();
+chiudi();
 const male = risultati.filter((r) => !r.ok);
 console.log(male.length ? `NON VA: ${male.map((r) => `${r.caso}/${r.notte ? 'notte' : 'giorno'}`).join(', ')}` : `Tutto bene: ${risultati.length} casi.`);
 process.exit(male.length ? 1 : 0);

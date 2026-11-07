@@ -101,3 +101,15 @@ test('la linea coi metri della guida: le posizioni seguono quelli', () => {
   assert.deepEqual(l.a(52).slice(0, 2), [50, 0]);
   assert.deepEqual(l.a(156).slice(0, 2), [150, 0]);
 });
+
+test('in galleria: i punti lo sanno, e il nastro lì ha il livello +10', () => {
+  const i = new IndiceSegmenti();
+  i.aggiungi('t', new Float32Array([-300, 0, 0, -50, 0, 0, 10, 3, -50, 0, 0.06, 50, 0, 0.06, 10, 3 + 64, 50, 0, 0, 300, 0, 0, 10, 3]), 0, 0, 1);
+  const l = new Linea([-300, 0, 300, 0]);
+  const p = profiloDi(l, 0, 600, i);
+  assert.equal(p.gallerie.length, 1);
+  const [da, a] = p.gallerie[0];
+  assert.ok(Math.abs(da - 250) < 5 && Math.abs(a - 350) < 5, `${da}..${a}`);
+  const n = nastro(l, p, 0, 600, 4, 0.6);
+  assert.ok([...n.livelli].some((v) => v >= 10) && [...n.livelli].some((v) => v === 0));
+});

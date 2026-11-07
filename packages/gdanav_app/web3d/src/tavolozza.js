@@ -15,6 +15,9 @@ export const GIORNO = {
   nebbiaA: 3200,
   asfalto: '#959ba3',
   asfaltoGrande: '#8c939c',
+  // Sui ponti l'asfalto è più chiaro: l'impalcato si stacca dalle strade sotto.
+  asfaltoPonte: '#adb2b8',
+  asfaltoPonteGrande: '#a6acb3',
   righe: '#ffffff',
   cemento: '#d6d3cc',
   trave: '#b9b6ae',
@@ -38,6 +41,8 @@ export const NOTTE = {
   nebbiaA: 2300,
   asfalto: '#4a5366',
   asfaltoGrande: '#535d72',
+  asfaltoPonte: '#66708a',
+  asfaltoPonteGrande: '#6c7690',
   righe: '#f2f5fa',
   cemento: '#59606c',
   trave: '#3f4550',

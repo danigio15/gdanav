@@ -29,9 +29,13 @@ export function larghezzaStrada(p) {
 
 /** Il livello di una strada: almeno 1 per un ponte, 0 per una galleria. */
 export function livelloStrada(p) {
-  if (p.brunnel === 'bridge') return Math.max(1, +(p.layer ?? 1) || 1);
+  // Un ponte senza layer (o con un layer storto: 0, negativo, non un numero)
+  // sta al primo livello; più di cinque livelli non ce ne sono.
+  if (p.brunnel === 'bridge') return Math.min(5, Math.max(1, Math.round(+(p.layer ?? 1)) || 1));
   if (p.brunnel === 'tunnel') return 0;
-  return Math.max(0, +(p.layer ?? 0) || 0);
+  // Fuori dai ponti un layer positivo è quasi sempre un rilevato o un errore:
+  // a terra (le rampe salgono da sole verso il ponte a cui si attaccano).
+  return 0;
 }
 
 /** L'altezza di un ponte di quel livello. */

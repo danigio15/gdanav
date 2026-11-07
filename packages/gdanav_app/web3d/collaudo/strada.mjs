@@ -112,7 +112,7 @@ function dijkstra(g, a, b) {
     if (i === b) break;
     for (const e of g.nodi[i].adj) {
       const f = g.feats[e.f];
-      if (!GUIDABILI.has(f.cls) || f.galleria) continue;
+      if (!GUIDABILI.has(f.cls)) continue;
       if (f.senso === 1 && !e.avanti) continue;
       if (f.senso === -1 && e.avanti) continue;
       const nv = v + e.d;
@@ -159,10 +159,14 @@ export async function percorso(centro, via, raggio = 1) {
   let ultimo = null;
   let lunghezza = 0;
   let massima = 0;
+  let metriMassima = 0;
   for (const [j, i] of nodi.entries()) {
     const n = g.nodi[i];
-    massima = Math.max(massima, n.h);
     if (ultimo) lunghezza += Math.hypot(n.x - ultimo.x, n.y - ultimo.y);
+    if (n.h > massima) {
+      massima = n.h;
+      metriMassima = lunghezza;
+    }
     if (j && j < nodi.length - 1 && ultimo && Math.hypot(n.x - punti.at(-1).x, n.y - punti.at(-1).y) < 15) {
       ultimo = n;
       continue;
@@ -170,7 +174,7 @@ export async function percorso(centro, via, raggio = 1) {
     punti.push(n);
     ultimo = n;
   }
-  return { punti: punti.flatMap((n) => g.lonlat(n.x, n.y)), lunghezza, quotaMassima: massima, g };
+  return { punti: punti.flatMap((n) => g.lonlat(n.x, n.y)), lunghezza, quotaMassima: massima, metriMassima };
 }
 
 /** I punti del prototipo (metri attorno al centro di Rho/Pero) in longitudine e latitudine. */
@@ -193,7 +197,7 @@ function distanze(g, da, indietro = false) {
     if (v > dist[i] || v > 2500) continue;
     for (const e of g.nodi[i].adj) {
       const f = g.feats[e.f];
-      if (!GUIDABILI.has(f.cls) || f.galleria) continue;
+      if (!GUIDABILI.has(f.cls)) continue;
       const avanti = indietro ? !e.avanti : e.avanti;
       if (f.senso === 1 && !avanti) continue;
       if (f.senso === -1 && avanti) continue;
@@ -208,27 +212,57 @@ function distanze(g, da, indietro = false) {
   return { dist, prima };
 }
 
+/** I nodi in fila da [da] a [a2] con la tabella [prima] di una visita. */
+const catena = (prima, da, a2) => {
+  const out = [];
+  for (let c = a2; c >= 0 && c !== da; c = prima[c]) out.push(c);
+  out.push(da);
+  return out.reverse();
+};
+
+/** Da una fila di nodi al percorso: un punto ogni 15 m, la lunghezza, i metri dei nodi voluti. */
+function daNodi(g, nodi, segnati = {}) {
+  const punti = [];
+  let lunghezza = 0;
+  let massima = 0;
+  const metri = {};
+  nodi.forEach((i, j) => {
+    const n = g.nodi[i];
+    massima = Math.max(massima, n.h);
+    if (j) lunghezza += Math.hypot(n.x - g.nodi[nodi[j - 1]].x, n.y - g.nodi[nodi[j - 1]].y);
+    for (const [k, v] of Object.entries(segnati)) if (v === i && metri[k] === undefined) metri[k] = lunghezza;
+    if (j && j < nodi.length - 1 && Math.hypot(n.x - punti.at(-1).x, n.y - punti.at(-1).y) < 15) return;
+    punti.push(n);
+  });
+  return { punti: punti.flatMap((n) => g.lonlat(n.x, n.y)), lunghezza, quotaMassima: massima, metri };
+}
+
+const STRADE_GRANDI = ['motorway', 'trunk', 'primary', 'secondary', 'tertiary'];
+
 /**
- * Un percorso che prende la rampa in quota fra [a] e [b] (`[lon, lat]`):
- * da una strada grande [prima] metri prima a una [dopo] metri dopo.
+ * Un percorso che passa per un tratto (fra [a] e [b], `[lon, lat]`): una
+ * rampa in quota, un viadotto, un anello di quadrifoglio, una galleria. Da
+ * una strada grande [prima] metri prima a una [dopo] metri dopo.
+ * [tipo]: quali strade possono essere il tratto (`{ponte, rampa, galleria}`).
  */
-export async function percorsoDaRampa(centro, a, b, prima = 700, dopo = 800) {
+export async function percorsoDaTratto(centro, a, b, { prima = 700, dopo = 800, ponte = true, rampa = true, galleria = false } = {}) {
   const g = await grafoAttorno(centro[0], centro[1], 1);
   const [ax, ay] = g.metri(...a);
   const [bx, by] = g.metri(...b);
-  let rampa = null;
+  let tratto = null;
   let bd = Infinity;
   for (const f of g.feats) {
-    if (!f.rampa || !f.ponte) continue;
+    if (f.cucita || !GUIDABILI.has(f.cls)) continue;
+    if ((ponte !== null && f.ponte !== ponte) || (rampa !== null && f.rampa !== rampa) || f.galleria !== galleria) continue;
     const p = g.nodi[f.nodi[0]];
     const q = g.nodi[f.nodi.at(-1)];
     const d = Math.hypot(p.x - ax, p.y - ay) + Math.hypot(q.x - bx, q.y - by);
     if (d < bd) {
       bd = d;
-      rampa = f;
+      tratto = f;
     }
   }
-  const grande = (i) => g.nodi[i].feats.some((fi) => !g.feats[fi].rampa && ['motorway', 'trunk'].includes(g.feats[fi].cls));
+  const grande = (i) => g.nodi[i].feats.some((fi) => !g.feats[fi].rampa && !g.feats[fi].galleria && STRADE_GRANDI.includes(g.feats[fi].cls));
   const scegli = ({ dist }, voluta) => {
     let meglio = -1;
     let bv = Infinity;
@@ -242,29 +276,56 @@ export async function percorsoDaRampa(centro, a, b, prima = 700, dopo = 800) {
     });
     return meglio;
   };
-  const inizio = rampa.nodi[0];
-  const fine = rampa.nodi.at(-1);
+  const inizio = tratto.nodi[0];
+  const fine = tratto.nodi.at(-1);
   const giu = distanze(g, inizio, true);
   const su = distanze(g, fine);
   const s = scegli(giu, prima);
   const e = scegli(su, dopo);
-  const catena = (prima2, da, a2) => {
-    const out = [];
-    for (let c = a2; c >= 0 && c !== da; c = prima2[c]) out.push(c);
-    out.push(da);
-    return out.reverse();
-  };
-  const avanti = catena(giu.prima, inizio, s).reverse();
-  const nodi = [...avanti, ...rampa.nodi.slice(1), ...catena(su.prima, fine, e).slice(1)];
-  const punti = [];
-  let lunghezza = 0;
-  let massima = 0;
-  nodi.forEach((i, j) => {
-    const n = g.nodi[i];
-    massima = Math.max(massima, n.h);
-    if (j) lunghezza += Math.hypot(n.x - g.nodi[nodi[j - 1]].x, n.y - g.nodi[nodi[j - 1]].y);
-    if (j && j < nodi.length - 1 && Math.hypot(n.x - punti.at(-1).x, n.y - punti.at(-1).y) < 15) return;
-    punti.push(n);
+  const nodi = [...catena(giu.prima, inizio, s).reverse(), ...tratto.nodi.slice(1), ...catena(su.prima, fine, e).slice(1)];
+  const r = daNodi(g, nodi, { inizio, fine });
+  return { ...r, metriTratto: r.metri.inizio, fineTratto: r.metri.fine };
+}
+
+/** Il percorso della rampa in quota fra [a] e [b] (vedi [percorsoDaTratto]). */
+export const percorsoDaRampa = (centro, a, b, prima, dopo) => percorsoDaTratto(centro, a, b, { prima, dopo });
+
+/**
+ * Un percorso su una strada [cls] (a terra, non una rampa) che passa per
+ * [punto]: [prima] metri prima e [dopo] metri dopo, nel suo senso di marcia.
+ * Per esempio sotto un cavalcavia.
+ */
+export async function percorsoAttraverso(centro, punto, { cls = 'motorway', prima = 450, dopo = 400 } = {}) {
+  const g = await grafoAttorno(centro[0], centro[1], 1);
+  const [px, py] = g.metri(...punto);
+  let meglio = -1;
+  let bd = Infinity;
+  g.nodi.forEach((n, i) => {
+    if (!n.feats.some((fi) => g.feats[fi].cls === cls && !g.feats[fi].rampa && !g.feats[fi].ponte)) return;
+    const d = Math.hypot(n.x - px, n.y - py);
+    if (d < bd) {
+      bd = d;
+      meglio = i;
+    }
   });
-  return { punti: punti.flatMap((n) => g.lonlat(n.x, n.y)), lunghezza, quotaMassima: massima, metriRampa: giu.dist[s] };
+  const sulla = (i) => g.nodi[i].feats.some((fi) => g.feats[fi].cls === cls && !g.feats[fi].rampa);
+  const scegli = ({ dist }, voluta) => {
+    let m = -1;
+    let bv = Infinity;
+    dist.forEach((d, i) => {
+      if (!Number.isFinite(d) || !sulla(i)) return;
+      if (Math.abs(d - voluta) < bv) {
+        bv = Math.abs(d - voluta);
+        m = i;
+      }
+    });
+    return m;
+  };
+  const giu = distanze(g, meglio, true);
+  const su = distanze(g, meglio);
+  const s = scegli(giu, prima);
+  const e = scegli(su, dopo);
+  const nodi = [...catena(giu.prima, meglio, s).reverse(), ...catena(su.prima, meglio, e).slice(1)];
+  const r = daNodi(g, nodi, { qui: meglio });
+  return { ...r, metriPunto: r.metri.qui };
 }

@@ -11,6 +11,10 @@ test('il livello: un ponte almeno 1, una galleria 0', () => {
   assert.equal(livelloStrada({ brunnel: 'bridge', layer: -1 }), 1);
   assert.equal(livelloStrada({ brunnel: 'tunnel', layer: -1 }), 0);
   assert.equal(livelloStrada({}), 0);
+  assert.equal(livelloStrada({ brunnel: 'bridge', layer: 0 }), 1, 'un ponte a layer 0 sta comunque in alto');
+  assert.equal(livelloStrada({ brunnel: 'bridge', layer: 'x' }), 1);
+  assert.equal(livelloStrada({ brunnel: 'bridge', layer: 9 }), 5);
+  assert.equal(livelloStrada({ layer: 1 }), 0, 'un layer senza ponte resta a terra');
   assert.equal(altezzaLivello(2), 2 * ALTEZZA_LIVELLO);
 });
 

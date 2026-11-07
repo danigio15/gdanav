@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import { generatore } from './caso.js';
-import { CAMPATA, PERIODO_STRADA, PIANO } from './tessera.js';
+import { CAMPATA, NASTRI, PERIODO_STRADA, PIANO } from './tessera.js';
 import { GIORNO, NOTTE, SOLE } from './tavolozza.js';
 
 const tela = (w, h) => {
@@ -24,12 +24,15 @@ function trama(c, ripeti = true) {
 }
 
 /** La trama d'asfalto di un tipo di strada, con le righe. */
-function tramaStrada(tipo, P, notte) {
+function tramaStrada(nome, P, notte) {
+  const ponte = nome.endsWith('-ponte');
+  const tipo = nome === 'galleria' ? 'plain' : nome.replace('-ponte', '');
   const W = 128;
   const H = 512;
   const c = tela(W, H);
   const g = c.getContext('2d');
-  g.fillStyle = tipo === 'motorway' || tipo === 'trunk' || tipo === 'ramp' ? P.asfaltoGrande : P.asfalto;
+  const grande = tipo === 'motorway' || tipo === 'trunk' || tipo === 'ramp';
+  g.fillStyle = ponte ? (grande ? P.asfaltoPonteGrande : P.asfaltoPonte) : grande ? P.asfaltoGrande : P.asfalto;
   g.fillRect(0, 0, W, H);
   const r = generatore(tipo.length * 977);
   for (let i = 0; i < 2600; i++) {
@@ -209,15 +212,19 @@ uniform float uPasso;
 uniform float uNotte;
 uniform float uInizio;
 uniform float uFrecce;
+uniform float uOpacita;
 varying vec2 vUv;
 varying float vLivello;
 void main() {
   float e = abs(vUv.x - 0.5) * 2.0;
+  // In galleria (+10): il percorso si vede «dentro», più tenue e tratteggiato.
+  float galleria = vLivello > 9.5 ? 1.0 : 0.0;
+  float livello = vLivello - galleria * 10.0;
   vec3 c = mix(uCore, uBordo, smoothstep(0.70, 0.80, e));
   c = mix(c, vec3(1.0), 0.18 * (1.0 - smoothstep(0.0, 0.45, e)));
   // La coda: una striscia in mezzo, il celeste ai lati (come in stile.dart).
-  if (vLivello > 0.5) {
-    vec3 coda = vLivello < 1.5 ? vec3(0.976, 0.659, 0.145) : vLivello < 2.5 ? vec3(0.937, 0.424, 0.0) : vLivello < 3.5 ? vec3(0.827, 0.184, 0.184) : vec3(0.482, 0.122, 0.122);
+  if (livello > 0.5) {
+    vec3 coda = livello < 1.5 ? vec3(0.976, 0.659, 0.145) : livello < 2.5 ? vec3(0.937, 0.424, 0.0) : livello < 3.5 ? vec3(0.827, 0.184, 0.184) : vec3(0.482, 0.122, 0.122);
     c = mix(c, coda, 1.0 - smoothstep(0.46, 0.52, e));
   }
   float w = abs(vUv.x - 0.5) * uLargo;
@@ -226,7 +233,8 @@ void main() {
   c = mix(c, vec3(1.0), chev * 0.92);
   float a = 1.0 - smoothstep(0.93, 1.0, e);
   a *= smoothstep(uInizio, uInizio + 6.0, vUv.y);
-  gl_FragColor = vec4(c * (1.0 + 0.35 * uNotte), a * 0.97);
+  a *= mix(1.0, 0.45 + 0.35 * step(0.5, fract(vUv.y / 8.0)), galleria);
+  gl_FragColor = vec4(c * (1.0 + 0.35 * uNotte), a * 0.97 * uOpacita);
   #include <colorspace_fragment>
 }`;
 
@@ -331,7 +339,11 @@ export class Scena {
       uNotte: { value: 0 },
       uInizio: { value: -1e9 },
       uFrecce: { value: 1 },
+      uOpacita: { value: 1 },
     };
+    // Il «fantasma» del percorso: lo stesso nastro, disegnato solo dove
+    // qualcosa ci sta davanti (un cavalcavia, un edificio), più tenue.
+    this.uniformiFantasma = { ...this.uniformiPercorso, uInizio: { value: -1e9 }, uOpacita: { value: 0.5 } };
     this.uniformiRisparmio = {
       uCore: { value: colore('#4ADE80') },
       uBordo: { value: colore('#166534') },
@@ -340,6 +352,7 @@ export class Scena {
       uNotte: { value: 0 },
       uInizio: { value: -1e9 },
       uFrecce: { value: 0 },
+      uOpacita: { value: 1 },
     };
     this.nastri = {};
     this.colorAuto = '#d62a26';
@@ -373,9 +386,12 @@ export class Scena {
 
   materiali(notte, P) {
     const m = {};
-    for (const tipo of ['motorway', 'trunk', 'ramp', 'primary1', 'primary2', 'tertiary', 'plain', 'rail']) {
+    for (const tipo of NASTRI) {
       m['strada-' + tipo] = new THREE.MeshLambertMaterial({ map: tramaStrada(tipo, P, notte), polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
     }
+    // La galleria: la strada che passa sotto, scura e un poco trasparente.
+    Object.assign(m['strada-galleria'], { transparent: true, opacity: notte ? 0.5 : 0.55, depthWrite: false });
+    m['strada-galleria'].color.set(notte ? 0x3a3f4a : 0x5d636c);
     m.opere = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     m.ombre = new THREE.MeshBasicMaterial({ color: 0x0c1220, transparent: true, opacity: P.ombra, depthWrite: true, depthFunc: THREE.LessDepth, fog: true });
     ['residenziale', 'uffici', 'industria'].forEach((s, i) => {
@@ -420,6 +436,9 @@ export class Scena {
     const nastro = (frammento, uniformi, extra = {}) =>
       new THREE.ShaderMaterial({ uniforms: uniformi, vertexShader: VERTICE_NASTRO, fragmentShader: frammento, transparent: true, depthWrite: false, ...extra });
     m.percorso = nastro(FRAMMENTO_NASTRO, this.uniformiPercorso, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+    m.percorsoFantasma = nastro(FRAMMENTO_NASTRO, this.uniformiFantasma, { depthFunc: THREE.GreaterDepth });
+    // L'auto sotto un ponte: la sua sagoma rossa, sempre in vista.
+    m.autoFantasma = new THREE.MeshBasicMaterial({ color: notte ? 0xff5a4f : 0xe0392f, transparent: true, opacity: 0.62, depthWrite: false, depthFunc: THREE.GreaterDepth, fog: false });
     m.alone = nastro(FRAMMENTO_ALONE, this.uniformiPercorso, { blending: notte ? THREE.AdditiveBlending : THREE.NormalBlending });
     m.freccia = nastro(FRAMMENTO_FRECCIA, {}, { polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
     m.punta = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false });
@@ -546,6 +565,10 @@ export class Scena {
       vecchio.geometry.dispose();
       delete this.nastri[nome];
     }
+    if (nome === 'percorso' && this.nastri.fantasma) {
+      this.mondo.remove(this.nastri.fantasma);
+      delete this.nastri.fantasma;
+    }
     if (!dati || !dati.indici.length) return;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(dati.posizioni, 3));
@@ -558,6 +581,15 @@ export class Scena {
     mesh.renderOrder = ordine;
     this.nastri[nome] = mesh;
     this.mondo.add(mesh);
+    if (nome === 'percorso') {
+      const vecchio2 = this.nastri.fantasma;
+      if (vecchio2) this.mondo.remove(vecchio2);
+      const f = new THREE.Mesh(g, this.mat.percorsoFantasma);
+      f.userData.materiale = 'percorsoFantasma';
+      f.renderOrder = 40;
+      this.nastri.fantasma = f;
+      this.mondo.add(f);
+    }
   }
 
   /** La punta della freccia di manovra in [x, y, z], girata come [dir]. */
@@ -647,6 +679,15 @@ export class Scena {
     dentro.add(coda);
     dentro.rotation.x = Math.PI / 2;
     g.add(dentro);
+    // La sagoma: le stesse forme, disegnate solo dove qualcosa copre l'auto.
+    const sagoma = new THREE.Group();
+    sagoma.rotation.x = Math.PI / 2;
+    for (const geo of [sotto, abitacolo, tetto]) {
+      const ms = new THREE.Mesh(geo, this.mat.autoFantasma);
+      ms.renderOrder = 41;
+      sagoma.add(ms);
+    }
+    g.add(sagoma);
     // L'ombra sotto l'auto, morbida.
     const sh = tela(64, 64);
     const sg = sh.getContext('2d');
@@ -679,7 +720,7 @@ export class Scena {
       g.rotation.copy(vecchia.rotation);
       this.mondo.remove(vecchia);
       vecchia.traverse((o) => {
-        if (o.isMesh) {
+        if (o.isMesh && o.material !== this.mat?.autoFantasma) {
           o.geometry.dispose();
           o.material.map?.dispose();
           o.material.dispose();
@@ -699,6 +740,52 @@ export class Scena {
     a.rotation.set(0, 0, 0);
     a.rotateZ(dir);
     a.rotateY(-pendenza);
+  }
+
+  /**
+   * I segni in quota: icone (autovelox, meta) e nomi dei ponti all'altezza
+   * dell'impalcato, sempre sopra (come i simboli di MapLibre), grandi uguali
+   * a ogni distanza. [segni]: `{chiave, x, y, z, immagine, w, h}` (w e h in
+   * punti dello schermo; l'immagine è una bitmap o una tela).
+   */
+  impostaSegni(segni) {
+    this.segni ??= new Map();
+    this.trameSegni ??= new Map();
+    const tieni = new Set();
+    for (const g of segni) {
+      tieni.add(g.chiave);
+      let sp = this.segni.get(g.chiave);
+      if (!sp) {
+        let t = this.trameSegni.get(g.immagine);
+        if (!t) {
+          t = new THREE.Texture(g.immagine);
+          t.colorSpace = THREE.SRGBColorSpace;
+          t.needsUpdate = true;
+          this.trameSegni.set(g.immagine, t);
+        }
+        sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, depthWrite: false, sizeAttenuation: false, transparent: true, fog: false }));
+        sp.center.set(0.5, g.centro ?? 0);
+        sp.renderOrder = 60;
+        this.segni.set(g.chiave, sp);
+        this.mondo.add(sp);
+      }
+      sp.position.set(g.x, g.y, g.z);
+      sp.userData.w = g.w;
+      sp.userData.h = g.h;
+    }
+    for (const [k, sp] of this.segni) {
+      if (tieni.has(k)) continue;
+      this.mondo.remove(sp);
+      sp.material.dispose();
+      this.segni.delete(k);
+    }
+  }
+
+  /** Le dimensioni dei segni per questo fotogramma ([p11] della proiezione, [alto] in punti). */
+  scalaSegni(p11, alto) {
+    if (!this.segni) return;
+    const k = 2 / (p11 * alto);
+    for (const sp of this.segni.values()) sp.scale.set(sp.userData.w * k, sp.userData.h * k, 1);
   }
 
   /** Quanti triangoli disegna adesso (le istanze contano ognuna). */

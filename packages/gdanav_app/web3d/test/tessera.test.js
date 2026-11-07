@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { LIMITI, TIPI_STRADA, costruisciTessera, stimaTriangoli, bufferDellaTessera } from '../src/tessera.js';
-import { cavalcavia } from './finte.js';
+import { LIMITI, NASTRI, costruisciTessera, stimaTriangoli, bufferDellaTessera } from '../src/tessera.js';
+import { cavalcavia, sottopasso } from './finte.js';
 
 const X = 8605;
 const Y = 5860;
@@ -9,11 +9,19 @@ const Y = 5860;
 test('una tessera con un cavalcavia: strade, ponte, piloni, edificio, alberi', () => {
   const t = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': cavalcavia() } });
   assert.equal(t.chiave, `14/${X}/${Y}`);
-  for (const k of Object.keys(t.strade)) assert.ok(TIPI_STRADA.includes(k));
+  for (const k of Object.keys(t.strade)) assert.ok(NASTRI.includes(k));
   assert.ok(t.strade.motorway, 'il nastro dell’autostrada');
+  assert.ok(t.strade['primary2-ponte'], 'il ponte ha il suo asfalto');
   assert.ok(t.opere && t.opere.indici.length > 0, 'parapetti e travi');
   assert.ok(t.capitelli.length / 16 > 3, 'i piloni sotto il ponte');
-  assert.equal(t.conti.edificiFatti, 1);
+  assert.equal(t.conti.edificiFatti, 2);
+  // Il capannone sotto il cavalcavia non buca l'impalcato.
+  const zTetti = [...t.tetti.posizioni].filter((_, k) => k % 3 === 2);
+  assert.ok(Math.max(...zTetti) < 12.5 && zTetti.some((z) => z < 5.2), `tetti ${Math.min(...zTetti)}..${Math.max(...zTetti)}`);
+  // Il nome del ponte, all'altezza dell'impalcato.
+  assert.equal(t.etichette.length, 1);
+  assert.equal(t.etichette[0].nome, 'Cavalcavia Bacula');
+  assert.ok(t.etichette[0].h > 6.5);
   assert.ok(t.conti.alberi > 10, 'gli alberi nel parco');
   // I segmenti: il ponte a 7 m sopra l’autostrada, che resta a terra.
   const s = t.segmenti;
@@ -57,4 +65,32 @@ test('i limiti: gli alberi non passano il tetto della tessera', () => {
 
 test('senza la tessera di mezzo non si fa niente', () => {
   assert.throws(() => costruisciTessera({ z: 14, x: X, y: Y, livelli: {} }));
+});
+
+test('sotto il cavalcavia: un pilone per lato della strada di sotto, nessuno sopra', () => {
+  const t = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': cavalcavia() } });
+  const ys = [];
+  for (let i = 0; i < t.fusti.length; i += 16) if (Math.abs(t.fusti[i + 12]) < 3) ys.push(t.fusti[i + 13]);
+  // L'autostrada è larga 11,5 m: i piloni a qualche metro dal bordo, da tutte e due le parti.
+  assert.ok(ys.some((y) => y > 6 && y < 13), `a nord (${ys})`);
+  assert.ok(ys.some((y) => y < -6 && y > -13), `a sud (${ys})`);
+  // E il ponte sopra ha la luce per passarci sotto: almeno 5 m fra l'asfalto e il ventre.
+  let ponte = 0;
+  for (let i = 0; i < t.segmenti.length; i += 8) {
+    if (t.segmenti[i + 7] & 32 && Math.abs(t.segmenti[i + 1]) < 8) ponte = Math.max(ponte, t.segmenti[i + 2]);
+  }
+  assert.ok(ponte - 1.8 - 0.24 >= 5, `luce sotto il cavalcavia: ${ponte - 1.8 - 0.24}`);
+});
+
+test('il sottopasso: un nastro di galleria, gli imbocchi, e i segmenti per il percorso', () => {
+  const t = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': sottopasso() } });
+  assert.ok(t.strade.galleria, 'il nastro della galleria');
+  assert.ok(t.opere && t.opere.indici.length / 3 >= 2 * (5 * 2 * 3 + 2), 'due imbocchi');
+  let galleria = 0;
+  for (let i = 0; i < t.segmenti.length; i += 8) if (t.segmenti[i + 7] & 64) galleria++;
+  assert.ok(galleria > 10);
+  // Sotto il viale: la galleria sta più in basso della strada che la copre.
+  const zg = Math.max(...[...t.strade.galleria.posizioni].filter((_, k) => k % 3 === 2));
+  const zv = Math.min(...[...t.strade.secondary === undefined ? t.strade.primary2.posizioni : t.strade.primary2.posizioni].filter((_, k) => k % 3 === 2));
+  assert.ok(zg < zv, `galleria ${zg} sotto la strada ${zv}`);
 });

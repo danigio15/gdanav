@@ -61,7 +61,11 @@ export class Costruttore {
     this.tri(ia, ib, ic);
   }
 
-  /** Un quadrilatero a-b-c-d (in giro), con quattro vertici e due triangoli. */
+  /**
+   * Un quadrilatero a-b-c-d (in giro), con quattro vertici e due triangoli.
+   * [cg]/[cn]: un colore per tutti, o quattro (uno per vertice: le ombre
+   * negli angoli del cemento).
+   */
   quad(a, b, c, d, n, cg, cn) {
     const ux = b[0] - a[0];
     const uy = b[1] - a[1];
@@ -73,7 +77,8 @@ export class Costruttore {
     const gy = uz * vx - ux * vz;
     const gz = ux * vy - uy * vx;
     const giro = gx * n[0] + gy * n[1] + gz * n[2] < 0;
-    const q = [a, b, c, d].map((p) => this.v(p[0], p[1], p[2], n[0], n[1], n[2], p[3] ?? 0, p[4] ?? 0, cg, cn));
+    const uno = (c, i) => (c && Array.isArray(c[0]) ? c[i] : c);
+    const q = [a, b, c, d].map((p, i) => this.v(p[0], p[1], p[2], n[0], n[1], n[2], p[3] ?? 0, p[4] ?? 0, uno(cg, i), uno(cn, i)));
     if (giro) {
       this.tri(q[0], q[2], q[1]);
       this.tri(q[0], q[3], q[2]);
