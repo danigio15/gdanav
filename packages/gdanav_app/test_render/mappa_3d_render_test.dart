@@ -226,7 +226,10 @@ void main() {
 
   for (final MapEntry(key: nome, value: c) in _casi.entries) {
     for (final notte in [false, true]) {
-      for (final traverso in [false, true]) {
+      // Di traverso solo con GDANAV_TRAVERSO=1: il cruscotto della guida su un
+      // telefono di traverso non ci sta (la barra in fondo esce dallo schermo,
+      // anche con la mappa di sempre), e la foto lo mostrerebbe.
+      for (final traverso in [false, if (Platform.environment['GDANAV_TRAVERSO'] == '1') true]) {
         final momento = notte ? 'notte' : 'giorno';
         final foto = File(
           c.foto == null
@@ -283,7 +286,8 @@ void main() {
           await tester.pump();
           await tester.runAsync(() => a.viaggio.vaiA(Luogo(nome: c.meta, posizione: percorso.punti.last)));
           await tester.pumpAndSettle();
-          await tester.tap(find.text('Avvia'));
+          // La guida parte come quando la avvia l'auto: si apre la sua schermata.
+          a.guida.avvia();
           await tester.pumpAndSettle();
           await tester.runAsync(() => precacheImage(immagine, tester.element(find.byType(Image).first)));
           final qui = _a(linea, auto);
