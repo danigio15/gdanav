@@ -37,8 +37,8 @@ bool get mappa3dPossibile {
   return WebViewPlatform.instance != null;
 }
 
-/// Solo per le prove e le immagini: fa credere che la WebView ci sia (o no).
-@visibleForTesting
+/// Solo per le prove e per le immagini del cruscotto (`test_render`): fa
+/// credere che la WebView ci sia (o no). `null`: si guarda davvero.
 bool? provaMappa3dPossibile;
 
 /// Perché il 3D si è fermato, e se ricordarlo (il telefono non ce la fa) o no

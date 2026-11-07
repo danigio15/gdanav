@@ -129,9 +129,9 @@ void lasciaAumentataConAvviso(BuildContext context, ControlloMappa controllo, St
         key: const Key('aumentato-non-va'),
         content: Row(
           children: [
-            const IconaAumentata(
+            IconaAumentata(
               dimensione: 22,
-              stile: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+              stile: TextStyle(color: Theme.of(context).colorScheme.onInverseSurface, fontWeight: FontWeight.w800),
             ),
             const SizedBox(width: 14),
             Expanded(child: Text(avvisoAumentatoNonVa(controllo.vista, ricorda: ricorda))),
@@ -162,24 +162,29 @@ class IconaAumentata extends StatelessWidget {
     return Semantics(
       label: '3D aumentato',
       excludeSemantics: true,
-      child: SizedBox(
-        width: dimensione * 1.3,
-        height: dimensione,
-        child: Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.center,
-          children: [
-            Text('3D', style: testo),
-            Positioned(
-              right: -dimensione * 0.12,
-              top: -dimensione * 0.12,
-              child: Icon(
-                Icons.auto_awesome_rounded,
-                size: dimensione * 0.5,
-                color: spenta ? testo.color : const Color(0xFFF2B01E),
+      // Larga quanto serve anche dove la si stira (l'icona di un dialogo).
+      child: Align(
+        widthFactor: 1,
+        heightFactor: 1,
+        child: SizedBox(
+          width: dimensione * 1.3,
+          height: dimensione,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              Text('3D', style: testo),
+              Positioned(
+                right: -dimensione * 0.12,
+                top: -dimensione * 0.12,
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  size: dimensione * 0.5,
+                  color: spenta ? testo.color : const Color(0xFFF2B01E),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

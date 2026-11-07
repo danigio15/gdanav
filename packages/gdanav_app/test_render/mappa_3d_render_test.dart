@@ -20,6 +20,9 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/gdanav_app.dart';
+import 'package:gdanav_app/mappa/controllo_mappa.dart';
+import 'package:gdanav_app/mappa/mappa_3d.dart' show provaMappa3dPossibile;
+import 'package:gdanav_app/mappa/scelta_vista.dart' show lasciaAumentataConAvviso;
 import 'package:gdanav_app/stato/gestore_posizione.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -259,6 +262,18 @@ void main() {
           tester.view.viewPadding = bordo;
           final byte = await tester.runAsync(() => foto.readAsBytes());
           final immagine = MemoryImage(byte!);
+          // La mappa di sempre (per quando il 3D aumentato si ferma, a Rho).
+          final fotoPrima = File('$collaudo/rho-telefono-prima-$momento.png');
+          final prima = nome == 'rho' && !traverso && fotoPrima.existsSync()
+              ? MemoryImage((await tester.runAsync(() => fotoPrima.readAsBytes()))!)
+              : null;
+          // Il telefono regge il 3D aumentato, ed è la vista scelta (il
+          // «prima» è la mappa di sempre, in 3D).
+          provaMappa3dPossibile = true;
+          addTearDown(() => provaMappa3dPossibile = null);
+          if (c.foto == null) await tester.runAsync(() => a.archivio.salvaVistaMappa(VistaMappa.aumentata));
+          BuildContext? contesto;
+          ControlloMappa? controllo;
           await tester.pumpWidget(
             RepaintBoundary(
               key: _chiave,
@@ -269,8 +284,20 @@ void main() {
                 viaggio: a.viaggio,
                 guida: a.guida,
                 segnalazioni: a.segnalazioni,
-                // La mappa 3D com'è sul telefono: qui la sua foto dal browser.
-                mappa: (_, _) => Image(image: immagine, fit: BoxFit.cover, gaplessPlayback: true),
+                // La mappa 3D com'è sul telefono: qui la sua foto dal browser;
+                // nelle altre viste la mappa di sempre (la sua foto).
+                mappa: (context, ctl) {
+                  contesto = context;
+                  controllo = ctl;
+                  return ListenableBuilder(
+                    listenable: ctl,
+                    builder: (_, _) => Image(
+                      image: ctl.vista == VistaMappa.aumentata || prima == null ? immagine : prima,
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                    ),
+                  );
+                },
               ),
             ),
           );
@@ -282,6 +309,9 @@ void main() {
           a.guida.avvia();
           await tester.pumpAndSettle();
           await tester.runAsync(() => precacheImage(immagine, tester.element(find.byType(Image).first)));
+          if (prima != null) {
+            await tester.runAsync(() => precacheImage(prima, tester.element(find.byType(Image).first)));
+          }
           final qui = _a(linea, auto);
           final rotta = rottaGradi(qui, _a(linea, auto + 10));
           a.posizione.avvia();
@@ -292,15 +322,48 @@ void main() {
             await tester.pump(const Duration(milliseconds: 300));
           }
           await tester.pump(const Duration(milliseconds: 500));
-          await tester.runAsync(() async {
+          Future<void> scrivi(String file) => tester.runAsync(() async {
             final confine = _chiave.currentContext!.findRenderObject()! as RenderRepaintBoundary;
             final img = await confine.toImage(pixelRatio: 2);
             final dati = await img.toByteData(format: ui.ImageByteFormat.png);
-            final f = File('$cartella/$nome-guida-${traverso ? 'orizzontale' : 'telefono'}-$momento.png');
+            final f = File('$cartella/$file');
             await f.parent.create(recursive: true);
             await f.writeAsBytes(dati!.buffer.asUint8List());
             debugPrint('scritto ${f.path}');
           });
+          await scrivi('$nome-guida-${traverso ? 'orizzontale' : 'telefono'}-$momento.png');
+          // A Rho anche: la scelta della vista aperta; il 3D aumentato che si
+          // ferma (l'avviso, e sotto la mappa di sempre); e la scelta dopo,
+          // con la voce spenta e il perché.
+          if (prima != null) {
+            final tasto = find.byKey(const Key('2d-3d')).hitTestable();
+            Future<void> scelta(String file) async {
+              await tester.tap(tasto);
+              await tester.pumpAndSettle();
+              await scrivi(file);
+              await tester.tapAt(const Offset(20, 600));
+              await tester.pumpAndSettle();
+            }
+
+            await scelta('rho-scelta-vista-telefono-$momento.png');
+            final ctx = contesto!;
+            if (!ctx.mounted) fail('la guida non c\'è più');
+            lasciaAumentataConAvviso(ctx, controllo!, 'lento', ricorda: true);
+            await tester.pump(const Duration(milliseconds: 300));
+            await tester.pump(const Duration(milliseconds: 300));
+            await scrivi('rho-aumentato-non-disponibile-telefono-$momento.png');
+            if (ctx.mounted) ScaffoldMessenger.of(ctx).removeCurrentSnackBar();
+            await tester.pumpAndSettle();
+            await scelta('rho-scelta-vista-spenta-telefono-$momento.png');
+            // Toccata la voce spenta: il perché, e «Riprova».
+            await tester.tap(tasto);
+            await tester.pumpAndSettle();
+            await tester.tap(find.byKey(const Key('vista-aumentata')));
+            await tester.pumpAndSettle();
+            await scrivi('rho-aumentato-riprova-telefono-$momento.png');
+            await tester.tap(find.text('Chiudi'));
+            await tester.pumpAndSettle();
+          }
           // Via la guida dallo schermo: i suoi orologi si fermano con lei.
           await tester.pumpWidget(const SizedBox());
           debugDisableShadows = true;
