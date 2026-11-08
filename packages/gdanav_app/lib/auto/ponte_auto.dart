@@ -15,6 +15,8 @@ import '../componenti/vista_svincolo.dart';
 import '../componenti/ztl.dart';
 import '../mappa/controllo_mappa.dart' show VistaMappa;
 import '../mappa/dati_viaggio.dart';
+import '../mappa/ponte_3d.dart' show chiamata3d;
+import '../mappa/regia_3d.dart';
 import '../mappa/segnaposto.dart';
 import '../mappa/stile.dart';
 import '../schermate/scheda_punto.dart';
@@ -203,6 +205,22 @@ class PonteAuto {
       case 'prova_guida':
         await provaDiGuida();
       // La sessione dell'auto è finita: la prova di guida pure.
+      // La scena 3D sullo schermo dell'auto (Scena3dAuto): come la vede
+      // l'auto (giorno o notte, la vista, quanto coprono le schede), e quello
+      // che la pagina dice.
+      case 'stato3d':
+        _stato3d = (
+          notte: a['notte'] == true,
+          vista: a['vista'] == 'immersiva' ? VistaMappa.immersiva : VistaMappa.inclinata,
+          sopra: (a['sopra'] as num?)?.toDouble() ?? 0,
+          sinistra: (a['sinistra'] as num?)?.toDouble() ?? 0,
+        );
+        _regia3d?.comandi();
+      case 'dalla3d':
+        (_regia3d ??= _nuovaRegia3d()).dallaMappa(a['testo'] as String? ?? '');
+      case 'chiusa3d':
+        _regia3d?.ferma();
+        _regia3d = null;
       case 'prova_fine':
         _conProva = false;
         _seguiProva();
@@ -454,6 +472,8 @@ class PonteAuto {
     guida.risparmio?.removeListener(_strada);
     _persone?.ferma();
     _persone = null;
+    _regia3d?.ferma();
+    _regia3d = null;
   }
 
   /// La strada proposta mandata all'auto, e il suo numero: la risposta
@@ -505,7 +525,49 @@ class PonteAuto {
     _aspetto3d = a;
     _stili();
     _posizione();
+    _vuoi3d();
   }
+
+  /* ── La scena 3D sull'auto ────────────────────────────────────────────
+   *
+   * «Certo, voglio la scena reale anche in macchina.» Col 3D aumentato
+   * scelto sul telefono, Android Auto nelle viste 3D e immersiva mostra la
+   * stessa pagina del telefono (viadotti, alberi, edifici, l'auto 3D) in una
+   * WebView sua (Scena3dAuto), al posto della mappa di MapLibre. I dati sono
+   * quelli del telefono, dalla stessa regia ([Regia3d]). Se la pagina non ce
+   * la fa (WebGL che manca, troppo lenta) l'auto torna alla mappa di sempre,
+   * e per questa sessione ci resta. */
+  Regia3d? _regia3d;
+  var _treDNonVa = false;
+  ({bool notte, VistaMappa vista, double sopra, double sinistra}) _stato3d = (
+    notte: false,
+    vista: VistaMappa.inclinata,
+    sopra: 0,
+    sinistra: 0,
+  );
+
+  void _vuoi3d() => _manda('web3d_vuoi', {'si': _aspetto3d && !_treDNonVa});
+
+  Regia3d _nuovaRegia3d() => Regia3d(
+    gestore: viaggio,
+    posizione: posizione,
+    guida: guida,
+    manda: (m) => _manda('web3d', {'js': chiamata3d(m)}),
+    notte: () => _stato3d.notte,
+    vista: () => _stato3d.vista,
+    inquadratura: () => (libera: false, sopra: _stato3d.sopra, sinistra: _stato3d.sinistra),
+    onNonVa: (motivo, {required ricorda}) {
+      _treDNonVa = true;
+      _regia3d?.ferma();
+      _regia3d = null;
+      _manda('web3d_no', {'motivo': motivo});
+      _vuoi3d();
+    },
+    segnalazioni: segnalazioni,
+    vicini: vicini,
+    persone: persone,
+    orologio: _ora,
+  )..avvia();
 
   void _stili() {
     String stile({required bool scuro, bool immersiva = false}) => jsonEncode(

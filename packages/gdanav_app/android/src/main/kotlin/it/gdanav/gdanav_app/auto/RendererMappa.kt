@@ -12,6 +12,7 @@ import android.hardware.display.VirtualDisplay
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.View
 import android.widget.FrameLayout
 import androidx.car.app.CarContext
 import androidx.car.app.SurfaceCallback
@@ -51,6 +52,11 @@ class RendererMappa(
 ) : SurfaceCallback {
     private var display: VirtualDisplay? = null
     private var presentazione: Presentation? = null
+    private var contenuto: FrameLayout? = null
+
+    /** La scena 3D vera ([Scena3dAuto]), quando c'è: al posto della mappa. */
+    private var scena: Scena3dAuto? = null
+    private var stato3dDetto: String? = null
     private var mappaView: MapView? = null
     private var pannello: PannelloAuto? = null
     private var freccia: FrecciaAuto? = null
@@ -158,6 +164,7 @@ class RendererMappa(
         }
         p.show()
         presentazione = p
+        this.contenuto = contenuto
         mappaView = vista
         pannello = sopra
         freccia = segnaposto
@@ -178,6 +185,8 @@ class RendererMappa(
         principale.removeCallbacks(torna)
         principale.removeCallbacks(chiudi)
         principale.removeCallbacks(contaTraffico)
+        chiudiScena()
+        contenuto = null
         /* La mappa rifatta segue l'auto: ferma dov'era, ripartirebbe dal
          * mezzo del mondo, e senza più il tempo che la riporta sull'auto. Il
          * punto della scheda, se è ancora aperta, resta acceso. */
@@ -255,6 +264,8 @@ class RendererMappa(
      * restano fermi, come vuole Android Auto per chi guida.
      */
     override fun onClick(x: Float, y: Float) {
+        // Con la scena 3D sotto il dito non c'è la mappa di MapLibre.
+        if (scena != null) return
         // Il tap sulla mappa arriva dal thread dell'host Android Auto: un
         // layer che nel frattempo e' stato ricreato, o una geometria POI
         // inattesa, non deve mai abbattere la sessione dell'auto.
@@ -295,18 +306,24 @@ class RendererMappa(
     // --- col dito o con la manopola -------------------------------------
 
     override fun onScroll(distanceX: Float, distanceY: Float) {
+        // Con la scena 3D la mappa sotto non si sposta: la scena segue l'auto.
+        if (scena != null) return
         val m = mappa ?: return
         liberaPerUnPo()
         m.scrollBy(-distanceX, -distanceY)
     }
 
     override fun onFling(velocityX: Float, velocityY: Float) {
+        // Con la scena 3D la mappa sotto non si sposta: la scena segue l'auto.
+        if (scena != null) return
         val m = mappa ?: return
         liberaPerUnPo()
         m.scrollBy(velocityX / 8f, velocityY / 8f, 300)
     }
 
     override fun onScale(focusX: Float, focusY: Float, scaleFactor: Float) {
+        // Con la scena 3D la mappa sotto non si sposta: la scena segue l'auto.
+        if (scena != null) return
         val m = mappa ?: return
         // Il doppio tocco arriva con un fattore negativo: si ingrandisce di uno.
         val passo = if (scaleFactor <= 0f) 1.0 else ln(scaleFactor.toDouble()) / ln(2.0)
@@ -459,6 +476,7 @@ class RendererMappa(
     /** Chiamata a ogni novità dal telefono. */
     fun aggiorna() {
         pannello?.aggiorna()
+        aggiornaScena()
         val m = mappa ?: return
         val immersiva = vista == Vista.IMMERSIVA
         val json = when {
@@ -488,6 +506,82 @@ class RendererMappa(
             return
         }
         stile?.let { aggiornaDati(m, it) }
+    }
+
+    // --- la scena 3D vera ------------------------------------------------
+
+    /*
+     * «Certo, voglio la scena reale anche in macchina.» Col 3D aumentato
+     * scelto sul telefono, nelle viste 3D e immersiva dell'auto c'è la scena
+     * della pagina 3D ([Scena3dAuto]) al posto di MapLibre: la mappa resta
+     * sotto, ferma e nascosta, e torna se la scena se ne va (vista 2D, 3D
+     * aumentato spento sul telefono, o la pagina che non ce la fa). Sopra
+     * restano il cruscotto e le schede di Android Auto.
+     */
+    private fun vuoleLaScena() =
+        !soloMappa && PonteAuto.vuole3d && !PonteAuto.nonVa3d && vista != Vista.PIATTA && presentazione != null
+
+    private fun aggiornaScena() {
+        val c = contenuto ?: return
+        if (!vuoleLaScena()) {
+            chiudiScena()
+            return
+        }
+        if (scena == null) {
+            val nuova = try {
+                Scena3dAuto(c.context, carContext.isDarkMode)
+            } catch (e: Exception) {
+                // Nessuna WebView su questo telefono: la mappa di sempre.
+                PonteAuto.nonVa3d = true
+                return
+            }
+            val tutto = FrameLayout.LayoutParams.MATCH_PARENT
+            // Sopra la mappa, sotto il segnaposto e il cruscotto.
+            c.addView(nuova.vista, 1, FrameLayout.LayoutParams(tutto, tutto))
+            scena = nuova
+            PonteAuto.scena3d = { js -> nuova.esegui(js) }
+            spegniFotogrammi()
+            freccia?.nascondi()
+            mappaView?.visibility = View.INVISIBLE
+            stato3dDetto = null
+            principale.removeCallbacks(attesaScena)
+            principale.postDelayed(attesaScena, ATTESA_SCENA_MS)
+        }
+        diciLoStato3d()
+    }
+
+    /** La pagina non ha detto niente in tempo: per questa sessione la mappa di sempre. */
+    private val attesaScena = Runnable {
+        if (scena?.haParlato == false) {
+            PonteAuto.nonVa3d = true
+            chiudiScena()
+            aggiorna()
+        }
+    }
+
+    private fun chiudiScena() {
+        principale.removeCallbacks(attesaScena)
+        val s = scena ?: return
+        scena = null
+        PonteAuto.scena3d = null
+        contenuto?.removeView(s.vista)
+        s.distruggi()
+        mappaView?.visibility = View.VISIBLE
+        stato3dDetto = null
+        PonteAuto.chiusa3d()
+    }
+
+    /** Alla regia: giorno o notte, la vista, quanto coprono le schede (in punti della pagina). */
+    private fun diciLoStato3d() {
+        val a = areaLibera()
+        val notte = carContext.isDarkMode
+        val v = if (vista == Vista.IMMERSIVA) "immersiva" else "inclinata"
+        val sopra = (a.top / densita).toDouble()
+        val sinistra = (a.left / densita).toDouble()
+        val chiave = "$notte|$v|$sopra|$sinistra"
+        if (chiave == stato3dDetto) return
+        stato3dDetto = chiave
+        PonteAuto.stato3d(notte, v, sopra, sinistra)
     }
 
     private val sorgentiCaricate = HashMap<String, String>()
@@ -619,6 +713,12 @@ class RendererMappa(
 
     /** Una novità dal telefono: la posizione, e la telecamera che si vuole. */
     private fun muovi(m: MapLibreMap) {
+        // Con la scena 3D la mappa sta ferma sotto: la telecamera la muove la pagina.
+        if (scena != null) {
+            spegniFotogrammi()
+            freccia?.nascondi()
+            return
+        }
         val qui = PonteAuto.qui
         if (qui == null) {
             spegniFotogrammi()
@@ -884,6 +984,9 @@ class RendererMappa(
 
         /** Ogni quanto, in guida, il percorso si riscrive comunque. */
         private const val RISCRIVI_PERCORSO_MS = 25_000L
+
+        /** Se la pagina 3D non dice niente entro questo tempo, la mappa di sempre. */
+        private const val ATTESA_SCENA_MS = 20_000L
 
         /** Il tetto dei fotogrammi della mappa sull'auto. */
         private const val FPS_MASSIMI = 30
