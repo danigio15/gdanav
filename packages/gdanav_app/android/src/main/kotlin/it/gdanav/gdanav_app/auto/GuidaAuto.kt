@@ -162,11 +162,12 @@ class GuidaAuto(private val context: Context) {
     companion object {
         /**
          * La riga dell'auto nella scheda dell'arrivo, sotto tempo, ora e km:
-         * «🔋 51% · 200 km · all'arrivo 46% · ☀ 12° · pedaggio ~12,40 €».
+         * «🔋 51% · 200 km · arrivo 46% · ☀ 12° · pedaggio ~12,40 €».
          *
          * «Non mi piace la predisposizione batteria: ingloba in km residui e
          * tempo di arrivo», e poi «togli anche il simbolo del meteo e ingloba
-         * nel quadrato». Stava in una barra sopra la mappa, accanto al
+         * nel quadrato». «Arrivo» e non «all'arrivo»: la scheda è stretta, e
+         * la riga deve starci intera. Stava in una barra sopra la mappa, accanto al
          * tachimetro, e copriva la strada; adesso è una riga della scheda
          * che Android Auto disegna già. La batteria all'arrivo in verde (in
          * rosso sotto il 10%), il pedaggio in ambra come sul telefono; i
@@ -189,7 +190,7 @@ class GuidaAuto(private val context: Context) {
                 c.autonomiaKm?.let { pezzo("$circa${it.roundToInt()} km") }
                 c.arrivoBatteria?.let { v ->
                     if (testo.isNotEmpty()) testo.append(" · ")
-                    testo.append("all'arrivo ")
+                    testo.append("arrivo ")
                     val da = testo.length
                     testo.append("${v.roundToInt()}%")
                     testo.setSpan(
