@@ -108,6 +108,9 @@ export const CASI = {
   },
 };
 
+/** Il pannello del cruscotto di traverso su 844×390 col bordo di 47 (come `_larghezzaPannello` in schermata_guida.dart). */
+const PANNELLO_TRAVERSO = Math.min(460, Math.max(340, 844 * 0.46)) + 47;
+
 const { chromium } = await playwright();
 const { porta, chiudi } = await servitore();
 const browser = await chromium.launch({ args: ARGOMENTI_CHROMIUM });
@@ -232,7 +235,7 @@ for (const [chiave, caso] of Object.entries(CASI)) {
     await ctx.close();
     // Il telefono di traverso.
     if (caso.orizzontale && !soloViste) {
-      const o = await apri(browser, { porta, cartella: uscita, rotta, caso: c, notte, nome: `${nome}-orizzontale`, larghezza: 844, altezza: 390 });
+      const o = await apri(browser, { porta, cartella: uscita, rotta, caso: c, notte, nome: `${nome}-orizzontale`, larghezza: 844, altezza: 390, sinistra: PANNELLO_TRAVERSO });
       await o.posizione(metri, 0);
       await aspetta(o.page);
       await o.page.waitForTimeout(2500);

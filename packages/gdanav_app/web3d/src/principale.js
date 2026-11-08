@@ -48,7 +48,7 @@ const S = {
   risparmio: null,
   posizione: null,
   zoomVoluto: null,
-  camera: { modo: 'segui', sopra: 0, riquadro: null },
+  camera: { modo: 'segui', sopra: 0, sinistra: 0, riquadro: null },
   pausa: false,
   grezze: new Map(),
   costruite: new Map(),
@@ -171,7 +171,7 @@ const GESTORI = {
   },
   camera(m) {
     const prima = S.camera.modo;
-    S.camera = { modo: m.modo, sopra: m.sopra ?? S.camera.sopra, riquadro: m.riquadro ?? null };
+    S.camera = { modo: m.modo, sopra: m.sopra ?? S.camera.sopra, sinistra: m.sinistra ?? S.camera.sinistra ?? 0, riquadro: m.riquadro ?? null };
     if (m.modo === 'segui' && prima !== 'segui') S.transizione = { da: performance.now(), dur: 900, partenza: null };
     if (m.modo === 'panoramica' && m.riquadro && S.mappa) {
       const [s, o, n, e] = m.riquadro;
@@ -1146,7 +1146,7 @@ function muovi(adesso, dt) {
     c.quota = smorza(c.quota, z, dt, 300);
     c.pitch = smorza(c.pitch, vista.pitch, dt, 600);
     const H = m.getCanvas().clientHeight;
-    let voluta = { center: [lon, lat], zoom: c.zoom, pitch: c.pitch, bearing: c.rotta, padding: { top: H * 0.12 + S.camera.sopra * 0.8, bottom: 0, left: 0, right: 0 } };
+    let voluta = { center: [lon, lat], zoom: c.zoom, pitch: c.pitch, bearing: c.rotta, padding: { top: H * 0.12 + S.camera.sopra * 0.8, bottom: 0, left: S.camera.sinistra ?? 0, right: 0 } };
     const tr = S.transizione;
     if (tr) {
       tr.partenza ??= { center: m.getCenter().toArray(), zoom: m.getZoom(), pitch: m.getPitch(), bearing: m.getBearing() };

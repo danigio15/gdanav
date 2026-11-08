@@ -38,6 +38,7 @@ const CONTROLLI = {
   camera: (m) =>
     ['segui', 'libera', 'panoramica'].includes(m.modo) &&
     (m.sopra === undefined || numero(m.sopra)) &&
+    (m.sinistra === undefined || numero(m.sinistra)) &&
     (m.riquadro === undefined || (Array.isArray(m.riquadro) && m.riquadro.length === 4 && m.riquadro.every(numero))),
   pausa: (m) => typeof m.si === 'boolean',
 };

@@ -92,18 +92,37 @@ class _SchermataGuidaState extends State<SchermataGuida> {
 
   /// Col popup dello svincolo aperto la mappa sposta giù l'auto: la strada
   /// che arriva resta in vista sotto il popup.
+  ///
+  /// Di traverso il popup sta nel pannello a sinistra, col resto del
+  /// cruscotto: la mappa mette l'auto nel mezzo della parte libera a destra.
   void _copri(BuildContext context, GestoreGuida g) {
-    final alto = _svincolo(g) == null
+    final traverso = _traverso(context);
+    final alto = _svincolo(g) == null || traverso
         ? 0.0
         : MediaQuery.paddingOf(context).top +
               8 +
               72 +
               PopupSvincolo.larghezzaSu(MediaQuery.sizeOf(context).width) * 9 / 16;
-    if ((alto - controllo.coperto).abs() < 1) return;
+    final sinistra = traverso ? _larghezzaPannello(context) : 0.0;
+    if ((alto - controllo.coperto).abs() < 1 && (sinistra - controllo.copertoSinistra).abs() < 1) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) controllo.copriAlto(alto);
+      if (!mounted) return;
+      controllo.copriAlto(alto);
+      controllo.copriSinistra(sinistra);
     });
   }
+
+  /// Il telefono (o il tablet) di traverso: il cruscotto in un pannello a
+  /// sinistra, la mappa a destra. In verticale la manovra in alto e la barra
+  /// in fondo, come sempre.
+  static bool _traverso(BuildContext context) {
+    final d = MediaQuery.sizeOf(context);
+    return d.width > d.height * 1.15;
+  }
+
+  /// Quanto è largo il pannello di sinistra, di traverso (col bordo sicuro).
+  static double _larghezzaPannello(BuildContext context) =>
+      (MediaQuery.sizeOf(context).width * 0.46).clamp(340.0, 460.0) + MediaQuery.paddingOf(context).left;
 
   /// Ridisegna ogni secondo il tachimetro e l'avviso del GPS: il GPS può
   /// tacere (da fermi, o perché il flusso si è perso), e quando tace nessuno
@@ -231,136 +250,127 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                 _copri(context, g);
                 final risparmio = g.risparmio;
                 final strada = risparmio?.proposta;
-                return Column(
-                  children: [
-                    // In alto la manovra; avvicinandosi a un'uscita o a un
-                    // bivio, al suo posto il popup con lo svincolo in 3D.
-                    SafeArea(
-                      bottom: false,
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 280),
-                        transitionBuilder: (figlio, animazione) => SizeTransition(
-                          sizeFactor: animazione,
-                          alignment: Alignment.topCenter,
-                          child: FadeTransition(opacity: animazione, child: figlio),
-                        ),
-                        child: switch ((_svincolo(g), g.pronto)) {
-                          ((final m, final metri), final p?) => PopupSvincolo(
-                            key: ValueKey(m.inizio),
-                            viaggio: p.viaggio,
-                            manovra: m,
-                            metri: metri,
-                            onChiudi: () => setState(() => _svincoliChiusi.add(m.inizio)),
+                final traverso = _traverso(context);
+                // In alto la manovra; avvicinandosi a un'uscita o a un
+                // bivio, al suo posto il popup con lo svincolo in 3D.
+                final alto = SafeArea(
+                  bottom: false,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 280),
+                    transitionBuilder: (figlio, animazione) => SizeTransition(
+                      sizeFactor: animazione,
+                      alignment: Alignment.topCenter,
+                      child: FadeTransition(opacity: animazione, child: figlio),
+                    ),
+                    child: switch ((_svincolo(g), g.pronto)) {
+                      ((final m, final metri), final p?) => PopupSvincolo(
+                        key: ValueKey(m.inizio),
+                        viaggio: p.viaggio,
+                        manovra: m,
+                        metri: metri,
+                        onChiudi: () => setState(() => _svincoliChiusi.add(m.inizio)),
+                      ),
+                      _ => _Banner(key: const ValueKey('banner'), guida: g),
+                    },
+                  ),
+                );
+                final avvisi = <Widget>[
+                  if (widget.posizione.tace()) const _GpsAssente(),
+                  if (_ztl?.avviso case final z?) _AvvisoZtl(avviso: z),
+                  if (_avvisi?.davanti case (final s, final m)) AvvisoSegnalazione(segnalazione: s, metri: m),
+                  if (_avvisi?.tutor case final t?) AvvisoTutor(stato: t),
+                  if (_avvisi?.passata case final s?)
+                    _Ancora(
+                      segnalazione: s,
+                      onSi: () => _avvisi!.rispondi(s, true),
+                      onNo: () => _avvisi!.rispondi(s, false),
+                    ),
+                  if (g.proposta case final testo?) _Proposta(testo: testo, onSi: g.ricalcolaOra, onNo: g.lasciaCosi),
+                  // Finita una ricarica per strada: quanto si è speso.
+                  if (g.daChiedere case final i? when i < g.ricaricheInViaggio.length)
+                    QuantoHaiSpeso(
+                      ricarica: g.ricaricheInViaggio[i],
+                      onSalva: (euro) => g.pagaRicarica(i, euro),
+                      onDopo: g.nonOra,
+                    ),
+                ];
+                // Di lato, la striscia del traffico, se davanti c'è qualche coda.
+                final Widget striscia = switch (g.pronto?.viaggio.percorso) {
+                  // Le etichette tornano col «+N min di traffico» in basso.
+                  final p? => switch (strisciaTraffico(
+                    p,
+                    percorsiM: g.avanzamento?.percorsiM ?? 0,
+                  )?.allineataA(g.minutiDiTraffico, g.ritardoDavanti)) {
+                    final s? => Padding(
+                      padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
+                      child: StrisciaTrafficoLaterale(striscia: s),
+                    ),
+                    _ => const SizedBox.shrink(),
+                  },
+                  _ => const SizedBox.shrink(),
+                };
+                final comandi = Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                  child: ListenableBuilder(
+                    listenable: controllo,
+                    builder: (context, _) => Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Mappa spostata o allontanata: si torna sull'auto.
+                        // Sopra la riga: accanto al tachimetro grande non
+                        // ci sta su un telefono stretto.
+                        if (controllo.libera) ...[
+                          FilledButton.icon(
+                            key: const Key('riprendi'),
+                            onPressed: controllo.segui,
+                            icon: const Icon(Icons.navigation),
+                            label: const Text('Riprendi'),
                           ),
-                          _ => _Banner(key: const ValueKey('banner'), guida: g),
-                        },
-                      ),
-                    ),
-                    // Si riguarda a ogni battito: il silenzio non avvisa.
-                    if (widget.posizione.tace()) const _GpsAssente(),
-                    if (_ztl?.avviso case final z?) _AvvisoZtl(avviso: z),
-                    if (_avvisi?.davanti case (final s, final m)) AvvisoSegnalazione(segnalazione: s, metri: m),
-                    if (_avvisi?.tutor case final t?) AvvisoTutor(stato: t),
-                    if (_avvisi?.passata case final s?)
-                      _Ancora(
-                        segnalazione: s,
-                        onSi: () => _avvisi!.rispondi(s, true),
-                        onNo: () => _avvisi!.rispondi(s, false),
-                      ),
-                    if (g.proposta case final testo?) _Proposta(testo: testo, onSi: g.ricalcolaOra, onNo: g.lasciaCosi),
-                    // Finita una ricarica per strada: quanto si è speso.
-                    if (g.daChiedere case final i? when i < g.ricaricheInViaggio.length)
-                      QuantoHaiSpeso(
-                        ricarica: g.ricaricheInViaggio[i],
-                        onSalva: (euro) => g.pagaRicarica(i, euro),
-                        onDopo: g.nonOra,
-                      ),
-                    // Lo spazio libero sopra il tachimetro: di lato, la
-                    // striscia del traffico, se davanti c'è qualche coda. Il
-                    // resto lascia passare i tocchi alla mappa.
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: switch (g.pronto?.viaggio.percorso) {
-                          // Le etichette tornano col «+N min di traffico» in basso.
-                          final p? => switch (strisciaTraffico(
-                            p,
-                            percorsiM: g.avanzamento?.percorsiM ?? 0,
-                          )?.allineataA(g.minutiDiTraffico, g.ritardoDavanti)) {
-                            final s? => Padding(
-                              padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
-                              child: StrisciaTrafficoLaterale(striscia: s),
-                            ),
-                            _ => const SizedBox.shrink(),
-                          },
-                          _ => const SizedBox.shrink(),
-                        },
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-                      child: ListenableBuilder(
-                        listenable: controllo,
-                        builder: (context, _) => Column(
-                          mainAxisSize: MainAxisSize.min,
+                          const SizedBox(height: 10),
+                        ],
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            // Mappa spostata o allontanata: si torna sull'auto.
-                            // Sopra la riga: accanto al tachimetro grande non
-                            // ci sta su un telefono stretto.
-                            if (controllo.libera) ...[
-                              FilledButton.icon(
-                                key: const Key('riprendi'),
-                                onPressed: controllo.segui,
-                                icon: const Icon(Icons.navigation),
-                                label: const Text('Riprendi'),
-                              ),
-                              const SizedBox(height: 10),
-                            ],
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
+                            // Quella di adesso: col GPS muto da qualche
+                            // secondo è zero, non l'ultima letta.
+                            Tachimetro(
+                              velocitaKmh: widget.posizione.velocitaAdesso(),
+                              limiteKmh: g.avanzamento?.limiteKmh,
+                            ),
+                            const Spacer(),
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                // Quella di adesso: col GPS muto da qualche
-                                // secondo è zero, non l'ultima letta.
-                                Tachimetro(
-                                  velocitaKmh: widget.posizione.velocitaAdesso(),
-                                  limiteKmh: g.avanzamento?.limiteKmh,
+                                Vetro(
+                                  raggio: 28,
+                                  child: SceltaVista(key: const Key('2d-3d'), controllo: controllo),
                                 ),
-                                const Spacer(),
-                                Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Vetro(
-                                      raggio: 28,
-                                      child: SceltaVista(key: const Key('2d-3d'), controllo: controllo),
+                                // Auto termica: un distributore per strada, e poi si prosegue.
+                                if (g.pronto?.termica ?? false) ...[
+                                  const SizedBox(height: 12),
+                                  BottoneDistributori(
+                                    onTap: () => mostraDistributori(
+                                      context,
+                                      qui: g.avanzamento?.posizioneSulPercorso ?? widget.posizione.qui,
+                                      inGuida: true,
+                                      carburante: g.auto.carburante,
+                                      onScegli: g.passaDa,
                                     ),
-                                    // Auto termica: un distributore per strada, e poi si prosegue.
-                                    if (g.pronto?.termica ?? false) ...[
-                                      const SizedBox(height: 12),
-                                      BottoneDistributori(
-                                        onTap: () => mostraDistributori(
-                                          context,
-                                          qui: g.avanzamento?.posizioneSulPercorso ?? widget.posizione.qui,
-                                          inGuida: true,
-                                          carburante: g.auto.carburante,
-                                          onScegli: g.passaDa,
-                                        ),
-                                      ),
-                                    ],
-                                    const SizedBox(height: 12),
-                                    if (widget.segnalazioni case final seg?)
-                                      BottoneSegnala(onTap: () => mostraSegnala(context, seg)),
-                                  ],
-                                ),
+                                  ),
+                                ],
+                                const SizedBox(height: 12),
+                                if (widget.segnalazioni case final seg?)
+                                  BottoneSegnala(onTap: () => mostraSegnala(context, seg)),
                               ],
                             ),
                           ],
                         ),
-                      ),
+                      ],
                     ),
-                    // Una strada a risparmio (o più rapida): sopra la barra
-                    // in basso, e la strada verde sulla mappa.
-                    if (risparmio != null && strada != null)
-                      PropostaRisparmio(
+                  ),
+                );
+                final Widget? proposta = risparmio != null && strada != null
+                    ? PropostaRisparmio(
                         proposta: strada,
                         unita: risparmio.unita,
                         elettrica: g.auto.elettrica,
@@ -376,7 +386,39 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                         },
                         onPrendi: g.prendiStrada,
                         onResta: g.restaQui,
-                      ),
+                      )
+                    : null;
+                if (traverso) {
+                  return _DiTraverso(
+                    larghezza: _larghezzaPannello(context),
+                    alto: alto,
+                    avvisi: [...avvisi, ?proposta],
+                    striscia: striscia,
+                    comandi: comandi,
+                    // Basso (un telefono): la barra stretta, e col popup dello
+                    // svincolo aperto solo arrivo, strada e tasti.
+                    fondo: _Fondo(
+                      guida: g,
+                      onFine: _fine,
+                      compatto: MediaQuery.sizeOf(context).height < 560,
+                      ridotto: MediaQuery.sizeOf(context).height < 560 && _svincolo(g) != null,
+                    ),
+                  );
+                }
+                return Column(
+                  children: [
+                    alto,
+                    ...avvisi,
+                    // Lo spazio libero sopra il tachimetro: di lato la
+                    // striscia del traffico. Il resto lascia passare i tocchi
+                    // alla mappa.
+                    Expanded(
+                      child: Align(alignment: Alignment.centerRight, child: striscia),
+                    ),
+                    comandi,
+                    // Una strada a risparmio (o più rapida): sopra la barra
+                    // in basso, e la strada verde sulla mappa.
+                    ?proposta,
                     _Fondo(guida: g, onFine: _fine),
                   ],
                 );
@@ -401,6 +443,76 @@ class _SchermataGuidaState extends State<SchermataGuida> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Il cruscotto della guida di traverso: a sinistra, in un pannello largo
+/// [larghezza], la manovra (o il popup dello svincolo) con le corsie, gli
+/// avvisi e in fondo la barra dell'arrivo; a destra la mappa libera, con la
+/// striscia del traffico e in basso tachimetro, vista e segnalazioni. Quello
+/// che non ci sta in altezza nel pannello scorre, non esce dallo schermo.
+class _DiTraverso extends StatelessWidget {
+  const _DiTraverso({
+    required this.larghezza,
+    required this.alto,
+    required this.avvisi,
+    required this.striscia,
+    required this.comandi,
+    required this.fondo,
+  });
+
+  final double larghezza;
+  final Widget alto;
+  final List<Widget> avvisi;
+  final Widget striscia;
+  final Widget comandi;
+  final Widget fondo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned(
+          key: const Key('pannello-traverso'),
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: larghezza,
+          child: SafeArea(
+            right: false,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: SingleChildScrollView(
+                    physics: const ClampingScrollPhysics(),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [alto, ...avvisi]),
+                  ),
+                ),
+                fondo,
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          left: larghezza,
+          top: 0,
+          right: 0,
+          bottom: 0,
+          child: SafeArea(
+            left: false,
+            child: Column(
+              children: [
+                Expanded(
+                  child: Align(alignment: Alignment.centerRight, child: striscia),
+                ),
+                comandi,
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -864,9 +976,16 @@ class _Banner extends StatelessWidget {
 }
 
 class _Fondo extends StatelessWidget {
-  const _Fondo({required this.guida, required this.onFine});
+  const _Fondo({required this.guida, required this.onFine, this.compatto = false, this.ridotto = false});
   final GestoreGuida guida;
   final VoidCallback onFine;
+
+  /// Di traverso su un telefono: meno margini.
+  final bool compatto;
+
+  /// Solo la prima riga (arrivo, strada, tasti): di traverso col popup dello
+  /// svincolo aperto non ci sta altro.
+  final bool ridotto;
 
   @override
   Widget build(BuildContext context) {
@@ -886,14 +1005,15 @@ class _Fondo extends StatelessWidget {
     final coloreTraffico = gravitaRitardo(traffico) >= 2
         ? ColoriGdanav.di(context).guasta
         : ColoriGdanav.di(context).piena;
+    final divisore = compatto ? 12.0 : 20.0;
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(compatto ? 8 : 12),
         child: Vetro(
           raggio: 24,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 12, 14),
+            padding: compatto ? const EdgeInsets.fromLTRB(16, 9, 10, 9) : const EdgeInsets.fromLTRB(18, 14, 12, 14),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -990,9 +1110,9 @@ class _Fondo extends StatelessWidget {
                   ],
                 ),
                 // Con l'auto termica niente batteria: solo arrivo e strada.
-                if (!(p?.soloPercorso ?? false)) ...[const Divider(height: 20), _Batteria(guida: guida)],
-                if (sosta != null) ...[
-                  const Divider(height: 20),
+                if (!(p?.soloPercorso ?? false) && !ridotto) ...[Divider(height: divisore), _Batteria(guida: guida)],
+                if (sosta != null && !ridotto) ...[
+                  Divider(height: divisore),
                   Row(
                     children: [
                       Icon(Icons.ev_station, color: ColoriGdanav.di(context).libera),

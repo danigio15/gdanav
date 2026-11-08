@@ -104,6 +104,7 @@ class _Mappa3dState extends State<Mappa3d> {
   DateTime? _lettaMandata;
   ModoCamera3d? _modoMandato;
   double? _sopraMandato;
+  double? _sinistraMandata;
   VistaMappa? _vistaMandata;
   Segnaposto? _segnapostoMandato;
   Viaggio? _panoramicaDi;
@@ -352,10 +353,11 @@ class _Mappa3dState extends State<Mappa3d> {
     final c = widget.controllo;
     final modo = c.libera ? ModoCamera3d.libera : ModoCamera3d.segui;
     if (_panoramicaDi != null && !forza) return;
-    if (!forza && modo == _modoMandato && c.coperto == _sopraMandato) return;
+    if (!forza && modo == _modoMandato && c.coperto == _sopraMandato && c.copertoSinistra == _sinistraMandata) return;
     _modoMandato = modo;
     _sopraMandato = c.coperto;
-    _manda(msgCamera(modo, sopra: c.coperto));
+    _sinistraMandata = c.copertoSinistra;
+    _manda(msgCamera(modo, sopra: c.coperto, sinistra: c.copertoSinistra));
   }
 
   void _segnalazioni() {

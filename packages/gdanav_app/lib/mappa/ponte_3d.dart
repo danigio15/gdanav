@@ -126,11 +126,13 @@ enum ModoCamera3d { segui, libera, panoramica }
 /// La telecamera: segue l'auto, è libera (un dito l'ha spostata), o mostra
 /// tutta la strada ([riquadro]: sud, ovest, nord, est). [sopra]: quanto alto
 /// copre un popup (in punti).
-Map<String, Object?> msgCamera(ModoCamera3d modo, {double sopra = 0, (Punto, Punto)? riquadro}) => _m('camera', {
-  'modo': modo.name,
-  'sopra': sopra,
-  if (riquadro case (final so, final ne)?) 'riquadro': [so.lat, so.lon, ne.lat, ne.lon],
-});
+Map<String, Object?> msgCamera(ModoCamera3d modo, {double sopra = 0, double sinistra = 0, (Punto, Punto)? riquadro}) =>
+    _m('camera', {
+      'modo': modo.name,
+      'sopra': sopra,
+      if (sinistra > 0) 'sinistra': sinistra,
+      if (riquadro case (final so, final ne)?) 'riquadro': [so.lat, so.lon, ne.lat, ne.lon],
+    });
 
 /// L'app va in secondo piano (o torna): la mappa smette di disegnare.
 Map<String, Object?> msgPausa(bool si) => _m('pausa', {'si': si});

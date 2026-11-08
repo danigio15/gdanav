@@ -63,7 +63,7 @@ export function lungo(punti, metri) {
  * Apre la pagina per [caso] (`{punti, code, manovra}`) e le manda tutto;
  * restituisce `{page, ctx, manda, posizione, messaggi}`.
  */
-export async function apri(browser, { porta, cartella, rotta, caso, notte, larghezza = 390, altezza = 844, vista = 'inclinata', nome }) {
+export async function apri(browser, { porta, cartella, rotta, caso, notte, larghezza = 390, altezza = 844, vista = 'inclinata', nome, sinistra = 0 }) {
   const ctx = await browser.newContext({ viewport: { width: larghezza, height: altezza }, deviceScaleFactor: 2 });
   await ctx.route(/https:\/\/(tiles\.openfreemap\.org|api\.tomtom\.com)\/.*/, async (route) => {
     try {
@@ -106,7 +106,8 @@ export async function apri(browser, { porta, cartella, rotta, caso, notte, largh
     const p = lungo(punti, metri);
     await manda({ tipo: 'posizione', lat: p[1], lon: p[0], rotta: p[2], metri, velocita: v, zoom: caso.zoom ?? 17.9, quando });
   };
-  await manda({ tipo: 'camera', modo: 'segui', sopra: 0 });
+  // Di traverso il cruscotto copre la sinistra: l'auto nella parte libera.
+  await manda({ tipo: 'camera', modo: 'segui', sopra: 0, sinistra });
   return { page, ctx, manda, posizione, messaggi, errori };
 }
 

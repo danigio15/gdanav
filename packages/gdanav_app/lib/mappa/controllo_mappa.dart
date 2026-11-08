@@ -213,6 +213,16 @@ class ControlloMappa extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Quanto spazio a sinistra copre il cruscotto (di traverso, in punti):
+  /// l'auto si mette nel mezzo della parte libera.
+  double copertoSinistra = 0;
+
+  void copriSinistra(double punti) {
+    if ((punti - copertoSinistra).abs() < 1) return;
+    copertoSinistra = punti;
+    notifyListeners();
+  }
+
   /// Si torna a seguire l'auto.
   void segui() {
     _ritorno?.cancel();

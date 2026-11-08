@@ -138,6 +138,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   var _libera = false;
   var _centrate = 0;
   var _coperto = 0.0;
+  var _copertoSinistra = 0.0;
 
   /// Quale elenco di tutte le colonnine ha già la mappa: sono megabyte, e
   /// si rimandano solo quando cambiano.
@@ -300,9 +301,11 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
       }
     }
     // Un popup copre la parte alta: il centro della mappa scende.
-    if (widget.controllo.coperto != _coperto) {
+    // Di traverso il cruscotto sta a sinistra: l'auto va nella parte libera.
+    if (widget.controllo.coperto != _coperto || widget.controllo.copertoSinistra != _copertoSinistra) {
       _coperto = widget.controllo.coperto;
-      await m.updateContentInsets(EdgeInsets.only(top: _coperto * 0.8), true);
+      _copertoSinistra = widget.controllo.copertoSinistra;
+      await m.updateContentInsets(EdgeInsets.only(top: _coperto * 0.8, left: _copertoSinistra), true);
     }
     if (widget.controllo.richiesteCentra != _centrate) {
       _centrate = widget.controllo.richiesteCentra;

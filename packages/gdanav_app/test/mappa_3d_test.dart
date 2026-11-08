@@ -135,6 +135,15 @@ void main() {
       expect(p['sopra'], 120);
       expect(p['riquadro'], [45.0, 9.0, 45.003, closeTo(9.0042, 1e-9)]);
       expect(msgCamera(ModoCamera3d.segui).containsKey('riquadro'), isFalse);
+      // Di traverso il cruscotto copre la sinistra: la pagina sposta l'auto.
+      expect(msgCamera(ModoCamera3d.segui, sinistra: 435)['sinistra'], 435);
+      expect(msgCamera(ModoCamera3d.segui).containsKey('sinistra'), isFalse);
+      final c = ControlloMappa();
+      var avvisi = 0;
+      c.addListener(() => avvisi++);
+      c.copriSinistra(435);
+      c.copriSinistra(435.4);
+      expect((c.copertoSinistra, avvisi), (435, 1));
     });
 
     test('le immagini in base64, la strada a risparmio', () {
