@@ -11,6 +11,7 @@
 // 2), e per Rho/Pero anche di traverso. La guida è vera: lo stesso percorso
 // della foto, l'auto dove la mette il collaudo, una manovra davanti.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -23,6 +24,7 @@ import 'package:gdanav_app/gdanav_app.dart';
 import 'package:gdanav_app/mappa/controllo_mappa.dart';
 import 'package:gdanav_app/mappa/mappa_3d.dart' show provaMappa3dPossibile;
 import 'package:gdanav_app/mappa/scelta_vista.dart' show lasciaAumentataConAvviso;
+import 'package:gdanav_app/schermate/scheda_punto.dart' show PuntoToccato, mostraPunto;
 import 'package:gdanav_app/stato/gestore_posizione.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -60,6 +62,10 @@ class _Caso {
     this.meta = 'Destinazione',
     this.percorso,
     this.foto,
+    this.vista = VistaMappa.aumentata,
+    this.soloTraverso = false,
+    this.autoDalPiuAlto,
+    this.tocco,
   });
   final String istruzione;
   final String verso;
@@ -76,13 +82,27 @@ class _Caso {
 
   /// Il nome della foto della mappa, se non è quella del caso.
   final String? foto;
+
+  /// La vista scelta (il tasto la dice); il 3D aumentato per le foto del 3D.
+  final VistaMappa vista;
+
+  /// Solo di traverso (le foto della mappa di sempre nelle tre viste).
+  final bool soloTraverso;
+
+  /// L'auto a tanti metri prima del punto più alto del percorso (invece che
+  /// dove la mette il collaudo).
+  final double? autoDalPiuAlto;
+
+  /// Lo strato del segno in quota toccato (`tocco-<percorso>-<strato>.json`
+  /// del collaudo): la sua scheda aperta sopra la guida.
+  final String? tocco;
 }
 
 const _destra = [
   Corsia([DirezioneCorsia.dritto]),
   Corsia([DirezioneCorsia.leggeraDestra], giusta: true, consigliata: DirezioneCorsia.leggeraDestra),
 ];
-const _casi = {
+final _casi = {
   'rho': _Caso(
     "Prendi l'uscita a destra verso A8",
     'A8 · Milano · Varese',
@@ -154,6 +174,35 @@ const _casi = {
     percorso: 'rho',
     foto: 'rho-telefono-prima',
   ),
+  // Di traverso con la mappa di sempre, nelle tre viste.
+  for (final (n, v) in [('2d', VistaMappa.piatta), ('3d', VistaMappa.inclinata), ('immersiva', VistaMappa.immersiva)])
+    'rho-$n': _Caso(
+      "Prendi l'uscita a destra verso A8",
+      'A8 · Milano · Varese',
+      metri: 2994,
+      corsie: _destra,
+      limite: 80,
+      meta: 'Milano, viale Certosa',
+      percorso: 'rho',
+      foto: 'rho-traverso-${v.name}',
+      vista: v,
+      soloTraverso: true,
+    ),
+  // Sul viadotto di secondo livello: la scheda dell'autovelox, della tappa e
+  // della sosta toccate lassù.
+  for (final strato in ['segnalazioni', 'tappe', 'gdanav-soste'])
+    'rho-tocco-$strato': _Caso(
+      "Prendi l'uscita a destra verso A8",
+      'A8 · Milano · Varese',
+      metri: 2994,
+      corsie: _destra,
+      limite: 80,
+      meta: 'Milano, viale Certosa',
+      percorso: 'rho',
+      foto: 'rho-viadotto',
+      autoDalPiuAlto: 70,
+      tocco: strato,
+    ),
   'sottopasso': _Caso(
     'Prosegui nel sottopasso',
     'Centro',
@@ -169,7 +218,9 @@ const _casi = {
 (PercorsoCalcolato, double) _percorso(String nome, _Caso c) {
   final j = jsonDecode(File('$collaudo/percorso-${c.percorso ?? nome}.json').readAsStringSync()) as Map;
   final xy = (j['punti'] as List).cast<num>();
-  final auto = (j['auto'] as num).toDouble();
+  final auto = c.autoDalPiuAlto == null
+      ? (j['auto'] as num).toDouble()
+      : (j['metriMassima'] as num).toDouble() - c.autoDalPiuAlto!;
   final punti = [for (var i = 0; i < xy.length; i += 2) Punto(xy[i + 1].toDouble(), xy[i].toDouble())];
   final linea = Linea(punti);
   final dove = c.metri ?? auto + c.davanti;
@@ -224,14 +275,17 @@ void main() {
       // Di traverso solo con GDANAV_TRAVERSO=1: il cruscotto della guida su un
       // telefono di traverso non ci sta (la barra in fondo esce dallo schermo,
       // anche con la mappa di sempre), e la foto lo mostrerebbe.
-      for (final traverso in [false, if (Platform.environment['GDANAV_TRAVERSO'] == '1') true]) {
+      for (final traverso in [
+        if (!c.soloTraverso) false,
+        if (c.soloTraverso || Platform.environment['GDANAV_TRAVERSO'] == '1') true,
+      ]) {
         final momento = notte ? 'notte' : 'giorno';
         final foto = File(
           c.foto == null
               ? '$collaudo/$nome-${traverso ? 'orizzontale' : 'telefono'}-$momento.png'
               : '$collaudo/${c.foto}-$momento.png',
         );
-        if ((c.foto != null && traverso) ||
+        if ((c.foto != null && traverso && !c.soloTraverso) ||
             !foto.existsSync() ||
             !File('$collaudo/percorso-${c.percorso ?? nome}.json').existsSync()) {
           continue;
@@ -271,7 +325,7 @@ void main() {
           // «prima» è la mappa di sempre, in 3D).
           provaMappa3dPossibile = true;
           addTearDown(() => provaMappa3dPossibile = null);
-          if (c.foto == null) await tester.runAsync(() => a.archivio.salvaVistaMappa(VistaMappa.aumentata));
+          await tester.runAsync(() => a.archivio.salvaVistaMappa(c.foto == null ? VistaMappa.aumentata : c.vista));
           BuildContext? contesto;
           ControlloMappa? controllo;
           await tester.pumpWidget(
@@ -331,6 +385,16 @@ void main() {
             await f.writeAsBytes(dati!.buffer.asUint8List());
             debugPrint('scritto ${f.path}');
           });
+          if (c.tocco case final strato?) {
+            // Il tocco in quota: lo stesso elemento che la pagina 3D ha
+            // mandato all'app nel collaudo, e la scheda che si apre.
+            final el = jsonDecode(File('$collaudo/tocco-rho-$strato.json').readAsStringSync()) as Map<String, Object?>;
+            final punto = PuntoToccato.daElemento(el)!;
+            final ctx = contesto!;
+            if (!ctx.mounted) fail('la guida non c\'è più');
+            unawaited(mostraPunto(ctx, punto, onVai: (_) {}, qui: qui));
+            await tester.pumpAndSettle();
+          }
           await scrivi('$nome-guida-${traverso ? 'orizzontale' : 'telefono'}-$momento.png');
           // A Rho anche: la scelta della vista aperta; il 3D aumentato che si
           // ferma (l'avviso, e sotto la mappa di sempre); e la scelta dopo,

@@ -19,10 +19,10 @@ const segnaposto = path.join(qui, '..', '..', 'assets', 'segnaposto');
 const maplibre = path.join(qui, '..', 'node_modules', 'maplibre-gl', 'dist');
 const { chromium } = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.js').then((m) => m.default ?? m);
 
-function stile(scuro, aspetto3d, perAuto = true) {
-  const f = path.join(uscita, `stile-${perAuto ? 'auto' : 'telefono'}-${scuro ? 'scuro' : 'chiaro'}${aspetto3d ? '-3d' : ''}.json`);
+function stile(scuro, aspetto3d, perAuto = true, immersiva = false) {
+  const f = path.join(uscita, `stile-${perAuto ? 'auto' : 'telefono'}-${scuro ? 'scuro' : 'chiaro'}${aspetto3d ? '-3d' : ''}${immersiva ? '-immersiva' : ''}.json`);
   if (!fs.existsSync(f)) {
-    const a = [path.join(qui, 'stile.dart'), f, scuro ? 'scuro' : 'chiaro', ...(perAuto ? ['auto'] : []), ...(aspetto3d ? ['3d'] : [])];
+    const a = [path.join(qui, 'stile.dart'), f, scuro ? 'scuro' : 'chiaro', ...(perAuto ? ['auto'] : []), ...(aspetto3d ? ['3d'] : []), ...(immersiva ? ['immersiva'] : [])];
     execFileSync('dart', ['run', ...a], { cwd: path.join(qui, '..', '..'), stdio: 'ignore' });
   }
   return JSON.parse(fs.readFileSync(f, 'utf8'));
@@ -50,17 +50,32 @@ const porta = servitore.address().port;
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const rotta = JSON.parse(fs.readFileSync(path.join(uscita, 'percorso-rho.json'), 'utf8'));
 
-for (const [schermo, w, h] of [
-  ['android-auto', 1280, 720],
-  ['carplay', 1280, 720],
-  // Il telefono com'è oggi (la mappa nativa inclinata), per il prima e dopo.
-  ['telefono', 390, 844],
-]) {
+// TRAVERSO=1: solo il telefono di traverso con la mappa di sempre nelle tre
+// viste (2D, 3D, immersiva), la parte sinistra coperta dal cruscotto.
+const traverso = process.env.TRAVERSO === '1';
+const VISTE = {
+  piatta: { zoom: 16.3, pitch: 0, nord: true },
+  inclinata: { zoom: 17.0, pitch: 58 },
+  immersiva: { zoom: 18.3, pitch: 60, immersiva: true },
+};
+const schermi = traverso
+  ? Object.keys(VISTE).map((v) => [`traverso-${v}`, 844, 390])
+  : [
+      ['android-auto', 1280, 720],
+      ['carplay', 1280, 720],
+      // Il telefono com'è oggi (la mappa nativa inclinata), per il prima e dopo.
+      ['telefono', 390, 844],
+    ];
+for (const [schermo, w, h] of schermi) {
+  const vista = schermo.startsWith('traverso-') ? VISTE[schermo.slice(9)] : null;
   for (const scuro of [false, true]) {
     for (const aspetto3d of [false, true]) {
-      const telefono = schermo === 'telefono';
+      const telefono = schermo === 'telefono' || vista !== null;
       if (telefono && aspetto3d) continue;
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: telefono ? 2 : 1.5 });
+      const vv = vista ?? (telefono ? { zoom: 17.0, pitch: 58 } : { zoom: 16.6, pitch: 60 });
+      // Il pannello del cruscotto di traverso (come _larghezzaPannello, col bordo di 47).
+      const sinistra = vista ? Math.min(460, Math.max(340, w * 0.46)) + 47 : telefono ? 0 : 420;
       await ctx.route(/https:\/\/tiles\.openfreemap\.org\/.*/, async (route) => {
         const r = await scarica(route.request().url());
         await route.fulfill({ status: r.stato, body: r.corpo, headers: { 'content-type': r.tipo, 'access-control-allow-origin': '*' } });
@@ -68,7 +83,7 @@ for (const [schermo, w, h] of [
       const page = await ctx.newPage();
       await page.goto(`http://127.0.0.1:${porta}/`);
       await page.evaluate(
-        async ([s, punti, icona, telefono, metriAuto]) => {
+        async ([s, punti, icona, telefono, metriAuto, vv, sinistra]) => {
           // L'auto a 1790 m lungo il percorso, e da lì il pezzo che resta.
           const c = [];
           let m = 0;
@@ -87,7 +102,7 @@ for (const [schermo, w, h] of [
             if (qui) c.push([punti[i], punti[i + 1]]);
             m += d;
           }
-          const mappa = new maplibregl.Map({ container: 'm', style: s, center: qui, zoom: telefono ? 17.0 : 16.6, pitch: telefono ? 58 : 60, bearing: rotta, attributionControl: false, fadeDuration: 0, canvasContextAttributes: { preserveDrawingBuffer: true } });
+          const mappa = new maplibregl.Map({ container: 'm', style: s, center: qui, zoom: vv.zoom, pitch: vv.pitch, bearing: vv.nord ? 0 : rotta, attributionControl: false, fadeDuration: 0, canvasContextAttributes: { preserveDrawingBuffer: true } });
           window.__m = mappa;
           await new Promise((r) => mappa.on('load', r));
           const img = new Image();
@@ -96,10 +111,13 @@ for (const [schermo, w, h] of [
           mappa.addImage(icona, img, { pixelRatio: 3 });
           mappa.getSource('gdanav-percorso').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: c }, properties: {} });
           mappa.getSource('gdanav-io').setData({ type: 'Feature', geometry: { type: 'Point', coordinates: qui }, properties: { icona, rotta } });
-          mappa.setPadding(telefono ? { top: 0, bottom: 0, left: 0, right: 0 } : { top: 0, bottom: 0, left: 420, right: 0 });
+          mappa.setPadding({ top: 0, bottom: 0, left: sinistra, right: 0 });
           mappa.jumpTo({ center: qui });
-          if (mappa.getLayer('edifici-3d')) mappa.setLayoutProperty('edifici-3d', 'visibility', 'visible');
-          if (mappa.getLayer('edifici')) mappa.setLayoutProperty('edifici', 'visibility', 'none');
+          // Inclinata: gli edifici in 3D (dall'alto i piatti, come nell'app).
+          if (vv.pitch > 0) {
+            if (mappa.getLayer('edifici-3d')) mappa.setLayoutProperty('edifici-3d', 'visibility', 'visible');
+            if (mappa.getLayer('edifici')) mappa.setLayoutProperty('edifici', 'visibility', 'none');
+          }
           await new Promise((r) => {
             const iv = setInterval(() => {
               if (mappa.areTilesLoaded()) {
@@ -109,10 +127,12 @@ for (const [schermo, w, h] of [
             }, 300);
           });
         },
-        [stile(scuro, aspetto3d, !telefono), rotta.punti, aspetto3d ? 'auto_rossa' : 'freccia', telefono, rotta.auto ?? 1790],
+        [stile(scuro, aspetto3d, !telefono, !!vv.immersiva), rotta.punti, aspetto3d ? 'auto_rossa' : 'freccia', telefono, rotta.auto ?? 1790, vv, sinistra],
       );
       await page.waitForTimeout(1500);
-      const f = telefono
+      const f = vista
+        ? path.join(uscita, `rho-${schermo}-${scuro ? 'notte' : 'giorno'}.png`)
+        : telefono
         ? path.join(uscita, `rho-telefono-prima-${scuro ? 'notte' : 'giorno'}.png`)
         : path.join(uscita, `${schermo}-${scuro ? 'notte' : 'giorno'}-${aspetto3d ? 'dopo' : 'prima'}.png`);
       await page.screenshot({ path: f });

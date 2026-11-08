@@ -45,11 +45,15 @@ class PuntoToccato {
     if (p.containsKey('sosta') && p['id'] is String) {
       return PuntoToccato(tipo: 'colonnina', id: p['id'] as String?, nome: nome, posizione: dove, proprieta: p);
     }
-    if (p['tappa'] == true) {
+    // Dalla pagina 3D arriva anche lo strato.
+    final strato = e['layer'];
+    if (p['tappa'] == true || strato == 'tappe') {
       final n = p['numero'];
       return PuntoToccato(tipo: 'tappa', nome: nome.isNotEmpty ? nome : 'Tappa $n', posizione: dove, proprieta: p);
     }
-    if (p['arrivo'] == true) return PuntoToccato(tipo: 'arrivo', nome: 'Arrivo', posizione: dove, proprieta: p);
+    if (p['arrivo'] == true || strato == 'arrivo') {
+      return PuntoToccato(tipo: 'arrivo', nome: 'Arrivo', posizione: dove, proprieta: p);
+    }
     if (p['icona'] is String && TipoSegnalazione.values.any((t) => t.name == p['tipo'])) {
       final t = TipoSegnalazione.values.byName(p['tipo']! as String);
       return PuntoToccato(tipo: 'segnalazione', id: p['id'] as String?, nome: t.nome, posizione: dove, proprieta: p);
