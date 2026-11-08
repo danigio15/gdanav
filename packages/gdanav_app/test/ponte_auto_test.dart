@@ -490,8 +490,8 @@ void main() {
       expect(strati.contains('corsie-destra'), accesa);
       ponte.ferma();
       messaggero.setMockMethodCallHandler(canale, null);
-      expect(iconaSullAuto(Segnaposto.freccia, aspetto3d: accesa), accesa ? 'auto_rossa' : 'freccia');
-      // Chi ha scelto un'auto la vede sempre.
+      // «Se cambio simbolo e metto freccia non funziona»: quello scelto, sempre.
+      expect(iconaSullAuto(Segnaposto.freccia, aspetto3d: accesa), 'freccia');
       expect(iconaSullAuto(Segnaposto.autoBianca, aspetto3d: accesa), 'auto_bianca');
     }
   });

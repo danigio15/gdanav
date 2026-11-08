@@ -1121,8 +1121,10 @@ Position? posizioneDellAuto(Map<Object?, Object?> dati) {
   );
 }
 
-/// Il segnaposto sullo schermo dell'auto: quello scelto; la freccia di
-/// partenza, con l'aspetto della mappa 3D, diventa l'auto rossa (come sul
-/// telefono: sul blu del percorso si vede).
-String iconaSullAuto(Segnaposto s, {required bool aspetto3d}) =>
-    aspetto3d && s == Segnaposto.freccia ? Segnaposto.autoRossa.immagine : s.immagine;
+/// Il segnaposto sullo schermo dell'auto: quello scelto, sempre.
+///
+/// Con l'aspetto della mappa 3D la freccia diventava l'auto rossa, come
+/// nella scena 3D del telefono (che di frecce non ne ha). Ma sull'auto la
+/// freccia c'è, e chi l'ha scelta non la vedeva: «se cambio simbolo e
+/// metto freccia non funziona». [aspetto3d] resta per chi chiama.
+String iconaSullAuto(Segnaposto s, {required bool aspetto3d}) => s.immagine;
