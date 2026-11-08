@@ -811,7 +811,7 @@ export class Scena {
    * prima dei nomi, poi il più vicino), gli altri si nascondono finché non
    * si spostano. [camera] è già quella del fotogramma; [W]×[H] in punti.
    */
-  sfoltisciSegni(camera, W, H) {
+  sfoltisciSegni(camera, W, H, occupati = []) {
     if (!this.segni?.size) return;
     const v = new THREE.Vector3();
     const voci = [];
@@ -831,7 +831,8 @@ export class Scena {
       });
     }
     voci.sort((a, b) => a.peso - b.peso);
-    const presi = [];
+    // Quello che c'è già (l'auto): i nomi non ci vanno sopra.
+    const presi = [...occupati];
     for (const q of voci) {
       const libero = !q.fuori && !presi.some((p) => q.r[0] < p[2] && q.r[2] > p[0] && q.r[1] < p[3] && q.r[3] > p[1]);
       // Un'icona si vede sempre; un nome solo se non copre niente.

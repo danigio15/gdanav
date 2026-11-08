@@ -543,7 +543,14 @@ function strato3d() {
       if (scena.mat.bagliore) scena.mat.bagliore.size = 9 * ppm;
       scena.scalaSegni(Pm.elements[5], m.getCanvas().clientHeight);
       // La camera di three.js con le matrici di questo fotogramma, per sfoltire i nomi.
-      scena.sfoltisciSegni(camera, m.getCanvas().clientWidth, m.getCanvas().clientHeight);
+      const occupati = [];
+      if (S.auto) {
+        const va = new THREE.Vector3(S.auto.x, S.auto.y, S.auto.z + 1).project(camera);
+        const ax = ((va.x + 1) / 2) * m.getCanvas().clientWidth;
+        const ay = ((1 - va.y) / 2) * m.getCanvas().clientHeight;
+        occupati.push([ax - 70, ay - 60, ax + 70, ay + 40]);
+      }
+      scena.sfoltisciSegni(camera, m.getCanvas().clientWidth, m.getCanvas().clientHeight, occupati);
       renderer.resetState();
       renderer.render(scena.scena, camera);
       S.camera3d = camera;
