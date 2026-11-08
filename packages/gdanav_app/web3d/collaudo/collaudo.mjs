@@ -177,7 +177,7 @@ for (const [chiave, caso] of Object.entries(CASI)) {
   for (const notte of soloViste ? [false] : [false, true]) {
     const momento = notte ? 'notte' : 'giorno';
     const nome = `${chiave}-${momento}`;
-    const { page, ctx, posizione, errori } = await apri(browser, { porta, cartella: uscita, rotta, caso: c, notte, nome });
+    const { page, ctx, posizione, errori, messaggi } = await apri(browser, { porta, cartella: uscita, rotta, caso: c, notte, nome });
     await posizione(metri, 0);
     await aspetta(page);
     await page.waitForTimeout(2500);
@@ -218,6 +218,26 @@ for (const [chiave, caso] of Object.entries(CASI)) {
         await foto(page, path.join(uscita, `${chiave}-telefono-${e.nome}.png`));
         esito[e.nome] = await autoVisibile(page);
         esito.ok &&= esito[e.nome].visibile;
+        // I segni in quota si toccano: un tocco dove stanno, e la pagina
+        // manda all'app l'elemento dello strato giusto.
+        if (c.puntiInQuota?.length) {
+          const segni = await page.evaluate(() => window.gdanav3d.prova.segniSulloSchermo());
+          esito.toccati = [];
+          for (const strato of ['tappe', 'gdanav-soste', 'segnalazioni']) {
+            const s = segni.find((q) => q.strato === strato && q.x > 0 && q.x < 390 && q.y > 0 && q.y < 844);
+            if (!s) continue;
+            const prima = messaggi.length;
+            await page.mouse.click(s.x, s.y);
+            await page.waitForTimeout(600);
+            const tocco = messaggi.slice(prima).find((m) => m.tipo === 'tocco');
+            const el = tocco?.elementi?.[0];
+            esito.toccati.push({ strato, preso: el?.layer ?? null });
+            if (el?.layer === strato) fs.writeFileSync(path.join(uscita, `tocco-${chiave}-${strato}.json`), JSON.stringify(el));
+          }
+          esito.ok &&= esito.toccati.length >= 2 && esito.toccati.every((t) => t.preso === t.strato);
+          // Il tocco ha fermato la telecamera? Si torna a seguire.
+          await page.evaluate(() => window.gdanav3d.ricevi({ v: 1, tipo: 'camera', modo: 'segui', sopra: 0 }));
+        }
       }
       // L'auto torna al punto del caso: le viste libere la inquadrano lì.
       await posizione(metri, 0);

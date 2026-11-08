@@ -389,7 +389,16 @@ class _Mappa3dState extends State<Mappa3d> {
           return widget.onPunto!(PuntoToccato(tipo: 'colonnina', id: c.id, nome: c.nome, posizione: c.posizione));
         }
       }
-      if (PuntoToccato.daElemento(e) case final p? when widget.onPunto != null) return widget.onPunto!(p);
+      if (PuntoToccato.daElemento(e) case final p? when widget.onPunto != null) {
+        // L'arrivo col nome della meta.
+        final meta = widget.gestore.destinazione;
+        if (p.tipo == 'arrivo' && meta != null) {
+          return widget.onPunto!(
+            PuntoToccato(tipo: 'arrivo', nome: meta.nome, posizione: p.posizione, proprieta: p.proprieta),
+          );
+        }
+        return widget.onPunto!(p);
+      }
     }
   }
 

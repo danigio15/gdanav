@@ -60,6 +60,11 @@ const stratiToccabili = [
   'gdanav-tutte-gruppi',
   'gdanav-tutte',
   'nomi-poi',
+  // Il viaggio: autovelox e segnalazioni, le tappe, l'arrivo (la scheda dice
+  // cos'è; per le soste di ricarica la colonnina).
+  'segnalazioni',
+  'tappe',
+  'arrivo',
 ];
 
 /// Dall'alto gli edifici sono piatti e puliti; inclinando la mappa si

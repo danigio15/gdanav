@@ -1113,6 +1113,8 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
       // vicine, ristoranti…), poi le colonnine del viaggio.
       // Una strada alternativa: si sceglie quella.
       if (mappa case {'properties': {'alternativa': final num i}}) return widget.gestore.scegli(i.toInt());
+      // Una sosta del viaggio: come sempre, la sua colonnina.
+      if (mappa case {'properties': {'sosta': _, 'id': final String id}}) return widget.onColonnina(id);
       if (PuntoToccato.daElemento(mappa) case final p? when widget.onPunto != null) return widget.onPunto!(p);
       if (mappa case {'properties': {'id': final String id}}) return widget.onColonnina(id);
     }

@@ -796,6 +796,7 @@ export class Scena {
       sp.position.set(g.x, g.y, g.z);
       sp.userData.w = g.w;
       sp.userData.h = g.h;
+      sp.userData.elemento = g.elemento ?? null;
     }
     for (const [k, sp] of this.segni) {
       if (tieni.has(k)) continue;

@@ -15,6 +15,7 @@ import '../componenti/vista_svincolo.dart';
 import '../componenti/vetro.dart';
 import '../componenti/ztl.dart';
 import '../mappa/controllo_mappa.dart';
+import '../mappa/dati_viaggio.dart' show puntoLungo;
 import '../mappa/scelta_vista.dart';
 import '../mappa/mappa_3d.dart';
 import '../mappa/mappa_viaggio.dart';
@@ -160,6 +161,17 @@ class _SchermataGuidaState extends State<SchermataGuida> {
     if (g.viaggio.stato is ViaggioPronto) g.avvia();
   }
 
+  /// Una sosta di ricarica toccata sulla mappa di sempre: la scheda della
+  /// colonnina, come nel 3D aumentato.
+  void _colonninaDelViaggio(String id) {
+    final v = widget.guida.pronto?.viaggio;
+    final c = v?.colonnine.where((x) => x.id == id).firstOrNull;
+    if (v == null || c == null) return;
+    final dove = c.dettaglio?.posizione ?? puntoLungo(Linea(v.percorso.punti), c.distanzaM);
+    if (dove == null) return;
+    _punto(PuntoToccato(tipo: 'colonnina', id: c.id, nome: c.nome, posizione: dove));
+  }
+
   void _punto(PuntoToccato p) {
     final g = widget.guida;
     mostraPunto(
@@ -204,7 +216,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
       guida: g,
       segnalazioni: widget.segnalazioni,
       onPuntoScelto: (_) {},
-      onColonnina: (_) {},
+      onColonnina: _colonninaDelViaggio,
       vicini: widget.vicini,
       ztl: widget.ztl,
       onPunto: _punto,

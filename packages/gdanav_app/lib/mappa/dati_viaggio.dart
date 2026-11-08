@@ -52,7 +52,7 @@ Map<String, Map<String, Object?>> datiViaggio(
     sorgenteColonnine: _oVuota('colonnine', () => _colonnine(v)),
     sorgenteArrivo: _collezione([
       if (v.percorso.punti.lastOrNull case final fine? when _scrivibile(fine))
-        _elemento({'type': 'Point', 'coordinates': _xy(fine)}, const {}),
+        _elemento({'type': 'Point', 'coordinates': _xy(fine)}, const {'arrivo': true}),
     ]),
     sorgenteCode: _oVuota('code', () => datiCode(v.percorso)),
     sorgenteAlternative: _oVuota('alternative', () => datiAlternative(scelte, scelta, eco: eco)),
@@ -61,7 +61,10 @@ Map<String, Map<String, Object?>> datiViaggio(
       () => _collezione([
         for (final (i, t) in tappe.indexed)
           if (_scrivibile(t.posizione))
-            _elemento({'type': 'Point', 'coordinates': _xy(t.posizione)}, {'numero': i + 1, 'nome': t.nome}),
+            _elemento(
+              {'type': 'Point', 'coordinates': _xy(t.posizione)},
+              {'numero': i + 1, 'nome': t.nome, 'tappa': true},
+            ),
       ]),
     ),
     sorgentePassandoci: passandoci ? _oVuota('passandoci', () => datiPassandoci(v.percorso)) : _collezione([]),
@@ -547,6 +550,9 @@ int preseAdatte(Colonnina c, Set<TipoConnettore> connettori) =>
 
 /// Il punto del percorso a tanti metri dalla partenza; `null` se il percorso
 /// non ha punti (prima, lì, un errore portava via tutte le colonnine).
+/// Il punto del percorso a [metri] dalla partenza (il vertice dopo).
+Punto? puntoLungo(Linea l, double metri) => _lungo(l, metri);
+
 Punto? _lungo(Linea l, double metri) {
   for (var i = 1; i < l.punti.length; i++) {
     if (l.cumulate[i] >= metri) return l.punti[i];

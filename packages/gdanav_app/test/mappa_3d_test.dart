@@ -10,6 +10,8 @@ import 'package:gdanav_app/mappa/mappa_3d.dart';
 import 'package:gdanav_app/mappa/ponte_3d.dart';
 import 'package:gdanav_app/mappa/scelta_vista.dart';
 import 'package:gdanav_app/mappa/segnaposto.dart';
+import 'package:gdanav_app/mappa/stile.dart' show stratiToccabili;
+import 'package:gdanav_app/schermate/scheda_punto.dart';
 import 'package:gdanav_app/stato/archivio.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -375,6 +377,98 @@ void main() {
 
     test('nelle prove (e senza WebView) il 3D aumentato non si prova: resta la mappa di sempre', () {
       expect(mappa3dPossibile, isFalse);
+    });
+  });
+
+  group('i segni del viaggio si toccano (anche in quota, sui viadotti)', () {
+    Map<String, Object?> elemento(String strato, Map<String, Object?> p) => {
+      'type': 'Feature',
+      'geometry': {
+        'type': 'Point',
+        'coordinates': [9.1, 45.5],
+      },
+      'properties': p,
+      'layer': strato,
+    };
+
+    test('gli strati del viaggio sono fra quelli toccabili (a terra e nella pagina 3D)', () {
+      expect(stratiToccabili, containsAll(['segnalazioni', 'tappe', 'arrivo', 'gdanav-soste']));
+      final js = File('web3d/src/principale.js').readAsStringSync();
+      for (final s in ['segnalazioni', 'tappe', 'arrivo']) {
+        expect(js, contains("'$s'"));
+      }
+    });
+
+    test('autovelox, tappa, arrivo e sosta diventano il punto giusto per la scheda', () {
+      final s = datiSegnalazioni([
+        Segnalazione(
+          id: 'av1',
+          tipo: TipoSegnalazione.autovelox,
+          punto: const Punto(45.5, 9.1),
+          creata: DateTime(2026, 11, 8, 10),
+          conferme: 3,
+          limiteKmh: 90,
+        ),
+      ]);
+      final props = ((s['features']! as List).first as Map)['properties'] as Map<String, Object?>;
+      expect(props['conferme'], 3);
+      expect(props['limite'], 90);
+      final av = PuntoToccato.daElemento(elemento('segnalazioni', props))!;
+      expect((av.tipo, av.id, av.nome), ('segnalazione', 'av1', 'Autovelox'));
+      expect(av.posizione, const Punto(45.5, 9.1));
+      final tappa = PuntoToccato.daElemento(elemento('tappe', {'numero': 2, 'nome': 'Bologna', 'tappa': true}))!;
+      expect((tappa.tipo, tappa.nome), ('tappa', 'Bologna'));
+      final arrivo = PuntoToccato.daElemento(elemento('arrivo', {'arrivo': true}))!;
+      expect(arrivo.tipo, 'arrivo');
+      final sosta = PuntoToccato.daElemento(
+        elemento('gdanav-soste', {'id': 'c1', 'nome': 'Ionity', 'sosta': true, 'numero': 1, 'stato': 'libera'}),
+      )!;
+      expect((sosta.tipo, sosta.id, sosta.nome), ('colonnina', 'c1', 'Ionity'));
+    });
+
+    testWidgets('la scheda di un autovelox toccato: cosa è e cosa si sa, senza «Vai»', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => mostraPunto(
+                  context,
+                  PuntoToccato(
+                    tipo: 'segnalazione',
+                    id: 'av1',
+                    nome: 'Autovelox',
+                    posizione: const Punto(45.5, 9.1),
+                    proprieta: {
+                      'tipo': 'autovelox',
+                      'limite': 90,
+                      'conferme': 3,
+                      'creata': DateTime.now().subtract(const Duration(minutes: 12)).toIso8601String(),
+                    },
+                  ),
+                  onVai: (_) {},
+                ),
+                child: const Text('tocca'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('tocca'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('scheda-punto-segnalazione')), findsOneWidget);
+      expect(find.text('AUTOVELOX'), findsOneWidget);
+      expect(find.text('Limite 90 km/h'), findsOneWidget);
+      expect(find.text('Confermata da 3 persone'), findsOneWidget);
+      expect(find.text('Segnalata 12 min fa'), findsOneWidget);
+      expect(find.byKey(const Key('vai-punto')), findsNothing);
+    });
+
+    test('da quanto', () {
+      expect(fa(const Duration(seconds: 20)), 'adesso');
+      expect(fa(const Duration(minutes: 5)), '5 min fa');
+      expect(fa(const Duration(hours: 3)), '3 ore fa');
+      expect(fa(const Duration(days: 4)), '4 giorni fa');
     });
   });
 

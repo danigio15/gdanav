@@ -19,7 +19,7 @@ import { GIORNO, NOTTE } from './tavolozza.js';
 import './gdanav3d.css';
 
 /** Gli strati da toccare (come `stratiToccabili` in stile.dart). */
-const TOCCABILI = ['persone', 'alternative-etichetta', 'alternative', 'gdanav-soste', 'gdanav-colonnine', 'gdanav-distributori', 'gdanav-vicine', 'gdanav-tutte-gruppi', 'gdanav-tutte', 'nomi-poi'];
+const TOCCABILI = ['persone', 'alternative-etichetta', 'alternative', 'gdanav-soste', 'gdanav-colonnine', 'gdanav-distributori', 'gdanav-vicine', 'gdanav-tutte-gruppi', 'gdanav-tutte', 'nomi-poi', 'segnalazioni', 'tappe', 'arrivo'];
 
 /** Le viste: inclinazione e zoom di partenza (il prototipo approvato). */
 const VISTE = { inclinata: { pitch: 70, zoom: 17.9 }, immersiva: { pitch: 74, zoom: 18.3 } };
@@ -207,6 +207,23 @@ window.gdanav3d = {
       S.mappa?.triggerRepaint();
     },
     /** L'auto sullo schermo (in punti), col tetto un metro e mezzo sopra la strada. */
+    /** I segni in quota toccabili, dove stanno sullo schermo (in punti). */
+    segniSulloSchermo() {
+      const cam = S.camera3d;
+      if (!cam || !scena.segni) return [];
+      const c = S.mappa.getCanvas();
+      const v = new THREE.Vector3();
+      const out = [];
+      for (const sp of scena.segni.values()) {
+        const el = sp.userData.elemento;
+        if (!el) continue;
+        sp.getWorldPosition(v).project(cam);
+        const x = ((v.x + 1) / 2) * c.clientWidth;
+        const y = ((1 - v.y) / 2) * c.clientHeight - sp.userData.h * (0.5 - sp.center.y);
+        out.push({ x, y, strato: el.layer, proprieta: el.properties });
+      }
+      return out;
+    },
     schermoAuto() {
       if (!S.auto || !S.camera3d) return null;
       const v = new THREE.Vector3(S.auto.x, S.auto.y, S.auto.z + 2.5).project(S.camera3d);
@@ -292,6 +309,12 @@ function creaMappa(stile) {
     });
   }
   mappa.on('click', (e) => {
+    // Prima i segni in quota (sui viadotti): lì MapLibre non ha più niente.
+    const segno = segnoToccato(e.point.x, e.point.y);
+    if (segno) {
+      manda('tocco', { elementi: [segno] });
+      return;
+    }
     const strati = TOCCABILI.filter((id) => mappa.getLayer(id));
     const trovati = strati.length ? mappa.queryRenderedFeatures(e.point, { layers: strati }) : [];
     if (trovati.length) {
@@ -868,11 +891,12 @@ function unisciNastri(parti) {
  * l'immagine (dalla proprietà o fissa) e quanto è grande (come in stile.dart).
  */
 const IN_QUOTA = {
-  'gdanav-segnalazioni': { immagine: (p) => p.icona, grandezza: (p) => (p.tipo === 'autovelox' ? 1.15 : 0.85) },
-  'gdanav-arrivo': { immagine: () => 'arrivo-bandiera', grandezza: () => 1.7 },
+  'gdanav-segnalazioni': { strato: () => 'segnalazioni', immagine: (p) => p.icona, grandezza: (p) => (p.tipo === 'autovelox' ? 1.15 : 0.85) },
+  'gdanav-arrivo': { strato: () => 'arrivo', immagine: () => 'arrivo-bandiera', grandezza: () => 1.7 },
   // Le colonnine (le soste col numero, grandi) e le tappe: cerchi come quelli
   // di MapLibre, coi colori presi dallo stile.
   'gdanav-colonnine': {
+    strato: (p) => (p.sosta ? 'gdanav-soste' : 'gdanav-colonnine'),
     tela: (p) =>
       p.sosta
         ? cerchio(14, colore('gdanav-soste', 'circle-color', p), colore('gdanav-soste', 'circle-stroke-color', p), 3, String(p.numero ?? ''), '#FFFFFF', 14)
@@ -880,6 +904,7 @@ const IN_QUOTA = {
     grandezza: () => 1,
   },
   'gdanav-tappe': {
+    strato: () => 'tappe',
     tela: (p) => cerchio(12, colore('tappe', 'circle-color', p), colore('tappe', 'circle-stroke-color', p), 3.5, String(p.numero ?? ''), colore('tappe-numeri', 'text-color', p), 13),
     grandezza: () => 1,
   },
@@ -992,6 +1017,8 @@ function aggiornaSegni(adesso) {
         const g = regola.grandezza(pr);
         // La chiave dice anche l'immagine: un punto che cambia (stato, numero) si ridisegna.
         const segno = { chiave: `${k}|${img.chiave ?? regola.immagine(pr)}`, x, y, z: z + 0.4, immagine: img.bmp, w: (img.bmp.width / img.ratio) * g, h: (img.bmp.height / img.ratio) * g };
+        // Toccandolo in quota arriva all'app come lo strato di MapLibre a terra.
+        segno.elemento = { type: 'Feature', geometry: f.geometry, properties: pr, layer: regola.strato(pr) };
         if (img.centro !== undefined) segno.centro = img.centro;
         segni.push(segno);
       } else if (inQuota.delete(k)) cambiato = true;
@@ -1019,6 +1046,42 @@ function aggiornaSegni(adesso) {
     segni.push({ chiave: `nome:${testo}:${Math.round(e.x)}:${Math.round(e.y)}`, x: e.x, y: e.y, z: e.h + 1.2, immagine: tela, w: tela.width / 2, h: tela.height / 2, centro: 0.5 });
   }
   scena.impostaSegni(segni);
+}
+
+/**
+ * Il segno in quota sotto il dito (in punti dello schermo), il più vicino se
+ * ce n'è più d'uno; `null` se non ce n'è. Il riquadro è quello dell'immagine
+ * (ancorata in basso o nel mezzo), con un margine per le dita.
+ */
+function segnoToccato(px, py, margine = 8) {
+  const cam = S.camera3d;
+  if (!cam || !scena.segni || !S.mappa) return null;
+  const c = S.mappa.getCanvas();
+  const W = c.clientWidth;
+  const H = c.clientHeight;
+  const v = new THREE.Vector3();
+  let meglio = null;
+  let dMeglio = Infinity;
+  for (const sp of scena.segni.values()) {
+    const el = sp.userData.elemento;
+    if (!el || !sp.visible) continue;
+    sp.getWorldPosition(v).project(cam);
+    if (v.z > 1 || v.z < -1) continue;
+    const sx = ((v.x + 1) / 2) * W;
+    const sy = ((1 - v.y) / 2) * H;
+    const w = sp.userData.w;
+    const h = sp.userData.h;
+    const cy = sp.center.y;
+    const alto = sy - h * (1 - cy) - margine;
+    const basso = sy + h * cy + margine;
+    if (px < sx - w / 2 - margine || px > sx + w / 2 + margine || py < alto || py > basso) continue;
+    const d = Math.hypot(px - sx, py - (alto + basso) / 2);
+    if (d < dMeglio) {
+      dMeglio = d;
+      meglio = el;
+    }
+  }
+  return meglio;
 }
 
 /** Il nome di un ponte, come quelli di MapLibre: scritta scura con l'alone chiaro (o un cartello per i numeri). */
