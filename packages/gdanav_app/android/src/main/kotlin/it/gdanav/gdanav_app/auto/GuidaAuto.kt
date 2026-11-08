@@ -186,11 +186,11 @@ class GuidaAuto(private val context: Context) {
             }
             val circa = if (c.batteriaStimata) "~" else ""
             c.batteria?.let { b ->
-                pezzo("🔋 $circa${b.roundToInt()}%", if (b < 20) CarColor.RED else null)
-                c.autonomiaKm?.let { pezzo("$circa${it.roundToInt()} km") }
+                pezzo("🔋$NBSP$circa${b.roundToInt()}%", if (b < 20) CarColor.RED else null)
+                c.autonomiaKm?.let { pezzo("$circa${it.roundToInt()}${NBSP}km") }
                 c.arrivoBatteria?.let { v ->
                     if (testo.isNotEmpty()) testo.append(" · ")
-                    testo.append("arrivo ")
+                    testo.append("arrivo$NBSP")
                     val da = testo.length
                     testo.append("${v.roundToInt()}%")
                     testo.setSpan(
@@ -201,10 +201,18 @@ class GuidaAuto(private val context: Context) {
                     )
                 }
             }
-            c.meteoTemperatura?.let { m -> pezzo("${c.meteoEmoji ?: ""} ${m.roundToInt()}°".trim()) }
+            c.meteoTemperatura?.let { m -> pezzo("${c.meteoEmoji?.let { "$it$NBSP" } ?: ""}${m.roundToInt()}°") }
             if (!pedaggio.isNullOrEmpty()) pezzo(pedaggio, CarColor.createCustom(AMBRA_GIORNO, AMBRA_NOTTE))
             return testo.takeIf { it.isNotEmpty() }
         }
+
+        /**
+         * Lo spazio che non va a capo: «Guarda il meteo», il sole restava in
+         * fondo a una riga e i gradi andavano sotto. Dentro un pezzo (il sole e
+         * i gradi, «arrivo» e la percentuale, i km) non si va a capo; si va a
+         * capo solo fra un pezzo e l'altro, dove c'è il «·».
+         */
+        private const val NBSP = "\u00A0"
 
         /** L'ambra della pastiglia del pedaggio sul telefono, di giorno e di notte. */
         private val AMBRA_GIORNO = android.graphics.Color.rgb(138, 83, 0)
