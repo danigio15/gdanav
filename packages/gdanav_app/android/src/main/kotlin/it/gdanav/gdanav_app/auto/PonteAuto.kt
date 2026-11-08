@@ -162,8 +162,8 @@ object PonteAuto {
 
     /**
      * L'auto scrive un testo accanto ai km che restano (API 5,
-     * `TravelEstimate.setTripText`): il pedaggio va lì, e non nella barra
-     * sulla mappa.
+     * `TravelEstimate.setTripText`): in guida batteria, km, batteria
+     * all'arrivo, meteo e pedaggio vanno lì, e non nella barra sulla mappa.
      */
     @Volatile var pedaggioNellaStima = false
 

@@ -2,7 +2,6 @@ package it.gdanav.gdanav_app.auto
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.text.SpannableString
 import android.text.Spanned
 import androidx.car.app.model.CarColor
 import androidx.car.app.model.CarIcon
@@ -20,6 +19,7 @@ import androidx.car.app.navigation.model.TravelEstimate
 import androidx.car.app.navigation.model.Trip
 import androidx.core.graphics.drawable.IconCompat
 import java.util.TimeZone
+import kotlin.math.roundToInt
 
 /**
  * La guida nei modi di Android Auto, gli stessi per tutti: la scheda della
@@ -109,8 +109,9 @@ class GuidaAuto(private val context: Context) {
 
     /**
      * Arrivo, tempo e km che restano. Con [conTesto] (l'auto ha l'API 5)
-     * accanto ai km anche il pedaggio che resta, in ambra: «~12,40 €
-     * pedaggio». Il colore l'auto può ignorarlo; il testo resta.
+     * accanto anche quello che stava nella barra sopra la mappa: la batteria,
+     * i km che le restano, la batteria all'arrivo, il meteo e il pedaggio
+     * che resta ([testoDelViaggio]).
      */
     fun stima(g: PonteAuto.Guida, conTesto: Boolean = false): TravelEstimate {
         val stima = TravelEstimate.Builder(distanza(g.restantiM), DateTimeWithZone.create(g.arrivoMs, TimeZone.getDefault()))
@@ -122,17 +123,7 @@ class GuidaAuto(private val context: Context) {
             g.trafficoMin >= 10 -> stima.setRemainingTimeColor(CarColor.RED)
             g.trafficoMin >= 1 -> stima.setRemainingTimeColor(CarColor.YELLOW)
         }
-        val pedaggio = g.pedaggio
-        if (conTesto && !pedaggio.isNullOrEmpty()) {
-            val testo = SpannableString(pedaggio)
-            testo.setSpan(
-                ForegroundCarColorSpan.create(CarColor.createCustom(AMBRA_GIORNO, AMBRA_NOTTE)),
-                0,
-                pedaggio.length,
-                Spanned.SPAN_INCLUSIVE_EXCLUSIVE,
-            )
-            stima.setTripText(CarText.create(testo))
-        }
+        if (conTesto) testoDelViaggio(PonteAuto.cruscotto, g.pedaggio)?.let { stima.setTripText(CarText.create(it)) }
         return stima.build()
     }
 
@@ -169,6 +160,51 @@ class GuidaAuto(private val context: Context) {
     }
 
     companion object {
+        /**
+         * La riga dell'auto nella scheda dell'arrivo, sotto tempo, ora e km:
+         * «🔋 51% · 200 km · all'arrivo 46% · ☀ 12° · pedaggio ~12,40 €».
+         *
+         * «Non mi piace la predisposizione batteria: ingloba in km residui e
+         * tempo di arrivo», e poi «togli anche il simbolo del meteo e ingloba
+         * nel quadrato». Stava in una barra sopra la mappa, accanto al
+         * tachimetro, e copriva la strada; adesso è una riga della scheda
+         * che Android Auto disegna già. La batteria all'arrivo in verde (in
+         * rosso sotto il 10%), il pedaggio in ambra come sul telefono; i
+         * colori l'auto può ignorarli, il testo resta. `null` se non c'è
+         * niente da dire.
+         */
+        fun testoDelViaggio(c: PonteAuto.Cruscotto, pedaggio: String?): CharSequence? {
+            val testo = android.text.SpannableStringBuilder()
+            fun pezzo(t: String, colore: CarColor? = null) {
+                if (testo.isNotEmpty()) testo.append(" · ")
+                val da = testo.length
+                testo.append(t)
+                colore?.let {
+                    testo.setSpan(ForegroundCarColorSpan.create(it), da, testo.length, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+                }
+            }
+            val circa = if (c.batteriaStimata) "~" else ""
+            c.batteria?.let { b ->
+                pezzo("🔋 $circa${b.roundToInt()}%", if (b < 20) CarColor.RED else null)
+                c.autonomiaKm?.let { pezzo("$circa${it.roundToInt()} km") }
+                c.arrivoBatteria?.let { v ->
+                    if (testo.isNotEmpty()) testo.append(" · ")
+                    testo.append("all'arrivo ")
+                    val da = testo.length
+                    testo.append("${v.roundToInt()}%")
+                    testo.setSpan(
+                        ForegroundCarColorSpan.create(if (v < 10) CarColor.RED else CarColor.GREEN),
+                        da,
+                        testo.length,
+                        Spanned.SPAN_INCLUSIVE_EXCLUSIVE,
+                    )
+                }
+            }
+            c.meteoTemperatura?.let { m -> pezzo("${c.meteoEmoji ?: ""} ${m.roundToInt()}°".trim()) }
+            if (!pedaggio.isNullOrEmpty()) pezzo(pedaggio, CarColor.createCustom(AMBRA_GIORNO, AMBRA_NOTTE))
+            return testo.takeIf { it.isNotEmpty() }
+        }
+
         /** L'ambra della pastiglia del pedaggio sul telefono, di giorno e di notte. */
         private val AMBRA_GIORNO = android.graphics.Color.rgb(138, 83, 0)
         private val AMBRA_NOTTE = android.graphics.Color.rgb(255, 207, 112)

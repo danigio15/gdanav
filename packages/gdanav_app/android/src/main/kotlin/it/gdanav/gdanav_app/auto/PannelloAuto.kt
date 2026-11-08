@@ -71,9 +71,18 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         // In basso a sinistra, dal lato di chi guida: velocità e limite, e
         // sopra una barra sottile coi dati dell'auto e il meteo.
         val tachimetro = velocita(canvas, a, c)
-        // Il pedaggio sta nella scheda dell'arrivo, accanto ai km, quando
-        // l'auto lo sa scrivere: qui solo per le auto più vecchie.
-        barra(canvas, a, tachimetro, if (PonteAuto.pedaggioNellaStima) c.copy(pedaggio = null) else c)
+        // In guida batteria, km, batteria all'arrivo, meteo e pedaggio stanno
+        // nella scheda dell'arrivo, sotto tempo e km, quando l'auto lo sa
+        // scrivere (`GuidaAuto.testoDelViaggio`): qui resta la sosta, se c'è.
+        // Senza guida la scheda non c'è, e la barra resta; e sulle auto più
+        // vecchie anche in guida.
+        val nellaScheda = PonteAuto.pedaggioNellaStima && PonteAuto.guida != null
+        barra(
+            canvas,
+            a,
+            tachimetro,
+            if (nellaScheda) c.copy(batteria = null, meteoTemperatura = null, pedaggio = null) else c,
+        )
     }
 
     /**
@@ -354,9 +363,11 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         // spazio libero; la sosta, se è più lunga, si accorcia.
         val sopraPaint = font(14f, colore = ambra)
         val larghezzaSopra = pedaggioSopra?.let { sopraPaint.measureText(it) } ?: 0f
-        val w = (maxOf(if (pezzi.isEmpty()) dp(220f) else larghezzaRiga, larghezzaSopra) + p * 2)
+        val w = (maxOf(if (pezzi.isEmpty()) sosta?.let { piccolo.measureText(it) } ?: dp(220f) else larghezzaRiga, larghezzaSopra) + p * 2)
             .coerceAtMost(a.width() - margine * 2)
-        val hRiga = dp(54f)
+        // Solo la sosta (in guida il resto sta nella scheda dell'arrivo): una
+        // riga sola, senza quella vuota sotto.
+        val hRiga = if (pezzi.isEmpty()) dp(10f) else dp(54f)
         val hSosta = if (sosta != null || pedaggioSopra != null) dp(24f) else 0f
         val h = hRiga + hSosta
 
