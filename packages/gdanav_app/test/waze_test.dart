@@ -375,7 +375,7 @@ void main() {
     int numero(String chiave) => int.parse(RegExp(r'\d+').allMatches(testo(chiave)).last.group(0)!);
 
     // Fra due letture dell'auto la batteria è una stima: «~», come in auto.
-    expect(testo('batteria-ora'), startsWith('🔋\u00A0~'));
+    expect(testo('batteria-ora'), contains('~'));
     final stimata = numero('batteria-ora');
     final arrivo = numero('batteria-arrivo');
     expect(stimata, inExclusiveRange(arrivo, 90));
@@ -392,7 +392,8 @@ void main() {
     a.posizioni.add(punti[11]);
     await aspetta(tester);
     // Detta dall'auto non è più una stima.
-    expect(testo('batteria-ora'), contains('🔋\u00A0${stimata - 4}%'));
+    expect(testo('batteria-ora'), endsWith('${stimata - 4}%'));
+    expect(testo('batteria-ora'), isNot(contains('~')));
     expect(numero('autonomia'), lessThan(km));
     expect(numero('batteria-arrivo'), inInclusiveRange(arrivo - 5, arrivo - 3));
     await tester.tap(find.text('Fine'));

@@ -11,7 +11,10 @@ typedef PezzoViaggio = ({String chiave, String prima, String testo, TonoPezzo to
 
 /// Lo spazio che non va a capo: dentro un pezzo («arrivo 46%», «☀ 12°») non
 /// si va a capo, solo fra un pezzo e l'altro.
-const _nbsp = ' ';
+const _nbsp = '\u00A0';
+
+/// La pila davanti alla batteria, come la scrive l'auto.
+const _pila = '🔋$_nbsp';
 
 /// La riga del viaggio, la stessa della scheda dell'arrivo di Android Auto
 /// (`GuidaAuto.testoDelViaggio`): «🔋 51% · 200 km · arrivo 46% · ☀ 12°».
@@ -36,7 +39,7 @@ List<PezzoViaggio> pezziDelViaggio({
       (
         chiave: 'batteria-ora',
         prima: '',
-        testo: '🔋$_nbsp$circa${batteria.round()}%',
+        testo: '$_pila$circa${batteria.round()}%',
         tono: batteria < 20 ? TonoPezzo.rosso : TonoPezzo.normale,
       ),
       if (autonomiaKm != null)
@@ -89,10 +92,26 @@ class RigaDelViaggio extends StatelessWidget {
               children: [
                 if (i > 0) const TextSpan(text: ' · '),
                 if (p.prima.isNotEmpty) TextSpan(text: p.prima),
-                TextSpan(
-                  text: p.testo,
-                  style: TextStyle(color: colore(p.tono), fontWeight: FontWeight.w800),
-                ),
+                // Sul telefono la pila è l'icona dell'app, non l'emoji
+                // (che l'auto disegna da sé): uguale su ogni telefono.
+                if (p.testo.startsWith(_pila)) ...[
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Icon(
+                      Icons.battery_std_rounded,
+                      size: (base?.fontSize ?? 16) * 1.15,
+                      color: colore(p.tono) ?? base?.color,
+                    ),
+                  ),
+                  TextSpan(
+                    text: p.testo.substring(_pila.length),
+                    style: TextStyle(color: colore(p.tono), fontWeight: FontWeight.w800),
+                  ),
+                ] else
+                  TextSpan(
+                    text: p.testo,
+                    style: TextStyle(color: colore(p.tono), fontWeight: FontWeight.w800),
+                  ),
               ],
             ),
             key: Key(p.chiave),
