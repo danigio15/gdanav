@@ -1,0 +1,543 @@
+getpwuid_r did not find a match for uid 501
+Timestamp               Ty Process[PID:TID]
+2026-11-08 22:40:10.863 Df Runner[34741:18fc9] [com.apple.securityd:trust] (Trust 0x600003505ef0) trustd returned 4
+2026-11-08 22:40:10.863 Df Runner[34741:18fc9] [com.apple.CFNetwork:Default] Connection 2: TLS Trust result 0
+2026-11-08 22:40:10.863 Df Runner[34741:18fc9] [com.apple.network:boringssl] boringssl_context_evaluate_trust_async_external_block_invoke_3(1773) [C2.1.1.1:2][0x10276c870] Returning from external verify block with result: true
+2026-11-08 22:40:10.863 Df Runner[34741:18fc9] [com.apple.network:boringssl] boringssl_context_certificate_verify_callback(2014) [C2.1.1.1:2][0x10276c870] Certificate verification result: OK
+2026-11-08 22:40:10.863 Df Runner[34741:18fc9] [com.apple.network:boringssl] boringssl_context_info_handler(2407) [C2.1.1.1:2][0x10276c870] Client handshake state: TLS 1.3 client read_server_finished
+2026-11-08 22:40:10.863 Df Runner[34741:18fc9] [com.apple.network:boringssl] boringssl_context_info_handler(2407) [C2.1.1.1:2][0x10276c870] Client handshake state: TLS 1.3 client send_end_of_early_data
+2026-11-08 22:40:10.863 Df Runner[34741:18fc9] [com.apple.network:boringssl] boringssl_context_info_handler(2407) [C2.1.1.1:2][0x10276c870] Client handshake state: TLS 1.3 client send_client_encrypted_extensions
+2026-11-08 22:40:10.863 Df Runner[34741:18fc9] [com.apple.network:boringssl] boringssl_context_info_handler(2407) [C2.1.1.1:2][0x10276c870] Client handshake state: TLS 1.3 client send_client_certificate
+2026-11-08 22:40:10.863 Df Runner[34741:18fc9] [com.apple.network:boringssl] boringssl_context_info_handler(2407) [C2.1.1.1:2][0x10276c870] Client handshake state: TLS 1.3 client complete_second_flight
+2026-11-08 22:40:10.864 Df Runner[34741:18fc9] [com.apple.network:boringssl] boringssl_context_info_handler(2407) [C2.1.1.1:2][0x10276c870] Client handshake state: TLS 1.3 client done
+2026-11-08 22:40:10.864 Df Runner[34741:18fc9] [com.apple.network:boringssl] boringssl_context_info_handler(2407) [C2.1.1.1:2][0x10276c870] Client handshake state: TLS client finish_client_handshake
+2026-11-08 22:40:10.865 Df Runner[34741:18fc9] [com.apple.network:boringssl] boringssl_context_info_handler(2407) [C2.1.1.1:2][0x10276c870] Client handshake state: TLS client done
+2026-11-08 22:40:10.865 Df Runner[34741:18fc9] [com.apple.network:boringssl] boringssl_context_info_handler(2396) [C2.1.1.1:2][0x10276c870] Client handshake done
+2026-11-08 22:40:10.866 A  Runner[34741:18fc9] (Security) SecKeyCopyPublicBytes
+2026-11-08 22:40:10.867 A  Runner[34741:18fc9] (Security) SecKeyCopyAttributes
+2026-11-08 22:40:10.867 A  Runner[34741:18fc9] (Security) SecKeyCopyPublicBytes
+2026-11-08 22:40:10.868 Df Runner[34741:18fc9] [com.apple.network:boringssl] nw_protocol_boringssl_signal_connected(895) [C2.1.1.1:2][0x10276c870] TLS connected [server(0) version(0x0304) ciphersuite(TLS_AES_256_GCM_SHA384) group(0x11ec) signature_alg(0x0403) alpn(h2) resumed(0) offered_ticket(0) in_early_data(0) early_data_accepted(0) false_started(0) ocsp_received(0) sct_received(0) connect_time(838ms) flight_time(6ms) rtt(6ms) write_stalls(0) read_stalls(2) pake(0x0000)]
+2026-11-08 22:40:10.869 Df Runner[34741:18fc9] [com.apple.network:connection] nw_flow_connected [C2.1.1.1 IPv4#c02f8d02:443 in_progress socket-flow (satisfied (Path is satisfied), interface: en0)] Output protocol connected (CFNetworkConnection-2072216185)
+2026-11-08 22:40:10.870 Df Runner[34741:18fc9] [com.apple.network:connection] [C2.1.1.1 IPv4#c02f8d02:443 ready socket-flow (satisfied (Path is satisfied), interface: en0)] event: flow:child_finish_connect @0.907s
+2026-11-08 22:40:10.870 Df Runner[34741:18fc9] [com.apple.network:connection] [C2.1.1 Hostname#b37b2911:443 ready resolver (satisfied (Path is satisfied), interface: en0)] event: flow:child_finish_connect @0.907s
+2026-11-08 22:40:10.871 Df Runner[34741:18fc9] [com.apple.network:connection] [C2.1 Hostname#b37b2911:443 ready transform (satisfied (Path is satisfied), interface: en0)] event: flow:child_finish_connect @0.908s
+2026-11-08 22:40:10.872 Df Runner[34741:18fc9] [com.apple.network:connection] nw_flow_connected [C2 IPv4#c02f8d02:443 in_progress parent-flow (satisfied (Path is satisfied), interface: en0)] Output protocol connected (endpoint_flow)
+2026-11-08 22:40:10.874 Df Runner[34741:18fc9] [com.apple.network:connection] [C2 IPv4#c02f8d02:443 ready parent-flow (satisfied (Path is satisfied), interface: en0)] event: flow:finish_connect @0.911s
+2026-11-08 22:40:10.875 Df Runner[34741:18fc9] [com.apple.network:connection] nw_connection_report_state_with_handler_on_nw_queue [C2] reporting state ready
+2026-11-08 22:40:10.897 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <C715C18D-ABE0-4CC0-99BD-E52DCD83DB79>.<3> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:10.901 A  Runner[34741:19118] (Security) SecTrustEvaluateIfNecessary
+2026-11-08 22:40:10.904 A  Runner[34741:18fc4] (Security) SecItemDelete_ios
+2026-11-08 22:40:10.904 Df Runner[34741:18fc4] [com.apple.securityd:thread-local-client-debug] SecSecurityClientGet new thread!
+2026-11-08 22:40:10.905 A  Runner[34741:1911a] (Security) SecTrustEvaluateIfNecessary
+2026-11-08 22:40:10.906 A  Runner[34741:18fc4] (Security) SecItemDelete_ios
+2026-11-08 22:40:10.907 A  Runner[34741:18fbc] (Metal) Metal Compiling Shader
+2026-11-08 22:40:10.910 A  Runner[34741:18fc9] (Security) SecKeyCopyPublicBytes
+2026-11-08 22:40:10.910 A  Runner[34741:18fc9] (Security) SecKeyCopyAttributes
+2026-11-08 22:40:10.910 A  Runner[34741:18fc9] (Security) SecKeyCopyPublicBytes
+2026-11-08 22:40:10.911 Df Runner[34741:1911a] [com.apple.xpc:connection] [0x11ed07f40] activating connection: mach=true listener=false peer=false name=com.apple.trustd
+2026-11-08 22:40:10.911 Df Runner[34741:19118] [com.apple.xpc:connection] [0x1029c3ea0] activating connection: mach=true listener=false peer=false name=com.apple.trustd
+2026-11-08 22:40:10.915 A  Runner[34741:18fc9] (Security) SecKeyCopyPublicBytes
+2026-11-08 22:40:10.916 A  Runner[34741:18fc9] (Security) SecKeyCopyAttributes
+2026-11-08 22:40:10.916 A  Runner[34741:18fc9] (Security) SecKeyCopyPublicBytes
+2026-11-08 22:40:10.916 Df Runner[34741:18fc9] [com.apple.xpc:connection] [0x102724210] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+2026-11-08 22:40:10.917 Df Runner[34741:18fc9] [com.apple.CFNetwork:Default] Connection 2: connected successfully
+2026-11-08 22:40:10.917 Df Runner[34741:18fc9] [com.apple.CFNetwork:Default] Connection 2: TLS handshake complete
+2026-11-08 22:40:10.917 Df Runner[34741:18fc9] [com.apple.CFNetwork:Default] Connection 2: ready C(N) E(N)
+2026-11-08 22:40:10.917 Df Runner[34741:18fc9] [com.apple.network:connection] [C2] event: client:connection_reused @0.954s
+2026-11-08 22:40:10.917 Df Runner[34741:18fc9] [com.apple.network:connection] nw_protocol_socket_notify [C2.1.1.1:3] nw_protocol_notification_type_connection_idle is false
+2026-11-08 22:40:10.918 E  Runner[34741:18fc9] [com.apple.network:connection] nw_socket_set_connection_idle [C2.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-08 22:40:10.918 Df Runner[34741:18fc9] [com.apple.CFNetwork:Default] Task <B1EA2E20-FAFE-4ACB-B5CB-FACFC3F308E4>.<2> now using Connection 2
+2026-11-08 22:40:10.918 Df Runner[34741:18fc9] [com.apple.CFNetwork:Default] Task <B1EA2E20-FAFE-4ACB-B5CB-FACFC3F308E4>.<2> sent request, body N 0
+2026-11-08 22:40:10.923 Df Runner[34741:18fc9] [com.apple.CFNetwork:Default] Task <C715C18D-ABE0-4CC0-99BD-E52DCD83DB79>.<3> now using Connection 2
+2026-11-08 22:40:10.923 Df Runner[34741:18fc9] [com.apple.CFNetwork:Default] Task <C715C18D-ABE0-4CC0-99BD-E52DCD83DB79>.<3> sent request, body N 0
+2026-11-08 22:40:10.928 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <B1EA2E20-FAFE-4ACB-B5CB-FACFC3F308E4>.<2> received response, status 200 content U
+2026-11-08 22:40:10.928 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <B1EA2E20-FAFE-4ACB-B5CB-FACFC3F308E4>.<2> done using Connection 2
+2026-11-08 22:40:10.929 A  Runner[34741:18fc5] (Security) SecTrustEvaluateIfNecessary
+2026-11-08 22:40:10.929 Df Runner[34741:18fc5] [com.apple.xpc:connection] [0x10265fd00] activating connection: mach=true listener=false peer=false name=com.apple.trustd
+2026-11-08 22:40:11.257 Df Runner[34741:19118] [com.apple.xpc:connection] [0x1029c3ea0] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+2026-11-08 22:40:11.258 Df Runner[34741:1911a] [com.apple.xpc:connection] [0x11ed07f40] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+2026-11-08 22:40:11.262 Df Runner[34741:18fc5] [com.apple.xpc:connection] [0x10265fd00] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+2026-11-08 22:40:11.262 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <B1EA2E20-FAFE-4ACB-B5CB-FACFC3F308E4>.<2> response ended
+2026-11-08 22:40:11.262 Df Runner[34741:18fc9] [com.apple.CFNetwork:Summary] Task <B1EA2E20-FAFE-4ACB-B5CB-FACFC3F308E4>.<2> summary for task success {transaction_duration_ms=1372, response_status=200, connection=2, protocol="h2", domain_lookup_duration_ms=7, connect_duration_ms=864, secure_connection_duration_ms=838, private_relay=false, request_start_ms=1027, request_duration_ms=0, response_start_ms=1038, response_duration_ms=334, request_bytes=149, request_throughput_kbps=7096, response_bytes=2422, response_throughput_kbps=57, cache_hit=false}
+2026-11-08 22:40:11.263 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <B1EA2E20-FAFE-4ACB-B5CB-FACFC3F308E4>.<2> finished successfully
+2026-11-08 22:40:11.263 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <C715C18D-ABE0-4CC0-99BD-E52DCD83DB79>.<3> received response, status 200 content U
+2026-11-08 22:40:11.263 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <C715C18D-ABE0-4CC0-99BD-E52DCD83DB79>.<3> done using Connection 2
+2026-11-08 22:40:11.263 Df Runner[34741:18fc5] [com.apple.network:connection] [C2] event: client:connection_idle @1.300s
+2026-11-08 22:40:11.268 Df Runner[34741:18fc5] [com.apple.network:connection] nw_protocol_socket_notify [C2.1.1.1:3] nw_protocol_notification_type_connection_idle is true
+2026-11-08 22:40:11.268 E  Runner[34741:18fc5] [com.apple.network:connection] nw_socket_set_connection_idle [C2.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-08 22:40:11.269 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <C715C18D-ABE0-4CC0-99BD-E52DCD83DB79>.<3> response ended
+2026-11-08 22:40:11.269 Df Runner[34741:18fc5] [com.apple.CFNetwork:Summary] Task <C715C18D-ABE0-4CC0-99BD-E52DCD83DB79>.<3> summary for task success {transaction_duration_ms=358, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=12, request_duration_ms=0, response_start_ms=351, response_duration_ms=6, request_bytes=44, request_throughput_kbps=4453, response_bytes=45378, response_throughput_kbps=58827, cache_hit=false}
+2026-11-08 22:40:11.269 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <C715C18D-ABE0-4CC0-99BD-E52DCD83DB79>.<3> finished successfully
+2026-11-08 22:40:11.410 A  Runner[34741:18fbc] (Metal) Metal Compiling Shader
+2026-11-08 22:40:11.464 A  Runner[34741:18fbc] (Metal) Metal Compiling Shader
+2026-11-08 22:40:11.498 A  Runner[34741:18fbc] (Metal) Metal Compiling Shader
+2026-11-08 22:40:11.501 A  Runner[34741:18fc6] (Metal) Metal Compiling Shader
+2026-11-08 22:40:11.528 A  Runner[34741:18fc5] (Metal) Metal Compiling Shader
+2026-11-08 22:40:11.533 A  Runner[34741:18fbc] (Metal) Metal Compiling Shader
+2026-11-08 22:40:11.557 A  Runner[34741:18fc6] (Metal) Metal Compiling Shader
+2026-11-08 22:40:11.561 A  Runner[34741:18fbc] (Metal) Metal Compiling Shader
+2026-11-08 22:40:11.952 A  Runner[34741:18fc5] (Metal) Metal Compiling Shader
+2026-11-08 22:40:12.016 A  Runner[34741:18fbc] (Metal) Metal Compiling Shader
+2026-11-08 22:40:12.020 A  Runner[34741:18fbc] (Metal) Metal Compiling Shader
+2026-11-08 22:40:12.032 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <5B676BFF-5BB8-4A63-BFFB-2F8915E7BE5C>.<4> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.033 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <C468F6B7-E5AB-415B-A9DD-3B9CEE4F42BC>.<5> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.033 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <A7D22819-2E53-46C3-AC7D-AF5D1051DE9B>.<6> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.033 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <87BBD5AF-D52A-436E-BA79-A15859F8488D>.<7> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.038 Df Runner[34741:1911c] [com.apple.network:connection] [C2] event: client:connection_reused @2.075s
+2026-11-08 22:40:12.040 Df Runner[34741:1911c] [com.apple.network:connection] nw_protocol_socket_notify [C2.1.1.1:3] nw_protocol_notification_type_connection_idle is false
+2026-11-08 22:40:12.040 E  Runner[34741:1911c] [com.apple.network:connection] nw_socket_set_connection_idle [C2.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-08 22:40:12.041 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <5B676BFF-5BB8-4A63-BFFB-2F8915E7BE5C>.<4> now using Connection 2
+2026-11-08 22:40:12.042 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <C468F6B7-E5AB-415B-A9DD-3B9CEE4F42BC>.<5> now using Connection 2
+2026-11-08 22:40:12.042 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <A7D22819-2E53-46C3-AC7D-AF5D1051DE9B>.<6> now using Connection 2
+2026-11-08 22:40:12.044 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <87BBD5AF-D52A-436E-BA79-A15859F8488D>.<7> now using Connection 2
+2026-11-08 22:40:12.044 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <5B676BFF-5BB8-4A63-BFFB-2F8915E7BE5C>.<4> sent request, body N 0
+2026-11-08 22:40:12.044 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <C468F6B7-E5AB-415B-A9DD-3B9CEE4F42BC>.<5> sent request, body N 0
+2026-11-08 22:40:12.044 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <A7D22819-2E53-46C3-AC7D-AF5D1051DE9B>.<6> sent request, body N 0
+2026-11-08 22:40:12.044 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <87BBD5AF-D52A-436E-BA79-A15859F8488D>.<7> sent request, body N 0
+2026-11-08 22:40:12.066 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <5B676BFF-5BB8-4A63-BFFB-2F8915E7BE5C>.<4> received response, status 200 content K
+2026-11-08 22:40:12.066 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <A7D22819-2E53-46C3-AC7D-AF5D1051DE9B>.<6> received response, status 200 content K
+2026-11-08 22:40:12.066 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <5B676BFF-5BB8-4A63-BFFB-2F8915E7BE5C>.<4> done using Connection 2
+2026-11-08 22:40:12.067 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <5B676BFF-5BB8-4A63-BFFB-2F8915E7BE5C>.<4> response ended
+2026-11-08 22:40:12.067 Df Runner[34741:1911c] [com.apple.CFNetwork:Summary] Task <5B676BFF-5BB8-4A63-BFFB-2F8915E7BE5C>.<4> summary for task success {transaction_duration_ms=34, response_status=200, connection=2, reused=1, reused_after_ms=772, request_start_ms=10, request_duration_ms=0, response_start_ms=32, response_duration_ms=1, request_bytes=44, request_throughput_kbps=3557, response_bytes=49525, response_throughput_kbps=272490, cache_hit=false}
+2026-11-08 22:40:12.067 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <5B676BFF-5BB8-4A63-BFFB-2F8915E7BE5C>.<4> finished successfully
+2026-11-08 22:40:12.073 Df Runner[34741:18fbc] [com.apple.CFNetwork:Default] Task <C468F6B7-E5AB-415B-A9DD-3B9CEE4F42BC>.<5> received response, status 200 content K
+2026-11-08 22:40:12.082 Df Runner[34741:18fbc] [com.apple.CFNetwork:Default] Task <87BBD5AF-D52A-436E-BA79-A15859F8488D>.<7> received response, status 200 content K
+2026-11-08 22:40:12.085 Df Runner[34741:18fbc] [com.apple.CFNetwork:Default] Task <A7D22819-2E53-46C3-AC7D-AF5D1051DE9B>.<6> done using Connection 2
+2026-11-08 22:40:12.085 Df Runner[34741:18fbc] [com.apple.CFNetwork:Default] Task <87BBD5AF-D52A-436E-BA79-A15859F8488D>.<7> done using Connection 2
+2026-11-08 22:40:12.085 Df Runner[34741:18fbc] [com.apple.CFNetwork:Default] Task <C468F6B7-E5AB-415B-A9DD-3B9CEE4F42BC>.<5> done using Connection 2
+2026-11-08 22:40:12.085 Df Runner[34741:18fbc] [com.apple.network:connection] [C2] event: client:connection_idle @2.122s
+2026-11-08 22:40:12.085 Df Runner[34741:18fbc] [com.apple.network:connection] nw_protocol_socket_notify [C2.1.1.1:3] nw_protocol_notification_type_connection_idle is true
+2026-11-08 22:40:12.085 E  Runner[34741:18fbc] [com.apple.network:connection] nw_socket_set_connection_idle [C2.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-08 22:40:12.090 Df Runner[34741:18fbc] [com.apple.CFNetwork:Default] Task <A7D22819-2E53-46C3-AC7D-AF5D1051DE9B>.<6> response ended
+2026-11-08 22:40:12.090 Df Runner[34741:18fbc] [com.apple.CFNetwork:Default] Task <87BBD5AF-D52A-436E-BA79-A15859F8488D>.<7> response ended
+2026-11-08 22:40:12.090 Df Runner[34741:18fc5] [com.apple.CFNetwork:Summary] Task <A7D22819-2E53-46C3-AC7D-AF5D1051DE9B>.<6> summary for task success {transaction_duration_ms=56, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=10, request_duration_ms=0, response_start_ms=32, response_duration_ms=24, request_bytes=45, request_throughput_kbps=3129, response_bytes=390630, response_throughput_kbps=128634, cache_hit=false}
+2026-11-08 22:40:12.090 Df Runner[34741:18fbc] [com.apple.CFNetwork:Default] Task <C468F6B7-E5AB-415B-A9DD-3B9CEE4F42BC>.<5> response ended
+2026-11-08 22:40:12.090 Df Runner[34741:18fc5] [com.apple.CFNetwork:Summary] Task <87BBD5AF-D52A-436E-BA79-A15859F8488D>.<7> summary for task success {transaction_duration_ms=56, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=10, request_duration_ms=0, response_start_ms=48, response_duration_ms=8, request_bytes=45, request_throughput_kbps=2975, response_bytes=211311, response_throughput_kbps=203648, cache_hit=false}
+2026-11-08 22:40:12.090 Df Runner[34741:18fbc] [com.apple.CFNetwork:Default] Task <A7D22819-2E53-46C3-AC7D-AF5D1051DE9B>.<6> finished successfully
+2026-11-08 22:40:12.090 Df Runner[34741:18fc5] [com.apple.CFNetwork:Summary] Task <C468F6B7-E5AB-415B-A9DD-3B9CEE4F42BC>.<5> summary for task success {transaction_duration_ms=57, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=10, request_duration_ms=0, response_start_ms=39, response_duration_ms=17, request_bytes=45, request_throughput_kbps=3304, response_bytes=407931, response_throughput_kbps=186152, cache_hit=false}
+2026-11-08 22:40:12.091 Df Runner[34741:18fbc] [com.apple.CFNetwork:Default] Task <87BBD5AF-D52A-436E-BA79-A15859F8488D>.<7> finished successfully
+2026-11-08 22:40:12.092 Df Runner[34741:18fbc] [com.apple.CFNetwork:Default] Task <C468F6B7-E5AB-415B-A9DD-3B9CEE4F42BC>.<5> finished successfully
+2026-11-08 22:40:12.214 A  Runner[34741:1911c] (Metal) Metal Compiling Shader
+2026-11-08 22:40:12.247 A  Runner[34741:1911c] (Metal) Metal Compiling Shader
+2026-11-08 22:40:12.276 A  Runner[34741:18fc5] (Metal) Metal Compiling Shader
+2026-11-08 22:40:12.300 A  Runner[34741:1911c] (Metal) Metal Compiling Shader
+2026-11-08 22:40:12.302 A  Runner[34741:1911c] (Metal) Metal Compiling Shader
+2026-11-08 22:40:12.307 A  Runner[34741:1911c] (Metal) Metal Compiling Shader
+2026-11-08 22:40:12.309 A  Runner[34741:1911c] (Metal) Metal Compiling Shader
+2026-11-08 22:40:12.891 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <13E61117-7EA0-4DE6-8DBE-DF22C5F39B5D>.<8> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.893 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <6A5AA7DA-4286-4B97-BE1F-0914176FBAE0>.<9> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.893 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <6FDCA7E2-1E9A-4263-B4AA-DEA0DA661B2F>.<10> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.893 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <769E9FE4-6B4B-4D25-89E7-6AD829D6560F>.<11> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.894 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <ADA36304-52CE-4019-8CA4-8C229ED95058>.<12> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.894 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <B897C5F9-3D8B-4044-B40F-D85D8ABDAF2A>.<13> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.894 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <0CAF5C67-C751-4BD3-8D44-529CD87B08D9>.<14> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.898 Df Runner[34741:18fc5] [com.apple.network:connection] [C2] event: client:connection_reused @2.935s
+2026-11-08 22:40:12.916 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <A47BFE0B-7A6F-4F8D-A3BF-93B049EDDB5D>.<15> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.923 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <709B4A76-B8F9-410B-8E18-2EC39AC51E51>.<16> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.929 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <FD5F239B-7BB8-45B8-9304-6928CB482F83>.<17> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.929 Df Runner[34741:18fc5] [com.apple.network:connection] nw_protocol_socket_notify [C2.1.1.1:3] nw_protocol_notification_type_connection_idle is false
+2026-11-08 22:40:12.930 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <B840B8FB-BE5A-49B6-8438-88FC5CE2125F>.<18> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.930 E  Runner[34741:18fc5] [com.apple.network:connection] nw_socket_set_connection_idle [C2.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-08 22:40:12.931 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <F7592600-8D11-4A9A-86EF-BD60E03ED74F>.<19> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.932 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <13E61117-7EA0-4DE6-8DBE-DF22C5F39B5D>.<8> now using Connection 2
+2026-11-08 22:40:12.933 Df Runner[34741:190ca] [com.apple.CFNetwork:Default] Task <A2076FD4-8EA2-4BF9-BDB9-D617604E0A43>.<20> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-08 22:40:12.934 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <6A5AA7DA-4286-4B97-BE1F-0914176FBAE0>.<9> now using Connection 2
+2026-11-08 22:40:12.944 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <6FDCA7E2-1E9A-4263-B4AA-DEA0DA661B2F>.<10> now using Connection 2
+2026-11-08 22:40:12.945 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <769E9FE4-6B4B-4D25-89E7-6AD829D6560F>.<11> now using Connection 2
+2026-11-08 22:40:12.946 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <ADA36304-52CE-4019-8CA4-8C229ED95058>.<12> now using Connection 2
+2026-11-08 22:40:12.949 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <B897C5F9-3D8B-4044-B40F-D85D8ABDAF2A>.<13> now using Connection 2
+2026-11-08 22:40:12.953 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <0CAF5C67-C751-4BD3-8D44-529CD87B08D9>.<14> now using Connection 2
+2026-11-08 22:40:12.953 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <A47BFE0B-7A6F-4F8D-A3BF-93B049EDDB5D>.<15> now using Connection 2
+2026-11-08 22:40:12.953 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <709B4A76-B8F9-410B-8E18-2EC39AC51E51>.<16> now using Connection 2
+2026-11-08 22:40:12.953 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <FD5F239B-7BB8-45B8-9304-6928CB482F83>.<17> now using Connection 2
+2026-11-08 22:40:12.953 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <B840B8FB-BE5A-49B6-8438-88FC5CE2125F>.<18> now using Connection 2
+2026-11-08 22:40:12.953 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <F7592600-8D11-4A9A-86EF-BD60E03ED74F>.<19> now using Connection 2
+2026-11-08 22:40:12.953 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <A2076FD4-8EA2-4BF9-BDB9-D617604E0A43>.<20> now using Connection 2
+2026-11-08 22:40:12.953 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <13E61117-7EA0-4DE6-8DBE-DF22C5F39B5D>.<8> sent request, body N 0
+2026-11-08 22:40:12.953 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <6A5AA7DA-4286-4B97-BE1F-0914176FBAE0>.<9> sent request, body N 0
+2026-11-08 22:40:12.953 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <6FDCA7E2-1E9A-4263-B4AA-DEA0DA661B2F>.<10> sent request, body N 0
+2026-11-08 22:40:12.954 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <769E9FE4-6B4B-4D25-89E7-6AD829D6560F>.<11> sent request, body N 0
+2026-11-08 22:40:12.954 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <ADA36304-52CE-4019-8CA4-8C229ED95058>.<12> sent request, body N 0
+2026-11-08 22:40:12.954 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <B897C5F9-3D8B-4044-B40F-D85D8ABDAF2A>.<13> sent request, body N 0
+2026-11-08 22:40:12.954 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <0CAF5C67-C751-4BD3-8D44-529CD87B08D9>.<14> sent request, body N 0
+2026-11-08 22:40:12.954 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <A47BFE0B-7A6F-4F8D-A3BF-93B049EDDB5D>.<15> sent request, body N 0
+2026-11-08 22:40:12.954 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <709B4A76-B8F9-410B-8E18-2EC39AC51E51>.<16> sent request, body N 0
+2026-11-08 22:40:12.954 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <FD5F239B-7BB8-45B8-9304-6928CB482F83>.<17> sent request, body N 0
+2026-11-08 22:40:12.954 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <B840B8FB-BE5A-49B6-8438-88FC5CE2125F>.<18> sent request, body N 0
+2026-11-08 22:40:12.954 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <F7592600-8D11-4A9A-86EF-BD60E03ED74F>.<19> sent request, body N 0
+2026-11-08 22:40:12.954 Df Runner[34741:18fc5] [com.apple.CFNetwork:Default] Task <A2076FD4-8EA2-4BF9-BDB9-D617604E0A43>.<20> sent request, body N 0
+2026-11-08 22:40:12.977 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <13E61117-7EA0-4DE6-8DBE-DF22C5F39B5D>.<8> received response, status 200 content U
+2026-11-08 22:40:12.977 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <6A5AA7DA-4286-4B97-BE1F-0914176FBAE0>.<9> received response, status 200 content U
+2026-11-08 22:40:12.977 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <6FDCA7E2-1E9A-4263-B4AA-DEA0DA661B2F>.<10> received response, status 200 content U
+2026-11-08 22:40:12.977 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <13E61117-7EA0-4DE6-8DBE-DF22C5F39B5D>.<8> done using Connection 2
+2026-11-08 22:40:12.977 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <6A5AA7DA-4286-4B97-BE1F-0914176FBAE0>.<9> done using Connection 2
+2026-11-08 22:40:12.977 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <6FDCA7E2-1E9A-4263-B4AA-DEA0DA661B2F>.<10> done using Connection 2
+2026-11-08 22:40:12.979 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <13E61117-7EA0-4DE6-8DBE-DF22C5F39B5D>.<8> response ended
+2026-11-08 22:40:13.003 Df Runner[34741:18fc5] [com.apple.CFNetwork:Summary] Task <13E61117-7EA0-4DE6-8DBE-DF22C5F39B5D>.<8> summary for task success {transaction_duration_ms=106, response_status=200, connection=2, reused=1, reused_after_ms=846, request_start_ms=56, request_duration_ms=0, response_start_ms=80, response_duration_ms=26, request_bytes=49, request_throughput_kbps=2992, response_bytes=47046, response_throughput_kbps=14307, cache_hit=false}
+2026-11-08 22:40:13.003 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <6A5AA7DA-4286-4B97-BE1F-0914176FBAE0>.<9> response ended
+2026-11-08 22:40:13.003 Df Runner[34741:18fbc] [com.apple.CFNetwork:Default] Task <13E61117-7EA0-4DE6-8DBE-DF22C5F39B5D>.<8> finished successfully
+2026-11-08 22:40:13.003 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <6FDCA7E2-1E9A-4263-B4AA-DEA0DA661B2F>.<10> response ended
+2026-11-08 22:40:13.003 Df Runner[34741:18fc5] [com.apple.CFNetwork:Summary] Task <6A5AA7DA-4286-4B97-BE1F-0914176FBAE0>.<9> summary for task success {transaction_duration_ms=106, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=56, request_duration_ms=0, response_start_ms=80, response_duration_ms=26, request_bytes=49, request_throughput_kbps=2684, response_bytes=40519, response_throughput_kbps=12209, cache_hit=false}
+2026-11-08 22:40:13.004 Df Runner[34741:18fbc] [com.apple.CFNetwork:Default] Task <6A5AA7DA-4286-4B97-BE1F-0914176FBAE0>.<9> finished successfully
+2026-11-08 22:40:13.004 Df Runner[34741:18fc6] [com.apple.CFNetwork:Summary] Task <6FDCA7E2-1E9A-4263-B4AA-DEA0DA661B2F>.<10> summary for task success {transaction_duration_ms=106, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=56, request_duration_ms=0, response_start_ms=80, response_duration_ms=26, request_bytes=48, request_throughput_kbps=1738, response_bytes=37932, response_throughput_kbps=11416, cache_hit=false}
+2026-11-08 22:40:13.004 Df Runner[34741:18fbc] [com.apple.CFNetwork:Default] Task <6FDCA7E2-1E9A-4263-B4AA-DEA0DA661B2F>.<10> finished successfully
+2026-11-08 22:40:13.005 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <769E9FE4-6B4B-4D25-89E7-6AD829D6560F>.<11> received response, status 200 content U
+2026-11-08 22:40:13.005 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <ADA36304-52CE-4019-8CA4-8C229ED95058>.<12> received response, status 200 content U
+2026-11-08 22:40:13.005 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <A47BFE0B-7A6F-4F8D-A3BF-93B049EDDB5D>.<15> received response, status 200 content U
+2026-11-08 22:40:13.005 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <0CAF5C67-C751-4BD3-8D44-529CD87B08D9>.<14> received response, status 200 content U
+2026-11-08 22:40:13.005 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <FD5F239B-7BB8-45B8-9304-6928CB482F83>.<17> received response, status 200 content U
+2026-11-08 22:40:13.005 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <B897C5F9-3D8B-4044-B40F-D85D8ABDAF2A>.<13> received response, status 200 content U
+2026-11-08 22:40:13.005 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <709B4A76-B8F9-410B-8E18-2EC39AC51E51>.<16> received response, status 200 content U
+2026-11-08 22:40:13.005 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <B840B8FB-BE5A-49B6-8438-88FC5CE2125F>.<18> received response, status 200 content U
+2026-11-08 22:40:13.005 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <A2076FD4-8EA2-4BF9-BDB9-D617604E0A43>.<20> received response, status 200 content U
+2026-11-08 22:40:13.005 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <F7592600-8D11-4A9A-86EF-BD60E03ED74F>.<19> received response, status 200 content U
+2026-11-08 22:40:13.005 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <769E9FE4-6B4B-4D25-89E7-6AD829D6560F>.<11> done using Connection 2
+2026-11-08 22:40:13.005 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <ADA36304-52CE-4019-8CA4-8C229ED95058>.<12> done using Connection 2
+2026-11-08 22:40:13.005 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <A47BFE0B-7A6F-4F8D-A3BF-93B049EDDB5D>.<15> done using Connection 2
+2026-11-08 22:40:13.005 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <0CAF5C67-C751-4BD3-8D44-529CD87B08D9>.<14> done using Connection 2
+2026-11-08 22:40:13.005 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <FD5F239B-7BB8-45B8-9304-6928CB482F83>.<17> done using Connection 2
+2026-11-08 22:40:13.005 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <B897C5F9-3D8B-4044-B40F-D85D8ABDAF2A>.<13> done using Connection 2
+2026-11-08 22:40:13.006 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <709B4A76-B8F9-410B-8E18-2EC39AC51E51>.<16> done using Connection 2
+2026-11-08 22:40:13.006 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <B840B8FB-BE5A-49B6-8438-88FC5CE2125F>.<18> done using Connection 2
+2026-11-08 22:40:13.006 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <A2076FD4-8EA2-4BF9-BDB9-D617604E0A43>.<20> done using Connection 2
+2026-11-08 22:40:13.006 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <F7592600-8D11-4A9A-86EF-BD60E03ED74F>.<19> done using Connection 2
+2026-11-08 22:40:13.006 Df Runner[34741:1911c] [com.apple.network:connection] [C2] event: client:connection_idle @3.043s
+2026-11-08 22:40:13.006 Df Runner[34741:1911c] [com.apple.network:connection] nw_protocol_socket_notify [C2.1.1.1:3] nw_protocol_notification_type_connection_idle is true
+2026-11-08 22:40:13.006 E  Runner[34741:1911c] [com.apple.network:connection] nw_socket_set_connection_idle [C2.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-08 22:40:13.011 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <769E9FE4-6B4B-4D25-89E7-6AD829D6560F>.<11> response ended
+2026-11-08 22:40:13.011 Df Runner[34741:18fbc] [com.apple.CFNetwork:Summary] Task <769E9FE4-6B4B-4D25-89E7-6AD829D6560F>.<11> summary for task success {transaction_duration_ms=113, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=56, request_duration_ms=0, response_start_ms=107, response_duration_ms=5, request_bytes=47, request_throughput_kbps=1305, response_bytes=44710, response_throughput_kbps=60033, cache_hit=false}
+2026-11-08 22:40:13.011 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <ADA36304-52CE-4019-8CA4-8C229ED95058>.<12> response ended
+2026-11-08 22:40:13.011 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <A47BFE0B-7A6F-4F8D-A3BF-93B049EDDB5D>.<15> response ended
+2026-11-08 22:40:13.011 Df Runner[34741:18fbc] [com.apple.CFNetwork:Summary] Task <ADA36304-52CE-4019-8CA4-8C229ED95058>.<12> summary for task success {transaction_duration_ms=113, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=56, request_duration_ms=0, response_start_ms=107, response_duration_ms=5, request_bytes=46, request_throughput_kbps=1075, response_bytes=58545, response_throughput_kbps=79074, cache_hit=false}
+2026-11-08 22:40:13.011 Df Runner[34741:18fc6] [com.apple.CFNetwork:Default] Task <769E9FE4-6B4B-4D25-89E7-6AD829D6560F>.<11> finished successfully
+2026-11-08 22:40:13.011 Df Runner[34741:18fbc] [com.apple.CFNetwork:Summary] Task <A47BFE0B-7A6F-4F8D-A3BF-93B049EDDB5D>.<15> summary for task success {transaction_duration_ms=84, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=27, request_duration_ms=0, response_start_ms=78, response_duration_ms=5, request_bytes=47, request_throughput_kbps=725, response_bytes=51773, response_throughput_kbps=70081, cache_hit=false}
+2026-11-08 22:40:13.011 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <0CAF5C67-C751-4BD3-8D44-529CD87B08D9>.<14> response ended
+2026-11-08 22:40:13.011 Df Runner[34741:18fc6] [com.apple.CFNetwork:Default] Task <ADA36304-52CE-4019-8CA4-8C229ED95058>.<12> finished successfully
+2026-11-08 22:40:13.017 Df Runner[34741:18fbc] [com.apple.CFNetwork:Summary] Task <0CAF5C67-C751-4BD3-8D44-529CD87B08D9>.<14> summary for task success {transaction_duration_ms=100, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=36, request_duration_ms=0, response_start_ms=88, response_duration_ms=12, request_bytes=46, request_throughput_kbps=801, response_bytes=49178, response_throughput_kbps=32455, cache_hit=false}
+2026-11-08 22:40:13.017 Df Runner[34741:18fc6] [com.apple.CFNetwork:Default] Task <A47BFE0B-7A6F-4F8D-A3BF-93B049EDDB5D>.<15> finished successfully
+2026-11-08 22:40:13.017 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <FD5F239B-7BB8-45B8-9304-6928CB482F83>.<17> response ended
+2026-11-08 22:40:13.017 Df Runner[34741:18fbc] [com.apple.CFNetwork:Summary] Task <FD5F239B-7BB8-45B8-9304-6928CB482F83>.<17> summary for task success {transaction_duration_ms=87, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=23, request_duration_ms=0, response_start_ms=74, response_duration_ms=12, request_bytes=47, request_throughput_kbps=592, response_bytes=24915, response_throughput_kbps=16105, cache_hit=false}
+2026-11-08 22:40:13.017 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <B897C5F9-3D8B-4044-B40F-D85D8ABDAF2A>.<13> response ended
+2026-11-08 22:40:13.018 Df Runner[34741:18fc6] [com.apple.CFNetwork:Default] Task <0CAF5C67-C751-4BD3-8D44-529CD87B08D9>.<14> finished successfully
+2026-11-08 22:40:13.018 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <709B4A76-B8F9-410B-8E18-2EC39AC51E51>.<16> response ended
+2026-11-08 22:40:13.018 Df Runner[34741:18fbc] [com.apple.CFNetwork:Summary] Task <B897C5F9-3D8B-4044-B40F-D85D8ABDAF2A>.<13> summary for task success {transaction_duration_ms=120, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=56, request_duration_ms=0, response_start_ms=107, response_duration_ms=12, request_bytes=47, request_throughput_kbps=923, response_bytes=91358, response_throughput_kbps=58399, cache_hit=false}
+2026-11-08 22:40:13.018 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <B840B8FB-BE5A-49B6-8438-88FC5CE2125F>.<18> response ended
+2026-11-08 22:40:13.018 Df Runner[34741:18fbc] [com.apple.CFNetwork:Summary] Task <709B4A76-B8F9-410B-8E18-2EC39AC51E51>.<16> summary for task success {transaction_duration_ms=88, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=23, request_duration_ms=0, response_start_ms=75, response_duration_ms=12, request_bytes=47, request_throughput_kbps=656, response_bytes=54213, response_throughput_kbps=34198, cache_hit=false}
+2026-11-08 22:40:13.018 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <A2076FD4-8EA2-4BF9-BDB9-D617604E0A43>.<20> response ended
+2026-11-08 22:40:13.018 Df Runner[34741:18fbc] [com.apple.CFNetwork:Summary] Task <B840B8FB-BE5A-49B6-8438-88FC5CE2125F>.<18> summary for task success {transaction_duration_ms=87, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=22, request_duration_ms=0, response_start_ms=74, response_duration_ms=12, request_bytes=47, request_throughput_kbps=542, response_bytes=62049, response_throughput_kbps=38777, cache_hit=false}
+2026-11-08 22:40:13.018 Df Runner[34741:1911c] [com.apple.CFNetwork:Default] Task <F7592600-8D11-4A9A-86EF-BD60E03ED74F>.<19> response ended
+2026-11-08 22:40:13.018 Df Runner[34741:18fbc] [com.apple.CFNetwork:Summary] Task <A2076FD4-8EA2-4BF9-BDB9-D617604E0A43>.<20> summary for task success {transaction_duration_ms=75, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=10, request_duration_ms=0, response_start_ms=62, response_duration_ms=13, request_bytes=46, request_throughput_kbps=452, response_bytes=56990, response_throughput_kbps=34922, cache_hit=false}
+2026-11-08 22:40:13.019 Df Runner[34741:18fbc] [com.apple.CFNetwork:Summary] Task <F7592600-8D11-4A9A-86EF-BD60E03ED74F>.<19> summary for task success {transaction_duration_ms=85, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=20, request_duration_ms=0, response_start_ms=72, response_duration_ms=13, request_bytes=47, request_throughput_kbps=507, response_bytes=75441, response_throughput_kbps=45521, cache_hit=false}
+2026-11-08 22:40:13.019 Df Runner[34741:18fc6] [com.apple.CFNetwork:Default] Task <FD5F239B-7BB8-45B8-9304-6928CB482F83>.<17> finished successfully
+2026-11-08 22:40:13.019 Df Runner[34741:18fc6] [com.apple.CFNetwork:Default] Task <B897C5F9-3D8B-4044-B40F-D85D8ABDAF2A>.<13> finished successfully
+2026-11-08 22:40:13.019 Df Runner[34741:18fc6] [com.apple.CFNetwork:Default] Task <709B4A76-B8F9-410B-8E18-2EC39AC51E51>.<16> finished successfully
+2026-11-08 22:40:13.019 Df Runner[34741:18fc6] [com.apple.CFNetwork:Default] Task <B840B8FB-BE5A-49B6-8438-88FC5CE2125F>.<18> finished successfully
+2026-11-08 22:40:13.019 Df Runner[34741:18fc6] [com.apple.CFNetwork:Default] Task <A2076FD4-8EA2-4BF9-BDB9-D617604E0A43>.<20> finished successfully
+2026-11-08 22:40:13.020 Df Runner[34741:18fc6] [com.apple.CFNetwork:Default] Task <F7592600-8D11-4A9A-86EF-BD60E03ED74F>.<19> finished successfully
+2026-11-08 22:40:13.036 A  Runner[34741:1911c] (Metal) Metal Compiling Shader
+2026-11-08 22:40:13.099 A  Runner[34741:18fbc] (Metal) Metal Compiling Shader
+2026-11-08 22:40:13.101 A  Runner[34741:1911c] (Metal) Metal Compiling Shader
+2026-11-08 22:40:51.210 Df Runner[34741:18fa7] [com.apple.KeyboardArbiter:Client] RX sceneBecameFocused:(null)
+2026-11-08 22:40:59.003 A  Runner[34741:1a1d7] (RunningBoardServices) didChangeInheritances
+2026-11-08 22:40:59.005 Df Runner[34741:18fbc] [com.apple.BoardServices:XPCErrors] [C:3] Alloc 36323:FBWorkspace-com.apple.CarPlayTemplateUIHost
+2026-11-08 22:40:59.005 Df Runner[34741:18fbc] [com.apple.xpc:connection] [0x10268fa70] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-11-08 22:40:59.005 Df Runner[34741:18fbc] [com.apple.FrontBoard:Common] FBSWorkspace registering source: 36323:FBWorkspace-com.apple.CarPlayTemplateUIHost
+2026-11-08 22:40:59.006 Df Runner[34741:18fbc] [com.apple.FrontBoard:Common] FBSWorkspace connected to endpoint : <BSServiceConnectionEndpoint: 0x6000002c61c0; target: 36323:FBWorkspace-com.apple.CarPlayTemplateUIHost; service: com.apple.frontboard.workspace-service>
+2026-11-08 22:40:59.006 Df Runner[34741:18fbc] [com.apple.FrontBoard:Common] <FBSWorkspaceScenesClient:0x600003021d40 36323:FBWorkspace-com.apple.CarPlayTemplateUIHost> attempting immediate handshake from activate
+2026-11-08 22:40:59.006 Df Runner[34741:18fbc] [com.apple.FrontBoard:Common] <FBSWorkspaceScenesClient:0x600003021d40 36323:FBWorkspace-com.apple.CarPlayTemplateUIHost> sent handshake
+2026-11-08 22:40:59.008 E  Runner[34741:0] [com.apple.os_debug_log:] assertion failed: 24H232 23C54: libxpc.dylib + 56152 [5D3B42DD-89E9-36F1-8E20-F4BBF2B7644E]: 0x87
+2026-11-08 22:40:59.120 Df Runner[34741:1a1d7] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneCarPlaySessionSettings on FBSSceneSettings
+2026-11-08 22:40:59.122 Df Runner[34741:1a1d7] [com.apple.FrontBoard:SceneExtension] CPUIMutableTemplateApplicationSceneSettings setting counterpart class: CPUITemplateApplicationSceneSettings
+2026-11-08 22:40:59.124 Df Runner[34741:18fa7] [com.apple.UIKit:UIScreen] Evaluated capturing state as 0 on <UIScreen: 0x1029b4b60> for initial
+2026-11-08 22:40:59.124 Df Runner[34741:18fa7] [com.apple.UIKit:UIScreen] Evaluated capturing state as 0 on <UIScreen: 0x1029b4b60> for CADisplay KVO
+2026-11-08 22:40:59.130 E  Runner[34741:18fbc] [com.apple.carkit:General] Provided status bar edge is invalid, assigning default
+2026-11-08 22:40:59.130 Df Runner[34741:18fbc] [com.apple.carkit:DisplayScale] Physical size is zero, applying default size Result({0, 0}) = PointSize({0, 0})/CROptimalPointsPerMM(0.376647834274953)
+2026-11-08 22:40:59.132 Df Runner[34741:18fbc] [com.apple.carkit:General] connected session <CARSession: 0x600002150c80> configuration: [<CARSessionConfiguration: 0x11ede7870> session: (null), name: (null), modelName: (null), manufacturer: (null), serialNumber: (null), transport: USB, ETC supported: NO, right hand drive: NO, limitableUserInterfaces: (), manufacturerIconLabel: OEM, manufacturerIconVisible: YES, night mode supported: NO, supports AC_BACK: YES, screens: (
+    "<CARScreenInfo: 0x600003760000>, identifier: PurpleTVOut, availableInteractionModels: Touch, Knob, primaryInteractionModel: Knob, isLimited: NO, isNightMode: NO, supportsHiFi: NO, maxFPS: 0, physicalSize: {w: 0.000000, h: 0.000000}, pixelSize: {w: 0.000000, h: 0.000000}, wantsCornerMasks: NO, initialFocusOwner: YES, viewAreas: (\134n    \134"<CARScreenViewArea: 0x600003337c00> {visibleFrame: {x: 0.000000, y: 0.000000, w: 800.000000, h: 480.000000} safeFrame: {x: 0.000000, y: 0.000000, w: 800.000000, h: 480.000000} displaysTransitionControl: 0 statusBarEdge: 0 supportsFocusTransfer: no}\134"\134n), displayScaleInfo: DisplayInfo: phys
+2026-11-08 22:40:59.132 Df Runner[34741:18fa7] [com.apple.carkit:General] disconnected session <CARSession: 0x600002150c80>
+2026-11-08 22:40:59.132 E  Runner[34741:18fa7] [com.apple.carkit:General] Provided status bar edge is invalid, assigning default
+2026-11-08 22:40:59.132 Df Runner[34741:18fa7] [com.apple.carkit:DisplayScale] Physical size is zero, applying default size Result({0, 0}) = PointSize({0, 0})/CROptimalPointsPerMM(0.376647834274953)
+2026-11-08 22:40:59.133 Df Runner[34741:18fa7] [com.apple.carkit:General] connected session <CARSession: 0x60000218ce10> configuration: [<CARSessionConfiguration: 0x102764330> session: (null), name: (null), modelName: (null), manufacturer: (null), serialNumber: (null), transport: USB, ETC supported: NO, right hand drive: NO, limitableUserInterfaces: (), manufacturerIconLabel: OEM, manufacturerIconVisible: YES, night mode supported: NO, supports AC_BACK: YES, screens: (
+    "<CARScreenInfo: 0x6000037664c0>, identifier: PurpleTVOut, availableInteractionModels: Touch, Knob, primaryInteractionModel: Knob, isLimited: NO, isNightMode: NO, supportsHiFi: NO, maxFPS: 0, physicalSize: {w: 0.000000, h: 0.000000}, pixelSize: {w: 0.000000, h: 0.000000}, wantsCornerMasks: NO, initialFocusOwner: YES, viewAreas: (\134n    \134"<CARScreenViewArea: 0x600003331f40> {visibleFrame: {x: 0.000000, y: 0.000000, w: 800.000000, h: 480.000000} safeFrame: {x: 0.000000, y: 0.000000, w: 800.000000, h: 480.000000} displaysTransitionControl: 0 statusBarEdge: 0 supportsFocusTransfer: no}\134"\134n), displayScaleInfo: DisplayInfo: phys
+2026-11-08 22:40:59.153 Df Runner[34741:18fa7] [com.apple.carplayframework:General] Template scene content style updated to dark
+2026-11-08 22:40:59.153 Df Runner[34741:18fa7] [com.apple.carplayframework:General] Template app scene updated to unrestricted frame rate
+2026-11-08 22:40:59.155 Df Runner[34741:18fa7] [com.apple.UIKit:HomeAffordanceObservation] Initializing: <_UIHomeAffordanceSceneNotifier: 0x6000029444d0>; with scene: <CPTemplateApplicationScene: 0x1029c92f0>
+2026-11-08 22:40:59.155 Df Runner[34741:18fa7] [com.apple.BacklightServices:scenes] 0x600000c8c780 setDelegate:<0x600000c8d920 _UIBacklightEnvironment> hasDelegate:YES for environment:Car[2-3]:it.gdanav.gdanav
+2026-11-08 22:40:59.155 Df Runner[34741:18fa7] [com.apple.UIKit:EventDeferring] [0x600002944540] Initialized with scene: <CPTemplateApplicationScene: 0x1029c92f0>; behavior: <_UIEventDeferringBehavior_CarPlay: 0x6000002a1f80>; availableForProcess: 1, systemShellManagesKeyboardFocus: 0
+2026-11-08 22:40:59.156 Df Runner[34741:18fa7] [com.apple.carplayframework:General] Application declares maps entitlement.
+2026-11-08 22:40:59.162 Df Runner[34741:18fa7] [com.apple.carplayframework:General] Application declares maps entitlement.
+2026-11-08 22:40:59.162 Df Runner[34741:18fa7] [com.apple.carplayframework:General] Connecting to listener endpoint for scene identifier: Car[2-3]:it.gdanav.gdanav
+2026-11-08 22:40:59.165 Df Runner[34741:18fa7] [com.apple.xpc:connection] [0x132c28060] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-11-08 22:40:59.166 Df Runner[34741:18fa7] [com.apple.carplayframework:General] Scene will connect observer fired
+2026-11-08 22:40:59.166 Df Runner[34741:18fa7] [com.apple.carplayframework:General] Attempting to deliver interface controller...
+2026-11-08 22:40:59.166 Df Runner[34741:18fa7] [com.apple.carplayframework:General] App ready to receive interface controller
+2026-11-08 22:40:59.166 Df Runner[34741:18fa7] [com.apple.carplayframework:General] App supports CPTemplateApplicationScene method with window
+2026-11-08 22:40:59.191 Df Runner[34741:18fa7] [com.apple.network:path] nw_path_evaluator_start [789FF491-FAF6-48AD-BD83-A0C5CADC8AB5 <NULL> generic, attribution: developer]
+	path: satisfied (Path is satisfied), interface: en0
+2026-11-08 22:40:59.192 A  Runner[34741:18fa7] (CoreLocation) CL: CLLocationManager
+2026-11-08 22:40:59.192 Df Runner[34741:18fa7] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":initWithEffectiveBundleIdentifier:bundlePath:websiteIdentifier:delegate:silo:, "self":"0x600000048710", "identifier":(null), "bundlePath":(null)}
+2026-11-08 22:40:59.192 Df Runner[34741:18fa7] [com.apple.locationd.Core:Client] {"msg":"client allocated", "client":"0x1026a24c0"}
+2026-11-08 22:40:59.192 A  Runner[34741:18fa7] (CoreLocation) CL: _CLClientCreateConnection
+2026-11-08 22:40:59.192 Df Runner[34741:18fa7] [com.apple.locationd.Core:Client] {"msg":"_CLClientCreateConnection", "event":activity, "client":"0x1026a24c0"}
+2026-11-08 22:40:59.192 A  Runner[34741:18fbc] (LocationSupport) CL: Sending cached messages to daemon
+2026-11-08 22:40:59.192 Df Runner[34741:18fbc] [com.apple.LocationSupport:Connection] {"msg":"Sending cached messages to daemon", "event":activity}
+2026-11-08 22:40:59.192 Df Runner[34741:18fbc] [com.apple.xpc:connection] [0x132c4fbc0] activating connection: mach=true listener=false peer=false name=com.apple.locationd.registration
+2026-11-08 22:40:59.192 A  Runner[34741:18fa7] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-08 22:40:59.192 A  Runner[34741:18fbc] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-08 22:40:59.193 A  Runner[34741:18fa7] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-08 22:40:59.193 A  Runner[34741:18fbc] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-08 22:40:59.193 A  Runner[34741:18fa7] (CoreLocation) CL: CLLocationManager
+2026-11-08 22:40:59.193 Df Runner[34741:18fa7] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDelegate:, "self":"0x600000048710", "delegate":"0x6000002eccc0"}
+2026-11-08 22:40:59.258 Df Runner[34741:18fa7] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-08 22:40:59.259 Df Runner[34741:18fa7] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-08 22:40:59.261 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: Set automatically hides navigation bar: 0
+2026-11-08 22:40:59.262 Df Runner[34741:18fa7] [com.apple.carplayframework:General] Setting root template <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0> animated 0
+2026-11-08 22:40:59.262 Df Runner[34741:18fa7] [com.apple.carplayframework:General] Application declares maps entitlement.
+2026-11-08 22:40:59.262 Df Runner[34741:18fa7] [com.apple.carplayframework:General] Creating template: <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>; presentation style: 1; animated: NO
+2026-11-08 22:40:59.262 Df Runner[34741:18fa7] [com.apple.carplayframework:General] Template did push, stack count: 1
+2026-11-08 22:40:59.281 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000219d090> {UUID: 3C9E3F23-7133-4486-AE24-E7DC658CDC73, enabled: YES}"
+)
+2026-11-08 22:40:59.281 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000219d0e0> {UUID: FC5FA274-48F0-4AC9-8B07-D74F4ABC0305, enabled: YES}",
+    "<CPBarButton: 0x60000219d130> {UUID: 09975F8B-D688-496B-B90C-20A2FD54B381, enabled: YES}"
+)
+2026-11-08 22:40:59.409 Df Runner[34741:18fa7] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:it.gdanav.gdanav-41FB4325-68DD-4601-8D4A-CFDE04F0AC28  persistentID: 41FB4325-68DD-4601-8D4A-CFDE04F0AC28
+2026-11-08 22:40:59.411 Df Runner[34741:18fa7] [com.apple.FrontBoard:SceneExtension] Ingesting properties from CPUITemplateApplicationSceneSettings...
+2026-11-08 22:40:59.413 Df Runner[34741:18fa7] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <CPUITemplateApplicationSceneSettings[derived]> on FBSSceneSettings
+2026-11-08 22:40:59.413 Df Runner[34741:18fa7] [com.apple.FrontBoard:SceneExtension] Ingesting properties from UIApplicationSceneSettings...
+2026-11-08 22:40:59.417 Df Runner[34741:18fa7] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <UIApplicationSceneSettings[derived]> on FBSSceneSettings
+2026-11-08 22:40:59.419 A  Runner[34741:18fa7] (CoreLocation) CL: CLLocationManager
+2026-11-08 22:40:59.419 Df Runner[34741:18fa7] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":onClientEventRegistration:, "self":"0x600000048710", "clientKey":iit.gdanav.gdanav:}
+2026-11-08 22:40:59.419 Df Runner[34741:18fa7] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000048710", "delegate":"0x6000002eccc0", "selector":locationManagerDidChangeAuthorization:, "authorizationStatus":4, "limitsPrecision":0, "isAuthorizedForWidgetUpdates":0}
+2026-11-08 22:40:59.420 A  Runner[34741:18fa7] (CoreLocation) CL: CLLocationManager
+2026-11-08 22:40:59.420 Df Runner[34741:18fa7] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000048710"}
+2026-11-08 22:40:59.421 A  Runner[34741:18fa7] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-08 22:40:59.421 A  Runner[34741:18fa7] (CoreLocation) CL: CLLocationManager
+2026-11-08 22:40:59.421 Df Runner[34741:18fa7] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingHeading, "self":"0x600000048710"}
+2026-11-08 22:40:59.421 A  Runner[34741:18fbc] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-08 22:40:59.421 Df Runner[34741:18fa7] [com.apple.locationd.Core:Client] Stop updating heading
+2026-11-08 22:40:59.421 A  Runner[34741:18fa7] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-08 22:40:59.421 Df Runner[34741:18fa7] [com.apple.carplayframework:General] Fetched interface controller image sizes.
+2026-11-08 22:40:59.422 A  Runner[34741:18fbc] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-08 22:40:59.422 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021996d0> {UUID: 74A7A8D6-B55F-4C66-B2EE-C705E087E2CA, enabled: YES}"
+)
+2026-11-08 22:40:59.422 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000219a530> {UUID: DA9229C5-1F7F-4F3B-AB6A-16B72C619A19, enabled: YES}",
+    "<CPBarButton: 0x600002199590> {UUID: FD350898-D4BE-43B5-ADF2-9D8E4AAAA6DF, enabled: YES}"
+)
+2026-11-08 22:40:59.426 Df Runner[34741:18fa7] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:it.gdanav.gdanav-41FB4325-68DD-4601-8D4A-CFDE04F0AC28  persistentID: 41FB4325-68DD-4601-8D4A-CFDE04F0AC28
+2026-11-08 22:40:59.441 A  Runner[34741:18fbc] (Security) SecItemCopyMatching_ios
+2026-11-08 22:40:59.444 A  Runner[34741:18fbc] (Security) SecItemCopyMatching_ios
+2026-11-08 22:40:59.445 A  Runner[34741:18fbc] (Security) SecItemCopyMatching_ios
+2026-11-08 22:40:59.445 A  Runner[34741:18fbc] (Security) SecItemCopyMatching_ios
+2026-11-08 22:40:59.446 A  Runner[34741:18fbc] (Security) SecItemCopyMatching_ios
+2026-11-08 22:40:59.446 A  Runner[34741:18fbc] (Security) SecItemCopyMatching_ios
+2026-11-08 22:40:59.486 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021a1d10> {UUID: D9FB0ACC-50AA-4F07-9DDF-8FABEDB5E1E1, enabled: YES}"
+)
+2026-11-08 22:40:59.486 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021a3bb0> {UUID: 16686589-627B-4483-9E2C-174651FBA7E2, enabled: YES}",
+    "<CPBarButton: 0x6000021a3c00> {UUID: B407AC2F-B18B-4E02-99E2-AC2DA6A4617B, enabled: YES}"
+)
+2026-11-08 22:40:59.538 A  Runner[34741:1a219] (Metal) Metal Compiling Shader
+2026-11-08 22:40:59.866 A  Runner[34741:18fbc] (Metal) Metal Compiling Shader
+2026-11-08 22:40:59.873 A  Runner[34741:18fbc] (Metal) Metal Compiling Shader
+2026-11-08 22:41:01.810 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021268f0> {UUID: 323A8EEB-0FC5-4F81-9A8C-55CA136BFA81, enabled: YES}"
+)
+2026-11-08 22:41:01.810 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002127520> {UUID: CD72F390-7040-4CA9-A111-6C250B5B34C0, enabled: YES}",
+    "<CPBarButton: 0x600002126ee0> {UUID: 18DB46E4-0218-4A06-86A3-28259A3D4B10, enabled: YES}"
+)
+2026-11-08 22:41:06.815 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000219b890> {UUID: E29184E9-A39A-42E5-8DA3-177B78927785, enabled: YES}"
+)
+2026-11-08 22:41:06.815 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000219b930> {UUID: 066FD695-1C41-4509-8608-DDA2798D748B, enabled: YES}",
+    "<CPBarButton: 0x60000219b980> {UUID: 736BC804-DA5B-4497-9297-E067BD2E714E, enabled: YES}"
+)
+2026-11-08 22:41:11.813 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000217eee0> {UUID: D79B442D-8853-47B3-8AE7-18F117558ED7, enabled: YES}"
+)
+2026-11-08 22:41:11.814 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000217f2a0> {UUID: FF15EADA-F2DC-49E2-9C9E-55431EFEDE73, enabled: YES}",
+    "<CPBarButton: 0x60000217e8f0> {UUID: 7CBED619-B9FF-4C1D-8CCD-C0A9984A2AC0, enabled: YES}"
+)
+2026-11-08 22:41:16.823 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000217f070> {UUID: 90E51AFE-6680-488F-A5DE-6610A4B410C6, enabled: YES}"
+)
+2026-11-08 22:41:16.824 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000219b750> {UUID: 5BAA07AC-186D-4B5E-B56F-7D29B94D2E04, enabled: YES}",
+    "<CPBarButton: 0x60000219b700> {UUID: 5FABA6A7-43C6-4E6A-AF3B-AEC02301AFAC, enabled: YES}"
+)
+2026-11-08 22:41:21.809 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000217f4d0> {UUID: 0035A37A-891F-4EB1-8D56-1DEC278C432F, enabled: YES}"
+)
+2026-11-08 22:41:21.810 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000217f700> {UUID: D030553A-7184-4E0A-957E-E06E115C0358, enabled: YES}",
+    "<CPBarButton: 0x60000217f0c0> {UUID: A98820E3-FA99-4778-8DEF-76B04B206D8D, enabled: YES}"
+)
+2026-11-08 22:41:26.807 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002150690> {UUID: 78098959-F4B9-4A20-8882-D13DECFA9997, enabled: YES}"
+)
+2026-11-08 22:41:26.807 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021514f0> {UUID: A8CF5CF0-46BD-4DB6-8046-2D775459545A, enabled: YES}",
+    "<CPBarButton: 0x600002150c80> {UUID: 135C8576-FCB8-4273-ACE5-CFC6F9311B2E, enabled: YES}"
+)
+2026-11-08 22:41:31.812 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000219fd40> {UUID: 647BC2FB-31F5-4617-8177-30A4DB0270EE, enabled: YES}"
+)
+2026-11-08 22:41:31.812 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000219eee0> {UUID: 36B5A656-6D88-433B-9FD7-8CEFCA7A8A75, enabled: YES}",
+    "<CPBarButton: 0x60000219fbb0> {UUID: 0BB85145-3BF2-4295-80AE-7610C44EA2DF, enabled: YES}"
+)
+2026-11-08 22:41:36.815 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000219fca0> {UUID: 0B96D269-40C2-4DDA-99A1-F7F58708701B, enabled: YES}"
+)
+2026-11-08 22:41:36.815 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000219fed0> {UUID: 74D3113C-143E-4342-B938-8F60ED0498AD, enabled: YES}",
+    "<CPBarButton: 0x60000219fd90> {UUID: 2C5CC4FC-6DC7-4C33-8AFC-0087C7631114, enabled: YES}"
+)
+2026-11-08 22:41:41.811 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000219f8e0> {UUID: D2E2A627-5648-4A21-91A6-1187FC323629, enabled: YES}"
+)
+2026-11-08 22:41:41.812 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000219fc50> {UUID: C185D829-0403-4CB1-A4F9-CEABEF8746E7, enabled: YES}",
+    "<CPBarButton: 0x60000219f5c0> {UUID: 26C2C3D3-ED06-4A25-BAC3-3A1C132557B4, enabled: YES}"
+)
+2026-11-08 22:41:43.357 Df Runner[34741:18fa7] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: Car[2-3]:it.gdanav.gdanav  persistentID: Car[2-3]:it.gdanav.gdanav
+2026-11-08 22:41:43.360 A  Runner[34741:1b6f7] (RunningBoardServices) didChangeInheritances
+2026-11-08 22:41:43.362 Df Runner[34741:18fa7] [com.apple.UIKit:UpdateScheduler] Target list changed: <CADisplay:TVOut PurpleTVOut>, <CADisplay:LCD PurpleMain>
+2026-11-08 22:41:43.550 Df Runner[34741:18fa7] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: Car[2-3]:it.gdanav.gdanav  persistentID: Car[2-3]:it.gdanav.gdanav
+2026-11-08 22:41:43.655 A  Runner[34741:1b6f7] (CoreFoundation) Loading Preferences From User Session CFPrefsD
+2026-11-08 22:41:43.656 A  Runner[34741:1b6f7] (CoreFoundation) Loading Preferences From User Session CFPrefsD
+2026-11-08 22:41:43.695 Df Runner[34741:1b6f7] [com.apple.xpc:connection] [0x132c46150] activating connection: mach=true listener=false peer=false name=com.apple.geod
+2026-11-08 22:41:43.704 Df Runner[34741:1b6f7] [com.apple.xpc:connection] [0x10275cda0] activating connection: mach=true listener=false peer=false name=com.apple.geod
+2026-11-08 22:41:43.716 Df Runner[34741:1b6f7] [com.apple.xpc:connection] [0x13c106c50] activating connection: mach=true listener=false peer=false name=com.apple.geod
+2026-11-08 22:41:43.716 Df Runner[34741:1a219] [com.apple.xpc:connection] [0x1026f6d70] activating connection: mach=true listener=false peer=false name=com.apple.geod
+2026-11-08 22:41:43.717 Df Runner[34741:18fa7] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: Car[2-3]:it.gdanav.gdanav  persistentID: Car[2-3]:it.gdanav.gdanav
+2026-11-08 22:41:43.718 Df Runner[34741:18fa7] [com.apple.UIKit:UIScreen] CarPlay session settings updated for scene: 36323:FBWorkspace-com.apple.CarPlayTemplateUIHost/FBSceneManager:Car%5B2-3%5D%3Ait.gdanav.gdanav, availableInteractionModels: touch|knob, primaryInteractionModel: knob, touchLevel: lowFidelity
+2026-11-08 22:41:43.720 Df Runner[34741:18fa7] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x10293f140> (41FB4325-68DD-4601-8D4A-CFDE04F0AC28)
+2026-11-08 22:41:44.135 Df Runner[34741:18fa7] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: Car[2-3]:it.gdanav.gdanav  persistentID: Car[2-3]:it.gdanav.gdanav
+2026-11-08 22:41:44.322 Df Runner[34741:18fa7] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: Car[2-3]:it.gdanav.gdanav  persistentID: Car[2-3]:it.gdanav.gdanav
+2026-11-08 22:41:46.809 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000217e5d0> {UUID: 4B0236F9-6F9D-4672-A199-2881A45DBA2B, enabled: YES}"
+)
+2026-11-08 22:41:46.809 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000217eee0> {UUID: 6A533349-20F1-424D-B39D-92B52799EED2, enabled: YES}",
+    "<CPBarButton: 0x60000217f2a0> {UUID: F743B967-4DBB-4733-8AF4-7F2EA581E734, enabled: YES}"
+)
+2026-11-08 22:41:51.812 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002199590> {UUID: 693F4DCC-D94D-498C-B3FC-93E32A62C322, enabled: YES}"
+)
+2026-11-08 22:41:51.812 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000219a530> {UUID: AA78040B-0CE5-46CC-B5C6-A0E92EBF1386, enabled: YES}",
+    "<CPBarButton: 0x6000021996d0> {UUID: 614A789C-FC41-42D0-9410-BA42AA4726C5, enabled: YES}"
+)
+2026-11-08 22:41:56.811 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002120e10> {UUID: 31C47D92-9F0E-4A8E-B844-32DDD99E310C, enabled: YES}"
+)
+2026-11-08 22:41:56.811 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002120d70> {UUID: 0057312D-451B-45D2-8D43-938A353B314A, enabled: YES}",
+    "<CPBarButton: 0x600002120870> {UUID: 66797DD5-D00E-4297-AE21-DDF5B8E80304, enabled: YES}"
+)
+2026-11-08 22:42:01.812 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000212f520> {UUID: 6A5A006B-7954-42DE-B6EF-F7E72630110F, enabled: YES}"
+)
+2026-11-08 22:42:01.813 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000212f890> {UUID: 1DCD3CF4-9324-4BB1-B8AE-CC97461ADA63, enabled: YES}",
+    "<CPBarButton: 0x600002127e80> {UUID: C9EEB575-6482-433D-BF45-01130DD6FDFA, enabled: YES}"
+)
+2026-11-08 22:42:06.818 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000217eb70> {UUID: 41FC7913-CD76-4C70-B6E4-3B5809274B3D, enabled: YES}"
+)
+2026-11-08 22:42:06.818 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000217f070> {UUID: A8DB9C87-7EB7-4DB5-BA30-5DF947DE03E4, enabled: YES}",
+    "<CPBarButton: 0x60000217edf0> {UUID: 7E59F203-6326-4D35-9A92-42805F9D23C4, enabled: YES}"
+)
+2026-11-08 22:42:11.823 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002120870> {UUID: 9274FC46-2249-43C3-AFEC-020A65A14B91, enabled: YES}"
+)
+2026-11-08 22:42:11.823 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002120d70> {UUID: AA113C0A-02C7-4785-85B7-77158F02C98A, enabled: YES}",
+    "<CPBarButton: 0x600002120e10> {UUID: EA679C89-924F-4812-902B-0A2023C97332, enabled: YES}"
+)
+2026-11-08 22:42:16.810 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000217f110> {UUID: 9EB1BD9B-5973-4246-A766-2AD68DEFEE31, enabled: YES}"
+)
+2026-11-08 22:42:16.810 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000217e760> {UUID: 4BDE177F-DA17-452E-B20F-76D3105B7850, enabled: YES}",
+    "<CPBarButton: 0x60000217eee0> {UUID: 5723433C-BFA5-4AE6-AEF4-0C91E7799D7F, enabled: YES}"
+)
+2026-11-08 22:42:21.808 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000217f9d0> {UUID: 35C64C27-4CE4-4452-BA87-5D105D22DADD, enabled: YES}"
+)
+2026-11-08 22:42:21.808 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000217f2f0> {UUID: C21655D9-1ED0-482F-8A8E-5D47C9BA0C7E, enabled: YES}",
+    "<CPBarButton: 0x60000217f5c0> {UUID: 005612CB-5E86-4431-A54C-162A2397254C, enabled: YES}"
+)
+2026-11-08 22:42:26.806 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021328f0> {UUID: CC9C404B-1428-4209-BFAA-8EBAE59E831F, enabled: YES}"
+)
+2026-11-08 22:42:26.806 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002130690> {UUID: FBB39814-B2F4-46CD-8D81-70E5FF845042, enabled: YES}",
+    "<CPBarButton: 0x60000212d860> {UUID: CEDB7644-D460-4C0A-B3AC-AAE08CAEFDCD, enabled: YES}"
+)
+2026-11-08 22:42:31.811 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000219bde0> {UUID: 271B25A0-03FC-4814-8723-3AF40087BACF, enabled: YES}"
+)
+2026-11-08 22:42:31.811 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000219b7f0> {UUID: BB532E69-F482-4D4A-96DD-EF474D064105, enabled: YES}",
+    "<CPBarButton: 0x60000219b8e0> {UUID: B42A85C2-BE5A-4CDF-8CC0-AD74A1111206, enabled: YES}"
+)
+2026-11-08 22:42:36.811 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002120870> {UUID: 22D59985-C4E3-4E72-A476-07B18CB26FA1, enabled: YES}"
+)
+2026-11-08 22:42:36.811 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002120d70> {UUID: 3EC6925D-1EA9-45BC-AF4E-11EAB7285E08, enabled: YES}",
+    "<CPBarButton: 0x600002120e10> {UUID: 8BF6D495-7F85-47B5-B400-2AC04FDB2358, enabled: YES}"
+)
+2026-11-08 22:42:41.807 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002135c20> {UUID: 84AF7C67-CA6B-4435-A957-8362DFFD6F66, enabled: YES}"
+)
+2026-11-08 22:42:41.807 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021300a0> {UUID: 6117E69F-A505-4060-9A28-F726799B6435, enabled: YES}",
+    "<CPBarButton: 0x6000021305f0> {UUID: 93FB4256-018C-48BC-80F2-34D5EED2A53F, enabled: YES}"
+)
+2026-11-08 22:42:46.808 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x600002100730> {UUID: A3F15151-C42C-4A48-9E51-3E98B556FC48, enabled: YES}"
+)
+2026-11-08 22:42:46.808 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000212d860> {UUID: 1E70FA2B-C2EC-4513-9701-BFF7323FF637, enabled: YES}",
+    "<CPBarButton: 0x60000213ac10> {UUID: 571EF894-52FC-4F44-B49F-EC190F29DF2D, enabled: YES}"
+)
+2026-11-08 22:42:51.813 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000217ec60> {UUID: 8C75C63F-49F0-402F-AB09-90E5D5533A45, enabled: YES}"
+)
+2026-11-08 22:42:51.814 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000217f2a0> {UUID: 1E08299B-92A5-4231-978C-41594C66423E, enabled: YES}",
+    "<CPBarButton: 0x60000217ed00> {UUID: 4D60D2CC-5A37-4AF4-A6BD-D031DE278876, enabled: YES}"
+)
+2026-11-08 22:42:56.813 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021087d0> {UUID: 32DCC4C9-CC52-408B-97C5-F202542AC278, enabled: YES}"
+)
+2026-11-08 22:42:56.814 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002108370> {UUID: E59CC651-492C-4182-86E3-9727C9CD5844, enabled: YES}",
+    "<CPBarButton: 0x60000210b570> {UUID: D66A31BE-4998-4123-BFB9-02CD3339E973, enabled: YES}"
+)
+2026-11-08 22:43:01.809 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000218c9b0> {UUID: 50EF2A1E-1E99-4F79-AE98-261273C8E8B6, enabled: YES}"
+)
+2026-11-08 22:43:01.810 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x60000218d3b0> {UUID: A33FF890-8AAF-4F94-A941-A6EAA0C1B54E, enabled: YES}",
+    "<CPBarButton: 0x60000218d860> {UUID: FAFAABDA-99DB-429F-832F-2AD82FFD470D, enabled: YES}"
+)
+2026-11-08 22:43:06.819 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x60000217ea80> {UUID: 6651F126-E9D1-4D04-9A5D-56CCDB3660F6, enabled: YES}"
+)
+2026-11-08 22:43:06.820 Df Runner[34741:18fa7] [com.apple.carplayframework:General] <CPMapTemplate: 0x60000375eb80> <identifier: 42E146BB-1C94-4F3B-AC6E-920A7C81221D, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002151270> {UUID: 7A75D9B9-8389-40FE-B2AF-B1F6C1A1A252, enabled: YES}",
+    "<CPBarButton: 0x6000021512c0> {UUID: 9C3F5C2F-8D7B-4113-B54D-DF3275FD1544, enabled: YES}"
+)
