@@ -807,22 +807,63 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
 
   // I nomi dei ponti (e i numeri delle strade sui ponti), con la quota
   // dell'impalcato: la mappa li scrive lassù, non a terra sotto il viadotto.
+  // I nomi delle strade che MapLibre scriverebbe nel posto sbagliato: sui
+  // ponti e sulle rampe in quota (a terra, sotto), e sulle gallerie (sopra
+  // quello che le copre; le tessere uniscono i pezzi in galleria a quelli
+  // aperti). Li scrive il 3D: al centro del pezzo più lungo fuori dalla
+  // galleria, alla quota della strada lì; MapLibre li tace ([nascosti]).
   const etichette = [];
+  const nascosti = new Set();
   const TN = centro.transportation_name;
   if (TN) {
-    const nodiPonte = [];
-    for (const f of feats) if (f.ponte) for (const i of f.nodi) nodiPonte.push(nodi[i]);
     const gp = new Map();
-    for (const nn of nodiPonte) {
-      const key = Math.floor(nn.x / GQ) + ',' + Math.floor(nn.y / GQ);
-      if (!gp.has(key)) gp.set(key, []);
-      gp.get(key).push(nn);
+    for (const f of visibili) {
+      if (f.cls === 'rail') continue;
+      for (const i of f.nodi) {
+        const nn = nodi[i];
+        const key = Math.floor(nn.x / GQ) + ',' + Math.floor(nn.y / GQ);
+        if (!gp.has(key)) gp.set(key, []);
+        gp.get(key).push({ x: nn.x, y: nn.y, h: f.galleria ? 0 : nn.h, galleria: !!f.galleria });
+      }
     }
+    // Il nodo aperto più vicino e quello in galleria più vicino: in galleria
+    // solo se è chiaramente più vicino (una strada che passa sopra una
+    // galleria le sta proprio sopra).
+    const vicino = (px, py, raggio) => {
+      let aperto = null;
+      let da = raggio;
+      let dg = raggio;
+      for (let ax = -1; ax <= 1; ax++) {
+        for (let ay = -1; ay <= 1; ay++) {
+          for (const nn of gp.get(Math.floor(px / GQ) + ax + ',' + (Math.floor(py / GQ) + ay)) || []) {
+            const d = Math.hypot(nn.x - px, nn.y - py);
+            if (nn.galleria) dg = Math.min(dg, d);
+            else if (d < da) {
+              da = d;
+              aperto = nn;
+            }
+          }
+        }
+      }
+      if (dg < raggio && dg < da - 2) return { galleria: true, h: 0 };
+      return aperto;
+    };
+    /** Ci sono almeno [n] campioni di fila che fanno [prova]? (Un incrocio sotto un ponte non basta.) */
+    const diFila = (campioni, prova, n = 3) => {
+      let fila = 0;
+      for (const c of campioni) {
+        fila = c.salto ? 0 : fila;
+        fila = prova(c) ? fila + 1 : 0;
+        if (fila >= n) return true;
+      }
+      return false;
+    };
     for (let i = 0; i < TN.length && etichette.length < 60; i++) {
       const f = TN.feature(i);
       const p = f.properties;
-      if (f.type !== 2 || p.brunnel !== 'bridge' || !(p.name || p.ref)) continue;
-      let meglio = null;
+      if (f.type !== 2 || !(p.name || p.ref) || p.class === 'rail' || p.class === 'transit') continue;
+      // I campioni ogni 8 m lungo i pezzi nella tessera: in galleria, in quota, a terra.
+      const campioni = [];
       for (const linea of f.loadGeometry()) {
         for (const pezzo of ritagliaLinea(
           linea.map((q) => sys.metri(x * ESTENSIONE + q.x, y * ESTENSIONE + q.y)),
@@ -831,44 +872,51 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           meta,
           meta,
         )) {
-          let L = 0;
-          for (let k = 1; k < pezzo.length; k++) L += Math.hypot(pezzo[k][0] - pezzo[k - 1][0], pezzo[k][1] - pezzo[k - 1][1]);
-          if (!meglio || L > meglio.L) meglio = { L, pezzo };
-        }
-      }
-      if (!meglio || meglio.L < 40) continue;
-      // Il punto a metà del pezzo, e la quota del ponte più vicino lì.
-      let resta = meglio.L / 2;
-      let px = 0;
-      let py = 0;
-      let dir = 0;
-      for (let k = 1; k < meglio.pezzo.length; k++) {
-        const [ax, ay] = meglio.pezzo[k - 1];
-        const [bx, by] = meglio.pezzo[k];
-        const d = Math.hypot(bx - ax, by - ay);
-        if (d >= resta) {
-          px = ax + ((bx - ax) * resta) / d;
-          py = ay + ((by - ay) * resta) / d;
-          dir = Math.atan2(by - ay, bx - ax);
-          break;
-        }
-        resta -= d;
-      }
-      let h = null;
-      let bd = 18;
-      for (let ax = -1; ax <= 1; ax++) {
-        for (let ay = -1; ay <= 1; ay++) {
-          for (const nn of gp.get(Math.floor(px / GQ) + ax + ',' + (Math.floor(py / GQ) + ay)) || []) {
-            const d = Math.hypot(nn.x - px, nn.y - py);
-            if (d < bd) {
-              bd = d;
-              h = nn.h;
+          let prossimo = 0;
+          let fatto = 0;
+          let primo = true;
+          for (let k = 1; k < pezzo.length; k++) {
+            const [ax, ay] = pezzo[k - 1];
+            const [bx, by] = pezzo[k];
+            const d = Math.hypot(bx - ax, by - ay);
+            while (d > 0 && prossimo <= fatto + d) {
+              const t = prossimo - fatto;
+              const cx = ax + ((bx - ax) * t) / d;
+              const cy = ay + ((by - ay) * t) / d;
+              campioni.push({ x: cx, y: cy, dir: Math.atan2(by - ay, bx - ax), nn: vicino(cx, cy, 14), salto: primo });
+              primo = false;
+              prossimo += 8;
             }
+            fatto += d;
           }
         }
       }
-      if (h === null || h < 2) continue;
-      etichette.push({ x: px, y: py, h: h + 0.25, dir, nome: p.name ?? '', ref: p.ref ?? '', cls: p.class });
+      if (!campioni.length) continue;
+      const galleria = p.brunnel === 'tunnel' || diFila(campioni, (c) => c.nn?.galleria);
+      const inQuota = p.brunnel === 'bridge' || diFila(campioni, (c) => c.nn && !c.nn.galleria && c.nn.h > 2.5);
+      if (!galleria && !inQuota) continue;
+      if (p.name) nascosti.add(p.name);
+      // Il pezzo più lungo fuori dalla galleria.
+      let meglio = null;
+      let corrente = [];
+      const chiudi = () => {
+        if (corrente.length && (!meglio || corrente.length > meglio.length)) meglio = corrente;
+        corrente = [];
+      };
+      // Con una galleria: fuori dalla galleria. In quota: sul pezzo in quota.
+      const buono = galleria ? (c) => !c.nn?.galleria && p.brunnel !== 'tunnel' : (c) => c.nn && c.nn.h > 2.5;
+      for (const c of campioni) {
+        if (c.salto) chiudi();
+        if (buono(c)) corrente.push(c);
+        else chiudi();
+      }
+      chiudi();
+      if (!meglio || meglio.length * 8 < 32) continue;
+      const c = meglio[Math.floor(meglio.length / 2)];
+      const h = c.nn?.h ?? 0;
+      // Un ponte senza un nodo vicino in quota: niente (prima si saltava uguale).
+      if (p.brunnel === 'bridge' && h < 2) continue;
+      etichette.push({ x: c.x, y: c.y, h: h + 0.25, dir: c.dir, nome: p.name ?? '', ref: p.ref ?? '', cls: p.class, galleria });
     }
   }
 
@@ -891,6 +939,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     luci,
     segmenti: new Float32Array(segmenti),
     etichette,
+    nascosti: [...nascosti],
   };
   const triStrade = Object.values(nastri).reduce((s, g) => s + g.triangoli, 0);
   out.conti = {

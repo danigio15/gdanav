@@ -14,7 +14,7 @@ import { codeOrdinate, decodifica } from './messaggi.js';
 import { angoloVerso, Moto, smorza } from './moto.js';
 import { IndiceSegmenti, Linea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote } from './percorso.js';
 import { Scena } from './scena.js';
-import { STRATO_3D, ZOOM_3D, adattaStile } from './stile3d.js';
+import { STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
 import { GIORNO, NOTTE } from './tavolozza.js';
 import './gdanav3d.css';
 
@@ -329,6 +329,9 @@ function creaMappa(stile) {
 
 function caricaStile(stile) {
   S.stileCaricato = false;
+  // Lo stile nuovo ha il filtro dei nomi di partenza: si rimette.
+  S.nomiNascosti = null;
+  S.sporco.segni = true;
   S.mappa.setStyle(adattaStile(stile, { notte: S.notte }), { diff: false });
 }
 
@@ -1025,7 +1028,17 @@ function aggiornaSegni(adesso) {
     });
     if (cambiato) scriviSorgente(id, sulSuolo(id, dati));
   }
-  // I nomi dei ponti vicini, scritti sull'impalcato.
+  // I nomi che il 3D scrive al posto di MapLibre (rampe in quota, gallerie).
+  const nascosti = new Set();
+  for (const c of S.costruite.values()) for (const n of scena.tessere.get(c.chiave)?.dati.nascosti ?? []) nascosti.add(n);
+  const elenco = [...nascosti].sort().slice(0, 300);
+  const firma = elenco.join('|');
+  if (firma !== S.nomiNascosti && S.mappa?.getLayer('nomi-strade')) {
+    S.nomiNascosti = firma;
+    S.mappa.setFilter('nomi-strade', filtroNomi(elenco));
+  }
+  // I nomi dei ponti e delle rampe vicine, scritti sull'impalcato; delle
+  // strade con una galleria, fuori dalla galleria.
   const nomi = [];
   for (const c of S.costruite.values()) {
     const v = scena.tessere.get(c.chiave);

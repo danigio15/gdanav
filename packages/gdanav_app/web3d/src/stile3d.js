@@ -68,7 +68,7 @@ export function adattaStile(stile, { notte = false } = {}) {
     if (l.id === 'nomi-strade') {
       // Né i ponti (i loro nomi li scrive il 3D sull'impalcato) né le
       // gallerie (il nome finirebbe sopra quello che le copre).
-      l.filter = ['match', ['coalesce', ['get', 'brunnel'], ''], ['bridge', 'tunnel'], false, true];
+      l.filter = FILTRO_NOMI;
       l.layout = {
         ...l.layout,
         'text-pitch-alignment': 'viewport',
@@ -107,6 +107,19 @@ export function adattaStile(stile, { notte = false } = {}) {
  * come in Italia. Le immagini `scudo-verde` e `scudo-blu` le disegna la
  * mappa (`cartelli`).
  */
+/** I nomi che scrive MapLibre: né i ponti né le gallerie (vedi [filtroNomi]). */
+export const FILTRO_NOMI = ['match', ['coalesce', ['get', 'brunnel'], ''], ['bridge', 'tunnel'], false, true];
+
+/**
+ * Il filtro dei nomi delle strade, senza quelli che scrive il 3D: le strade
+ * con un pezzo in galleria o in quota (rampe, viadotti) che le tessere
+ * uniscono al resto, e MapLibre scriverebbe a terra o sopra la galleria.
+ */
+export function filtroNomi(nascosti) {
+  if (!nascosti.length) return FILTRO_NOMI;
+  return ['all', FILTRO_NOMI, ['!', ['in', ['coalesce', ['get', 'name'], ''], ['literal', nascosti]]]];
+}
+
 export function scudi() {
   return {
     id: 'scudi',

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { LIMITI, NASTRI, costruisciTessera, stimaTriangoli, bufferDellaTessera } from '../src/tessera.js';
 import { ALTEZZA_LIVELLO, SPESSORE_IMPALCATO } from '../src/elevazione.js';
-import { cavalcavia, cavalcaviaDueCarreggiate, sottopasso } from './finte.js';
+import { cavalcavia, cavalcaviaConRampa, cavalcaviaDueCarreggiate, sottopasso, sottopassoConNome } from './finte.js';
 
 const X = 8605;
 const Y = 5860;
@@ -135,4 +135,36 @@ test('un ponte spezzato in due sopra la strada: niente spalla in mezzo alla carr
   for (let i = 0; i < p.length; i += 3) {
     if (Math.abs(p[i + 1]) < 5.5 && p[i + 2] < 4 && Math.abs(p[i]) < 6) assert.fail(`cemento in carreggiata a ${p[i]}, ${p[i + 1]}, ${p[i + 2]}`);
   }
+});
+
+test('i nomi delle rampe in quota li scrive il 3D, in quota; quelli a terra MapLibre', () => {
+  const t = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': cavalcaviaConRampa() } });
+  const rampa = t.etichette.find((e) => e.nome === 'Rampa Bacula');
+  assert.ok(rampa, `la rampa ha il suo nome (${t.etichette.map((e) => e.nome)})`);
+  assert.ok(rampa.h > 2.5, `in quota: ${rampa.h}`);
+  assert.ok(t.nascosti.includes('Rampa Bacula') && t.nascosti.includes('Cavalcavia Bacula'));
+  assert.ok(!t.nascosti.includes('Autostrada dei Laghi'), 'la strada a terra la scrive MapLibre');
+  assert.ok(!t.etichette.some((e) => e.nome === 'Autostrada dei Laghi'));
+});
+
+test('il nome di una strada con un sottopasso: fuori dalla galleria, mai sopra', () => {
+  const t = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': sottopassoConNome() } });
+  assert.ok(t.nascosti.includes('Viale Lunigiana'), 'MapLibre lo tace');
+  const e = t.etichette.find((q) => q.nome === 'Viale Lunigiana');
+  assert.ok(e, 'il 3D lo scrive');
+  // La galleria va da y = 2600 a 1500 nella tessera: in metri intorno al centro.
+  const inGalleria = t.segmenti;
+  let dentro = false;
+  for (let i = 0; i < inGalleria.length; i += 8) {
+    if (!(inGalleria[i + 7] & 64)) continue;
+    const ax = inGalleria[i];
+    const ay = inGalleria[i + 1];
+    const bx = inGalleria[i + 3];
+    const by = inGalleria[i + 4];
+    const L2 = (bx - ax) ** 2 + (by - ay) ** 2 || 1;
+    const u = Math.max(0, Math.min(1, ((e.x - ax) * (bx - ax) + (e.y - ay) * (by - ay)) / L2));
+    if (Math.hypot(ax + (bx - ax) * u - e.x, ay + (by - ay) * u - e.y) < 6) dentro = true;
+  }
+  assert.ok(!dentro, `il nome non sta sopra la galleria (${e.x}, ${e.y})`);
+  assert.ok(e.h < 1, 'a terra');
 });
