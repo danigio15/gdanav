@@ -144,6 +144,8 @@ Future<GdanavApp> preparaGdanav({
   GestoreRisparmio.attuale = risparmio;
   // La prova di guida di Android Auto: posizioni finte al posto del GPS.
   final prova = ProvaDiGuida(acceleratore: dimostrazione == null ? 1 : Dimostrazione.acceleratore);
+  // Volume e velocità della voce, scelti l'ultima volta (dal menu dell'auto).
+  regolazioniVoce.value = await archivio.regolazioniDellaVoce();
   final guida = GestoreGuida(
     viaggio: viaggio,
     auto: auto,

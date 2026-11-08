@@ -4,15 +4,9 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:gdanav_core/gdanav_core.dart' show Viaggio;
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../componenti/icona_manovra.dart' show bandieraArrivoPng, puntaManovraPng;
-import '../componenti/icone_punti.dart';
-import '../componenti/icone_segnalazioni.dart';
 import '../schermate/scheda_punto.dart';
-import '../servizi.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_persone.dart';
 import '../stato/gestore_posizione.dart';
@@ -20,10 +14,8 @@ import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/gestore_vicini.dart';
 import 'controllo_mappa.dart';
-import 'dati_viaggio.dart';
 import 'ponte_3d.dart';
-import 'segnaposto.dart';
-import 'stile.dart';
+import 'regia_3d.dart';
 
 /// Si può provare il 3D su questo telefono? Serve una WebView (Android o
 /// iPhone, e il plugin registrato: nelle prove non c'è).
@@ -41,10 +33,6 @@ bool get mappa3dPossibile {
 /// Solo per le prove e per le immagini del cruscotto (`test_render`): fa
 /// credere che la WebView ci sia (o no). `null`: si guarda davvero.
 bool? provaMappa3dPossibile;
-
-/// Perché il 3D si è fermato, e se ricordarlo (il telefono non ce la fa) o no
-/// (un intoppo di questa volta).
-typedef Mappa3dNonVa = void Function(String motivo, {required bool ricorda});
 
 /// La mappa 3D della guida: viadotti in quota, alberi, edifici con le
 /// finestre, il percorso all'altezza della strada e l'auto rossa. La disegna
@@ -94,59 +82,49 @@ class Mappa3d extends StatefulWidget {
 
 class _Mappa3dState extends State<Mappa3d> {
   late final WebViewController _web;
-  var _caricata = false;
-  var _pronta = false;
-  var _finita = false;
-  bool? _notte;
-  Timer? _attesa;
-  Timer? _guardia;
+  late final Regia3d _regia;
+  var _notte = false;
   AppLifecycleListener? _vita;
-
-  /// Quello che la pagina ha già: non si rimanda uguale.
-  Object? _viaggioMandato;
-  (int, int)? _frecciaMandata = (-1, -1);
-  Object? _propostaMandata = 0;
-  int? _letturaMandata;
-  DateTime? _lettaMandata;
-  ModoCamera3d? _modoMandato;
-  double? _sopraMandato;
-  double? _sinistraMandata;
-  VistaMappa? _vistaMandata;
-  Segnaposto? _segnapostoMandato;
-  Viaggio? _panoramicaDi;
-
-  DateTime _ora() => (widget.orologio ?? DateTime.now)();
 
   @override
   void initState() {
     super.initState();
     _web = WebViewController();
+    _regia = Regia3d(
+      gestore: widget.gestore,
+      posizione: widget.posizione,
+      guida: widget.guida,
+      manda: (m) =>
+          _web.runJavaScript(chiamata3d(m)).catchError((Object e) => debugPrint('mappa 3D, ${m['tipo']}: $e')),
+      notte: () => _notte,
+      vista: () => widget.controllo.vista,
+      inquadratura: () => (
+        libera: widget.controllo.libera,
+        sopra: widget.controllo.coperto,
+        sinistra: widget.controllo.copertoSinistra,
+      ),
+      onNonVa: (motivo, {required ricorda}) => widget.onNonVa(motivo, ricorda: ricorda),
+      segnalazioni: widget.segnalazioni,
+      vicini: widget.vicini,
+      persone: widget.persone,
+      onTocco: _tocco,
+      onToccata: widget.controllo.toccata,
+      orologio: widget.orologio,
+      attesa: Mappa3d.attesa,
+    )..avvia();
     unawaited(_avvia());
-    widget.gestore.addListener(_viaggio);
-    widget.guida.addListener(_dallaGuida);
-    widget.posizione.addListener(_dallaPosizione);
     widget.controllo.addListener(_comandi);
-    widget.segnalazioni?.addListener(_segnalazioni);
-    widget.guida.avvisi.addListener(_segnalazioni);
-    widget.vicini?.addListener(_vicini);
-    widget.persone?.addListener(_persone);
-    widget.guida.risparmio?.addListener(_risparmio);
-    _attesa = Timer(Mappa3d.attesa, () {
-      if (!_pronta) _nonVa('tempo', ricorda: false);
-    });
-    // Col GPS muto nessuno chiama: la telecamera la si sistema da qui.
-    _guardia = Timer.periodic(const Duration(seconds: 2), (_) => _dallaGuida());
-    _vita = AppLifecycleListener(onHide: () => _manda(msgPausa(true)), onShow: () => _manda(msgPausa(false)));
+    _vita = AppLifecycleListener(onHide: () => _regia.pausa(true), onShow: () => _regia.pausa(false));
   }
 
   Future<void> _avvia() async {
     try {
       await _web.setJavaScriptMode(JavaScriptMode.unrestricted);
-      await _web.addJavaScriptChannel(canale3d, onMessageReceived: (m) => _dallaMappa(m.message));
+      await _web.addJavaScriptChannel(canale3d, onMessageReceived: (m) => _regia.dallaMappa(m.message));
       await _web.setNavigationDelegate(
         NavigationDelegate(
           onWebResourceError: (e) {
-            if (e.isForMainFrame ?? false) _nonVa('pagina', ricorda: false);
+            if (e.isForMainFrame ?? false) _regia.nonVa('pagina', ricorda: false);
           },
           // La pagina è dentro l'app: niente si apre altrove.
           onNavigationRequest: (r) => r.url.startsWith('file:') || r.url.startsWith('about:')
@@ -157,244 +135,19 @@ class _Mappa3dState extends State<Mappa3d> {
       await _web.loadFlutterAsset(paginaMappa3d);
     } catch (e) {
       debugPrint('mappa 3D, avvio: $e');
-      _nonVa('webview', ricorda: true);
+      _regia.nonVa('webview', ricorda: true);
     }
   }
 
   @override
   void dispose() {
-    _finita = true;
-    widget.gestore.removeListener(_viaggio);
-    widget.guida.removeListener(_dallaGuida);
-    widget.posizione.removeListener(_dallaPosizione);
+    _regia.ferma();
     widget.controllo.removeListener(_comandi);
-    widget.segnalazioni?.removeListener(_segnalazioni);
-    widget.guida.avvisi.removeListener(_segnalazioni);
-    widget.vicini?.removeListener(_vicini);
-    widget.persone?.removeListener(_persone);
-    widget.guida.risparmio?.removeListener(_risparmio);
-    _attesa?.cancel();
-    _guardia?.cancel();
     _vita?.dispose();
     super.dispose();
   }
 
-  void _nonVa(String motivo, {required bool ricorda}) {
-    if (_finita) return;
-    _finita = true;
-    _attesa?.cancel();
-    debugPrint('mappa 3D: non va ($motivo), torna la mappa di sempre');
-    widget.onNonVa(motivo, ricorda: ricorda);
-  }
-
-  /// Manda un messaggio alla pagina (se c'è).
-  void _manda(Map<String, Object?> m) {
-    if (!_caricata || _finita) return;
-    _web.runJavaScript(chiamata3d(m)).catchError((Object e) => debugPrint('mappa 3D, ${m['tipo']}: $e'));
-  }
-
-  void _dallaMappa(String testo) {
-    switch (MessaggioDalla3d.leggi(testo)) {
-      case Caricata3d():
-        _caricata = true;
-        unawaited(_tutto());
-      case Pronta3d():
-        _pronta = true;
-        _attesa?.cancel();
-      case final Errore3d e:
-        final (motivo, ricorda) = nonVaPer(e)!;
-        _nonVa(motivo, ricorda: ricorda);
-      case final Prestazioni3d p:
-        debugPrint('mappa 3D: ${p.fps} fotogrammi al secondo, ${p.triangoli} triangoli');
-        if (nonVaPer(p) case (final motivo, final ricorda)) _nonVa(motivo, ricorda: ricorda);
-      case Toccata3d():
-        widget.controllo.toccata();
-      case Tocco3d(:final elementi):
-        _tocco(elementi);
-      case null:
-        break;
-    }
-  }
-
-  /// La pagina c'è: tutto da capo (le opzioni prima dello stile).
-  Future<void> _tutto() async {
-    _viaggioMandato = null;
-    _frecciaMandata = (-1, -1);
-    _propostaMandata = 0;
-    _letturaMandata = null;
-    _lettaMandata = null;
-    _modoMandato = null;
-    _sopraMandato = null;
-    _opzioni(forza: true);
-    _stile();
-    // Le persone sono un cerchio e due scritte, senza immagini: subito.
-    _persone();
-    await _immagini();
-    if (_finita) return;
-    _viaggio();
-    _segnalazioni();
-    _vicini();
-    _risparmio();
-    _comandi();
-    _dallaGuida();
-  }
-
-  void _opzioni({bool forza = false}) {
-    final notte = Theme.of(context).brightness == Brightness.dark;
-    final vista = widget.controllo.vista, segnaposto = widget.posizione.segnaposto;
-    if (!forza && notte == _notte && vista == _vistaMandata && segnaposto == _segnapostoMandato) return;
-    final cambiaNotte = _notte != null && notte != _notte;
-    _notte = notte;
-    _vistaMandata = vista;
-    _segnapostoMandato = segnaposto;
-    _manda(msgOpzioni(notte: notte, vista: vista, segnaposto: segnaposto));
-    if (cambiaNotte) _stile();
-  }
-
-  void _stile() {
-    _manda(msgStile(stileMappa(scuro: _notte ?? false, chiaveTraffico: Servizi.chiaveTomTom)));
-  }
-
-  /// Le immagini dello stile: le stesse della mappa di sempre.
-  Future<void> _immagini() async {
-    Future<void> una(String nome, Future<Uint8List> Function() png) async {
-      try {
-        _manda(msgImmagine(nome, await png()));
-      } catch (e) {
-        debugPrint('mappa 3D, immagine $nome: $e');
-      }
-    }
-
-    for (final s in Segnaposto.values) {
-      await una(s.immagine, () async => (await rootBundle.load(s.asset)).buffer.asUint8List());
-    }
-    await una(immaginePuntaManovra, puntaManovraPng);
-    await una(immagineBandieraArrivo, bandieraArrivoPng);
-    try {
-      for (final MapEntry(:key, :value) in (await iconeSegnalazioni()).entries) {
-        _manda(msgImmagine(key, value));
-      }
-      for (final MapEntry(:key, :value) in (await iconePunti()).entries) {
-        _manda(msgImmagine(key, value));
-      }
-    } catch (e) {
-      debugPrint('mappa 3D, icone: $e');
-    }
-  }
-
-  /// Il viaggio: il percorso (con le code) per il 3D, e le sorgenti di sempre
-  /// (colonnine, meta, tappe; e il percorso per la vista da lontano).
-  void _viaggio() {
-    final stato = widget.gestore.stato;
-    if (identical(stato, _viaggioMandato) || !_caricata) return;
-    _viaggioMandato = stato;
-    final v = stato is ViaggioPronto ? stato.viaggio : null;
-    _manda(msgPercorso(v));
-    for (final MapEntry(key: id, value: dati) in datiViaggio(
-      v,
-      tappe: stato is ViaggioPronto ? stato.tappe : const [],
-    ).entries) {
-      _manda(msgSorgente(id, dati));
-    }
-    _frecciaMandata = (-1, -1);
-    _dallaGuida();
-  }
-
-  /// A ogni novità della guida: la posizione (una volta per lettura), la
-  /// freccia della manovra, la telecamera.
-  void _dallaGuida() {
-    if (!_caricata || !mounted || _finita) return;
-    final g = widget.guida;
-    final v = g.pronto?.viaggio, a = g.avanzamento;
-    // La freccia della prossima manovra, avvicinandosi.
-    final chiave = chiaveFreccia(v, a?.prossima, a?.allaProssimaM, ricalcolo: g.ricalcolando);
-    if (chiave != _frecciaMandata) {
-      _frecciaMandata = chiave;
-      _manda(chiave == null ? msgManovra(null, null) : msgManovra(v, a?.prossima));
-    }
-    // Nessun punto sul percorso e il GPS muto da dieci secondi: tutta la strada.
-    if (a == null && widget.posizione.tace(const Duration(seconds: 10)) && v != null) {
-      if (!identical(v, _panoramicaDi) && !widget.controllo.libera) {
-        _panoramicaDi = v;
-        _modoMandato = ModoCamera3d.panoramica;
-        _manda(msgCamera(ModoCamera3d.panoramica, sopra: widget.controllo.coperto, riquadro: confini(v)));
-      }
-      return;
-    }
-    if (_panoramicaDi != null) {
-      _panoramicaDi = null;
-      _comandi(forza: true);
-    }
-    final metri = g.metriStimati();
-    final stimata = g.posizioneStimata();
-    final qui = stimata?.punto ?? a?.posizioneSulPercorso ?? widget.posizione.qui;
-    if (qui == null) return;
-    if (g.letture == _letturaMandata && widget.posizione.lettoAlle == _lettaMandata) return;
-    _letturaMandata = g.letture;
-    _lettaMandata = widget.posizione.lettoAlle;
-    _manda(
-      msgPosizione(
-        qui: qui,
-        rotta: stimata?.rotta ?? a?.rotta ?? widget.posizione.rotta,
-        metri: metri,
-        velocitaMs: (g.velocitaMs ?? widget.posizione.velocitaAdesso() / 3.6),
-        zoom: zoom3d(
-          widget.controllo.vista,
-          velocitaStradaKmh: a?.velocitaStradaKmh ?? 0,
-          allaProssimaM: a == null ? 0 : (a.prossima == null ? a.restantiM : a.allaProssimaM),
-        ),
-        // La stima è già portata ad adesso (`metriStimati`).
-        quando: _ora(),
-      ),
-    );
-  }
-
-  /// Senza guida agganciata la posizione la dà il GPS.
-  void _dallaPosizione() {
-    if (widget.guida.avanzamento != null) return;
-    _dallaGuida();
-    if (widget.posizione.segnaposto != _segnapostoMandato) _opzioni();
-  }
-
-  void _comandi({bool forza = false}) {
-    if (!_caricata) return;
-    _opzioni();
-    final c = widget.controllo;
-    final modo = c.libera ? ModoCamera3d.libera : ModoCamera3d.segui;
-    if (_panoramicaDi != null && !forza) return;
-    if (!forza && modo == _modoMandato && c.coperto == _sopraMandato && c.copertoSinistra == _sinistraMandata) return;
-    _modoMandato = modo;
-    _sopraMandato = c.coperto;
-    _sinistraMandata = c.copertoSinistra;
-    _manda(msgCamera(modo, sopra: c.coperto, sinistra: c.copertoSinistra));
-  }
-
-  void _segnalazioni() {
-    final g = widget.segnalazioni;
-    if (g == null) return;
-    _manda(msgSorgente(sorgenteSegnalazioni, datiSegnalazioni(g.vicine, widget.guida.avvisi)));
-  }
-
-  void _vicini() {
-    final v = widget.vicini;
-    if (v == null) return;
-    for (final MapEntry(:key, :value) in v.dati().entries) {
-      _manda(msgSorgente(key, value));
-    }
-  }
-
-  void _persone() {
-    final g = widget.persone;
-    if (g == null) return;
-    _manda(msgSorgente(sorgentePersone, datiPersone(g.persone)));
-  }
-
-  void _risparmio() {
-    final p = widget.guida.risparmio?.proposta;
-    if (identical(p, _propostaMandata)) return;
-    _propostaMandata = p;
-    _manda(msgRisparmio(p));
-  }
+  void _comandi() => _regia.comandi();
 
   /// Un tocco su un punto: come sulla mappa di sempre.
   void _tocco(List<Map<Object?, Object?>> elementi) {
@@ -421,7 +174,8 @@ class _Mappa3dState extends State<Mappa3d> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Il tema (giorno o notte) arriva da qui.
-    if (_caricata) _opzioni();
+    _notte = Theme.of(context).brightness == Brightness.dark;
+    _regia.opzioni();
   }
 
   @override

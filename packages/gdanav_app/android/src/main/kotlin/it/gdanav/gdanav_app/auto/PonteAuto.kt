@@ -162,8 +162,8 @@ object PonteAuto {
 
     /**
      * L'auto scrive un testo accanto ai km che restano (API 5,
-     * `TravelEstimate.setTripText`): il pedaggio va lì, e non nella barra
-     * sulla mappa.
+     * `TravelEstimate.setTripText`): in guida batteria, km, batteria
+     * all'arrivo, meteo e pedaggio vanno lì, e non nella barra sulla mappa.
      */
     @Volatile var pedaggioNellaStima = false
 
@@ -265,7 +265,16 @@ object PonteAuto {
     }
 
     private fun gestisci(call: MethodCall) {
+        // Il JavaScript per la scena 3D va dritto a lei: arriva a raffica (una
+        // posizione al secondo, le immagini all'inizio) e non cambia niente
+        // di quello che gli schermi mostrano.
+        if (call.method == "web3d") {
+            call.argument<String>("js")?.let { js -> scena3d?.invoke(js) }
+            return
+        }
         when (call.method) {
+            "web3d_vuoi" -> vuole3d = call.argument<Boolean>("si") == true
+            "web3d_no" -> nonVa3d = true
             "stili" -> {
                 stileChiaro = call.argument("chiaro")
                 stileScuro = call.argument("scuro")
@@ -475,6 +484,9 @@ object PonteAuto {
     fun cambiaOpzione(chiave: String, valore: Any) = chiedi("opzioni", mapOf(chiave to valore))
 
     fun alternaVoce() = chiedi("voce", null)
+
+    /** Una scelta delle impostazioni fatta in auto: un avviso, il simbolo, le ZTL, il 3D aumentato. */
+    fun scegli(dati: Map<String, Any>) = chiedi("scelta", dati)
 
     /** Segnala dove sei; la risposta è la frase da mostrare. */
     fun segnala(tipo: String, risposta: (String) -> Unit) =
@@ -691,4 +703,29 @@ object PonteAuto {
 
     /** L'auto ha chiesto di finire la guida (tasto sullo schermo o assistente). */
     fun fermaDallAuto() = principale.post { canale?.invokeMethod("ferma", null) }
+
+    // --- La scena 3D sull'auto (Scena3dAuto) ------------------------------
+
+    /** Il telefono la vuole: il 3D aumentato è scelto, e non è andato male. */
+    @Volatile var vuole3d = false
+
+    /** Non va (WebGL che manca, troppo lenta): per questa sessione la mappa di sempre. */
+    @Volatile var nonVa3d = false
+
+    /** Chi la mostra: gli si consegna il JavaScript che arriva dal telefono. */
+    @Volatile var scena3d: ((String) -> Unit)? = null
+
+    /** Un messaggio della pagina 3D, per la regia sul telefono. */
+    fun dalla3d(testo: String) = principale.post { canale?.invokeMethod("dalla3d", mapOf("testo" to testo)) }
+
+    /** Come la vede l'auto: giorno o notte, la vista, quanto coprono le schede (in punti). */
+    fun stato3d(notte: Boolean, vista: String, sopra: Double, sinistra: Double) = principale.post {
+        canale?.invokeMethod(
+            "stato3d",
+            mapOf("notte" to notte, "vista" to vista, "sopra" to sopra, "sinistra" to sinistra),
+        )
+    }
+
+    /** La scena 3D è chiusa: la regia sul telefono smette. */
+    fun chiusa3d() = principale.post { canale?.invokeMethod("chiusa3d", null) }
 }

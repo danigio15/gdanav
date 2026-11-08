@@ -15,6 +15,8 @@ import '../componenti/vista_svincolo.dart';
 import '../componenti/ztl.dart';
 import '../mappa/controllo_mappa.dart' show VistaMappa;
 import '../mappa/dati_viaggio.dart';
+import '../mappa/ponte_3d.dart' show chiamata3d;
+import '../mappa/regia_3d.dart';
 import '../mappa/segnaposto.dart';
 import '../mappa/stile.dart';
 import '../schermate/scheda_punto.dart';
@@ -33,7 +35,9 @@ import '../stato/gestore_risparmio.dart' show sintesiProposta;
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/prova_di_guida.dart';
+import '../stato/scelte_avvisi.dart';
 import '../stato/viaggi_pianificati.dart';
+import '../stato/voce.dart';
 import 'persone_in_auto.dart';
 import 'richiesta_navigazione.dart';
 import '../stato/gestore_vicini.dart';
@@ -127,6 +131,9 @@ class PonteAuto {
     auto?.addListener(_opzioni);
     meteo?.addListener(_cruscotto);
     vicini?.addListener(_vicini);
+    // Le scelte che il menu dell'auto mostra, anche se cambiano sul telefono.
+    guida.avvisi.addListener(_opzioni);
+    ztl?.addListener(_opzioni);
     if (segnalazioni case final s?) {
       s.addListener(_segnalazioni);
       guida.avvisi.addListener(_segnalazioni);
@@ -203,6 +210,22 @@ class PonteAuto {
       case 'prova_guida':
         await provaDiGuida();
       // La sessione dell'auto è finita: la prova di guida pure.
+      // La scena 3D sullo schermo dell'auto (Scena3dAuto): come la vede
+      // l'auto (giorno o notte, la vista, quanto coprono le schede), e quello
+      // che la pagina dice.
+      case 'stato3d':
+        _stato3d = (
+          notte: a['notte'] == true,
+          vista: a['vista'] == 'immersiva' ? VistaMappa.immersiva : VistaMappa.inclinata,
+          sopra: (a['sopra'] as num?)?.toDouble() ?? 0,
+          sinistra: (a['sinistra'] as num?)?.toDouble() ?? 0,
+        );
+        _regia3d?.comandi();
+      case 'dalla3d':
+        (_regia3d ??= _nuovaRegia3d()).dallaMappa(a['testo'] as String? ?? '');
+      case 'chiusa3d':
+        _regia3d?.ferma();
+        _regia3d = null;
       case 'prova_fine':
         _conProva = false;
         _seguiProva();
@@ -252,6 +275,8 @@ class PonteAuto {
       case 'voce':
         guida.alternaVoce();
         _opzioni();
+      case 'scelta':
+        await _sceltaDallAuto(a);
       case 'segnala':
         final tipo = TipoSegnalazione.values.where((t) => t.name == a['tipo']).firstOrNull;
         final s = segnalazioni;
@@ -428,15 +453,112 @@ class PonteAuto {
       // l'audio a tre stati per il menu nuovo.
       'muto': guida.muto,
       'audio': guida.audio.chiave,
+      // «Anche il discorso audio deve essere modificabile»: il modo si sceglie
+      // diretto, e la voce ha volume e velocità.
+      'audio_modi': [
+        for (final m in ModoAudio.values) {'id': m.chiave, 'nome': _nomeDelModo(m), 'sotto': _sottoDelModo(m)},
+      ],
+      'voce_volume': regolazioniVoce.value.$1.name,
+      'voce_volume_nome': regolazioniVoce.value.$1.nome,
+      'voce_volumi': [
+        for (final v in VolumeVoce.values) {'id': v.name, 'nome': v.nome},
+      ],
+      'voce_velocita': regolazioniVoce.value.$2.name,
+      'voce_velocita_nome': regolazioniVoce.value.$2.nome,
+      'voce_velocitas': [
+        for (final v in VelocitaVoce.values) {'id': v.name, 'nome': v.nome},
+      ],
       'elettrica': auto?.elettrica ?? true,
       'arrivo': ?viaggio.minimoArrivo,
+      /* «Dall'auto devi dare la possibilità di comandare di più le
+       * impostazioni: gli avvisi non si possono modificare, idem il simbolo
+       * dell'auto.» Sullo schermo dell'auto, come sul telefono: ogni avviso
+       * col suo modo (voce, beep, schermo, spento), il simbolo dell'auto, le
+       * ZTL sulla mappa e il 3D aumentato. */
+      'avvisi': [
+        for (final av in Avviso.values)
+          {
+            'id': av.name,
+            'nome': av.nome,
+            'sotto': av.sotto,
+            'come': guida.avvisi.di(av).name,
+            'come_nome': guida.avvisi.di(av).etichetta,
+            if (av.soloVoce) 'solo_voce': true,
+            if (av.segnalazione != null) 'segnalazione': true,
+          },
+      ],
+      'segnaposto': posizione.segnaposto.name,
+      'segnaposti': [
+        for (final sp in Segnaposto.values) {'id': sp.name, 'nome': sp.etichetta},
+      ],
+      if (ztl case final z?) 'ztl_mappa': z.scelte.sullaMappa,
+      if (guida.archivio != null) 'aumentato': Archivio.vistaScelta.value == VistaMappa.aumentata,
     });
+    _segnapostoNelMenu = posizione.segnaposto;
+  }
+
+  /// Il simbolo che il menu dell'auto ha in pagina.
+  Segnaposto? _segnapostoNelMenu;
+
+  static String _nomeDelModo(ModoAudio m) => switch (m) {
+    ModoAudio.tutto => 'Tutto',
+    ModoAudio.soloAvvisi => 'Solo avvisi',
+    ModoAudio.silenzio => 'Silenzio',
+  };
+
+  static String _sottoDelModo(ModoAudio m) => switch (m) {
+    ModoAudio.tutto => 'Le indicazioni e gli avvisi a voce',
+    ModoAudio.soloAvvisi => 'Autovelox, segnalazioni, ZTL e limite; niente indicazioni',
+    ModoAudio.silenzio => 'Nessuna voce, nemmeno gli avvisi',
+  };
+
+  /// Una scelta fatta sullo schermo dell'auto, nelle impostazioni.
+  Future<void> _sceltaDallAuto(Map<Object?, Object?> a) async {
+    if (a['audio'] case final String id) {
+      final m = ModoAudio.values.where((x) => x.chiave == id).firstOrNull;
+      if (m != null) guida.scegliAudio(m);
+    }
+    final (volume, velocita) = regolazioniVoce.value;
+    final nuovoVolume = VolumeVoce.values.where((x) => x.name == a['voce_volume']).firstOrNull ?? volume;
+    final nuovaVelocita = VelocitaVoce.values.where((x) => x.name == a['voce_velocita']).firstOrNull ?? velocita;
+    if (nuovoVolume != volume || nuovaVelocita != velocita) {
+      regolazioniVoce.value = (nuovoVolume, nuovaVelocita);
+      unawaited(guida.archivio?.salvaRegolazioniDellaVoce(regolazioniVoce.value));
+    }
+    // «Prova la voce»: come suona adesso, anche col silenzio scelto.
+    if (a['prova_voce'] == true) unawaited(guida.voce.parla('Tra trecento metri, svolta a destra.'));
+    if (a['avviso'] case final String id) {
+      final av = Avviso.values.where((x) => x.name == id).firstOrNull;
+      final come = ComeAvvisare.values.where((x) => x.name == a['come']).firstOrNull;
+      if (av != null && come != null) guida.avvisi.scegli(av, come);
+    }
+    if (a['segnaposto'] case final String n) {
+      final sp = Segnaposto.values.where((x) => x.name == n).firstOrNull;
+      if (sp != null && sp != posizione.segnaposto) {
+        await posizione.scegli(sp);
+        _posizione();
+      }
+    }
+    if (a['ztl_mappa'] case final bool si) await ztl?.mostra(si);
+    if (a['aumentato'] case final bool si) {
+      final archivio = guida.archivio;
+      if (archivio != null) {
+        await archivio.salvaVistaMappa(
+          si ? VistaMappa.aumentata : (await archivio.vistaPrimaDellAumentata() ?? VistaMappa.inclinata),
+        );
+        // Riaccesa a mano si riprova, come sul telefono.
+        if (si) _treDNonVa = false;
+      }
+    }
+    _opzioni();
   }
 
   void ferma() {
     Archivio.vistaScelta.removeListener(_dallaVista);
     viaggio.removeListener(_viaggio);
     viaggio.removeListener(_opzioni);
+    guida.avvisi.removeListener(_opzioni);
+    ztl?.removeListener(_opzioni);
     guida.removeListener(_guida);
     guida.removeListener(_posizione);
     posizione.removeListener(_posizione);
@@ -454,6 +576,8 @@ class PonteAuto {
     guida.risparmio?.removeListener(_strada);
     _persone?.ferma();
     _persone = null;
+    _regia3d?.ferma();
+    _regia3d = null;
   }
 
   /// La strada proposta mandata all'auto, e il suo numero: la risposta
@@ -505,7 +629,50 @@ class PonteAuto {
     _aspetto3d = a;
     _stili();
     _posizione();
+    _vuoi3d();
+    _opzioni();
   }
+
+  /* ── La scena 3D sull'auto ────────────────────────────────────────────
+   *
+   * «Certo, voglio la scena reale anche in macchina.» Col 3D aumentato
+   * scelto sul telefono, Android Auto nelle viste 3D e immersiva mostra la
+   * stessa pagina del telefono (viadotti, alberi, edifici, l'auto 3D) in una
+   * WebView sua (Scena3dAuto), al posto della mappa di MapLibre. I dati sono
+   * quelli del telefono, dalla stessa regia ([Regia3d]). Se la pagina non ce
+   * la fa (WebGL che manca, troppo lenta) l'auto torna alla mappa di sempre,
+   * e per questa sessione ci resta. */
+  Regia3d? _regia3d;
+  var _treDNonVa = false;
+  ({bool notte, VistaMappa vista, double sopra, double sinistra}) _stato3d = (
+    notte: false,
+    vista: VistaMappa.inclinata,
+    sopra: 0,
+    sinistra: 0,
+  );
+
+  void _vuoi3d() => _manda('web3d_vuoi', {'si': _aspetto3d && !_treDNonVa});
+
+  Regia3d _nuovaRegia3d() => Regia3d(
+    gestore: viaggio,
+    posizione: posizione,
+    guida: guida,
+    manda: (m) => _manda('web3d', {'js': chiamata3d(m)}),
+    notte: () => _stato3d.notte,
+    vista: () => _stato3d.vista,
+    inquadratura: () => (libera: false, sopra: _stato3d.sopra, sinistra: _stato3d.sinistra),
+    onNonVa: (motivo, {required ricorda}) {
+      _treDNonVa = true;
+      _regia3d?.ferma();
+      _regia3d = null;
+      _manda('web3d_no', {'motivo': motivo});
+      _vuoi3d();
+    },
+    segnalazioni: segnalazioni,
+    vicini: vicini,
+    persone: persone,
+    orologio: _ora,
+  )..avvia();
 
   void _stili() {
     String stile({required bool scuro, bool immersiva = false}) => jsonEncode(
@@ -845,14 +1012,21 @@ class PonteAuto {
     _seguiProva();
     final a = guida.avanzamento;
     final p = guida.pronto;
+    /* All'arrivo, al posto della manovra il riepilogo (e via quando si
+     * chiude). Si guarda anche a guida partita: «il navigatore
+     * improvvisamente perde il percorso». Arrivati senza toccare «Fine» il
+     * riepilogo restava, e il viaggio nuovo partiva con la linea vuota
+     * sull'auto (`_viaggio`, arrivati); la guida, partita, toglie il
+     * riepilogo, ma qui la linea si rimandava solo a guida ferma: scheda
+     * della manovra e arrivo c'erano, la linea blu no, fino al traffico
+     * dopo o a un ricalcolo. */
+    final arrivo = guida.attiva ? null : guida.riepilogo?.perAuto;
+    if (arrivo != _arrivoDetto) {
+      _arrivoDetto = arrivo;
+      _viaggio();
+    }
     if (!guida.attiva || p == null) {
       _manda('guida', {'attiva': false});
-      // All'arrivo, al posto della manovra il riepilogo (e via quando si chiude).
-      final arrivo = guida.attiva ? null : guida.riepilogo?.perAuto;
-      if (arrivo != _arrivoDetto) {
-        _arrivoDetto = arrivo;
-        _viaggio();
-      }
       if (_freccia != null) {
         _freccia = null;
         _manda('sorgenti', {
@@ -969,6 +1143,7 @@ class PonteAuto {
   /// fermarsi sull'ultimo punto ad aspettare il prossimo (`MotoFluido` in
   /// gdanav_core, rifatto in `RendererMappa` e `MappaCarPlay`).
   void _posizione() {
+    if (posizione.segnaposto != _segnapostoNelMenu) _opzioni();
     final a = guida.attiva ? guida.avanzamento : null;
     // In guida dove l'auto è adesso, portata avanti lungo la strada da
     // quando è arrivata la lettura: come sul telefono, a passi uguali.
@@ -1121,8 +1296,10 @@ Position? posizioneDellAuto(Map<Object?, Object?> dati) {
   );
 }
 
-/// Il segnaposto sullo schermo dell'auto: quello scelto; la freccia di
-/// partenza, con l'aspetto della mappa 3D, diventa l'auto rossa (come sul
-/// telefono: sul blu del percorso si vede).
-String iconaSullAuto(Segnaposto s, {required bool aspetto3d}) =>
-    aspetto3d && s == Segnaposto.freccia ? Segnaposto.autoRossa.immagine : s.immagine;
+/// Il segnaposto sullo schermo dell'auto: quello scelto, sempre.
+///
+/// Con l'aspetto della mappa 3D la freccia diventava l'auto rossa, come
+/// nella scena 3D del telefono (che di frecce non ne ha). Ma sull'auto la
+/// freccia c'è, e chi l'ha scelta non la vedeva: «se cambio simbolo e
+/// metto freccia non funziona». [aspetto3d] resta per chi chiama.
+String iconaSullAuto(Segnaposto s, {required bool aspetto3d}) => s.immagine;
