@@ -542,6 +542,8 @@ function strato3d() {
       scena.materialeFoschia.uniforms.uFar.value = P.nebbiaA * 1.1 * ppm;
       if (scena.mat.bagliore) scena.mat.bagliore.size = 9 * ppm;
       scena.scalaSegni(Pm.elements[5], m.getCanvas().clientHeight);
+      // La camera di three.js con le matrici di questo fotogramma, per sfoltire i nomi.
+      scena.sfoltisciSegni(camera, m.getCanvas().clientWidth, m.getCanvas().clientHeight);
       renderer.resetState();
       renderer.render(scena.scena, camera);
       S.camera3d = camera;
@@ -1052,7 +1054,9 @@ function aggiornaSegni(adesso) {
   nomi.sort((a, b) => a.d - b.d);
   const messi = [];
   for (const e of nomi) {
-    const testo = e.nome || e.ref;
+    // I nomi lunghi («A4 Svincolo Fiera Porta Est / Milano Fiorenza») si accorciano.
+    const intero = e.nome || e.ref;
+    const testo = intero.length > 30 ? intero.slice(0, 28).trimEnd() + '…' : intero;
     if (messi.length >= 8 || messi.some((m) => m.testo === testo && Math.hypot(m.x - e.x, m.y - e.y) < 250)) continue;
     messi.push({ ...e, testo });
     const tela = etichetta(testo, !e.nome);

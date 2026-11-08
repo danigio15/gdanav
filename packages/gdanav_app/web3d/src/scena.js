@@ -806,6 +806,40 @@ export class Scena {
     }
   }
 
+  /**
+   * I segni che si coprono sullo schermo: resta il più importante (le icone
+   * prima dei nomi, poi il più vicino), gli altri si nascondono finché non
+   * si spostano. [camera] è già quella del fotogramma; [W]×[H] in punti.
+   */
+  sfoltisciSegni(camera, W, H) {
+    if (!this.segni?.size) return;
+    const v = new THREE.Vector3();
+    const voci = [];
+    for (const sp of this.segni.values()) {
+      sp.getWorldPosition(v).project(camera);
+      const x = ((v.x + 1) / 2) * W;
+      const y = ((1 - v.y) / 2) * H;
+      const w = sp.userData.w;
+      const h = sp.userData.h;
+      const cy = sp.center.y;
+      voci.push({
+        sp,
+        fuori: v.z > 1 || v.z < -1,
+        r: [x - w / 2 - 3, y - h * (1 - cy) - 3, x + w / 2 + 3, y + h * cy + 3],
+        // Le icone (si toccano) prima dei nomi, poi il più vicino.
+        peso: (sp.userData.elemento ? 0 : 10) + v.z,
+      });
+    }
+    voci.sort((a, b) => a.peso - b.peso);
+    const presi = [];
+    for (const q of voci) {
+      const libero = !q.fuori && !presi.some((p) => q.r[0] < p[2] && q.r[2] > p[0] && q.r[1] < p[3] && q.r[3] > p[1]);
+      // Un'icona si vede sempre; un nome solo se non copre niente.
+      q.sp.visible = q.sp.userData.elemento ? !q.fuori : libero;
+      if (q.sp.visible) presi.push(q.r);
+    }
+  }
+
   /** Le dimensioni dei segni per questo fotogramma ([p11] della proiezione, [alto] in punti). */
   scalaSegni(p11, alto) {
     if (!this.segni) return;
