@@ -398,8 +398,11 @@ class GestoreGuida extends ChangeNotifier {
   }
 
   /// Il tasto dell'audio: Tutto → Solo avvisi → Silenzio → Tutto.
-  void alternaVoce() {
-    audio = audio.dopo;
+  void alternaVoce() => scegliAudio(audio.dopo);
+
+  /// Un modo dell'audio scelto direttamente (il menu dell'auto).
+  void scegliAudio(ModoAudio m) {
+    audio = m;
     if (archivio case final a?) unawaited(a.salvaModoAudio(audio));
     // Quello che si sta dicendo si ferma: col tasto appena toccato, una frase
     // lunga che continua sembra un tasto che non va.

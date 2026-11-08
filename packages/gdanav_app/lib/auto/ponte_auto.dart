@@ -37,6 +37,7 @@ import '../stato/gestore_viaggio.dart';
 import '../stato/prova_di_guida.dart';
 import '../stato/scelte_avvisi.dart';
 import '../stato/viaggi_pianificati.dart';
+import '../stato/voce.dart';
 import 'persone_in_auto.dart';
 import 'richiesta_navigazione.dart';
 import '../stato/gestore_vicini.dart';
@@ -452,6 +453,21 @@ class PonteAuto {
       // l'audio a tre stati per il menu nuovo.
       'muto': guida.muto,
       'audio': guida.audio.chiave,
+      // «Anche il discorso audio deve essere modificabile»: il modo si sceglie
+      // diretto, e la voce ha volume e velocità.
+      'audio_modi': [
+        for (final m in ModoAudio.values) {'id': m.chiave, 'nome': _nomeDelModo(m), 'sotto': _sottoDelModo(m)},
+      ],
+      'voce_volume': regolazioniVoce.value.$1.name,
+      'voce_volume_nome': regolazioniVoce.value.$1.nome,
+      'voce_volumi': [
+        for (final v in VolumeVoce.values) {'id': v.name, 'nome': v.nome},
+      ],
+      'voce_velocita': regolazioniVoce.value.$2.name,
+      'voce_velocita_nome': regolazioniVoce.value.$2.nome,
+      'voce_velocitas': [
+        for (final v in VelocitaVoce.values) {'id': v.name, 'nome': v.nome},
+      ],
       'elettrica': auto?.elettrica ?? true,
       'arrivo': ?viaggio.minimoArrivo,
       /* «Dall'auto devi dare la possibilità di comandare di più le
@@ -484,8 +500,33 @@ class PonteAuto {
   /// Il simbolo che il menu dell'auto ha in pagina.
   Segnaposto? _segnapostoNelMenu;
 
+  static String _nomeDelModo(ModoAudio m) => switch (m) {
+    ModoAudio.tutto => 'Tutto',
+    ModoAudio.soloAvvisi => 'Solo avvisi',
+    ModoAudio.silenzio => 'Silenzio',
+  };
+
+  static String _sottoDelModo(ModoAudio m) => switch (m) {
+    ModoAudio.tutto => 'Le indicazioni e gli avvisi a voce',
+    ModoAudio.soloAvvisi => 'Autovelox, segnalazioni, ZTL e limite; niente indicazioni',
+    ModoAudio.silenzio => 'Nessuna voce, nemmeno gli avvisi',
+  };
+
   /// Una scelta fatta sullo schermo dell'auto, nelle impostazioni.
   Future<void> _sceltaDallAuto(Map<Object?, Object?> a) async {
+    if (a['audio'] case final String id) {
+      final m = ModoAudio.values.where((x) => x.chiave == id).firstOrNull;
+      if (m != null) guida.scegliAudio(m);
+    }
+    final (volume, velocita) = regolazioniVoce.value;
+    final nuovoVolume = VolumeVoce.values.where((x) => x.name == a['voce_volume']).firstOrNull ?? volume;
+    final nuovaVelocita = VelocitaVoce.values.where((x) => x.name == a['voce_velocita']).firstOrNull ?? velocita;
+    if (nuovoVolume != volume || nuovaVelocita != velocita) {
+      regolazioniVoce.value = (nuovoVolume, nuovaVelocita);
+      unawaited(guida.archivio?.salvaRegolazioniDellaVoce(regolazioniVoce.value));
+    }
+    // «Prova la voce»: come suona adesso, anche col silenzio scelto.
+    if (a['prova_voce'] == true) unawaited(guida.voce.parla('Tra trecento metri, svolta a destra.'));
     if (a['avviso'] case final String id) {
       final av = Avviso.values.where((x) => x.name == id).firstOrNull;
       final come = ComeAvvisare.values.where((x) => x.name == a['come']).firstOrNull;

@@ -42,6 +42,33 @@ enum ModoAudio {
   bool get senzaAvvisi => this == silenzio;
 }
 
+/// Quanto forte e quanto veloce parla la voce di guida. «Anche il discorso
+/// audio deve essere modificabile», dall'auto: si sceglie lì (e vale anche sul
+/// telefono), e [VoceTelefono] lo legge prima di ogni frase.
+enum VolumeVoce {
+  basso('Basso', 0.5),
+  medio('Medio', 0.75),
+  alto('Alto', 1.0);
+
+  const VolumeVoce(this.nome, this.valore);
+  final String nome;
+  final double valore;
+}
+
+enum VelocitaVoce {
+  lenta('Lenta', 0.42),
+  normale('Normale', 0.5),
+  veloce('Veloce', 0.6);
+
+  const VelocitaVoce(this.nome, this.valore);
+  final String nome;
+  final double valore;
+}
+
+/// Il volume e la velocità di adesso, per chi parla. Li scrive chi li sceglie
+/// (il menu dell'auto) e li carica l'app all'avvio.
+final regolazioniVoce = ValueNotifier<(VolumeVoce, VelocitaVoce)>((VolumeVoce.alto, VelocitaVoce.normale));
+
 /// Chi parla durante la guida. Nelle prove se ne usa una che scrive e basta.
 abstract interface class Voce {
   Future<void> parla(String frase);
@@ -107,6 +134,9 @@ class VoceTelefono implements Voce {
   final _tts = FlutterTts();
   var _pronta = false;
 
+  /// Volume e velocità già dati alla sintesi vocale.
+  (VolumeVoce, VelocitaVoce)? _regolata;
+
   @override
   Future<void> parla(String frase) async {
     try {
@@ -129,6 +159,12 @@ class VoceTelefono implements Voce {
           } catch (_) {}
         }
         _pronta = true;
+      }
+      final r = regolazioniVoce.value;
+      if (r != _regolata) {
+        await _tts.setVolume(r.$1.valore);
+        await _tts.setSpeechRate(r.$2.valore);
+        _regolata = r;
       }
       // Il fuoco audio per la frase, poi la musica torna su.
       await _tts.speak(frase, focus: true);

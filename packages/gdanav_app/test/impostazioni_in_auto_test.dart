@@ -5,6 +5,7 @@ import 'package:gdanav_app/mappa/controllo_mappa.dart';
 import 'package:gdanav_app/mappa/segnaposto.dart';
 import 'package:gdanav_app/stato/archivio.dart';
 import 'package:gdanav_app/stato/scelte_avvisi.dart';
+import 'package:gdanav_app/stato/voce.dart';
 
 import 'aiuti.dart';
 
@@ -61,6 +62,19 @@ void main() {
     await aspetta();
     expect(a.posizione.segnaposto, Segnaposto.autoBianca);
     expect(opzioni()['segnaposto'], 'autoBianca');
+
+    // L'audio, scelto diretto, e la voce più bassa e più lenta.
+    expect((opzioni()['audio_modi'] as List).length, ModoAudio.values.length);
+    await dallAuto('scelta', {'audio': 'avvisi'});
+    await aspetta();
+    expect(a.guida.audio, ModoAudio.soloAvvisi);
+    expect(opzioni()['audio'], 'avvisi');
+    await dallAuto('scelta', {'voce_volume': 'basso', 'voce_velocita': 'lenta'});
+    await aspetta();
+    expect(regolazioniVoce.value, (VolumeVoce.basso, VelocitaVoce.lenta));
+    expect(opzioni()['voce_volume'], 'basso');
+    expect(await tester.runAsync(a.archivio.regolazioniDellaVoce), (VolumeVoce.basso, VelocitaVoce.lenta));
+    regolazioniVoce.value = (VolumeVoce.alto, VelocitaVoce.normale);
 
     // Il 3D aumentato acceso dall'auto: vale anche sul telefono.
     await dallAuto('scelta', {'aumentato': true});

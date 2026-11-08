@@ -37,6 +37,8 @@ class Archivio {
   static const _voceMuta = 'voce_muta';
   static const _avvisiMuti = 'avvisi_muti';
   static const _avvisiScelti = 'avvisi_scelti';
+  static const _volumeVoce = 'voce_volume';
+  static const _velocitaVoce = 'voce_velocita';
   static const _vistaPiatta = 'vista_2d';
   static const _vista = 'vista_mappa';
   static const _viaggiPianificati = 'viaggi_pianificati';
@@ -168,6 +170,21 @@ class Archivio {
   Future<void> salvaModoAudio(ModoAudio m) async {
     await salvaVoceMuta(m.senzaGuida);
     await (m.senzaAvvisi ? _p.write(key: _avvisiMuti, value: 'sì') : _p.delete(key: _avvisiMuti));
+  }
+
+  /// Volume e velocità della voce di guida (vedi [regolazioniVoce]).
+  Future<(VolumeVoce, VelocitaVoce)> regolazioniDellaVoce() async {
+    final v = await _p.read(key: _volumeVoce);
+    final r = await _p.read(key: _velocitaVoce);
+    return (
+      VolumeVoce.values.where((x) => x.name == v).firstOrNull ?? VolumeVoce.alto,
+      VelocitaVoce.values.where((x) => x.name == r).firstOrNull ?? VelocitaVoce.normale,
+    );
+  }
+
+  Future<void> salvaRegolazioniDellaVoce((VolumeVoce, VelocitaVoce) r) async {
+    await _p.write(key: _volumeVoce, value: r.$1.name);
+    await _p.write(key: _velocitaVoce, value: r.$2.name);
   }
 
   /// Gli avvisi della guida, uno per uno (vedi [ScelteAvvisi]).
