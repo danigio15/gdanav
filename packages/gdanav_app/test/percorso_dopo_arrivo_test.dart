@@ -42,7 +42,9 @@ void main() {
 
     // Si riparte verso un'altra meta (come «vai» dall'auto o dal telefono),
     // senza aver chiuso il riepilogo.
-    final ok = await tester.runAsync(() => ponte.vaiDallAuto(const Luogo(nome: 'Sud', posizione: Punto(42.0, 12.05))));
+    final ok = await tester.runAsync(
+      () => ponte.vaiDallAuto(const Luogo(nome: 'Sud', posizione: Punto(42.0, 12.05)), subito: true),
+    );
     await tester.pump();
     expect(ok, isTrue);
     expect(a.guida.attiva, isTrue);

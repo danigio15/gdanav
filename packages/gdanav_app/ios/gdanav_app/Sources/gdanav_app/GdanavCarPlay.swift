@@ -112,6 +112,11 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     private var spostamentoPrima: CGPoint = .zero
     private var sostaAvvisata: String?
 
+    /// Le strade mostrate prima di partire (le anteprime di CarPlay), e il
+    /// loro viaggio.
+    private var stradeMostrate: StradeAuto?
+    private var viaggioStrade: CPTrip?
+
     /// La strada a risparmio già proposta, e il suo avviso finché si vede.
     private var stradaMostrata: String?
     private weak var avvisoStrada: CPNavigationAlert?
@@ -180,6 +185,9 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     private func novita() {
         guard let m = mappa else { return }
         m.aggiorna()
+        // Prima via le anteprime delle strade, poi la guida: partiti dal
+        // telefono, CarPlay non deve avere le due cose insieme.
+        mostraStrade()
         sincronizzaGuida()
         mostraAvviso()
         mostraStrada()
@@ -242,6 +250,9 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         var destra = [tasto(titolo: "Menu") { [weak self] in self?.apriMenu() }]
         if ponte.guida != nil {
             destra.append(tasto(titolo: "Fine") { [weak self] in self?.fine() })
+        } else if ponte.strade != nil {
+            // Con le strade in vista: niente viaggio, come «Fine» sul telefono.
+            destra.append(tasto(titolo: "Annulla") { [weak self] in self?.fine() })
         }
         t.leadingNavigationBarButtons = sinistra
         t.trailingNavigationBarButtons = destra
@@ -370,6 +381,99 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                 if !ok { self?.premiumMostrato = false }
             }
         }
+    }
+
+    // MARK: - Le strade prima di partire
+
+    /// «Quando c'è il calcolo percorso questo non esce su CarPlay»: calcolato
+    /// il viaggio (dall'auto o dal telefono), le strade fra cui scegliere
+    /// nelle anteprime di CarPlay — più rapida, risparmia energia, tempo
+    /// simile, più lenta — con la durata, il consumo, il pedaggio, da dove
+    /// passa e la batteria all'arrivo; «Avvia» parte con quella scelta.
+    /// Toccandone una la si sceglie anche sul telefono. Partiti, o cambiato
+    /// il viaggio, le anteprime se ne vanno.
+    private func mostraStrade() {
+        guard let t = modello else { return }
+        let ponte = PonteAuto.shared
+        let ora = ponte.guida == nil && ponte.guidaInAuto ? ponte.strade : nil
+        if ora == stradeMostrate { return }
+        // Lo stesso viaggio con un'altra strada scelta (qui o sul telefono):
+        // l'anteprima resta, cambiano i tempi.
+        if let o = ora, let prima = stradeMostrate, let v = viaggioStrade, o.id == prima.id,
+           o.voci.map(\.nome) == prima.voci.map(\.nome)
+        {
+            stradeMostrate = o
+            stime(o, per: v)
+            return
+        }
+        stradeMostrate = ora
+        if viaggioStrade != nil {
+            t.hideTripPreviews()
+            viaggioStrade = nil
+        }
+        guard let s = ora else { return }
+        let qui = ponte.qui.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
+        let arrivo = CLLocationCoordinate2D(latitude: s.lat ?? qui?.latitude ?? 0, longitude: s.lon ?? qui?.longitude ?? 0)
+        let da = MKMapItem(placemark: MKPlacemark(coordinate: qui ?? arrivo))
+        let a = MKMapItem(placemark: MKPlacemark(coordinate: arrivo))
+        a.name = s.meta
+        let scelte = s.voci.enumerated().map { i, v -> CPRouteChoice in
+            // Dal più lungo al più corto: CarPlay prende quello che ci sta.
+            let durata = ManovreCarPlay.durata(v.durataS)
+            let costi = [v.consumo, v.pedaggio].compactMap { $0 }.joined(separator: " · ")
+            let c = CPRouteChoice(
+                summaryVariants: [
+                    [durata, v.nome, costi].filter { !$0.isEmpty }.joined(separator: " · "),
+                    "\(durata) · \(v.nome)",
+                    v.nome,
+                ],
+                additionalInformationVariants: [
+                    [v.via.isEmpty ? nil : v.via, v.km, v.arrivo.map { "arrivi con il \($0)%" }, v.traffico]
+                        .compactMap { $0 }.joined(separator: " · "),
+                    [v.km, v.arrivo.map { "arrivi con il \($0)%" }].compactMap { $0 }.joined(separator: " · "),
+                ],
+                selectionSummaryVariants: [v.via.isEmpty ? v.nome : v.via]
+            )
+            c.userInfo = i
+            return c
+        }
+        let v = CPTrip(origin: da, destination: a, routeChoices: scelte)
+        viaggioStrade = v
+        t.showTripPreviews(
+            [v],
+            textConfiguration: CPTripPreviewTextConfiguration(
+                startButtonTitle: "Avvia",
+                additionalRoutesButtonTitle: "Altre strade",
+                overviewButtonTitle: "Panoramica"
+            )
+        )
+        stime(s, per: v)
+    }
+
+    /// I tempi della strada scelta, sotto l'anteprima.
+    private func stime(_ s: StradeAuto, per v: CPTrip) {
+        guard let t = modello, s.voci.indices.contains(s.scelta) else { return }
+        let voce = s.voci[s.scelta]
+        t.update(
+            CPTravelEstimates(distanceRemaining: ManovreCarPlay.distanza(voce.metri), timeRemaining: voce.durataS),
+            for: v,
+            with: .default
+        )
+    }
+
+    public func mapTemplate(_ mapTemplate: CPMapTemplate, selectedPreviewFor trip: CPTrip, using routeChoice: CPRouteChoice) {
+        guard let s = stradeMostrate, let i = routeChoice.userInfo as? Int, i != s.scelta else { return }
+        stradeMostrate?.scelta = i
+        if let v = viaggioStrade, let ora = stradeMostrate { stime(ora, per: v) }
+        PonteAuto.shared.scegliStrada(s.id, indice: i)
+    }
+
+    public func mapTemplate(_ mapTemplate: CPMapTemplate, startedTrip trip: CPTrip, using routeChoice: CPRouteChoice) {
+        guard let s = stradeMostrate else { return }
+        let i = routeChoice.userInfo as? Int ?? s.scelta
+        mapTemplate.hideTripPreviews()
+        viaggioStrade = nil
+        PonteAuto.shared.avvia(s.id, indice: i)
     }
 
     // MARK: - La guida

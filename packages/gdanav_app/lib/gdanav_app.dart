@@ -254,11 +254,12 @@ Future<GdanavApp> preparaGdanav({
   }
   if (dimostrazione != null) {
     unawaited(
-      dimostrazione
-          .avvia(auto: auto, viaggio: viaggio, guida: guida, prova: prova)
-          // La posizione finta la tiene accesa il ponte dell'auto, come nella
-          // prova di guida: se no, al primo cambio della guida la spegne.
-          .then((_) => ponteAuto?.provaDiGuida()),
+      dimostrazione.avvia(auto: auto, viaggio: viaggio, guida: guida, prova: prova)
+      // La posizione finta la tiene accesa il ponte dell'auto, come nella
+      // prova di guida: se no, al primo cambio della guida la spegne.
+      .then((_) {
+        if (dimostrazione != Dimostrazione.strade) ponteAuto?.provaDiGuida();
+      }),
     );
   }
   return GdanavApp(

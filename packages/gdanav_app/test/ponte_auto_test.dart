@@ -193,7 +193,15 @@ void main() {
     a.auto.manuale.imposta(90);
     await dallAuto('vai', elenco.first);
     expect(a.viaggio.destinazione!.nome, 'Via Roma 1');
+    // Prima le strade, come sul telefono: si parte con «Avvia».
+    expect(a.guida.attiva, isFalse);
+    final strade = chiamate.lastWhere((c) => c.method == 'strade').arguments as Map;
+    expect(strade['meta'], 'Via Roma 1');
+    expect(strade['voci'], isNotEmpty);
+    expect(await dallAuto('avvia', {'id': strade['id']}), isTrue);
     expect(a.guida.attiva, isTrue);
+    // Partiti, le strade se ne vanno dall'auto.
+    expect(chiamate.lastWhere((c) => c.method == 'strade').arguments, isEmpty);
     expect((chiamate.lastWhere((c) => c.method == 'guida').arguments as Map)['attiva'], isTrue);
     expect(
       chiamate.where((c) => c.method == 'messaggio').map((c) => (c.arguments as Map)['testo']),
@@ -417,14 +425,30 @@ void main() {
     Iterable<Object?> messaggi(List<MethodCall> chiamate) =>
         chiamate.where((c) => c.method == 'messaggio').map((c) => (c.arguments as Map)['testo']);
 
-    testWidgets("partita: la risposta all'auto è sì, e la guida è accesa", (tester) async {
+    testWidgets("pronta: la risposta all'auto è sì, le strade sull'auto, e «Avvia» parte", (tester) async {
       final p = await prepara(tester);
       expect(await p.dallAuto('vai', meta), isTrue);
+      expect(p.a.guida.attiva, isFalse);
+      Map<Object?, Object?> strade() => p.chiamate.lastWhere((c) => c.method == 'strade').arguments as Map;
+      final prima = strade()['id'];
+      expect(await p.dallAuto('avvia', {'id': prima}), isTrue);
       expect(p.a.guida.attiva, isTrue);
       expect((p.chiamate.lastWhere((c) => c.method == 'guida').arguments as Map)['attiva'], isTrue);
-      // Una meta già scelta e poi un'altra: si cambia, e si riparte.
+      // Una meta già scelta e poi un'altra: la guida si ferma, e le strade
+      // della nuova hanno un altro numero (un «Avvia» vecchio non vale).
       expect(await p.dallAuto('vai', {...meta, 'nome': 'Via Milano 3', 'lat': 42.15}), isTrue);
       expect(p.a.viaggio.destinazione!.nome, 'Via Milano 3');
+      expect(p.a.guida.attiva, isFalse);
+      expect(strade()['id'], isNot(prima));
+      expect(await p.dallAuto('avvia', {'id': prima}), isFalse);
+      expect(p.a.guida.attiva, isFalse);
+      expect(await p.dallAuto('avvia', {'id': strade()['id']}), isTrue);
+      expect(p.a.guida.attiva, isTrue);
+    });
+
+    testWidgets("«Portami a casa» a voce parte subito, senza le strade", (tester) async {
+      final p = await prepara(tester);
+      expect(await p.dallAuto('vai', {...meta, 'subito': true}), isTrue);
       expect(p.a.guida.attiva, isTrue);
     });
 

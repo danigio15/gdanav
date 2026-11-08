@@ -40,7 +40,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
      * fermi, la segnalazione appena passata. La mappa sotto si ridisegna per
      * conto suo, che il modello si rifaccia o no.
      */
-    private fun firma(): Any? = listOf(PonteAuto.guida, PonteAuto.messaggio, PonteAuto.avviso.ancoraId, PonteAuto.strada.id, PonteAuto.termica.id, PonteAuto.arrivo)
+    private fun firma(): Any? = listOf(PonteAuto.guida, PonteAuto.messaggio, PonteAuto.avviso.ancoraId, PonteAuto.strada.id, PonteAuto.termica.id, PonteAuto.arrivo, PonteAuto.strade?.id)
 
     private var disegnata: Any? = null
     private var daAggiornare = false
@@ -57,6 +57,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             proponiStrada()
             proponiTermica()
             mostraArrivo()
+            mostraStrade()
             invalidate()
         }
     }
@@ -114,6 +115,22 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         arrivoMostrato = a
         if (a == null || giaAperto || PonteAuto.guida != null) return
         screenManager.push(SchermoRiepilogoArrivo(carContext))
+    }
+
+    /** Le strade già aperte ([SchermoStrade]): una volta per viaggio calcolato. */
+    private var stradeMostrate: String? = null
+
+    /**
+     * Calcolato il viaggio (dall'auto o dal telefono), sopra la mappa le
+     * strade fra cui scegliere, con «Avvia». Se le chiude il telefono
+     * (partito, o un altro viaggio) se ne vanno da sé.
+     */
+    private fun mostraStrade() {
+        val s = PonteAuto.strade
+        if (s == null || PonteAuto.guida != null || s.id == stradeMostrate) return
+        stradeMostrate = s.id
+        if (screenManager.top is SchermoStrade) return
+        screenManager.push(SchermoStrade(carContext))
     }
 
     /** La proposta dell'auto termica già aperta ([SchermoTermica]). */

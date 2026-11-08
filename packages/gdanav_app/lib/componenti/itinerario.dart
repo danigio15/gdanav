@@ -199,43 +199,27 @@ class ScelteStrada extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final f = consumo;
-    final consumi = [for (final s in scelte) f?.call(s)];
-    final costi = [for (final s in scelte) pedaggio?.call(s)];
-    // «Senza pedaggi» ha senso solo se un'altra strada li ha: in città
-    // sarebbe rumore su ogni carta.
-    final qualcunaPaga = costi.any((c) => c != null && !c.senzaPedaggi);
-    final etichette = etichetteStrade(scelte, (p) => f?.call(p) ?? 0, minimoPercento: minimoPercento);
-    final rapida = etichette.indexOf(EtichettaStrada.piuRapida);
+    final voci = vociStrade(
+      scelte,
+      scelta: scelta,
+      consumo: consumo,
+      arrivo: arrivo,
+      capacitaKwh: capacitaKwh,
+      minimoPercento: minimoPercento,
+      pedaggio: pedaggio,
+    );
     return Column(
       children: [
-        for (final (i, s) in scelte.indexed) ...[
-          if (i > 0) const SizedBox(height: 8),
-          _carta(
-            context,
-            i,
-            s,
-            etichette[i],
-            consumi[i],
-            rapida < 0 ? null : consumi[rapida],
-            consumi[scelta],
-            qualcunaPaga ? costi[i] : null,
-          ),
-        ],
+        for (final (i, v) in voci.indexed) ...[if (i > 0) const SizedBox(height: 8), _carta(context, i, v)],
       ],
     );
   }
 
-  Widget _carta(
-    BuildContext context,
-    int i,
-    PercorsoCalcolato s,
-    EtichettaStrada etichetta,
-    double? consumoQui,
-    double? consumoRapida,
-    double? consumoScelta,
-    CostoPedaggio? costo,
-  ) {
+  Widget _carta(BuildContext context, int i, VoceStrada v) {
+    final s = v.strada;
+    final etichetta = v.etichetta;
+    final consumoQui = v.consumo;
+    final costo = v.pedaggio;
     final tema = Theme.of(context);
     final t = tema.textTheme;
     final c = ColoriGdanav.di(context);
@@ -243,28 +227,15 @@ class ScelteStrada extends StatelessWidget {
     final verde = tema.brightness == Brightness.dark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A);
     final attiva = i == scelta;
     final risparmia = etichetta == EtichettaStrada.risparmia;
-    final via = s.stradaDistintiva([
-      for (final (j, a) in scelte.indexed)
-        if (j != i) a,
-    ]);
-    // La batteria all'arrivo: quella del piano per la scelta, spostata per le
-    // altre di quello che consumano in meno o in più.
-    final a = arrivo, cap = capacitaKwh;
-    final conArrivo = a == null || cap == null || cap <= 0 || consumoQui == null || consumoScelta == null
-        ? null
-        : (a + (consumoScelta - consumoQui) / cap * 100).clamp(0.0, 100.0);
-    final (nome, colore) = switch (etichetta) {
-      EtichettaStrada.piuRapida => ('PIÙ RAPIDA', tema.colorScheme.primary),
-      EtichettaStrada.risparmia => (unita == 'kWh' ? 'RISPARMIA ENERGIA' : 'RISPARMIA CARBURANTE', verde),
-      EtichettaStrada.tempoSimile => ('TEMPO SIMILE', muto),
-      EtichettaStrada.piuLenta => ('PIÙ LENTA', muto),
+    final via = v.via;
+    final conArrivo = v.arrivo;
+    final nome = nomeStrada(etichetta, unita).toUpperCase();
+    final colore = switch (etichetta) {
+      EtichettaStrada.piuRapida => tema.colorScheme.primary,
+      EtichettaStrada.risparmia => verde,
+      EtichettaStrada.tempoSimile || EtichettaStrada.piuLenta => muto,
     };
-    String numero(double v) => v.toStringAsFixed(1).replaceAll('.', ',');
-    final traffico = !s.trafficoVero
-        ? null
-        : s.ritardoTraffico.inMinutes >= 1
-        ? '+${durataBreve(s.ritardoTraffico)} traffico'
-        : 'scorrevole';
+    final traffico = v.traffico;
     return Material(
       color: attiva ? tema.colorScheme.primaryContainer.withValues(alpha: 0.55) : tema.colorScheme.surface,
       shape: RoundedRectangleBorder(
@@ -357,12 +328,12 @@ class ScelteStrada extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '${numero(consumoQui)} $unita',
+                        '${numeroStrada(consumoQui)} $unita',
                         style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800, color: risparmia ? verde : null),
                       ),
-                      if (risparmia && consumoRapida != null)
+                      if (v.risparmio case final r?)
                         Text(
-                          '−${numero(consumoRapida - consumoQui)} $unita',
+                          '−${numeroStrada(r)} $unita',
                           style: t.labelSmall?.copyWith(color: muto, fontWeight: FontWeight.w700),
                         ),
                     ],
@@ -375,6 +346,86 @@ class ScelteStrada extends StatelessWidget {
     );
   }
 }
+
+/// Una delle strade fra cui scegliere, con quello che se ne dice: il nome
+/// (più rapida, risparmia energia…), da dove passa, quanto consuma, quanto
+/// risparmia rispetto alla più rapida, la batteria all'arrivo, il pedaggio
+/// (solo se qualcuna delle strade paga) e il traffico.
+///
+/// Le stesse voci vanno sul telefono ([ScelteStrada]) e sull'auto (le strade
+/// prima di partire su Android Auto e CarPlay, `PonteAuto`): «quando c'è il
+/// calcolo percorso questo non esce su Android Auto e CarPlay».
+typedef VoceStrada = ({
+  EtichettaStrada etichetta,
+  PercorsoCalcolato strada,
+  String via,
+  double? consumo,
+  double? risparmio,
+  double? arrivo,
+  CostoPedaggio? pedaggio,
+  String? traffico,
+});
+
+/// Le voci delle [scelte]; [scelta] è quella del piano (vedi [ScelteStrada]
+/// per gli altri parametri).
+List<VoceStrada> vociStrade(
+  List<PercorsoCalcolato> scelte, {
+  required int scelta,
+  double Function(PercorsoCalcolato p)? consumo,
+  double? arrivo,
+  double? capacitaKwh,
+  double minimoPercento = 5,
+  CostoPedaggio Function(PercorsoCalcolato p)? pedaggio,
+}) {
+  if (scelte.isEmpty) return const [];
+  final f = consumo;
+  final consumi = [for (final s in scelte) f?.call(s)];
+  final costi = [for (final s in scelte) pedaggio?.call(s)];
+  // «Senza pedaggi» ha senso solo se un'altra strada li ha: in città
+  // sarebbe rumore su ogni carta.
+  final qualcunaPaga = costi.any((c) => c != null && !c.senzaPedaggi);
+  final etichette = etichetteStrade(scelte, (p) => f?.call(p) ?? 0, minimoPercento: minimoPercento);
+  final rapida = etichette.indexOf(EtichettaStrada.piuRapida);
+  final consumoScelta = consumi[scelta.clamp(0, scelte.length - 1)];
+  return [
+    for (final (i, s) in scelte.indexed)
+      (
+        etichetta: etichette[i],
+        strada: s,
+        via: s.stradaDistintiva([
+          for (final (j, a) in scelte.indexed)
+            if (j != i) a,
+        ]),
+        consumo: consumi[i],
+        risparmio:
+            etichette[i] == EtichettaStrada.risparmia && rapida >= 0 && consumi[rapida] != null && consumi[i] != null
+            ? consumi[rapida]! - consumi[i]!
+            : null,
+        // La batteria all'arrivo: quella del piano per la scelta, spostata per
+        // le altre di quello che consumano in meno o in più.
+        arrivo: arrivo == null || capacitaKwh == null || capacitaKwh <= 0 || consumi[i] == null || consumoScelta == null
+            ? null
+            : (arrivo + (consumoScelta - consumi[i]!) / capacitaKwh * 100).clamp(0.0, 100.0),
+        pedaggio: qualcunaPaga ? costi[i] : null,
+        traffico: !s.trafficoVero
+            ? null
+            : s.ritardoTraffico.inMinutes >= 1
+            ? '+${durataBreve(s.ritardoTraffico)} traffico'
+            : 'scorrevole',
+      ),
+  ];
+}
+
+/// Il nome di una strada, come nelle carte: «Più rapida», «Risparmia energia»…
+String nomeStrada(EtichettaStrada e, String unita) => switch (e) {
+  EtichettaStrada.piuRapida => 'Più rapida',
+  EtichettaStrada.risparmia => unita == 'kWh' ? 'Risparmia energia' : 'Risparmia carburante',
+  EtichettaStrada.tempoSimile => 'Tempo simile',
+  EtichettaStrada.piuLenta => 'Più lenta',
+};
+
+/// Un numero con una cifra dopo la virgola: «6,4».
+String numeroStrada(double v) => v.toStringAsFixed(1).replaceAll('.', ',');
 
 /// Da dove a dove, con le tappe in mezzo: si aggiungono, si tolgono, si
 /// riordinano trascinandole. Le soste di ricarica si ricalcolano sul viaggio

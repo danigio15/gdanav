@@ -9,6 +9,7 @@ import 'package:geolocator/geolocator.dart' show Position;
 import '../componenti/icona_manovra.dart' show bandieraArrivoPng, puntaManovraPng;
 import '../componenti/icone_punti.dart';
 import '../componenti/icone_segnalazioni.dart';
+import '../componenti/itinerario.dart' show nomeStrada, numeroStrada, vociStrade;
 import '../componenti/stato_colonnina.dart' show testoDisponibilita;
 import '../componenti/scena_svincolo.dart';
 import '../componenti/vista_svincolo.dart';
@@ -249,7 +250,26 @@ class PonteAuto {
         if (_pianificato(a['viaggio']) case final v?) return vaiPianificato(v);
         final l = luogoDaJson(call.arguments);
         if (l == null) return false;
-        return vaiDallAuto(l);
+        // «Ehi Siri, portami a casa» parte subito; una meta scelta sullo
+        // schermo mostra prima le strade (vedi [_strade]).
+        return vaiDallAuto(l, subito: a['subito'] == true);
+      // Una delle strade proposte, toccata sull'auto.
+      case 'scegli_strada':
+        if (a['id'] != _idStrade) return false;
+        final i = (a['indice'] as num?)?.toInt() ?? -1;
+        await viaggio.scegli(i);
+        return true;
+      // «Avvia» sulle strade dell'auto: si parte con quella scelta.
+      // Con l'indice della strada toccata: se non è ancora quella del
+      // viaggio (il tocco e «Avvia» arrivano insieme), prima la si sceglie.
+      case 'avvia':
+        if (a['id'] != _idStrade || viaggio.stato is! ViaggioPronto || guida.attiva) return guida.attiva;
+        if ((a['indice'] as num?)?.toInt() case final i? when i != (viaggio.stato as ViaggioPronto).scelta) {
+          await viaggio.scegli(i);
+          if (viaggio.stato is! ViaggioPronto || guida.attiva) return guida.attiva;
+        }
+        guida.avvia();
+        return guida.attiva;
       // «Imposta Casa» (o Lavoro) scelto dalla ricerca sull'auto.
       case 'imposta':
         final l = luogoDaJson(a['luogo']);
@@ -328,7 +348,7 @@ class PonteAuto {
           await guida.passaDa(l);
           return true;
         }
-        return vaiDallAuto(l, ricorda: false);
+        return vaiDallAuto(l, ricorda: false, subito: true);
       // Un punto toccato sulla mappa dell'auto: cosa dirne.
       case 'punto':
         try {
@@ -730,6 +750,93 @@ class PonteAuto {
       'dati': {for (final MapEntry(:key, :value) in dati.entries) key: jsonEncode(value)},
     });
     _cruscotto();
+    _strade();
+  }
+
+  /* ─── Le strade prima di partire ─────────────────────────────────────────
+   *
+   * «Quando c'è il calcolo percorso questo non esce su Android Auto e
+   * CarPlay»: sul telefono, calcolato il viaggio, la scheda mostra le strade
+   * fra cui scegliere (più rapida, risparmia energia, tempo simile, più
+   * lenta) con durata, km, batteria all'arrivo, consumo e pedaggio; l'auto
+   * vedeva solo la linea. Adesso le stesse voci ([vociStrade]) vanno
+   * all'auto: Android Auto le mostra nella sua anteprima dei percorsi,
+   * CarPlay nelle sue scelte del viaggio, con «Avvia». Toccandone una si
+   * sceglie anche sul telefono, e viceversa. */
+
+  /// Il numero del viaggio di cui l'auto ha le strade: le risposte valgono
+  /// solo per quello.
+  String? _idStrade;
+  var _numeroStrade = 0;
+  ViaggioPronto? _prontoStrade;
+  Object? _stradeMandate;
+
+  void _strade() {
+    final stato = viaggio.stato;
+    final pronto = stato is ViaggioPronto && !guida.attiva && guida.riepilogo == null ? stato : null;
+    // Un viaggio nuovo (un'altra meta, le tappe), non la stessa con un'altra
+    // strada scelta: lo stesso numero, così il tocco sull'auto vale ancora.
+    if (pronto == null) {
+      _prontoStrade = null;
+    } else if (_prontoStrade == null ||
+        _prontoStrade!.destinazione != pronto.destinazione ||
+        _prontoStrade!.tappe.length != pronto.tappe.length) {
+      _idStrade = 'strade-${++_numeroStrade}';
+      _prontoStrade = pronto;
+    } else {
+      _prontoStrade = pronto;
+    }
+    final dati = pronto == null ? const <String, Object?>{} : datiStrade(pronto, id: _idStrade!);
+    final chiave = jsonEncode(dati);
+    if (chiave == _stradeMandate) return;
+    _stradeMandate = chiave;
+    _manda('strade', dati);
+  }
+
+  /// Quello che l'auto mostra delle strade del viaggio [p]: le stesse carte
+  /// della scheda del telefono (`ScelteStrada`), in testo.
+  Map<String, Object?> datiStrade(ViaggioPronto p, {required String id}) {
+    final r = guida.risparmio;
+    final v = p.viaggio;
+    final piano = v.piano;
+    final unita = r?.unita ?? 'kWh';
+    final tariffa = viaggio.opzioni.tariffaPedaggio;
+    final scelte = p.scelte.length > 1 ? p.scelte : [v.percorso];
+    final voci = vociStrade(
+      scelte,
+      scelta: p.scelte.length > 1 ? p.scelta : 0,
+      consumo: r == null ? null : (q) => consumoStrada(q, r.stima),
+      // Come sul telefono: la batteria all'arrivo solo senza soste.
+      arrivo: p.soloPercorso || (piano?.soste.isNotEmpty ?? true) ? null : piano?.batteriaArrivo,
+      capacitaKwh: viaggio.auto.veicolo.capacitaUtileKwh,
+      minimoPercento: r?.soglie.minimoPercento ?? 5,
+      pedaggio: tariffa.stima,
+    );
+    // Con una strada sola il suo nome non dice niente: «Percorso».
+    final sola = voci.length == 1;
+    return {
+      'id': id,
+      'meta': p.destinazione.nome,
+      'lat': p.destinazione.posizione.lat,
+      'lon': p.destinazione.posizione.lon,
+      'scelta': p.scelte.length > 1 ? p.scelta : 0,
+      'voci': [
+        for (final x in voci)
+          {
+            'nome': sola ? 'Percorso' : nomeStrada(x.etichetta, unita),
+            'eco': x.etichetta == EtichettaStrada.risparmia && !sola,
+            'durata_s': x.strada.durata.inSeconds,
+            'metri': x.strada.lunghezzaM,
+            'via': x.via,
+            'km': '${(x.strada.lunghezzaM / 1000).round()} km',
+            if (x.arrivo case final a?) 'arrivo': a.round(),
+            if (x.consumo case final c?) 'consumo': '${numeroStrada(c)} $unita',
+            if (x.risparmio case final c?) 'risparmio': '−${numeroStrada(c)} $unita',
+            if (x.pedaggio case final c?) ...{'pedaggio': c.breve, 'paga': !c.senzaPedaggi},
+            'traffico': ?x.traffico,
+          },
+      ],
+    };
   }
 
   /// L'ultimo «manca la batteria» mandato all'auto, e il suo numero: la
@@ -881,7 +988,7 @@ class PonteAuto {
       await guida.passaDa(meta);
       return;
     }
-    await vaiDallAuto(meta);
+    await vaiDallAuto(meta, subito: true);
   }
 
   /* ─── Una meta scelta in auto, fino alla guida ───────────────────────────
@@ -910,10 +1017,13 @@ class PonteAuto {
    * impossibile) li dice gia' il viaggio stesso (`ErroreViaggio`), e arrivano
    * all'auto da [_viaggio] come sempre: qui non si ripetono. */
 
-  /// Ferma la guida in corso, calcola il viaggio verso [meta] e, se è
-  /// pronto, parte. [ricorda]: la meta va fra le recenti (non per un
-  /// distributore dove si passa). Torna `true` se la guida è partita.
-  Future<bool> vaiDallAuto(Luogo meta, {bool ricorda = true}) async {
+  /// Ferma la guida in corso e calcola il viaggio verso [meta]. Se è pronto,
+  /// con [subito] (la voce, un distributore dove si passa) si parte; senza,
+  /// l'auto mostra le strade fra cui scegliere e parte con «Avvia» (vedi
+  /// [_strade]). [ricorda]: la meta va fra le recenti (non per un
+  /// distributore). Torna `true` se il viaggio è pronto (e, con [subito], se
+  /// la guida è partita).
+  Future<bool> vaiDallAuto(Luogo meta, {bool ricorda = true, bool subito = false}) async {
     try {
       if (guida.attiva) await guida.ferma();
       if (ricorda) {
@@ -929,6 +1039,10 @@ class PonteAuto {
       return false;
     }
     if (viaggio.stato is! ViaggioPronto) return false;
+    if (!subito) {
+      _strade();
+      return true;
+    }
     guida.avvia();
     return guida.attiva;
   }
@@ -1010,6 +1124,8 @@ class PonteAuto {
 
   void _guida() {
     _seguiProva();
+    // Partita la guida (o arrivati), le strade se ne vanno dall'auto.
+    _strade();
     final a = guida.avanzamento;
     final p = guida.pronto;
     /* All'arrivo, al posto della manovra il riepilogo (e via quando si
