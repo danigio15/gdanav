@@ -359,9 +359,6 @@ double _fineFreccia(Viaggio v, Manovra m, Linea l, double centro, double dopoM) 
   return (math.max(0, centro - primaM), fine);
 }
 
-/// Dopo lo svincolo la freccia torna sul percorso in questi metri.
-const _rientroDallaCorsiaM = 25.0;
-
 /// La freccia della manovra che parte dalla corsia giusta, per la vista
 /// immersiva; `null` se la corsia giusta sta già sulla linea del percorso.
 ///
@@ -370,8 +367,8 @@ const _rientroDallaCorsiaM = 25.0;
 /// percorso, e quella giusta — tutta a sinistra, per un'uscita a sinistra —
 /// sta di lato. La freccia partiva dalla linea, cioè fra due corsie, accanto
 /// a quella blu. Qui la freccia sta spostata sulla corsia giusta fino alla
-/// manovra, e nei [_rientroDallaCorsiaM] metri dopo rientra sul percorso: esce
-/// dalla corsia blu e prende la rampa.
+/// manovra, e dopo la tiene finché il percorso non la raggiunge (vedi sotto):
+/// esce dalla corsia blu e prende la rampa.
 List<Punto>? _dallaCorsiaGiusta(Linea l, Manovra m, double da, double centro, double fine) {
   if (!m.corsieUtili) return null;
   final n = m.corsie.length;
@@ -383,23 +380,53 @@ List<Punto>? _dallaCorsiaGiusta(Linea l, Manovra m, double da, double centro, do
   // Di quanto sta la corsia giusta dalla linea (a destra il segno è più).
   final spostamento = ((giuste.first + giuste.last) / 2 - (n - 1) / 2) * larghezzaCorsia;
   if (spostamento.abs() < 0.1) return null;
-  // Con la manovra dopo vicina il tratto è corto: si rientra prima, perché
-  // la punta sta sulla linea.
-  final rientro = math.min(_rientroDallaCorsiaM, fine - centro);
-  double quanto(double metri) {
-    if (metri <= centro) return spostamento;
-    if (rientro <= 0) return 0.0;
-    final t = (metri - centro) / rientro;
-    return t >= 1 ? 0.0 : spostamento * (1 - t);
+  /* Dopo la manovra la freccia non torna indietro verso la linea.
+   *
+   * «La linea agli svincoli continua a non essere perfetta»: la freccia
+   * stava sulla corsia giusta (quella di destra, per un'uscita a destra) e
+   * dopo la manovra rientrava sul percorso in 25 metri. Ma lì la rampa si
+   * stacca appena dalla carreggiata, e il percorso è ancora quasi nel mezzo:
+   * rientrarci voleva dire tornare verso sinistra, e poi la rampa riportava a
+   * destra. Una «<» proprio sull'uscita.
+   *
+   * Adesso dopo la manovra la freccia tiene la corsia, dritta, finché il
+   * percorso non si è spostato di lato quanto lei: da lì è il percorso, sulla
+   * rampa. Solo negli ultimi metri, se il percorso non l'ha ancora raggiunta,
+   * ci scivola sopra, perché la punta sta sulla linea. */
+  final c = _aMetri(l, centro);
+  final (nEst, nNord) = _destraDi(l, math.max(0, centro - 12), centro);
+  const metriPerGrado = 111195.08;
+  final cosLat = math.cos(c.lat * math.pi / 180);
+  final ultimi = math.min(15.0, fine - centro);
+  Punto dopo(double metri) {
+    final p = _aMetri(l, metri);
+    // Di quanto il percorso si è già spostato verso la corsia giusta.
+    final lato = (p.lon - c.lon) * metriPerGrado * cosLat * nEst + (p.lat - c.lat) * metriPerGrado * nNord;
+    var resta = spostamento - lato;
+    if (resta * spostamento <= 0) return p;
+    if (ultimi > 0 && metri > fine - ultimi) resta *= ((fine - metri) / ultimi).clamp(0.0, 1.0);
+    return Punto(p.lat + nNord * resta / metriPerGrado, p.lon + nEst * resta / (metriPerGrado * cosLat));
   }
 
   // Un punto ogni due metri, e l'ultimo proprio sulla fine del tratto, dove
   // sta la punta.
   const passo = 2.0;
   return [
-    for (var metri = da; metri < fine; metri += passo) _diLato(l, metri, quanto(metri)),
-    _diLato(l, fine, quanto(fine)),
+    for (var metri = da; metri < fine; metri += passo) metri <= centro ? _diLato(l, metri, spostamento) : dopo(metri),
+    _aMetri(l, fine),
   ];
+}
+
+/// La destra di chi va lungo il percorso da [da] ad [a] metri, come vettore
+/// unitario (est, nord).
+(double, double) _destraDi(Linea l, double da, double a) {
+  final p = _aMetri(l, da), q = _aMetri(l, a);
+  const metriPerGrado = 111195.08;
+  final cosLat = math.cos(p.lat * math.pi / 180);
+  final est = (q.lon - p.lon) * metriPerGrado * cosLat, nord = (q.lat - p.lat) * metriPerGrado;
+  final lungo = math.sqrt(est * est + nord * nord);
+  if (lungo == 0) return (0, 0);
+  return (nord / lungo, -est / lungo);
 }
 
 /// Il punto del percorso a [metri] dalla partenza, spostato di [lato] metri

@@ -87,6 +87,43 @@ void main() {
     expect(solo.where((e) => (e['geometry'] as Map)['type'] == 'LineString'), hasLength(1));
   });
 
+  test("all'uscita la freccia non torna verso la carreggiata: niente «<» sulla rampa", () {
+    // «La linea agli svincoli continua a non essere perfetta.» Una rampa
+    // vera: dritto verso nord, poi si stacca a destra piano (1 m nei primi
+    // 10 m, 4 m a 20 m, 9 m a 30 m...). Prima la freccia stava sulla corsia
+    // di destra (3,5 m) e rientrava in 25 m su un percorso ancora quasi in
+    // mezzo: tornava a sinistra e poi a destra.
+    final rampa = [
+      for (var i = 0; i <= 30; i++) Punto(45 + i * 0.0001, 9),
+      for (var i = 1; i <= 12; i++) Punto(45.003 + i * 10 / 111195.08, 9 + (i * i * 1.0) / (111195.08 * 0.7071)),
+    ];
+    final uscita = Manovra(
+      istruzione: 'Esci a destra',
+      lunghezzaM: 300,
+      secondi: 20,
+      inizio: 30,
+      tipo: 20,
+      corsie: [dritta, dritta, giusta],
+    );
+    final v = Viaggio(
+      percorso: PercorsoCalcolato(punti: rampa, tratti: const [], manovre: [uscita]),
+      colonnine: const [],
+      piano: null,
+    );
+    final elementi = (datiManovra(v, uscita)['features']! as List).cast<Map>();
+    final sulLato = [
+      for (final e in elementi)
+        if ((e['properties'] as Map)['vista'] == 'immersiva')
+          ((e['geometry'] as Map)['coordinates'] as List).cast<List>(),
+    ].single;
+    // Verso est (a destra) la freccia va sempre avanti o resta, mai indietro.
+    final est = [for (final c in sulLato) ((c[0] as double) - 9) * 111195.08 * 0.7071];
+    for (var i = 1; i < est.length; i++) {
+      expect(est[i], greaterThanOrEqualTo(est[i - 1] - 0.05), reason: 'al punto $i torna verso la carreggiata');
+    }
+    expect(est.first, closeTo(3.5, 0.15));
+  });
+
   test("lo stile: l'immersiva disegna la freccia dalla corsia, le altre quella sulla linea", () {
     Map strato(bool immersiva, String id) => (stileMappa(scuro: false, immersiva: immersiva)['layers']! as List)
         .cast<Map>()
