@@ -5,8 +5,8 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import '../componenti/avvisi_in_guida.dart';
 import '../componenti/icona_manovra.dart';
-import '../componenti/indicatore_batteria.dart' show eta;
 import '../componenti/itinerario.dart' show BadgePedaggio;
+import '../componenti/riga_del_viaggio.dart';
 import '../componenti/icone_segnalazioni.dart';
 import '../componenti/risparmio.dart';
 import '../componenti/striscia_traffico.dart';
@@ -22,6 +22,7 @@ import '../mappa/mappa_viaggio.dart';
 import '../stato/avvisi_strada.dart';
 import '../stato/avvisi_ztl.dart';
 import '../stato/gestore_guida.dart';
+import '../stato/gestore_meteo.dart';
 import '../stato/gestore_persone.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_segnalazioni.dart';
@@ -48,6 +49,7 @@ class SchermataGuida extends StatefulWidget {
     this.ztl,
     this.persone,
     this.mappa,
+    this.meteo,
   });
 
   final GestoreGuida guida;
@@ -63,6 +65,9 @@ class SchermataGuida extends StatefulWidget {
   /// Le persone di casa (da GdAHome), anche in guida: sulla mappa di sempre
   /// e nel 3D aumentato, come sullo schermo dell'auto.
   final GestorePersone? persone;
+
+  /// Il meteo all'arrivo (o qui), nella riga del viaggio come in auto.
+  final GestoreMeteo? meteo;
   final CostruisciMappa? mappa;
 
   @override
@@ -419,6 +424,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                     // Basso (un telefono): la barra stretta, e col popup dello
                     // svincolo aperto solo arrivo, strada e tasti.
                     fondo: _Fondo(
+                      meteo: widget.meteo,
                       guida: g,
                       onFine: _fine,
                       compatto: MediaQuery.sizeOf(context).height < 560,
@@ -440,7 +446,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                     // Una strada a risparmio (o più rapida): sopra la barra
                     // in basso, e la strada verde sulla mappa.
                     ?proposta,
-                    _Fondo(guida: g, onFine: _fine),
+                    _Fondo(guida: g, onFine: _fine, meteo: widget.meteo),
                   ],
                 );
               },
@@ -997,8 +1003,9 @@ class _Banner extends StatelessWidget {
 }
 
 class _Fondo extends StatelessWidget {
-  const _Fondo({required this.guida, required this.onFine, this.compatto = false, this.ridotto = false});
+  const _Fondo({required this.guida, required this.onFine, this.compatto = false, this.ridotto = false, this.meteo});
   final GestoreGuida guida;
+  final GestoreMeteo? meteo;
   final VoidCallback onFine;
 
   /// Di traverso su un telefono: meno margini.
@@ -1007,6 +1014,23 @@ class _Fondo extends StatelessWidget {
   /// Solo la prima riga (arrivo, strada, tasti): di traverso col popup dello
   /// svincolo aperto non ci sta altro.
   final bool ridotto;
+
+  /// I pezzi della riga del viaggio, con gli stessi dati che vanno all'auto
+  /// (`PonteAuto._cruscotto`).
+  List<PezzoViaggio> _pezzi(ViaggioPronto? p) {
+    final elettrica = !(p?.soloPercorso ?? false);
+    final ora = elettrica ? guida.batteriaOra : null;
+    final m = meteo;
+    final previsione = m?.delViaggio?.arrivo?.previsione ?? m?.qui;
+    return pezziDelViaggio(
+      batteria: ora?.valore,
+      stimata: ora != null && !ora.misurata,
+      autonomiaKm: elettrica ? guida.autonomiaOra?.km : null,
+      arrivo: elettrica ? guida.batteriaArrivo : null,
+      meteoEmoji: previsione?.cielo.emoji,
+      temperaturaC: previsione?.temperaturaC,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1131,7 +1155,18 @@ class _Fondo extends StatelessWidget {
                   ],
                 ),
                 // Con l'auto termica niente batteria: solo arrivo e strada.
-                if (!(p?.soloPercorso ?? false) && !ridotto) ...[Divider(height: divisore), _Batteria(guida: guida)],
+                // La batteria, i km, l'arrivo e il meteo come nella scheda
+                // dell'arrivo di Android Auto (con l'auto termica solo il meteo).
+                if (!ridotto && _pezzi(p).isNotEmpty) ...[
+                  Divider(height: divisore),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: RigaDelViaggio(
+                      pezzi: _pezzi(p),
+                      stile: t.titleMedium?.copyWith(color: muto),
+                    ),
+                  ),
+                ],
                 if (sosta != null && !ridotto) ...[
                   Divider(height: divisore),
                   Row(
@@ -1154,94 +1189,6 @@ class _Fondo extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// Sempre in vista: batteria alla partenza, adesso, all'arrivo, e consumo.
-class _Batteria extends StatelessWidget {
-  const _Batteria({required this.guida});
-  final GestoreGuida guida;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
-    final muto = Theme.of(context).colorScheme.onSurfaceVariant;
-    final ora = guida.batteriaOra;
-    final consumo = guida.consumoKwh100;
-    final autonomia = guida.autonomiaOra;
-    String pc(double? v) => v == null ? '–' : '${v.round()}%';
-    Color colore(double? v) => switch (v) {
-      null => muto,
-      < 15 => ColoriGdanav.di(context).guasta,
-      < 30 => ColoriGdanav.di(context).piena,
-      _ => ColoriGdanav.di(context).libera,
-    };
-    Widget voce(String etichetta, double? v, {Key? chiave}) => Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            pc(v),
-            key: chiave,
-            style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: colore(v)),
-          ),
-          Text(
-            etichetta,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: t.labelMedium?.copyWith(color: muto),
-          ),
-        ],
-      ),
-    );
-    return Row(
-      children: [
-        voce('partenza', guida.batteriaPartenza, chiave: const Key('batteria-partenza')),
-        voce(
-          switch ((ora?.misurata, guida.auto.stato)) {
-            // Quanto è fresco il dato dell'auto, sotto: «auto» e «adesso» o «4 min fa».
-            (true, final s?) => 'auto\n${eta(DateTime.now().difference(s.letto))}',
-            _ => 'ora (stima)',
-          },
-          ora?.valore,
-          chiave: const Key('batteria-ora'),
-        ),
-        voce('all\'arrivo', guida.batteriaArrivo, chiave: const Key('batteria-arrivo')),
-        Expanded(
-          flex: 2,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // L'autonomia adesso: dall'auto, o stimata sul consumo vero.
-              Text(
-                autonomia == null ? '– km' : '${autonomia.km.round()} km',
-                key: const Key('autonomia'),
-                style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              Text(
-                autonomia?.dallAuto == true ? 'autonomia (auto)' : 'autonomia',
-                maxLines: 1,
-                style: t.labelMedium?.copyWith(color: muto),
-              ),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: consumo == null ? '–' : consumo.toStringAsFixed(1).replaceAll('.', ','),
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    const TextSpan(text: ' kWh/100 km'),
-                  ],
-                ),
-                key: const Key('consumo'),
-                maxLines: 1,
-                style: t.labelMedium?.copyWith(color: muto),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

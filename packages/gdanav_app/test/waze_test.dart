@@ -353,7 +353,7 @@ void main() {
     p.dispose();
   });
 
-  testWidgets('in guida la batteria è sempre in vista: partenza, adesso, arrivo e consumo', (tester) async {
+  testWidgets('in guida la riga del viaggio è quella di Android Auto: batteria, km, arrivo', (tester) async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
     final a = await ambiente(tester, km: 20);
     await tester.pumpWidget(a.app());
@@ -372,29 +372,29 @@ void main() {
       return t.data ?? t.textSpan!.toPlainText();
     }
 
-    expect(testo('batteria-partenza'), '90%');
-    final stimata = int.parse(testo('batteria-ora').replaceAll('%', ''));
-    final arrivo = int.parse(testo('batteria-arrivo').replaceAll('%', ''));
-    expect(stimata, inExclusiveRange(arrivo, 90));
-    expect(find.text('ora (stima)'), findsOneWidget);
-    expect(double.parse(testo('consumo').replaceAll(' kWh/100 km', '').replaceAll(',', '.')), inInclusiveRange(8, 35));
-    // L'autonomia adesso, stimata sul consumo del viaggio.
-    final km = int.parse(testo('autonomia').replaceAll(' km', ''));
-    expect(km, inInclusiveRange(100, 700));
-    expect(find.text('autonomia'), findsOneWidget);
+    int numero(String chiave) => int.parse(RegExp(r'\d+').allMatches(testo(chiave)).last.group(0)!);
 
-    // L'auto manda la batteria vera, più bassa del previsto: arrivo e consumo si adeguano.
+    // Fra due letture dell'auto la batteria è una stima: «~», come in auto.
+    expect(testo('batteria-ora'), startsWith('🔋\u00A0~'));
+    final stimata = numero('batteria-ora');
+    final arrivo = numero('batteria-arrivo');
+    expect(stimata, inExclusiveRange(arrivo, 90));
+    expect(testo('batteria-arrivo'), contains('arrivo\u00A0'));
+    // L'autonomia adesso, stimata sul consumo del viaggio.
+    final km = numero('autonomia');
+    expect(km, inInclusiveRange(100, 700));
+
+    // L'auto manda la batteria vera, più bassa del previsto: arrivo e autonomia si adeguano.
     a.auto.arbitro.registra(
       StatoAuto(sorgente: TipoSorgente.homeAssistant, letto: DateTime.now(), batteria: stimata - 4.0),
     );
     await tester.runAsync(() => a.auto.cambiaModalita(a.auto.modalita));
     a.posizioni.add(punti[11]);
     await aspetta(tester);
-    expect(find.text('auto\nadesso'), findsOneWidget);
-    // Con la batteria più bassa, anche l'autonomia scende.
-    expect(int.parse(testo('autonomia').replaceAll(' km', '')), lessThan(km));
-    expect(testo('batteria-ora'), '${stimata - 4}%');
-    expect(int.parse(testo('batteria-arrivo').replaceAll('%', '')), inInclusiveRange(arrivo - 5, arrivo - 3));
+    // Detta dall'auto non è più una stima.
+    expect(testo('batteria-ora'), contains('🔋\u00A0${stimata - 4}%'));
+    expect(numero('autonomia'), lessThan(km));
+    expect(numero('batteria-arrivo'), inInclusiveRange(arrivo - 5, arrivo - 3));
     await tester.tap(find.text('Fine'));
     await tester.pumpAndSettle();
   });

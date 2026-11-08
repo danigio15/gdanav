@@ -260,6 +260,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
           ztl: widget.ztl,
           persone: widget.persone,
           mappa: widget.mappa,
+          meteo: widget.meteo,
         ),
       ),
     );
