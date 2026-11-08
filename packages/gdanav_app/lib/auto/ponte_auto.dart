@@ -35,6 +35,7 @@ import '../stato/gestore_risparmio.dart' show sintesiProposta;
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/prova_di_guida.dart';
+import '../stato/scelte_avvisi.dart';
 import '../stato/viaggi_pianificati.dart';
 import 'persone_in_auto.dart';
 import 'richiesta_navigazione.dart';
@@ -129,6 +130,9 @@ class PonteAuto {
     auto?.addListener(_opzioni);
     meteo?.addListener(_cruscotto);
     vicini?.addListener(_vicini);
+    // Le scelte che il menu dell'auto mostra, anche se cambiano sul telefono.
+    guida.avvisi.addListener(_opzioni);
+    ztl?.addListener(_opzioni);
     if (segnalazioni case final s?) {
       s.addListener(_segnalazioni);
       guida.avvisi.addListener(_segnalazioni);
@@ -270,6 +274,8 @@ class PonteAuto {
       case 'voce':
         guida.alternaVoce();
         _opzioni();
+      case 'scelta':
+        await _sceltaDallAuto(a);
       case 'segnala':
         final tipo = TipoSegnalazione.values.where((t) => t.name == a['tipo']).firstOrNull;
         final s = segnalazioni;
@@ -448,13 +454,70 @@ class PonteAuto {
       'audio': guida.audio.chiave,
       'elettrica': auto?.elettrica ?? true,
       'arrivo': ?viaggio.minimoArrivo,
+      /* «Dall'auto devi dare la possibilità di comandare di più le
+       * impostazioni: gli avvisi non si possono modificare, idem il simbolo
+       * dell'auto.» Sullo schermo dell'auto, come sul telefono: ogni avviso
+       * col suo modo (voce, beep, schermo, spento), il simbolo dell'auto, le
+       * ZTL sulla mappa e il 3D aumentato. */
+      'avvisi': [
+        for (final av in Avviso.values)
+          {
+            'id': av.name,
+            'nome': av.nome,
+            'sotto': av.sotto,
+            'come': guida.avvisi.di(av).name,
+            'come_nome': guida.avvisi.di(av).etichetta,
+            if (av.soloVoce) 'solo_voce': true,
+            if (av.segnalazione != null) 'segnalazione': true,
+          },
+      ],
+      'segnaposto': posizione.segnaposto.name,
+      'segnaposti': [
+        for (final sp in Segnaposto.values) {'id': sp.name, 'nome': sp.etichetta},
+      ],
+      if (ztl case final z?) 'ztl_mappa': z.scelte.sullaMappa,
+      if (guida.archivio != null) 'aumentato': Archivio.vistaScelta.value == VistaMappa.aumentata,
     });
+    _segnapostoNelMenu = posizione.segnaposto;
+  }
+
+  /// Il simbolo che il menu dell'auto ha in pagina.
+  Segnaposto? _segnapostoNelMenu;
+
+  /// Una scelta fatta sullo schermo dell'auto, nelle impostazioni.
+  Future<void> _sceltaDallAuto(Map<Object?, Object?> a) async {
+    if (a['avviso'] case final String id) {
+      final av = Avviso.values.where((x) => x.name == id).firstOrNull;
+      final come = ComeAvvisare.values.where((x) => x.name == a['come']).firstOrNull;
+      if (av != null && come != null) guida.avvisi.scegli(av, come);
+    }
+    if (a['segnaposto'] case final String n) {
+      final sp = Segnaposto.values.where((x) => x.name == n).firstOrNull;
+      if (sp != null && sp != posizione.segnaposto) {
+        await posizione.scegli(sp);
+        _posizione();
+      }
+    }
+    if (a['ztl_mappa'] case final bool si) await ztl?.mostra(si);
+    if (a['aumentato'] case final bool si) {
+      final archivio = guida.archivio;
+      if (archivio != null) {
+        await archivio.salvaVistaMappa(
+          si ? VistaMappa.aumentata : (await archivio.vistaPrimaDellAumentata() ?? VistaMappa.inclinata),
+        );
+        // Riaccesa a mano si riprova, come sul telefono.
+        if (si) _treDNonVa = false;
+      }
+    }
+    _opzioni();
   }
 
   void ferma() {
     Archivio.vistaScelta.removeListener(_dallaVista);
     viaggio.removeListener(_viaggio);
     viaggio.removeListener(_opzioni);
+    guida.avvisi.removeListener(_opzioni);
+    ztl?.removeListener(_opzioni);
     guida.removeListener(_guida);
     guida.removeListener(_posizione);
     posizione.removeListener(_posizione);
@@ -526,6 +589,7 @@ class PonteAuto {
     _stili();
     _posizione();
     _vuoi3d();
+    _opzioni();
   }
 
   /* ── La scena 3D sull'auto ────────────────────────────────────────────
@@ -1038,6 +1102,7 @@ class PonteAuto {
   /// fermarsi sull'ultimo punto ad aspettare il prossimo (`MotoFluido` in
   /// gdanav_core, rifatto in `RendererMappa` e `MappaCarPlay`).
   void _posizione() {
+    if (posizione.segnaposto != _segnapostoNelMenu) _opzioni();
     final a = guida.attiva ? guida.avanzamento : null;
     // In guida dove l'auto è adesso, portata avanti lungo la strada da
     // quando è arrivata la lettura: come sul telefono, a passi uguali.

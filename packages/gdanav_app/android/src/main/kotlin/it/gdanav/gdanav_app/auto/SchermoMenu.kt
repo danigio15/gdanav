@@ -182,7 +182,7 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
                 "Impostazioni" to listOf(
                     riga(
                         "Impostazioni",
-                        "Batteria all'arrivo, vista della mappa, voce, percorso",
+                        "Mappa e simbolo dell'auto, voce, avvisi, percorso",
                         sfoglia = true,
                         icona = icona(R.drawable.icona_impostazioni),
                     ) { screenManager.push(SchermoImpostazioni(carContext, renderer)) },
@@ -197,16 +197,19 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
     }
 }
 
-/** Vista, voce, opzioni del percorso, e dove sono Casa e Lavoro. */
+/**
+ * Le impostazioni in auto. «Dall'auto devi dare la possibilità di comandare di
+ * più le impostazioni: gli avvisi non si possono modificare, idem il simbolo
+ * dell'auto.» Sei righe al più (quello che ogni auto mostra guidando), e
+ * dentro le cose che stanno insieme: la mappa (vista, 3D aumentato, simbolo,
+ * ZTL), gli avvisi uno per uno, il percorso, Casa e Lavoro.
+ */
 class SchermoImpostazioni(carContext: CarContext, private val renderer: RendererMappa) : SchermoAggiornato(carContext) {
-    // In pagina: le opzioni, la vista della mappa, Casa e Lavoro.
-    override fun firma(): Any? =
-        listOf(PonteAuto.opzioni, renderer.vista, PonteAuto.casa()?.nome, PonteAuto.lavoro()?.nome)
+    // In pagina: le opzioni e la vista della mappa.
+    override fun firma(): Any? = listOf(PonteAuto.opzioni, renderer.vista)
 
     override fun schermata(): Template {
         val o = PonteAuto.opzioni
-        val casa = PonteAuto.casa()
-        val lavoro = PonteAuto.lavoro()
         val elettrica = o["elettrica"] != false
         val arrivo = (o["arrivo"] as? Number)?.toInt()
         return elenco(
@@ -222,19 +225,16 @@ class SchermoImpostazioni(carContext: CarContext, private val renderer: Renderer
                 } else {
                     null
                 },
-                // La vista a tre stati, come l'audio: ogni tocco passa alla dopo.
                 riga(
-                    "Vista: ${renderer.vista.titolo}",
-                    when (renderer.vista) {
-                        Vista.PIATTA -> "Dall'alto, nord in su. Tocca per il 3D"
-                        Vista.INCLINATA -> "Inclinata, con gli edifici. Tocca per l'immersiva"
-                        Vista.IMMERSIVA -> "Da vicino, con le corsie sulla strada. Tocca per il 2D"
-                    },
+                    "Mappa",
+                    listOfNotNull(
+                        renderer.vista.titolo,
+                        if (o["aumentato"] == true) "3D aumentato" else null,
+                        nomeDelSimbolo(o),
+                    ).joinToString(" · "),
+                    sfoglia = true,
                     icona = icona(R.drawable.icona_mappa, CarColor.BLUE),
-                ) {
-                    renderer.alternaVista()
-                    invalidate()
-                },
+                ) { screenManager.push(SchermoMappa(carContext, renderer)) },
                 // L'audio a tre stati, come sul telefono: ogni tocco passa al
                 // dopo (Tutto, Solo avvisi, Silenzio). Un interruttore non
                 // basta più: «solo avvisi» tiene gli autovelox e la ZTL anche
@@ -252,6 +252,16 @@ class SchermoImpostazioni(carContext: CarContext, private val renderer: Renderer
                     },
                     icona = icona(R.drawable.icona_voce, if (audio(o) == "silenzio") CarColor.DEFAULT else CarColor.BLUE),
                 ) { PonteAuto.alternaVoce() },
+                if (avvisi(o).isNotEmpty()) {
+                    riga(
+                        "Avvisi",
+                        riassuntoAvvisi(avvisi(o)),
+                        sfoglia = true,
+                        icona = icona(R.drawable.icona_segnala, CarColor.YELLOW),
+                    ) { screenManager.push(SchermoAvvisi(carContext)) }
+                } else {
+                    null
+                },
                 riga(
                     "Percorso",
                     "${o["modo_nome"] ?: "Veloce"} · pedaggi, autostrade, traghetti",
@@ -260,6 +270,138 @@ class SchermoImpostazioni(carContext: CarContext, private val renderer: Renderer
                 ) {
                     screenManager.push(SchermoOpzioni(carContext))
                 },
+                riga(
+                    "Casa e Lavoro",
+                    listOf(PonteAuto.casa()?.nome ?: "Casa da impostare", PonteAuto.lavoro()?.nome ?: "Lavoro da impostare")
+                        .joinToString(" · "),
+                    sfoglia = true,
+                    icona = icona(R.drawable.icona_casa),
+                ) { screenManager.push(SchermoCasaLavoro(carContext)) },
+            ),
+        )
+    }
+}
+
+/** La mappa: la vista, il 3D aumentato, il simbolo dell'auto, le ZTL. */
+class SchermoMappa(carContext: CarContext, private val renderer: RendererMappa) : SchermoAggiornato(carContext) {
+    override fun firma(): Any? = listOf(PonteAuto.opzioni, renderer.vista)
+
+    override fun schermata(): Template {
+        val o = PonteAuto.opzioni
+        return elenco(
+            "Mappa",
+            listOfNotNull(
+                // La vista a tre stati, come l'audio: ogni tocco passa alla dopo.
+                riga(
+                    "Vista: ${renderer.vista.titolo}",
+                    when (renderer.vista) {
+                        Vista.PIATTA -> "Dall'alto, nord in su. Tocca per il 3D"
+                        Vista.INCLINATA -> "Inclinata, con gli edifici. Tocca per l'immersiva"
+                        Vista.IMMERSIVA -> "Da vicino, con le corsie sulla strada. Tocca per il 2D"
+                    },
+                    icona = icona(R.drawable.icona_mappa, CarColor.BLUE),
+                ) {
+                    renderer.alternaVista()
+                    invalidate()
+                },
+                // Lo stesso interruttore del telefono: vale anche lì.
+                (o["aumentato"] as? Boolean)?.let { acceso ->
+                    interruttore(
+                        "3D aumentato",
+                        acceso,
+                        "Viadotti, alberi ed edifici in 3D, nelle viste 3D e immersiva",
+                    ) { PonteAuto.scegli(mapOf("aumentato" to it)) }
+                },
+                riga(
+                    "Simbolo dell'auto",
+                    nomeDelSimbolo(o) ?: "Freccia",
+                    sfoglia = true,
+                    icona = icona(R.drawable.icona_mappa),
+                ) { screenManager.push(SchermoSimbolo(carContext)) },
+                (o["ztl_mappa"] as? Boolean)?.let { acceso ->
+                    interruttore("ZTL sulla mappa", acceso, "Le zone a traffico limitato e le aree pedonali") {
+                        PonteAuto.scegli(mapOf("ztl_mappa" to it))
+                    }
+                },
+            ),
+        )
+    }
+}
+
+/** Il simbolo dell'auto sulla mappa: la freccia o un'auto, come sul telefono. */
+class SchermoSimbolo(carContext: CarContext) : SchermoAggiornato(carContext) {
+    override fun firma(): Any? = PonteAuto.opzioni["segnaposto"]
+
+    override fun schermata(): Template {
+        val ora = PonteAuto.opzioni["segnaposto"] as? String
+        return elenco(
+            "Simbolo dell'auto",
+            simboli(PonteAuto.opzioni).map { (id, nome) ->
+                riga(if (id == ora) "✓  $nome" else nome, if (id == ora) "Scelto adesso" else null) {
+                    PonteAuto.scegli(mapOf("segnaposto" to id))
+                    screenManager.pop()
+                }
+            },
+        )
+    }
+}
+
+/**
+ * Gli avvisi, uno per uno, divisi in due: quelli della strada (autovelox,
+ * tutor, ZTL, limite) e le segnalazioni di chi passa. Due schermate e non una:
+ * dieci righe in una lista l'auto non le mostra guidando.
+ */
+class SchermoAvvisi(carContext: CarContext) : SchermoAggiornato(carContext) {
+    override fun firma(): Any? = avvisi(PonteAuto.opzioni)
+
+    override fun schermata(): Template {
+        val tutti = avvisi(PonteAuto.opzioni)
+        val (segnalazioni, strada) = tutti.partition { it.segnalazione }
+        return elenco(
+            "Avvisi",
+            listOf(
+                riga("Della strada", riassuntoAvvisi(strada), sfoglia = true) {
+                    screenManager.push(SchermoGruppoAvvisi(carContext, "Della strada", segnalazioni = false))
+                },
+                riga("Segnalati da chi passa", riassuntoAvvisi(segnalazioni), sfoglia = true) {
+                    screenManager.push(SchermoGruppoAvvisi(carContext, "Segnalati da chi passa", segnalazioni = true))
+                },
+            ),
+        )
+    }
+}
+
+/** Un gruppo di avvisi: ogni tocco passa al modo dopo (voce, beep, schermo, spento). */
+class SchermoGruppoAvvisi(
+    carContext: CarContext,
+    private val titolo: String,
+    private val segnalazioni: Boolean,
+) : SchermoAggiornato(carContext) {
+    override fun firma(): Any? = avvisi(PonteAuto.opzioni)
+
+    override fun schermata(): Template = elenco(
+        titolo,
+        avvisi(PonteAuto.opzioni).filter { it.segnalazione == segnalazioni }.map { a ->
+            riga(
+                "${a.nome}: ${a.comeNome}",
+                "${a.sotto} · tocca per cambiare",
+                icona = immagine("segnala-${a.id}")
+                    ?: icona(R.drawable.icona_segnala, if (a.come == "spento") CarColor.DEFAULT else CarColor.YELLOW),
+            ) { PonteAuto.scegli(mapOf("avviso" to a.id, "come" to a.dopo())) }
+        },
+    )
+}
+
+/** Dove sono Casa e Lavoro. */
+class SchermoCasaLavoro(carContext: CarContext) : SchermoAggiornato(carContext) {
+    override fun firma(): Any? = listOf(PonteAuto.casa()?.nome, PonteAuto.lavoro()?.nome)
+
+    override fun schermata(): Template {
+        val casa = PonteAuto.casa()
+        val lavoro = PonteAuto.lavoro()
+        return elenco(
+            "Casa e Lavoro",
+            listOf(
                 riga("Imposta Casa", casa?.nome ?: "Non ancora impostata", sfoglia = true, icona = icona(R.drawable.icona_casa)) {
                     screenManager.push(SchermoCerca(carContext, "casa"))
                 },
@@ -274,6 +416,64 @@ class SchermoImpostazioni(carContext: CarContext, private val renderer: Renderer
             ),
         )
     }
+}
+
+/** Un avviso come lo manda il telefono (`ponte_auto.dart`, opzioni). */
+private data class AvvisoInAuto(
+    val id: String,
+    val nome: String,
+    val sotto: String,
+    val come: String,
+    val comeNome: String,
+    val soloVoce: Boolean,
+    val segnalazione: Boolean,
+) {
+    /** Il modo dopo, in giro: voce, beep, schermo, spento. Il limite non si spegne (c'è il tachimetro). */
+    fun dopo(): String {
+        val giro = if (soloVoce) listOf("voce", "beep", "schermo") else listOf("voce", "beep", "schermo", "spento")
+        val i = giro.indexOf(come)
+        return giro[(i + 1) % giro.size]
+    }
+}
+
+private fun avvisi(o: Map<String, Any?>): List<AvvisoInAuto> =
+    (o["avvisi"] as? List<*>).orEmpty().mapNotNull { r ->
+        val m = r as? Map<*, *> ?: return@mapNotNull null
+        val id = m["id"] as? String ?: return@mapNotNull null
+        AvvisoInAuto(
+            id = id,
+            nome = m["nome"] as? String ?: id,
+            sotto = m["sotto"] as? String ?: "",
+            come = m["come"] as? String ?: "voce",
+            comeNome = m["come_nome"] as? String ?: "Voce",
+            soloVoce = m["solo_voce"] == true,
+            segnalazione = m["segnalazione"] == true,
+        )
+    }
+
+/** «Tutti a voce», «2 spenti · 1 solo schermo». */
+private fun riassuntoAvvisi(elenco: List<AvvisoInAuto>): String {
+    val spenti = elenco.count { it.come == "spento" }
+    val beep = elenco.count { it.come == "beep" }
+    val schermo = elenco.count { it.come == "schermo" }
+    if (spenti == 0 && beep == 0 && schermo == 0) return "Tutti a voce"
+    return listOfNotNull(
+        if (spenti > 0) (if (spenti == 1) "1 spento" else "$spenti spenti") else null,
+        if (beep > 0) (if (beep == 1) "1 col beep" else "$beep col beep") else null,
+        if (schermo > 0) "$schermo solo a schermo" else null,
+    ).joinToString(" · ")
+}
+
+private fun simboli(o: Map<String, Any?>): List<Pair<String, String>> =
+    (o["segnaposti"] as? List<*>).orEmpty().mapNotNull { r ->
+        val m = r as? Map<*, *> ?: return@mapNotNull null
+        val id = m["id"] as? String ?: return@mapNotNull null
+        id to (m["nome"] as? String ?: id)
+    }
+
+private fun nomeDelSimbolo(o: Map<String, Any?>): String? {
+    val ora = o["segnaposto"] as? String ?: return null
+    return simboli(o).firstOrNull { it.first == ora }?.second
 }
 
 /**

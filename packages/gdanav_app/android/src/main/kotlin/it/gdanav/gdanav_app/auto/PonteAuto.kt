@@ -485,6 +485,9 @@ object PonteAuto {
 
     fun alternaVoce() = chiedi("voce", null)
 
+    /** Una scelta delle impostazioni fatta in auto: un avviso, il simbolo, le ZTL, il 3D aumentato. */
+    fun scegli(dati: Map<String, Any>) = chiedi("scelta", dati)
+
     /** Segnala dove sei; la risposta è la frase da mostrare. */
     fun segnala(tipo: String, risposta: (String) -> Unit) =
         chiedi("segnala", mapOf("tipo" to tipo)) { risposta(it as? String ?: "Non è partita.") }
