@@ -23,6 +23,9 @@ class PersonaSullaMappa {
     return prime.toUpperCase();
   }
 
+  /// Il nome corto, per lo schermo dell'auto (vedi [nomeBreve]).
+  String get breve => nomeBreve(nome);
+
   @override
   bool operator ==(Object other) =>
       other is PersonaSullaMappa &&
@@ -35,6 +38,18 @@ class PersonaSullaMappa {
   @override
   int get hashCode => Object.hash(id, nome, posizione.lat, posizione.lon, dove);
 }
+
+/// Il nome corto di una persona, per lo schermo dell'auto: il primo nome, e
+/// se è lungo tagliato («Anna Rossi» → «Anna», «Massimiliano» →
+/// «Massimilia…»).
+String nomeBreve(String nome) {
+  final primo = nome.trim().split(RegExp(r'\s+')).first;
+  final lettere = primo.runes.toList();
+  if (lettere.length <= _breveMassimo) return primo;
+  return '${String.fromCharCodes(lettere.take(_breveMassimo - 1))}…';
+}
+
+const _breveMassimo = 11;
 
 /// Le persone della casa sulla mappa, e quale far vedere.
 ///
@@ -107,7 +122,15 @@ Map<String, Object?> datiPersone(List<PersonaSullaMappa> persone) => {
           'type': 'Point',
           'coordinates': [p.posizione.lon, p.posizione.lat],
         },
-        'properties': {'tipo': 'persona', 'id': p.id, 'nome': p.nome, 'iniziali': p.iniziali, 'dove': p.dove},
+        'properties': {
+          'tipo': 'persona',
+          'id': p.id,
+          'nome': p.nome,
+          'iniziali': p.iniziali,
+          'dove': p.dove,
+          // Sullo schermo dell'auto il nome corto (vedi `stileMappa(perAuto:)`).
+          'breve': p.breve,
+        },
       },
   ],
 };

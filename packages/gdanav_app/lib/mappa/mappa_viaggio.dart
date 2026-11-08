@@ -166,6 +166,9 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     widget.guida?.avvisi.addListener(_segnalazioni);
     widget.vicini?.addListener(_vicini);
     widget.persone?.addListener(_persone);
+    // In guida si seguono solo le richieste «mostra» di adesso: quella fatta
+    // prima, sulla mappa di fuori, non deve portare via la guida da te.
+    if (widget.guida != null) _mostrate = widget.persone?.richiesteMostra ?? 0;
     widget.ztl?.addListener(_zoneDaCapo);
     _gestoreRisparmio?.addListener(_risparmio);
     // Le ZTL cambiano stato nel corso della giornata: «attiva fino alle 18».

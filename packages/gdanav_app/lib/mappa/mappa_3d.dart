@@ -14,6 +14,7 @@ import '../componenti/icone_segnalazioni.dart';
 import '../schermate/scheda_punto.dart';
 import '../servizi.dart';
 import '../stato/gestore_guida.dart';
+import '../stato/gestore_persone.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
@@ -65,6 +66,7 @@ class Mappa3d extends StatefulWidget {
     required this.onNonVa,
     this.segnalazioni,
     this.vicini,
+    this.persone,
     this.onPunto,
     this.orologio,
   });
@@ -76,6 +78,10 @@ class Mappa3d extends StatefulWidget {
   final Mappa3dNonVa onNonVa;
   final GestoreSegnalazioni? segnalazioni;
   final GestoreVicini? vicini;
+
+  /// Le persone di casa (da GdAHome): a terra come sulla mappa di sempre, e
+  /// sui viadotti all'altezza dell'impalcato.
+  final GestorePersone? persone;
   final ValueChanged<PuntoToccato>? onPunto;
   final DateTime Function()? orologio;
 
@@ -123,6 +129,7 @@ class _Mappa3dState extends State<Mappa3d> {
     widget.segnalazioni?.addListener(_segnalazioni);
     widget.guida.avvisi.addListener(_segnalazioni);
     widget.vicini?.addListener(_vicini);
+    widget.persone?.addListener(_persone);
     widget.guida.risparmio?.addListener(_risparmio);
     _attesa = Timer(Mappa3d.attesa, () {
       if (!_pronta) _nonVa('tempo', ricorda: false);
@@ -164,6 +171,7 @@ class _Mappa3dState extends State<Mappa3d> {
     widget.segnalazioni?.removeListener(_segnalazioni);
     widget.guida.avvisi.removeListener(_segnalazioni);
     widget.vicini?.removeListener(_vicini);
+    widget.persone?.removeListener(_persone);
     widget.guida.risparmio?.removeListener(_risparmio);
     _attesa?.cancel();
     _guardia?.cancel();
@@ -219,6 +227,8 @@ class _Mappa3dState extends State<Mappa3d> {
     _sopraMandato = null;
     _opzioni(forza: true);
     _stile();
+    // Le persone sono un cerchio e due scritte, senza immagini: subito.
+    _persone();
     await _immagini();
     if (_finita) return;
     _viaggio();
@@ -371,6 +381,12 @@ class _Mappa3dState extends State<Mappa3d> {
     for (final MapEntry(:key, :value) in v.dati().entries) {
       _manda(msgSorgente(key, value));
     }
+  }
+
+  void _persone() {
+    final g = widget.persone;
+    if (g == null) return;
+    _manda(msgSorgente(sorgentePersone, datiPersone(g.persone)));
   }
 
   void _risparmio() {

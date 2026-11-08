@@ -27,12 +27,14 @@ import '../stato/gestore_auto.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_luoghi.dart';
 import '../stato/gestore_meteo.dart';
+import '../stato/gestore_persone.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_risparmio.dart' show sintesiProposta;
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/prova_di_guida.dart';
 import '../stato/viaggi_pianificati.dart';
+import 'persone_in_auto.dart';
 import 'richiesta_navigazione.dart';
 import '../stato/gestore_vicini.dart';
 import '../stato/gestore_ztl.dart';
@@ -59,6 +61,7 @@ class PonteAuto {
     this.vicini,
     this.prova,
     this.ztl,
+    this.persone,
     this.gpsDellAuto,
     MethodChannel? canale,
     DateTime Function()? orologio,
@@ -91,6 +94,11 @@ class PonteAuto {
 
   /// Le ZTL e le aree pedonali sulla mappa dell'auto, e gli avvisi.
   final GestoreZtl? ztl;
+
+  /// Le persone di casa, quando GdANav sta dentro GdAHome: sulla mappa
+  /// dell'auto come su quella del telefono (vedi [PersoneInAuto]).
+  final GestorePersone? persone;
+  PersoneInAuto? _persone;
   final MethodChannel _canale;
   final DateTime Function() _ora;
   var _attivo = true;
@@ -143,6 +151,14 @@ class PonteAuto {
     }
     _segnalazioni();
     _vicini();
+    if (persone case final g?) {
+      _persone = PersoneInAuto(
+        g,
+        (dati) => _manda('sorgenti', {
+          'dati': {sorgentePersone: dati},
+        }),
+      )..avvia();
+    }
   }
 
   /// Le icone delle segnalazioni, disegnate come sul telefono.
@@ -320,7 +336,11 @@ class PonteAuto {
               for (final r in righe) {'icona': r.icona, 'colore': r.colore, 'titolo': r.titolo, 'testo': r.testo},
             ],
             'stato': stato,
-            'vai': guida.attiva && (guida.pronto?.termica ?? false) ? 'Passa di qui' : 'Vai',
+            'vai': guida.attiva && (guida.pronto?.termica ?? false)
+                ? 'Passa di qui'
+                : p.tipo == 'persona' && p.nome.trim().isNotEmpty
+                ? 'Naviga verso ${nomeBreve(p.nome)}'
+                : 'Vai',
             'luogo': {
               'nome': p.nome.isEmpty ? 'Punto' : p.nome,
               'descrizione': descrizione,
@@ -432,6 +452,8 @@ class PonteAuto {
     ztl?.removeListener(_zoneDaCapo);
     _avvisiZtl?.removeListener(_avviso);
     guida.risparmio?.removeListener(_strada);
+    _persone?.ferma();
+    _persone = null;
   }
 
   /// La strada proposta mandata all'auto, e il suo numero: la risposta

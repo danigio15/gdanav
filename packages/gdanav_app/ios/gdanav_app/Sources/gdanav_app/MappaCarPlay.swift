@@ -237,7 +237,8 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         guard let s = mappa.style else { return }
         let ponte = PonteAuto.shared
         // Solo le sorgenti cambiate: rileggere il percorso a ogni novità del
-        // cruscotto fa perdere fotogrammi.
+        // cruscotto fa perdere fotogrammi. Fra queste anche le persone di casa
+        // (`gdanav-persone`), che il telefono manda al più ogni 30 secondi.
         for (id, dati) in ponte.sorgenti where sorgentiCaricate[id] != dati {
             if let sorgente = s.source(withIdentifier: id) as? MLNShapeSource,
                let d = dati.data(using: .utf8)

@@ -22,6 +22,7 @@ import '../mappa/mappa_viaggio.dart';
 import '../stato/avvisi_strada.dart';
 import '../stato/avvisi_ztl.dart';
 import '../stato/gestore_guida.dart';
+import '../stato/gestore_persone.dart';
 import '../stato/gestore_posizione.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
@@ -45,6 +46,7 @@ class SchermataGuida extends StatefulWidget {
     this.segnalazioni,
     this.vicini,
     this.ztl,
+    this.persone,
     this.mappa,
   });
 
@@ -57,6 +59,10 @@ class SchermataGuida extends StatefulWidget {
 
   /// Le ZTL sulla mappa, e gli avvisi mentre si guida.
   final GestoreZtl? ztl;
+
+  /// Le persone di casa (da GdAHome), anche in guida: sulla mappa di sempre
+  /// e nel 3D aumentato, come sullo schermo dell'auto.
+  final GestorePersone? persone;
   final CostruisciMappa? mappa;
 
   @override
@@ -205,6 +211,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
         guida: g,
         segnalazioni: widget.segnalazioni,
         vicini: widget.vicini,
+        persone: widget.persone,
         onPunto: _punto,
         onNonVa: _nonVa3d,
       );
@@ -218,6 +225,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
       onPuntoScelto: (_) {},
       onColonnina: _colonninaDelViaggio,
       vicini: widget.vicini,
+      persone: widget.persone,
       ztl: widget.ztl,
       onPunto: _punto,
     );
