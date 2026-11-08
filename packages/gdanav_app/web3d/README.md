@@ -40,13 +40,29 @@ la mappa scarica già (OpenFreeMap, schema OpenMapTiles).
   trasparente con gli imbocchi, e il percorso lì dentro è tenue e
   tratteggiato. Un ponte senza `layer` sta al primo livello (al più al
   quinto), le rampe salgono da sole verso il ponte a cui si attaccano.
+- **I viadotti sulle valli** (`segnaViadotti` in `src/tessera.js`): le
+  tessere danno solo il livello, ma in Italia i ponti sulle valli si
+  chiamano «Viadotto …» (e quello di Genova «(Ponte San Giorgio) A10 …»):
+  lungo quei nomi i pezzi di ponte stanno a 4,5 m ogni cento metri di
+  lunghezza, fra 10 e 60 (Genova a 47,5). Le salite oltre i 6,5 m sono
+  viadotti anche loro (impalcato e piloni, non un muro); i piloni alti sono
+  più grossi e le campate più lunghe. Un modello del terreno non c'è: il
+  suolo resta piano, e un'altezza vera sulla valle chiederebbe anche il
+  terreno sotto (i dati di AWS Terrain Tiles si raggiungono, ma con un
+  suolo piano darebbero solo un numero più preciso, non un paesaggio).
 - **L'auto e il percorso non si perdono mai**: dove un ponte o un edificio
   ci passa davanti si vedono in trasparenza (la sagoma rossa, il percorso
   tenue). L'auto sta sopra i cartelli e i nomi di MapLibre, tranne sotto un
   ponte, dove il ponte la copre davvero.
-- **Icone e nomi sui viadotti**: autovelox, meta e nomi dei ponti stanno
-  all'altezza dell'impalcato (`aggiornaSegni` in `src/principale.js`); i
-  nomi e i numeri delle strade su ponti e gallerie MapLibre non li scrive.
+- **Icone e nomi sui viadotti**: autovelox, segnalazioni, meta, soste di
+  ricarica, tappe e nomi dei ponti stanno all'altezza dell'impalcato
+  (`aggiornaSegni` in `src/principale.js`), e si toccano lì: la pagina li
+  cerca sotto il dito proiettandoli sullo schermo e manda all'app
+  l'elemento come lo strato a terra (la scheda è la stessa). I nomi delle
+  strade con un pezzo in quota (anche le rampe non segnate come ponte) li
+  scrive il 3D sul pezzo in quota; quelli con un pezzo in galleria, fuori
+  dalla galleria (o per niente, se è tutta in galleria); MapLibre li tace
+  (`filtroNomi` in `src/stile3d.js`).
 - Il **percorso** sta all'altezza della strada su cui passa
   (`src/percorso.js`): ogni pochi metri le quote delle strade sotto, e la
   sequenza più continua (chi è sul viadotto ci resta).
@@ -105,15 +121,29 @@ autostrada (Borgo Panigale), tre livelli (Napoli, Capodichino), il
 quadrifoglio (Torino, corso Francia), il viadotto San Giorgio (Genova), un
 sottopasso (Milano). Per ognuno: il telefono di giorno e di notte, la
 panoramica, la foto da vicino; i controlli dicono anche se l'auto si vede
-(sotto il cavalcavia compreso) e quanta luce c'è sotto il ponte (almeno 5
-m). `video.mjs` fa un video MP4 della guida un fotogramma alla volta;
+(sotto il cavalcavia compreso), quanta luce c'è sotto il ponte (almeno 5,5
+m), e a Rho toccano la tappa, la sosta e l'autovelox sul viadotto e
+controllano che arrivi lo strato giusto. Di traverso la telecamera lascia
+a sinistra il posto del cruscotto (`sinistra` nel messaggio `camera`). `video.mjs` fa un video MP4 della guida un fotogramma alla volta;
 `auto.mjs` le immagini di Android Auto e CarPlay (prima e dopo) e del
-telefono com'è oggi. Le immagini col cruscotto vero di Flutter sopra le
-foto le fa `test_render/mappa_3d_render_test.dart`.
+telefono com'è oggi; con `TRAVERSO=1` il telefono di traverso con la mappa
+di sempre nelle viste 2D, 3D e immersiva. Le immagini col cruscotto vero di
+Flutter sopra le foto le fa `test_render/mappa_3d_render_test.dart` (con
+`GDANAV_TRAVERSO=1` anche di traverso).
 
 Una correzione a MapLibre 5.6.0 si fa impacchettando (`build.mjs`): con la
 mappa molto inclinata `_updateRetainedTiles` leggeva quattro tessere figlie
-dove ce n'era una e perdeva il fotogramma.
+dove ce n'era una e perdeva il fotogramma. Se un giorno il pezzo da
+correggere non c'è più (MapLibre aggiornato), `build.mjs` si ferma e lo
+dice, invece di impacchettare la versione con l'errore.
+
+## Nell'app
+
+Il ritorno automatico è provato in `test/aumentato_fallback_test.dart` con
+una WebView finta (`test/webview_finta.dart`): la pagina che dice «lento»,
+«software» o «webgl2», quella che non risponde, e il telefono che se lo
+ricorda. Il cruscotto della guida di traverso (un pannello a sinistra) è
+provato in `test/guida_di_traverso_test.dart` su telefoni e tablet.
 
 ## Sull'auto (Android Auto e CarPlay)
 
