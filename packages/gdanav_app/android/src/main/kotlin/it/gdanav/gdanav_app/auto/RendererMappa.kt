@@ -492,7 +492,21 @@ class RendererMappa(
 
     private val sorgentiCaricate = HashMap<String, String>()
 
+    /** Quando si è riscritto il percorso l'ultima volta (vedi sotto). */
+    private var percorsoRiscrittoMs = 0L
+
     private fun aggiornaDati(m: MapLibreMap, s: Style) {
+        /* La rete del telefono, anche qui: in guida il percorso si riscrive
+         * ogni tanto anche se non è cambiato. «Il navigatore improvvisamente
+         * perde il percorso»: una scrittura persa (uno stile rifatto a metà,
+         * una sorgente che in quel momento non c'era) lasciava l'auto senza
+         * linea finché il viaggio non cambiava, e in città può non cambiare
+         * fino all'arrivo. Una lettura ogni venticinque secondi non si sente. */
+        val ora = System.currentTimeMillis()
+        if (PonteAuto.guida != null && ora - percorsoRiscrittoMs > RISCRIVI_PERCORSO_MS) {
+            percorsoRiscrittoMs = ora
+            sorgentiCaricate.remove(SORGENTE_PERCORSO)
+        }
         // Solo le sorgenti cambiate: rileggere il percorso a ogni novità del
         // cruscotto fa perdere fotogrammi.
         for ((id, dati) in PonteAuto.sorgenti) {
@@ -866,6 +880,10 @@ class RendererMappa(
     companion object {
         private const val VUOTA = "{\"type\":\"FeatureCollection\",\"features\":[]}"
         private const val SORGENTE_IO = "gdanav-io"
+        private const val SORGENTE_PERCORSO = "gdanav-percorso"
+
+        /** Ogni quanto, in guida, il percorso si riscrive comunque. */
+        private const val RISCRIVI_PERCORSO_MS = 25_000L
 
         /** Il tetto dei fotogrammi della mappa sull'auto. */
         private const val FPS_MASSIMI = 30

@@ -845,14 +845,21 @@ class PonteAuto {
     _seguiProva();
     final a = guida.avanzamento;
     final p = guida.pronto;
+    /* All'arrivo, al posto della manovra il riepilogo (e via quando si
+     * chiude). Si guarda anche a guida partita: «il navigatore
+     * improvvisamente perde il percorso». Arrivati senza toccare «Fine» il
+     * riepilogo restava, e il viaggio nuovo partiva con la linea vuota
+     * sull'auto (`_viaggio`, arrivati); la guida, partita, toglie il
+     * riepilogo, ma qui la linea si rimandava solo a guida ferma: scheda
+     * della manovra e arrivo c'erano, la linea blu no, fino al traffico
+     * dopo o a un ricalcolo. */
+    final arrivo = guida.attiva ? null : guida.riepilogo?.perAuto;
+    if (arrivo != _arrivoDetto) {
+      _arrivoDetto = arrivo;
+      _viaggio();
+    }
     if (!guida.attiva || p == null) {
       _manda('guida', {'attiva': false});
-      // All'arrivo, al posto della manovra il riepilogo (e via quando si chiude).
-      final arrivo = guida.attiva ? null : guida.riepilogo?.perAuto;
-      if (arrivo != _arrivoDetto) {
-        _arrivoDetto = arrivo;
-        _viaggio();
-      }
       if (_freccia != null) {
         _freccia = null;
         _manda('sorgenti', {
