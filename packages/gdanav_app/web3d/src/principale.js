@@ -456,7 +456,10 @@ function cartelli(m) {
 
 // ─── Lo strato 3D ────────────────────────────────────────────────────────
 
-/** Lo strato dell'auto: la stessa scena, solo i livelli dell'auto (vedi [Scena.creaAuto]). */
+/**
+ * Lo strato dell'auto: la stessa scena, solo i livelli dell'auto (vedi
+ * [Scena.creaAuto]) e i segni che stanno sopra (le persone in quota).
+ */
 const STRATO_AUTO = 'gdanav-3d-auto';
 function stratoAuto() {
   const camera = new THREE.Camera();
@@ -469,7 +472,7 @@ function stratoAuto() {
     renderingMode: '3d',
     render(gl, args) {
       const renderer = S.renderer;
-      if (!renderer || !S.origine || !scena.auto?.visible || !scena.mondo.visible) return;
+      if (!renderer || !S.origine || !(scena.auto?.visible || scena.segniSopra) || !scena.mondo.visible) return;
       matriciCamera(camera, args);
       renderer.resetState();
       renderer.render(scena.scena, camera);
@@ -920,7 +923,80 @@ const IN_QUOTA = {
     tela: (p) => cerchio(12, colore('tappe', 'circle-color', p), colore('tappe', 'circle-stroke-color', p), 3.5, String(p.numero ?? ''), colore('tappe-numeri', 'text-color', p), 13),
     grandezza: () => 1,
   },
+  // Le persone di casa (da GdAHome): il tondo viola con le iniziali e il nome
+  // sotto, come a terra; su un viadotto all'altezza dell'impalcato.
+  'gdanav-persone': {
+    strato: () => 'persone',
+    tela: (p) => segnoPersona(p),
+    grandezza: () => 1,
+    // Sopra i nomi e i cartelli di MapLibre, come l'auto: un «A52» non la copre.
+    sopra: true,
+  },
 };
+
+/** Il colore del nome di una persona, dallo stile (`persone-nome`). */
+function coloreNome(proprieta, altrimenti) {
+  try {
+    const c = S.mappa?.getPaintProperty('persone-nome', proprieta);
+    return typeof c === 'string' ? c : altrimenti;
+  } catch {
+    return altrimenti;
+  }
+}
+
+/**
+ * Il segno di una persona in quota: il cerchio di `persone` (15 col bordo di
+ * 3, le iniziali in bianco) e sotto il nome con l'alone, come gli strati
+ * `persone-iniziali` e `persone-nome` a terra. Ancorato al centro del cerchio.
+ */
+function segnoPersona(p) {
+  const nome = String(p.nome ?? '');
+  const riempi = colore('persone', 'circle-color', p);
+  const bordo = colore('persone', 'circle-stroke-color', p);
+  const chiave = ['persona', S.notte, riempi, bordo, p.iniziali ?? '', nome].join('|');
+  let c = teleCerchi.get(chiave);
+  if (c) return c;
+  const k = 2;
+  const r = 15;
+  const spessore = 3;
+  const font = (corpo) => `700 ${corpo * k}px "Noto Sans", Roboto, "Helvetica Neue", Arial, sans-serif`;
+  const misura = document.createElement('canvas').getContext('2d');
+  misura.font = font(13);
+  const largoNome = nome ? Math.ceil(misura.measureText(nome).width) + 8 * k : 0;
+  const lato = Math.ceil((r + spessore) * 2 * k) + 4;
+  const bmp = document.createElement('canvas');
+  bmp.width = Math.max(lato, largoNome);
+  bmp.height = lato + (nome ? 20 * k : 0);
+  const g = bmp.getContext('2d');
+  const cx = bmp.width / 2;
+  const cy = lato / 2;
+  g.beginPath();
+  g.arc(cx, cy, (r + spessore / 2) * k, 0, Math.PI * 2);
+  g.fillStyle = riempi;
+  g.fill();
+  g.lineWidth = spessore * k;
+  g.strokeStyle = bordo;
+  g.stroke();
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.font = font(13);
+  g.fillStyle = '#FFFFFF';
+  g.fillText(String(p.iniziali ?? ''), cx, cy + k);
+  if (nome) {
+    const y = lato + 9 * k;
+    g.lineJoin = 'round';
+    g.lineWidth = 4 * k;
+    g.strokeStyle = coloreNome('text-halo-color', S.notte ? '#28324A' : '#FFFFFF');
+    g.strokeText(nome, cx, y);
+    g.fillStyle = coloreNome('text-color', S.notte ? '#E8ECF2' : '#3E434A');
+    g.fillText(nome, cx, y);
+  }
+  // Il centro del cerchio, da sotto (come `center` degli sprite di three.js).
+  c = { bmp, ratio: k, centro: 1 - cy / bmp.height, chiave };
+  if (teleCerchi.size > 200) teleCerchi.clear();
+  teleCerchi.set(chiave, c);
+  return c;
+}
 
 /** Il colore di uno strato dello stile per un punto (i «match» sullo stato come in stile.dart). */
 function colore(strato, proprieta, p) {
@@ -1032,6 +1108,7 @@ function aggiornaSegni(adesso) {
         // Toccandolo in quota arriva all'app come lo strato di MapLibre a terra.
         segno.elemento = { type: 'Feature', geometry: f.geometry, properties: pr, layer: regola.strato(pr) };
         if (img.centro !== undefined) segno.centro = img.centro;
+        if (regola.sopra) segno.sopra = true;
         segni.push(segno);
       } else if (inQuota.delete(k)) cambiato = true;
     });

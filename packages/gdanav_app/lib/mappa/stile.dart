@@ -30,6 +30,10 @@ const sorgenteTappe = 'gdanav-tappe';
 /// Le persone di casa, quando GdANav sta dentro GdAHome (`GestorePersone`).
 const sorgentePersone = 'gdanav-persone';
 
+/// Il viola delle persone di casa: sul segnaposto della mappa, sulla scheda,
+/// sullo schermo dell'auto e nel 3D aumentato.
+const coloreDellePersone = '#7C3AED';
+
 /// Le ZTL e le aree pedonali intorno (i contorni e, come punti, dove
 /// scriverne il nome), e la strada che passerebbe dentro la ZTL di cui si
 /// chiede il permesso.
@@ -1806,15 +1810,18 @@ Map<String, Object> stileMappa({
         },
       },
       // Le persone di casa: un tondo viola con le iniziali, e il nome sotto.
+      // Sullo schermo dell'auto più grandi, da leggere a un braccio di
+      // distanza, e col nome corto («Anna», non «Anna Rossi»): fermi, senza
+      // animazioni (le regole di Android Auto e CarPlay per chi guida).
       {
         'id': 'persone',
         'type': 'circle',
         'source': sorgentePersone,
         'paint': {
-          'circle-radius': 15,
-          'circle-color': '#7C3AED',
+          'circle-radius': perAuto ? 18 : 15,
+          'circle-color': coloreDellePersone,
           'circle-stroke-color': '#FFFFFF',
-          'circle-stroke-width': 3,
+          'circle-stroke-width': perAuto ? 3.5 : 3,
         },
       },
       {
@@ -1824,7 +1831,7 @@ Map<String, Object> stileMappa({
         'layout': {
           'text-field': ['get', 'iniziali'],
           'text-font': ['Noto Sans Bold'],
-          'text-size': 13,
+          'text-size': perAuto ? 16 : 13,
           'text-allow-overlap': true,
           'text-ignore-placement': true,
         },
@@ -1835,14 +1842,20 @@ Map<String, Object> stileMappa({
         'type': 'symbol',
         'source': sorgentePersone,
         'layout': {
-          'text-field': ['get', 'nome'],
+          'text-field': perAuto
+              ? [
+                  'coalesce',
+                  ['get', 'breve'],
+                  ['get', 'nome'],
+                ]
+              : ['get', 'nome'],
           'text-font': ['Noto Sans Bold'],
-          'text-size': 13,
+          'text-size': perAuto ? 16 : 13,
           'text-anchor': 'top',
-          'text-offset': [0, 1.5],
+          'text-offset': [0, perAuto ? 1.45 : 1.5],
           'text-allow-overlap': true,
         },
-        'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': 2},
+        'paint': {'text-color': t.etichetta, 'text-halo-color': t.etichettaAlone, 'text-halo-width': perAuto ? 2.5 : 2},
       },
       {
         // Dove sei: la freccia o l'auto scelta, girata come vai, distesa sulla

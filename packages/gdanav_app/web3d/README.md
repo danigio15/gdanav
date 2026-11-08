@@ -55,7 +55,7 @@ la mappa scarica già (OpenFreeMap, schema OpenMapTiles).
   tenue). L'auto sta sopra i cartelli e i nomi di MapLibre, tranne sotto un
   ponte, dove il ponte la copre davvero.
 - **Icone e nomi sui viadotti**: autovelox, segnalazioni, meta, soste di
-  ricarica, tappe e nomi dei ponti stanno all'altezza dell'impalcato
+  ricarica, tappe, persone di casa (da GdAHome) e nomi dei ponti stanno all'altezza dell'impalcato
   (`aggiornaSegni` in `src/principale.js`), e si toccano lì: la pagina li
   cerca sotto il dito proiettandoli sullo schermo e manda all'app
   l'elemento come lo strato a terra (la scheda è la stessa). I nomi delle

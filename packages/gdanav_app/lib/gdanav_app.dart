@@ -232,6 +232,8 @@ Future<GdanavApp> preparaGdanav({
       vicini: vicini,
       prova: prova,
       ztl: ztl,
+      // Le persone di casa anche sulla mappa dell'auto, come sul telefono.
+      persone: persone,
       // Il GPS dell'auto, quando lo passa: davanti a quello del telefono.
       gpsDellAuto: gpsDellAuto,
     )..avvia();

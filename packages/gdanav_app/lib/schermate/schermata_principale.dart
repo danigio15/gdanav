@@ -258,6 +258,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
           segnalazioni: segnalazioni,
           vicini: widget.vicini,
           ztl: widget.ztl,
+          persone: widget.persone,
           mappa: widget.mappa,
         ),
       ),

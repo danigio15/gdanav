@@ -145,7 +145,10 @@ class Ambiente {
 
   /// [vero3d]: col 3D aumentato scelto (e una WebView, anche finta) la
   /// guida apre la sua pagina vera; altrimenti la mappa finta grigia.
-  Widget app({bool vero3d = false}) => GdanavApp(
+  ///
+  /// [persone]: quelli di casa, come li mette GdAHome.
+  Widget app({bool vero3d = false, GestorePersone? persone}) => GdanavApp(
+    persone: persone,
     posizione: posizione,
     archivio: archivio,
     auto: auto,

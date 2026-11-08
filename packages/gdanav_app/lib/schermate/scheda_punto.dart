@@ -479,6 +479,14 @@ typedef RigaInAuto = ({String icona, String? colore, String titolo, String? test
         ],
         stato: stato.name,
       );
+    // Una persona di casa (da GdAHome): dove sta, se si sa, e quanto è lontana.
+    case 'persona':
+      final dove = '${p.proprieta['dove'] ?? ''}'.trim();
+      final testo = [?distanzaTesto, if (dove.isNotEmpty) dove].join(' · ');
+      return (
+        righe: [(icona: 'luogo', colore: null, titolo: 'Persona di casa', testo: testo.isEmpty ? null : testo)],
+        stato: null,
+      );
     default:
       final cat = categoriaPoi(p.proprieta['subclass'] as String?, p.proprieta['class'] as String?);
       return (righe: [(icona: 'luogo', colore: 'blu', titolo: cat.etichetta, testo: distanzaTesto)], stato: null);

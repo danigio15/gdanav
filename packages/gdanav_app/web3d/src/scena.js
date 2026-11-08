@@ -770,7 +770,9 @@ export class Scena {
    * I segni in quota: icone (autovelox, meta) e nomi dei ponti all'altezza
    * dell'impalcato, sempre sopra (come i simboli di MapLibre), grandi uguali
    * a ogni distanza. [segni]: `{chiave, x, y, z, immagine, w, h}` (w e h in
-   * punti dello schermo; l'immagine è una bitmap o una tela).
+   * punti dello schermo; l'immagine è una bitmap o una tela). Con `sopra`
+   * il segno sta nei livelli dell'auto, disegnati sopra i nomi e i cartelli
+   * di MapLibre (le persone di casa: un cartello «A52» non le copre).
    */
   impostaSegni(segni) {
     this.segni ??= new Map();
@@ -789,15 +791,17 @@ export class Scena {
         }
         sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, depthWrite: false, sizeAttenuation: false, transparent: true, fog: false }));
         sp.center.set(0.5, g.centro ?? 0);
-        sp.renderOrder = 60;
         this.segni.set(g.chiave, sp);
         this.mondo.add(sp);
       }
+      sp.renderOrder = 60;
+      sp.layers.set(g.sopra ? 1 : 0);
       sp.position.set(g.x, g.y, g.z);
       sp.userData.w = g.w;
       sp.userData.h = g.h;
       sp.userData.elemento = g.elemento ?? null;
     }
+    this.segniSopra = segni.some((g) => g.sopra);
     for (const [k, sp] of this.segni) {
       if (tieni.has(k)) continue;
       this.mondo.remove(sp);

@@ -249,8 +249,10 @@ class RendererMappa(
 
     /**
      * Un tocco sulla mappa (Android Auto dalla versione 5 dell'auto): se sotto
-     * il dito c'è un distributore, una colonnina o un punto di interesse, la
-     * sua scheda.
+     * il dito c'è un distributore, una colonnina, un punto di interesse o una
+     * persona di casa (da GdAHome), la sua scheda, con «Vai» (per una persona
+     * «Naviga verso …»). Toccare non serve a niente altro: i segnaposto
+     * restano fermi, come vuole Android Auto per chi guida.
      */
     override fun onClick(x: Float, y: Float) {
         // Il tap sulla mappa arriva dal thread dell'host Android Auto: un
@@ -268,6 +270,7 @@ class RendererMappa(
                 "gdanav-distributori",
                 "gdanav-vicine",
                 "nomi-poi",
+                "persone",
             )
             // Il più vicino al dito.
             val punto = trovati.mapNotNull { f ->
