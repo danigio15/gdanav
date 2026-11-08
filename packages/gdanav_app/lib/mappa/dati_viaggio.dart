@@ -52,7 +52,7 @@ Map<String, Map<String, Object?>> datiViaggio(
     sorgenteColonnine: _oVuota('colonnine', () => _colonnine(v)),
     sorgenteArrivo: _collezione([
       if (v.percorso.punti.lastOrNull case final fine? when _scrivibile(fine))
-        _elemento({'type': 'Point', 'coordinates': _xy(fine)}, const {}),
+        _elemento({'type': 'Point', 'coordinates': _xy(fine)}, const {'arrivo': true}),
     ]),
     sorgenteCode: _oVuota('code', () => datiCode(v.percorso)),
     sorgenteAlternative: _oVuota('alternative', () => datiAlternative(scelte, scelta, eco: eco)),
@@ -61,7 +61,10 @@ Map<String, Map<String, Object?>> datiViaggio(
       () => _collezione([
         for (final (i, t) in tappe.indexed)
           if (_scrivibile(t.posizione))
-            _elemento({'type': 'Point', 'coordinates': _xy(t.posizione)}, {'numero': i + 1, 'nome': t.nome}),
+            _elemento(
+              {'type': 'Point', 'coordinates': _xy(t.posizione)},
+              {'numero': i + 1, 'nome': t.nome, 'tappa': true},
+            ),
       ]),
     ),
     sorgentePassandoci: passandoci ? _oVuota('passandoci', () => datiPassandoci(v.percorso)) : _collezione([]),
@@ -304,12 +307,7 @@ Map<String, Object?> datiManovra(Viaggio? v, Manovra? m, {double primaM = 60, do
   }
   final l = Linea(v.percorso.punti);
   final centro = l.cumulate[m.inizio.clamp(0, l.punti.length - 1)];
-  // Mai fin sulla manovra dopo: la punta ci arriverebbe sopra, e sembrerebbe
-  // di dover girare lì.
-  final manovre = v.percorso.manovre;
-  final k = manovre.indexWhere((x) => x.inizio > m.inizio);
-  final dopo = k < 0 ? l.lunghezzaM : l.cumulate[manovre[k].inizio.clamp(0, l.punti.length - 1)];
-  final fine = math.min(math.max(centro + 10, math.min(centro + dopoM, dopo - _primaDellaDopoM)), l.lunghezzaM);
+  final fine = _fineFreccia(v, m, l, centro, dopoM);
   final tratto = [
     _aMetri(l, math.max(0, centro - primaM)),
     for (var i = 0; i < l.punti.length; i++)
@@ -338,6 +336,27 @@ Map<String, Object?> datiManovra(Viaggio? v, Manovra? m, {double primaM = 60, do
       ),
     _elemento({'type': 'Point', 'coordinates': _xy(tratto.last)}, {'rotta': rotta}),
   ]);
+}
+
+/// Dove finisce la freccia: poco dopo la manovra, mai fin sulla manovra dopo
+/// (la punta ci arriverebbe sopra, e sembrerebbe di dover girare lì).
+double _fineFreccia(Viaggio v, Manovra m, Linea l, double centro, double dopoM) {
+  final manovre = v.percorso.manovre;
+  final k = manovre.indexWhere((x) => x.inizio > m.inizio);
+  final dopo = k < 0 ? l.lunghezzaM : l.cumulate[manovre[k].inizio.clamp(0, l.punti.length - 1)];
+  return math.min(math.max(centro + 10, math.min(centro + dopoM, dopo - _primaDellaDopoM)), l.lunghezzaM);
+}
+
+/// Il tratto della freccia della manovra [m] in metri lungo il percorso (da,
+/// a), lo stesso di [datiManovra]: per la mappa 3D, che la disegna
+/// all'altezza della strada. `null` dove la freccia non c'è.
+(double, double)? trattoManovraM(Viaggio? v, Manovra? m, {double primaM = 60, double dopoM = 45}) {
+  if (v == null || m == null || _senzaFreccia.contains(m.tipo) || v.percorso.punti.length < 2) return null;
+  final l = Linea(v.percorso.punti);
+  final centro = l.cumulate[m.inizio.clamp(0, l.punti.length - 1)];
+  final fine = _fineFreccia(v, m, l, centro, dopoM);
+  if (fine - centro < 5) return null;
+  return (math.max(0, centro - primaM), fine);
 }
 
 /// Dopo lo svincolo la freccia torna sul percorso in questi metri.
@@ -531,6 +550,9 @@ int preseAdatte(Colonnina c, Set<TipoConnettore> connettori) =>
 
 /// Il punto del percorso a tanti metri dalla partenza; `null` se il percorso
 /// non ha punti (prima, lì, un errore portava via tutte le colonnine).
+/// Il punto del percorso a [metri] dalla partenza (il vertice dopo).
+Punto? puntoLungo(Linea l, double metri) => _lungo(l, metri);
+
 Punto? _lungo(Linea l, double metri) {
   for (var i = 1; i < l.punti.length; i++) {
     if (l.cumulate[i] >= metri) return l.punti[i];

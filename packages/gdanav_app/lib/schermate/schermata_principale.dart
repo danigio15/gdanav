@@ -11,6 +11,7 @@ import '../componenti/avvisi_in_guida.dart';
 import '../componenti/scheda_auto.dart';
 import '../componenti/vetro.dart';
 import '../mappa/controllo_mappa.dart';
+import '../mappa/mappa_3d.dart' show mappa3dPossibile;
 import '../mappa/scelta_vista.dart';
 import '../mappa/mappa_viaggio.dart';
 import '../stato/archivio.dart';
@@ -54,7 +55,9 @@ import 'schermata_guida.dart';
 import 'strade_risparmio.dart';
 import 'zone_ztl.dart';
 
-typedef CostruisciMappa = Widget Function(BuildContext context, ControlloMappa controllo);
+/// La mappa al posto di quella vera (nelle prove e nelle immagini); `null`:
+/// quella vera (la si chiede di nuovo a ogni cambio del controllo).
+typedef CostruisciMappa = Widget? Function(BuildContext context, ControlloMappa controllo);
 
 class SchermataPrincipale extends StatefulWidget {
   const SchermataPrincipale({
@@ -164,8 +167,14 @@ class SchermataPrincipale extends StatefulWidget {
 }
 
 class _SchermataPrincipaleState extends State<SchermataPrincipale> {
-  /// 2D o 3D si ricorda: in 3D la mappa ti segue anche senza una meta.
-  late final controllo = ControlloMappa(salvaVista: widget.archivio.salvaVistaMappa);
+  /// La vista si ricorda: in 3D la mappa ti segue anche senza una meta. Il
+  /// 3D aumentato, fuori dalla guida, è il 3D; in guida la scena 3D.
+  late final controllo = ControlloMappa(
+    salvaVista: widget.archivio.salvaVistaMappa,
+    aumentataPossibile: mappa3dPossibile,
+    salvaAumentataNonVa: widget.archivio.salvaAumentataNonVa,
+    dimenticaAumentataNonVa: widget.archivio.dimenticaAumentataNonVa,
+  );
   PreferenzeRicarica _preferenze = const PreferenzeRicarica();
   late final GestoreLuoghi luoghi = widget.luoghi ?? (GestoreLuoghi(widget.archivio)..carica());
   late final GestoreSegnalazioni segnalazioni = widget.segnalazioni ?? GestoreSegnalazioni(posizione: widget.posizione);
@@ -181,7 +190,13 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
     _ricaricaPreferenze();
     // Solo le impostazioni: niente mappa, posizione né segnalazioni.
     if (widget.soloImpostazioni) return;
-    unawaited(controllo.carica(widget.archivio.vistaMappa()));
+    unawaited(
+      controllo.carica(
+        widget.archivio.vistaMappa(),
+        nonVa: widget.archivio.aumentataNonVa(),
+        prima: widget.archivio.vistaPrimaDellAumentata(),
+      ),
+    );
     widget.chiediPosizione?.call().then((ok) {
       if (ok) widget.posizione.avvia();
     });
@@ -248,6 +263,15 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
       ),
     );
     _inGuida = false;
+    // In guida il 3D aumentato può essersi spento da solo (il telefono non
+    // ce la fa): la vista e il perché si rileggono.
+    unawaited(
+      controllo.ricarica(
+        widget.archivio.vistaMappa(),
+        nonVa: widget.archivio.aumentataNonVa(),
+        prima: widget.archivio.vistaPrimaDellAumentata(),
+      ),
+    );
   }
 
   /// La guida partita dall'auto: anche il telefono passa alla guida.

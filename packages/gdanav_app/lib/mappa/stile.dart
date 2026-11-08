@@ -60,6 +60,11 @@ const stratiToccabili = [
   'gdanav-tutte-gruppi',
   'gdanav-tutte',
   'nomi-poi',
+  // Il viaggio: autovelox e segnalazioni, le tappe, l'arrivo (la scheda dice
+  // cos'è; per le soste di ricarica la colonnina).
+  'segnalazioni',
+  'tappe',
+  'arrivo',
 ];
 
 /// Dall'alto gli edifici sono piatti e puliti; inclinando la mappa si
@@ -193,6 +198,292 @@ const _scuro = _Tavolozza(
   ignota: '#818CF8',
   arrivo: '#F87171',
 );
+
+/* ─── L'aspetto della mappa 3D, sullo schermo dell'auto ───────────────────
+ *
+ * Sull'auto la mappa resta quella nativa di MapLibre (Android Auto e CarPlay
+ * vogliono la loro superficie: vedi `web3d/README.md`), ma prende i colori
+ * della mappa 3D del telefono: il suolo un poco più caldo, le strade
+ * d'asfalto grigio coi bordi bianchi come le righe, le autostrade con le
+ * corsie tratteggiate da vicino, i ponti sollevati (un'ombra spostata sotto e
+ * il parapetto di cemento) e gli edifici coi colori delle facciate. Niente
+ * che si muova da sé. */
+const _chiaro3d = _Tavolozza(
+  sfondo: '#E5E7E1',
+  abitato: '#E1E3DE',
+  industria: '#D6D9D8',
+  prato: '#CBE2BA',
+  bosco: '#B7D6A3',
+  acqua: '#A9D7F6',
+  edificio: '#DCCAA8',
+  edificioLato: '#A9B8C6',
+  edificioBordo: '#CDBFA4',
+  autostrada: '#8C939C',
+  autostradaBordo: '#F7F8F6',
+  principale: '#959BA3',
+  principaleBordo: '#F7F8F6',
+  strada: '#A3A8AF',
+  stradaBordo: '#C4C8CC',
+  sentiero: '#CBD0D6',
+  ferrovia: '#9C958E',
+  etichetta: '#3E434A',
+  etichettaAlone: '#FFFFFF',
+  luogo: '#4F74A3',
+  poi: '#8A919A',
+  percorso: '#27A2F8',
+  percorsoBordo: '#0A6CC2',
+  alternativa: '#A9C7E3',
+  alternativaBordo: '#6F93B8',
+  contorno: '#FFFFFF',
+  libera: '#16A34A',
+  piena: '#D97706',
+  guasta: '#DC2626',
+  ignota: '#4F46E5',
+  arrivo: '#E5484D',
+);
+
+const _scuro3d = _Tavolozza(
+  sfondo: '#28324A',
+  abitato: '#2B3550',
+  industria: '#2F3A52',
+  prato: '#24403A',
+  bosco: '#213B33',
+  acqua: '#1F4468',
+  edificio: '#8C8378',
+  edificioLato: '#6F7987',
+  edificioBordo: '#3F4A63',
+  autostrada: '#5A6479',
+  autostradaBordo: '#9AA5BA',
+  principale: '#525B6E',
+  principaleBordo: '#8E99AE',
+  strada: '#4A5366',
+  stradaBordo: '#1E2537',
+  sentiero: '#56617A',
+  ferrovia: '#4B4A4D',
+  etichetta: '#E8ECF2',
+  etichettaAlone: '#28324A',
+  luogo: '#A5C6F0',
+  poi: '#97A1B3',
+  percorso: '#3AB0FF',
+  percorsoBordo: '#0B5AA6',
+  alternativa: '#5D7C9B',
+  alternativaBordo: '#2E4459',
+  contorno: '#141A28',
+  libera: '#4ADE80',
+  piena: '#FBBF24',
+  guasta: '#F87171',
+  ignota: '#818CF8',
+  arrivo: '#F87171',
+);
+
+/// Gli edifici coi colori delle facciate della mappa 3D: bassi color sabbia
+/// e mattone, alti grigio-azzurri come i vetri degli uffici.
+Map<String, Object> _pitturaEdifici3d(bool scuro) => {
+  'fill-extrusion-color': [
+    'interpolate',
+    ['linear'],
+    [
+      'coalesce',
+      ['get', 'render_height'],
+      8,
+    ],
+    // Di notte scuri come le case della mappa 3D a luci spente: sull'auto
+    // di notte niente che abbagli.
+    0,
+    scuro ? '#3E4659' : '#E4DCCB',
+    10,
+    scuro ? '#444A5B' : '#D9CDB4',
+    18,
+    scuro ? '#4A4954' : '#CFAE95',
+    30,
+    scuro ? '#465166' : '#C9CED4',
+    60,
+    scuro ? '#4D5A72' : '#A9B8C6',
+  ],
+  'fill-extrusion-height': [
+    'interpolate',
+    ['linear'],
+    ['zoom'],
+    14,
+    0,
+    15.5,
+    ['get', 'render_height'],
+  ],
+  'fill-extrusion-base': [
+    'coalesce',
+    ['get', 'render_min_height'],
+    0,
+  ],
+};
+
+/// I ponti sollevati: sotto l'ombra spostata, poi il parapetto di cemento, poi
+/// l'asfalto (sopra le strade a terra).
+List<Map<String, Object>> _pontiSollevati(_Tavolozza t, bool scuro) {
+  final ponte = [
+    'all',
+    [
+      '==',
+      ['get', 'brunnel'],
+      'bridge',
+    ],
+    [
+      'match',
+      ['get', 'class'],
+      ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor'],
+      true,
+      false,
+    ],
+  ];
+  // Quanto è largo un ponte: come la sua strada.
+  List<Object> largo(double fattore, double piu) => [
+    'interpolate',
+    ['exponential', 1.6],
+    ['zoom'],
+    12,
+    [
+      'match',
+      ['get', 'class'],
+      ['motorway', 'trunk'],
+      3.4 * fattore + piu / 4,
+      ['primary', 'secondary'],
+      2.6 * fattore + piu / 4,
+      1.6 * fattore + piu / 4,
+    ],
+    18,
+    [
+      'match',
+      ['get', 'class'],
+      ['motorway', 'trunk'],
+      32 * fattore + piu,
+      ['primary', 'secondary'],
+      27 * fattore + piu,
+      20 * fattore + piu,
+    ],
+  ];
+  return [
+    {
+      'id': 'ponti-ombra',
+      'type': 'line',
+      'source': 'openmaptiles',
+      'source-layer': 'transportation',
+      'filter': ponte,
+      'minzoom': 13,
+      'layout': {'line-cap': 'butt', 'line-join': 'round'},
+      'paint': {
+        'line-color': scuro ? '#05070C' : '#0C1220',
+        'line-opacity': scuro ? 0.45 : 0.28,
+        'line-width': largo(1.15, 4),
+        'line-blur': 4,
+        // Verso il basso a destra, come il sole del 3D.
+        'line-translate': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          13,
+          [
+            'literal',
+            [1, 2],
+          ],
+          18,
+          [
+            'literal',
+            [9, 14],
+          ],
+        ],
+        'line-translate-anchor': 'map',
+      },
+    },
+    {
+      'id': 'ponti-bordo',
+      'type': 'line',
+      'source': 'openmaptiles',
+      'source-layer': 'transportation',
+      'filter': ponte,
+      'minzoom': 13,
+      'layout': {'line-cap': 'butt', 'line-join': 'round'},
+      'paint': {'line-color': scuro ? '#59606C' : '#D6D3CC', 'line-width': largo(1.18, 4)},
+    },
+    {
+      'id': 'ponti',
+      'type': 'line',
+      'source': 'openmaptiles',
+      'source-layer': 'transportation',
+      'filter': ponte,
+      'minzoom': 13,
+      'layout': {'line-cap': 'butt', 'line-join': 'round'},
+      'paint': {
+        'line-color': [
+          'match',
+          ['get', 'class'],
+          ['motorway', 'trunk'],
+          t.autostrada,
+          ['primary', 'secondary'],
+          t.principale,
+          t.strada,
+        ],
+        'line-width': largo(1, 0),
+      },
+    },
+  ];
+}
+
+/// Le corsie delle autostrade da vicino: due righe bianche tratteggiate per
+/// carreggiata, come le righe della mappa 3D.
+List<Map<String, Object>> _righeCorsie(bool scuro) => [
+  for (final (id, lato) in [('corsie-sinistra', -1.0), ('corsie-destra', 1.0)])
+    {
+      'id': id,
+      'type': 'line',
+      'source': 'openmaptiles',
+      'source-layer': 'transportation',
+      'minzoom': 15,
+      'filter': [
+        'all',
+        [
+          'match',
+          ['get', 'class'],
+          ['motorway', 'trunk'],
+          true,
+          false,
+        ],
+        [
+          '==',
+          ['get', 'oneway'],
+          1,
+        ],
+        [
+          '!=',
+          ['get', 'ramp'],
+          1,
+        ],
+      ],
+      'layout': {'line-cap': 'butt', 'line-join': 'round'},
+      'paint': {
+        'line-color': scuro ? '#C9D0DC' : '#FFFFFF',
+        'line-opacity': 0.85,
+        'line-width': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          15,
+          0.8,
+          18,
+          1.6,
+        ],
+        'line-dasharray': [3, 4],
+        // Un sesto della carreggiata per parte: le righe fra tre corsie.
+        'line-offset': [
+          'interpolate',
+          ['exponential', 1.6],
+          ['zoom'],
+          15,
+          lato * 32 / (1.6 * 1.6 * 1.6) / 6,
+          18,
+          lato * 32 / 6,
+        ],
+      },
+    },
+];
 
 /// [verde] per la strada che risparmia energia (`eco` nelle proprietà),
 /// [altro] per le altre.
@@ -386,14 +677,18 @@ const larghezzaCorsia = 3.5;
 
 /// [immersiva]: la vista immersiva (strade in metri, edifici sopra il
 /// percorso, corsie sulla strada). Si sceglie col tasto 2D · 3D · Immersiva.
+///
+/// [aspetto3d]: i colori e i ponti sollevati della mappa 3D, per lo schermo
+/// dell'auto (vedi `_chiaro3d`).
 Map<String, Object> stileMappa({
   required bool scuro,
   String chiaveTraffico = '',
   bool perAuto = false,
   bool immersiva = false,
+  bool aspetto3d = false,
 }) {
   final traffico = chiaveTraffico.trim();
-  final t = scuro ? _scuro : _chiaro;
+  final t = aspetto3d ? (scuro ? _scuro3d : _chiaro3d) : (scuro ? _scuro : _chiaro);
   final classi = {
     'autostrada': [
       'match',
@@ -631,6 +926,7 @@ Map<String, Object> stileMappa({
         t.autostrada,
         immersiva ? _metri(larghezzeVere['autostrade']!) : _largo(3.4, 32),
       ),
+      if (aspetto3d) ...[..._righeCorsie(scuro), ..._pontiSollevati(t, scuro)],
       // Il traffico come in Waze: solo dove si rallenta, arancio se lento e
       // rosso se quasi fermi; da lontano solo sulle strade principali.
       // Sull'auto più spesse: lo schermo si guarda da un braccio di
@@ -655,7 +951,7 @@ Map<String, Object> stileMappa({
         'source-layer': 'building',
         'minzoom': 14,
         'layout': {'visibility': 'none'},
-        'paint': {..._pitturaEdifici(t), 'fill-extrusion-opacity': 0.94},
+        'paint': {...(aspetto3d ? _pitturaEdifici3d(scuro) : _pitturaEdifici(t)), 'fill-extrusion-opacity': 0.94},
       },
       // Le ZTL e le aree pedonali (OpenStreetMap), sopra le strade e sotto i
       // loro nomi: la ZTL tratteggiata di rosso, più tenue quando è spenta;
@@ -1095,7 +1391,7 @@ Map<String, Object> stileMappa({
           'source': 'openmaptiles',
           'source-layer': 'building',
           'minzoom': 14,
-          'paint': {..._pitturaEdifici(t), 'fill-extrusion-opacity': 0.6},
+          'paint': {...(aspetto3d ? _pitturaEdifici3d(scuro) : _pitturaEdifici(t)), 'fill-extrusion-opacity': 0.6},
         },
       ],
       // Sull'auto, il punto della scheda aperta: un alone e un anello del

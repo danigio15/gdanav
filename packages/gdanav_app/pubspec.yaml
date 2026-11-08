@@ -35,11 +35,16 @@ dependencies:
   # I link della schermata Premium (privacy e condizioni, voluti dall'App Store).
   url_launcher: ^6.3.0
   audioplayers: ^6.8.1
+  # La mappa 3D in guida (assets/web3d): MapLibre GL JS e three.js in una
+  # WebView. GdAHome ha già la 4 (^4.10.0): stesso intervallo.
+  webview_flutter: ^4.10.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  # Una WebView finta nelle prove del 3D aumentato (che parte, che si ferma).
+  webview_flutter_platform_interface: ^2.10.0
 
 flutter:
   uses-material-design: true
@@ -63,3 +68,4 @@ flutter:
     - assets/colonnine.json
     - assets/autovelox.json
     - assets/ztl.json
+    - assets/web3d/

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/gdanav_app.dart';
+import 'package:gdanav_app/schermate/schermata_guida.dart' show SchermataGuida;
 import 'package:gdanav_app/mappa/controllo_mappa.dart';
 import 'package:gdanav_app/stato/archivio.dart';
 import 'package:gdanav_app/stato/gestore_auto.dart';
@@ -142,7 +143,9 @@ class Ambiente {
   /// L'ultimo controllo passato alla mappa finta (in guida, quello della guida).
   ControlloMappa? controllo;
 
-  Widget app() => GdanavApp(
+  /// [vero3d]: col 3D aumentato scelto (e una WebView, anche finta) la
+  /// guida apre la sua pagina vera; altrimenti la mappa finta grigia.
+  Widget app({bool vero3d = false}) => GdanavApp(
     posizione: posizione,
     archivio: archivio,
     auto: auto,
@@ -150,8 +153,9 @@ class Ambiente {
     guida: guida,
     segnalazioni: segnalazioni,
     ztl: ztl,
-    mappa: (_, c) {
+    mappa: (context, c) {
       controllo = c;
+      if (vero3d && c.scenaAumentata && context.findAncestorWidgetOfExactType<SchermataGuida>() != null) return null;
       return const ColoredBox(color: Colors.grey);
     },
   );

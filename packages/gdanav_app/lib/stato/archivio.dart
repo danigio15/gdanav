@@ -40,6 +40,10 @@ class Archivio {
   static const _vistaPiatta = 'vista_2d';
   static const _vista = 'vista_mappa';
   static const _viaggiPianificati = 'viaggi_pianificati';
+  // Perché il 3D aumentato non va su questo telefono (la chiave viene da
+  // quando era l'interruttore «Mappa 3D», e vale ancora).
+  static const _mappa3dEsito = 'mappa_3d_esito';
+  static const _vistaPrima = 'vista_mappa_prima';
 
   Future<Abbinamento?> abbinamento() async {
     final uri = await _p.read(key: _abbinamento);
@@ -171,20 +175,49 @@ class Archivio {
 
   Future<void> salvaScelteAvvisi(ScelteAvvisi s) => _p.write(key: _avvisiScelti, value: s.aJson());
 
-  /// Come si guarda la mappa: 2D, 3D o immersiva ([VistaMappa]). Si
-  /// ricorda, e vale anche fuori dalla guida. Di partenza 3D, come sullo
-  /// schermo dell'auto. Prima c'erano solo 2D e 3D, e si scriveva solo chi
-  /// l'aveva voluta piatta: quella scelta vale ancora.
+  /// Come si guarda la mappa: 2D, 3D, immersiva o 3D aumentato
+  /// ([VistaMappa]). Si ricorda, e vale anche fuori dalla guida. Di partenza
+  /// 3D, come sullo schermo dell'auto. Prima c'erano solo 2D e 3D, e si
+  /// scriveva solo chi l'aveva voluta piatta: quella scelta vale ancora.
   Future<VistaMappa> vistaMappa() async {
     final scritta = await _p.read(key: _vista);
-    if (scritta != null) return VistaMappa.daNome(scritta);
-    return await _p.read(key: _vistaPiatta) == 'sì' ? VistaMappa.piatta : VistaMappa.inclinata;
+    final v = scritta != null
+        ? VistaMappa.daNome(scritta)
+        : await _p.read(key: _vistaPiatta) == 'sì'
+        ? VistaMappa.piatta
+        : VistaMappa.inclinata;
+    vistaScelta.value = v;
+    return v;
   }
 
   Future<void> salvaVistaMappa(VistaMappa v) async {
     await _p.write(key: _vista, value: v.name);
     await _p.delete(key: _vistaPiatta);
+    if (v != VistaMappa.aumentata) await _p.write(key: _vistaPrima, value: v.name);
+    vistaScelta.value = v;
   }
+
+  /// L'ultima vista scelta che non è il 3D aumentato: se il 3D aumentato si
+  /// ferma si torna lì (`null`: mai scelta, si torna al 3D).
+  Future<VistaMappa?> vistaPrimaDellAumentata() async => switch (await _p.read(key: _vistaPrima)) {
+    final n? => VistaMappa.daNome(n),
+    null => null,
+  };
+
+  /// L'ultima vista letta o scelta sul telefono, per chi la segue da fuori
+  /// (lo schermo dell'auto prende l'aspetto 3D col 3D aumentato).
+  static final vistaScelta = ValueNotifier<VistaMappa?>(null);
+
+  /// Perché il 3D aumentato non va su questo telefono (`null`: va, o non ci
+  /// si è ancora provato): «lento», «webgl2», «software»…
+  Future<String?> aumentataNonVa() => _p.read(key: _mappa3dEsito);
+
+  /// Il 3D aumentato su questo telefono non va ([motivo]): la voce resta
+  /// spenta finché non si riprova a mano.
+  Future<void> salvaAumentataNonVa(String motivo) => _p.write(key: _mappa3dEsito, value: motivo);
+
+  /// «Riprova»: si dimentica che non andava.
+  Future<void> dimenticaAumentataNonVa() => _p.delete(key: _mappa3dEsito);
 
   /// L'identità di questo telefono verso il quadro delle licenze (i codici
   /// regalo): nasce una volta sola e resta qui, col suo segreto.

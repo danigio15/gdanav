@@ -23,7 +23,9 @@ class PuntoToccato {
     this.proprieta = const {},
   });
 
-  /// 'distributore', 'colonnina', 'persona' (di casa, da GdAHome) o 'poi'.
+  /// 'distributore', 'colonnina', 'persona' (di casa, da GdAHome), 'poi';
+  /// e del viaggio 'segnalazione' (autovelox e le altre), 'tappa', 'arrivo'.
+  /// Toccate anche sui viadotti del 3D aumentato, dove stanno in quota.
   final String tipo;
   final String? id;
   final String nome;
@@ -39,6 +41,23 @@ class PuntoToccato {
     if (xy is! List || xy.length < 2) return null;
     final dove = Punto((xy[1] as num).toDouble(), (xy[0] as num).toDouble());
     final nome = '${p['nome'] ?? p['name'] ?? ''}';
+    // Il viaggio: le soste di ricarica, le tappe, l'arrivo, le segnalazioni.
+    if (p.containsKey('sosta') && p['id'] is String) {
+      return PuntoToccato(tipo: 'colonnina', id: p['id'] as String?, nome: nome, posizione: dove, proprieta: p);
+    }
+    // Dalla pagina 3D arriva anche lo strato.
+    final strato = e['layer'];
+    if (p['tappa'] == true || strato == 'tappe') {
+      final n = p['numero'];
+      return PuntoToccato(tipo: 'tappa', nome: nome.isNotEmpty ? nome : 'Tappa $n', posizione: dove, proprieta: p);
+    }
+    if (p['arrivo'] == true || strato == 'arrivo') {
+      return PuntoToccato(tipo: 'arrivo', nome: 'Arrivo', posizione: dove, proprieta: p);
+    }
+    if (p['icona'] is String && TipoSegnalazione.values.any((t) => t.name == p['tipo'])) {
+      final t = TipoSegnalazione.values.byName(p['tipo']! as String);
+      return PuntoToccato(tipo: 'segnalazione', id: p['id'] as String?, nome: t.nome, posizione: dove, proprieta: p);
+    }
     return switch (p['tipo']) {
       'persona' => PuntoToccato(tipo: 'persona', id: p['id'] as String?, nome: nome, posizione: dove, proprieta: p),
       'distributore' || 'colonnina' => PuntoToccato(
@@ -156,6 +175,14 @@ class _Scheda extends StatelessWidget {
         'COLONNINA DI RICARICA',
       ),
       'persona' => (const Color(0xFF7C3AED), Icons.person, 'PERSONA DI CASA'),
+      'segnalazione' when punto.proprieta['tipo'] == 'autovelox' => (
+        const Color(0xFFD62A26),
+        Icons.speed_rounded,
+        'AUTOVELOX',
+      ),
+      'segnalazione' => (const Color(0xFFE08A00), Icons.warning_amber_rounded, 'SEGNALAZIONE'),
+      'tappa' => (const Color(0xFF2563EB), Icons.flag_rounded, 'TAPPA ${punto.proprieta['numero'] ?? ''}'.trim()),
+      'arrivo' => (const Color(0xFF16A34A), Icons.sports_score_rounded, 'ARRIVO'),
       _ => () {
         final c = categoriaPoi(punto.proprieta['subclass'] as String?, punto.proprieta['class'] as String?);
         return (coloreHex(c.colore), iconaCategoria(c), c.etichetta.toUpperCase());
@@ -163,6 +190,31 @@ class _Scheda extends StatelessWidget {
     };
     final dettagli = <Widget>[];
     var descrizione = '';
+    // Del viaggio: niente «Vai» (ci si sta già andando), quello che si sa.
+    final delViaggio = const {'segnalazione', 'tappa', 'arrivo'}.contains(punto.tipo);
+    if (punto.tipo == 'segnalazione') {
+      final p = punto.proprieta;
+      final righe = [
+        if (p['limite'] case final num l) 'Limite ${l.round()} km/h',
+        if (p['conferme'] case final num c when c > 0)
+          c == 1 ? 'Confermata da 1 persona' : 'Confermata da ${c.round()} persone',
+        if (DateTime.tryParse('${p['creata']}') case final d?) 'Segnalata ${fa(DateTime.now().difference(d))}',
+      ];
+      for (final r in righe) {
+        dettagli.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(r, style: t.bodyLarge),
+          ),
+        );
+      }
+    } else if (punto.tipo == 'tappa') {
+      dettagli.add(
+        Text('Una tappa del viaggio: ci si passa e si prosegue.', style: t.bodyMedium?.copyWith(color: muto)),
+      );
+    } else if (punto.tipo == 'arrivo') {
+      dettagli.add(Text('La meta del viaggio.', style: t.bodyMedium?.copyWith(color: muto)));
+    }
     if (d != null) {
       descrizione = descriviDistributore(d, qui ?? d.posizione, carburante: carburante);
       if (d.indirizzo != null || (d.marca != null && d.marca != d.nome)) {
@@ -296,21 +348,22 @@ class _Scheda extends StatelessWidget {
         const SizedBox(height: 8),
         ...dettagli,
         const SizedBox(height: 18),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            key: const Key('vai-punto'),
-            icon: const Icon(Icons.navigation),
-            label: Text(vai),
-            onPressed: () => onVai(
-              Luogo(
-                nome: punto.nome,
-                posizione: punto.posizione,
-                descrizione: descrizione.isNotEmpty ? descrizione : sopra[0] + sopra.substring(1).toLowerCase(),
+        if (!delViaggio)
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              key: const Key('vai-punto'),
+              icon: const Icon(Icons.navigation),
+              label: Text(vai),
+              onPressed: () => onVai(
+                Luogo(
+                  nome: punto.nome,
+                  posizione: punto.posizione,
+                  descrizione: descrizione.isNotEmpty ? descrizione : sopra[0] + sopra.substring(1).toLowerCase(),
+                ),
               ),
             ),
           ),
-        ),
         if (credito != null) ...[const SizedBox(height: 8), Text(credito, style: t.bodySmall?.copyWith(color: muto))],
       ],
     );
@@ -318,6 +371,16 @@ class _Scheda extends StatelessWidget {
 
   static double? _min(double? m, double e) => m == null || e < m ? e : m;
 }
+
+/// Da quanto: «adesso», «5 min fa», «2 ore fa», «3 giorni fa».
+String fa(Duration d) => switch (d.inMinutes) {
+  < 1 => 'adesso',
+  < 60 => '${d.inMinutes} min fa',
+  < 120 => '1 ora fa',
+  < 1440 => '${d.inHours} ore fa',
+  < 2880 => '1 giorno fa',
+  _ => '${d.inDays} giorni fa',
+};
 
 /// Una riga della scheda sullo schermo dell'auto: il disegno a sinistra col
 /// suo colore, la riga, e la linea sotto.

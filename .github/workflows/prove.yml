@@ -75,6 +75,22 @@ jobs:
       # senza Google, e controlla anche che le novita' stiano nella casella.
       - run: node --test ../tools/porta-nel-negozio.test.mjs
 
+  # La mappa 3D in guida (packages/gdanav_app/web3d): le prove delle parti
+  # pure, e che il pacchetto in assets/web3d sia quello della sorgente.
+  mappa3d:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/gdanav_app/web3d
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test
+      - run: npm run controlla
+
   # Il relay su Cloudflare, a ogni push su main, su gdanav.gdahome.org (il
   # dominio è su Cloudflare), con i segreti CLOUDFLARE_API_TOKEN e
   # CLOUDFLARE_ACCOUNT_ID. Senza segreti si salta.

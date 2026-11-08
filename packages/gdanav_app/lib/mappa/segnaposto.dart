@@ -70,6 +70,10 @@ Map<String, Object?> datiSegnalazioni(List<Segnalazione> tutte, [ScelteAvvisi? s
             // L'immagine: per gli autovelox il loro disegno (fisso, mobile,
             // semaforo) e il cartello del limite accanto, quando ce l'hanno.
             'icona': nomeIconaDi(s),
+            // Per la scheda, toccandola.
+            'conferme': s.conferme,
+            'limite': ?s.limiteKmh,
+            'creata': s.creata.toIso8601String(),
           },
         },
   ],

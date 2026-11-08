@@ -13,11 +13,13 @@ import '../componenti/stato_colonnina.dart' show testoDisponibilita;
 import '../componenti/scena_svincolo.dart';
 import '../componenti/vista_svincolo.dart';
 import '../componenti/ztl.dart';
+import '../mappa/controllo_mappa.dart' show VistaMappa;
 import '../mappa/dati_viaggio.dart';
 import '../mappa/segnaposto.dart';
 import '../mappa/stile.dart';
 import '../schermate/scheda_punto.dart';
 import '../servizi.dart';
+import '../stato/archivio.dart' show Archivio;
 import '../stato/avvisi_strada.dart';
 import '../stato/avvisi_ztl.dart';
 import '../stato/distributori.dart';
@@ -98,18 +100,11 @@ class PonteAuto {
 
   void avvia() {
     _canale.setMethodCallHandler(_dallAuto);
-    _manda('stili', {
-      'chiaro': jsonEncode(stileMappa(scuro: false, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true)),
-      'scuro': jsonEncode(stileMappa(scuro: true, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true)),
-      // La vista immersiva ha uno stile suo: le strade in metri, le corsie
-      // sulla strada, gli edifici sopra il percorso.
-      'chiaro_immersiva': jsonEncode(
-        stileMappa(scuro: false, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true, immersiva: true),
-      ),
-      'scuro_immersiva': jsonEncode(
-        stileMappa(scuro: true, chiaveTraffico: Servizi.chiaveTomTom, perAuto: true, immersiva: true),
-      ),
-    });
+    _stili();
+    // Col 3D aumentato scelto sul telefono anche l'auto ne prende l'aspetto
+    // (colori, ponti sollevati, corsie, auto rossa); altrimenti com'era.
+    Archivio.vistaScelta.addListener(_dallaVista);
+    unawaited(guida.archivio?.vistaMappa().then((_) => _dallaVista()));
     _immagini();
     viaggio.addListener(_viaggio);
     viaggio.addListener(_opzioni);
@@ -419,6 +414,7 @@ class PonteAuto {
   }
 
   void ferma() {
+    Archivio.vistaScelta.removeListener(_dallaVista);
     viaggio.removeListener(_viaggio);
     viaggio.removeListener(_opzioni);
     guida.removeListener(_guida);
@@ -474,6 +470,42 @@ class PonteAuto {
       },
     });
   }
+
+  /// La mappa dell'auto con l'aspetto della mappa 3D del telefono (colori,
+  /// ponti sollevati, corsie, auto rossa): solo se sul telefono la vista è
+  /// il 3D aumentato. L'auto ha le sue viste (2D, 3D, immersiva): l'aspetto
+  /// segue il telefono.
+  var _aspetto3d = false;
+
+  void _dallaVista() {
+    final a = Archivio.vistaScelta.value == VistaMappa.aumentata;
+    if (!_attivo || a == _aspetto3d) return;
+    _aspetto3d = a;
+    _stili();
+    _posizione();
+  }
+
+  void _stili() {
+    String stile({required bool scuro, bool immersiva = false}) => jsonEncode(
+      stileMappa(
+        scuro: scuro,
+        chiaveTraffico: Servizi.chiaveTomTom,
+        perAuto: true,
+        immersiva: immersiva,
+        aspetto3d: _aspetto3d,
+      ),
+    );
+    _manda('stili', {
+      'chiaro': stile(scuro: false),
+      'scuro': stile(scuro: true),
+      // La vista immersiva ha uno stile suo: le strade in metri, le corsie
+      // sulla strada, gli edifici sopra il percorso.
+      'chiaro_immersiva': stile(scuro: false, immersiva: true),
+      'scuro_immersiva': stile(scuro: true, immersiva: true),
+    });
+  }
+
+  String get _icona => iconaSullAuto(posizione.segnaposto, aspetto3d: _aspetto3d);
 
   void _viaggio() {
     final stato = viaggio.stato;
@@ -946,7 +978,7 @@ class PonteAuto {
       'rotta': a?.rottaMappa ?? rotta,
       'rotta_io': rotta,
       'velocita_ms': velocita.isFinite ? velocita : 0.0,
-      'icona': posizione.segnaposto.immagine,
+      'icona': _icona,
       if (pista != null && metri != null) ...{
         'pista': [
           for (final p in pista) ...[p.lat, p.lon],
@@ -1066,3 +1098,9 @@ Position? posizioneDellAuto(Map<Object?, Object?> dati) {
     speedAccuracy: 0,
   );
 }
+
+/// Il segnaposto sullo schermo dell'auto: quello scelto; la freccia di
+/// partenza, con l'aspetto della mappa 3D, diventa l'auto rossa (come sul
+/// telefono: sul blu del percorso si vede).
+String iconaSullAuto(Segnaposto s, {required bool aspetto3d}) =>
+    aspetto3d && s == Segnaposto.freccia ? Segnaposto.autoRossa.immagine : s.immagine;

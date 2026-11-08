@@ -1,0 +1,25 @@
+/* La pagina della mappa 3D: tutta mappa, niente margini. Il cielo è un
+   gradiente dietro la tela (lo cambia `aggiornaCielo`). */
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #e2eaf1;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#mappa {
+  position: absolute;
+  inset: 0;
+}
+/* L'attribuzione (OpenStreetMap) in alto a sinistra, sotto il cartello
+   della manovra: come sulla mappa di sempre. */
+.maplibregl-ctrl-top-left {
+  top: 200px;
+  left: 4px;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact {
+  opacity: 0.75;
+}
