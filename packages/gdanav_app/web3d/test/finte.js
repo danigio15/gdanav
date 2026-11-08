@@ -61,6 +61,19 @@ export function cavalcaviaConRampa() {
   return t;
 }
 
+/** Un ponte lungo 1400 px (circa 600 m) da ovest a est, col suo nome. */
+export function ponteLungo(nome) {
+  return {
+    transportation: strato([
+      { p: { class: 'motorway', oneway: 1 }, g: [[[0, 2048], [1348, 2048]]] },
+      { p: { class: 'motorway', oneway: 1, brunnel: 'bridge', layer: 1 }, g: [[[1348, 2048], [2748, 2048]]] },
+      { p: { class: 'motorway', oneway: 1 }, g: [[[2748, 2048], [4096, 2048]]] },
+    ]),
+    // Come nelle tessere vere: il nome sulla linea intera, senza «brunnel».
+    transportation_name: strato([{ p: { class: 'motorway', name: nome }, g: [[[0, 2048], [4096, 2048]]] }]),
+  };
+}
+
 /** Un sottopasso: una strada in galleria sotto un viale, con le rampe aperte ai capi. */
 export function sottopassoConNome() {
   const t = sottopasso();

@@ -42,6 +42,15 @@ export function livelloStrada(p) {
   return 0;
 }
 
+/**
+ * Quanto è alto sulla valle un viadotto lungo [metri] (da un capo all'altro):
+ * 4,5 m ogni cento, fra 10 e 60; 0 sotto i 200 m (lì vale il livello).
+ */
+export function altezzaViadotto(metri) {
+  if (!(metri >= 200)) return 0;
+  return Math.max(10, Math.min(60, metri * 0.045));
+}
+
 /** L'altezza di un ponte di quel livello. */
 export const altezzaLivello = (livello) => (livello > 0 ? livello * ALTEZZA_LIVELLO : 0);
 
@@ -183,6 +192,8 @@ export function grafoStrade(strade, metri, { iterazioni = 1500 } = {}) {
       rampa: p.ramp === 1 || p.ramp === '1' || p.ramp === true,
       ponte: p.brunnel === 'bridge',
       livello: livelloStrada(p),
+      // Un viadotto alto (vedi `segnaViadotti` in tessera.js): più del livello.
+      altezza: p.brunnel === 'bridge' && +p.altezza > 0 ? +p.altezza : null,
       senso: +(p.oneway ?? 0) || 0,
       w: larghezzaStrada(p),
       nodi: pieno,
@@ -283,7 +294,7 @@ export function grafoStrade(strade, metri, { iterazioni = 1500 } = {}) {
 
 /** Le altezze dei nodi del grafo (vedi in cima). */
 export function altezze(nodi, feats, iterazioni = 1500) {
-  const hDi = (f) => altezzaLivello(f.livello);
+  const hDi = (f) => Math.max(altezzaLivello(f.livello), f.altezza ?? 0);
   for (const n of nodi) {
     let hPonte = null;
     let diversi = false;

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { LIMITI, NASTRI, costruisciTessera, stimaTriangoli, bufferDellaTessera } from '../src/tessera.js';
-import { ALTEZZA_LIVELLO, SPESSORE_IMPALCATO } from '../src/elevazione.js';
-import { cavalcavia, cavalcaviaConRampa, cavalcaviaDueCarreggiate, sottopasso, sottopassoConNome } from './finte.js';
+import { ALTEZZA_LIVELLO, SPESSORE_IMPALCATO, altezzaViadotto } from '../src/elevazione.js';
+import { cavalcavia, cavalcaviaConRampa, cavalcaviaDueCarreggiate, ponteLungo, sottopasso, sottopassoConNome } from './finte.js';
 
 const X = 8605;
 const Y = 5860;
@@ -167,4 +167,25 @@ test('il nome di una strada con un sottopasso: fuori dalla galleria, mai sopra',
   }
   assert.ok(!dentro, `il nome non sta sopra la galleria (${e.x}, ${e.y})`);
   assert.ok(e.h < 1, 'a terra');
+});
+
+test('un viadotto lungo sta alto sulla valle; un ponte qualunque altrettanto lungo resta al suo livello', () => {
+  assert.equal(altezzaViadotto(150), 0);
+  assert.equal(altezzaViadotto(1000), 45);
+  assert.equal(altezzaViadotto(5000), 60);
+  const quota = (t) => {
+    let h = 0;
+    for (let i = 0; i < t.segmenti.length; i += 8) if (Math.abs(t.segmenti[i]) < 30 && t.segmenti[i + 7] & 32) h = Math.max(h, t.segmenti[i + 2]);
+    return h;
+  };
+  const alto = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': ponteLungo('Viadotto Aglio') } });
+  const genova = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': ponteLungo('(Ponte san Giorgio) A10 dir. Genova') } });
+  const basso = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': ponteLungo('Tangenziale di Bologna') } });
+  assert.ok(quota(genova) > 20, `il ponte di Genova in alto: ${quota(genova)}`);
+  assert.ok(quota(alto) > 20, `il viadotto in alto: ${quota(alto)}`);
+  assert.ok(Math.abs(quota(basso) - ALTEZZA_LIVELLO) < 1, `il ponte qualunque al primo livello: ${quota(basso)}`);
+  // I piloni del viadotto alto sono più grossi (la scala del fusto).
+  let grosso = 0;
+  for (let i = 0; i < alto.fusti.length; i += 16) grosso = Math.max(grosso, Math.hypot(alto.fusti[i], alto.fusti[i + 1]));
+  assert.ok(grosso > 1.6, `pilone grosso: ${grosso}`);
 });

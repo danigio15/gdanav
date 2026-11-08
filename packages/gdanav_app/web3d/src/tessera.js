@@ -10,7 +10,7 @@
 
 import { generatore, mescola, semeTessera } from './caso.js';
 import { Costruttore, matrice } from './costruttore.js';
-import { CLASSI_STRADE, SPESSORE_IMPALCATO, grafoStrade, uniscIBordi } from './elevazione.js';
+import { CLASSI_STRADE, SPESSORE_IMPALCATO, altezzaViadotto, grafoStrade, uniscIBordi } from './elevazione.js';
 import { ESTENSIONE, sistemaTessera } from './geo.js';
 import {
   anelliPoligoni,
@@ -34,6 +34,9 @@ export const NASTRI = [...TIPI_STRADA, ...TIPI_STRADA.map((t) => t + '-ponte'), 
 
 /** Quanto sotto passa una galleria (sopra c'è la strada che la copre). */
 const SOPRA_GALLERIA = 0.06;
+
+/** Oltre questa quota (m) una strada non segnata come ponte si disegna come un viadotto. */
+const ALTO_COME_PONTE = 6.5;
 
 /** Metri di strada per una ripetizione della trama. */
 export const PERIODO_STRADA = 12;
@@ -124,6 +127,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     }
   }
   uniscIBordi(strade);
+  segnaViadotti(livelli, x, y, strade, sys);
   const { nodi, feats } = grafoStrade(strade, sys.metri);
   const tGrafo = Date.now() - t0;
 
@@ -402,6 +406,9 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         const ha = pezzo[k - 1][2];
         const hb = pezzo[k][2];
         if (ha < 0.35 && hb < 0.35) continue;
+        // Una strada non segnata come ponte ma alta (la salita di un viadotto
+        // alto): da qui in su è un viadotto anche lei, non un muro.
+        const comePonte = f.ponte || (ha > ALTO_COME_PONTE && hb > ALTO_COME_PONTE);
         // L'ombra dell'impalcato.
         {
           const a = L[k - 1];
@@ -418,7 +425,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
             [0, 0, 1],
           );
           // E sotto, a piombo: sotto un ponte è sempre più scuro.
-          if (f.ponte && ha > 2.5 && hb > 2.5) {
+          if (comePonte && ha > 2.5 && hb > 2.5) {
             ombre.quad([a[0], a[1], 0], [b[0], b[1], 0], [c[0], c[1], 0], [d[0], d[1], 0], [0, 0, 1]);
             const nl0 = [-pezzo[k - 1][4], pezzo[k - 1][3]];
             const nl1 = [-pezzo[k][4], pezzo[k][3]];
@@ -449,7 +456,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
             opere.quad([a0[0], a0[1], a[2] + ph], [b0[0], b0[1], b[2] + ph], [b1[0], b1[1], b[2] + ph], [a1[0], a1[1], a[2] + ph], [0, 0, 1], ...sfuma(CORRIMANO, 1.15, 1.15));
             opere.quad([a1[0], a1[1], a[2]], [b1[0], b1[1], b[2]], [b1[0], b1[1], b[2] + ph], [a1[0], a1[1], a[2] + ph], inr, ...sfuma(cCemento, 0.7, 0.95));
           }
-          if (f.ponte) {
+          if (comePonte) {
             // Il fianco dell'impalcato: il cordolo chiaro che sporge un poco
             // (col suo sottile ventre in ombra), poi la trave più scura, rientrata.
             const CO = 0.55;
@@ -476,7 +483,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
             opere.quad([a0[0], a0[1], 0], [b0[0], b0[1], 0], [b0[0], b0[1], b[2]], [a0[0], a0[1], a[2]], nrm, ...sfuma(cCemento, 0.66, 0.98));
           }
         }
-        if (f.ponte) {
+        if (comePonte) {
           const a = L[k - 1];
           const b = L[k];
           const c = R[k];
@@ -504,8 +511,8 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         }
       }
       // I piloni: ai due lati di ogni strada che passa sotto (mai sopra), e
-      // ogni trenta metri nel resto del ponte.
-      if (f.ponte) {
+      // ogni trenta metri nel resto del ponte (e delle salite alte).
+      if (f.ponte || pezzo.some((q) => q[2] > ALTO_COME_PONTE)) {
         const aS = (sv) => {
           let k = 1;
           while (k < n - 1 && pezzo[k][5] < sv) k++;
@@ -547,11 +554,11 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         const metti = (sv) => {
           if (sv < pezzo[0][5] || sv > pezzo[n - 1][5] || !libero(sv)) return false;
           const [px, py, h, tx, ty] = aS(sv);
-          if (h < 2.5) return false;
+          if (h < (f.ponte ? 2.5 : ALTO_COME_PONTE)) return false;
           const tl = Math.hypot(tx, ty) || 1;
           const offs = f.w > 9 ? [-f.w * 0.27, f.w * 0.27] : [0];
           for (const o of offs) if (suStradaATerra(px - (ty / tl) * o, py + (tx / tl) * o, 0.8)) return false;
-          piloni.push({ x: px, y: py, h: h + zs - SPESSORE_IMPALCATO, ang: Math.atan2(ty, tx), w: f.w, offs });
+          piloni.push({ x: px, y: py, h: h + zs - SPESSORE_IMPALCATO, ang: Math.atan2(ty, tx), w: f.w, offs, alto: h > 14 });
           return true;
         };
         // Nello spartitraffico fra due carreggiate di sotto: un pilone a metà.
@@ -571,8 +578,10 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         let prossimo = 12 + Math.floor(semePezzo * 5) * 3;
         // Si conta dall'inizio della strada intera: le due tessere ai lati
         // del bordo mettono i piloni negli stessi punti.
-        while (prossimo < pezzo[0][5]) prossimo += 30;
-        for (; prossimo <= pezzo[n - 1][5]; prossimo += 30) {
+        while (prossimo < pezzo[0][5]) prossimo += pezzo.some((q) => q[2] > 20) ? 45 : 30;
+        // Sui viadotti alti le campate sono più lunghe.
+        const campata = pezzo.some((q) => q[2] > 20) ? 45 : 30;
+        for (; prossimo <= pezzo[n - 1][5]; prossimo += campata) {
           if (fatti.some((q) => Math.abs(q - prossimo) < 10)) continue;
           metti(prossimo);
         }
@@ -620,7 +629,9 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
       for (const o of p.offs) {
         const px = p.x - Math.sin(p.ang) * o;
         const py = p.y + Math.cos(p.ang) * o;
-        matrice(fusti, 16 * i++, px, py, 0, p.ang, 1.25, 1.6, Math.max(0.5, p.h - 0.8));
+        // Più alto, più grosso: un pilone di quaranta metri non è un palo.
+        const g = 1 + Math.min(1.4, Math.max(0, p.h - 12) / 22);
+        matrice(fusti, 16 * i++, px, py, 0, p.ang, 1.25 * g, 1.6 * g, Math.max(0.5, p.h - 0.8));
         const h = p.h;
         // L'ombra del fusto: una striscia stretta verso l'ombra.
         const ex = px + sox * h;
@@ -893,8 +904,8 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
       }
       if (!campioni.length) continue;
       const galleria = p.brunnel === 'tunnel' || diFila(campioni, (c) => c.nn?.galleria);
-      const inQuota = p.brunnel === 'bridge' || diFila(campioni, (c) => c.nn && !c.nn.galleria && c.nn.h > 2.5);
-      if (!galleria && !inQuota) continue;
+      const inAlto = p.brunnel === 'bridge' || diFila(campioni, (c) => c.nn && !c.nn.galleria && c.nn.h > 2.5);
+      if (!galleria && !inAlto) continue;
       if (p.name) nascosti.add(p.name);
       // Il pezzo più lungo fuori dalla galleria.
       let meglio = null;
@@ -1259,6 +1270,76 @@ function istanzeDiAlberi(alberi, ombre) {
     for (let k = 0; k < 6; k++) ombre.tri(centro, giro[k], giro[(k + 1) % 6]);
   }
   return { tronchi, chiome, chiome2, coni, coloriChiome, coloriChiome2, coloriConi };
+}
+
+/**
+ * I viadotti alti. Le tessere non dicono quanto è alto un ponte: solo il suo
+ * livello (8 m l'uno). In Italia però i ponti sulle valli si chiamano
+ * «Viadotto …», e più sono lunghi più sono alti: il viadotto di Genova (un
+ * chilometro) sta a 45 m sulla valle. Dai nomi delle nove tessere si prende
+ * quanto è lungo ogni viadotto (da un capo all'altro), e i suoi pezzi di
+ * ponte stanno a [altezzaViadotto] metri, se è più del loro livello. I ponti
+ * sui fiumi («Ponte sul Po») e le tangenziali sopraelevate restano al loro
+ * livello: lunghi, ma bassi.
+ */
+function segnaViadotti(livelli, x, y, strade, sys) {
+  // I nomi: «Viadotto …», o un'autostrada che si chiama «Ponte …» (il ponte
+  // di Genova è «(Ponte San Giorgio) A10 …»). Le tessere uniscono i pezzi
+  // della strada in una linea sola, ponte o no: il nome dice dove cercare.
+  const linee = new Map();
+  for (const [chiaveOff, layers] of Object.entries(livelli)) {
+    const TN = layers?.transportation_name;
+    if (!TN) continue;
+    const [dx, dy] = chiaveOff.split(',').map(Number);
+    const ox = (x + dx) * ESTENSIONE;
+    const oy = (y + dy) * ESTENSIONE;
+    for (let i = 0; i < TN.length; i++) {
+      const f = TN.feature(i);
+      const p = f.properties;
+      const nome = p.name ?? '';
+      if (f.type !== 2 || !(/viadott/i.test(nome) || (/\bponte\b/i.test(nome) && (p.class === 'motorway' || p.class === 'trunk')))) continue;
+      if (!linee.has(nome)) linee.set(nome, []);
+      for (const l of f.loadGeometry()) linee.get(nome).push(l.map((q) => [ox + q.x, oy + q.y]));
+    }
+  }
+  if (!linee.size) return;
+  const pxPerMetro = ESTENSIONE / sys.lato;
+  const vicino = 25 * pxPerMetro;
+  // I pezzi di ponte (non rampe) lungo quei nomi, e quanto è lungo il ponte
+  // da un capo all'altro.
+  const perNome = new Map();
+  for (const r of strade) {
+    if (r.p.brunnel !== 'bridge' || r.p.ramp) continue;
+    const m = r.g[Math.floor(r.g.length / 2)];
+    for (const [nome, ls] of linee) {
+      if (ls.some((l) => distanzaLinea(m[0], m[1], l) < vicino)) {
+        if (!perNome.has(nome)) perNome.set(nome, []);
+        perNome.get(nome).push(r);
+        break;
+      }
+    }
+  }
+  for (const pezzi of perNome.values()) {
+    const pts = pezzi.flatMap((r) => r.g);
+    let L = 0;
+    for (let a = 0; a < pts.length; a += Math.max(1, pts.length >> 6)) {
+      for (const b of pts) L = Math.max(L, Math.hypot(b[0] - pts[a][0], b[1] - pts[a][1]));
+    }
+    const h = altezzaViadotto(L / pxPerMetro);
+    if (h > 0) for (const r of pezzi) r.p = { ...r.p, altezza: Math.max(h, r.p.altezza ?? 0) };
+  }
+}
+
+function distanzaLinea(px, py, l) {
+  let d = Infinity;
+  for (let k = 1; k < l.length; k++) {
+    const [ax, ay] = l[k - 1];
+    const [bx, by] = l[k];
+    const L2 = (bx - ax) ** 2 + (by - ay) ** 2 || 1;
+    const u = Math.max(0, Math.min(1, ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / L2));
+    d = Math.min(d, Math.hypot(ax + (bx - ax) * u - px, ay + (by - ay) * u - py));
+  }
+  return d;
 }
 
 /** Tutti i buffer di una tessera fatta, da trasferire. */
