@@ -456,7 +456,10 @@ function cartelli(m) {
 
 // ─── Lo strato 3D ────────────────────────────────────────────────────────
 
-/** Lo strato dell'auto: la stessa scena, solo i livelli dell'auto (vedi [Scena.creaAuto]). */
+/**
+ * Lo strato dell'auto: la stessa scena, solo i livelli dell'auto (vedi
+ * [Scena.creaAuto]) e i segni che stanno sopra (le persone in quota).
+ */
 const STRATO_AUTO = 'gdanav-3d-auto';
 function stratoAuto() {
   const camera = new THREE.Camera();
@@ -469,7 +472,7 @@ function stratoAuto() {
     renderingMode: '3d',
     render(gl, args) {
       const renderer = S.renderer;
-      if (!renderer || !S.origine || !scena.auto?.visible || !scena.mondo.visible) return;
+      if (!renderer || !S.origine || !(scena.auto?.visible || scena.segniSopra) || !scena.mondo.visible) return;
       matriciCamera(camera, args);
       renderer.resetState();
       renderer.render(scena.scena, camera);
@@ -926,6 +929,8 @@ const IN_QUOTA = {
     strato: () => 'persone',
     tela: (p) => segnoPersona(p),
     grandezza: () => 1,
+    // Sopra i nomi e i cartelli di MapLibre, come l'auto: un «A52» non la copre.
+    sopra: true,
   },
 };
 
@@ -1103,6 +1108,7 @@ function aggiornaSegni(adesso) {
         // Toccandolo in quota arriva all'app come lo strato di MapLibre a terra.
         segno.elemento = { type: 'Feature', geometry: f.geometry, properties: pr, layer: regola.strato(pr) };
         if (img.centro !== undefined) segno.centro = img.centro;
+        if (regola.sopra) segno.sopra = true;
         segni.push(segno);
       } else if (inQuota.delete(k)) cambiato = true;
     });
