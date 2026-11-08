@@ -55,7 +55,9 @@ import 'schermata_guida.dart';
 import 'strade_risparmio.dart';
 import 'zone_ztl.dart';
 
-typedef CostruisciMappa = Widget Function(BuildContext context, ControlloMappa controllo);
+/// La mappa al posto di quella vera (nelle prove e nelle immagini); `null`:
+/// quella vera (la si chiede di nuovo a ogni cambio del controllo).
+typedef CostruisciMappa = Widget? Function(BuildContext context, ControlloMappa controllo);
 
 class SchermataPrincipale extends StatefulWidget {
   const SchermataPrincipale({
@@ -188,7 +190,13 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
     _ricaricaPreferenze();
     // Solo le impostazioni: niente mappa, posizione né segnalazioni.
     if (widget.soloImpostazioni) return;
-    unawaited(controllo.carica(widget.archivio.vistaMappa(), nonVa: widget.archivio.aumentataNonVa()));
+    unawaited(
+      controllo.carica(
+        widget.archivio.vistaMappa(),
+        nonVa: widget.archivio.aumentataNonVa(),
+        prima: widget.archivio.vistaPrimaDellAumentata(),
+      ),
+    );
     widget.chiediPosizione?.call().then((ok) {
       if (ok) widget.posizione.avvia();
     });
@@ -257,7 +265,13 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
     _inGuida = false;
     // In guida il 3D aumentato può essersi spento da solo (il telefono non
     // ce la fa): la vista e il perché si rileggono.
-    unawaited(controllo.ricarica(widget.archivio.vistaMappa(), nonVa: widget.archivio.aumentataNonVa()));
+    unawaited(
+      controllo.ricarica(
+        widget.archivio.vistaMappa(),
+        nonVa: widget.archivio.aumentataNonVa(),
+        prima: widget.archivio.vistaPrimaDellAumentata(),
+      ),
+    );
   }
 
   /// La guida partita dall'auto: anche il telefono passa alla guida.

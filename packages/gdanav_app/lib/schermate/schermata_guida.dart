@@ -137,7 +137,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
       if (mounted) setState(() {});
     });
     if (widget.guida.archivio case final a?) {
-      unawaited(controllo.carica(a.vistaMappa(), nonVa: a.aumentataNonVa()));
+      unawaited(controllo.carica(a.vistaMappa(), nonVa: a.aumentataNonVa(), prima: a.vistaPrimaDellAumentata()));
     }
     widget.guida.avvia();
     if (widget.segnalazioni case final seg?) _avvisi = AvvisiStrada.di(widget.guida, seg);
@@ -252,9 +252,10 @@ class _SchermataGuidaState extends State<SchermataGuida> {
         body: Stack(
           children: [
             Positioned.fill(
-              child:
-                  widget.mappa?.call(context, controllo) ??
-                  ListenableBuilder(listenable: controllo, builder: (context, _) => _mappa(context, g)),
+              child: ListenableBuilder(
+                listenable: controllo,
+                builder: (context, _) => widget.mappa?.call(context, controllo) ?? _mappa(context, g),
+              ),
             ),
             ListenableBuilder(
               listenable: Listenable.merge([g, widget.posizione, controllo, ?_avvisi, ?_ztl, ?g.risparmio]),

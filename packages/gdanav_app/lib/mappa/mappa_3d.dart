@@ -193,13 +193,12 @@ class _Mappa3dState extends State<Mappa3d> {
       case Pronta3d():
         _pronta = true;
         _attesa?.cancel();
-      case Errore3d(:final motivo):
-        // Senza WebGL, o col rendering in software, non andrà mai: lo si
-        // ricorda. Un contesto perso (memoria) è di questa volta.
-        _nonVa(motivo, ricorda: const {'webgl2', 'software', 'trame', 'memoria', 'mappa', 'webview'}.contains(motivo));
-      case Prestazioni3d(:final lento, :final fps, :final triangoli):
-        debugPrint('mappa 3D: $fps fotogrammi al secondo, $triangoli triangoli');
-        if (lento) _nonVa('lento', ricorda: true);
+      case final Errore3d e:
+        final (motivo, ricorda) = nonVaPer(e)!;
+        _nonVa(motivo, ricorda: ricorda);
+      case final Prestazioni3d p:
+        debugPrint('mappa 3D: ${p.fps} fotogrammi al secondo, ${p.triangoli} triangoli');
+        if (nonVaPer(p) case (final motivo, final ricorda)) _nonVa(motivo, ricorda: ricorda);
       case Toccata3d():
         widget.controllo.toccata();
       case Tocco3d(:final elementi):

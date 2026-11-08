@@ -122,9 +122,10 @@ class ControlloMappa extends ChangeNotifier {
 
   /// La scelta ricordata, appena letta. Se nel frattempo se n'è già fatta
   /// una qui, vale quella.
-  Future<void> carica(Future<VistaMappa> ricordata, {Future<String?>? nonVa}) async {
+  Future<void> carica(Future<VistaMappa> ricordata, {Future<String?>? nonVa, Future<VistaMappa?>? prima}) async {
     var v = await ricordata;
     if (nonVa != null) aumentataNonVa = await nonVa;
+    if (await prima case final p? when p != VistaMappa.aumentata) vistaPrima = p;
     // Ricordato il 3D aumentato, ma il telefono non ce la fa: il 3D.
     if (v == VistaMappa.aumentata && aumentataNonVa != null) v = VistaMappa.inclinata;
     _letta = true;
@@ -138,9 +139,9 @@ class ControlloMappa extends ChangeNotifier {
   /// Si rilegge la scelta ricordata anche se qui se n'era fatta una: l'ha
   /// cambiata un'altra schermata (la guida, o il 3D aumentato che si è
   /// fermato).
-  Future<void> ricarica(Future<VistaMappa> ricordata, {Future<String?>? nonVa}) {
+  Future<void> ricarica(Future<VistaMappa> ricordata, {Future<String?>? nonVa, Future<VistaMappa?>? prima}) {
     _sceltaQui = false;
-    return carica(ricordata, nonVa: nonVa);
+    return carica(ricordata, nonVa: nonVa, prima: prima);
   }
 
   /// La scelta ricordata è arrivata ([carica]), o se n'è fatta una qui.

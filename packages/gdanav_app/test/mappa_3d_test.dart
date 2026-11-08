@@ -268,8 +268,11 @@ void main() {
     test('si ricorda nell’archivio: la vista, e perché non va finché non si riprova', () async {
       preparaPiattaforma();
       final a = Archivio();
+      expect(await a.vistaPrimaDellAumentata(), isNull);
+      await a.salvaVistaMappa(VistaMappa.immersiva);
       await a.salvaVistaMappa(VistaMappa.aumentata);
       expect(await a.vistaMappa(), VistaMappa.aumentata);
+      expect(await a.vistaPrimaDellAumentata(), VistaMappa.immersiva);
       expect(Archivio.vistaScelta.value, VistaMappa.aumentata);
       expect(await a.aumentataNonVa(), isNull);
       await a.salvaAumentataNonVa('lento');

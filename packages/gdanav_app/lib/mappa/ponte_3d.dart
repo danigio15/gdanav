@@ -187,6 +187,19 @@ sealed class MessaggioDalla3d {
   }
 }
 
+/// Se un messaggio della pagina vuol dire che il 3D aumentato non va: il
+/// perché, e se ricordarlo (il telefono non ce la fa: WebGL 2 che manca,
+/// solo in software, troppo lento) o no (un intoppo di questa volta).
+/// `null`: va.
+(String, bool)? nonVaPer(MessaggioDalla3d m) => switch (m) {
+  Errore3d(:final motivo) => (motivo, motiviDaRicordare.contains(motivo)),
+  Prestazioni3d(lento: true) => ('lento', true),
+  _ => null,
+};
+
+/// I motivi per cui il 3D aumentato su questo telefono non andrà mai.
+const motiviDaRicordare = {'webgl2', 'software', 'trame', 'memoria', 'mappa', 'webview', 'lento'};
+
 /// La pagina è caricata: si può mandare lo stile.
 class Caricata3d extends MessaggioDalla3d {
   const Caricata3d();

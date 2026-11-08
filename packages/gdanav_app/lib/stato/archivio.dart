@@ -43,6 +43,7 @@ class Archivio {
   // Perché il 3D aumentato non va su questo telefono (la chiave viene da
   // quando era l'interruttore «Mappa 3D», e vale ancora).
   static const _mappa3dEsito = 'mappa_3d_esito';
+  static const _vistaPrima = 'vista_mappa_prima';
 
   Future<Abbinamento?> abbinamento() async {
     final uri = await _p.read(key: _abbinamento);
@@ -192,8 +193,16 @@ class Archivio {
   Future<void> salvaVistaMappa(VistaMappa v) async {
     await _p.write(key: _vista, value: v.name);
     await _p.delete(key: _vistaPiatta);
+    if (v != VistaMappa.aumentata) await _p.write(key: _vistaPrima, value: v.name);
     vistaScelta.value = v;
   }
+
+  /// L'ultima vista scelta che non è il 3D aumentato: se il 3D aumentato si
+  /// ferma si torna lì (`null`: mai scelta, si torna al 3D).
+  Future<VistaMappa?> vistaPrimaDellAumentata() async => switch (await _p.read(key: _vistaPrima)) {
+    final n? => VistaMappa.daNome(n),
+    null => null,
+  };
 
   /// L'ultima vista letta o scelta sul telefono, per chi la segue da fuori
   /// (lo schermo dell'auto prende l'aspetto 3D col 3D aumentato).
