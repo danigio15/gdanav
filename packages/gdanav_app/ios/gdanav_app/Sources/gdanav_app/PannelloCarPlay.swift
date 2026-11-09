@@ -139,8 +139,9 @@ final class PannelloCarPlay: UIView {
 
     /// Sullo schermo piccolo: «+7 min» sotto la colonna della velocità (o
     /// in alto, senza), allineato al suo bordo esterno.
-    private func trafficoPiccolo(_ a: CGRect, sotto colonna: CGRect?, aDestra: Bool, margine: CGFloat) {
-        guard let m = PonteAuto.shared.guida?.trafficoMinuti, m > 0 else { return }
+    @discardableResult
+    private func trafficoPiccolo(_ a: CGRect, sotto colonna: CGRect?, aDestra: Bool, margine: CGFloat) -> CGRect? {
+        guard let m = PonteAuto.shared.guida?.trafficoMinuti, m > 0 else { return nil }
         let testo = "+\(m) min"
         let valore: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 12, weight: .bold), .foregroundColor: coloreTraffico(m),
@@ -152,6 +153,60 @@ final class PannelloCarPlay: UIView {
         fondoScheda.setFill()
         UIBezierPath(roundedRect: box, cornerRadius: h / 2).fill()
         centrato(testo, box.midX, box.midY + 4.5, valore)
+        return box
+    }
+
+    /// Sullo schermo piccolo la riga del viaggio di Android Auto («🔋 51% ·
+    /// 200 km · arrivo 46% · ☀ 12°») in due righe corte, sotto il traffico
+    /// (o la velocità): prima sullo schermo piccolo la batteria non c'era.
+    private func batteriaPiccola(_ a: CGRect, _ c: CruscottoAuto, sotto: CGRect?, aDestra: Bool, margine: CGFloat) {
+        let b = c.elettrica ? c.batteria : nil
+        let circa = c.batteriaStimata ? "~" : ""
+        let prima = [
+            b.map { "🔋 \(circa)\(Int($0.rounded()))%" },
+            b != nil ? c.autonomiaKm.map { "\(circa)\(Int($0.rounded())) km" } : nil,
+        ].compactMap { $0 }.joined(separator: " · ")
+        let meteo = c.meteoTemperatura.map { "\(c.meteoEmoji ?? "") \(Int($0.rounded()))°".trimmingCharacters(in: .whitespaces) }
+        let arrivo = b != nil ? c.arrivoBatteria : nil
+        if prima.isEmpty && meteo == nil && arrivo == nil { return }
+        let forte: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 11.5, weight: .bold), .foregroundColor: UIColor.white]
+        let piano: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 10.5, weight: .regular), .foregroundColor: muto]
+        let verde = UIColor(red: 102 / 255, green: 187 / 255, blue: 106 / 255, alpha: 1)
+        let rosso = UIColor(red: 239 / 255, green: 83 / 255, blue: 80 / 255, alpha: 1)
+        let valoreArrivo: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 11.5, weight: .bold), .foregroundColor: (arrivo ?? 100) < 10 ? rosso : verde,
+        ]
+        // La seconda riga: «arrivo 46% · ☀ 12°».
+        let testoArrivo = arrivo.map { "\(Int($0.rounded()))%" }
+        let seconda = [testoArrivo.map { "arrivo \($0)" }, meteo].compactMap { $0 }.joined(separator: " · ")
+        let righe = [prima, seconda].filter { !$0.isEmpty }
+        let p: CGFloat = 8
+        let w = (righe.map { larghezza($0, forte) }.max() ?? 0) + p * 2
+        let hRiga: CGFloat = 15
+        let h = CGFloat(righe.count) * hRiga + 8
+        let x = aDestra ? (sotto?.maxX ?? a.maxX - margine) - w : (sotto?.minX ?? a.minX + margine)
+        let y = (sotto?.maxY ?? a.minY + margine) + 4
+        guard x >= a.minX, y + h <= a.maxY else { return }
+        let box = CGRect(x: x, y: y, width: w, height: h)
+        fondoScheda.setFill()
+        UIBezierPath(roundedRect: box, cornerRadius: 10).fill()
+        var linea = box.minY + 4 + 11.5
+        if !prima.isEmpty {
+            scrivi(prima, box.minX + p, linea, forte)
+            linea += hRiga
+        }
+        if !seconda.isEmpty {
+            var cx = box.minX + p
+            if let t = testoArrivo {
+                scrivi("arrivo ", cx, linea, piano)
+                cx += larghezza("arrivo ", piano)
+                scrivi(t, cx, linea, valoreArrivo)
+                cx += larghezza(t, valoreArrivo)
+                if let meteo { scrivi(" · \(meteo)", cx, linea, forte) }
+            } else if let meteo {
+                scrivi(meteo, cx, linea, forte)
+            }
+        }
     }
 
     // MARK: - La barra dei dati
@@ -298,7 +353,8 @@ final class PannelloCarPlay: UIView {
         let margine: CGFloat = 6
         let schedaASinistra = area.left >= area.right
         let colonna = velocitaPiccola(a, c, aDestra: schedaASinistra, margine: margine)
-        trafficoPiccolo(a, sotto: colonna, aDestra: schedaASinistra, margine: margine)
+        let ritardo = trafficoPiccolo(a, sotto: colonna, aDestra: schedaASinistra, margine: margine)
+        batteriaPiccola(a, c, sotto: ritardo ?? colonna, aDestra: schedaASinistra, margine: margine)
         // L'avviso nello spazio che resta accanto alla colonna.
         var sinistra = a.minX + margine
         var destra = a.maxX - margine

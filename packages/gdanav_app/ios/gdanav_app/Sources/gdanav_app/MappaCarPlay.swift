@@ -1,3 +1,4 @@
+import CoreLocation
 import Flutter
 import MapLibre
 import UIKit
@@ -259,7 +260,84 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
             s.layer(withIdentifier: "edifici")?.isVisible = vista == .piatta
             s.layer(withIdentifier: "edifici-3d")?.isVisible = vista == .inclinata
         }
+        if inquadraLeStrade() { return }
         muovi()
+    }
+
+    // MARK: - Le strade prima di partire
+
+    /// Le strade già inquadrate (id e quanti punti): si inquadrano una volta,
+    /// e di nuovo se arriva il percorso o se ne sceglie un altro.
+    private var stradeInquadrate: String?
+
+    /* «La mappa dietro mostra mezzo mondo»: con le strade in vista, prima di
+     * partire, la mappa non seguiva nessuno (la posizione magari non c'era
+     * ancora) e restava allo zoom del mondo. Adesso inquadra il viaggio,
+     * dalla partenza alla meta con le strade fra cui scegliere, nello spazio
+     * che l'anteprima di CarPlay lascia libero, col nord in su. */
+    private func inquadraLeStrade() -> Bool {
+        let ponte = PonteAuto.shared
+        guard ponte.guida == nil, let s = ponte.strade else {
+            if stradeInquadrate != nil {
+                // Si parte (o si annulla): la telecamera torna sull'auto.
+                stradeInquadrate = nil
+                cameraPronta = false
+            }
+            return false
+        }
+        var punti: [CLLocationCoordinate2D] = []
+        for id in ["gdanav-percorso", "gdanav-alternative"] {
+            if let d = ponte.sorgenti[id] { punti += MappaCarPlay.coordinate(d) }
+        }
+        if let q = ponte.qui { punti.append(CLLocationCoordinate2D(latitude: q.lat, longitude: q.lon)) }
+        if let la = s.lat, let lo = s.lon { punti.append(CLLocationCoordinate2D(latitude: la, longitude: lo)) }
+        guard let primo = punti.first else { return false }
+        let chiave = "\(s.id)|\(s.scelta)|\(punti.count)"
+        if stradeInquadrate == chiave { return true }
+        stradeInquadrate = chiave
+        var sw = primo
+        var ne = primo
+        for p in punti {
+            sw.latitude = min(sw.latitude, p.latitude)
+            sw.longitude = min(sw.longitude, p.longitude)
+            ne.latitude = max(ne.latitude, p.latitude)
+            ne.longitude = max(ne.longitude, p.longitude)
+        }
+        fermaAnimazione()
+        freccia.isHidden = true
+        let a = areaSicura
+        // L'anteprima delle strade sta a sinistra e copre quasi metà mappa.
+        let margini = UIEdgeInsets(
+            top: a.top + 24,
+            left: max(a.left, mappa.bounds.width * 0.46) + 16,
+            bottom: a.bottom + 24,
+            right: a.right + 24
+        )
+        if mappa.contentInset != .zero { mappa.setContentInset(.zero, animated: false, completionHandler: nil) }
+        let camera = mappa.cameraThatFitsCoordinateBounds(MLNCoordinateBoundsMake(sw, ne), edgePadding: margini)
+        mappa.setCamera(camera, withDuration: 0.6, animationTimingFunction: CAMediaTimingFunction(name: .easeInEaseOut))
+        return true
+    }
+
+    /// Tutte le coordinate di un GeoJSON (punti, linee, poligoni, raccolte).
+    static func coordinate(_ geojson: String) -> [CLLocationCoordinate2D] {
+        guard let d = geojson.data(using: .utf8), let o = try? JSONSerialization.jsonObject(with: d) else { return [] }
+        var out: [CLLocationCoordinate2D] = []
+        func giu(_ v: Any) {
+            if let a = v as? [Any] {
+                if a.count >= 2, !(a[0] is [Any]), let lon = numero(a[0]), let lat = numero(a[1]) {
+                    out.append(CLLocationCoordinate2D(latitude: lat, longitude: lon))
+                    return
+                }
+                for x in a { giu(x) }
+            } else if let m = v as? [String: Any] {
+                for k in ["coordinates", "geometry", "geometries", "features"] {
+                    if let x = m[k] { giu(x) }
+                }
+            }
+        }
+        giu(o)
+        return out
     }
 
     // MARK: - L'auto che scorre

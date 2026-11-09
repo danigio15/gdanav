@@ -417,20 +417,23 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         let da = MKMapItem(placemark: MKPlacemark(coordinate: qui ?? arrivo))
         let a = MKMapItem(placemark: MKPlacemark(coordinate: arrivo))
         a.name = s.meta
+        // Dentro ogni pezzo lo spazio non va a capo («+7 / min traffico»):
+        // CarPlay manda a capo solo fra un pezzo e l'altro.
+        func intero(_ t: String?) -> String? { t?.replacingOccurrences(of: " ", with: "\u{00A0}") }
         let scelte = s.voci.enumerated().map { i, v -> CPRouteChoice in
             // Dal più lungo al più corto: CarPlay prende quello che ci sta.
             let durata = ManovreCarPlay.durata(v.durataS)
             let costi = [v.consumo, v.pedaggio].compactMap { $0 }.joined(separator: " · ")
             let c = CPRouteChoice(
                 summaryVariants: [
-                    [durata, v.nome, costi].filter { !$0.isEmpty }.joined(separator: " · "),
-                    "\(durata) · \(v.nome)",
+                    [durata, v.nome, costi].filter { !$0.isEmpty }.compactMap { intero($0) }.joined(separator: " · "),
+                    "\(intero(durata) ?? durata) · \(v.nome)",
                     v.nome,
                 ],
                 additionalInformationVariants: [
                     [v.via.isEmpty ? nil : v.via, v.km, v.arrivo.map { "arrivi con il \($0)%" }, v.traffico]
-                        .compactMap { $0 }.joined(separator: " · "),
-                    [v.km, v.arrivo.map { "arrivi con il \($0)%" }].compactMap { $0 }.joined(separator: " · "),
+                        .compactMap { intero($0) }.joined(separator: " · "),
+                    [v.km, v.arrivo.map { "arrivi con il \($0)%" }].compactMap { intero($0) }.joined(separator: " · "),
                 ],
                 selectionSummaryVariants: [v.via.isEmpty ? v.nome : v.via]
             )
