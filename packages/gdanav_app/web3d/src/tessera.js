@@ -680,8 +680,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           return { pts, muro };
         });
         edificiOut.push({
-          // L'id dell'edificio sulla mappa: lo stesso in ogni tessera.
-          id: f.id ?? null,
+          seme: semeEdificio(f.id, poli[0], x, y, z),
           h: Math.max(+(p.render_height ?? 8) || 8, 3),
           mh: +(p.render_min_height ?? 0) || 0,
           // L'area dell'edificio intero (non del pezzo dentro la tessera):
@@ -740,7 +739,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     // palazzo a cavallo di due tessere si disegna a pezzi, e ogni pezzo
     // prendeva il suo colore e la sua facciata («a destra la facciata
     // giusta, al centro un'altra: non è così il palazzo»).
-    const r = generatore(b.id !== null ? Math.imul(Number(b.id) % 2147483647, 2654435761) ^ 0x5bd1e995 : seme ^ Math.imul(bi + 1, 2654435761));
+    const r = generatore(b.seme);
     const ventre = sottoIlPonte(b.anelli.map((a) => a.pts));
     const h = Math.min(b.h, ventre - 0.6);
     const m0 = b.mh;
@@ -1236,6 +1235,36 @@ function piantaAlberi({ centro, sys, x, y, linee, visibili, edifici, limite, sem
     }
   }
   return alberi;
+}
+
+/**
+ * Il seme di un edificio: lo stesso in ogni tessera in cui compare a pezzi,
+ * diverso per ogni edificio. Le tessere mettono insieme in un solo oggetto
+ * (un solo id) tutti gli edifici della stessa altezza: l'id da solo dava lo
+ * stesso colore e la stessa facciata a decine di case («sempre uguali»).
+ * Allora l'id più dove sta l'edificio: i lati del suo rettangolo, in una
+ * griglia di circa due metri, tranne quelli tagliati dal bordo della
+ * tessera (che cambiano da una tessera all'altra).
+ */
+function semeEdificio(id, anello, x, y, z) {
+  let minx = Infinity;
+  let maxx = -Infinity;
+  let miny = Infinity;
+  let maxy = -Infinity;
+  for (const p of anello) {
+    minx = Math.min(minx, p[0]);
+    maxx = Math.max(maxx, p[0]);
+    miny = Math.min(miny, p[1]);
+    maxy = Math.max(maxy, p[1]);
+  }
+  const taglioX = minx <= -60 || maxx >= ESTENSIONE + 60;
+  const taglioY = miny <= -60 || maxy >= ESTENSIONE + 60;
+  const g = (v, t) => Math.round(((t * ESTENSIONE + v) / ESTENSIONE) * 2 ** (24 - z));
+  let h = Math.imul(Number(id ?? 0) % 2147483647, 2654435761) ^ 0x5bd1e995;
+  const parti = taglioX ? [0, 0] : [g(minx, x), g(maxx, x)];
+  parti.push(...(taglioY ? [0, 0] : [g(miny, y), g(maxy, y)]));
+  for (const v of parti) h = Math.imul(h ^ (v | 0), 0x01000193) ^ (h >>> 13);
+  return h >>> 0;
 }
 
 /**

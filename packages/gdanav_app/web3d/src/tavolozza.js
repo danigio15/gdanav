@@ -80,8 +80,10 @@ export const FACCIATE = {
 export const TETTI = {
   // I coppi delle case italiane, in tante sfumature; qualche tetto piano
   // chiaro. Da sopra l'edificio si legge, e la città non è grigia.
-  giorno: ['#b8654c', '#c4775b', '#a95b45', '#c9866a', '#b56f57', '#c08a74', '#d6d1c8', '#bd6a4f'],
-  notte: ['#4a3d3b', '#4f4240', '#463a38', '#524542', '#4a3e3c', '#4f4341', '#424852', '#4a3d3b'],
+  // Metà coppi, metà terrazzi piani (a Napoli quasi tutti): tutto rosso
+  // faceva un tappeto uniforme.
+  giorno: ['#b8654c', '#c4775b', '#a95b45', '#c9866a', '#b56f57', '#bd6a4f', '#d6d1c8', '#cfc9bf', '#ddd6ca', '#c9c4bb', '#e0dbd2', '#d3cbbd'],
+  notte: ['#4a3d3b', '#4f4240', '#463a38', '#524542', '#4a3e3c', '#4a3d3b', '#424852', '#40454e', '#454a53', '#3f444d', '#474c55', '#43474f'],
   industriaGiorno: ['#e8e2d6', '#ece7dc', '#e2dccf', '#efe9de', '#dfd8ca'],
   // Gli uffici e le torri: tetti piani, chiari e freddi.
   ufficiGiorno: ['#d3d8dd', '#dce0e4', '#cdd3d9', '#d8dcdf'],
