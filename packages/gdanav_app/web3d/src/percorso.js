@@ -129,7 +129,7 @@ export class IndiceSegmenti {
             // dei 45°, e dove il percorso cambia carreggiata (sotto, nessuna
             // strada abbastanza vicina) la linea saliva sull'impalcato.
             if (coseno < (h > 2.5 ? 0.92 : 0.7)) continue;
-            out.push({ h, d, codice: s[o + 7], galleria: (s[o + 7] & 64) !== 0 });
+            out.push({ h, d, px, py, codice: s[o + 7], galleria: (s[o + 7] & 64) !== 0 });
           }
         }
       }
@@ -162,14 +162,19 @@ export function quote(punti, indice) {
           g.costo = costo;
           g.h = c.h;
           g.galleria = c.galleria;
+          g.px = c.px;
+          g.py = c.py;
         }
-      } else gruppi.push({ h: c.h, costo, galleria: c.galleria });
+      } else gruppi.push({ h: c.h, costo, galleria: c.galleria, px: c.px, py: c.py });
     }
     cand[i] = gruppi;
   }
   const h = new Float64Array(n).fill(NaN);
   // Quali punti passano in galleria (sotto qualcosa): il nastro lì è «dentro».
   h.galleria = new Uint8Array(n);
+  // Di quanto spostare ogni punto per stare sul mezzo della strada scelta.
+  h.dx = new Float64Array(n).fill(NaN);
+  h.dy = new Float64Array(n).fill(NaN);
   // Viterbi su ogni tratto di punti che hanno candidati.
   let i = 0;
   while (i < n) {
@@ -210,6 +215,10 @@ export function quote(punti, indice) {
     for (let k = j - 1; k >= i; k--) {
       h[k] = cand[k][q].h;
       h.galleria[k] = cand[k][q].galleria ? 1 : 0;
+      if (cand[k][q].px !== undefined) {
+        h.dx[k] = cand[k][q].px - punti[k][0];
+        h.dy[k] = cand[k][q].py - punti[k][1];
+      }
       q = da[k - i][q];
     }
     i = j;
@@ -314,11 +323,24 @@ export class Linea {
 
 /** Il profilo delle quote di un tratto della linea: un campione ogni [passo] metri. */
 export class Profilo {
-  constructor(s0, passo, h, galleria = null) {
+  constructor(s0, passo, h, galleria = null, dx = null, dy = null) {
     this.s0 = s0;
     this.passo = passo;
     this.h = h;
     this.galleria = galleria;
+    this.dx = dx;
+    this.dy = dy;
+  }
+
+  /** Di quanto spostare il punto a [s] metri per stare sulla strada (vedi [spostamenti]). */
+  sposta(s) {
+    if (!this.dx) return [0, 0];
+    const n = this.dx.length;
+    const f = (s - this.s0) / this.passo;
+    if (!(f >= 0) || f > n - 1) return [0, 0];
+    const i = Math.min(n - 2, Math.floor(f));
+    const t = f - i;
+    return [this.dx[i] + (this.dx[i + 1] - this.dx[i]) * t, this.dy[i] + (this.dy[i + 1] - this.dy[i]) * t];
   }
   /** I tratti in galleria, in metri: `[da, a]`. */
   get gallerie() {
@@ -361,7 +383,55 @@ export function profiloDi(linea, s0, s1, indice, passo = 4) {
     punti.push([p[0], p[1]]);
   }
   const grezze = quote(punti, indice);
-  return new Profilo(s0, passo, riempiQuote(grezze), grezze.galleria);
+  const [dx, dy] = spostamenti(grezze.dx, grezze.dy);
+  return new Profilo(s0, passo, riempiQuote(grezze), grezze.galleria, dx, dy);
+}
+
+/** Più di così non si sposta: oltre, la strada giusta è un'altra. */
+export const SPOSTAMENTO_MAX_M = 6;
+
+/**
+ * Lo spostamento di ogni punto sul mezzo della strada sotto, morbido.
+ *
+ * «In alcuni punti la linea del percorso non è sulla strada»: la geometria
+ * del percorso arriva dal calcolatore dei percorsi, e in qualche tratto sta
+ * qualche metro di lato rispetto alle strade della mappa. Le quote trovano
+ * già la strada su cui si è ([quote]); qui la linea ci si appoggia sopra.
+ * Dove non c'è una strada lo spostamento è zero; si leviga su una trentina
+ * di metri, così agli incroci e ai cambi di strada non fa scalini.
+ */
+export function spostamenti(dxGrezzi, dyGrezzi) {
+  const n = dxGrezzi.length;
+  const dx = new Float64Array(n);
+  const dy = new Float64Array(n);
+  for (let k = 0; k < n; k++) {
+    let x = dxGrezzi[k];
+    let y = dyGrezzi[k];
+    if (Number.isNaN(x) || Number.isNaN(y)) continue;
+    const l = Math.hypot(x, y);
+    if (l > SPOSTAMENTO_MAX_M) {
+      x = 0;
+      y = 0;
+    }
+    dx[k] = x;
+    dy[k] = y;
+  }
+  const r = 4;
+  const lisci = (a) => {
+    const out = new Float64Array(n);
+    for (let k = 0; k < n; k++) {
+      let somma = 0;
+      let peso = 0;
+      for (let j = Math.max(0, k - r); j <= Math.min(n - 1, k + r); j++) {
+        const w = r + 1 - Math.abs(j - k);
+        somma += a[j] * w;
+        peso += w;
+      }
+      out[k] = somma / peso;
+    }
+    return out;
+  };
+  return [lisci(dx), lisci(dy)];
 }
 
 /**
@@ -401,7 +471,10 @@ export function nastro(linea, profilo, s0, s1, largo, sopra, { passo = 2, code =
   const ind = [];
   for (let k = 0; k < stazioni.length; k++) {
     const [s, l, staccata] = stazioni[k];
-    const [x, y] = linea.a(s);
+    const [x0, y0] = linea.a(s);
+    const [sx, sy] = profilo.sposta ? profilo.sposta(s) : [0, 0];
+    const x = x0 + sx;
+    const y = y0 + sy;
     const dir = linea.direzione(s, 3);
     const nx = -Math.sin(dir);
     const ny = Math.cos(dir);

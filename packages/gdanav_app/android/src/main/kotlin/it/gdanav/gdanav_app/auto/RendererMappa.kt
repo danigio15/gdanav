@@ -128,8 +128,15 @@ class RendererMappa(
          * tutta la superficie. */
         areaVisibile?.let { if (it.right > larghezza || it.bottom > altezza) areaVisibile = null }
         densita = contenitore.dpi / 160f
-        // Sotto i 900 punti di larghezza la scheda del viaggio è stretta.
-        if (!soloMappa) PonteAuto.mappaStretta = larghezza / densita < LARGHEZZA_STRETTA_DP
+        // Sotto i 900 punti di larghezza la scheda del viaggio è stretta; e
+        // anche quando la mappa è poco più larga che alta, cioè a mezzo
+        // schermo su uno schermo largo («a mezzo schermo si continuano a
+        // tagliare le info nel quadrato di sinistra»: lì la metà passava i
+        // 900 punti e la riga restava quella lunga, tagliata).
+        if (!soloMappa) {
+            PonteAuto.mappaStretta = larghezza / densita < LARGHEZZA_STRETTA_DP ||
+                (altezza > 0 && larghezza.toFloat() / altezza < PROPORZIONE_STRETTA)
+        }
         MapLibre.getInstance(carContext)
         val p = Presentation(carContext, d.display)
         val contenuto = FrameLayout(p.context)
@@ -995,6 +1002,9 @@ class RendererMappa(
         /** Sotto questa larghezza (in punti) la mappa è a mezzo schermo. */
         private const val LARGHEZZA_STRETTA_DP = 900f
 
+        /** Larga meno di 1,75 volte l'altezza: è mezzo schermo (lo schermo intero di un'auto è più largo). */
+        private const val PROPORZIONE_STRETTA = 1.75f
+
         private const val VUOTA = "{\"type\":\"FeatureCollection\",\"features\":[]}"
         private const val SORGENTE_IO = "gdanav-io"
         private const val SORGENTE_PERCORSO = "gdanav-percorso"
@@ -1093,7 +1103,8 @@ class RendererMappa(
          */
         /**
          * In autostrada, con la prossima manovra lontana, la mappa si
-         * allontana: fino a due livelli su una strada da 95 all'ora e con la
+         * allontana: fino a un livello (erano due: «in strada zoom troppo
+         * lontano») su una strada da 95 all'ora e con la
          * manovra oltre 2,5 km, niente sotto i 50 all'ora o entro 800 metri.
          * La strada la dice il percorso ([stradaKmh], la velocità prevista
          * del tratto), non il tachimetro: frenando in autostrada la mappa
@@ -1108,7 +1119,7 @@ class RendererMappa(
             }
             val v = morbido((kmh - 50.0) / (95.0 - 50.0))
             val d = if (allaProssimaM.isFinite()) morbido((allaProssimaM - 800.0) / (2500.0 - 800.0)) else 1.0
-            return -2.0 * v * d
+            return -1.0 * v * d
         }
 
         private fun zoomInSvolta(g: PonteAuto.Guida?): Double {

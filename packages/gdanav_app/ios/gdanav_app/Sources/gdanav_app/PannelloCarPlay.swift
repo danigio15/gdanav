@@ -180,40 +180,58 @@ final class PannelloCarPlay: UIView {
         // La seconda riga: «arrivo 46% · ☀ 12°».
         let testoArrivo = arrivo.map { "\(Int($0.rounded()))%" }
         let seconda = [testoArrivo.map { "arrivo \($0)" }, meteo].compactMap { $0 }.joined(separator: " · ")
-        let righe = [prima, seconda].filter { !$0.isEmpty }
         let p: CGFloat = 8
-        let w = (righe.map { larghezza($0, forte) }.max() ?? 0) + p * 2
         let hRiga: CGFloat = 15
-        let h = CGFloat(righe.count) * hRiga + 8
-        var x = aDestra ? (sotto?.maxX ?? a.maxX - margine) - w : (sotto?.minX ?? a.minX + margine)
-        var y = (sotto?.maxY ?? a.minY + margine) + 4
-        // Sotto non ci sta (la scheda dei tempi in basso si prende lo
-        // spazio): accanto alla colonna della velocità, in alto. Prima in
-        // quel caso la riga non si disegnava, senza dire niente.
-        if y + h > a.maxY, let sotto {
-            x = aDestra ? sotto.minX - margine - w : sotto.maxX + margine
-            y = a.minY + margine
+        /* Due modi, dal più completo: due righe («🔋 62% · 210 km» e
+         * «arrivo 58% · ☀ 18°»), o una sola, corta: «🔋 62% → 58%». E due
+         * posti: sotto il traffico (o la velocità), o accanto in alto. Sullo
+         * schermo da 800×480 la scheda della manovra si prende metà larghezza
+         * e due righe non ci stavano da nessuna parte: la riga non si vedeva. */
+        let corta = b.map { "🔋 \(circa)\(Int($0.rounded()))%" } ?? meteo ?? ""
+        let modi: [(righe: Int, larga: CGFloat)] = [
+            (2, max(larghezza(prima, forte), larghezza(seconda, forte)) + p * 2),
+            (1, larghezza(corta, forte) + (testoArrivo.map { larghezza(" → \($0)", valoreArrivo) } ?? 0) + p * 2),
+        ].filter { $0.righe == 1 || (!prima.isEmpty && !seconda.isEmpty) }
+        var scelto: (CGRect, Int)?
+        for modo in modi {
+            let h = CGFloat(modo.righe) * hRiga + 8
+            let w = modo.larga
+            let posti: [CGPoint] = [
+                CGPoint(
+                    x: aDestra ? (sotto?.maxX ?? a.maxX - margine) - w : (sotto?.minX ?? a.minX + margine),
+                    y: (sotto?.maxY ?? a.minY + margine) + 4
+                ),
+            ] + (sotto.map { [CGPoint(x: aDestra ? $0.minX - margine - w : $0.maxX + margine, y: a.minY + margine)] } ?? [])
+                // Se no, in alto dall'altro lato dell'area libera (dove sta l'avviso, che viene e va).
+                + [CGPoint(x: aDestra ? a.minX + margine : a.maxX - margine - w, y: a.minY + margine)]
+            if let posto = posti.first(where: { $0.x >= a.minX && $0.x + w <= a.maxX && $0.y + h <= a.maxY }) {
+                scelto = (CGRect(x: posto.x, y: posto.y, width: w, height: h), modo.righe)
+                break
+            }
         }
-        guard x >= a.minX, x + w <= a.maxX, y + h <= a.maxY else { return nil }
-        let box = CGRect(x: x, y: y, width: w, height: h)
+        guard let trovato = scelto else { return nil }
+        let (box, righe) = trovato
         fondoScheda.setFill()
         UIBezierPath(roundedRect: box, cornerRadius: 10).fill()
-        var linea = box.minY + 4 + 11.5
-        if !prima.isEmpty {
-            scrivi(prima, box.minX + p, linea, forte)
-            linea += hRiga
-        }
-        if !seconda.isEmpty {
-            var cx = box.minX + p
-            if let t = testoArrivo {
-                scrivi("arrivo ", cx, linea, piano)
-                cx += larghezza("arrivo ", piano)
-                scrivi(t, cx, linea, valoreArrivo)
-                cx += larghezza(t, valoreArrivo)
-                if let meteo { scrivi(" · \(meteo)", cx, linea, forte) }
-            } else if let meteo {
-                scrivi(meteo, cx, linea, forte)
+        let linea = box.minY + 4 + 11.5
+        if righe == 1 {
+            scrivi(corta, box.minX + p, linea, forte)
+            if let t = testoArrivo, b != nil {
+                scrivi(" → \(t)", box.minX + p + larghezza(corta, forte), linea, valoreArrivo)
             }
+            return box
+        }
+        scrivi(prima, box.minX + p, linea, forte)
+        var cx = box.minX + p
+        let linea2 = linea + hRiga
+        if let t = testoArrivo {
+            scrivi("arrivo ", cx, linea2, piano)
+            cx += larghezza("arrivo ", piano)
+            scrivi(t, cx, linea2, valoreArrivo)
+            cx += larghezza(t, valoreArrivo)
+            if let meteo { scrivi(" · \(meteo)", cx, linea2, forte) }
+        } else if let meteo {
+            scrivi(meteo, cx, linea2, forte)
         }
         return box
     }

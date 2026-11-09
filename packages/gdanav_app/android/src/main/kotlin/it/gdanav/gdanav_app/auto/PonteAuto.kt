@@ -50,7 +50,14 @@ object PonteAuto {
         val stradaKmh: Double? = null,
         /** Quanti minuti del tempo che resta sono traffico: colora il tempo (0: niente). */
         val trafficoMin: Int = 0,
+        /** La striscia del traffico di lato, come sul telefono (vuota: niente code). */
+        val striscia: List<CodaInStriscia> = emptyList(),
+        /** Il viaggio va oltre la cima della striscia: in cima niente bandiera. */
+        val strisciaTagliata: Boolean = false,
     )
+
+    /** Una coda sulla striscia: da 0 (l'auto) a 1 (la cima), coi minuti e «12 km» o «ci sei». */
+    data class CodaInStriscia(val da: Float, val a: Float, val livello: Int, val minuti: Int, val sotto: String)
 
     /** Una corsia prima dello svincolo: le frecce, se è giusta, quale seguire. */
     data class CorsiaAuto(val direzioni: List<String>, val giusta: Boolean, val consigliata: String?)
@@ -475,6 +482,21 @@ object PonteAuto {
                         pedaggio = call.argument<String>("pedaggio"),
                         stradaKmh = numero(call, "strada_kmh"),
                         trafficoMin = numero(call, "traffico_minuti")?.toInt() ?: 0,
+                        striscia = ((call.argument<Map<String, Any?>>("striscia"))?.get("code") as? List<*>)
+                            .orEmpty()
+                            .mapNotNull { v ->
+                                val c = v as? Map<*, *> ?: return@mapNotNull null
+                                val da = (c["da"] as? Number)?.toFloat() ?: return@mapNotNull null
+                                val a = (c["a"] as? Number)?.toFloat() ?: return@mapNotNull null
+                                CodaInStriscia(
+                                    da = da.coerceIn(0f, 1f),
+                                    a = a.coerceIn(0f, 1f),
+                                    livello = (c["livello"] as? Number)?.toInt() ?: 2,
+                                    minuti = (c["minuti"] as? Number)?.toInt() ?: 0,
+                                    sotto = c["sotto"] as? String ?: "",
+                                )
+                            },
+                        strisciaTagliata = (call.argument<Map<String, Any?>>("striscia"))?.get("tagliata") == true,
                     )
                 } else {
                     null

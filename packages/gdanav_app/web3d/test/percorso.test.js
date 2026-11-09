@@ -60,6 +60,23 @@ test('sotto un cavalcavia di sbieco la linea resta a terra, anche cambiando carr
   assert.ok(Math.max(...h) < 0.5, `la linea sale sul ponte (${Math.max(...h).toFixed(1)} m)`);
 });
 
+test('la linea si appoggia sulla strada: tre metri di lato tornano in mezzo', () => {
+  // «In alcuni punti la linea del percorso non è sulla strada.»
+  const i = indice([[-400, 0, 0, 400, 0, 0, 10, 1]]);
+  const l = new Linea([-300, 3, 300, 3]);
+  const p = profiloDi(l, 0, 600, i);
+  const [dx, dy] = p.sposta(300);
+  assert.ok(Math.abs(dx) < 0.1 && Math.abs(dy + 3) < 0.1, `spostamento ${dx.toFixed(2)}, ${dy.toFixed(2)}`);
+  const n = nastro(l, p, 250, 350, 4, 0.6);
+  const ys = [];
+  for (let k = 1; k < n.posizioni.length; k += 3) ys.push(n.posizioni[k]);
+  const mezzo = (Math.max(...ys) + Math.min(...ys)) / 2;
+  assert.ok(Math.abs(mezzo) < 0.2, `il nastro sta in mezzo alla strada (${mezzo.toFixed(2)})`);
+  // Lontano dalle strade (oltre sei metri) non si sposta.
+  const lontana = profiloDi(new Linea([-300, 20, 300, 20]), 0, 600, i);
+  assert.deepEqual(lontana.sposta(300), [0, 0]);
+});
+
 test('i buchi: corti si riempiono, lunghi tornano a terra', () => {
   const h = riempiQuote([7, NaN, NaN, 7]);
   assert.ok(h.every((v) => Math.abs(v - 7) < 0.01));

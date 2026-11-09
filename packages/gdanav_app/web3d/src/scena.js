@@ -686,6 +686,17 @@ export class Scena {
       uOpacita: { value: 1 },
       uSotto: { value: 0 },
     };
+    this.uniformiFatto = {
+      uCore: { value: colore('#7f9fc9') },
+      uBordo: { value: colore('#4f6f99') },
+      uLargo: { value: 3.6 },
+      uPasso: { value: 16 },
+      uNotte: { value: 0 },
+      uInizio: { value: -1e9 },
+      uFrecce: { value: 0 },
+      uOpacita: { value: 0.85 },
+      uSotto: { value: 0 },
+    };
     this.nastri = {};
     this.colorAuto = '#d62a26';
     this.impostaNotte(false);
@@ -832,13 +843,25 @@ export class Scena {
     const nastro = (frammento, uniformi, extra = {}) =>
       new THREE.ShaderMaterial({ uniforms: uniformi, vertexShader: VERTICE_NASTRO, fragmentShader: frammento, transparent: true, depthWrite: false, ...extra });
     m.percorso = nastro(FRAMMENTO_NASTRO, this.uniformiPercorso, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
-    m.percorsoFantasma = nastro(FRAMMENTO_NASTRO, this.uniformiFantasma, { depthFunc: THREE.GreaterDepth });
+    // Spinto verso la telecamera: compare solo dove qualcosa sta davvero
+    // davanti (un ponte, un palazzo). A pari con l'asfalto lì sotto il
+    // confronto di profondità vinceva e perdeva a chiazze: l'«effetto glitch»
+    // sotto i ponti.
+    m.percorsoFantasma = nastro(FRAMMENTO_NASTRO, this.uniformiFantasma, {
+      depthFunc: THREE.GreaterDepth,
+      polygonOffset: true,
+      polygonOffsetFactor: -6,
+      polygonOffsetUnits: -40,
+    });
     // L'auto sotto un ponte: la sua sagoma rossa, sempre in vista.
-    m.autoFantasma = new THREE.MeshBasicMaterial({ color: notte ? 0xff5a4f : 0xe0392f, transparent: true, opacity: 0.62, depthWrite: false, depthFunc: THREE.GreaterDepth, fog: false });
+    m.autoFantasma = new THREE.MeshBasicMaterial({ color: notte ? 0xff5a4f : 0xe0392f, transparent: true, opacity: 0.62, depthWrite: false, depthFunc: THREE.GreaterDepth, fog: false, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -40 });
     m.alone = nastro(FRAMMENTO_ALONE, this.uniformiPercorso, { blending: notte ? THREE.AdditiveBlending : THREE.NormalBlending });
     m.freccia = nastro(FRAMMENTO_FRECCIA, {}, { polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
     m.punta = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false });
     m.risparmio = nastro(FRAMMENTO_NASTRO, this.uniformiRisparmio, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -3 });
+    // La strada già fatta: un blu più tenue e stretto, senza frecce, sotto il
+    // percorso (come `percorso-fatto` sulla mappa piatta).
+    m.fatto = nastro(FRAMMENTO_NASTRO, this.uniformiFatto, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
     m.traffico = nastro(FRAMMENTO_CODA, { uNotte: { value: notte ? 1 : 0 } }, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
     return m;
   }
