@@ -1131,8 +1131,33 @@ class PonteAuto {
   /// Il riepilogo dell'arrivo già mandato all'auto.
   String? _arrivoDetto;
 
+  /// La versione della strada già fatta mandata all'auto, e quando.
+  var _tracciaMandata = -1;
+  DateTime? _tracciaMandataAlle;
+
+  /// La strada già fatta in guida, all'auto: ogni quattro punti nuovi o tre secondi.
+  void _traccia() {
+    final v = guida.versioneTraccia;
+    if (v == _tracciaMandata) return;
+    final ora = _ora();
+    final prima = _tracciaMandataAlle;
+    // Ogni quattro punti nuovi (una trentina di metri) o tre secondi.
+    if (guida.traccia.isNotEmpty &&
+        prima != null &&
+        v - _tracciaMandata < 4 &&
+        ora.difference(prima) < const Duration(seconds: 3)) {
+      return;
+    }
+    _tracciaMandata = v;
+    _tracciaMandataAlle = ora;
+    _manda('sorgenti', {
+      'dati': {sorgenteFatto: jsonEncode(datiTraccia(guida.traccia))},
+    });
+  }
+
   void _guida() {
     _seguiProva();
+    _traccia();
     // Partita la guida (o arrivati), le strade se ne vanno dall'auto.
     _strade();
     final a = guida.avanzamento;

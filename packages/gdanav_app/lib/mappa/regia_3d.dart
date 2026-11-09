@@ -205,6 +205,7 @@ class Regia3d {
   Future<void> _tutto() async {
     _viaggioMandato = null;
     _frecciaMandata = (-1, -1);
+    _tracciaMandata = -1;
     _propostaMandata = 0;
     _letturaMandata = null;
     _lettaMandata = null;
@@ -284,14 +285,32 @@ class Regia3d {
       _manda(msgSorgente(id, dati));
     }
     _frecciaMandata = (-1, -1);
+    _tracciaMandata = -1;
     dallaGuida();
   }
 
   /// A ogni novità della guida: la posizione (una volta per lettura), la
   /// freccia della manovra, la telecamera.
+  /// La versione della strada già fatta mandata alla pagina, e quando.
+  var _tracciaMandata = -1;
+  DateTime? _tracciaMandataAlle;
+
   void dallaGuida() {
     if (!_caricata || _finita) return;
     final g = guida;
+    // La strada già fatta, piatta a terra sotto il percorso: al più ogni tre secondi.
+    if (g.versioneTraccia != _tracciaMandata) {
+      final ora = _ora();
+      final prima = _tracciaMandataAlle;
+      if (g.traccia.isEmpty ||
+          prima == null ||
+          g.versioneTraccia - _tracciaMandata >= 4 ||
+          ora.difference(prima) >= const Duration(seconds: 3)) {
+        _tracciaMandata = g.versioneTraccia;
+        _tracciaMandataAlle = ora;
+        _manda(msgSorgente(sorgenteFatto, datiTraccia(g.traccia)));
+      }
+    }
     final v = g.pronto?.viaggio, a = g.avanzamento;
     // La freccia della prossima manovra, avvicinandosi.
     final chiave = chiaveFreccia(v, a?.prossima, a?.allaProssimaM, ricalcolo: g.ricalcolando);

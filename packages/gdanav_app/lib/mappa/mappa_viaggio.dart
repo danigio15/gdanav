@@ -628,6 +628,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     final m = _mappa;
     if (m == null || !_stileCaricato) return;
     _guardiaPercorso();
+    unawaited(_traccia(m));
     final a = widget.guida?.avanzamento;
     final stimata = widget.guida?.posizioneStimata();
     final qui = stimata?.punto ?? a?.posizioneSulPercorso ?? widget.posizione.qui;
@@ -822,6 +823,24 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   static const _frecciaIgnota = (-1, -1);
   (int, int)? _frecciaDisegnata = _frecciaIgnota;
 
+  /// La versione della strada già fatta che c'è sulla mappa (-1: da scrivere).
+  var _tracciaScritta = -1;
+
+  /// La strada già fatta in guida, sotto il percorso: resta dopo un ricalcolo.
+  Future<void> _traccia(MapLibreMapController m) async {
+    final g = widget.guida;
+    if (g == null) return;
+    final v = g.versioneTraccia;
+    if (v == _tracciaScritta) return;
+    _tracciaScritta = v;
+    try {
+      await m.setGeoJsonSource(sorgenteFatto, datiTraccia(g.traccia).cast<String, dynamic>());
+    } catch (e) {
+      if (_tracciaScritta == v) _tracciaScritta = -1;
+      debugPrint('mappa, strada fatta: $e');
+    }
+  }
+
   /// La freccia della prossima manovra sul percorso, avvicinandosi.
   Future<void> _freccia(MapLibreMapController m) async {
     final g = widget.guida;
@@ -1014,6 +1033,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     _inScrittura = null;
     _giroDisegno++;
     _frecciaDisegnata = _frecciaIgnota;
+    _tracciaScritta = -1;
     _suTuttaLaStrada = null;
   }
 

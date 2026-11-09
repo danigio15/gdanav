@@ -27,6 +27,9 @@ const sorgenteCode = 'gdanav-code';
 const sorgenteAlternative = 'gdanav-alternative';
 const sorgenteTappe = 'gdanav-tappe';
 
+/// La strada già fatta in guida, da quando si è partiti ([datiTraccia]).
+const sorgenteFatto = 'gdanav-fatto';
+
 /// Le persone di casa, quando GdANav sta dentro GdAHome (`GestorePersone`).
 const sorgentePersone = 'gdanav-persone';
 
@@ -758,6 +761,7 @@ Map<String, Object> stileMappa({
     'sources': {
       'openmaptiles': {'type': 'vector', 'url': 'https://tiles.openfreemap.org/planet'},
       sorgentePercorso: {'type': 'geojson', 'data': _vuota},
+      sorgenteFatto: {'type': 'geojson', 'data': _vuota},
       sorgenteCode: {'type': 'geojson', 'data': _vuota},
       sorgenteAlternative: {'type': 'geojson', 'data': _vuota},
       sorgenteTappe: {'type': 'geojson', 'data': _vuota},
@@ -1167,6 +1171,17 @@ Map<String, Object> stileMappa({
         ],
         'layout': {'line-cap': 'round', 'line-join': 'round'},
         'paint': {'line-color': '#4ADE80', 'line-width': _largo(5.5, 18)},
+      },
+      /* La strada già fatta, sotto il percorso: «se calcoli il percorso e io
+       * cambio strada, dopo il ricalcolo la linea riparte da quel punto e non
+       * si vede il percorso già fatto». Il percorso nuovo parte da dove si
+       * è; quello che si è percorso resta qui, un blu più tenue e stretto. */
+      {
+        'id': 'percorso-fatto',
+        'type': 'line',
+        'source': sorgenteFatto,
+        'layout': {'line-cap': 'round', 'line-join': 'round'},
+        'paint': {'line-color': scuro ? '#5b7fae' : '#7f9fc9', 'line-width': _largo(4.5, 15), 'line-opacity': 0.85},
       },
       /* Il percorso: un alone morbido, il bordo blu scuro, la linea celeste e
        * le frecce della direzione. Sempre blu: nessuna strada ha quel colore.

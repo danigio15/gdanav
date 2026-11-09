@@ -22,6 +22,14 @@ StatoColonnina statoDi(Disponibilita d) {
 /// numeri; con [passandoci] la strada dentro la ZTL di cui si chiede il
 /// permesso.
 ///
+/// La strada già fatta in guida ([GestoreGuida.traccia]): una linea sola.
+Map<String, Object?> datiTraccia(List<Punto> traccia) {
+  final punti = _linea(traccia);
+  return _collezione([
+    if (punti.length > 1) _elemento({'type': 'LineString', 'coordinates': punti}, const {}),
+  ]);
+}
+
 /// Ogni sorgente per conto suo, e la linea del percorso prima di tutto: una
 /// colonnina o una coda storte lasciano vuota la loro, non le altre. Prima
 /// un errore qualunque qui dentro lasciava la mappa senza percorso.

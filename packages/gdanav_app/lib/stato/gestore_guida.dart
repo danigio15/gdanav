@@ -318,10 +318,34 @@ class GestoreGuida extends ChangeNotifier {
     return null;
   }
 
+  /// La strada fatta da quando è partita la guida: le posizioni, una ogni
+  /// [_passoTraccia] metri. Resta dopo un ricalcolo (il percorso nuovo parte
+  /// da dove si è), e si vuota alla fine. [versioneTraccia] cresce a ogni
+  /// punto nuovo: chi la disegna la riscrive solo quando cambia.
+  final List<Punto> traccia = [];
+  var versioneTraccia = 0;
+  static const _passoTraccia = 8.0;
+  static const _puntiTracciaMassimi = 6000;
+
+  void _allungaTraccia(Punto qui) {
+    if (traccia.isNotEmpty && distanzaM(traccia.last, qui) < _passoTraccia) return;
+    traccia.add(qui);
+    // Un viaggio lunghissimo: un punto su due, la forma resta.
+    if (traccia.length > _puntiTracciaMassimi) {
+      final meta = [for (var i = 0; i < traccia.length; i += 2) traccia[i]];
+      traccia
+        ..clear()
+        ..addAll(meta);
+    }
+    versioneTraccia++;
+  }
+
   void avvia() {
     final p = pronto;
     if (p == null || attiva) return;
     attiva = true;
+    traccia.clear();
+    versioneTraccia++;
     _vicinoDetto = false;
     _guida = Guida(p.viaggio.percorso);
     // Il riepilogo dell'arrivo comincia qui.
@@ -363,6 +387,8 @@ class GestoreGuida extends ChangeNotifier {
 
   Future<void> ferma() async {
     attiva = false;
+    traccia.clear();
+    versioneTraccia++;
     _giroStrade++;
     risparmio?.lascia();
     auto.removeListener(_datiAuto);
@@ -542,6 +568,7 @@ class GestoreGuida extends ChangeNotifier {
     if (g == null || !attiva) return;
     final a = g.aggiorna(qui);
     avanzamento = a;
+    _allungaTraccia(qui);
     if (pronto case final p?) _consuma(p, a.percorsiM / 1000);
     _controllaLimite(a.limiteKmh, _velocitaKmh(qui));
     // Arrivati al distributore: da qui si prosegue verso la meta.
