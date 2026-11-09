@@ -355,7 +355,7 @@ function trameFacciata(stile, seme) {
         }
       } else [wx0, wx1, wy0, wy1] = [18, 46, 12, 50];
       const tono = 40 + Math.floor(r() * 30);
-      g.fillStyle = stile === 'uffici' ? `rgb(${tono + 40},${tono + 62},${tono + 85})` : `rgb(${tono},${tono + 8},${tono + 20})`;
+      g.fillStyle = stile === 'uffici' ? `rgb(${tono + 95},${tono + 115},${tono + 135})` : `rgb(${tono},${tono + 8},${tono + 20})`;
       g.fillRect(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
       const gr = g.createLinearGradient(0, y0 + wy0, 0, y0 + wy1);
       gr.addColorStop(0, 'rgba(255,255,255,0.28)');
@@ -591,7 +591,9 @@ export class Scena {
       // Dov'è l'auto sullo schermo (coordinate -1..1 e profondità), e lo schermo in pixel.
       uAutoSchermo: { value: new THREE.Vector3(0, -2, -1) },
       uSchermo: { value: new THREE.Vector2(1, 1) },
-      uFinestreTenui: { value: 0.6 },
+      uFinestreTenui: { value: 0.45 },
+      // Un po' di luce propria sui tetti di giorno: chiari come da sopra.
+      uLuceTetti: { value: 0.12 },
     };
     this.uniformiRisparmio = {
       uCore: { value: colore('#4ADE80') },
@@ -615,9 +617,10 @@ export class Scena {
     const P = notte ? NOTTE : GIORNO;
     this.P = P;
     // Di notte le finestre accese restano tutte.
-    this.uniformiEdifici.uFinestreTenui.value = notte ? 0 : 0.6;
+    this.uniformiEdifici.uFinestreTenui.value = notte ? 0 : 0.45;
+    this.uniformiEdifici.uLuceTetti.value = notte ? 0 : 0.12;
     this.emisferica.color.set(notte ? 0x4a5d8c : 0xdbe8ff);
-    this.emisferica.groundColor.set(notte ? 0x141a26 : 0x8d917f);
+    this.emisferica.groundColor.set(notte ? 0x141a26 : 0xc4bcae);
     this.emisferica.intensity = notte ? 0.75 : 1.35;
     this.sole.color.set(notte ? 0x9db2ff : 0xfff0d8);
     this.sole.intensity = notte ? 0.5 : 2.3;
@@ -669,7 +672,7 @@ export class Scena {
     go.addColorStop(1, 'rgba(255,255,255,0)');
     tg.fillStyle = go;
     tg.fillRect(0, 0, 64, 64);
-    m.ombreAlberi = new THREE.MeshBasicMaterial({ color: 0x0c1220, alphaMap: trama(to, false), transparent: true, opacity: P.ombra * 0.75, depthWrite: false, fog: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
+    m.ombreAlberi = new THREE.MeshBasicMaterial({ color: 0x0c1220, alphaMap: trama(to, false), transparent: true, opacity: P.ombra, depthWrite: false, fog: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
     ['residenziale', 'uffici', 'industria'].forEach((s, i) => {
       const [mappa, luci] = trameFacciata(s, 11 + i * 7);
       m['facciata-' + s] = new THREE.MeshLambertMaterial({
@@ -768,18 +771,21 @@ export class Scena {
         .replace(
           '#include <common>',
           `#include <common>
-          varying float vQuota;`,
+          varying float vQuota;
+          varying vec2 vPiano;`,
         )
         .replace(
           '#include <worldpos_vertex>',
           `#include <worldpos_vertex>
-          vQuota = transformed.z;`,
+          vQuota = transformed.z;
+          vPiano = transformed.xy;`,
         );
       sh.fragmentShader = sh.fragmentShader
         .replace(
           '#include <common>',
           `#include <common>
           varying float vQuota;
+          varying vec2 vPiano;
           uniform vec3 uAutoSchermo;
           uniform vec2 uSchermo;
           uniform float uFinestreTenui;`,
@@ -797,22 +803,42 @@ export class Scena {
           '#include <color_fragment>',
           facciata
             ? `#include <color_fragment>
-          diffuseColor.rgb *= mix(0.7, 1.0, smoothstep(0.0, 12.0, vQuota)) * mix(1.0, 1.05, smoothstep(12.0, 60.0, vQuota));`
-            : '#include <color_fragment>',
+          // Il piano terra (negozi, portoni) più scuro e netto, poi la luce
+          // che sale piano: la casa poggia a terra.
+          diffuseColor.rgb *= mix(0.8, 1.0, smoothstep(3.3, 3.6, vQuota)) * mix(0.86, 1.0, smoothstep(0.0, 14.0, vQuota)) * mix(1.0, 1.05, smoothstep(14.0, 60.0, vQuota));`
+            : `#include <color_fragment>
+          // I tetti: a chiazze leggere (guaine, ghiaia, coppi rifatti), non
+          // una lastra liscia che sembra un buco nella mappa.
+          {
+            vec2 q = floor(vPiano * 0.35);
+            float n = fract(sin(dot(q, vec2(12.9898, 78.233))) * 43758.5453);
+            vec2 q2 = floor(vPiano * 1.3);
+            float n2 = fract(sin(dot(q2, vec2(39.346, 11.135))) * 24634.6345);
+            diffuseColor.rgb *= 0.97 + 0.04 * n + 0.02 * n2;
+          }`,
         )
         .replace(
           '#include <opaque_fragment>',
           `{
-            // Dove copre l'auto sullo schermo: attorno a lei e giù fino al
-            // bordo (la telecamera sta dietro), solo davanti a lei.
+            // Solo dove copre davvero l'auto sullo schermo (un cerchio
+            // attorno a lei) e solo le parti davanti a lei. Prima la zona
+            // scendeva fino al bordo e sbavava i palazzi di lato.
             vec2 ndc = gl_FragCoord.xy / uSchermo * 2.0 - 1.0;
             vec2 p = vec2((ndc.x - uAutoSchermo.x) * uSchermo.x / uSchermo.y, ndc.y - uAutoSchermo.y);
-            float d = p.y < 0.0 ? abs(p.x) : length(p);
+            float d = length(p);
             float davanti = step(gl_FragCoord.z, uAutoSchermo.z * 0.5 + 0.5 - 0.00002);
-            diffuseColor.a *= 1.0 - 0.72 * davanti * (1.0 - smoothstep(0.16, 0.30, d));
+            diffuseColor.a *= 1.0 - 0.7 * davanti * (1.0 - smoothstep(0.09, 0.15, d));
           }
           #include <opaque_fragment>`,
-        );
+        )
+        .replace(
+          '#include <emissivemap_fragment>',
+          facciata
+            ? '#include <emissivemap_fragment>'
+            : `#include <emissivemap_fragment>
+          totalEmissiveRadiance += diffuseColor.rgb * uLuceTetti;`,
+        )
+        .replace('uniform float uFinestreTenui;', 'uniform float uFinestreTenui;\n          uniform float uLuceTetti;');
     };
     materiale.transparent = true;
     materiale.depthWrite = true;

@@ -27,7 +27,7 @@ export const GIORNO = {
   pilone: '#cfccc4',
   percorso: '#27A2F8',
   percorsoBordo: '#0A6CC2',
-  ombra: 0.32,
+  ombra: 0.24,
   // L'ombra in più sotto i ponti (alone e nucleo).
   ombraPonte: 0.2,
 };
@@ -112,7 +112,9 @@ export function rgb(esa) {
 }
 
 /** Il sole: da dove viene (gradi da nord, in senso orario) e quanto è alto. */
-export const SOLE = { azimut: 248, altezza: 36 };
+// Il sole alto: le ombre delle torri restano corte (lunghe coprivano interi
+// isolati di grigio, come una mappa non caricata).
+export const SOLE = { azimut: 248, altezza: 50 };
 
 /** Di quanto si sposta l'ombra di un punto alto un metro: verso est e verso nord. */
 export function spostamentoOmbra() {

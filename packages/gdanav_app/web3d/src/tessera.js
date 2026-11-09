@@ -739,6 +739,9 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     const cg = rgb(pal.giorno[scelta]).map((c) => Math.min(255, Math.round(c * v)));
     const cn = rgb(pal.notte[scelta]).map((c) => Math.min(255, Math.round(c * v)));
     const gb = facciate[stile];
+    const cornice = cg.map((c) => Math.round(c + (255 - c) * 0.7));
+    const sottoCornice = cg.map((c) => Math.round(c * 0.68));
+    const corniceNotte = cn.map((c) => Math.round(c * 0.8));
     const bw = stile === 'industria' ? 6 : CAMPATA;
     const uoff = Math.floor(r() * 4) * 0.25;
     const voff = Math.floor(r() * 4) * 0.25;
@@ -765,6 +768,12 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           const v0 = m0 / (PIANO * 4) + voff;
           const v1 = h / (PIANO * 4) + voff;
           gb.quad([a[0], a[1], m0, u0, v0], [c[0], c[1], m0, u1, v0], [c[0], c[1], h, u1, v1], [a[0], a[1], h, u0, v1], [nx, ny, 0], cg, cn);
+          // Il cornicione: una fascia chiara in cima, il bordo del palazzo si legge.
+          const fx = nx * 0.25;
+          const fy = ny * 0.25;
+          tetti.quad([a[0] + fx, a[1] + fy, h - 0.6], [c[0] + fx, c[1] + fy, h - 0.6], [c[0] + fx, c[1] + fy, h + 0.3], [a[0] + fx, a[1] + fy, h + 0.3], [nx, ny, 0], cornice, corniceNotte);
+          // E sotto, la sua ombra: una riga scura che stacca il tetto dalla facciata.
+          tetti.quad([a[0] + fx * 0.6, a[1] + fy * 0.6, h - 1.2], [c[0] + fx * 0.6, c[1] + fy * 0.6, h - 1.2], [c[0] + fx * 0.6, c[1] + fy * 0.6, h - 0.6], [a[0] + fx * 0.6, a[1] + fy * 0.6, h - 0.6], [nx, ny, 0], sottoCornice, corniceNotte);
           // L'ombra del muro, stesa a terra.
           if (m0 < 1) {
             ombre.quad([a[0], a[1], 0], [c[0], c[1], 0], [c[0] + sox * h, c[1] + soy * h, 0], [a[0] + sox * h, a[1] + soy * h, 0], [0, 0, 1]);
