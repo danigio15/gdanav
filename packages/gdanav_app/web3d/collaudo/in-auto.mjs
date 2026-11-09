@@ -17,7 +17,7 @@ const metri = 900;
 const casi = (process.env.CASI ?? 'auto-giusta,auto-sbagliata').split(',').map((nome) =>
   nome === 'auto-sbagliata'
     ? { nome, sinistra: 1200, sopra: 300, zoom: 17.9 }
-    : { nome, sinistra: 400, sopra: 0, zoom: Number(process.env.ZOOM ?? 17.9) },
+    : { nome, sinistra: 400, sopra: 0, zoom: Number(process.env.ZOOM ?? 17.9), pitch: Number(nome.match(/pitch(\d+)/)?.[1] ?? 0) || undefined },
 );
 for (const c of casi) {
   const { page, ctx, posizione, manda } = await apri(browser, {
@@ -31,7 +31,7 @@ for (const c of casi) {
     altezza: 480,
     sinistra: c.sinistra,
   });
-  await manda({ tipo: 'camera', modo: 'segui', sopra: c.sopra, sinistra: c.sinistra });
+  await manda({ tipo: 'camera', modo: 'segui', sopra: c.sopra, sinistra: c.sinistra, ...(c.pitch ? { pitch: c.pitch } : {}) });
   await posizione(metri, 0);
   await aspetta(page);
   await page.waitForTimeout(2500);

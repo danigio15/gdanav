@@ -677,6 +677,9 @@ class PonteAuto {
   /// [Regia3d.piuVicina]).
   static const piuVicina3dInAuto = 0.7;
 
+  /// Sull'auto la telecamera più dall'alto che sul telefono (70°).
+  static const inclinazione3dInAuto = 55.0;
+
   Regia3d _nuovaRegia3d() => Regia3d(
     gestore: viaggio,
     posizione: posizione,
@@ -697,6 +700,7 @@ class PonteAuto {
     persone: persone,
     orologio: _ora,
     piuVicina: piuVicina3dInAuto,
+    inclinazione: inclinazione3dInAuto,
   )..avvia();
 
   void _stili() {

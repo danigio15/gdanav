@@ -173,7 +173,7 @@ const GESTORI = {
   },
   camera(m) {
     const prima = S.camera.modo;
-    S.camera = { modo: m.modo, sopra: m.sopra ?? S.camera.sopra, sinistra: m.sinistra ?? S.camera.sinistra ?? 0, riquadro: m.riquadro ?? null };
+    S.camera = { modo: m.modo, sopra: m.sopra ?? S.camera.sopra, sinistra: m.sinistra ?? S.camera.sinistra ?? 0, pitch: m.pitch ?? null, riquadro: m.riquadro ?? null };
     if (m.modo === 'segui' && prima !== 'segui') S.transizione = { da: performance.now(), dur: 900, partenza: null };
     if (m.modo === 'panoramica' && m.riquadro && S.mappa) {
       const [s, o, n, e] = m.riquadro;
@@ -1354,11 +1354,14 @@ function muovi(adesso, dt) {
   let assestata = true;
   if (S.camera.modo === 'segui') {
     const zoomVoluto = S.zoomVoluto ?? vista.zoom;
-    const c = (S.cam ??= { rotta: rottaCamera, zoom: zoomVoluto, quota: z, pitch: vista.pitch });
+    // L'inclinazione: quella della vista, o quella chiesta (sull'auto più
+    // dall'alto: «voglio vederla un po' più dall'alto»).
+    const pitchVoluto = S.camera.pitch ?? vista.pitch;
+    const c = (S.cam ??= { rotta: rottaCamera, zoom: zoomVoluto, quota: z, pitch: pitchVoluto });
     c.rotta = angoloVerso(c.rotta, rottaCamera, 1 - Math.exp(-dt / 400));
     c.zoom = smorza(c.zoom, zoomVoluto, dt, 1500);
     c.quota = smorza(c.quota, z, dt, 300);
-    c.pitch = smorza(c.pitch, vista.pitch, dt, 600);
+    c.pitch = smorza(c.pitch, pitchVoluto, dt, 600);
     const H = m.getCanvas().clientHeight;
     const W = m.getCanvas().clientWidth;
     // Lo spazio delle schede, mai più di metà schermo: con misure sbagliate

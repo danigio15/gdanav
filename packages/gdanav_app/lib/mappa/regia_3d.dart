@@ -56,6 +56,7 @@ class Regia3d {
     this.orologio,
     this.attesa = const Duration(seconds: 15),
     this.piuVicina = 0,
+    this.inclinazione,
   });
 
   final GestoreViaggio gestore;
@@ -92,6 +93,10 @@ class Regia3d {
   /// largo e basso: allo zoom del telefono l'auto era piccola, lontana, e la
   /// scena piatta («lo zoom troppo lontano e piatto»).
   final double piuVicina;
+
+  /// L'inclinazione della telecamera, in gradi; `null`: quella della vista.
+  /// Sull'auto più dall'alto: «voglio vederla un po' più dall'alto».
+  final double? inclinazione;
 
   var _caricata = false;
   var _pronta = false;
@@ -352,7 +357,7 @@ class Regia3d {
     _modoMandato = modo;
     _sopraMandato = c.sopra;
     _sinistraMandata = c.sinistra;
-    _manda(msgCamera(modo, sopra: c.sopra, sinistra: c.sinistra));
+    _manda(msgCamera(modo, sopra: c.sopra, sinistra: c.sinistra, pitch: inclinazione));
   }
 
   void _segnalazioni() {
