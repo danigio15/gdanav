@@ -1,0 +1,15 @@
+19:41:48 inizio
+google/sdk_gphone64_x86_64/emu64xa:14/UE1A.230829.036.A4/12096271:user/release-keys
+GdANav: it.gdanav.gdanav.prova
+--- Android Auto nel telefono?
+package:com.android.carrierconfig.auto_generated_rro_vendor__
+package:com.android.carrierconfig.auto_generated_rro_product__
+package:com.android.carrierdefaultapp
+package:com.google.android.projection.gearhead
+package:com.android.carrierconfig
+Android Auto: 1.2.531830-stub
+NO: Android Auto nell'emulatore è il segnaposto (1.2.531830-stub), senza la proiezione.
+La DHU si collega ma nessuno le risponde («Failed to read from transport»).
+Serve l'app vera dal Play Store (account Google) o un telefono vero collegato.
+Starting service: Intent { cmp=com.google.android.projection.gearhead/.headunit.HeadUnitServerService }
+Error: Not found; no service started.
