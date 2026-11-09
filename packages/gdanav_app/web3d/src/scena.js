@@ -7,6 +7,12 @@ import { generatore } from './caso.js';
 import { CAMPATA, NASTRI, PERIODO_STRADA, PIANO } from './tessera.js';
 import { GIORNO, NOTTE, SOLE } from './tavolozza.js';
 
+/** Fin dove (in metri, davanti e di lato) gli edifici attorno all'auto restano bassi. */
+const VICINO_BASSI = 110;
+
+/** Quanto sono alti lì: due piani. */
+const TETTO_BASSO = 7;
+
 const tela = (w, h) => {
   const c = document.createElement('canvas');
   c.width = w;
@@ -349,6 +355,13 @@ export class Scena {
     // Il «fantasma» del percorso: lo stesso nastro, disegnato solo dove
     // qualcosa ci sta davanti (un cavalcavia, un edificio), più tenue.
     this.uniformiFantasma = { ...this.uniformiPercorso, uInizio: { value: -1e9 }, uOpacita: { value: 0.5 } };
+    // Gli edifici bassi attorno all'auto (vedi [abbassaVicino]).
+    this.uniformiEdifici = {
+      uAuto: { value: new THREE.Vector2(1e9, 1e9) },
+      uDir: { value: new THREE.Vector2(1, 0) },
+      uVicino: { value: VICINO_BASSI },
+      uTetto: { value: TETTO_BASSO },
+    };
     this.uniformiRisparmio = {
       uCore: { value: colore('#4ADE80') },
       uBordo: { value: colore('#166534') },
@@ -424,8 +437,10 @@ export class Scena {
       });
       // Per la scala delle trame: una campata e un piano.
       m['facciata-' + s].userData = { campata: CAMPATA, piano: PIANO };
+      this.abbassaVicino(m['facciata-' + s], 'facciata-' + s);
     });
     m.tetti = new THREE.MeshLambertMaterial({ vertexColors: true });
+    this.abbassaVicino(m.tetti, 'tetti');
     m.fusto = new THREE.MeshLambertMaterial({ color: P.pilone });
     m.capitello = new THREE.MeshLambertMaterial({ color: P.trave });
     m.tronco = new THREE.MeshLambertMaterial({ color: notte ? '#3a2e26' : '#6b5241' });
@@ -464,6 +479,52 @@ export class Scena {
     m.risparmio = nastro(FRAMMENTO_NASTRO, this.uniformiRisparmio, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -3 });
     m.traffico = nastro(FRAMMENTO_CODA, { uNotte: { value: notte ? 1 : 0 } }, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
     return m;
+  }
+
+  /**
+   * Gli edifici attorno all'auto, e soprattutto fra lei e la telecamera,
+   * scendono a due piani: «quando si passa nei palazzi non si capisce nulla,
+   * gli incroci si perdono». Fra i grattacieli (il Centro Direzionale di
+   * Napoli) le facciate coprivano strada, incroci e percorso. Più in là
+   * tornano alti, piano piano; le finestre restano grandi uguali (la trama
+   * scende con il tetto).
+   */
+  abbassaVicino(materiale, nome) {
+    const u = this.uniformiEdifici;
+    materiale.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, u);
+      sh.vertexShader = sh.vertexShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+          uniform vec2 uAuto;
+          uniform vec2 uDir;
+          uniform float uVicino;
+          uniform float uTetto;`,
+        )
+        .replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+          {
+            vec2 sulPiano = (modelMatrix * vec4(transformed, 1.0)).xy - uAuto;
+            float avanti = dot(sulPiano, uDir);
+            float lato = dot(sulPiano, vec2(-uDir.y, uDir.x));
+            // Dietro l'auto (verso la telecamera) il giro è tre volte più lungo.
+            float d = length(vec2(lato, avanti < 0.0 ? avanti / 3.0 : avanti));
+            float alto = smoothstep(uVicino, uVicino * 1.8, d);
+            float z = min(transformed.z, mix(uTetto, transformed.z, alto));
+            float giu = transformed.z - z;
+            transformed.z = z;
+            #ifdef USE_MAP
+              vMapUv.y -= giu / ${(PIANO * 4).toFixed(2)};
+            #endif
+            #ifdef USE_EMISSIVEMAP
+              vEmissiveMapUv.y -= giu / ${(PIANO * 4).toFixed(2)};
+            #endif
+          }`,
+        );
+    };
+    materiale.customProgramCacheKey = () => 'bassi-' + nome;
   }
 
   /** Una tessera fatta dal lavoratore, messa al suo posto nella scena. */
@@ -831,6 +892,8 @@ export class Scena {
     const a = this.auto;
     a.visible = true;
     a.position.set(x, y, z + 0.26);
+    this.uniformiEdifici.uAuto.value.set(x, y);
+    this.uniformiEdifici.uDir.value.set(Math.cos(dir), Math.sin(dir));
     a.rotation.set(0, 0, 0);
     a.rotateZ(dir);
     a.rotateY(-pendenza);

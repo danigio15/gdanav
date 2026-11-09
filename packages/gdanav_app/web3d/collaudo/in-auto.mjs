@@ -13,7 +13,7 @@ const rotta = JSON.parse(fs.readFileSync(path.join(uscita, 'percorso-rho.json'),
 const { chromium } = await playwright();
 const browser = await chromium.launch({ args: ARGOMENTI_CHROMIUM });
 const { porta } = await servitore();
-const metri = 900;
+const metri = Number(process.env.METRI ?? 900);
 const casi = (process.env.CASI ?? 'auto-giusta,auto-sbagliata').split(',').map((nome) =>
   nome === 'auto-sbagliata'
     ? { nome, sinistra: 1200, sopra: 300, zoom: 17.9 }
