@@ -7,11 +7,11 @@ import { generatore } from './caso.js';
 import { CAMPATA, NASTRI, PERIODO_STRADA, PIANO } from './tessera.js';
 import { GIORNO, NOTTE, SOLE } from './tavolozza.js';
 
-/** Fin dove (in metri, davanti e di lato) gli edifici attorno all'auto restano bassi. */
-const VICINO_BASSI = 110;
+/** Fin dove (in metri, davanti e di lato) gli edifici attorno all'auto sono di vetro. */
+const VICINO_VETRO = 120;
 
-/** Quanto sono alti lì: due piani. */
-const TETTO_BASSO = 7;
+/** Quanto si vede attraverso, lì: i punti tolti dalle facciate (0,6 = sei su dieci). */
+const VETRO = 0.6;
 
 const tela = (w, h) => {
   const c = document.createElement('canvas');
@@ -354,13 +354,13 @@ export class Scena {
     };
     // Il «fantasma» del percorso: lo stesso nastro, disegnato solo dove
     // qualcosa ci sta davanti (un cavalcavia, un edificio), più tenue.
-    this.uniformiFantasma = { ...this.uniformiPercorso, uInizio: { value: -1e9 }, uOpacita: { value: 0.5 } };
-    // Gli edifici bassi attorno all'auto (vedi [abbassaVicino]).
+    this.uniformiFantasma = { ...this.uniformiPercorso, uInizio: { value: -1e9 }, uOpacita: { value: 0.85 } };
+    // Gli edifici di vetro attorno all'auto (vedi [vetroVicino]).
     this.uniformiEdifici = {
       uAuto: { value: new THREE.Vector2(1e9, 1e9) },
       uDir: { value: new THREE.Vector2(1, 0) },
-      uVicino: { value: VICINO_BASSI },
-      uTetto: { value: TETTO_BASSO },
+      uVicino: { value: VICINO_VETRO },
+      uVetro: { value: VETRO },
     };
     this.uniformiRisparmio = {
       uCore: { value: colore('#4ADE80') },
@@ -437,10 +437,10 @@ export class Scena {
       });
       // Per la scala delle trame: una campata e un piano.
       m['facciata-' + s].userData = { campata: CAMPATA, piano: PIANO };
-      this.abbassaVicino(m['facciata-' + s], 'facciata-' + s);
+      this.vetroVicino(m['facciata-' + s], 'facciata-' + s);
     });
     m.tetti = new THREE.MeshLambertMaterial({ vertexColors: true });
-    this.abbassaVicino(m.tetti, 'tetti');
+    this.vetroVicino(m.tetti, 'tetti');
     m.fusto = new THREE.MeshLambertMaterial({ color: P.pilone });
     m.capitello = new THREE.MeshLambertMaterial({ color: P.trave });
     m.tronco = new THREE.MeshLambertMaterial({ color: notte ? '#3a2e26' : '#6b5241' });
@@ -483,13 +483,14 @@ export class Scena {
 
   /**
    * Gli edifici attorno all'auto, e soprattutto fra lei e la telecamera,
-   * scendono a due piani: «quando si passa nei palazzi non si capisce nulla,
-   * gli incroci si perdono». Fra i grattacieli (il Centro Direzionale di
-   * Napoli) le facciate coprivano strada, incroci e percorso. Più in là
-   * tornano alti, piano piano; le finestre restano grandi uguali (la trama
-   * scende con il tetto).
+   * diventano di vetro: restano alti e si vedono, ma attraverso si vedono la
+   * strada, gli incroci e il percorso. «Quando si passa nei palazzi non si
+   * capisce nulla: gli incroci si perdono»; e poi «i palazzi si devono
+   * vedere, ma deve vedersi anche il percorso». Il vetro è una trama fine di
+   * punti tolti (niente trasparenze da ordinare): più si è vicini all'auto,
+   * più se ne tolgono; più in là gli edifici tornano pieni, piano piano.
    */
-  abbassaVicino(materiale, nome) {
+  vetroVicino(materiale, nome) {
     const u = this.uniformiEdifici;
     materiale.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, u);
@@ -497,34 +498,43 @@ export class Scena {
         .replace(
           '#include <common>',
           `#include <common>
+          varying vec2 vSulPiano;`,
+        )
+        .replace(
+          '#include <worldpos_vertex>',
+          `#include <worldpos_vertex>
+          vSulPiano = (modelMatrix * vec4(transformed, 1.0)).xy;`,
+        );
+      sh.fragmentShader = sh.fragmentShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+          varying vec2 vSulPiano;
           uniform vec2 uAuto;
           uniform vec2 uDir;
           uniform float uVicino;
-          uniform float uTetto;`,
+          uniform float uVetro;`,
         )
         .replace(
-          '#include <begin_vertex>',
-          `#include <begin_vertex>
+          '#include <clipping_planes_fragment>',
+          `#include <clipping_planes_fragment>
           {
-            vec2 sulPiano = (modelMatrix * vec4(transformed, 1.0)).xy - uAuto;
-            float avanti = dot(sulPiano, uDir);
-            float lato = dot(sulPiano, vec2(-uDir.y, uDir.x));
+            vec2 v = vSulPiano - uAuto;
+            float avanti = dot(v, uDir);
+            float lato = dot(v, vec2(-uDir.y, uDir.x));
             // Dietro l'auto (verso la telecamera) il giro è tre volte più lungo.
             float d = length(vec2(lato, avanti < 0.0 ? avanti / 3.0 : avanti));
-            float alto = smoothstep(uVicino, uVicino * 1.8, d);
-            float z = min(transformed.z, mix(uTetto, transformed.z, alto));
-            float giu = transformed.z - z;
-            transformed.z = z;
-            #ifdef USE_MAP
-              vMapUv.y -= giu / ${(PIANO * 4).toFixed(2)};
-            #endif
-            #ifdef USE_EMISSIVEMAP
-              vEmissiveMapUv.y -= giu / ${(PIANO * 4).toFixed(2)};
-            #endif
+            float tolti = uVetro * (1.0 - smoothstep(uVicino, uVicino * 1.8, d));
+            // Una trama di Bayer 4×4 sullo schermo: i punti tolti sono sparsi.
+            vec2 q = mod(floor(gl_FragCoord.xy), 4.0);
+            vec2 q1 = mod(q, 2.0);
+            vec2 q2 = floor(q / 2.0);
+            float b = 4.0 * mod(2.0 * q1.x + 3.0 * q1.y, 4.0) + mod(2.0 * q2.x + 3.0 * q2.y, 4.0);
+            if ((b + 0.5) / 16.0 < tolti) discard;
           }`,
         );
     };
-    materiale.customProgramCacheKey = () => 'bassi-' + nome;
+    materiale.customProgramCacheKey = () => 'vetro-' + nome;
   }
 
   /** Una tessera fatta dal lavoratore, messa al suo posto nella scena. */
