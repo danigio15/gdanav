@@ -13,7 +13,7 @@ import { chiave as chiaveTessera, daChiave, mercPerMetro, latDaMerc } from './ge
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { angoloVerso, Moto, smorza } from './moto.js';
 import { IndiceSegmenti, Linea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote } from './percorso.js';
-import { Scena } from './scena.js';
+import { BIT_OMBRA, Scena } from './scena.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
 import { GIORNO, NOTTE } from './tavolozza.js';
 import './gdanav3d.css';
@@ -30,6 +30,9 @@ const FOTOGRAMMA_MS = 1000 / 30;
 /** Fin dove davanti all'auto si fa il percorso in 3D, e da quanto dietro. */
 const FINESTRA_AVANTI = 2600;
 const FINESTRA_DIETRO = 80;
+
+/** L'angolo verticale dell'obiettivo della mappa, in gradi (MapLibre: 36,87). */
+const OBIETTIVO_GRADI = 16;
 
 const S = {
   mappa: null,
@@ -287,6 +290,12 @@ function creaMappa(stile) {
     manda('errore', { motivo: 'mappa', dettaglio: String(e).slice(0, 300) });
     return;
   }
+  // Un teleobiettivo (16° invece di 37°): la telecamera sta più lontana e
+  // più alta, a parità di strada inquadrata. Da vicino le torri di cento
+  // metri arrivavano quasi all'altezza della telecamera: il tetto enorme, le
+  // pareti che si stringevano verso terra, il palazzo «vuoto», come visto
+  // da dentro.
+  mappa.setVerticalFieldOfView(OBIETTIVO_GRADI);
   S.mappa = mappa;
   window.__mappa = mappa;
   window.__scena = scena;
@@ -482,6 +491,19 @@ function stratoAuto() {
   };
 }
 
+/**
+ * Pulisce solo il bit dello stencil delle ombre ([BIT_OMBRA]): prima della
+ * scena, perché ogni punto si scurisca una volta; dopo, perché MapLibre
+ * ritrovi lo stencil delle sue tessere com'era.
+ */
+function pulisciBitOmbra(gl) {
+  gl.disable(gl.SCISSOR_TEST);
+  gl.stencilMask(BIT_OMBRA);
+  gl.clearStencil(0);
+  gl.clear(gl.STENCIL_BUFFER_BIT);
+  gl.stencilMask(0xff);
+}
+
 /** La telecamera di three.js dalle matrici di MapLibre (metri della scena → schermo). */
 function matriciCamera(camera, args) {
   const m = S.mappa;
@@ -563,8 +585,11 @@ function strato3d() {
         occupati.push([ax - 70, ay - 60, ax + 70, ay + 40]);
       }
       scena.sfoltisciSegni(camera, m.getCanvas().clientWidth, m.getCanvas().clientHeight, occupati);
+      pulisciBitOmbra(gl);
       renderer.resetState();
       renderer.render(scena.scena, camera);
+      renderer.resetState();
+      pulisciBitOmbra(gl);
       S.camera3d = camera;
       const ora = performance.now();
       S.msDisegno = smorza(S.msDisegno ?? ora - t0, ora - t0, 1, 10);

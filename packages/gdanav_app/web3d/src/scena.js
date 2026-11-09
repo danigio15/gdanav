@@ -464,6 +464,9 @@ function trameFacciata(stile, seme, variante = 0) {
   return [trama(c), trama(e)];
 }
 
+/** Il bit dello stencil delle ombre a terra (vedi `Scena.materiali`). */
+export const BIT_OMBRA = 0x80;
+
 /** Una geometria three.js dai dati del lavoratore. */
 function geometria(d, notte) {
   const g = new THREE.BufferGeometry();
@@ -732,6 +735,19 @@ export class Scena {
     m.ombre = new THREE.MeshBasicMaterial({ color: 0x0c1220, transparent: true, opacity: P.ombra, depthWrite: true, depthFunc: THREE.LessDepth, fog: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
     m.ombrePonti = m.ombre.clone();
     m.ombrePonti.opacity = P.ombraPonte;
+    // Ogni punto del suolo si scurisce una volta sola: l'ombra di un muro e
+    // quella del tetto si sovrappongono, e col solo depth test litigavano a
+    // righe («palazzi trasparenti»). Il bit alto dello stencil segna i punti
+    // già in ombra; `principale.js` lo pulisce prima e dopo la scena.
+    Object.assign(m.ombre, {
+      stencilWrite: true,
+      stencilRef: BIT_OMBRA,
+      stencilFuncMask: BIT_OMBRA,
+      stencilWriteMask: BIT_OMBRA,
+      stencilFunc: THREE.NotEqualStencilFunc,
+      stencilZPass: THREE.ReplaceStencilOp,
+      depthWrite: false,
+    });
     // Sotto gli alberi una macchia tonda e sfumata: più scura al centro.
     const to = tela(64, 64);
     const tg = to.getContext('2d');
