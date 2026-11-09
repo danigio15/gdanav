@@ -666,7 +666,8 @@ function pianifica() {
     S.costruite.delete(k);
     S.sporco.profilo = true;
   }
-  const disegno = daDisegnare(S.costruite, qui[0], qui[1]);
+  const disegno = daDisegnare(S.costruite, qui[0], qui[1], BUDGET, S.disegnate);
+  S.disegnate = disegno.si;
   for (const k of S.costruite.keys()) scena.mostraTessera(k, disegno.si.has(k));
   if (S.lavoro || !lavoratore) return;
   let prossima = piano.richieste[0];
