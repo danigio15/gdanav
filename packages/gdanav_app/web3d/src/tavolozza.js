@@ -80,7 +80,7 @@ export const TETTI = {
   // chiaro. Da sopra l'edificio si legge, e la città non è grigia.
   giorno: ['#b8654c', '#c4775b', '#a95b45', '#c9866a', '#b56f57', '#c08a74', '#d6d1c8', '#bd6a4f'],
   notte: ['#4a3d3b', '#4f4240', '#463a38', '#524542', '#4a3e3c', '#4f4341', '#424852', '#4a3d3b'],
-  industriaGiorno: ['#d9d6cf', '#dedbd4', '#d2d0cb', '#e0ddd6', '#cfcdc8'],
+  industriaGiorno: ['#e8e2d6', '#ece7dc', '#e2dccf', '#efe9de', '#dfd8ca'],
   // Gli uffici e le torri: tetti piani, chiari e freddi.
   ufficiGiorno: ['#d3d8dd', '#dce0e4', '#cdd3d9', '#d8dcdf'],
   ufficiNotte: ['#3c414b', '#424852', '#3c414b', '#424852'],

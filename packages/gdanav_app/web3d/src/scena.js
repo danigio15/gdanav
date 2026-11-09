@@ -659,6 +659,17 @@ export class Scena {
     m.ombre = new THREE.MeshBasicMaterial({ color: 0x0c1220, transparent: true, opacity: P.ombra, depthWrite: true, depthFunc: THREE.LessDepth, fog: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
     m.ombrePonti = m.ombre.clone();
     m.ombrePonti.opacity = P.ombraPonte;
+    // Sotto gli alberi una macchia tonda e sfumata: più scura al centro.
+    const to = tela(64, 64);
+    const tg = to.getContext('2d');
+    const go = tg.createRadialGradient(32, 32, 0, 32, 32, 32);
+    go.addColorStop(0, 'rgba(255,255,255,1)');
+    go.addColorStop(0.3, 'rgba(255,255,255,0.75)');
+    go.addColorStop(0.65, 'rgba(255,255,255,0.25)');
+    go.addColorStop(1, 'rgba(255,255,255,0)');
+    tg.fillStyle = go;
+    tg.fillRect(0, 0, 64, 64);
+    m.ombreAlberi = new THREE.MeshBasicMaterial({ color: 0x0c1220, alphaMap: trama(to, false), transparent: true, opacity: P.ombra * 0.75, depthWrite: false, fog: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
     ['residenziale', 'uffici', 'industria'].forEach((s, i) => {
       const [mappa, luci] = trameFacciata(s, 11 + i * 7);
       m['facciata-' + s] = new THREE.MeshLambertMaterial({
@@ -834,6 +845,11 @@ export class Scena {
       const o = new THREE.Mesh(geometria(t.ombrePonti, notte));
       o.position.z = 0.46;
       aggiungi('ombrePonti', o, 2);
+    }
+    if (t.ombreAlberi) {
+      const o = new THREE.Mesh(geometria(t.ombreAlberi, notte));
+      o.position.z = 0.42;
+      aggiungi('ombreAlberi', o, 2);
     }
     if (t.opere) aggiungi('opere', new THREE.Mesh(geometria(t.opere, notte)), 3);
     for (const [s, d] of Object.entries(t.facciate)) aggiungi('facciata-' + s, new THREE.Mesh(geometria(d, notte)), 3);

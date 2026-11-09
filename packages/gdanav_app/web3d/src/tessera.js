@@ -808,7 +808,9 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
 
   // ── Gli alberi ────────────────────────────────────────────────────────
   const alberi = lim.alberi > 0 ? piantaAlberi({ centro, sys, x, y, linee, visibili, edifici: edificiOut, limite: lim.alberi, seme, dentro }) : [];
-  const istanzeAlberi = istanzeDiAlberi(alberi, ombre);
+  // Le ombre degli alberi: macchie tonde e sfumate (una trama), non esagoni.
+  const ombreAlberi = new Costruttore({ uv: true });
+  const istanzeAlberi = istanzeDiAlberi(alberi, ombreAlberi);
 
   // ── I lampioni ────────────────────────────────────────────────────────
   const lamp = lampioni.filter((l) => dentro(l.x, l.y)).slice(0, lim.lampioni);
@@ -945,6 +947,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     opere: opere.triangoli ? opere.fatto() : null,
     ombre: ombre.triangoli ? ombre.fatto() : null,
     ombrePonti: ombrePonti.triangoli ? ombrePonti.fatto() : null,
+    ombreAlberi: ombreAlberi.triangoli ? ombreAlberi.fatto() : null,
     facciate: Object.fromEntries(STILI.filter((s) => facciate[s].triangoli).map((s) => [s, facciate[s].fatto()])),
     tetti: tetti.triangoli ? tetti.fatto() : null,
     fusti,
@@ -961,7 +964,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   out.conti = {
     strade: triStrade,
     opere: opere.triangoli,
-    ombre: ombre.triangoli + ombrePonti.triangoli,
+    ombre: ombre.triangoli + ombrePonti.triangoli + ombreAlberi.triangoli,
     edifici: triEdifici,
     edificiFatti,
     edificiTotali: edificiOut.length,
@@ -984,7 +987,7 @@ export function stimaTriangoli(t) {
   const tri = (g) => (g ? g.indici.length / 3 : 0);
   let n = 0;
   for (const g of Object.values(t.strade)) n += tri(g);
-  n += tri(t.opere) + tri(t.ombre) + tri(t.ombrePonti) + tri(t.tetti);
+  n += tri(t.opere) + tri(t.ombre) + tri(t.ombrePonti) + tri(t.ombreAlberi) + tri(t.tetti);
   for (const g of Object.values(t.facciate)) n += tri(g);
   n += (t.fusti.length / 16) * TRIANGOLI_ISTANZA.fusto + (t.capitelli.length / 16) * TRIANGOLI_ISTANZA.capitello;
   // Gli alberi sono immagini: due triangoli l'uno.
@@ -1210,7 +1213,11 @@ function piantaAlberi({ centro, sys, x, y, linee, visibili, edifici, limite, sem
   return alberi;
 }
 
-/** Le istanze degli alberi: tronchi, chiome (due), coni; e le loro ombre tonde. */
+/**
+ * Le istanze degli alberi: tronchi, chiome (due), coni; e le loro ombre: un
+ * quadrato con la trama di una macchia tonda e sfumata (vedi `Scena`), poco
+ * spostato verso l'ombra, così sta sotto la chioma come quella vera.
+ */
 function istanzeDiAlberi(alberi, ombre) {
   const latifoglie = alberi.filter((t) => t[3] === 0).length;
   const conifere = alberi.length - latifoglie;
@@ -1276,14 +1283,11 @@ function istanzeDiAlberi(alberi, ombre) {
       alto = th * 0.6 + hh * 0.4;
       raggio = rad;
     }
-    // L'ombra: un esagono steso a terra, spostato col sole.
-    const cx = px + sox * alto;
-    const cy = py + soy * alto;
-    const rr2 = raggio * 0.95;
-    const centro = ombre.v(cx, cy, 0, 0, 0, 1);
-    const giro = [];
-    for (let k = 0; k < 6; k++) giro.push(ombre.v(cx + Math.cos((k * Math.PI) / 3) * rr2, cy + Math.sin((k * Math.PI) / 3) * rr2, 0, 0, 0, 1));
-    for (let k = 0; k < 6; k++) ombre.tri(centro, giro[k], giro[(k + 1) % 6]);
+    // L'ombra: una macchia sfumata a terra, un po' spostata col sole.
+    const cx = px + sox * alto * 0.5;
+    const cy = py + soy * alto * 0.5;
+    const rr2 = raggio * 1.25;
+    ombre.quad([cx - rr2, cy - rr2, 0, 0, 0], [cx + rr2, cy - rr2, 0, 1, 0], [cx + rr2, cy + rr2, 0, 1, 1], [cx - rr2, cy + rr2, 0, 0, 1], [0, 0, 1]);
   }
   return { tronchi, chiome, chiome2, coni, coloriChiome, coloriChiome2, coloriConi, foglie, coloriFoglie, abeti, coloriAbeti };
 }
@@ -1369,6 +1373,7 @@ export function bufferDellaTessera(t) {
   geo(t.opere);
   geo(t.ombre);
   geo(t.ombrePonti);
+  geo(t.ombreAlberi);
   geo(t.tetti);
   for (const g of Object.values(t.facciate)) geo(g);
   for (const a of [t.fusti, t.capitelli, t.pali, t.teste, t.luci, t.segmenti, ...Object.values(t.alberi)]) lista.push(a.buffer);
