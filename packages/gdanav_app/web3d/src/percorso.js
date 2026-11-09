@@ -122,8 +122,14 @@ export class IndiceSegmenti {
             const w = s[o + 6];
             if (d > w / 2 + 4 || d > raggio) continue;
             const coseno = dx || dy ? Math.abs((sx * dx + sy * dy) / Math.sqrt(l2) / (Math.hypot(dx, dy) || 1)) : 1;
-            if (coseno < 0.7) continue;
-            out.push({ h: s[o + 2] + (s[o + 5] - s[o + 2]) * u, d, codice: s[o + 7], galleria: (s[o + 7] & 64) !== 0 });
+            const h = s[o + 2] + (s[o + 5] - s[o + 2]) * u;
+            // Una strada in quota vale solo se va quasi come il percorso
+            // (entro 23°): «la linea non può salire sul ponte se la strada è
+            // sotto». Un cavalcavia che taglia di sbieco passava il filtro
+            // dei 45°, e dove il percorso cambia carreggiata (sotto, nessuna
+            // strada abbastanza vicina) la linea saliva sull'impalcato.
+            if (coseno < (h > 2.5 ? 0.92 : 0.7)) continue;
+            out.push({ h, d, codice: s[o + 7], galleria: (s[o + 7] & 64) !== 0 });
           }
         }
       }
@@ -183,7 +189,10 @@ export function quote(punti, indice) {
         let meglio = Infinity;
         let quale = 0;
         for (let q = 0; q < prev.length; q++) {
-          const v = costi[k - 1 - i][q] + Math.abs(c.h - prev[q].h) * 1.0;
+          // Un salto di quota fra due punti vicini (4 m) costa molto più
+          // della salita di una rampa vera, che sale poco a ogni passo.
+          const salto = Math.abs(c.h - prev[q].h);
+          const v = costi[k - 1 - i][q] + salto * (salto > 1.5 ? 4 : 1);
           if (v < meglio) {
             meglio = v;
             quale = q;

@@ -37,6 +37,7 @@ void main() {
     await tester.runAsync(() => d.avvia(auto: a.auto, viaggio: a.viaggio, guida: a.guida, prova: prova));
     // Con due code l'auto è elettrica al 62%: la foto della riga della batteria.
     expect(a.auto.elettrica, isTrue);
+    expect(a.auto.stato?.batteria, 62);
     final pronto = a.viaggio.stato as ViaggioPronto;
     expect(pronto.destinazione.nome, 'Orvieto');
     expect(pronto.viaggio.percorso.ritardoTraffico.inMinutes, 18);

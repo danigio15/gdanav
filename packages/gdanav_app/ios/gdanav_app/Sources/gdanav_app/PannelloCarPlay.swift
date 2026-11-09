@@ -159,7 +159,8 @@ final class PannelloCarPlay: UIView {
     /// Sullo schermo piccolo la riga del viaggio di Android Auto («🔋 51% ·
     /// 200 km · arrivo 46% · ☀ 12°») in due righe corte, sotto il traffico
     /// (o la velocità): prima sullo schermo piccolo la batteria non c'era.
-    private func batteriaPiccola(_ a: CGRect, _ c: CruscottoAuto, sotto: CGRect?, aDestra: Bool, margine: CGFloat) {
+    @discardableResult
+    private func batteriaPiccola(_ a: CGRect, _ c: CruscottoAuto, sotto: CGRect?, aDestra: Bool, margine: CGFloat) -> CGRect? {
         let b = c.elettrica ? c.batteria : nil
         let circa = c.batteriaStimata ? "~" : ""
         let prima = [
@@ -168,7 +169,7 @@ final class PannelloCarPlay: UIView {
         ].compactMap { $0 }.joined(separator: " · ")
         let meteo = c.meteoTemperatura.map { "\(c.meteoEmoji ?? "") \(Int($0.rounded()))°".trimmingCharacters(in: .whitespaces) }
         let arrivo = b != nil ? c.arrivoBatteria : nil
-        if prima.isEmpty && meteo == nil && arrivo == nil { return }
+        if prima.isEmpty && meteo == nil && arrivo == nil { return nil }
         let forte: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 11.5, weight: .bold), .foregroundColor: UIColor.white]
         let piano: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 10.5, weight: .regular), .foregroundColor: muto]
         let verde = UIColor(red: 102 / 255, green: 187 / 255, blue: 106 / 255, alpha: 1)
@@ -184,9 +185,16 @@ final class PannelloCarPlay: UIView {
         let w = (righe.map { larghezza($0, forte) }.max() ?? 0) + p * 2
         let hRiga: CGFloat = 15
         let h = CGFloat(righe.count) * hRiga + 8
-        let x = aDestra ? (sotto?.maxX ?? a.maxX - margine) - w : (sotto?.minX ?? a.minX + margine)
-        let y = (sotto?.maxY ?? a.minY + margine) + 4
-        guard x >= a.minX, y + h <= a.maxY else { return }
+        var x = aDestra ? (sotto?.maxX ?? a.maxX - margine) - w : (sotto?.minX ?? a.minX + margine)
+        var y = (sotto?.maxY ?? a.minY + margine) + 4
+        // Sotto non ci sta (la scheda dei tempi in basso si prende lo
+        // spazio): accanto alla colonna della velocità, in alto. Prima in
+        // quel caso la riga non si disegnava, senza dire niente.
+        if y + h > a.maxY, let sotto {
+            x = aDestra ? sotto.minX - margine - w : sotto.maxX + margine
+            y = a.minY + margine
+        }
+        guard x >= a.minX, x + w <= a.maxX, y + h <= a.maxY else { return nil }
         let box = CGRect(x: x, y: y, width: w, height: h)
         fondoScheda.setFill()
         UIBezierPath(roundedRect: box, cornerRadius: 10).fill()
@@ -207,6 +215,7 @@ final class PannelloCarPlay: UIView {
                 scrivi(meteo, cx, linea, forte)
             }
         }
+        return box
     }
 
     // MARK: - La barra dei dati
@@ -354,12 +363,16 @@ final class PannelloCarPlay: UIView {
         let schedaASinistra = area.left >= area.right
         let colonna = velocitaPiccola(a, c, aDestra: schedaASinistra, margine: margine)
         let ritardo = trafficoPiccolo(a, sotto: colonna, aDestra: schedaASinistra, margine: margine)
-        batteriaPiccola(a, c, sotto: ritardo ?? colonna, aDestra: schedaASinistra, margine: margine)
+        let riga = batteriaPiccola(a, c, sotto: ritardo ?? colonna, aDestra: schedaASinistra, margine: margine)
         // L'avviso nello spazio che resta accanto alla colonna.
         var sinistra = a.minX + margine
         var destra = a.maxX - margine
         if let colonna {
             if schedaASinistra { destra = colonna.minX - margine } else { sinistra = colonna.maxX + margine }
+        }
+        // La riga della batteria accanto alla colonna, in alto: l'avviso le sta accanto.
+        if let riga, riga.minY < a.minY + margine + 1 {
+            if schedaASinistra { destra = min(destra, riga.minX - margine) } else { sinistra = max(sinistra, riga.maxX + margine) }
         }
         if destra - sinistra > 80 {
             avviso(sinistra: sinistra, destra: destra, alto: a.minY + margine, piccolo: true)

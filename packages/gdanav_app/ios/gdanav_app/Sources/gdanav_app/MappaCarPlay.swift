@@ -307,12 +307,26 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         freccia.isHidden = true
         let a = areaSicura
         // L'anteprima delle strade sta a sinistra e copre quasi metà mappa.
-        let margini = UIEdgeInsets(
+        var margini = UIEdgeInsets(
             top: a.top + 24,
             left: max(a.left, mappa.bounds.width * 0.46) + 16,
             bottom: a.bottom + 24,
             right: a.right + 24
         )
+        // Mai più margini della mappa: con lo schermo piccolo la somma
+        // superava la mappa, e MapLibre la lasciava allo zoom del mondo.
+        let largo = mappa.bounds.width, alto = mappa.bounds.height
+        if margini.left + margini.right > largo - 60 {
+            let k = max(largo - 60, 0) / (margini.left + margini.right)
+            margini.left *= k
+            margini.right *= k
+        }
+        if margini.top + margini.bottom > alto - 50 {
+            let k = max(alto - 50, 0) / (margini.top + margini.bottom)
+            margini.top *= k
+            margini.bottom *= k
+        }
+        guard largo > 0, alto > 0 else { stradeInquadrate = nil; return false }
         if mappa.contentInset != .zero { mappa.setContentInset(.zero, animated: false, completionHandler: nil) }
         let camera = mappa.cameraThatFitsCoordinateBounds(MLNCoordinateBoundsMake(sw, ne), edgePadding: margini)
         mappa.setCamera(camera, withDuration: 0.6, animationTimingFunction: CAMediaTimingFunction(name: .easeInEaseOut))

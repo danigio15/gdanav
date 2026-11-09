@@ -44,6 +44,22 @@ test('chi sale sul viadotto ci resta; chi sta sotto resta sotto', () => {
   assert.ok(Math.max(...g.map((v, k) => (giu[k][0] > 100 ? v : 0))) < 0.5, 'sotto il viadotto a terra');
 });
 
+test('sotto un cavalcavia di sbieco la linea resta a terra, anche cambiando carreggiata', () => {
+  // La strada a terra lungo x, interrotta fra 80 e 160 (il percorso lì passa
+  // di lato, da una carreggiata alla rampa); sopra, a 8 m, un cavalcavia
+  // che la taglia a 35°, largo 20 m.
+  const a = (35 * Math.PI) / 180;
+  const i = indice([
+    [-300, 0, 0, 80, 0, 0, 10, 1],
+    [160, 0, 0, 400, 0, 0, 10, 1],
+    [120 - 300 * Math.cos(a), -300 * Math.sin(a), 8, 120 + 300 * Math.cos(a), 300 * Math.sin(a), 8, 20, 49],
+  ]);
+  const punti = [];
+  for (let x = -100; x <= 300; x += 4) punti.push([x, 0]);
+  const h = riempiQuote(quote(punti, i));
+  assert.ok(Math.max(...h) < 0.5, `la linea sale sul ponte (${Math.max(...h).toFixed(1)} m)`);
+});
+
 test('i buchi: corti si riempiono, lunghi tornano a terra', () => {
   const h = riempiQuote([7, NaN, NaN, 7]);
   assert.ok(h.every((v) => Math.abs(v - 7) < 0.01));
