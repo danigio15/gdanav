@@ -3,6 +3,7 @@
 // di MapLibre (`principale.js`), con la sua telecamera.
 
 import * as THREE from 'three';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { generatore } from './caso.js';
 import { CAMPATA, NASTRI, PERIODO_STRADA, PIANO } from './tessera.js';
 import { GIORNO, NOTTE, SOLE } from './tavolozza.js';
@@ -12,6 +13,29 @@ const VICINO_VETRO = 120;
 
 /** Quanto si vede attraverso, lì: i punti tolti dalle facciate (0,6 = sei su dieci). */
 const VETRO = 0.6;
+
+/**
+ * La chioma di una latifoglia: una sfera un poco bitorzoluta (80 triangoli,
+ * 20 quella piccola accanto) con le normali morbide; non l'icosaedro a facce piatte di prima.
+ */
+function chiomaMorbida(dettaglio = 1) {
+  const g = new THREE.IcosahedronGeometry(1, dettaglio);
+  g.deleteAttribute('normal');
+  g.deleteAttribute('uv');
+  const p = g.getAttribute('position');
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    // Bitorzoli fissi (dalla posizione, uguali per i vertici in comune).
+    const k = 1 + 0.09 * Math.sin(v.x * 5.3 + v.y * 2.1) * Math.cos(v.z * 4.7 - v.x * 1.3);
+    v.multiplyScalar(k);
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  // Le facce sono separate: si uniscono i vertici per avere le normali morbide.
+  const unita = mergeVertices(g);
+  unita.computeVertexNormals();
+  return unita;
+}
 
 const tela = (w, h) => {
   const c = document.createElement('canvas');
@@ -336,7 +360,9 @@ export class Scena {
       fusto,
       capitello,
       tronco,
-      chioma: new THREE.IcosahedronGeometry(1, 0),
+      chioma: chiomaMorbida(),
+      // La chioma piccola accanto: meno triangoli, morbida uguale.
+      chioma2: chiomaMorbida(0),
       cono,
       palo,
       testa: new THREE.BoxGeometry(1, 1, 1),
@@ -443,8 +469,23 @@ export class Scena {
     this.vetroVicino(m.tetti, 'tetti');
     m.fusto = new THREE.MeshLambertMaterial({ color: P.pilone });
     m.capitello = new THREE.MeshLambertMaterial({ color: P.trave });
-    m.tronco = new THREE.MeshLambertMaterial({ color: notte ? '#3a2e26' : '#6b5241' });
-    m.chioma = new THREE.MeshLambertMaterial({ flatShading: true, color: notte ? 0xe6e6e6 : 0xffffff });
+    m.tronco = new THREE.MeshLambertMaterial({ color: notte ? '#2e2823' : '#4f4238' });
+    // Le chiome morbide (niente facce piatte), più scure sotto e dentro: la
+    // luce del cielo arriva dall'alto, sotto la chioma c'è ombra.
+    m.chioma = new THREE.MeshLambertMaterial({ color: notte ? 0xd8d8d8 : 0xffffff });
+    m.chioma.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', `#include <common>
+          varying float vAltoChioma;`)
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          vAltoChioma = position.z;`);
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', `#include <common>
+          varying float vAltoChioma;`)
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          diffuseColor.rgb *= mix(0.55, 1.08, smoothstep(-1.0, 0.9, vAltoChioma));`);
+    };
+    m.chioma.customProgramCacheKey = () => 'chioma-ombra';
     m.palo = new THREE.MeshLambertMaterial({ color: notte ? 0x3b4250 : 0x8d949e });
     m.testa = notte ? new THREE.MeshBasicMaterial({ color: 0xffd9a0 }) : new THREE.MeshLambertMaterial({ color: 0x9aa1aa });
     if (notte) {
@@ -498,22 +539,36 @@ export class Scena {
         .replace(
           '#include <common>',
           `#include <common>
-          varying vec2 vSulPiano;`,
+          varying vec2 vSulPiano;
+          varying float vQuota;`,
         )
         .replace(
           '#include <worldpos_vertex>',
           `#include <worldpos_vertex>
-          vSulPiano = (modelMatrix * vec4(transformed, 1.0)).xy;`,
+          vSulPiano = (modelMatrix * vec4(transformed, 1.0)).xy;
+          vQuota = transformed.z;`,
         );
       sh.fragmentShader = sh.fragmentShader
         .replace(
           '#include <common>',
           `#include <common>
           varying vec2 vSulPiano;
+          varying float vQuota;
           uniform vec2 uAuto;
           uniform vec2 uDir;
           uniform float uVicino;
           uniform float uVetro;`,
+        )
+        .replace(
+          '#include <color_fragment>',
+          nome.startsWith('facciata')
+            ? `#include <color_fragment>
+          // Più scure verso terra, un poco più chiare in alto: la luce del
+          // cielo e l'ombra della strada. «Gli edifici sembrano tutto
+          // cartonato»: prima la facciata era dello stesso colore dal
+          // marciapiede al tetto.
+          diffuseColor.rgb *= mix(0.62, 1.0, smoothstep(0.0, 14.0, vQuota)) * mix(1.0, 1.06, smoothstep(14.0, 60.0, vQuota));`
+            : '#include <color_fragment>',
         )
         .replace(
           '#include <clipping_planes_fragment>',
@@ -574,7 +629,7 @@ export class Scena {
     if (a.tronchi.length) aggiungi('tronco', istanze(g.tronco, null, a.tronchi), 3);
     if (a.chiome.length) {
       aggiungi('chioma', istanze(g.chioma, null, a.chiome, a.coloriChiome), 3);
-      aggiungi('chioma', istanze(g.chioma, null, a.chiome2, a.coloriChiome2), 3);
+      aggiungi('chioma', istanze(g.chioma2, null, a.chiome2, a.coloriChiome2), 3);
     }
     if (a.coni.length) aggiungi('chioma', istanze(g.cono, null, a.coni, a.coloriConi), 3);
     if (t.pali.length) {

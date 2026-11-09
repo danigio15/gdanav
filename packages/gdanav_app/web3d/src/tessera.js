@@ -972,7 +972,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
 }
 
 /** Triangoli di una geometria istanziata, per le stime. */
-export const TRIANGOLI_ISTANZA = { fusto: 24, capitello: 12, tronco: 10, chioma: 20, chioma2: 20, cono: 7, palo: 12, testa: 12 };
+export const TRIANGOLI_ISTANZA = { fusto: 24, capitello: 12, tronco: 10, chioma: 80, chioma2: 20, cono: 7, palo: 12, testa: 12 };
 
 /** Quanti triangoli disegna la tessera (le istanze contano per ognuna). */
 export function stimaTriangoli(t) {

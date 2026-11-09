@@ -78,19 +78,22 @@ export const TETTI = {
   industriaNotte: ['#4a4f58', '#4a4f58', '#4a4f58', '#4a4f58', '#4a4f58'],
 };
 
-/** Le chiome d'autunno (colore, peso): il prototipo approvato. */
+/**
+ * Le chiome (colore, peso): verdi veri, scuri e chiari, qualcuno oliva, pochi
+ * più gialli. «Questi alberi così sono orrendi»: le chiome d'autunno del
+ * prototipo (arancio, rosso, giallo) facevano un bosco di cartone colorato.
+ */
 export const CHIOME = [
-  ['#6f9440', 14],
-  ['#58833a', 10],
-  ['#86a03e', 8],
-  ['#d6a62d', 14],
-  ['#e2b941', 8],
-  ['#dc7f2a', 14],
-  ['#c9632b', 10],
-  ['#e3943a', 6],
-  ['#b8452c', 9],
-  ['#9e3424', 5],
-  ['#8e5a2c', 4],
+  ['#4b6b34', 16],
+  ['#56783a', 14],
+  ['#3f5e2f', 12],
+  ['#62823f', 10],
+  ['#4f6a3c', 9],
+  ['#6b8a46', 7],
+  ['#5a6f35', 6],
+  ['#38522c', 6],
+  ['#7a8f45', 3],
+  ['#8a8a42', 2],
 ];
 
 /** Da «#rrggbb» a [r, g, b] (0..255). */
