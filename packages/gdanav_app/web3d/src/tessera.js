@@ -761,9 +761,12 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     const uoff = Math.floor(r() * 4) * 0.25;
     const voff = Math.floor(r() * 4) * 0.25;
     const prima = gb.triangoli + tetti.triangoli + ombre.triangoli;
-    for (const anello of b.anelli) {
+    for (const [k, anello] of b.anelli.entries()) {
       const p = anello.pts;
-      const ccw = area(p) < 0;
+      // I muri guardano fuori dall'anello; quelli di un cortile (gli anelli
+      // dopo il primo) guardano dentro, verso il cortile: prima guardavano
+      // dentro il muro e sparivano.
+      const ccw = area(p) < 0 !== k > 0;
       let per = 0;
       for (let i = 0; i < p.length; i++) {
         const a = p[i];

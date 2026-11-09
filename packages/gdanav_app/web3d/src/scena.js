@@ -929,6 +929,10 @@ export class Scena {
     };
     materiale.transparent = true;
     materiale.depthWrite = true;
+    // Le pareti da tutte e due le parti: nelle tessere qualche contorno è
+    // girato al contrario (o un cortile è scritto come un edificio), e la
+    // parete girata spariva: il tetto restava sospeso sul vuoto.
+    materiale.side = THREE.DoubleSide;
     materiale.customProgramCacheKey = () => 'guida-' + nome;
   }
 
