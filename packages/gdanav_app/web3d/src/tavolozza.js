@@ -62,8 +62,10 @@ export const NOTTE = {
 export const FACCIATE = {
   residenziale: {
     // Chiari e caldi, poco saturi: si vedono come case, non tirano l'occhio.
-    giorno: ['#ece3d3', '#f1e9dc', '#e3cdb5', '#dcc0a6', '#f3efe8', '#e6d5bf', '#e8d2bb', '#ddd2c3', '#e2c9b0'],
-    notte: ['#8c8378', '#91877a', '#7d6a5f', '#806155', '#8d8a85', '#86786a', '#8c8378', '#91877a', '#7d6a5f'],
+    // I colori delle città italiane: ocra, giallo, rosa, terracotta, panna,
+    // bianco, grigio pietra. «Sempre uguali»: erano nove beige quasi uguali.
+    giorno: ['#ecd9a8', '#f0dfb4', '#e6c48c', '#efc9b4', '#e8b8a0', '#d9a07e', '#f3ecdf', '#f6f3ee', '#e3dccf', '#d8d4cc', '#f1e1c9', '#e9cfae', '#dfe0d6', '#efd6c4'],
+    notte: ['#8c8270', '#91877a', '#86745e', '#8a7468', '#866a5e', '#7d6252', '#8d8a85', '#91908c', '#86817a', '#7f7c77', '#8c8378', '#86786a', '#80817b', '#8a7a70'],
   },
   uffici: {
     giorno: ['#d5dde6', '#e2e6eb', '#cbd5df', '#dbe2e9'],

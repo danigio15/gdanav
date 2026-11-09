@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { generatore } from './caso.js';
-import { CAMPATA, NASTRI, PERIODO_STRADA, PIANO } from './tessera.js';
+import { CAMPATA, NASTRI, PERIODO_STRADA, PIANO, STILI_FACCIATA } from './tessera.js';
 import { GIORNO, NOTTE, SOLE } from './tavolozza.js';
 
 
@@ -318,8 +318,23 @@ function tramaStrada(nome, P, notte) {
   return trama(c);
 }
 
-/** Le facciate: quattro campate per quattro piani; il giorno e le finestre accese di notte. */
-function trameFacciata(stile, seme) {
+/**
+ * Le facciate: quattro campate per quattro piani; il giorno e le finestre
+ * accese di notte. «Vedo gli edifici sempre uguali»: una sola trama per
+ * tipo faceva una città di fotocopie. Ora ogni tipo ha i suoi modelli
+ * ([variante], vedi `VARIANTI_FACCIATA`):
+ *
+ *  - residenziale 0: finestre con le persiane verdi aperte;
+ *  - residenziale 1: portefinestre con i balconi e la ringhiera, persiane marroni;
+ *  - residenziale 2: palazzo d'epoca, finestre con la cornice e il timpano,
+ *    una fascia a ogni piano;
+ *  - residenziale 3: anni '70, finestre a nastro e balconi continui;
+ *  - uffici 0: vetrata a griglia; uffici 1: nastri di vetro e marcapiani;
+ *  - industria: finestre alte a nastro.
+ *
+ * La trama è bianca dove c'è il muro: il colore lo dà l'edificio.
+ */
+function trameFacciata(stile, seme, variante = 0) {
   const N = 4;
   const CW = 64;
   const Wp = N * CW;
@@ -331,12 +346,30 @@ function trameFacciata(stile, seme) {
   g.fillRect(0, 0, Wp, Wp);
   h.fillStyle = '#000';
   h.fillRect(0, 0, Wp, Wp);
-  const r = generatore(seme);
-  for (let i = 0; i < 3000; i++) {
+  const r = generatore(seme + variante * 101);
+  // L'intonaco: macchie leggere, più fitte in basso (lo sporco della strada).
+  for (let i = 0; i < 3500; i++) {
     g.fillStyle = `rgba(0,0,0,${r() * 0.05})`;
-    g.fillRect(r() * Wp, r() * Wp, 2, 2);
+    g.fillRect(r() * Wp, r() * Wp, 2 + r() * 3, 2 + r() * 3);
   }
   const caldi = ['#ffd27a', '#ffe0a3', '#fff1cf', '#ffc46b', '#cfe1ff'];
+  const persiane = variante === 1 ? ['#6e4a33', '#7a5236', '#654330'] : ['#4d7550', '#557d57', '#466c4a'];
+  const vetro = (x, y, w, hh, freddo = false) => {
+    const tono = 40 + Math.floor(r() * 30);
+    g.fillStyle = freddo ? `rgb(${tono + 95},${tono + 115},${tono + 135})` : `rgb(${tono},${tono + 8},${tono + 20})`;
+    g.fillRect(x, y, w, hh);
+    const gr = g.createLinearGradient(0, y, 0, y + hh);
+    gr.addColorStop(0, 'rgba(255,255,255,0.28)');
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr;
+    g.fillRect(x, y, w, hh);
+  };
+  const anta = (x, y, w, hh) => {
+    g.fillStyle = persiane[Math.floor(r() * persiane.length)];
+    g.fillRect(x, y, w, hh);
+    g.fillStyle = 'rgba(0,0,0,0.22)';
+    for (let k = y + 3; k < y + hh - 1; k += 4) g.fillRect(x + 1, k, w - 2, 1);
+  };
   for (let fy = 0; fy < N; fy++) {
     for (let bx = 0; bx < N; bx++) {
       const x0 = bx * CW;
@@ -345,36 +378,73 @@ function trameFacciata(stile, seme) {
       let wx1;
       let wy0;
       let wy1;
-      if (stile === 'uffici') [wx0, wx1, wy0, wy1] = [3, 61, 10, 52];
-      else if (stile === 'industria') {
+      if (stile === 'uffici' && variante === 1) {
+        [wx0, wx1, wy0, wy1] = [0, 64, 8, 42];
+        vetro(x0, y0 + wy0, CW, wy1 - wy0, true);
+        g.fillStyle = 'rgba(210,218,226,0.95)';
+        g.fillRect(x0 + 31, y0 + wy0, 2, wy1 - wy0);
+        g.fillStyle = 'rgba(0,0,0,0.16)';
+        g.fillRect(x0, y0 + wy1, CW, 3);
+      } else if (stile === 'uffici') {
+        [wx0, wx1, wy0, wy1] = [3, 61, 10, 52];
+        vetro(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0, true);
+        g.strokeStyle = 'rgba(255,255,255,0.9)';
+        g.lineWidth = 2;
+        g.strokeRect(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
+        g.fillStyle = 'rgba(220,225,230,0.9)';
+        g.fillRect(x0 + 31, y0 + wy0, 2, wy1 - wy0);
+      } else if (stile === 'industria') {
         [wx0, wx1, wy0, wy1] = [0, 64, 14, 30];
         if (fy % 2) {
           g.fillStyle = 'rgba(0,0,0,0.10)';
           g.fillRect(x0 + 31, y0, 2, CW);
           continue;
         }
-      } else [wx0, wx1, wy0, wy1] = [18, 46, 12, 50];
-      const tono = 40 + Math.floor(r() * 30);
-      g.fillStyle = stile === 'uffici' ? `rgb(${tono + 95},${tono + 115},${tono + 135})` : `rgb(${tono},${tono + 8},${tono + 20})`;
-      g.fillRect(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
-      const gr = g.createLinearGradient(0, y0 + wy0, 0, y0 + wy1);
-      gr.addColorStop(0, 'rgba(255,255,255,0.28)');
-      gr.addColorStop(1, 'rgba(255,255,255,0)');
-      g.fillStyle = gr;
-      g.fillRect(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
-      g.strokeStyle = 'rgba(255,255,255,0.9)';
-      g.lineWidth = 2;
-      g.strokeRect(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
-      if (stile === 'uffici') {
-        g.fillStyle = 'rgba(220,225,230,0.9)';
+        vetro(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
+      } else if (variante === 1) {
+        // Portafinestra, balcone e ringhiera.
+        [wx0, wx1, wy0, wy1] = [23, 41, 8, 58];
+        vetro(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
+        anta(x0 + wx0 - 9, y0 + wy0, 8, wy1 - wy0);
+        anta(x0 + wx1 + 1, y0 + wy0, 8, wy1 - wy0);
+        g.fillStyle = 'rgba(0,0,0,0.38)';
+        g.fillRect(x0 + 8, y0 + 59, 48, 4);
+        g.fillStyle = 'rgba(40,40,40,0.75)';
+        g.fillRect(x0 + 8, y0 + 44, 48, 2);
+        for (let k = x0 + 9; k < x0 + 56; k += 4) g.fillRect(k, y0 + 44, 1, 15);
+      } else if (variante === 2) {
+        // Palazzo d'epoca: cornice, timpano, fascia al piano.
+        [wx0, wx1, wy0, wy1] = [21, 43, 16, 52];
+        g.fillStyle = 'rgba(0,0,0,0.13)';
+        g.fillRect(x0 + wx0 - 4, y0 + wy0 - 4, wx1 - wx0 + 8, wy1 - wy0 + 8);
+        g.fillStyle = '#ffffff';
+        g.fillRect(x0 + wx0 - 2, y0 + wy0 - 2, wx1 - wx0 + 4, wy1 - wy0 + 4);
+        vetro(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
+        g.fillStyle = 'rgba(0,0,0,0.3)';
+        g.fillRect(x0 + wx0 - 5, y0 + wy0 - 8, wx1 - wx0 + 10, 3);
+        g.fillRect(x0 + wx0 - 3, y0 + wy1 + 3, wx1 - wx0 + 6, 3);
+        g.fillStyle = 'rgba(0,0,0,0.12)';
+        g.fillRect(x0, y0 + 61, CW, 3);
+      } else if (variante === 3) {
+        // Anni '70: finestra larga e balcone continuo col parapetto pieno.
+        [wx0, wx1, wy0, wy1] = [6, 58, 12, 38];
+        vetro(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
+        g.fillStyle = 'rgba(255,255,255,0.85)';
         g.fillRect(x0 + 31, y0 + wy0, 2, wy1 - wy0);
-      }
-      if (stile === 'residenziale') {
-        g.fillStyle = 'rgba(0,0,0,0.25)';
-        g.fillRect(x0 + wx0 - 2, y0 + wy1, wx1 - wx0 + 4, 3);
-        g.fillStyle = 'rgba(0,0,0,0.08)';
-        g.fillRect(x0 + wx0 - 7, y0 + wy0, 6, wy1 - wy0);
-        g.fillRect(x0 + wx1 + 1, y0 + wy0, 6, wy1 - wy0);
+        g.fillStyle = 'rgba(0,0,0,0.2)';
+        g.fillRect(x0, y0 + 42, CW, 18);
+        g.fillStyle = 'rgba(0,0,0,0.4)';
+        g.fillRect(x0, y0 + 60, CW, 4);
+      } else {
+        // Finestre con le persiane aperte e il davanzale.
+        [wx0, wx1, wy0, wy1] = [22, 42, 12, 50];
+        vetro(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
+        if (r() < 0.85) {
+          anta(x0 + wx0 - 10, y0 + wy0, 9, wy1 - wy0);
+          anta(x0 + wx1 + 1, y0 + wy0, 9, wy1 - wy0);
+        } else anta(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
+        g.fillStyle = 'rgba(0,0,0,0.3)';
+        g.fillRect(x0 + wx0 - 3, y0 + wy1, wx1 - wx0 + 6, 3);
       }
       const accesa = r() < (stile === 'industria' ? 0.25 : stile === 'uffici' ? 0.45 : 0.42);
       if (accesa) {
@@ -673,8 +743,9 @@ export class Scena {
     tg.fillStyle = go;
     tg.fillRect(0, 0, 64, 64);
     m.ombreAlberi = new THREE.MeshBasicMaterial({ color: 0x0c1220, alphaMap: trama(to, false), transparent: true, opacity: P.ombra, depthWrite: false, fog: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
-    ['residenziale', 'uffici', 'industria'].forEach((s, i) => {
-      const [mappa, luci] = trameFacciata(s, 11 + i * 7);
+    STILI_FACCIATA.forEach((s) => {
+      const [stile, variante] = s.split('-');
+      const [mappa, luci] = trameFacciata(stile, 11 + ['residenziale', 'uffici', 'industria'].indexOf(stile) * 7, Number(variante));
       m['facciata-' + s] = new THREE.MeshLambertMaterial({
         map: mappa,
         vertexColors: true,

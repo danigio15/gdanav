@@ -43,6 +43,11 @@ export const PERIODO_STRADA = 12;
 export const PIANO = 3.2;
 export const CAMPATA = 3.4;
 
+/** Quanti modelli di facciata ha ogni tipo di edificio (vedi `trameFacciata`). */
+export const VARIANTI_FACCIATA = { residenziale: 4, uffici: 2, industria: 1 };
+/** Le facciate, una geometria e un materiale l'una: «residenziale-0» … */
+export const STILI_FACCIATA = Object.entries(VARIANTI_FACCIATA).flatMap(([s, n]) => Array.from({ length: n }, (_, i) => `${s}-${i}`));
+
 /** Quanto sopra il terreno sta ogni classe di strada (per non litigare col suolo). */
 const SOPRA = { motorway: 0.24, trunk: 0.23, primary: 0.21, secondary: 0.2, tertiary: 0.18, minor: 0.16, service: 0.14, rail: 0.12 };
 
@@ -719,7 +724,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     }
     return basso;
   };
-  const STILI = ['residenziale', 'uffici', 'industria'];
+  const STILI = STILI_FACCIATA;
   const facciate = Object.fromEntries(STILI.map((s) => [s, new Costruttore({ uv: true, colori: true })]));
   const tetti = new Costruttore({ colori: true });
   let triEdifici = 0;
@@ -738,7 +743,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     const v = 0.92 + r() * 0.12;
     const cg = rgb(pal.giorno[scelta]).map((c) => Math.min(255, Math.round(c * v)));
     const cn = rgb(pal.notte[scelta]).map((c) => Math.min(255, Math.round(c * v)));
-    const gb = facciate[stile];
+    const gb = facciate[`${stile}-${Math.floor(r() * VARIANTI_FACCIATA[stile])}`];
     // L'ombra a terra al massimo quella di un palazzo di 40 m: le torri
     // stendevano lastre grigie su interi isolati, come una mappa non caricata.
     const hOmbra = Math.min(h, 40);
