@@ -29,6 +29,8 @@ export const STRATI_SOSTITUITI = [
   'edifici',
   'edifici-3d',
   'edifici-immersivi',
+  // La strada già fatta: da vicino la disegna il 3D, all'altezza della strada.
+  'percorso-fatto',
   'risparmio-bordo',
   'risparmio',
   'percorso-alone',

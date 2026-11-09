@@ -686,6 +686,17 @@ export class Scena {
       uOpacita: { value: 1 },
       uSotto: { value: 0 },
     };
+    this.uniformiFatto = {
+      uCore: { value: colore('#7f9fc9') },
+      uBordo: { value: colore('#4f6f99') },
+      uLargo: { value: 3.6 },
+      uPasso: { value: 16 },
+      uNotte: { value: 0 },
+      uInizio: { value: -1e9 },
+      uFrecce: { value: 0 },
+      uOpacita: { value: 0.85 },
+      uSotto: { value: 0 },
+    };
     this.nastri = {};
     this.colorAuto = '#d62a26';
     this.impostaNotte(false);
@@ -839,6 +850,9 @@ export class Scena {
     m.freccia = nastro(FRAMMENTO_FRECCIA, {}, { polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
     m.punta = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false });
     m.risparmio = nastro(FRAMMENTO_NASTRO, this.uniformiRisparmio, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -3 });
+    // La strada già fatta: un blu più tenue e stretto, senza frecce, sotto il
+    // percorso (come `percorso-fatto` sulla mappa piatta).
+    m.fatto = nastro(FRAMMENTO_NASTRO, this.uniformiFatto, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
     m.traffico = nastro(FRAMMENTO_CODA, { uNotte: { value: notte ? 1 : 0 } }, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
     return m;
   }

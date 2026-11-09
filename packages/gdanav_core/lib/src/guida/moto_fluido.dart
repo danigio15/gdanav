@@ -543,8 +543,9 @@ TelecameraLibera telecameraLibera({required double velocitaMs, required bool tri
  * ([Avanzamento.velocitaStradaKmh]): finché si resta in autostrada la mappa
  * resta larga, e cambia solo cambiando strada o avvicinandosi all'uscita. */
 
-/// Di quanti livelli al più si allontana la mappa in guida.
-const zoomLontanoAlPiu = 2.0;
+/// Di quanti livelli al più si allontana la mappa in guida. Era 2: «in strada
+/// zoom troppo lontano», a 87 all'ora in tangenziale.
+const zoomLontanoAlPiu = 1.0;
 
 /// Su strade previste sotto questa velocità non ci si allontana; da
 /// [lontanoTuttoSopraKmh] del tutto (una statale veloce, un'autostrada).

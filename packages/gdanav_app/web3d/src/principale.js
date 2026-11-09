@@ -142,6 +142,16 @@ const GESTORI = {
   },
   sorgente(m) {
     S.sorgenti.set(m.id, m.dati);
+    if (m.id === SORGENTE_FATTO) {
+      // La strada già fatta anche in 3D, all'altezza della strada: piatta a
+      // terra, dove la rampa è in quota, finiva sotto il viadotto («controlla
+      // ancora le linee del percorso»).
+      const c = (m.dati?.features ?? []).find((f) => f.geometry?.type === 'LineString')?.geometry.coordinates ?? [];
+      const lonlat = c.flat();
+      S.fatto = lonlat.length >= 4 && S.origine ? { lonlat, linea: lineaDi(lonlat) } : null;
+      S.sporco.profilo = true;
+      sveglia();
+    }
     if (IN_QUOTA[m.id]) S.sporco.segni = true;
     scriviSorgente(m.id, sulSuolo(m.id, m.dati));
   },
@@ -786,6 +796,7 @@ function riorigina(lon, lat) {
   }
   if (S.percorso) S.percorso.linea = lineaDi(S.percorso.lonlat, S.percorso.metri);
   if (S.risparmio) S.risparmio.linea = lineaDi(S.risparmio.lonlat);
+  if (S.fatto) S.fatto.linea = lineaDi(S.fatto.lonlat);
   moto.s = null;
   moto.x = null;
   S.auto = null;
@@ -806,6 +817,11 @@ function lineaDi(lonlat, metri = null) {
 // ─── Il percorso, la freccia, la strada a risparmio, il traffico ─────────
 
 let ultimoProfilo = 0;
+
+/** La sorgente della strada già fatta (`sorgenteFatto` in `stile.dart`). */
+const SORGENTE_FATTO = 'gdanav-fatto';
+/** Quanta strada già fatta disegna il 3D: dietro l'auto, oltre non si vede. */
+const FATTO_M = 1500;
 function aggiornaPercorso(adesso) {
   const p = S.percorso;
   const s = S.auto?.s ?? (p ? 0 : null);
@@ -829,6 +845,13 @@ function aggiornaPercorso(adesso) {
     scena.impostaNastro('percorso', nastro(p.linea, p.profilo, da, a, 4.6, 0.62, { code: p.code }), 'percorso', 5);
     aggiornaFreccia();
   }
+  // La strada già fatta: gli ultimi [FATTO_M] metri, all'altezza giusta.
+  const f = S.fatto;
+  if (f && f.linea.lunghezza > 2) {
+    const a = f.linea.lunghezza;
+    const da = Math.max(0, a - FATTO_M);
+    scena.impostaNastro('fatto', nastro(f.linea, profiloDi(f.linea, da, a, indice), da, a, 3.6, 0.5), 'fatto', 3);
+  } else scena.impostaNastro('fatto', null);
   const r = S.risparmio;
   if (r && r.linea.lunghezza > 2) {
     // La strada proposta: verde, all'altezza giusta, vicino all'auto.

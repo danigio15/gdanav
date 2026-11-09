@@ -673,9 +673,9 @@ class PonteAuto {
 
   void _vuoi3d() => _manda('web3d_vuoi', {'si': _aspetto3d && !_treDNonVa});
 
-  /// Sull'auto la scena 3D un poco più vicina che sul telefono (vedi
-  /// [Regia3d.piuVicina]).
-  static const piuVicina3dInAuto = 0.7;
+  /// Sull'auto la scena 3D quasi alla distanza del telefono (vedi
+  /// [Regia3d.piuVicina]): a 0,7 livelli più vicina, «troppo zoomato».
+  static const piuVicina3dInAuto = 0.2;
 
   /// Sull'auto la telecamera più dall'alto che sul telefono (70°).
   static const inclinazione3dInAuto = 55.0;

@@ -1103,7 +1103,8 @@ class RendererMappa(
          */
         /**
          * In autostrada, con la prossima manovra lontana, la mappa si
-         * allontana: fino a due livelli su una strada da 95 all'ora e con la
+         * allontana: fino a un livello (erano due: «in strada zoom troppo
+         * lontano») su una strada da 95 all'ora e con la
          * manovra oltre 2,5 km, niente sotto i 50 all'ora o entro 800 metri.
          * La strada la dice il percorso ([stradaKmh], la velocità prevista
          * del tratto), non il tachimetro: frenando in autostrada la mappa
@@ -1118,7 +1119,7 @@ class RendererMappa(
             }
             val v = morbido((kmh - 50.0) / (95.0 - 50.0))
             val d = if (allaProssimaM.isFinite()) morbido((allaProssimaM - 800.0) / (2500.0 - 800.0)) else 1.0
-            return -2.0 * v * d
+            return -1.0 * v * d
         }
 
         private fun zoomInSvolta(g: PonteAuto.Guida?): Double {

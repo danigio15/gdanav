@@ -406,7 +406,7 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
     }
 
     /// In autostrada, con la prossima manovra lontana, la mappa si allontana:
-    /// fino a due livelli su una strada da 95 all'ora e con la manovra oltre
+    /// fino a un livello su una strada da 95 all'ora e con la manovra oltre
     /// 2,5 km, niente sotto i 50 all'ora o entro 800 metri. La strada la dice
     /// il percorso (`stradaKmh`), non il tachimetro. Il conto di
     /// `zoomLontanoInGuida` (gdanav_core), come su Android Auto
@@ -419,7 +419,7 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         }
         let v = morbido((kmh - 50) / (95 - 50))
         let d = allaProssimaM.isFinite ? morbido((allaProssimaM - 800) / (2500 - 800)) : 1
-        return -2 * v * d
+        return -1 * v * d
     }
 
     /// Una novità dal telefono: la posizione, e la telecamera che si vuole.
