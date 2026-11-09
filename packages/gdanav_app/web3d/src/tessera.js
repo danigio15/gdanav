@@ -680,9 +680,13 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           return { pts, muro };
         });
         edificiOut.push({
+          // L'id dell'edificio sulla mappa: lo stesso in ogni tessera.
+          id: f.id ?? null,
           h: Math.max(+(p.render_height ?? 8) || 8, 3),
           mh: +(p.render_min_height ?? 0) || 0,
-          area: Math.abs(area(out[0].pts)),
+          // L'area dell'edificio intero (non del pezzo dentro la tessera):
+          // decide lo stile, che deve essere lo stesso in ogni pezzo.
+          area: Math.max(Math.abs(area(out[0].pts)), Math.abs(area(poli[0].map(([px, py]) => sys.metri(x * ESTENSIONE + px, y * ESTENSIONE + py))))),
           anelli: out,
         });
       }
@@ -732,7 +736,11 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   const seme = semeTessera(z, x, y);
   for (const [bi, b] of edificiOut.entries()) {
     if (triEdifici > lim.triangoliEdifici) break;
-    const r = generatore(seme ^ Math.imul(bi + 1, 2654435761));
+    // Colore, facciata e tetto dall'id dell'edificio, non dalla tessera: un
+    // palazzo a cavallo di due tessere si disegna a pezzi, e ogni pezzo
+    // prendeva il suo colore e la sua facciata («a destra la facciata
+    // giusta, al centro un'altra: non è così il palazzo»).
+    const r = generatore(b.id !== null ? Math.imul(Number(b.id) % 2147483647, 2654435761) ^ 0x5bd1e995 : seme ^ Math.imul(bi + 1, 2654435761));
     const ventre = sottoIlPonte(b.anelli.map((a) => a.pts));
     const h = Math.min(b.h, ventre - 0.6);
     const m0 = b.mh;
