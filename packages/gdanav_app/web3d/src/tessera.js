@@ -739,6 +739,9 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     const cg = rgb(pal.giorno[scelta]).map((c) => Math.min(255, Math.round(c * v)));
     const cn = rgb(pal.notte[scelta]).map((c) => Math.min(255, Math.round(c * v)));
     const gb = facciate[stile];
+    // L'ombra a terra al massimo quella di un palazzo di 40 m: le torri
+    // stendevano lastre grigie su interi isolati, come una mappa non caricata.
+    const hOmbra = Math.min(h, 40);
     const cornice = cg.map((c) => Math.round(c + (255 - c) * 0.7));
     const sottoCornice = cg.map((c) => Math.round(c * 0.68));
     const corniceNotte = cn.map((c) => Math.round(c * 0.8));
@@ -776,7 +779,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           tetti.quad([a[0] + fx * 0.6, a[1] + fy * 0.6, h - 1.2], [c[0] + fx * 0.6, c[1] + fy * 0.6, h - 1.2], [c[0] + fx * 0.6, c[1] + fy * 0.6, h - 0.6], [a[0] + fx * 0.6, a[1] + fy * 0.6, h - 0.6], [nx, ny, 0], sottoCornice, corniceNotte);
           // L'ombra del muro, stesa a terra.
           if (m0 < 1) {
-            ombre.quad([a[0], a[1], 0], [c[0], c[1], 0], [c[0] + sox * h, c[1] + soy * h, 0], [a[0] + sox * h, a[1] + soy * h, 0], [0, 0, 1]);
+            ombre.quad([a[0], a[1], 0], [c[0], c[1], 0], [c[0] + sox * hOmbra, c[1] + soy * hOmbra, 0], [a[0] + sox * hOmbra, a[1] + soy * hOmbra, 0], [0, 0, 1]);
           }
         }
         per += l;
@@ -804,9 +807,9 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
       tetti.triPunti([piatti[2 * i0], piatti[2 * i0 + 1], h], [piatti[2 * i1], piatti[2 * i1 + 1], h], [piatti[2 * i2], piatti[2 * i2 + 1], h], [0, 0, 1], rg, rn);
       if (m0 < 1) {
         ombre.triPunti(
-          [piatti[2 * i0] + sox * h, piatti[2 * i0 + 1] + soy * h, 0],
-          [piatti[2 * i1] + sox * h, piatti[2 * i1 + 1] + soy * h, 0],
-          [piatti[2 * i2] + sox * h, piatti[2 * i2 + 1] + soy * h, 0],
+          [piatti[2 * i0] + sox * hOmbra, piatti[2 * i0 + 1] + soy * hOmbra, 0],
+          [piatti[2 * i1] + sox * hOmbra, piatti[2 * i1 + 1] + soy * hOmbra, 0],
+          [piatti[2 * i2] + sox * hOmbra, piatti[2 * i2 + 1] + soy * hOmbra, 0],
           [0, 0, 1],
         );
       }

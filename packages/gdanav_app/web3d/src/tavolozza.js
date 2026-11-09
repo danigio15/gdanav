@@ -27,7 +27,7 @@ export const GIORNO = {
   pilone: '#cfccc4',
   percorso: '#27A2F8',
   percorsoBordo: '#0A6CC2',
-  ombra: 0.24,
+  ombra: 0.2,
   // L'ombra in più sotto i ponti (alone e nucleo).
   ombraPonte: 0.2,
 };
