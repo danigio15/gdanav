@@ -55,6 +55,8 @@ class Regia3d {
     this.onToccata,
     this.orologio,
     this.attesa = const Duration(seconds: 15),
+    this.piuVicina = 0,
+    this.inclinazione,
   });
 
   final GestoreViaggio gestore;
@@ -86,6 +88,15 @@ class Regia3d {
 
   /// Quanto si aspetta che la pagina sia pronta, prima di lasciar perdere.
   final Duration attesa;
+
+  /// Livelli di zoom in più rispetto al telefono. Sull'auto lo schermo è
+  /// largo e basso: allo zoom del telefono l'auto era piccola, lontana, e la
+  /// scena piatta («lo zoom troppo lontano e piatto»).
+  final double piuVicina;
+
+  /// L'inclinazione della telecamera, in gradi; `null`: quella della vista.
+  /// Sull'auto più dall'alto: «voglio vederla un po' più dall'alto».
+  final double? inclinazione;
 
   var _caricata = false;
   var _pronta = false;
@@ -194,6 +205,7 @@ class Regia3d {
   Future<void> _tutto() async {
     _viaggioMandato = null;
     _frecciaMandata = (-1, -1);
+    _tracciaMandata = -1;
     _propostaMandata = 0;
     _letturaMandata = null;
     _lettaMandata = null;
@@ -273,14 +285,32 @@ class Regia3d {
       _manda(msgSorgente(id, dati));
     }
     _frecciaMandata = (-1, -1);
+    _tracciaMandata = -1;
     dallaGuida();
   }
 
   /// A ogni novità della guida: la posizione (una volta per lettura), la
   /// freccia della manovra, la telecamera.
+  /// La versione della strada già fatta mandata alla pagina, e quando.
+  var _tracciaMandata = -1;
+  DateTime? _tracciaMandataAlle;
+
   void dallaGuida() {
     if (!_caricata || _finita) return;
     final g = guida;
+    // La strada già fatta, piatta a terra sotto il percorso: al più ogni tre secondi.
+    if (g.versioneTraccia != _tracciaMandata) {
+      final ora = _ora();
+      final prima = _tracciaMandataAlle;
+      if (g.traccia.isEmpty ||
+          prima == null ||
+          g.versioneTraccia - _tracciaMandata >= 4 ||
+          ora.difference(prima) >= const Duration(seconds: 3)) {
+        _tracciaMandata = g.versioneTraccia;
+        _tracciaMandataAlle = ora;
+        _manda(msgSorgente(sorgenteFatto, datiTraccia(g.traccia)));
+      }
+    }
     final v = g.pronto?.viaggio, a = g.avanzamento;
     // La freccia della prossima manovra, avvicinandosi.
     final chiave = chiaveFreccia(v, a?.prossima, a?.allaProssimaM, ricalcolo: g.ricalcolando);
@@ -315,11 +345,13 @@ class Regia3d {
         rotta: stimata?.rotta ?? a?.rotta ?? posizione.rotta,
         metri: metri,
         velocitaMs: (g.velocitaMs ?? posizione.velocitaAdesso() / 3.6),
-        zoom: zoom3d(
-          vista(),
-          velocitaStradaKmh: a?.velocitaStradaKmh ?? 0,
-          allaProssimaM: a == null ? 0 : (a.prossima == null ? a.restantiM : a.allaProssimaM),
-        ),
+        zoom:
+            zoom3d(
+              vista(),
+              velocitaStradaKmh: a?.velocitaStradaKmh ?? 0,
+              allaProssimaM: a == null ? 0 : (a.prossima == null ? a.restantiM : a.allaProssimaM),
+            ) +
+            piuVicina,
         // La stima è già portata ad adesso (`metriStimati`).
         quando: _ora(),
       ),
@@ -344,7 +376,7 @@ class Regia3d {
     _modoMandato = modo;
     _sopraMandato = c.sopra;
     _sinistraMandata = c.sinistra;
-    _manda(msgCamera(modo, sopra: c.sopra, sinistra: c.sinistra));
+    _manda(msgCamera(modo, sopra: c.sopra, sinistra: c.sinistra, pitch: inclinazione));
   }
 
   void _segnalazioni() {

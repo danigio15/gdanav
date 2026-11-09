@@ -673,6 +673,13 @@ class PonteAuto {
 
   void _vuoi3d() => _manda('web3d_vuoi', {'si': _aspetto3d && !_treDNonVa});
 
+  /// Sull'auto la scena 3D un poco più vicina che sul telefono (vedi
+  /// [Regia3d.piuVicina]).
+  static const piuVicina3dInAuto = 0.7;
+
+  /// Sull'auto la telecamera più dall'alto che sul telefono (70°).
+  static const inclinazione3dInAuto = 55.0;
+
   Regia3d _nuovaRegia3d() => Regia3d(
     gestore: viaggio,
     posizione: posizione,
@@ -692,6 +699,8 @@ class PonteAuto {
     vicini: vicini,
     persone: persone,
     orologio: _ora,
+    piuVicina: piuVicina3dInAuto,
+    inclinazione: inclinazione3dInAuto,
   )..avvia();
 
   void _stili() {
@@ -1122,8 +1131,33 @@ class PonteAuto {
   /// Il riepilogo dell'arrivo già mandato all'auto.
   String? _arrivoDetto;
 
+  /// La versione della strada già fatta mandata all'auto, e quando.
+  var _tracciaMandata = -1;
+  DateTime? _tracciaMandataAlle;
+
+  /// La strada già fatta in guida, all'auto: ogni quattro punti nuovi o tre secondi.
+  void _traccia() {
+    final v = guida.versioneTraccia;
+    if (v == _tracciaMandata) return;
+    final ora = _ora();
+    final prima = _tracciaMandataAlle;
+    // Ogni quattro punti nuovi (una trentina di metri) o tre secondi.
+    if (guida.traccia.isNotEmpty &&
+        prima != null &&
+        v - _tracciaMandata < 4 &&
+        ora.difference(prima) < const Duration(seconds: 3)) {
+      return;
+    }
+    _tracciaMandata = v;
+    _tracciaMandataAlle = ora;
+    _manda('sorgenti', {
+      'dati': {sorgenteFatto: jsonEncode(datiTraccia(guida.traccia))},
+    });
+  }
+
   void _guida() {
     _seguiProva();
+    _traccia();
     // Partita la guida (o arrivati), le strade se ne vanno dall'auto.
     _strade();
     final a = guida.avanzamento;

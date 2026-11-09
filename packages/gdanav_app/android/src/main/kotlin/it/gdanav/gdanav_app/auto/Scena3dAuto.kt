@@ -47,14 +47,49 @@ internal class Scena3dAuto(context: Context, notte: Boolean) {
                 return !(url.startsWith("file:") || url.startsWith("about:"))
             }
 
+            override fun onPageFinished(view: WebView, url: String?) {
+                misura()
+            }
+
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
                 if (request.isForMainFrame) PonteAuto.dalla3d("{\"tipo\":\"errore\",\"motivo\":\"pagina\"}")
             }
         }
         loadUrl(PAGINA)
+        addOnLayoutChangeListener { _, sx, su, dx, gi, vsx, vsu, vdx, vgi ->
+            if (dx - sx != vdx - vsx || gi - su != vgi - vsu) post { misura() }
+        }
     }
 
     private var finita = false
+
+    /**
+     * Quanti pixel dello schermo dell'auto fa un punto della pagina, misurato
+     * nella pagina stessa (`window.innerWidth`): la WebView dentro la
+     * Presentation non usa per forza la densità dell'auto. Con quella
+     * sbagliata lo spazio delle schede, detto in punti, era troppo grande per
+     * la pagina e l'auto finiva in un angolo, lontana («lo zoom troppo
+     * lontano e piatto»). `null` finché non si sa.
+     */
+    @Volatile var scala: Float? = null
+        private set
+
+    /** Chiamata quando [scala] cambia. */
+    var alMisurato: (() -> Unit)? = null
+
+    /** Misura [scala]; si rifà quando la WebView cambia grandezza. */
+    fun misura() {
+        if (finita || vista.width <= 0) return
+        vista.evaluateJavascript("window.innerWidth") { r ->
+            val punti = r?.trim('"')?.toFloatOrNull() ?: return@evaluateJavascript
+            if (punti <= 0f || finita) return@evaluateJavascript
+            val nuova = vista.width / punti
+            if (scala == null || kotlin.math.abs(nuova - scala!!) > 0.01f) {
+                scala = nuova
+                alMisurato?.invoke()
+            }
+        }
+    }
 
     /** La pagina ha detto qualcosa: è viva. */
     @Volatile var haParlato = false

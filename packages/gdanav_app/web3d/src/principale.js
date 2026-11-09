@@ -13,7 +13,7 @@ import { chiave as chiaveTessera, daChiave, mercPerMetro, latDaMerc } from './ge
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { angoloVerso, Moto, smorza } from './moto.js';
 import { IndiceSegmenti, Linea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote } from './percorso.js';
-import { Scena } from './scena.js';
+import { BIT_OMBRA, Scena } from './scena.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
 import { GIORNO, NOTTE } from './tavolozza.js';
 import './gdanav3d.css';
@@ -30,6 +30,9 @@ const FOTOGRAMMA_MS = 1000 / 30;
 /** Fin dove davanti all'auto si fa il percorso in 3D, e da quanto dietro. */
 const FINESTRA_AVANTI = 2600;
 const FINESTRA_DIETRO = 80;
+
+/** L'angolo verticale dell'obiettivo della mappa, in gradi (MapLibre: 36,87). */
+const OBIETTIVO_GRADI = 16;
 
 const S = {
   mappa: null,
@@ -173,7 +176,7 @@ const GESTORI = {
   },
   camera(m) {
     const prima = S.camera.modo;
-    S.camera = { modo: m.modo, sopra: m.sopra ?? S.camera.sopra, sinistra: m.sinistra ?? S.camera.sinistra ?? 0, riquadro: m.riquadro ?? null };
+    S.camera = { modo: m.modo, sopra: m.sopra ?? S.camera.sopra, sinistra: m.sinistra ?? S.camera.sinistra ?? 0, pitch: m.pitch ?? null, riquadro: m.riquadro ?? null };
     if (m.modo === 'segui' && prima !== 'segui') S.transizione = { da: performance.now(), dur: 900, partenza: null };
     if (m.modo === 'panoramica' && m.riquadro && S.mappa) {
       const [s, o, n, e] = m.riquadro;
@@ -287,6 +290,12 @@ function creaMappa(stile) {
     manda('errore', { motivo: 'mappa', dettaglio: String(e).slice(0, 300) });
     return;
   }
+  // Un teleobiettivo (16° invece di 37°): la telecamera sta più lontana e
+  // più alta, a parità di strada inquadrata. Da vicino le torri di cento
+  // metri arrivavano quasi all'altezza della telecamera: il tetto enorme, le
+  // pareti che si stringevano verso terra, il palazzo «vuoto», come visto
+  // da dentro.
+  mappa.setVerticalFieldOfView(OBIETTIVO_GRADI);
   S.mappa = mappa;
   window.__mappa = mappa;
   window.__scena = scena;
@@ -482,6 +491,19 @@ function stratoAuto() {
   };
 }
 
+/**
+ * Pulisce solo il bit dello stencil delle ombre ([BIT_OMBRA]): prima della
+ * scena, perché ogni punto si scurisca una volta; dopo, perché MapLibre
+ * ritrovi lo stencil delle sue tessere com'era.
+ */
+function pulisciBitOmbra(gl) {
+  gl.disable(gl.SCISSOR_TEST);
+  gl.stencilMask(BIT_OMBRA);
+  gl.clearStencil(0);
+  gl.clear(gl.STENCIL_BUFFER_BIT);
+  gl.stencilMask(0xff);
+}
+
 /** La telecamera di three.js dalle matrici di MapLibre (metri della scena → schermo). */
 function matriciCamera(camera, args) {
   const m = S.mappa;
@@ -549,6 +571,13 @@ function strato3d() {
       scena.scalaSegni(Pm.elements[5], m.getCanvas().clientHeight);
       // La camera di three.js con le matrici di questo fotogramma, per sfoltire i nomi.
       const occupati = [];
+      // Dov'è l'auto sullo schermo: lì gli edifici davanti a lei si fanno trasparenti.
+      const ue = scena.uniformiEdifici;
+      ue.uSchermo.value.set(gl.drawingBufferWidth, gl.drawingBufferHeight);
+      if (S.auto) {
+        const vs = new THREE.Vector3(S.auto.x, S.auto.y, S.auto.z + 1.2).project(camera);
+        ue.uAutoSchermo.value.set(vs.x, vs.y, vs.z);
+      } else ue.uAutoSchermo.value.set(0, -2, -1);
       if (S.auto) {
         const va = new THREE.Vector3(S.auto.x, S.auto.y, S.auto.z + 1).project(camera);
         const ax = ((va.x + 1) / 2) * m.getCanvas().clientWidth;
@@ -556,8 +585,11 @@ function strato3d() {
         occupati.push([ax - 70, ay - 60, ax + 70, ay + 40]);
       }
       scena.sfoltisciSegni(camera, m.getCanvas().clientWidth, m.getCanvas().clientHeight, occupati);
+      pulisciBitOmbra(gl);
       renderer.resetState();
       renderer.render(scena.scena, camera);
+      renderer.resetState();
+      pulisciBitOmbra(gl);
       S.camera3d = camera;
       const ora = performance.now();
       S.msDisegno = smorza(S.msDisegno ?? ora - t0, ora - t0, 1, 10);
@@ -666,7 +698,8 @@ function pianifica() {
     S.costruite.delete(k);
     S.sporco.profilo = true;
   }
-  const disegno = daDisegnare(S.costruite, qui[0], qui[1]);
+  const disegno = daDisegnare(S.costruite, qui[0], qui[1], BUDGET, S.disegnate);
+  S.disegnate = disegno.si;
   for (const k of S.costruite.keys()) scena.mostraTessera(k, disegno.si.has(k));
   if (S.lavoro || !lavoratore) return;
   let prossima = piano.richieste[0];
@@ -1083,10 +1116,19 @@ function cerchio(r, riempi, bordo, spessore, testo = '', coloreTesto = '#FFFFFF'
 /** I punti delle sorgenti che stanno in quota (chiave → quota), rifatti in [aggiornaSegni]. */
 const inQuota = new Map();
 
+/**
+ * Le segnalazioni (autovelox, tutor, polizia…) troppo lontane dall'auto: non
+ * si disegnano, né in quota né a terra. «Si vedono da lontano i punti per
+ * autovelox, stanno piazzati in alto»: col 3D inclinato quelli a chilometri
+ * finivano all'orizzonte, in cima allo schermo, grandi come quelli vicini.
+ */
+const lontani = new Set();
+const VICINO_SEGNALAZIONI_M = 1200;
+
 /** I dati per MapLibre senza i punti che disegna il 3D in quota. */
 function sulSuolo(id, dati) {
   if (!IN_QUOTA[id] || !dati?.features) return dati;
-  return { ...dati, features: dati.features.filter((f, i) => !inQuota.has(`${id}#${i}`)) };
+  return { ...dati, features: dati.features.filter((f, i) => !inQuota.has(`${id}#${i}`) && !lontani.has(`${id}#${i}`)) };
 }
 
 /**
@@ -1126,9 +1168,17 @@ function aggiornaSegni(adesso) {
       let z = null;
       let x = 0;
       let y = 0;
+      let via = false;
       if (xy) {
         [x, y] = S.origine.daLonLat(xy[0], xy[1]);
-        if (Math.hypot(x - qui[0], y - qui[1]) < 3000) z = quotaDi(x, y);
+        const d = Math.hypot(x - qui[0], y - qui[1]);
+        via = id === 'gdanav-segnalazioni' && d > VICINO_SEGNALAZIONI_M;
+        if (d < 3000 && !via) z = quotaDi(x, y);
+      }
+      if (via !== lontani.has(k)) {
+        cambiato = true;
+        if (via) lontani.add(k);
+        else lontani.delete(k);
       }
       const pr = f.properties ?? {};
       const img = z !== null && z > 2.5 ? (regola.tela ? regola.tela(pr) : S.bitmap.get(regola.immagine(pr))) : null;
@@ -1337,13 +1387,21 @@ function muovi(adesso, dt) {
   let assestata = true;
   if (S.camera.modo === 'segui') {
     const zoomVoluto = S.zoomVoluto ?? vista.zoom;
-    const c = (S.cam ??= { rotta: rottaCamera, zoom: zoomVoluto, quota: z, pitch: vista.pitch });
+    // L'inclinazione: quella della vista, o quella chiesta (sull'auto più
+    // dall'alto: «voglio vederla un po' più dall'alto»).
+    const pitchVoluto = S.camera.pitch ?? vista.pitch;
+    const c = (S.cam ??= { rotta: rottaCamera, zoom: zoomVoluto, quota: z, pitch: pitchVoluto });
     c.rotta = angoloVerso(c.rotta, rottaCamera, 1 - Math.exp(-dt / 400));
     c.zoom = smorza(c.zoom, zoomVoluto, dt, 1500);
     c.quota = smorza(c.quota, z, dt, 300);
-    c.pitch = smorza(c.pitch, vista.pitch, dt, 600);
+    c.pitch = smorza(c.pitch, pitchVoluto, dt, 600);
     const H = m.getCanvas().clientHeight;
-    let voluta = { center: [lon, lat], zoom: c.zoom, pitch: c.pitch, bearing: c.rotta, padding: { top: H * 0.12 + S.camera.sopra * 0.8, bottom: 0, left: S.camera.sinistra ?? 0, right: 0 } };
+    const W = m.getCanvas().clientWidth;
+    // Lo spazio delle schede, mai più di metà schermo: con misure sbagliate
+    // (l'auto le dà in punti suoi) l'auto finiva in un angolo, lontana.
+    const sopra = Math.min(H * 0.12 + S.camera.sopra * 0.8, H * 0.5);
+    const sinistra = Math.min(S.camera.sinistra ?? 0, W * 0.45);
+    let voluta = { center: [lon, lat], zoom: c.zoom, pitch: c.pitch, bearing: c.rotta, padding: { top: sopra, bottom: 0, left: sinistra, right: 0 } };
     const tr = S.transizione;
     if (tr) {
       tr.partenza ??= { center: m.getCenter().toArray(), zoom: m.getZoom(), pitch: m.getPitch(), bearing: m.getBearing() };

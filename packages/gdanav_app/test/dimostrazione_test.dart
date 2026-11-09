@@ -35,7 +35,8 @@ void main() {
     addTearDown(prova.chiudi);
     final a = await ambiente(tester, costruisci: d.pianificatore, dove: d.posizione, prova: prova);
     await tester.runAsync(() => d.avvia(auto: a.auto, viaggio: a.viaggio, guida: a.guida, prova: prova));
-    expect(a.auto.elettrica, isFalse);
+    // Con due code l'auto è elettrica al 62%: la foto della riga della batteria.
+    expect(a.auto.elettrica, isTrue);
     final pronto = a.viaggio.stato as ViaggioPronto;
     expect(pronto.destinazione.nome, 'Orvieto');
     expect(pronto.viaggio.percorso.ritardoTraffico.inMinutes, 18);

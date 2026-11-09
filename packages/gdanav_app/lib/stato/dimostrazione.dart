@@ -128,7 +128,8 @@ enum Dimostrazione {
   /// così le foto trovano le code dove devono essere.
   static const acceleratore = 0.05;
 
-  /// Parte: auto termica (niente soste da chiedere), il viaggio verso
+  /// Parte: auto termica (niente soste da chiedere; elettrica al 62% con
+  /// [traffico18]), il viaggio verso
   /// [meta], la guida e la posizione finta sulla strada.
   Future<void> avvia({
     required GestoreAuto auto,
@@ -136,8 +137,11 @@ enum Dimostrazione {
     required GestoreGuida guida,
     required ProvaDiGuida prova,
   }) async {
-    // Solo in memoria: l'archivio del telefono resta com'era.
-    auto.elettrica = false;
+    // Solo in memoria: l'archivio del telefono resta com'era. Con due code
+    // l'auto è elettrica al 62%, per la foto della riga della batteria
+    // (batteria, km, arrivo) sull'auto; le altre termiche, senza soste.
+    auto.elettrica = this == traffico18;
+    if (this == traffico18) auto.manuale.imposta(62);
     // Il traffico è già nelle strade: per le strade da scegliere ognuna
     // resta la sua.
     viaggio.trafficoFinto = this == strade ? (p) async => p : (_) async => percorso();

@@ -70,16 +70,42 @@ export function pianoTessere(disponibili, costruite, x, y, budget = BUDGET) {
 /**
  * Quali tessere disegnare: le costruite entro la nebbia, finché i triangoli
  * stanno nel budget (prima le vicine). Le altre restano pronte, spente.
+ *
+ * «I palazzi e gli alberi vanno e vengono, diventano grigi e poi compaiono:
+ * fa un effetto glitch continuo.» Nei quartieri fitti (il centro di Napoli)
+ * poche tessere piene riempiono il budget, e andando avanti l'ordine delle
+ * distanze cambiava di continuo: una tessera si spegneva (sotto, il suolo
+ * grigio), quella accanto si accendeva, e poi al contrario. Adesso:
+ *
+ *  - quelle già accese ([prima]) restano accese finché i triangoli non
+ *    passano il budget di un quarto: si spengono solo quando serve davvero;
+ *  - quelle a meno di [VICINE_SEMPRE_M] dall'auto si disegnano sempre.
  */
-export function daDisegnare(costruite, x, y, budget = BUDGET) {
+export const VICINE_SEMPRE_M = 400;
+
+export function daDisegnare(costruite, x, y, budget = BUDGET, prima = new Set()) {
   const ordinate = [...costruite.values()]
     .map((c) => ({ chiave: c.chiave, triangoli: c.triangoli, d: distanzaTessera(x, y, c.cx, c.cy, c.lato) }))
+    .filter((c) => c.d <= budget.lontanoM + 400)
     .sort((a, b) => a.d - b.d);
   const si = new Set();
   let tri = 0;
+  // Le vicine sempre; poi quelle già accese, con un quarto di margine;
+  // poi le nuove, nel budget.
   for (const c of ordinate) {
-    if (c.d > budget.lontanoM + 400) break;
-    if (tri + c.triangoli > budget.triangoli && si.size) break;
+    if (c.d > VICINE_SEMPRE_M) continue;
+    tri += c.triangoli;
+    si.add(c.chiave);
+  }
+  for (const c of ordinate) {
+    if (si.has(c.chiave) || !prima.has(c.chiave)) continue;
+    if (tri + c.triangoli > budget.triangoli * 1.25) continue;
+    tri += c.triangoli;
+    si.add(c.chiave);
+  }
+  for (const c of ordinate) {
+    if (si.has(c.chiave)) continue;
+    if (tri + c.triangoli > budget.triangoli && si.size) continue;
     tri += c.triangoli;
     si.add(c.chiave);
   }

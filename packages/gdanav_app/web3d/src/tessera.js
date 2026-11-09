@@ -43,6 +43,11 @@ export const PERIODO_STRADA = 12;
 export const PIANO = 3.2;
 export const CAMPATA = 3.4;
 
+/** Quanti modelli di facciata ha ogni tipo di edificio (vedi `trameFacciata`). */
+export const VARIANTI_FACCIATA = { residenziale: 4, uffici: 2, industria: 1 };
+/** Le facciate, una geometria e un materiale l'una: «residenziale-0» … */
+export const STILI_FACCIATA = Object.entries(VARIANTI_FACCIATA).flatMap(([s, n]) => Array.from({ length: n }, (_, i) => `${s}-${i}`));
+
 /** Quanto sopra il terreno sta ogni classe di strada (per non litigare col suolo). */
 const SOPRA = { motorway: 0.24, trunk: 0.23, primary: 0.21, secondary: 0.2, tertiary: 0.18, minor: 0.16, service: 0.14, rail: 0.12 };
 
@@ -675,9 +680,12 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           return { pts, muro };
         });
         edificiOut.push({
+          seme: semeEdificio(f.id, poli[0], x, y, z),
           h: Math.max(+(p.render_height ?? 8) || 8, 3),
           mh: +(p.render_min_height ?? 0) || 0,
-          area: Math.abs(area(out[0].pts)),
+          // L'area dell'edificio intero (non del pezzo dentro la tessera):
+          // decide lo stile, che deve essere lo stesso in ogni pezzo.
+          area: Math.max(Math.abs(area(out[0].pts)), Math.abs(area(poli[0].map(([px, py]) => sys.metri(x * ESTENSIONE + px, y * ESTENSIONE + py))))),
           anelli: out,
         });
       }
@@ -719,7 +727,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     }
     return basso;
   };
-  const STILI = ['residenziale', 'uffici', 'industria'];
+  const STILI = STILI_FACCIATA;
   const facciate = Object.fromEntries(STILI.map((s) => [s, new Costruttore({ uv: true, colori: true })]));
   const tetti = new Costruttore({ colori: true });
   let triEdifici = 0;
@@ -727,7 +735,11 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   const seme = semeTessera(z, x, y);
   for (const [bi, b] of edificiOut.entries()) {
     if (triEdifici > lim.triangoliEdifici) break;
-    const r = generatore(seme ^ Math.imul(bi + 1, 2654435761));
+    // Colore, facciata e tetto dall'id dell'edificio, non dalla tessera: un
+    // palazzo a cavallo di due tessere si disegna a pezzi, e ogni pezzo
+    // prendeva il suo colore e la sua facciata («a destra la facciata
+    // giusta, al centro un'altra: non è così il palazzo»).
+    const r = generatore(b.seme);
     const ventre = sottoIlPonte(b.anelli.map((a) => a.pts));
     const h = Math.min(b.h, ventre - 0.6);
     const m0 = b.mh;
@@ -738,14 +750,23 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     const v = 0.92 + r() * 0.12;
     const cg = rgb(pal.giorno[scelta]).map((c) => Math.min(255, Math.round(c * v)));
     const cn = rgb(pal.notte[scelta]).map((c) => Math.min(255, Math.round(c * v)));
-    const gb = facciate[stile];
+    const gb = facciate[`${stile}-${Math.floor(r() * VARIANTI_FACCIATA[stile])}`];
+    // L'ombra a terra al massimo quella di un palazzo di 40 m: le torri
+    // stendevano lastre grigie su interi isolati, come una mappa non caricata.
+    const hOmbra = Math.min(h, 40);
+    const cornice = cg.map((c) => Math.round(c + (255 - c) * 0.7));
+    const sottoCornice = cg.map((c) => Math.round(c * 0.68));
+    const corniceNotte = cn.map((c) => Math.round(c * 0.8));
     const bw = stile === 'industria' ? 6 : CAMPATA;
     const uoff = Math.floor(r() * 4) * 0.25;
     const voff = Math.floor(r() * 4) * 0.25;
     const prima = gb.triangoli + tetti.triangoli + ombre.triangoli;
-    for (const anello of b.anelli) {
+    for (const [k, anello] of b.anelli.entries()) {
       const p = anello.pts;
-      const ccw = area(p) < 0;
+      // I muri guardano fuori dall'anello; quelli di un cortile (gli anelli
+      // dopo il primo) guardano dentro, verso il cortile: prima guardavano
+      // dentro il muro e sparivano.
+      const ccw = area(p) < 0 !== k > 0;
       let per = 0;
       for (let i = 0; i < p.length; i++) {
         const a = p[i];
@@ -765,9 +786,15 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           const v0 = m0 / (PIANO * 4) + voff;
           const v1 = h / (PIANO * 4) + voff;
           gb.quad([a[0], a[1], m0, u0, v0], [c[0], c[1], m0, u1, v0], [c[0], c[1], h, u1, v1], [a[0], a[1], h, u0, v1], [nx, ny, 0], cg, cn);
+          // Il cornicione: una fascia chiara in cima, il bordo del palazzo si legge.
+          const fx = nx * 0.25;
+          const fy = ny * 0.25;
+          tetti.quad([a[0] + fx, a[1] + fy, h - 0.6], [c[0] + fx, c[1] + fy, h - 0.6], [c[0] + fx, c[1] + fy, h + 0.3], [a[0] + fx, a[1] + fy, h + 0.3], [nx, ny, 0], cornice, corniceNotte);
+          // E sotto, la sua ombra: una riga scura che stacca il tetto dalla facciata.
+          tetti.quad([a[0] + fx * 0.6, a[1] + fy * 0.6, h - 1.2], [c[0] + fx * 0.6, c[1] + fy * 0.6, h - 1.2], [c[0] + fx * 0.6, c[1] + fy * 0.6, h - 0.6], [a[0] + fx * 0.6, a[1] + fy * 0.6, h - 0.6], [nx, ny, 0], sottoCornice, corniceNotte);
           // L'ombra del muro, stesa a terra.
           if (m0 < 1) {
-            ombre.quad([a[0], a[1], 0], [c[0], c[1], 0], [c[0] + sox * h, c[1] + soy * h, 0], [a[0] + sox * h, a[1] + soy * h, 0], [0, 0, 1]);
+            ombre.quad([a[0], a[1], 0], [c[0], c[1], 0], [c[0] + sox * hOmbra, c[1] + soy * hOmbra, 0], [a[0] + sox * hOmbra, a[1] + soy * hOmbra, 0], [0, 0, 1]);
           }
         }
         per += l;
@@ -781,7 +808,12 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
       for (const [px, py] of anello.pts) piatti.push(px, py);
     }
     const facce = earcut(piatti, buchi.length ? buchi : null, 2);
-    const rp = stile === 'industria' ? [TETTI.industriaGiorno, TETTI.industriaNotte] : [TETTI.giorno, TETTI.notte];
+    const rp =
+      stile === 'industria'
+        ? [TETTI.industriaGiorno, TETTI.industriaNotte]
+        : stile === 'uffici'
+          ? [TETTI.ufficiGiorno, TETTI.ufficiNotte]
+          : [TETTI.giorno, TETTI.notte];
     const ri = Math.floor(r() * rp[0].length);
     const rg = rgb(rp[0][ri]);
     const rn = rgb(rp[1][ri]);
@@ -790,9 +822,9 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
       tetti.triPunti([piatti[2 * i0], piatti[2 * i0 + 1], h], [piatti[2 * i1], piatti[2 * i1 + 1], h], [piatti[2 * i2], piatti[2 * i2 + 1], h], [0, 0, 1], rg, rn);
       if (m0 < 1) {
         ombre.triPunti(
-          [piatti[2 * i0] + sox * h, piatti[2 * i0 + 1] + soy * h, 0],
-          [piatti[2 * i1] + sox * h, piatti[2 * i1 + 1] + soy * h, 0],
-          [piatti[2 * i2] + sox * h, piatti[2 * i2 + 1] + soy * h, 0],
+          [piatti[2 * i0] + sox * hOmbra, piatti[2 * i0 + 1] + soy * hOmbra, 0],
+          [piatti[2 * i1] + sox * hOmbra, piatti[2 * i1 + 1] + soy * hOmbra, 0],
+          [piatti[2 * i2] + sox * hOmbra, piatti[2 * i2 + 1] + soy * hOmbra, 0],
           [0, 0, 1],
         );
       }
@@ -803,7 +835,9 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
 
   // ── Gli alberi ────────────────────────────────────────────────────────
   const alberi = lim.alberi > 0 ? piantaAlberi({ centro, sys, x, y, linee, visibili, edifici: edificiOut, limite: lim.alberi, seme, dentro }) : [];
-  const istanzeAlberi = istanzeDiAlberi(alberi, ombre);
+  // Le ombre degli alberi: macchie tonde e sfumate (una trama), non esagoni.
+  const ombreAlberi = new Costruttore({ uv: true });
+  const istanzeAlberi = istanzeDiAlberi(alberi, ombreAlberi);
 
   // ── I lampioni ────────────────────────────────────────────────────────
   const lamp = lampioni.filter((l) => dentro(l.x, l.y)).slice(0, lim.lampioni);
@@ -940,6 +974,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     opere: opere.triangoli ? opere.fatto() : null,
     ombre: ombre.triangoli ? ombre.fatto() : null,
     ombrePonti: ombrePonti.triangoli ? ombrePonti.fatto() : null,
+    ombreAlberi: ombreAlberi.triangoli ? ombreAlberi.fatto() : null,
     facciate: Object.fromEntries(STILI.filter((s) => facciate[s].triangoli).map((s) => [s, facciate[s].fatto()])),
     tetti: tetti.triangoli ? tetti.fatto() : null,
     fusti,
@@ -956,7 +991,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   out.conti = {
     strade: triStrade,
     opere: opere.triangoli,
-    ombre: ombre.triangoli + ombrePonti.triangoli,
+    ombre: ombre.triangoli + ombrePonti.triangoli + ombreAlberi.triangoli,
     edifici: triEdifici,
     edificiFatti,
     edificiTotali: edificiOut.length,
@@ -972,20 +1007,19 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
 }
 
 /** Triangoli di una geometria istanziata, per le stime. */
-export const TRIANGOLI_ISTANZA = { fusto: 24, capitello: 12, tronco: 10, chioma: 20, chioma2: 20, cono: 7, palo: 12, testa: 12 };
+export const TRIANGOLI_ISTANZA = { fusto: 24, capitello: 12, albero: 2, palo: 12, testa: 12 };
 
 /** Quanti triangoli disegna la tessera (le istanze contano per ognuna). */
 export function stimaTriangoli(t) {
   const tri = (g) => (g ? g.indici.length / 3 : 0);
   let n = 0;
   for (const g of Object.values(t.strade)) n += tri(g);
-  n += tri(t.opere) + tri(t.ombre) + tri(t.ombrePonti) + tri(t.tetti);
+  n += tri(t.opere) + tri(t.ombre) + tri(t.ombrePonti) + tri(t.ombreAlberi) + tri(t.tetti);
   for (const g of Object.values(t.facciate)) n += tri(g);
   n += (t.fusti.length / 16) * TRIANGOLI_ISTANZA.fusto + (t.capitelli.length / 16) * TRIANGOLI_ISTANZA.capitello;
+  // Gli alberi sono immagini: due triangoli l'uno.
   const a = t.alberi;
-  n += (a.tronchi.length / 16) * TRIANGOLI_ISTANZA.tronco;
-  n += (a.chiome.length / 16) * (TRIANGOLI_ISTANZA.chioma + TRIANGOLI_ISTANZA.chioma2);
-  n += (a.coni.length / 16) * TRIANGOLI_ISTANZA.cono;
+  n += ((a.foglie.length + a.abeti.length) / 16) * TRIANGOLI_ISTANZA.albero;
   n += (t.pali.length / 16) * (TRIANGOLI_ISTANZA.palo + TRIANGOLI_ISTANZA.testa);
   return n;
 }
@@ -1206,7 +1240,41 @@ function piantaAlberi({ centro, sys, x, y, linee, visibili, edifici, limite, sem
   return alberi;
 }
 
-/** Le istanze degli alberi: tronchi, chiome (due), coni; e le loro ombre tonde. */
+/**
+ * Il seme di un edificio: lo stesso in ogni tessera in cui compare a pezzi,
+ * diverso per ogni edificio. Le tessere mettono insieme in un solo oggetto
+ * (un solo id) tutti gli edifici della stessa altezza: l'id da solo dava lo
+ * stesso colore e la stessa facciata a decine di case («sempre uguali»).
+ * Allora l'id più dove sta l'edificio: i lati del suo rettangolo, in una
+ * griglia di circa due metri, tranne quelli tagliati dal bordo della
+ * tessera (che cambiano da una tessera all'altra).
+ */
+function semeEdificio(id, anello, x, y, z) {
+  let minx = Infinity;
+  let maxx = -Infinity;
+  let miny = Infinity;
+  let maxy = -Infinity;
+  for (const p of anello) {
+    minx = Math.min(minx, p[0]);
+    maxx = Math.max(maxx, p[0]);
+    miny = Math.min(miny, p[1]);
+    maxy = Math.max(maxy, p[1]);
+  }
+  const taglioX = minx <= -60 || maxx >= ESTENSIONE + 60;
+  const taglioY = miny <= -60 || maxy >= ESTENSIONE + 60;
+  const g = (v, t) => Math.round(((t * ESTENSIONE + v) / ESTENSIONE) * 2 ** (24 - z));
+  let h = Math.imul(Number(id ?? 0) % 2147483647, 2654435761) ^ 0x5bd1e995;
+  const parti = taglioX ? [0, 0] : [g(minx, x), g(maxx, x)];
+  parti.push(...(taglioY ? [0, 0] : [g(miny, y), g(maxy, y)]));
+  for (const v of parti) h = Math.imul(h ^ (v | 0), 0x01000193) ^ (h >>> 13);
+  return h >>> 0;
+}
+
+/**
+ * Le istanze degli alberi: tronchi, chiome (due), coni; e le loro ombre: un
+ * quadrato con la trama di una macchia tonda e sfumata (vedi `Scena`), poco
+ * spostato verso l'ombra, così sta sotto la chioma come quella vera.
+ */
 function istanzeDiAlberi(alberi, ombre) {
   const latifoglie = alberi.filter((t) => t[3] === 0).length;
   const conifere = alberi.length - latifoglie;
@@ -1217,6 +1285,12 @@ function istanzeDiAlberi(alberi, ombre) {
   const coloriChiome = new Uint8Array(latifoglie * 3);
   const coloriChiome2 = new Uint8Array(latifoglie * 3);
   const coloriConi = new Uint8Array(conifere * 3);
+  // Gli alberi dipinti (vedi `Scena.alberiDipinti`): un'immagine per albero,
+  // da terra alla cima, larga quanto la chioma; il colore è solo la luce.
+  const foglie = new Float32Array(latifoglie * 16);
+  const coloriFoglie = new Uint8Array(latifoglie * 3);
+  const abeti = new Float32Array(conifere * 16);
+  const coloriAbeti = new Uint8Array(conifere * 3);
   const totale = CHIOME.reduce((s, a) => s + a[1], 0);
   const scegli = (u) => {
     let a = u * totale;
@@ -1248,6 +1322,9 @@ function istanzeDiAlberi(alberi, ombre) {
       const luce = 1 + (r() - 0.5) * 0.12;
       coloriChiome.set(c.map((v) => Math.min(255, Math.round(v * luce))), 3 * id);
       coloriChiome2.set(c.map((v) => Math.min(255, Math.round(v * luce * 1.08))), 3 * id);
+      matrice(foglie, 16 * id, px, py, 0, ang, cr * 2.25, cr * 2.25, th + ch * 1.85);
+      const l = Math.round(232 + (r() - 0.5) * 40);
+      coloriFoglie.set([l, Math.min(255, l + 6), l - 6], 3 * id);
       id++;
       alto = th + ch * 0.85;
       raggio = cr;
@@ -1256,20 +1333,20 @@ function istanzeDiAlberi(alberi, ombre) {
       const rad = (1.9 + r() * 0.5) * s;
       matrice(coni, 16 * ic, px, py, th * 0.6, 0, rad, rad, hh);
       coloriConi.set(rgb(r() < 0.8 ? '#3f6b3c' : '#4e7a3e'), 3 * ic);
+      matrice(abeti, 16 * ic, px, py, 0, 0, rad * 2.3, rad * 2.3, th * 0.6 + hh * 1.02);
+      const l = Math.round(228 + (r() - 0.5) * 36);
+      coloriAbeti.set([l, l, l], 3 * ic);
       ic++;
       alto = th * 0.6 + hh * 0.4;
       raggio = rad;
     }
-    // L'ombra: un esagono steso a terra, spostato col sole.
-    const cx = px + sox * alto;
-    const cy = py + soy * alto;
-    const rr2 = raggio * 0.95;
-    const centro = ombre.v(cx, cy, 0, 0, 0, 1);
-    const giro = [];
-    for (let k = 0; k < 6; k++) giro.push(ombre.v(cx + Math.cos((k * Math.PI) / 3) * rr2, cy + Math.sin((k * Math.PI) / 3) * rr2, 0, 0, 0, 1));
-    for (let k = 0; k < 6; k++) ombre.tri(centro, giro[k], giro[(k + 1) % 6]);
+    // L'ombra: una macchia sfumata a terra, un po' spostata col sole.
+    const cx = px + sox * alto * 0.5;
+    const cy = py + soy * alto * 0.5;
+    const rr2 = raggio * 1.25;
+    ombre.quad([cx - rr2, cy - rr2, 0, 0, 0], [cx + rr2, cy - rr2, 0, 1, 0], [cx + rr2, cy + rr2, 0, 1, 1], [cx - rr2, cy + rr2, 0, 0, 1], [0, 0, 1]);
   }
-  return { tronchi, chiome, chiome2, coni, coloriChiome, coloriChiome2, coloriConi };
+  return { tronchi, chiome, chiome2, coni, coloriChiome, coloriChiome2, coloriConi, foglie, coloriFoglie, abeti, coloriAbeti };
 }
 
 /**
@@ -1353,6 +1430,7 @@ export function bufferDellaTessera(t) {
   geo(t.opere);
   geo(t.ombre);
   geo(t.ombrePonti);
+  geo(t.ombreAlberi);
   geo(t.tetti);
   for (const g of Object.values(t.facciate)) geo(g);
   for (const a of [t.fusti, t.capitelli, t.pali, t.teste, t.luci, t.segmenti, ...Object.values(t.alberi)]) lista.push(a.buffer);

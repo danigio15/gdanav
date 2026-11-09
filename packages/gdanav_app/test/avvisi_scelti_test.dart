@@ -216,7 +216,15 @@ void main() {
     await aspetta(tester);
 
     String mappa() {
-      final ultima = chiamate.lastWhere((c) => c.method == 'sorgenti').arguments as Map;
+      final ultima =
+          chiamate
+                  .lastWhere(
+                    (c) =>
+                        c.method == 'sorgenti' &&
+                        ((c.arguments as Map)['dati'] as Map).containsKey(sorgenteSegnalazioni),
+                  )
+                  .arguments
+              as Map;
       return (ultima['dati'] as Map)[sorgenteSegnalazioni] as String;
     }
 

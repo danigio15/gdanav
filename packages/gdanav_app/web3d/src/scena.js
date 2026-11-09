@@ -3,9 +3,34 @@
 // di MapLibre (`principale.js`), con la sua telecamera.
 
 import * as THREE from 'three';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { generatore } from './caso.js';
-import { CAMPATA, NASTRI, PERIODO_STRADA, PIANO } from './tessera.js';
+import { CAMPATA, NASTRI, PERIODO_STRADA, PIANO, STILI_FACCIATA } from './tessera.js';
 import { GIORNO, NOTTE, SOLE } from './tavolozza.js';
+
+
+/**
+ * La chioma di una latifoglia: una sfera un poco bitorzoluta (80 triangoli,
+ * 20 quella piccola accanto) con le normali morbide; non l'icosaedro a facce piatte di prima.
+ */
+function chiomaMorbida(dettaglio = 1) {
+  const g = new THREE.IcosahedronGeometry(1, dettaglio);
+  g.deleteAttribute('normal');
+  g.deleteAttribute('uv');
+  const p = g.getAttribute('position');
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    // Bitorzoli fissi (dalla posizione, uguali per i vertici in comune).
+    const k = 1 + 0.09 * Math.sin(v.x * 5.3 + v.y * 2.1) * Math.cos(v.z * 4.7 - v.x * 1.3);
+    v.multiplyScalar(k);
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  // Le facce sono separate: si uniscono i vertici per avere le normali morbide.
+  const unita = mergeVertices(g);
+  unita.computeVertexNormals();
+  return unita;
+}
 
 const tela = (w, h) => {
   const c = document.createElement('canvas');
@@ -21,6 +46,206 @@ function trama(c, ripeti = true) {
   t.anisotropy = 4;
   t.generateMipmaps = true;
   return t;
+}
+
+// ─── Gli alberi dipinti ───────────────────────────────────────────────────
+//
+// «Lo vedo sempre a cartone, lo voglio realistico: gli alberi non sono
+// così.» Le chiome erano solidi (icosaedri, poi sfere): da vicino sempre
+// palline. Adesso ogni albero è un'immagine dipinta qui, una volta sola —
+// migliaia di foglie a piccoli tocchi, la luce da sinistra in alto, l'ombra
+// dentro e sotto la chioma, il tronco coi rami — su un rettangolo che guarda
+// sempre la telecamera (ruota solo attorno al suo asse, come un albero vero).
+// Quattro alberi diversi: tre latifoglie e un abete. Due triangoli l'uno.
+
+/** Le celle dell'atlante: larghe e alte, in pixel. */
+const CELLA_L = 256;
+const CELLA_A = 344;
+
+/** L'atlante degli alberi: tre latifoglie e un abete, uno accanto all'altro. */
+function atlanteAlberi() {
+  const c = tela(CELLA_L * 4, CELLA_A);
+  const g = c.getContext('2d');
+  dipingiLatifoglia(g, 0, generatore(11), ['#2c4a22', '#4c7034', '#7da24c', '#a9c56a'], 0.46, 0.4);
+  dipingiLatifoglia(g, CELLA_L, generatore(23), ['#29431f', '#43682e', '#6f9442', '#9cba5c'], 0.42, 0.44);
+  dipingiLatifoglia(g, CELLA_L * 2, generatore(37), ['#33461f', '#57702f', '#87a046', '#b7c66c'], 0.36, 0.5);
+  dipingiAbete(g, CELLA_L * 3, generatore(51));
+  const t = trama(c, false);
+  t.anisotropy = 1;
+  return t;
+}
+
+/** Un colore fra quelli di [scala] (dal più scuro al più chiaro), con [l] fra 0 e 1. */
+function tono(scala, l, r) {
+  const x = Math.max(0, Math.min(0.999, l)) * (scala.length - 1);
+  const i = Math.floor(x);
+  const a = rgbDi(scala[i]);
+  const b = rgbDi(scala[i + 1]);
+  const t = x - i;
+  const n = (r() - 0.5) * 18;
+  return `rgb(${[0, 1, 2].map((k) => Math.round(a[k] + (b[k] - a[k]) * t + n)).join(',')})`;
+}
+
+function rgbDi(esa) {
+  const v = parseInt(esa.slice(1), 16);
+  return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+}
+
+/** Il tronco e due rami, dal basso al [fino] (frazione dell'altezza dall'alto). */
+function tronco(g, cx, r, fino, largo) {
+  const base = CELLA_A - 2;
+  const cima = CELLA_A * fino;
+  const grad = g.createLinearGradient(cx - largo, 0, cx + largo, 0);
+  grad.addColorStop(0, '#5a4636');
+  grad.addColorStop(0.45, '#46372b');
+  grad.addColorStop(1, '#2a211a');
+  g.fillStyle = grad;
+  g.beginPath();
+  g.moveTo(cx - largo, base);
+  g.lineTo(cx - largo * 0.45, cima);
+  g.lineTo(cx + largo * 0.45, cima);
+  g.lineTo(cx + largo, base);
+  g.closePath();
+  g.fill();
+  g.strokeStyle = '#3a2d22';
+  for (const lato of [-1, 1]) {
+    g.lineWidth = largo * 0.5;
+    g.beginPath();
+    const y0 = cima + (base - cima) * (0.25 + r() * 0.15);
+    g.moveTo(cx, y0);
+    g.quadraticCurveTo(cx + lato * largo * 2, y0 - 20, cx + lato * largo * (3 + r() * 2), y0 - 45 - r() * 20);
+    g.stroke();
+  }
+}
+
+/**
+ * Una latifoglia nella cella che parte da [x0]: la chioma fatta di grappoli
+ * ([raggio] e [alto]: quanto è larga e dove sta il centro, in frazioni).
+ */
+function dipingiLatifoglia(g, x0, r, scala, raggio, alto) {
+  const cx = x0 + CELLA_L / 2;
+  tronco(g, cx, r, alto + 0.12, CELLA_L * 0.035);
+  const cy = CELLA_A * alto;
+  const rx = CELLA_L * raggio;
+  const ry = CELLA_A * (alto - 0.03);
+  // I grappoli: cerchi dentro l'ellisse della chioma.
+  const grappoli = [];
+  for (let i = 0; i < 26; i++) {
+    const a = r() * Math.PI * 2;
+    const d = Math.sqrt(r()) * 0.72;
+    const gr = (0.22 + r() * 0.18) * rx;
+    grappoli.push({ x: cx + Math.cos(a) * d * (rx - gr * 0.6), y: cy + Math.sin(a) * d * (ry - gr * 0.6), r: gr });
+  }
+  // Prima l'ombra dentro la chioma, poi le foglie: le più scure dietro.
+  const tocchi = [];
+  for (let i = 0; i < 2600; i++) {
+    const q = grappoli[Math.floor(r() * grappoli.length)];
+    const a = r() * Math.PI * 2;
+    const d = Math.sqrt(r());
+    const x = q.x + Math.cos(a) * d * q.r;
+    const y = q.y + Math.sin(a) * d * q.r;
+    // Luce: dal grappolo (sinistra in alto) e dalla chioma (in alto più luce).
+    const lg = -((x - q.x) * 0.6 + (y - q.y) * 0.8) / q.r;
+    const lc = 1 - (y - (cy - ry)) / (2 * ry);
+    const l = 0.18 + 0.38 * (lg * 0.5 + 0.5) * d + 0.4 * lc + (r() - 0.5) * 0.18;
+    tocchi.push({ x, y, l, s: 2.2 + r() * 3.6, a: r() * Math.PI });
+  }
+  tocchi.sort((p, q) => p.l - q.l);
+  for (const t of tocchi) {
+    g.fillStyle = tono(scala, t.l, r);
+    g.beginPath();
+    g.ellipse(t.x, t.y, t.s, t.s * 0.62, t.a, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
+/** Un abete: palchi di rami dal basso alla punta, più scuri dentro. */
+function dipingiAbete(g, x0, r) {
+  const cx = x0 + CELLA_L / 2;
+  tronco(g, cx, r, 0.9, CELLA_L * 0.03);
+  const scala = ['#1d3420', '#2c4a2c', '#3f6337', '#5f8148'];
+  const cima = 6;
+  const base = CELLA_A * 0.9;
+  const tocchi = [];
+  for (let i = 0; i < 2600; i++) {
+    const t = Math.pow(r(), 0.8);
+    const y = cima + t * (base - cima);
+    // I palchi: la larghezza va a dente di sega, più larga in basso.
+    const palco = (t * 7) % 1;
+    const largo = CELLA_L * 0.44 * t * (0.72 + 0.28 * palco);
+    const x = cx + (r() * 2 - 1) * largo;
+    const lato = (cx - x) / Math.max(1, largo);
+    const l = 0.15 + 0.35 * (1 - t) + 0.25 * (lato * 0.5 + 0.5) + 0.3 * palco + (r() - 0.5) * 0.15;
+    tocchi.push({ x, y, l, s: 2 + r() * 3, a: r() * 0.6 - 0.3 });
+  }
+  tocchi.sort((p, q) => p.l - q.l);
+  for (const t of tocchi) {
+    g.fillStyle = tono(scala, t.l, r);
+    g.beginPath();
+    g.ellipse(t.x, t.y, t.s * 1.4, t.s * 0.55, t.a, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
+const VERTICE_ALBERO = `
+#include <common>
+#include <fog_pars_vertex>
+uniform float uPrima;
+uniform float uQuante;
+varying vec2 vUv;
+varying vec3 vTinta;
+void main() {
+  mat4 m = modelMatrix * instanceMatrix;
+  vec3 base = (m * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+  float largo = length((m * vec4(1.0, 0.0, 0.0, 0.0)).xyz);
+  float alto = length((m * vec4(0.0, 0.0, 1.0, 0.0)).xyz);
+  // La destra della telecamera, in pianta: l'albero gira solo attorno al suo asse.
+  vec2 d = vec2(viewMatrix[0][0], viewMatrix[1][0]);
+  vec3 destra = vec3(d / max(length(d), 1e-6), 0.0);
+  vec3 mondo = base + destra * position.x * largo + vec3(0.0, 0.0, position.y * alto);
+  vec4 mvPosition = viewMatrix * vec4(mondo, 1.0);
+  gl_Position = projectionMatrix * mvPosition;
+  // Quale albero dell'atlante, e girato o no: dal posto, sempre lo stesso.
+  float h = fract(sin(dot(floor(base.xy * 0.7), vec2(12.9898, 78.233))) * 43758.5453);
+  float cella = uPrima + floor(h * uQuante);
+  float u = fract(h * 7.0) < 0.5 ? uv.x : 1.0 - uv.x;
+  vUv = vec2((cella + u) / 4.0, uv.y);
+  #ifdef USE_INSTANCING_COLOR
+    vTinta = instanceColor;
+  #else
+    vTinta = vec3(1.0);
+  #endif
+  #include <fog_vertex>
+}`;
+
+const FRAMMENTO_ALBERO = `
+#include <common>
+#include <fog_pars_fragment>
+uniform sampler2D uAtlante;
+uniform float uNotte;
+varying vec2 vUv;
+varying vec3 vTinta;
+void main() {
+  vec4 t = texture2D(uAtlante, vUv);
+  if (t.a < 0.5) discard;
+  vec3 c = t.rgb * vTinta * mix(1.0, 0.5, uNotte);
+  gl_FragColor = vec4(c, 1.0);
+  #include <colorspace_fragment>
+  #include <fog_fragment>
+}`;
+
+/** Il materiale degli alberi dipinti: [prima] la prima cella, [quante] fra cui scegliere. */
+function materialeAlberi(atlante, notte, prima, quante) {
+  return new THREE.ShaderMaterial({
+    uniforms: THREE.UniformsUtils.merge([
+      THREE.UniformsLib.fog,
+      { uAtlante: { value: null }, uNotte: { value: notte ? 1 : 0 }, uPrima: { value: prima }, uQuante: { value: quante } },
+    ]),
+    vertexShader: VERTICE_ALBERO,
+    fragmentShader: FRAMMENTO_ALBERO,
+    side: THREE.DoubleSide,
+    fog: true,
+  });
 }
 
 /** La trama d'asfalto di un tipo di strada, con le righe. */
@@ -93,8 +318,23 @@ function tramaStrada(nome, P, notte) {
   return trama(c);
 }
 
-/** Le facciate: quattro campate per quattro piani; il giorno e le finestre accese di notte. */
-function trameFacciata(stile, seme) {
+/**
+ * Le facciate: quattro campate per quattro piani; il giorno e le finestre
+ * accese di notte. «Vedo gli edifici sempre uguali»: una sola trama per
+ * tipo faceva una città di fotocopie. Ora ogni tipo ha i suoi modelli
+ * ([variante], vedi `VARIANTI_FACCIATA`):
+ *
+ *  - residenziale 0: finestre con le persiane verdi aperte;
+ *  - residenziale 1: portefinestre con i balconi e la ringhiera, persiane marroni;
+ *  - residenziale 2: palazzo d'epoca, finestre con la cornice e il timpano,
+ *    una fascia a ogni piano;
+ *  - residenziale 3: anni '70, finestre a nastro e balconi continui;
+ *  - uffici 0: vetrata a griglia; uffici 1: nastri di vetro e marcapiani;
+ *  - industria: finestre alte a nastro.
+ *
+ * La trama è bianca dove c'è il muro: il colore lo dà l'edificio.
+ */
+function trameFacciata(stile, seme, variante = 0) {
   const N = 4;
   const CW = 64;
   const Wp = N * CW;
@@ -106,12 +346,30 @@ function trameFacciata(stile, seme) {
   g.fillRect(0, 0, Wp, Wp);
   h.fillStyle = '#000';
   h.fillRect(0, 0, Wp, Wp);
-  const r = generatore(seme);
-  for (let i = 0; i < 3000; i++) {
+  const r = generatore(seme + variante * 101);
+  // L'intonaco: macchie leggere, più fitte in basso (lo sporco della strada).
+  for (let i = 0; i < 3500; i++) {
     g.fillStyle = `rgba(0,0,0,${r() * 0.05})`;
-    g.fillRect(r() * Wp, r() * Wp, 2, 2);
+    g.fillRect(r() * Wp, r() * Wp, 2 + r() * 3, 2 + r() * 3);
   }
   const caldi = ['#ffd27a', '#ffe0a3', '#fff1cf', '#ffc46b', '#cfe1ff'];
+  const persiane = variante === 1 ? ['#6e4a33', '#7a5236', '#654330'] : ['#4d7550', '#557d57', '#466c4a'];
+  const vetro = (x, y, w, hh, freddo = false) => {
+    const tono = 40 + Math.floor(r() * 30);
+    g.fillStyle = freddo ? `rgb(${tono + 95},${tono + 115},${tono + 135})` : `rgb(${tono},${tono + 8},${tono + 20})`;
+    g.fillRect(x, y, w, hh);
+    const gr = g.createLinearGradient(0, y, 0, y + hh);
+    gr.addColorStop(0, 'rgba(255,255,255,0.28)');
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr;
+    g.fillRect(x, y, w, hh);
+  };
+  const anta = (x, y, w, hh) => {
+    g.fillStyle = persiane[Math.floor(r() * persiane.length)];
+    g.fillRect(x, y, w, hh);
+    g.fillStyle = 'rgba(0,0,0,0.22)';
+    for (let k = y + 3; k < y + hh - 1; k += 4) g.fillRect(x + 1, k, w - 2, 1);
+  };
   for (let fy = 0; fy < N; fy++) {
     for (let bx = 0; bx < N; bx++) {
       const x0 = bx * CW;
@@ -120,36 +378,73 @@ function trameFacciata(stile, seme) {
       let wx1;
       let wy0;
       let wy1;
-      if (stile === 'uffici') [wx0, wx1, wy0, wy1] = [3, 61, 10, 52];
-      else if (stile === 'industria') {
+      if (stile === 'uffici' && variante === 1) {
+        [wx0, wx1, wy0, wy1] = [0, 64, 8, 42];
+        vetro(x0, y0 + wy0, CW, wy1 - wy0, true);
+        g.fillStyle = 'rgba(210,218,226,0.95)';
+        g.fillRect(x0 + 31, y0 + wy0, 2, wy1 - wy0);
+        g.fillStyle = 'rgba(0,0,0,0.16)';
+        g.fillRect(x0, y0 + wy1, CW, 3);
+      } else if (stile === 'uffici') {
+        [wx0, wx1, wy0, wy1] = [3, 61, 10, 52];
+        vetro(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0, true);
+        g.strokeStyle = 'rgba(255,255,255,0.9)';
+        g.lineWidth = 2;
+        g.strokeRect(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
+        g.fillStyle = 'rgba(220,225,230,0.9)';
+        g.fillRect(x0 + 31, y0 + wy0, 2, wy1 - wy0);
+      } else if (stile === 'industria') {
         [wx0, wx1, wy0, wy1] = [0, 64, 14, 30];
         if (fy % 2) {
           g.fillStyle = 'rgba(0,0,0,0.10)';
           g.fillRect(x0 + 31, y0, 2, CW);
           continue;
         }
-      } else [wx0, wx1, wy0, wy1] = [18, 46, 12, 50];
-      const tono = 40 + Math.floor(r() * 30);
-      g.fillStyle = stile === 'uffici' ? `rgb(${tono + 40},${tono + 62},${tono + 85})` : `rgb(${tono},${tono + 8},${tono + 20})`;
-      g.fillRect(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
-      const gr = g.createLinearGradient(0, y0 + wy0, 0, y0 + wy1);
-      gr.addColorStop(0, 'rgba(255,255,255,0.28)');
-      gr.addColorStop(1, 'rgba(255,255,255,0)');
-      g.fillStyle = gr;
-      g.fillRect(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
-      g.strokeStyle = 'rgba(255,255,255,0.9)';
-      g.lineWidth = 2;
-      g.strokeRect(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
-      if (stile === 'uffici') {
-        g.fillStyle = 'rgba(220,225,230,0.9)';
+        vetro(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
+      } else if (variante === 1) {
+        // Portafinestra, balcone e ringhiera.
+        [wx0, wx1, wy0, wy1] = [23, 41, 8, 58];
+        vetro(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
+        anta(x0 + wx0 - 9, y0 + wy0, 8, wy1 - wy0);
+        anta(x0 + wx1 + 1, y0 + wy0, 8, wy1 - wy0);
+        g.fillStyle = 'rgba(0,0,0,0.38)';
+        g.fillRect(x0 + 8, y0 + 59, 48, 4);
+        g.fillStyle = 'rgba(40,40,40,0.75)';
+        g.fillRect(x0 + 8, y0 + 44, 48, 2);
+        for (let k = x0 + 9; k < x0 + 56; k += 4) g.fillRect(k, y0 + 44, 1, 15);
+      } else if (variante === 2) {
+        // Palazzo d'epoca: cornice, timpano, fascia al piano.
+        [wx0, wx1, wy0, wy1] = [21, 43, 16, 52];
+        g.fillStyle = 'rgba(0,0,0,0.13)';
+        g.fillRect(x0 + wx0 - 4, y0 + wy0 - 4, wx1 - wx0 + 8, wy1 - wy0 + 8);
+        g.fillStyle = '#ffffff';
+        g.fillRect(x0 + wx0 - 2, y0 + wy0 - 2, wx1 - wx0 + 4, wy1 - wy0 + 4);
+        vetro(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
+        g.fillStyle = 'rgba(0,0,0,0.3)';
+        g.fillRect(x0 + wx0 - 5, y0 + wy0 - 8, wx1 - wx0 + 10, 3);
+        g.fillRect(x0 + wx0 - 3, y0 + wy1 + 3, wx1 - wx0 + 6, 3);
+        g.fillStyle = 'rgba(0,0,0,0.12)';
+        g.fillRect(x0, y0 + 61, CW, 3);
+      } else if (variante === 3) {
+        // Anni '70: finestra larga e balcone continuo col parapetto pieno.
+        [wx0, wx1, wy0, wy1] = [6, 58, 12, 38];
+        vetro(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
+        g.fillStyle = 'rgba(255,255,255,0.85)';
         g.fillRect(x0 + 31, y0 + wy0, 2, wy1 - wy0);
-      }
-      if (stile === 'residenziale') {
-        g.fillStyle = 'rgba(0,0,0,0.25)';
-        g.fillRect(x0 + wx0 - 2, y0 + wy1, wx1 - wx0 + 4, 3);
-        g.fillStyle = 'rgba(0,0,0,0.08)';
-        g.fillRect(x0 + wx0 - 7, y0 + wy0, 6, wy1 - wy0);
-        g.fillRect(x0 + wx1 + 1, y0 + wy0, 6, wy1 - wy0);
+        g.fillStyle = 'rgba(0,0,0,0.2)';
+        g.fillRect(x0, y0 + 42, CW, 18);
+        g.fillStyle = 'rgba(0,0,0,0.4)';
+        g.fillRect(x0, y0 + 60, CW, 4);
+      } else {
+        // Finestre con le persiane aperte e il davanzale.
+        [wx0, wx1, wy0, wy1] = [22, 42, 12, 50];
+        vetro(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
+        if (r() < 0.85) {
+          anta(x0 + wx0 - 10, y0 + wy0, 9, wy1 - wy0);
+          anta(x0 + wx1 + 1, y0 + wy0, 9, wy1 - wy0);
+        } else anta(x0 + wx0, y0 + wy0, wx1 - wx0, wy1 - wy0);
+        g.fillStyle = 'rgba(0,0,0,0.3)';
+        g.fillRect(x0 + wx0 - 3, y0 + wy1, wx1 - wx0 + 6, 3);
       }
       const accesa = r() < (stile === 'industria' ? 0.25 : stile === 'uffici' ? 0.45 : 0.42);
       if (accesa) {
@@ -168,6 +463,9 @@ function trameFacciata(stile, seme) {
   for (let fy = 0; fy < N; fy++) g.fillRect(0, fy * CW, Wp, 3);
   return [trama(c), trama(e)];
 }
+
+/** Il bit dello stencil delle ombre a terra (vedi `Scena.materiali`). */
+export const BIT_OMBRA = 0x80;
 
 /** Una geometria three.js dai dati del lavoratore. */
 function geometria(d, notte) {
@@ -235,7 +533,9 @@ void main() {
   c = mix(c, vec3(1.0), chev * 0.92);
   float a = 1.0 - smoothstep(0.93, 1.0, e);
   a *= smoothstep(uInizio, uInizio + 6.0, vUv.y);
-  a *= mix(1.0, 0.45 + 0.35 * step(0.5, fract(vUv.y / 8.0)), galleria);
+  // In galleria quasi piena, con un tratteggio leggero: «rendi più visibile la
+  // linea nelle gallerie» (prima metà tenue, a strisce).
+  a *= mix(1.0, 0.82 + 0.18 * step(0.5, fract(vUv.y / 8.0)), galleria);
   gl_FragColor = vec4(c * (1.0 + 0.35 * uNotte), a * 0.97 * uOpacita);
   #include <colorspace_fragment>
 }`;
@@ -330,7 +630,15 @@ export class Scena {
       fusto,
       capitello,
       tronco,
-      chioma: new THREE.IcosahedronGeometry(1, 0),
+      // Il rettangolo di un albero dipinto: largo 1, da terra (0) alla cima (1).
+      albero: (() => {
+        const q = new THREE.PlaneGeometry(1, 1);
+        q.translate(0, 0.5, 0);
+        return q;
+      })(),
+      chioma: chiomaMorbida(),
+      // La chioma piccola accanto: meno triangoli, morbida uguale.
+      chioma2: chiomaMorbida(0),
       cono,
       palo,
       testa: new THREE.BoxGeometry(1, 1, 1),
@@ -348,7 +656,18 @@ export class Scena {
     };
     // Il «fantasma» del percorso: lo stesso nastro, disegnato solo dove
     // qualcosa ci sta davanti (un cavalcavia, un edificio), più tenue.
-    this.uniformiFantasma = { ...this.uniformiPercorso, uInizio: { value: -1e9 }, uOpacita: { value: 0.5 } };
+    this.uniformiFantasma = { ...this.uniformiPercorso, uInizio: { value: -1e9 }, uOpacita: { value: 0.85 } };
+    // Gli edifici di vetro attorno all'auto (vedi [vetroVicino]).
+    this.uniformiEdifici = {
+      uAuto: { value: new THREE.Vector2(1e9, 1e9) },
+      uDir: { value: new THREE.Vector2(1, 0) },
+      // Dov'è l'auto sullo schermo (coordinate -1..1 e profondità), e lo schermo in pixel.
+      uAutoSchermo: { value: new THREE.Vector3(0, -2, -1) },
+      uSchermo: { value: new THREE.Vector2(1, 1) },
+      uFinestreTenui: { value: 0.45 },
+      // Un po' di luce propria sui tetti di giorno: chiari come da sopra.
+      uLuceTetti: { value: 0.12 },
+    };
     this.uniformiRisparmio = {
       uCore: { value: colore('#4ADE80') },
       uBordo: { value: colore('#166534') },
@@ -370,8 +689,11 @@ export class Scena {
     this.notte = notte;
     const P = notte ? NOTTE : GIORNO;
     this.P = P;
+    // Di notte le finestre accese restano tutte.
+    this.uniformiEdifici.uFinestreTenui.value = notte ? 0 : 0.45;
+    this.uniformiEdifici.uLuceTetti.value = notte ? 0 : 0.12;
     this.emisferica.color.set(notte ? 0x4a5d8c : 0xdbe8ff);
-    this.emisferica.groundColor.set(notte ? 0x141a26 : 0x8d917f);
+    this.emisferica.groundColor.set(notte ? 0x141a26 : 0xc4bcae);
     this.emisferica.intensity = notte ? 0.75 : 1.35;
     this.sole.color.set(notte ? 0x9db2ff : 0xfff0d8);
     this.sole.intensity = notte ? 0.5 : 2.3;
@@ -413,8 +735,33 @@ export class Scena {
     m.ombre = new THREE.MeshBasicMaterial({ color: 0x0c1220, transparent: true, opacity: P.ombra, depthWrite: true, depthFunc: THREE.LessDepth, fog: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
     m.ombrePonti = m.ombre.clone();
     m.ombrePonti.opacity = P.ombraPonte;
-    ['residenziale', 'uffici', 'industria'].forEach((s, i) => {
-      const [mappa, luci] = trameFacciata(s, 11 + i * 7);
+    // Ogni punto del suolo si scurisce una volta sola: l'ombra di un muro e
+    // quella del tetto si sovrappongono, e col solo depth test litigavano a
+    // righe («palazzi trasparenti»). Il bit alto dello stencil segna i punti
+    // già in ombra; `principale.js` lo pulisce prima e dopo la scena.
+    Object.assign(m.ombre, {
+      stencilWrite: true,
+      stencilRef: BIT_OMBRA,
+      stencilFuncMask: BIT_OMBRA,
+      stencilWriteMask: BIT_OMBRA,
+      stencilFunc: THREE.NotEqualStencilFunc,
+      stencilZPass: THREE.ReplaceStencilOp,
+      depthWrite: false,
+    });
+    // Sotto gli alberi una macchia tonda e sfumata: più scura al centro.
+    const to = tela(64, 64);
+    const tg = to.getContext('2d');
+    const go = tg.createRadialGradient(32, 32, 0, 32, 32, 32);
+    go.addColorStop(0, 'rgba(255,255,255,1)');
+    go.addColorStop(0.3, 'rgba(255,255,255,0.75)');
+    go.addColorStop(0.65, 'rgba(255,255,255,0.25)');
+    go.addColorStop(1, 'rgba(255,255,255,0)');
+    tg.fillStyle = go;
+    tg.fillRect(0, 0, 64, 64);
+    m.ombreAlberi = new THREE.MeshBasicMaterial({ color: 0x0c1220, alphaMap: trama(to, false), transparent: true, opacity: P.ombra, depthWrite: false, fog: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
+    STILI_FACCIATA.forEach((s) => {
+      const [stile, variante] = s.split('-');
+      const [mappa, luci] = trameFacciata(stile, 11 + ['residenziale', 'uffici', 'industria'].indexOf(stile) * 7, Number(variante));
       m['facciata-' + s] = new THREE.MeshLambertMaterial({
         map: mappa,
         vertexColors: true,
@@ -424,12 +771,34 @@ export class Scena {
       });
       // Per la scala delle trame: una campata e un piano.
       m['facciata-' + s].userData = { campata: CAMPATA, piano: PIANO };
+      this.vetroVicino(m['facciata-' + s], 'facciata-' + s);
     });
     m.tetti = new THREE.MeshLambertMaterial({ vertexColors: true });
+    this.vetroVicino(m.tetti, 'tetti');
     m.fusto = new THREE.MeshLambertMaterial({ color: P.pilone });
     m.capitello = new THREE.MeshLambertMaterial({ color: P.trave });
-    m.tronco = new THREE.MeshLambertMaterial({ color: notte ? '#3a2e26' : '#6b5241' });
-    m.chioma = new THREE.MeshLambertMaterial({ flatShading: true, color: notte ? 0xe6e6e6 : 0xffffff });
+    m.tronco = new THREE.MeshLambertMaterial({ color: notte ? '#2e2823' : '#4f4238' });
+    // Le chiome morbide (niente facce piatte), più scure sotto e dentro: la
+    // luce del cielo arriva dall'alto, sotto la chioma c'è ombra.
+    m.chioma = new THREE.MeshLambertMaterial({ color: notte ? 0xd8d8d8 : 0xffffff });
+    m.chioma.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', `#include <common>
+          varying float vAltoChioma;`)
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          vAltoChioma = position.z;`);
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', `#include <common>
+          varying float vAltoChioma;`)
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          diffuseColor.rgb *= mix(0.55, 1.08, smoothstep(-1.0, 0.9, vAltoChioma));`);
+    };
+    m.chioma.customProgramCacheKey = () => 'chioma-ombra';
+    this.atlanteAlberi ??= atlanteAlberi();
+    m.foglie = materialeAlberi(this.atlanteAlberi, notte, 0, 3);
+    m.foglie.uniforms.uAtlante.value = this.atlanteAlberi;
+    m.abeti = materialeAlberi(this.atlanteAlberi, notte, 3, 1);
+    m.abeti.uniforms.uAtlante.value = this.atlanteAlberi;
     m.palo = new THREE.MeshLambertMaterial({ color: notte ? 0x3b4250 : 0x8d949e });
     m.testa = notte ? new THREE.MeshBasicMaterial({ color: 0xffd9a0 }) : new THREE.MeshLambertMaterial({ color: 0x9aa1aa });
     if (notte) {
@@ -466,6 +835,107 @@ export class Scena {
     return m;
   }
 
+  /**
+   * Gli edifici per la guida: «deve essere bello da vedere e utile; viene
+   * usato guidando, quindi informazioni e strada sempre ben visibili».
+   *
+   *  - Di giorno le finestre appena accennate: la facciata resta una
+   *    superficie pulita, il disegno delle finestre non fa rumore (di notte
+   *    restano, accese).
+   *  - Più scure verso terra, un poco più chiare in alto: la luce del cielo e
+   *    l'ombra della strada danno volume senza effetto «cartone».
+   *  - Pieni dappertutto, tranne dove coprono l'auto sullo schermo: lì, e
+   *    solo nelle parti davanti a lei, diventano trasparenti, come nei giochi
+   *    di guida. Prima erano di vetro (a puntini, poi liscio) tutti quelli
+   *    attorno all'auto, e la città sembrava un acquario.
+   */
+  vetroVicino(materiale, nome) {
+    const u = this.uniformiEdifici;
+    const facciata = nome.startsWith('facciata');
+    materiale.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, u);
+      sh.vertexShader = sh.vertexShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+          varying float vQuota;
+          varying vec2 vPiano;`,
+        )
+        .replace(
+          '#include <worldpos_vertex>',
+          `#include <worldpos_vertex>
+          vQuota = transformed.z;
+          vPiano = transformed.xy;`,
+        );
+      sh.fragmentShader = sh.fragmentShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+          varying float vQuota;
+          varying vec2 vPiano;
+          uniform vec3 uAutoSchermo;
+          uniform vec2 uSchermo;
+          uniform float uFinestreTenui;`,
+        )
+        .replace(
+          '#include <map_fragment>',
+          facciata
+            ? `#ifdef USE_MAP
+              vec4 finestre = texture2D(map, vMapUv);
+              diffuseColor *= mix(finestre, vec4(1.0), uFinestreTenui);
+            #endif`
+            : '#include <map_fragment>',
+        )
+        .replace(
+          '#include <color_fragment>',
+          facciata
+            ? `#include <color_fragment>
+          // Il piano terra (negozi, portoni) più scuro e netto, poi la luce
+          // che sale piano: la casa poggia a terra.
+          diffuseColor.rgb *= mix(0.8, 1.0, smoothstep(3.3, 3.6, vQuota)) * mix(0.86, 1.0, smoothstep(0.0, 14.0, vQuota)) * mix(1.0, 1.05, smoothstep(14.0, 60.0, vQuota));`
+            : `#include <color_fragment>
+          // I tetti: a chiazze leggere (guaine, ghiaia, coppi rifatti), non
+          // una lastra liscia che sembra un buco nella mappa.
+          {
+            vec2 q = floor(vPiano * 0.35);
+            float n = fract(sin(dot(q, vec2(12.9898, 78.233))) * 43758.5453);
+            vec2 q2 = floor(vPiano * 1.3);
+            float n2 = fract(sin(dot(q2, vec2(39.346, 11.135))) * 24634.6345);
+            diffuseColor.rgb *= 0.97 + 0.04 * n + 0.02 * n2;
+          }`,
+        )
+        .replace(
+          '#include <opaque_fragment>',
+          `{
+            // Solo dove copre davvero l'auto sullo schermo (un cerchio
+            // attorno a lei) e solo le parti davanti a lei. Prima la zona
+            // scendeva fino al bordo e sbavava i palazzi di lato.
+            vec2 ndc = gl_FragCoord.xy / uSchermo * 2.0 - 1.0;
+            vec2 p = vec2((ndc.x - uAutoSchermo.x) * uSchermo.x / uSchermo.y, ndc.y - uAutoSchermo.y);
+            float d = length(p);
+            float davanti = step(gl_FragCoord.z, uAutoSchermo.z * 0.5 + 0.5 - 0.00002);
+            diffuseColor.a *= 1.0 - 0.7 * davanti * (1.0 - smoothstep(0.09, 0.15, d));
+          }
+          #include <opaque_fragment>`,
+        )
+        .replace(
+          '#include <emissivemap_fragment>',
+          facciata
+            ? '#include <emissivemap_fragment>'
+            : `#include <emissivemap_fragment>
+          totalEmissiveRadiance += diffuseColor.rgb * uLuceTetti;`,
+        )
+        .replace('uniform float uFinestreTenui;', 'uniform float uFinestreTenui;\n          uniform float uLuceTetti;');
+    };
+    materiale.transparent = true;
+    materiale.depthWrite = true;
+    // Le pareti da tutte e due le parti: nelle tessere qualche contorno è
+    // girato al contrario (o un cortile è scritto come un edificio), e la
+    // parete girata spariva: il tetto restava sospeso sul vuoto.
+    materiale.side = THREE.DoubleSide;
+    materiale.customProgramCacheKey = () => 'guida-' + nome;
+  }
+
   /** Una tessera fatta dal lavoratore, messa al suo posto nella scena. */
   aggiungiTessera(t, x, y, k) {
     this.togliTessera(t.chiave);
@@ -493,19 +963,28 @@ export class Scena {
       o.position.z = 0.46;
       aggiungi('ombrePonti', o, 2);
     }
+    if (t.ombreAlberi) {
+      const o = new THREE.Mesh(geometria(t.ombreAlberi, notte));
+      o.position.z = 0.42;
+      aggiungi('ombreAlberi', o, 2);
+    }
     if (t.opere) aggiungi('opere', new THREE.Mesh(geometria(t.opere, notte)), 3);
     for (const [s, d] of Object.entries(t.facciate)) aggiungi('facciata-' + s, new THREE.Mesh(geometria(d, notte)), 3);
     if (t.tetti) aggiungi('tetti', new THREE.Mesh(geometria(t.tetti, notte)), 3);
     const g = this.geo;
     if (t.fusti.length) aggiungi('fusto', istanze(g.fusto, null, t.fusti), 3);
     if (t.capitelli.length) aggiungi('capitello', istanze(g.capitello, null, t.capitelli), 3);
+    // Gli alberi dipinti: un'immagine per albero (vedi [atlanteAlberi]).
     const a = t.alberi;
-    if (a.tronchi.length) aggiungi('tronco', istanze(g.tronco, null, a.tronchi), 3);
-    if (a.chiome.length) {
-      aggiungi('chioma', istanze(g.chioma, null, a.chiome, a.coloriChiome), 3);
-      aggiungi('chioma', istanze(g.chioma, null, a.chiome2, a.coloriChiome2), 3);
-    }
-    if (a.coni.length) aggiungi('chioma', istanze(g.cono, null, a.coni, a.coloriConi), 3);
+    // Girano nella GPU: la sfera dei confini di three.js non li contiene, e
+    // la tessera intera è già nel campo quando si disegna.
+    const dipinti = (dati, colori) => {
+      const i = istanze(g.albero, null, dati, colori);
+      i.frustumCulled = false;
+      return i;
+    };
+    if (a.foglie?.length) aggiungi('foglie', dipinti(a.foglie, a.coloriFoglie), 3);
+    if (a.abeti?.length) aggiungi('abeti', dipinti(a.abeti, a.coloriAbeti), 3);
     if (t.pali.length) {
       aggiungi('palo', istanze(g.palo, null, t.pali), 3);
       aggiungi('testa', istanze(g.testa, null, t.teste), 3);
@@ -831,6 +1310,8 @@ export class Scena {
     const a = this.auto;
     a.visible = true;
     a.position.set(x, y, z + 0.26);
+    this.uniformiEdifici.uAuto.value.set(x, y);
+    this.uniformiEdifici.uDir.value.set(Math.cos(dir), Math.sin(dir));
     a.rotation.set(0, 0, 0);
     a.rotateZ(dir);
     a.rotateY(-pendenza);

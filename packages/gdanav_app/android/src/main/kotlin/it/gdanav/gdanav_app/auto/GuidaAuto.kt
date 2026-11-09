@@ -174,7 +174,19 @@ class GuidaAuto(private val context: Context) {
          * colori l'auto può ignorarli, il testo resta. `null` se non c'è
          * niente da dire.
          */
-        fun testoDelViaggio(c: PonteAuto.Cruscotto, pedaggio: String?): CharSequence? {
+        /*
+         * [stretto]: la mappa ha mezzo schermo (accanto la musica, il
+         * telefono), e la scheda è più stretta. «Quando sta messo a riquadro
+         * doppio non entra tutto nel riquadro delle info viaggio»: il
+         * pedaggio finiva tagliato («1,0…»). Allora la riga si accorcia:
+         * «🔋 99% → 93%» al posto di «🔋 99% · arrivo 93%», e il pedaggio
+         * senza la parola («1,05 €», in ambra).
+         */
+        fun testoDelViaggio(
+            c: PonteAuto.Cruscotto,
+            pedaggio: String?,
+            stretto: Boolean = PonteAuto.mappaStretta,
+        ): CharSequence? {
             val testo = android.text.SpannableStringBuilder()
             fun pezzo(t: String, colore: CarColor? = null) {
                 if (testo.isNotEmpty()) testo.append(" · ")
@@ -187,8 +199,21 @@ class GuidaAuto(private val context: Context) {
             val circa = if (c.batteriaStimata) "~" else ""
             c.batteria?.let { b ->
                 pezzo("🔋$NBSP$circa${b.roundToInt()}%", if (b < 20) CarColor.RED else null)
+                // Stretta: la batteria all'arrivo subito dopo quella di adesso.
+                val arrivo = c.arrivoBatteria
+                if (stretto && arrivo != null) {
+                    testo.append("${NBSP}→$NBSP")
+                    val da = testo.length
+                    testo.append("${arrivo.roundToInt()}%")
+                    testo.setSpan(
+                        ForegroundCarColorSpan.create(if (arrivo < 10) CarColor.RED else CarColor.GREEN),
+                        da,
+                        testo.length,
+                        Spanned.SPAN_INCLUSIVE_EXCLUSIVE,
+                    )
+                }
                 c.autonomiaKm?.let { pezzo("$circa${it.roundToInt()}${NBSP}km") }
-                c.arrivoBatteria?.let { v ->
+                c.arrivoBatteria?.takeIf { !stretto }?.let { v ->
                     if (testo.isNotEmpty()) testo.append(" · ")
                     testo.append("arrivo$NBSP")
                     val da = testo.length
@@ -202,7 +227,8 @@ class GuidaAuto(private val context: Context) {
                 }
             }
             c.meteoTemperatura?.let { m -> pezzo("${c.meteoEmoji?.let { "$it$NBSP" } ?: ""}${m.roundToInt()}°") }
-            if (!pedaggio.isNullOrEmpty()) pezzo(pedaggio, CarColor.createCustom(AMBRA_GIORNO, AMBRA_NOTTE))
+            val costo = if (stretto) c.pedaggio ?: pedaggio?.removeSuffix(" pedaggio") else pedaggio
+            if (!costo.isNullOrEmpty()) pezzo(costo, CarColor.createCustom(AMBRA_GIORNO, AMBRA_NOTTE))
             return testo.takeIf { it.isNotEmpty() }
         }
 

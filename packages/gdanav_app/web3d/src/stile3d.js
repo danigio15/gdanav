@@ -62,6 +62,10 @@ export function adattaStile(stile, { notte = false } = {}) {
   const s = JSON.parse(JSON.stringify(stile));
   const layers = [];
   for (const l of s.layers) {
+    // In 3D niente nomi di negozi, bar e uffici: guidando sono rumore. Restano
+    // i nomi delle strade, e i punti di GdANav (colonnine, distributori,
+    // segnalazioni, meta).
+    if (l.id === 'nomi-poi') continue;
     if (STRATI_SOSTITUITI.includes(l.id)) {
       // Gli edifici in 3D di MapLibre non servono mai: da lontano bastano i piatti.
       if (l.id === 'edifici-3d' || l.id === 'edifici-immersivi') continue;
