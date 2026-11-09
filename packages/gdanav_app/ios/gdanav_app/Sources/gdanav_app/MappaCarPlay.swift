@@ -315,10 +315,23 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
             }
         }
         if let m = meta { punti.append(m) }
+        // Un punto solo (la meta, senza linee né posizione): attorno la
+        // lunghezza del viaggio. Un rettangolo di un punto non si inquadra,
+        // e la mappa restava dov'era (mezza Italia, nelle foto di prova).
+        let lunghezzaViaggio = s.voci.indices.contains(s.scelta) ? s.voci[s.scelta].metri : 0
+        if let m = meta, punti.count < 2 {
+            let raggio = max(lunghezzaViaggio / 2, 1_500)
+            let dLat = raggio / 111_000
+            let dLon = raggio / (111_000 * max(cos(m.latitude * .pi / 180), 0.2))
+            punti.append(CLLocationCoordinate2D(latitude: m.latitude - dLat, longitude: m.longitude - dLon))
+            punti.append(CLLocationCoordinate2D(latitude: m.latitude + dLat, longitude: m.longitude + dLon))
+        }
         guard let primo = punti.first else { return false }
         let chiave = "\(s.id)|\(s.scelta)|\(punti.count)"
         if stradeInquadrate == chiave { return true }
         stradeInquadrate = chiave
+        let diagnosi = "gdanav carplay: inquadro le strade, \(punti.count) punti, posizione \(ponte.qui == nil ? "no" : "sì"), mappa \(Int(mappa.bounds.width))x\(Int(mappa.bounds.height))"
+        NSLog("%@", diagnosi as NSString)
         var sw = primo
         var ne = primo
         for p in punti {
