@@ -76,6 +76,9 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         // scrivere (`GuidaAuto.testoDelViaggio`): qui resta la sosta, se c'è.
         // Senza guida la scheda non c'è, e la barra resta; e sulle auto più
         // vecchie anche in guida.
+        // A destra la striscia del traffico, come sul telefono, se davanti
+        // c'è qualche coda.
+        PonteAuto.guida?.let { g -> if (g.striscia.isNotEmpty()) striscia(canvas, a, margine, g) }
         val nellaScheda = PonteAuto.pedaggioNellaStima && PonteAuto.guida != null
         barra(
             canvas,
@@ -491,6 +494,99 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         numero.textSize = dp(8.5f) * k
         canvas.drawText("km/h", cxVelocita, cy + dp(15f) * k, numero)
         return box
+    }
+
+    /**
+     * La striscia del traffico, di lato come sul telefono: «su Android Auto
+     * non esce la linea ai lati del traffico con i minuti in più». In basso
+     * l'auto, in cima la meta (o i puntini, se il viaggio va oltre); le code
+     * colorate al loro posto e, a sinistra di ognuna, «+7 min» e quanto manca.
+     */
+    private fun striscia(canvas: Canvas, a: Rect, margine: Float, g: PonteAuto.Guida) {
+        val sopra = dp(46f)
+        val sotto = dp(30f)
+        val alto = a.top + margine + sopra
+        val basso = a.bottom - margine - sotto
+        val barra = basso - alto
+        if (barra < dp(90f)) return
+        val w = dp(10f)
+        val cx = a.right - margine - dp(14f)
+        fun y(f: Float) = alto + barra * (1f - f)
+        fun colore(livello: Int) = when {
+            livello >= 4 -> Color.rgb(156, 163, 175)
+            livello == 3 -> Color.rgb(248, 113, 113)
+            else -> Color.rgb(251, 191, 36)
+        }
+        val contorno = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = dp(1.5f)
+            color = Color.WHITE
+        }
+        pieno.color = Color.rgb(58, 176, 255)
+        val tubo = RectF(cx - w / 2, alto, cx + w / 2, basso)
+        canvas.drawRoundRect(tubo, w / 2, w / 2, pieno)
+        canvas.drawRoundRect(tubo, w / 2, w / 2, contorno)
+        for (c in g.striscia) {
+            val r = RectF(cx - w / 2, y(c.a), cx + w / 2, max(y(c.da), y(c.a) + dp(5f)))
+            pieno.color = colore(c.livello)
+            canvas.drawRoundRect(r, w / 2, w / 2, pieno)
+            canvas.drawRoundRect(r, w / 2, w / 2, contorno)
+        }
+        // In cima: la bandiera della meta, o i puntini se il viaggio va oltre.
+        if (g.strisciaTagliata) {
+            numero.color = Color.rgb(58, 176, 255)
+            numero.textSize = dp(22f)
+            canvas.drawText("…", cx, alto - dp(10f), numero)
+        } else {
+            val asta = alto - dp(8f)
+            pieno.color = Color.WHITE
+            canvas.drawRect(cx - dp(7f), asta - dp(26f), cx - dp(5.5f), asta, pieno)
+            val q = dp(4f)
+            for (riga in 0 until 3) for (col in 0 until 3) {
+                pieno.color = if ((riga + col) % 2 == 0) Color.WHITE else Color.rgb(32, 33, 36)
+                val x0 = cx - dp(5.5f) + col * q
+                val y0 = asta - dp(26f) + riga * q
+                canvas.drawRect(x0, y0, x0 + q, y0 + q, pieno)
+            }
+        }
+        // In basso: l'auto.
+        pieno.color = Color.rgb(58, 176, 255)
+        canvas.drawCircle(cx, basso + dp(14f), dp(10f), pieno)
+        contorno.strokeWidth = dp(2f)
+        canvas.drawCircle(cx, basso + dp(14f), dp(10f), contorno)
+        pieno.color = Color.WHITE
+        val punta = android.graphics.Path().apply {
+            moveTo(cx, basso + dp(8f))
+            lineTo(cx + dp(5f), basso + dp(19f))
+            lineTo(cx, basso + dp(16f))
+            lineTo(cx - dp(5f), basso + dp(19f))
+            close()
+        }
+        canvas.drawPath(punta, pieno)
+        // Le etichette, dall'auto in su, senza sovrapporsi.
+        val forte = font(17f)
+        val piccolo = font(13f, grassetto = false, colore = muto)
+        val hEtichetta = dp(40f)
+        var libero = basso + sotto
+        for (c in g.striscia) {
+            if (c.minuti < 1) continue
+            val centro = y((c.da + c.a) / 2f)
+            val cima = minOf(centro - hEtichetta / 2, libero - hEtichetta - dp(4f))
+            if (cima < a.top + margine) break
+            forte.color = colore(c.livello)
+            val riga1 = "+${c.minuti} min"
+            val larga = max(forte.measureText(riga1), piccolo.measureText(c.sotto)) + dp(18f)
+            val destra = cx - w / 2 - dp(8f)
+            val box = RectF(destra - larga, cima, destra, cima + hEtichetta)
+            canvas.drawRoundRect(box, dp(10f), dp(10f), sfondoScheda)
+            pieno.color = colore(c.livello)
+            canvas.drawRect(box.right - dp(3f), box.top + dp(6f), box.right, box.bottom - dp(6f), pieno)
+            forte.textAlign = Paint.Align.RIGHT
+            piccolo.textAlign = Paint.Align.RIGHT
+            canvas.drawText(riga1, box.right - dp(9f), box.top + dp(18f), forte)
+            if (c.sotto.isNotEmpty()) canvas.drawText(c.sotto, box.right - dp(9f), box.top + dp(34f), piccolo)
+            libero = cima
+        }
     }
 
     /** Da che parte va la manovra: 1 destra, -1 sinistra, 0 dritto. */

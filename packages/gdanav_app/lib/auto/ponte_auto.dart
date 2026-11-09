@@ -1190,6 +1190,13 @@ class PonteAuto {
       return;
     }
     final m = a?.prossima ?? p.viaggio.percorso.manovre.firstOrNull;
+    final minutiDiTraffico = guida.minutiDiTraffico;
+    // La striscia del traffico di lato, come sul telefono: «su Android Auto
+    // non esce la linea ai lati del traffico con i minuti in più».
+    final striscia = strisciaTraffico(
+      p.viaggio.percorso,
+      percorsiM: a?.percorsiM ?? 0,
+    )?.allineataA(minutiDiTraffico, guida.ritardoDavanti);
     _manda('guida', {
       'attiva': true,
       'tipo': m?.tipo ?? 8,
@@ -1201,7 +1208,8 @@ class PonteAuto {
       'arrivo': (guida.arrivoAlle ?? _ora()).millisecondsSinceEpoch,
       // Quanti minuti dell'arrivo sono traffico: l'auto colora il tempo
       // che resta (arancio, rosso da dieci minuti). Zero: niente colore.
-      'traffico_minuti': guida.minutiDiTraffico,
+      'traffico_minuti': minutiDiTraffico,
+      if (striscia != null && striscia.code.isNotEmpty) 'striscia': datiStriscia(striscia),
       'destinazione': p.destinazione.nome,
       // Dove si arriva: CarPlay vuole il viaggio con partenza e arrivo.
       'destinazione_lat': p.destinazione.posizione.lat,
@@ -1453,3 +1461,20 @@ Position? posizioneDellAuto(Map<Object?, Object?> dati) {
 /// freccia c'è, e chi l'ha scelta non la vedeva: «se cambio simbolo e
 /// metto freccia non funziona». [aspetto3d] resta per chi chiama.
 String iconaSullAuto(Segnaposto s, {required bool aspetto3d}) => s.immagine;
+
+/// La striscia del traffico per l'auto: le code dal basso (l'auto, 0) verso
+/// l'alto (la meta, o la cima se il viaggio è più lungo, 1), coi minuti e
+/// quanto mancano, già scritti come sul telefono.
+Map<String, Object> datiStriscia(StrisciaTraffico s) => {
+  'tagliata': s.tagliata,
+  'code': [
+    for (final c in s.code)
+      {
+        'da': c.da,
+        'a': c.a,
+        'livello': c.livello,
+        'minuti': c.minuti,
+        'sotto': c.dentro ? 'ci sei' : distanzaBreve(c.distanzaM),
+      },
+  ],
+};

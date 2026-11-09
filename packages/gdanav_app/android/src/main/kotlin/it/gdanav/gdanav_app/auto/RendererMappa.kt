@@ -128,8 +128,15 @@ class RendererMappa(
          * tutta la superficie. */
         areaVisibile?.let { if (it.right > larghezza || it.bottom > altezza) areaVisibile = null }
         densita = contenitore.dpi / 160f
-        // Sotto i 900 punti di larghezza la scheda del viaggio è stretta.
-        if (!soloMappa) PonteAuto.mappaStretta = larghezza / densita < LARGHEZZA_STRETTA_DP
+        // Sotto i 900 punti di larghezza la scheda del viaggio è stretta; e
+        // anche quando la mappa è poco più larga che alta, cioè a mezzo
+        // schermo su uno schermo largo («a mezzo schermo si continuano a
+        // tagliare le info nel quadrato di sinistra»: lì la metà passava i
+        // 900 punti e la riga restava quella lunga, tagliata).
+        if (!soloMappa) {
+            PonteAuto.mappaStretta = larghezza / densita < LARGHEZZA_STRETTA_DP ||
+                (altezza > 0 && larghezza.toFloat() / altezza < PROPORZIONE_STRETTA)
+        }
         MapLibre.getInstance(carContext)
         val p = Presentation(carContext, d.display)
         val contenuto = FrameLayout(p.context)
@@ -994,6 +1001,9 @@ class RendererMappa(
     companion object {
         /** Sotto questa larghezza (in punti) la mappa è a mezzo schermo. */
         private const val LARGHEZZA_STRETTA_DP = 900f
+
+        /** Larga meno di 1,75 volte l'altezza: è mezzo schermo (lo schermo intero di un'auto è più largo). */
+        private const val PROPORZIONE_STRETTA = 1.75f
 
         private const val VUOTA = "{\"type\":\"FeatureCollection\",\"features\":[]}"
         private const val SORGENTE_IO = "gdanav-io"
