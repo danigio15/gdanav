@@ -58,23 +58,25 @@ export const NOTTE = {
 /** I colori delle facciate e dei tetti, per stile di edificio. */
 export const FACCIATE = {
   residenziale: {
-    giorno: ['#dccaa8', '#e6d6b9', '#cc9273', '#b9705a', '#ece6db', '#d2b892', '#d9ab84', '#c4ab90', '#bf8a68'],
+    // Chiari e caldi, poco saturi: si vedono come case, non tirano l'occhio.
+    giorno: ['#ece3d3', '#f1e9dc', '#e3cdb5', '#dcc0a6', '#f3efe8', '#e6d5bf', '#e8d2bb', '#ddd2c3', '#e2c9b0'],
     notte: ['#8c8378', '#91877a', '#7d6a5f', '#806155', '#8d8a85', '#86786a', '#8c8378', '#91877a', '#7d6a5f'],
   },
   uffici: {
-    giorno: ['#a9b8c6', '#c9ced4', '#97a4b0', '#bcc7cf'],
+    giorno: ['#d5dde6', '#e2e6eb', '#cbd5df', '#dbe2e9'],
     notte: ['#6f7987', '#7a828c', '#6f7987', '#7a828c'],
   },
   industria: {
-    giorno: ['#cfd2d5', '#bcc1c7', '#d8d3ca', '#b8a48d', '#c9b9a2', '#a7b2bd', '#d9d9d6'],
+    giorno: ['#e1e3e5', '#d8dbdf', '#e5e1d9', '#d6cdc1', '#ded6ca', '#d3d9df', '#e7e7e5'],
     notte: ['#7f838a', '#767b82', '#857c70', '#7f838a', '#767b82', '#857c70', '#7f838a'],
   },
 };
 
 export const TETTI = {
-  giorno: ['#858990', '#94918c', '#a0594a', '#8f8a84', '#7a7f86'],
+  // Più chiari dei muri: da sopra l'edificio si legge.
+  giorno: ['#c7cacf', '#d0cdc8', '#c08a7a', '#cbc6bf', '#c0c4c9'],
   notte: ['#3c414b', '#424852', '#3c414b', '#424852', '#3c414b'],
-  industriaGiorno: ['#8c9095', '#9a9893', '#80868c', '#a3a099', '#767b80'],
+  industriaGiorno: ['#cdd0d4', '#d4d2cd', '#c6cacf', '#d6d3cd', '#c2c6ca'],
   industriaNotte: ['#4a4f58', '#4a4f58', '#4a4f58', '#4a4f58', '#4a4f58'],
 };
 

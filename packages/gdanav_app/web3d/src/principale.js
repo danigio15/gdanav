@@ -549,6 +549,13 @@ function strato3d() {
       scena.scalaSegni(Pm.elements[5], m.getCanvas().clientHeight);
       // La camera di three.js con le matrici di questo fotogramma, per sfoltire i nomi.
       const occupati = [];
+      // Dov'è l'auto sullo schermo: lì gli edifici davanti a lei si fanno trasparenti.
+      const ue = scena.uniformiEdifici;
+      ue.uSchermo.value.set(gl.drawingBufferWidth, gl.drawingBufferHeight);
+      if (S.auto) {
+        const vs = new THREE.Vector3(S.auto.x, S.auto.y, S.auto.z + 1.2).project(camera);
+        ue.uAutoSchermo.value.set(vs.x, vs.y, vs.z);
+      } else ue.uAutoSchermo.value.set(0, -2, -1);
       if (S.auto) {
         const va = new THREE.Vector3(S.auto.x, S.auto.y, S.auto.z + 1).project(camera);
         const ax = ((va.x + 1) / 2) * m.getCanvas().clientWidth;

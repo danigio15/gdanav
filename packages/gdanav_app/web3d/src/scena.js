@@ -8,11 +8,6 @@ import { generatore } from './caso.js';
 import { CAMPATA, NASTRI, PERIODO_STRADA, PIANO } from './tessera.js';
 import { GIORNO, NOTTE, SOLE } from './tavolozza.js';
 
-/** Fin dove (in metri, davanti e di lato) gli edifici attorno all'auto sono di vetro. */
-const VICINO_VETRO = 120;
-
-/** Quanto si vede attraverso, lì: 0,65 vuol dire che la facciata copre per un terzo. */
-const VETRO = 0.65;
 
 /**
  * La chioma di una latifoglia: una sfera un poco bitorzoluta (80 triangoli,
@@ -593,8 +588,10 @@ export class Scena {
     this.uniformiEdifici = {
       uAuto: { value: new THREE.Vector2(1e9, 1e9) },
       uDir: { value: new THREE.Vector2(1, 0) },
-      uVicino: { value: VICINO_VETRO },
-      uVetro: { value: VETRO },
+      // Dov'è l'auto sullo schermo (coordinate -1..1 e profondità), e lo schermo in pixel.
+      uAutoSchermo: { value: new THREE.Vector3(0, -2, -1) },
+      uSchermo: { value: new THREE.Vector2(1, 1) },
+      uFinestreTenui: { value: 0.6 },
     };
     this.uniformiRisparmio = {
       uCore: { value: colore('#4ADE80') },
@@ -617,6 +614,8 @@ export class Scena {
     this.notte = notte;
     const P = notte ? NOTTE : GIORNO;
     this.P = P;
+    // Di notte le finestre accese restano tutte.
+    this.uniformiEdifici.uFinestreTenui.value = notte ? 0 : 0.6;
     this.emisferica.color.set(notte ? 0x4a5d8c : 0xdbe8ff);
     this.emisferica.groundColor.set(notte ? 0x141a26 : 0x8d917f);
     this.emisferica.intensity = notte ? 0.75 : 1.35;
@@ -736,78 +735,77 @@ export class Scena {
   }
 
   /**
-   * Gli edifici attorno all'auto, e soprattutto fra lei e la telecamera,
-   * diventano di vetro: restano alti e si vedono, ma attraverso si vedono la
-   * strada, gli incroci e il percorso. «Quando si passa nei palazzi non si
-   * capisce nulla: gli incroci si perdono»; e poi «i palazzi si devono
-   * vedere, ma deve vedersi anche il percorso». Il vetro è una trama fine di
-   * punti tolti (niente trasparenze da ordinare): più si è vicini all'auto,
-   * più se ne tolgono; più in là gli edifici tornano pieni, piano piano.
+   * Gli edifici per la guida: «deve essere bello da vedere e utile; viene
+   * usato guidando, quindi informazioni e strada sempre ben visibili».
+   *
+   *  - Di giorno le finestre appena accennate: la facciata resta una
+   *    superficie pulita, il disegno delle finestre non fa rumore (di notte
+   *    restano, accese).
+   *  - Più scure verso terra, un poco più chiare in alto: la luce del cielo e
+   *    l'ombra della strada danno volume senza effetto «cartone».
+   *  - Pieni dappertutto, tranne dove coprono l'auto sullo schermo: lì, e
+   *    solo nelle parti davanti a lei, diventano trasparenti, come nei giochi
+   *    di guida. Prima erano di vetro (a puntini, poi liscio) tutti quelli
+   *    attorno all'auto, e la città sembrava un acquario.
    */
   vetroVicino(materiale, nome) {
     const u = this.uniformiEdifici;
+    const facciata = nome.startsWith('facciata');
     materiale.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, u);
       sh.vertexShader = sh.vertexShader
         .replace(
           '#include <common>',
           `#include <common>
-          varying vec2 vSulPiano;
           varying float vQuota;`,
         )
         .replace(
           '#include <worldpos_vertex>',
           `#include <worldpos_vertex>
-          vSulPiano = (modelMatrix * vec4(transformed, 1.0)).xy;
           vQuota = transformed.z;`,
         );
       sh.fragmentShader = sh.fragmentShader
         .replace(
           '#include <common>',
           `#include <common>
-          varying vec2 vSulPiano;
           varying float vQuota;
-          uniform vec2 uAuto;
-          uniform vec2 uDir;
-          uniform float uVicino;
-          uniform float uVetro;
-          float vTrasparenza = 0.0;`,
+          uniform vec3 uAutoSchermo;
+          uniform vec2 uSchermo;
+          uniform float uFinestreTenui;`,
+        )
+        .replace(
+          '#include <map_fragment>',
+          facciata
+            ? `#ifdef USE_MAP
+              vec4 finestre = texture2D(map, vMapUv);
+              diffuseColor *= mix(finestre, vec4(1.0), uFinestreTenui);
+            #endif`
+            : '#include <map_fragment>',
         )
         .replace(
           '#include <color_fragment>',
-          nome.startsWith('facciata')
+          facciata
             ? `#include <color_fragment>
-          // Più scure verso terra, un poco più chiare in alto: la luce del
-          // cielo e l'ombra della strada. «Gli edifici sembrano tutto
-          // cartonato»: prima la facciata era dello stesso colore dal
-          // marciapiede al tetto.
-          diffuseColor.rgb *= mix(0.62, 1.0, smoothstep(0.0, 14.0, vQuota)) * mix(1.0, 1.06, smoothstep(14.0, 60.0, vQuota));`
+          diffuseColor.rgb *= mix(0.7, 1.0, smoothstep(0.0, 12.0, vQuota)) * mix(1.0, 1.05, smoothstep(12.0, 60.0, vQuota));`
             : '#include <color_fragment>',
         )
         .replace(
           '#include <opaque_fragment>',
-          `diffuseColor.a *= 1.0 - vTrasparenza;
+          `{
+            // Dove copre l'auto sullo schermo: attorno a lei e giù fino al
+            // bordo (la telecamera sta dietro), solo davanti a lei.
+            vec2 ndc = gl_FragCoord.xy / uSchermo * 2.0 - 1.0;
+            vec2 p = vec2((ndc.x - uAutoSchermo.x) * uSchermo.x / uSchermo.y, ndc.y - uAutoSchermo.y);
+            float d = p.y < 0.0 ? abs(p.x) : length(p);
+            float davanti = step(gl_FragCoord.z, uAutoSchermo.z * 0.5 + 0.5 - 0.00002);
+            diffuseColor.a *= 1.0 - 0.72 * davanti * (1.0 - smoothstep(0.16, 0.30, d));
+          }
           #include <opaque_fragment>`,
-        )
-        .replace(
-          '#include <clipping_planes_fragment>',
-          `#include <clipping_planes_fragment>
-          {
-            vec2 v = vSulPiano - uAuto;
-            float avanti = dot(v, uDir);
-            float lato = dot(v, vec2(-uDir.y, uDir.x));
-            // Dietro l'auto (verso la telecamera) il giro è tre volte più lungo.
-            float d = length(vec2(lato, avanti < 0.0 ? avanti / 3.0 : avanti));
-            vTrasparenza = uVetro * (1.0 - smoothstep(uVicino, uVicino * 1.8, d));
-          }`,
         );
     };
-    // Vetro liscio, non a puntini: «non mi piace la visione dei palazzi
-    // così». Trasparenti vicino all'auto (si vedono dopo strade e alberi,
-    // che restano dietro), pieni più in là.
     materiale.transparent = true;
     materiale.depthWrite = true;
-    materiale.customProgramCacheKey = () => 'vetro-liscio-' + nome;
+    materiale.customProgramCacheKey = () => 'guida-' + nome;
   }
 
   /** Una tessera fatta dal lavoratore, messa al suo posto nella scena. */
