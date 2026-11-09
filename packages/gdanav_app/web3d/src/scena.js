@@ -511,6 +511,7 @@ uniform float uNotte;
 uniform float uInizio;
 uniform float uFrecce;
 uniform float uOpacita;
+uniform float uSotto;
 varying vec2 vUv;
 varying float vLivello;
 void main() {
@@ -529,13 +530,16 @@ void main() {
   // La punta in avanti: in mezzo più avanti, ai lati più indietro («le frecce
   // sul percorso sono al contrario»: era la punta indietro).
   float t = fract((vUv.y + w * 1.1) / uPasso);
-  float chev = (1.0 - smoothstep(0.0, 0.06, abs(t - 0.06) - 0.03)) * (1.0 - smoothstep(0.50, 0.56, e)) * uFrecce;
+  float chev = (1.0 - smoothstep(0.0, 0.06, abs(t - 0.06) - 0.03)) * (1.0 - smoothstep(0.50, 0.56, e)) * uFrecce * (1.0 - uSotto);
   c = mix(c, vec3(1.0), chev * 0.92);
   float a = 1.0 - smoothstep(0.93, 1.0, e);
   a *= smoothstep(uInizio, uInizio + 6.0, vUv.y);
   // In galleria quasi piena, con un tratteggio leggero: «rendi più visibile la
   // linea nelle gallerie» (prima metà tenue, a strisce).
   a *= mix(1.0, 0.82 + 0.18 * step(0.5, fract(vUv.y / 8.0)), galleria);
+  // Il tratto coperto (sotto un cavalcavia, dietro un palazzo): tratteggiato
+  // e senza frecce, così si capisce che passa sotto e non sopra.
+  a *= mix(1.0, 0.1 + 0.9 * step(0.5, fract(vUv.y / 6.0)), uSotto);
   gl_FragColor = vec4(c * (1.0 + 0.35 * uNotte), a * 0.97 * uOpacita);
   #include <colorspace_fragment>
 }`;
@@ -653,10 +657,13 @@ export class Scena {
       uInizio: { value: -1e9 },
       uFrecce: { value: 1 },
       uOpacita: { value: 1 },
+      uSotto: { value: 0 },
     };
     // Il «fantasma» del percorso: lo stesso nastro, disegnato solo dove
-    // qualcosa ci sta davanti (un cavalcavia, un edificio), più tenue.
-    this.uniformiFantasma = { ...this.uniformiPercorso, uInizio: { value: -1e9 }, uOpacita: { value: 0.85 } };
+    // qualcosa ci sta davanti (un cavalcavia, un edificio), tenue e
+    // tratteggiato. Quasi pieno (85%) sembrava passare sopra il ponte: «la
+    // linea non può salire sul ponte se la strada è sotto».
+    this.uniformiFantasma = { ...this.uniformiPercorso, uInizio: { value: -1e9 }, uOpacita: { value: 0.32 }, uSotto: { value: 1 } };
     // Gli edifici di vetro attorno all'auto (vedi [vetroVicino]).
     this.uniformiEdifici = {
       uAuto: { value: new THREE.Vector2(1e9, 1e9) },
@@ -677,6 +684,7 @@ export class Scena {
       uInizio: { value: -1e9 },
       uFrecce: { value: 0 },
       uOpacita: { value: 1 },
+      uSotto: { value: 0 },
     };
     this.nastri = {};
     this.colorAuto = '#d62a26';
