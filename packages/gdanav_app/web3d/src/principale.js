@@ -1083,10 +1083,19 @@ function cerchio(r, riempi, bordo, spessore, testo = '', coloreTesto = '#FFFFFF'
 /** I punti delle sorgenti che stanno in quota (chiave → quota), rifatti in [aggiornaSegni]. */
 const inQuota = new Map();
 
+/**
+ * Le segnalazioni (autovelox, tutor, polizia…) troppo lontane dall'auto: non
+ * si disegnano, né in quota né a terra. «Si vedono da lontano i punti per
+ * autovelox, stanno piazzati in alto»: col 3D inclinato quelli a chilometri
+ * finivano all'orizzonte, in cima allo schermo, grandi come quelli vicini.
+ */
+const lontani = new Set();
+const VICINO_SEGNALAZIONI_M = 1200;
+
 /** I dati per MapLibre senza i punti che disegna il 3D in quota. */
 function sulSuolo(id, dati) {
   if (!IN_QUOTA[id] || !dati?.features) return dati;
-  return { ...dati, features: dati.features.filter((f, i) => !inQuota.has(`${id}#${i}`)) };
+  return { ...dati, features: dati.features.filter((f, i) => !inQuota.has(`${id}#${i}`) && !lontani.has(`${id}#${i}`)) };
 }
 
 /**
@@ -1126,9 +1135,17 @@ function aggiornaSegni(adesso) {
       let z = null;
       let x = 0;
       let y = 0;
+      let via = false;
       if (xy) {
         [x, y] = S.origine.daLonLat(xy[0], xy[1]);
-        if (Math.hypot(x - qui[0], y - qui[1]) < 3000) z = quotaDi(x, y);
+        const d = Math.hypot(x - qui[0], y - qui[1]);
+        via = id === 'gdanav-segnalazioni' && d > VICINO_SEGNALAZIONI_M;
+        if (d < 3000 && !via) z = quotaDi(x, y);
+      }
+      if (via !== lontani.has(k)) {
+        cambiato = true;
+        if (via) lontani.add(k);
+        else lontani.delete(k);
       }
       const pr = f.properties ?? {};
       const img = z !== null && z > 2.5 ? (regola.tela ? regola.tela(pr) : S.bitmap.get(regola.immagine(pr))) : null;
@@ -1343,7 +1360,12 @@ function muovi(adesso, dt) {
     c.quota = smorza(c.quota, z, dt, 300);
     c.pitch = smorza(c.pitch, vista.pitch, dt, 600);
     const H = m.getCanvas().clientHeight;
-    let voluta = { center: [lon, lat], zoom: c.zoom, pitch: c.pitch, bearing: c.rotta, padding: { top: H * 0.12 + S.camera.sopra * 0.8, bottom: 0, left: S.camera.sinistra ?? 0, right: 0 } };
+    const W = m.getCanvas().clientWidth;
+    // Lo spazio delle schede, mai più di metà schermo: con misure sbagliate
+    // (l'auto le dà in punti suoi) l'auto finiva in un angolo, lontana.
+    const sopra = Math.min(H * 0.12 + S.camera.sopra * 0.8, H * 0.5);
+    const sinistra = Math.min(S.camera.sinistra ?? 0, W * 0.45);
+    let voluta = { center: [lon, lat], zoom: c.zoom, pitch: c.pitch, bearing: c.rotta, padding: { top: sopra, bottom: 0, left: sinistra, right: 0 } };
     const tr = S.transizione;
     if (tr) {
       tr.partenza ??= { center: m.getCenter().toArray(), zoom: m.getZoom(), pitch: m.getPitch(), bearing: m.getBearing() };

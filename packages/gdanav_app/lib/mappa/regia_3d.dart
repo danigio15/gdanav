@@ -55,6 +55,7 @@ class Regia3d {
     this.onToccata,
     this.orologio,
     this.attesa = const Duration(seconds: 15),
+    this.piuVicina = 0,
   });
 
   final GestoreViaggio gestore;
@@ -86,6 +87,11 @@ class Regia3d {
 
   /// Quanto si aspetta che la pagina sia pronta, prima di lasciar perdere.
   final Duration attesa;
+
+  /// Livelli di zoom in più rispetto al telefono. Sull'auto lo schermo è
+  /// largo e basso: allo zoom del telefono l'auto era piccola, lontana, e la
+  /// scena piatta («lo zoom troppo lontano e piatto»).
+  final double piuVicina;
 
   var _caricata = false;
   var _pronta = false;
@@ -315,11 +321,13 @@ class Regia3d {
         rotta: stimata?.rotta ?? a?.rotta ?? posizione.rotta,
         metri: metri,
         velocitaMs: (g.velocitaMs ?? posizione.velocitaAdesso() / 3.6),
-        zoom: zoom3d(
-          vista(),
-          velocitaStradaKmh: a?.velocitaStradaKmh ?? 0,
-          allaProssimaM: a == null ? 0 : (a.prossima == null ? a.restantiM : a.allaProssimaM),
-        ),
+        zoom:
+            zoom3d(
+              vista(),
+              velocitaStradaKmh: a?.velocitaStradaKmh ?? 0,
+              allaProssimaM: a == null ? 0 : (a.prossima == null ? a.restantiM : a.allaProssimaM),
+            ) +
+            piuVicina,
         // La stima è già portata ad adesso (`metriStimati`).
         quando: _ora(),
       ),

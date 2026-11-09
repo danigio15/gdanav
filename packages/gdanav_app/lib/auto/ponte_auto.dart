@@ -673,6 +673,10 @@ class PonteAuto {
 
   void _vuoi3d() => _manda('web3d_vuoi', {'si': _aspetto3d && !_treDNonVa});
 
+  /// Sull'auto la scena 3D un poco più vicina che sul telefono (vedi
+  /// [Regia3d.piuVicina]).
+  static const piuVicina3dInAuto = 0.7;
+
   Regia3d _nuovaRegia3d() => Regia3d(
     gestore: viaggio,
     posizione: posizione,
@@ -692,6 +696,7 @@ class PonteAuto {
     vicini: vicini,
     persone: persone,
     orologio: _ora,
+    piuVicina: piuVicina3dInAuto,
   )..avvia();
 
   void _stili() {

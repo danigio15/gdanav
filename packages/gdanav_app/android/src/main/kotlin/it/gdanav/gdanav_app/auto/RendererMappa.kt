@@ -128,6 +128,8 @@ class RendererMappa(
          * tutta la superficie. */
         areaVisibile?.let { if (it.right > larghezza || it.bottom > altezza) areaVisibile = null }
         densita = contenitore.dpi / 160f
+        // Sotto i 900 punti di larghezza la scheda del viaggio è stretta.
+        if (!soloMappa) PonteAuto.mappaStretta = larghezza / densita < LARGHEZZA_STRETTA_DP
         MapLibre.getInstance(carContext)
         val p = Presentation(carContext, d.display)
         val contenuto = FrameLayout(p.context)
@@ -540,6 +542,13 @@ class RendererMappa(
             c.addView(nuova.vista, 1, FrameLayout.LayoutParams(tutto, tutto))
             scena = nuova
             PonteAuto.scena3d = { js -> nuova.esegui(js) }
+            // Misurata la pagina, lo spazio delle schede si ridice nei suoi punti.
+            nuova.alMisurato = {
+                principale.post {
+                    stato3dDetto = null
+                    diciLoStato3d()
+                }
+            }
             spegniFotogrammi()
             freccia?.nascondi()
             mappaView?.visibility = View.INVISIBLE
@@ -571,13 +580,18 @@ class RendererMappa(
         PonteAuto.chiusa3d()
     }
 
-    /** Alla regia: giorno o notte, la vista, quanto coprono le schede (in punti della pagina). */
+    /**
+     * Alla regia: giorno o notte, la vista, quanto coprono le schede, in
+     * punti della pagina: quelli misurati nella pagina ([Scena3dAuto.scala]),
+     * la densità dell'auto finché non si sa.
+     */
     private fun diciLoStato3d() {
         val a = areaLibera()
         val notte = carContext.isDarkMode
         val v = if (vista == Vista.IMMERSIVA) "immersiva" else "inclinata"
-        val sopra = (a.top / densita).toDouble()
-        val sinistra = (a.left / densita).toDouble()
+        val scala = scena?.scala ?: densita
+        val sopra = (a.top / scala).toDouble()
+        val sinistra = (a.left / scala).toDouble()
         val chiave = "$notte|$v|$sopra|$sinistra"
         if (chiave == stato3dDetto) return
         stato3dDetto = chiave
@@ -978,6 +992,9 @@ class RendererMappa(
     }
 
     companion object {
+        /** Sotto questa larghezza (in punti) la mappa è a mezzo schermo. */
+        private const val LARGHEZZA_STRETTA_DP = 900f
+
         private const val VUOTA = "{\"type\":\"FeatureCollection\",\"features\":[]}"
         private const val SORGENTE_IO = "gdanav-io"
         private const val SORGENTE_PERCORSO = "gdanav-percorso"
