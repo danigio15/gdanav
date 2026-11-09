@@ -11,8 +11,8 @@ import { GIORNO, NOTTE, SOLE } from './tavolozza.js';
 /** Fin dove (in metri, davanti e di lato) gli edifici attorno all'auto sono di vetro. */
 const VICINO_VETRO = 120;
 
-/** Quanto si vede attraverso, lì: i punti tolti dalle facciate (0,6 = sei su dieci). */
-const VETRO = 0.6;
+/** Quanto si vede attraverso, lì: 0,65 vuol dire che la facciata copre per un terzo. */
+const VETRO = 0.65;
 
 /**
  * La chioma di una latifoglia: una sfera un poco bitorzoluta (80 triangoli,
@@ -465,7 +465,9 @@ void main() {
   c = mix(c, vec3(1.0), chev * 0.92);
   float a = 1.0 - smoothstep(0.93, 1.0, e);
   a *= smoothstep(uInizio, uInizio + 6.0, vUv.y);
-  a *= mix(1.0, 0.45 + 0.35 * step(0.5, fract(vUv.y / 8.0)), galleria);
+  // In galleria quasi piena, con un tratteggio leggero: «rendi più visibile la
+  // linea nelle gallerie» (prima metà tenue, a strisce).
+  a *= mix(1.0, 0.82 + 0.18 * step(0.5, fract(vUv.y / 8.0)), galleria);
   gl_FragColor = vec4(c * (1.0 + 0.35 * uNotte), a * 0.97 * uOpacita);
   #include <colorspace_fragment>
 }`;
@@ -768,7 +770,8 @@ export class Scena {
           uniform vec2 uAuto;
           uniform vec2 uDir;
           uniform float uVicino;
-          uniform float uVetro;`,
+          uniform float uVetro;
+          float vTrasparenza = 0.0;`,
         )
         .replace(
           '#include <color_fragment>',
@@ -782,6 +785,11 @@ export class Scena {
             : '#include <color_fragment>',
         )
         .replace(
+          '#include <opaque_fragment>',
+          `diffuseColor.a *= 1.0 - vTrasparenza;
+          #include <opaque_fragment>`,
+        )
+        .replace(
           '#include <clipping_planes_fragment>',
           `#include <clipping_planes_fragment>
           {
@@ -790,17 +798,16 @@ export class Scena {
             float lato = dot(v, vec2(-uDir.y, uDir.x));
             // Dietro l'auto (verso la telecamera) il giro è tre volte più lungo.
             float d = length(vec2(lato, avanti < 0.0 ? avanti / 3.0 : avanti));
-            float tolti = uVetro * (1.0 - smoothstep(uVicino, uVicino * 1.8, d));
-            // Una trama di Bayer 4×4 sullo schermo: i punti tolti sono sparsi.
-            vec2 q = mod(floor(gl_FragCoord.xy), 4.0);
-            vec2 q1 = mod(q, 2.0);
-            vec2 q2 = floor(q / 2.0);
-            float b = 4.0 * mod(2.0 * q1.x + 3.0 * q1.y, 4.0) + mod(2.0 * q2.x + 3.0 * q2.y, 4.0);
-            if ((b + 0.5) / 16.0 < tolti) discard;
+            vTrasparenza = uVetro * (1.0 - smoothstep(uVicino, uVicino * 1.8, d));
           }`,
         );
     };
-    materiale.customProgramCacheKey = () => 'vetro-' + nome;
+    // Vetro liscio, non a puntini: «non mi piace la visione dei palazzi
+    // così». Trasparenti vicino all'auto (si vedono dopo strade e alberi,
+    // che restano dietro), pieni più in là.
+    materiale.transparent = true;
+    materiale.depthWrite = true;
+    materiale.customProgramCacheKey = () => 'vetro-liscio-' + nome;
   }
 
   /** Una tessera fatta dal lavoratore, messa al suo posto nella scena. */
