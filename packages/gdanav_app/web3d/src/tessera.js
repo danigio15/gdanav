@@ -972,7 +972,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
 }
 
 /** Triangoli di una geometria istanziata, per le stime. */
-export const TRIANGOLI_ISTANZA = { fusto: 24, capitello: 12, tronco: 10, chioma: 80, chioma2: 20, cono: 7, palo: 12, testa: 12 };
+export const TRIANGOLI_ISTANZA = { fusto: 24, capitello: 12, albero: 2, palo: 12, testa: 12 };
 
 /** Quanti triangoli disegna la tessera (le istanze contano per ognuna). */
 export function stimaTriangoli(t) {
@@ -982,10 +982,9 @@ export function stimaTriangoli(t) {
   n += tri(t.opere) + tri(t.ombre) + tri(t.ombrePonti) + tri(t.tetti);
   for (const g of Object.values(t.facciate)) n += tri(g);
   n += (t.fusti.length / 16) * TRIANGOLI_ISTANZA.fusto + (t.capitelli.length / 16) * TRIANGOLI_ISTANZA.capitello;
+  // Gli alberi sono immagini: due triangoli l'uno.
   const a = t.alberi;
-  n += (a.tronchi.length / 16) * TRIANGOLI_ISTANZA.tronco;
-  n += (a.chiome.length / 16) * (TRIANGOLI_ISTANZA.chioma + TRIANGOLI_ISTANZA.chioma2);
-  n += (a.coni.length / 16) * TRIANGOLI_ISTANZA.cono;
+  n += ((a.foglie.length + a.abeti.length) / 16) * TRIANGOLI_ISTANZA.albero;
   n += (t.pali.length / 16) * (TRIANGOLI_ISTANZA.palo + TRIANGOLI_ISTANZA.testa);
   return n;
 }
@@ -1217,6 +1216,12 @@ function istanzeDiAlberi(alberi, ombre) {
   const coloriChiome = new Uint8Array(latifoglie * 3);
   const coloriChiome2 = new Uint8Array(latifoglie * 3);
   const coloriConi = new Uint8Array(conifere * 3);
+  // Gli alberi dipinti (vedi `Scena.alberiDipinti`): un'immagine per albero,
+  // da terra alla cima, larga quanto la chioma; il colore è solo la luce.
+  const foglie = new Float32Array(latifoglie * 16);
+  const coloriFoglie = new Uint8Array(latifoglie * 3);
+  const abeti = new Float32Array(conifere * 16);
+  const coloriAbeti = new Uint8Array(conifere * 3);
   const totale = CHIOME.reduce((s, a) => s + a[1], 0);
   const scegli = (u) => {
     let a = u * totale;
@@ -1248,6 +1253,9 @@ function istanzeDiAlberi(alberi, ombre) {
       const luce = 1 + (r() - 0.5) * 0.12;
       coloriChiome.set(c.map((v) => Math.min(255, Math.round(v * luce))), 3 * id);
       coloriChiome2.set(c.map((v) => Math.min(255, Math.round(v * luce * 1.08))), 3 * id);
+      matrice(foglie, 16 * id, px, py, 0, ang, cr * 2.25, cr * 2.25, th + ch * 1.85);
+      const l = Math.round(232 + (r() - 0.5) * 40);
+      coloriFoglie.set([l, Math.min(255, l + 6), l - 6], 3 * id);
       id++;
       alto = th + ch * 0.85;
       raggio = cr;
@@ -1256,6 +1264,9 @@ function istanzeDiAlberi(alberi, ombre) {
       const rad = (1.9 + r() * 0.5) * s;
       matrice(coni, 16 * ic, px, py, th * 0.6, 0, rad, rad, hh);
       coloriConi.set(rgb(r() < 0.8 ? '#3f6b3c' : '#4e7a3e'), 3 * ic);
+      matrice(abeti, 16 * ic, px, py, 0, 0, rad * 2.3, rad * 2.3, th * 0.6 + hh * 1.02);
+      const l = Math.round(228 + (r() - 0.5) * 36);
+      coloriAbeti.set([l, l, l], 3 * ic);
       ic++;
       alto = th * 0.6 + hh * 0.4;
       raggio = rad;
@@ -1269,7 +1280,7 @@ function istanzeDiAlberi(alberi, ombre) {
     for (let k = 0; k < 6; k++) giro.push(ombre.v(cx + Math.cos((k * Math.PI) / 3) * rr2, cy + Math.sin((k * Math.PI) / 3) * rr2, 0, 0, 0, 1));
     for (let k = 0; k < 6; k++) ombre.tri(centro, giro[k], giro[(k + 1) % 6]);
   }
-  return { tronchi, chiome, chiome2, coni, coloriChiome, coloriChiome2, coloriConi };
+  return { tronchi, chiome, chiome2, coni, coloriChiome, coloriChiome2, coloriConi, foglie, coloriFoglie, abeti, coloriAbeti };
 }
 
 /**

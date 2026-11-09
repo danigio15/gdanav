@@ -53,6 +53,206 @@ function trama(c, ripeti = true) {
   return t;
 }
 
+// ─── Gli alberi dipinti ───────────────────────────────────────────────────
+//
+// «Lo vedo sempre a cartone, lo voglio realistico: gli alberi non sono
+// così.» Le chiome erano solidi (icosaedri, poi sfere): da vicino sempre
+// palline. Adesso ogni albero è un'immagine dipinta qui, una volta sola —
+// migliaia di foglie a piccoli tocchi, la luce da sinistra in alto, l'ombra
+// dentro e sotto la chioma, il tronco coi rami — su un rettangolo che guarda
+// sempre la telecamera (ruota solo attorno al suo asse, come un albero vero).
+// Quattro alberi diversi: tre latifoglie e un abete. Due triangoli l'uno.
+
+/** Le celle dell'atlante: larghe e alte, in pixel. */
+const CELLA_L = 256;
+const CELLA_A = 344;
+
+/** L'atlante degli alberi: tre latifoglie e un abete, uno accanto all'altro. */
+function atlanteAlberi() {
+  const c = tela(CELLA_L * 4, CELLA_A);
+  const g = c.getContext('2d');
+  dipingiLatifoglia(g, 0, generatore(11), ['#2c4a22', '#4c7034', '#7da24c', '#a9c56a'], 0.46, 0.4);
+  dipingiLatifoglia(g, CELLA_L, generatore(23), ['#29431f', '#43682e', '#6f9442', '#9cba5c'], 0.42, 0.44);
+  dipingiLatifoglia(g, CELLA_L * 2, generatore(37), ['#33461f', '#57702f', '#87a046', '#b7c66c'], 0.36, 0.5);
+  dipingiAbete(g, CELLA_L * 3, generatore(51));
+  const t = trama(c, false);
+  t.anisotropy = 1;
+  return t;
+}
+
+/** Un colore fra quelli di [scala] (dal più scuro al più chiaro), con [l] fra 0 e 1. */
+function tono(scala, l, r) {
+  const x = Math.max(0, Math.min(0.999, l)) * (scala.length - 1);
+  const i = Math.floor(x);
+  const a = rgbDi(scala[i]);
+  const b = rgbDi(scala[i + 1]);
+  const t = x - i;
+  const n = (r() - 0.5) * 18;
+  return `rgb(${[0, 1, 2].map((k) => Math.round(a[k] + (b[k] - a[k]) * t + n)).join(',')})`;
+}
+
+function rgbDi(esa) {
+  const v = parseInt(esa.slice(1), 16);
+  return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+}
+
+/** Il tronco e due rami, dal basso al [fino] (frazione dell'altezza dall'alto). */
+function tronco(g, cx, r, fino, largo) {
+  const base = CELLA_A - 2;
+  const cima = CELLA_A * fino;
+  const grad = g.createLinearGradient(cx - largo, 0, cx + largo, 0);
+  grad.addColorStop(0, '#5a4636');
+  grad.addColorStop(0.45, '#46372b');
+  grad.addColorStop(1, '#2a211a');
+  g.fillStyle = grad;
+  g.beginPath();
+  g.moveTo(cx - largo, base);
+  g.lineTo(cx - largo * 0.45, cima);
+  g.lineTo(cx + largo * 0.45, cima);
+  g.lineTo(cx + largo, base);
+  g.closePath();
+  g.fill();
+  g.strokeStyle = '#3a2d22';
+  for (const lato of [-1, 1]) {
+    g.lineWidth = largo * 0.5;
+    g.beginPath();
+    const y0 = cima + (base - cima) * (0.25 + r() * 0.15);
+    g.moveTo(cx, y0);
+    g.quadraticCurveTo(cx + lato * largo * 2, y0 - 20, cx + lato * largo * (3 + r() * 2), y0 - 45 - r() * 20);
+    g.stroke();
+  }
+}
+
+/**
+ * Una latifoglia nella cella che parte da [x0]: la chioma fatta di grappoli
+ * ([raggio] e [alto]: quanto è larga e dove sta il centro, in frazioni).
+ */
+function dipingiLatifoglia(g, x0, r, scala, raggio, alto) {
+  const cx = x0 + CELLA_L / 2;
+  tronco(g, cx, r, alto + 0.12, CELLA_L * 0.035);
+  const cy = CELLA_A * alto;
+  const rx = CELLA_L * raggio;
+  const ry = CELLA_A * (alto - 0.03);
+  // I grappoli: cerchi dentro l'ellisse della chioma.
+  const grappoli = [];
+  for (let i = 0; i < 26; i++) {
+    const a = r() * Math.PI * 2;
+    const d = Math.sqrt(r()) * 0.72;
+    const gr = (0.22 + r() * 0.18) * rx;
+    grappoli.push({ x: cx + Math.cos(a) * d * (rx - gr * 0.6), y: cy + Math.sin(a) * d * (ry - gr * 0.6), r: gr });
+  }
+  // Prima l'ombra dentro la chioma, poi le foglie: le più scure dietro.
+  const tocchi = [];
+  for (let i = 0; i < 2600; i++) {
+    const q = grappoli[Math.floor(r() * grappoli.length)];
+    const a = r() * Math.PI * 2;
+    const d = Math.sqrt(r());
+    const x = q.x + Math.cos(a) * d * q.r;
+    const y = q.y + Math.sin(a) * d * q.r;
+    // Luce: dal grappolo (sinistra in alto) e dalla chioma (in alto più luce).
+    const lg = -((x - q.x) * 0.6 + (y - q.y) * 0.8) / q.r;
+    const lc = 1 - (y - (cy - ry)) / (2 * ry);
+    const l = 0.18 + 0.38 * (lg * 0.5 + 0.5) * d + 0.4 * lc + (r() - 0.5) * 0.18;
+    tocchi.push({ x, y, l, s: 2.2 + r() * 3.6, a: r() * Math.PI });
+  }
+  tocchi.sort((p, q) => p.l - q.l);
+  for (const t of tocchi) {
+    g.fillStyle = tono(scala, t.l, r);
+    g.beginPath();
+    g.ellipse(t.x, t.y, t.s, t.s * 0.62, t.a, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
+/** Un abete: palchi di rami dal basso alla punta, più scuri dentro. */
+function dipingiAbete(g, x0, r) {
+  const cx = x0 + CELLA_L / 2;
+  tronco(g, cx, r, 0.9, CELLA_L * 0.03);
+  const scala = ['#1d3420', '#2c4a2c', '#3f6337', '#5f8148'];
+  const cima = 6;
+  const base = CELLA_A * 0.9;
+  const tocchi = [];
+  for (let i = 0; i < 2600; i++) {
+    const t = Math.pow(r(), 0.8);
+    const y = cima + t * (base - cima);
+    // I palchi: la larghezza va a dente di sega, più larga in basso.
+    const palco = (t * 7) % 1;
+    const largo = CELLA_L * 0.44 * t * (0.72 + 0.28 * palco);
+    const x = cx + (r() * 2 - 1) * largo;
+    const lato = (cx - x) / Math.max(1, largo);
+    const l = 0.15 + 0.35 * (1 - t) + 0.25 * (lato * 0.5 + 0.5) + 0.3 * palco + (r() - 0.5) * 0.15;
+    tocchi.push({ x, y, l, s: 2 + r() * 3, a: r() * 0.6 - 0.3 });
+  }
+  tocchi.sort((p, q) => p.l - q.l);
+  for (const t of tocchi) {
+    g.fillStyle = tono(scala, t.l, r);
+    g.beginPath();
+    g.ellipse(t.x, t.y, t.s * 1.4, t.s * 0.55, t.a, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
+const VERTICE_ALBERO = `
+#include <common>
+#include <fog_pars_vertex>
+uniform float uPrima;
+uniform float uQuante;
+varying vec2 vUv;
+varying vec3 vTinta;
+void main() {
+  mat4 m = modelMatrix * instanceMatrix;
+  vec3 base = (m * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+  float largo = length((m * vec4(1.0, 0.0, 0.0, 0.0)).xyz);
+  float alto = length((m * vec4(0.0, 0.0, 1.0, 0.0)).xyz);
+  // La destra della telecamera, in pianta: l'albero gira solo attorno al suo asse.
+  vec2 d = vec2(viewMatrix[0][0], viewMatrix[1][0]);
+  vec3 destra = vec3(d / max(length(d), 1e-6), 0.0);
+  vec3 mondo = base + destra * position.x * largo + vec3(0.0, 0.0, position.y * alto);
+  vec4 mvPosition = viewMatrix * vec4(mondo, 1.0);
+  gl_Position = projectionMatrix * mvPosition;
+  // Quale albero dell'atlante, e girato o no: dal posto, sempre lo stesso.
+  float h = fract(sin(dot(floor(base.xy * 0.7), vec2(12.9898, 78.233))) * 43758.5453);
+  float cella = uPrima + floor(h * uQuante);
+  float u = fract(h * 7.0) < 0.5 ? uv.x : 1.0 - uv.x;
+  vUv = vec2((cella + u) / 4.0, uv.y);
+  #ifdef USE_INSTANCING_COLOR
+    vTinta = instanceColor;
+  #else
+    vTinta = vec3(1.0);
+  #endif
+  #include <fog_vertex>
+}`;
+
+const FRAMMENTO_ALBERO = `
+#include <common>
+#include <fog_pars_fragment>
+uniform sampler2D uAtlante;
+uniform float uNotte;
+varying vec2 vUv;
+varying vec3 vTinta;
+void main() {
+  vec4 t = texture2D(uAtlante, vUv);
+  if (t.a < 0.5) discard;
+  vec3 c = t.rgb * vTinta * mix(1.0, 0.5, uNotte);
+  gl_FragColor = vec4(c, 1.0);
+  #include <colorspace_fragment>
+  #include <fog_fragment>
+}`;
+
+/** Il materiale degli alberi dipinti: [prima] la prima cella, [quante] fra cui scegliere. */
+function materialeAlberi(atlante, notte, prima, quante) {
+  return new THREE.ShaderMaterial({
+    uniforms: THREE.UniformsUtils.merge([
+      THREE.UniformsLib.fog,
+      { uAtlante: { value: null }, uNotte: { value: notte ? 1 : 0 }, uPrima: { value: prima }, uQuante: { value: quante } },
+    ]),
+    vertexShader: VERTICE_ALBERO,
+    fragmentShader: FRAMMENTO_ALBERO,
+    side: THREE.DoubleSide,
+    fog: true,
+  });
+}
+
 /** La trama d'asfalto di un tipo di strada, con le righe. */
 function tramaStrada(nome, P, notte) {
   const ponte = nome.endsWith('-ponte');
@@ -360,6 +560,12 @@ export class Scena {
       fusto,
       capitello,
       tronco,
+      // Il rettangolo di un albero dipinto: largo 1, da terra (0) alla cima (1).
+      albero: (() => {
+        const q = new THREE.PlaneGeometry(1, 1);
+        q.translate(0, 0.5, 0);
+        return q;
+      })(),
       chioma: chiomaMorbida(),
       // La chioma piccola accanto: meno triangoli, morbida uguale.
       chioma2: chiomaMorbida(0),
@@ -486,6 +692,11 @@ export class Scena {
           diffuseColor.rgb *= mix(0.55, 1.08, smoothstep(-1.0, 0.9, vAltoChioma));`);
     };
     m.chioma.customProgramCacheKey = () => 'chioma-ombra';
+    this.atlanteAlberi ??= atlanteAlberi();
+    m.foglie = materialeAlberi(this.atlanteAlberi, notte, 0, 3);
+    m.foglie.uniforms.uAtlante.value = this.atlanteAlberi;
+    m.abeti = materialeAlberi(this.atlanteAlberi, notte, 3, 1);
+    m.abeti.uniforms.uAtlante.value = this.atlanteAlberi;
     m.palo = new THREE.MeshLambertMaterial({ color: notte ? 0x3b4250 : 0x8d949e });
     m.testa = notte ? new THREE.MeshBasicMaterial({ color: 0xffd9a0 }) : new THREE.MeshLambertMaterial({ color: 0x9aa1aa });
     if (notte) {
@@ -625,13 +836,17 @@ export class Scena {
     const g = this.geo;
     if (t.fusti.length) aggiungi('fusto', istanze(g.fusto, null, t.fusti), 3);
     if (t.capitelli.length) aggiungi('capitello', istanze(g.capitello, null, t.capitelli), 3);
+    // Gli alberi dipinti: un'immagine per albero (vedi [atlanteAlberi]).
     const a = t.alberi;
-    if (a.tronchi.length) aggiungi('tronco', istanze(g.tronco, null, a.tronchi), 3);
-    if (a.chiome.length) {
-      aggiungi('chioma', istanze(g.chioma, null, a.chiome, a.coloriChiome), 3);
-      aggiungi('chioma', istanze(g.chioma2, null, a.chiome2, a.coloriChiome2), 3);
-    }
-    if (a.coni.length) aggiungi('chioma', istanze(g.cono, null, a.coni, a.coloriConi), 3);
+    // Girano nella GPU: la sfera dei confini di three.js non li contiene, e
+    // la tessera intera è già nel campo quando si disegna.
+    const dipinti = (dati, colori) => {
+      const i = istanze(g.albero, null, dati, colori);
+      i.frustumCulled = false;
+      return i;
+    };
+    if (a.foglie?.length) aggiungi('foglie', dipinti(a.foglie, a.coloriFoglie), 3);
+    if (a.abeti?.length) aggiungi('abeti', dipinti(a.abeti, a.coloriAbeti), 3);
     if (t.pali.length) {
       aggiungi('palo', istanze(g.palo, null, t.pali), 3);
       aggiungi('testa', istanze(g.testa, null, t.teste), 3);
