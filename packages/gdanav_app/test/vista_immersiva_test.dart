@@ -45,83 +45,33 @@ void main() {
     expect((linea.first as List)[1], lessThan(45.0016));
   });
 
-  test("nell'immersiva la freccia della manovra parte dalla corsia giusta, e dopo lo svincolo rientra", () {
-    // Tre corsie, giusta quella di destra: sta una corsia (3,5 m) a destra
-    // della linea del percorso, che va verso nord.
-    final uscita = Manovra(
-      istruzione: 'Esci a destra',
+  test("la freccia della manovra sta sulla linea blu, anche nell'immersiva e anche con le corsie", () {
+    // «La linea bianca non combacia con quella blu, e sul continuo del
+    // percorso»: «mantieni la sinistra» a un bivio, la corsia giusta tutta a
+    // sinistra. Prima la freccia partiva da lì, spostata di lato, e correva
+    // parallela al percorso; adesso è una sola, sulla linea.
+    final bivio = Manovra(
+      istruzione: 'Mantieni la sinistra',
       lunghezzaM: 300,
       secondi: 20,
       inizio: 30,
-      tipo: 20,
-      corsie: [dritta, dritta, giusta],
+      tipo: 18,
+      corsie: [giusta, dritta, dritta],
     );
-    final elementi = (datiManovra(viaggioCon(uscita), uscita)['features']! as List).cast<Map>();
+    final v = viaggioCon(bivio);
+    final elementi = (datiManovra(v, bivio)['features']! as List).cast<Map>();
     final linee = [
       for (final e in elementi)
-        if ((e['geometry'] as Map)['type'] == 'LineString') e,
-    ];
-    expect(linee, hasLength(2));
-    // Quella sulla linea resta per le altre viste; l'immersiva prende l'altra.
-    expect((linee.first['properties'] as Map)['sostituibile'], isTrue);
-    expect((linee.last['properties'] as Map)['vista'], 'immersiva');
-    final sulLato = ((linee.last['geometry'] as Map)['coordinates'] as List).cast<List>();
-    final sullaLinea = ((linee.first['geometry'] as Map)['coordinates'] as List).cast<List>();
-    // All'inizio, 3,5 m a est (a destra di chi va a nord).
-    final est = ((sulLato.first[0] as double) - 9) * 111195.08 * 0.7071;
-    expect(est, closeTo(3.5, 0.15));
-    // Alla fine è di nuovo sulla linea, dove sta la punta.
-    expect(sulLato.last[0] as double, closeTo(sullaLinea.last[0] as double, 1e-7));
-    expect(sulLato.last[1] as double, closeTo(sullaLinea.last[1] as double, 1e-7));
-
-    // Con la corsia giusta in mezzo non c'è niente da spostare.
-    final inMezzo = Manovra(
-      istruzione: 'Esci a destra',
-      lunghezzaM: 300,
-      secondi: 20,
-      inizio: 30,
-      tipo: 20,
-      corsie: [dritta, giusta, dritta],
-    );
-    final solo = (datiManovra(viaggioCon(inMezzo), inMezzo)['features']! as List).cast<Map>();
-    expect(solo.where((e) => (e['geometry'] as Map)['type'] == 'LineString'), hasLength(1));
-  });
-
-  test("all'uscita la freccia non torna verso la carreggiata: niente «<» sulla rampa", () {
-    // «La linea agli svincoli continua a non essere perfetta.» Una rampa
-    // vera: dritto verso nord, poi si stacca a destra piano (1 m nei primi
-    // 10 m, 4 m a 20 m, 9 m a 30 m...). Prima la freccia stava sulla corsia
-    // di destra (3,5 m) e rientrava in 25 m su un percorso ancora quasi in
-    // mezzo: tornava a sinistra e poi a destra.
-    final rampa = [
-      for (var i = 0; i <= 30; i++) Punto(45 + i * 0.0001, 9),
-      for (var i = 1; i <= 12; i++) Punto(45.003 + i * 10 / 111195.08, 9 + (i * i * 1.0) / (111195.08 * 0.7071)),
-    ];
-    final uscita = Manovra(
-      istruzione: 'Esci a destra',
-      lunghezzaM: 300,
-      secondi: 20,
-      inizio: 30,
-      tipo: 20,
-      corsie: [dritta, dritta, giusta],
-    );
-    final v = Viaggio(
-      percorso: PercorsoCalcolato(punti: rampa, tratti: const [], manovre: [uscita]),
-      colonnine: const [],
-      piano: null,
-    );
-    final elementi = (datiManovra(v, uscita)['features']! as List).cast<Map>();
-    final sulLato = [
-      for (final e in elementi)
-        if ((e['properties'] as Map)['vista'] == 'immersiva')
+        if ((e['geometry'] as Map)['type'] == 'LineString')
           ((e['geometry'] as Map)['coordinates'] as List).cast<List>(),
-    ].single;
-    // Verso est (a destra) la freccia va sempre avanti o resta, mai indietro.
-    final est = [for (final c in sulLato) ((c[0] as double) - 9) * 111195.08 * 0.7071];
-    for (var i = 1; i < est.length; i++) {
-      expect(est[i], greaterThanOrEqualTo(est[i - 1] - 0.05), reason: 'al punto $i torna verso la carreggiata');
+    ];
+    expect(linee, hasLength(1));
+    // Ogni punto della freccia sta sul percorso: sul tratto verso nord (lon
+    // 9) o su quello verso est (lat 45,003), mai di lato.
+    for (final c in linee.single) {
+      final sulTratto = ((c[0] as double) - 9).abs() < 1e-9 || ((c[1] as double) - 45.003).abs() < 1e-9;
+      expect(sulTratto, isTrue, reason: 'il punto $c è fuori dal percorso');
     }
-    expect(est.first, closeTo(3.5, 0.15));
   });
 
   test("lo stile: l'immersiva disegna la freccia dalla corsia, le altre quella sulla linea", () {
