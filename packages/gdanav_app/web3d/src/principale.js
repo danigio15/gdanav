@@ -14,7 +14,7 @@ import { codeOrdinate, decodifica } from './messaggi.js';
 import { angoloVerso, Moto, smorza } from './moto.js';
 import { IndiceSegmenti, Linea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote } from './percorso.js';
 import { Scena } from './scena.js';
-import { STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
+import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
 import { GIORNO, NOTTE } from './tavolozza.js';
 import './gdanav3d.css';
 
@@ -114,9 +114,11 @@ const GESTORI = {
     S.notte = m.notte;
     if (m.vista) S.vista = m.vista;
     if (m.icona) S.icona = m.icona;
-    if (m.auto && m.auto !== S.colorAuto) {
-      S.colorAuto = m.auto;
-      scena.creaAuto(m.auto);
+    // La freccia, se è quella scelta; l'auto del suo colore, altrimenti.
+    const forma = S.icona === 'freccia' ? 'freccia' : 'auto';
+    if ((m.auto && m.auto !== S.colorAuto) || forma !== (scena.formaAuto ?? 'auto')) {
+      if (m.auto) S.colorAuto = m.auto;
+      scena.creaAuto(S.colorAuto, forma);
     }
     if (cambiaNotte) {
       // Lo stile della notte lo manda l'app subito dopo (è un altro stile).
@@ -782,9 +784,11 @@ function aggiornaPercorso(adesso) {
   if (!p || p.linea.lunghezza < 2) {
     for (const n of ['percorso', 'alone', 'freccia']) scena.impostaNastro(n, null);
     scena.impostaPunta(null);
+    scriviOltre(null, 0);
   } else {
     const da = Math.max(0, (s ?? 0) - FINESTRA_DIETRO);
     const a = Math.min(p.linea.lunghezza, da + FINESTRA_AVANTI);
+    scriviOltre(p, a);
     p.da = da;
     p.profilo = profiloDi(p.linea, da, a, indice);
     S.sporco.segni = true;
@@ -801,6 +805,35 @@ function aggiornaPercorso(adesso) {
     const prof = profiloDi(r.linea, da, a, indice);
     scena.impostaNastro('risparmio', nastro(r.linea, prof, da, a, 4, 0.5), 'risparmio', 3);
   } else scena.impostaNastro('risparmio', null);
+}
+
+/**
+ * Il percorso oltre quello che fa il 3D ([FINESTRA_AVANTI] davanti all'auto),
+ * piatto come sulla mappa di sempre (`SORGENTE_OLTRE` in `stile3d.js`).
+ * «Ad un certo punto la linea si interrompe, non si vede più»: spostando la
+ * mappa più avanti il percorso finiva nel vuoto, dove il 3D non arrivava.
+ */
+function scriviOltre(p, a) {
+  const vuoto = { type: 'FeatureCollection', features: [] };
+  if (!p || a >= p.linea.lunghezza - 1) return scriviSorgente(SORGENTE_OLTRE, vuoto);
+  const linea = (props, da, fino = p.linea.lunghezza) => ({
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: pezzoDi(p, da, fino) },
+    properties: props,
+  });
+  // Le code oltre, dello stesso colore che hanno da vicino.
+  const code = (p.code ?? []).filter(([, fino]) => fino > a).map(([da, fino, livello]) => linea({ livello }, Math.max(a, da), fino));
+  scriviSorgente(SORGENTE_OLTRE, { type: 'FeatureCollection', features: [linea({}, a), ...code] });
+}
+
+/** I punti `[lon, lat]` del percorso [p] fra [da] e [fino] metri. */
+function pezzoDi(p, da, fino) {
+  const [x0, y0, i] = p.linea.a(da);
+  const [x1, y1, j] = p.linea.a(fino);
+  const punti = [S.origine.lonLat(x0, y0)];
+  for (let k = i; k < j; k++) punti.push([p.lonlat[2 * k], p.lonlat[2 * k + 1]]);
+  punti.push(S.origine.lonLat(x1, y1));
+  return punti;
 }
 
 function aggiornaFreccia() {

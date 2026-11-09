@@ -184,6 +184,31 @@ object PonteAuto {
      * distanza, consumo, ricariche, costo). Lo mostra [SchermoRiepilogoArrivo]; `null`
      * in viaggio, e dopo «Fine».
      */
+    /** Una delle strade fra cui scegliere prima di partire, come la carta del telefono. */
+    data class VoceStrada(
+        val nome: String,
+        val eco: Boolean,
+        val durataS: Long,
+        val metri: Double,
+        val via: String,
+        val km: String,
+        val arrivo: Int?,
+        val consumo: String?,
+        val risparmio: String?,
+        val pedaggio: String?,
+        val paga: Boolean,
+        val traffico: String?,
+    )
+
+    /**
+     * Le strade del viaggio calcolato, prima di partire ([SchermoStrade]):
+     * «quando c'è il calcolo percorso questo non esce su Android Auto».
+     * [id] cambia con un viaggio nuovo: le risposte valgono per quello.
+     */
+    data class Strade(val id: String, val meta: String, val scelta: Int, val voci: List<VoceStrada>)
+
+    @Volatile var strade: Strade? = null
+
     data class Arrivo(val titolo: String, val righe: List<Pair<String, String>>)
 
     @Volatile var arrivo: Arrivo? = null
@@ -312,6 +337,27 @@ object PonteAuto {
                             .map { r -> r[0] to r[1] },
                     )
                 }
+            }
+            "strade" -> strade = (call.arguments as? Map<*, *>)?.let { m ->
+                val id = m["id"] as? String ?: return@let null
+                val voci = (m["voci"] as? List<*>).orEmpty().mapNotNull { v ->
+                    val x = v as? Map<*, *> ?: return@mapNotNull null
+                    VoceStrada(
+                        nome = x["nome"] as? String ?: "Percorso",
+                        eco = x["eco"] == true,
+                        durataS = (x["durata_s"] as? Number)?.toLong() ?: 0L,
+                        metri = (x["metri"] as? Number)?.toDouble() ?: 0.0,
+                        via = x["via"] as? String ?: "",
+                        km = x["km"] as? String ?: "",
+                        arrivo = (x["arrivo"] as? Number)?.toInt(),
+                        consumo = x["consumo"] as? String,
+                        risparmio = x["risparmio"] as? String,
+                        pedaggio = x["pedaggio"] as? String,
+                        paga = x["paga"] == true,
+                        traffico = x["traffico"] as? String,
+                    )
+                }
+                if (voci.isEmpty()) null else Strade(id, m["meta"] as? String ?: "", (m["scelta"] as? Number)?.toInt() ?: 0, voci)
             }
             "messaggio" -> {
                 messaggio = call.argument<String>("testo")
@@ -501,6 +547,12 @@ object PonteAuto {
         avvisa()
         chiedi("termica", mapOf("id" to id))
     }
+
+    /** Una delle strade toccata sull'auto: si sceglie anche sul telefono. */
+    fun scegliStrada(id: String, indice: Int) = chiedi("scegli_strada", mapOf("id" to id, "indice" to indice))
+
+    /** «Avvia» sulle strade: si parte con quella scelta. */
+    fun avvia(id: String, indice: Int) = chiedi("avvia", mapOf("id" to id, "indice" to indice))
 
     /** «Prendila» (o «Resto qui») sulla strada proposta. */
     fun rispondiStrada(id: String, si: Boolean) = chiedi("strada", mapOf("id" to id, "si" to si))

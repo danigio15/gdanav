@@ -400,6 +400,12 @@ enum ManovreCarPlay {
         }
     }
 
+    /// Una durata breve, come sul telefono: «23 min», «1 h 05 min».
+    static func durata(_ secondi: Double) -> String {
+        let minuti = max(1, Int((secondi / 60).rounded()))
+        return minuti < 60 ? "\(minuti) min" : String(format: "%d h %02d min", minuti / 60, minuti % 60)
+    }
+
     /// «600 m», «1,2 km»: come le distanze sul telefono.
     static func distanza(_ metri: Double) -> Measurement<UnitLength> {
         if metri >= 1000 {

@@ -45,6 +45,15 @@ export const STRATI_SOSTITUITI = [
   'io',
 ];
 
+/**
+ * Il percorso oltre il tratto che disegna il 3D: gli stessi strati del
+ * percorso di sempre, piatti, anche da vicino, su una sorgente che ha solo
+ * quel pezzo (la scrive `principale.js`).
+ */
+export const SORGENTE_OLTRE = 'gdanav-3d-oltre';
+const STRATI_OLTRE = ['percorso-alone', 'percorso-bordo', 'percorso', 'code', 'percorso-frecce'];
+const LARGO_OLTRE = 0.32;
+
 /** Il suolo con i colori del 3D. */
 const SUOLO = { sfondo: 'sfondo', abitato: 'abitato', industria: 'industria', prato: 'prato', bosco: 'bosco', parco: 'prato', acqua: 'acqua' };
 
@@ -84,6 +93,24 @@ export function adattaStile(stile, { notte = false } = {}) {
     }
     if (l.id === 'luoghi' && l.layout) l.layout['text-pitch-alignment'] = 'viewport';
     layers.push(l);
+    if (STRATI_OLTRE.includes(l.id) && (l.source === 'gdanav-percorso' || l.source === 'gdanav-code')) {
+      const oltre = JSON.parse(JSON.stringify(l));
+      oltre.id = `${l.id}-oltre`;
+      oltre.source = SORGENTE_OLTRE;
+      // Sulla stessa sorgente il percorso e le code: le code hanno il livello.
+      oltre.filter = l.source === 'gdanav-code' ? ['has', 'livello'] : ['!', ['has', 'livello']];
+      oltre.minzoom = ZOOM_3D;
+      delete oltre.maxzoom;
+      // Largo quanto il nastro del 3D, non quanto la linea della mappa di sempre.
+      const w = oltre.paint?.['line-width'];
+      if (Array.isArray(w) && w[0] === 'interpolate') {
+        oltre.paint['line-width'] = w.map((v, i) => (i >= 4 && i % 2 === 0 && typeof v === 'number' ? +(v * LARGO_OLTRE).toFixed(2) : v));
+      }
+      layers.push(oltre);
+    }
+  }
+  if (s.sources?.['gdanav-percorso']) {
+    s.sources[SORGENTE_OLTRE] = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } };
   }
   // Il traffico da vicino lo disegna il 3D, ma le tessere di TomTom le
   // scarica MapLibre solo se uno strato le usa: uno invisibile.

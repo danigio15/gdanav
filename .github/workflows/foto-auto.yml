@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dimostrazione: [traffico7, traffico18]
+        dimostrazione: [traffico7, traffico18, strade]
     defaults:
       run:
         working-directory: app

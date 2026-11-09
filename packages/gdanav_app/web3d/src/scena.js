@@ -228,7 +228,9 @@ void main() {
     c = mix(c, coda, 1.0 - smoothstep(0.46, 0.52, e));
   }
   float w = abs(vUv.x - 0.5) * uLargo;
-  float t = fract((vUv.y - w * 1.1) / uPasso);
+  // La punta in avanti: in mezzo più avanti, ai lati più indietro («le frecce
+  // sul percorso sono al contrario»: era la punta indietro).
+  float t = fract((vUv.y + w * 1.1) / uPasso);
   float chev = (1.0 - smoothstep(0.0, 0.06, abs(t - 0.06) - 0.03)) * (1.0 - smoothstep(0.50, 0.56, e)) * uFrecce;
   c = mix(c, vec3(1.0), chev * 0.92);
   float a = 1.0 - smoothstep(0.93, 1.0, e);
@@ -641,9 +643,16 @@ export class Scena {
     if (this.punta) this.punta.material = this.mat.punta;
   }
 
-  /** L'auto: rossa (o del colore scelto), che sul percorso blu si vede. */
-  creaAuto(colore = '#d62a26') {
+  /**
+   * L'auto: rossa (o del colore scelto), che sul percorso blu si vede. Con
+   * [simbolo] `freccia` è la freccia arancione scelta fra i simboli: «quando
+   * parte il percorso continua a uscire l'auto, invece ho impostato la
+   * freccia».
+   */
+  creaAuto(colore = '#d62a26', simbolo = this.formaAuto ?? 'auto') {
     this.colorAuto = colore;
+    this.formaAuto = simbolo;
+    if (simbolo === 'freccia') return this.creaFreccia();
     const vecchia = this.auto;
     const g = new THREE.Group();
     const notte = this.notte;
@@ -711,17 +720,7 @@ export class Scena {
     }
     g.add(sagoma);
     // L'ombra sotto l'auto, morbida.
-    const sh = tela(64, 64);
-    const sg = sh.getContext('2d');
-    const gr = sg.createRadialGradient(32, 32, 4, 32, 32, 32);
-    gr.addColorStop(0, 'rgba(0,0,0,0.55)');
-    gr.addColorStop(1, 'rgba(0,0,0,0)');
-    sg.fillStyle = gr;
-    sg.fillRect(0, 0, 64, 64);
-    const ombra = new THREE.Mesh(new THREE.PlaneGeometry(L * 1.25, W * 1.6), new THREE.MeshBasicMaterial({ map: trama(sh, false), transparent: true, depthWrite: false }));
-    ombra.position.z = 0.05;
-    ombra.renderOrder = 8;
-    g.add(ombra);
+    g.add(this.ombraAuto(L * 1.25, W * 1.6));
     if (notte) {
       const lc = tela(128, 128);
       const lg = lc.getContext('2d');
@@ -736,6 +735,77 @@ export class Scena {
       g.add(pozza);
     }
     g.scale.setScalar(2.0);
+    this.sostituisciAuto(g, vecchia);
+  }
+
+  /** L'ombra morbida sotto l'auto o la freccia, lunga [l] e larga [w]. */
+  ombraAuto(l, w) {
+    const sh = tela(64, 64);
+    const sg = sh.getContext('2d');
+    const gr = sg.createRadialGradient(32, 32, 4, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(0,0,0,0.55)');
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    sg.fillStyle = gr;
+    sg.fillRect(0, 0, 64, 64);
+    const ombra = new THREE.Mesh(new THREE.PlaneGeometry(l, w), new THREE.MeshBasicMaterial({ map: trama(sh, false), transparent: true, depthWrite: false }));
+    ombra.position.z = 0.05;
+    ombra.renderOrder = 8;
+    return ombra;
+  }
+
+  /**
+   * La freccia, come il simbolo della mappa di sempre (`freccia.png`): la
+   * metà sinistra arancio chiaro, la destra arancio scuro, il bordo bianco.
+   * Sta appena sopra la strada, girata dove si va, grande come l'auto.
+   */
+  creaFreccia() {
+    const vecchia = this.auto;
+    const g = new THREE.Group();
+    const scura = this.notte ? 0.86 : 1;
+    const piatto = (pts, alto, basso = 0) => {
+      const s = new THREE.Shape();
+      pts.forEach(([px, py], i) => (i ? s.lineTo(px, py) : s.moveTo(px, py)));
+      const geo = new THREE.ExtrudeGeometry(s, { depth: alto - basso, bevelEnabled: false });
+      geo.translate(0, 0, basso);
+      return geo;
+    };
+    const tinta = (hex) => {
+      const c = new THREE.Color(hex);
+      c.multiplyScalar(scura);
+      return new THREE.MeshPhongMaterial({ color: c, shininess: 70, specular: 0x553322 });
+    };
+    // In avanti è +x, come l'auto; la punta davanti, la tacca dietro.
+    const punta = [2.5, 0];
+    const sinistra = [-2.0, 1.55];
+    const tacca = [-0.95, 0];
+    const destra = [-2.0, -1.55];
+    const bordo = piatto([[2.95, 0], [-2.38, 1.9], [-1.0, 0.36], [-1.0, -0.36], [-2.38, -1.9]], 0.34);
+    const chiara = piatto([punta, sinistra, tacca], 0.52, 0.1);
+    const scuraMeta = piatto([punta, tacca, destra], 0.52, 0.1);
+    const dentro = new THREE.Group();
+    dentro.add(
+      new THREE.Mesh(bordo, new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 40 })),
+      new THREE.Mesh(chiara, tinta('#ff8a2a')),
+      new THREE.Mesh(scuraMeta, tinta('#e8470e')),
+    );
+    dentro.position.z = 0.25;
+    g.add(dentro);
+    // La sagoma, dove qualcosa la copre: come per l'auto.
+    const sagoma = new THREE.Group();
+    sagoma.position.z = 0.25;
+    for (const geo of [bordo]) {
+      const ms = new THREE.Mesh(geo, this.mat.autoFantasma);
+      ms.renderOrder = 41;
+      sagoma.add(ms);
+    }
+    g.add(sagoma);
+    g.add(this.ombraAuto(6.2, 4.6));
+    g.scale.setScalar(2.4);
+    this.sostituisciAuto(g, vecchia);
+  }
+
+  /** Mette [g] al posto di [vecchia], nello stesso punto, e la butta. */
+  sostituisciAuto(g, vecchia) {
     // L'auto si disegna nel suo strato, sopra i nomi di MapLibre (livello 1).
     g.traverse((o) => o.layers.set(this.autoCoperta ? 0 : 1));
     g.visible = vecchia ? vecchia.visible : false;

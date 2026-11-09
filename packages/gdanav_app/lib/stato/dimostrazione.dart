@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -22,7 +23,12 @@ enum Dimostrazione {
 
   /// Due code: fra il km 4 e il 9 (+8 minuti, ferma) e fra il 20 e il 26
   /// (+10): +18 minuti.
-  traffico18;
+  traffico18,
+
+  /// Tre strade fra cui scegliere, e non si parte: le foto delle strade
+  /// prima di partire («quando c'è il calcolo percorso questo non esce su
+  /// Android Auto e CarPlay»). La prima con una coda (+7 min).
+  strade;
 
   /// Quella chiesta alla compilazione, o `null`.
   static Dimostrazione? get daCompilazione => daNome(Servizi.dimostrazione);
@@ -41,7 +47,7 @@ enum Dimostrazione {
 
   /// Le code di questa dimostrazione, in metri dall'inizio.
   List<Coda> get code => switch (this) {
-    traffico7 => const [Coda(daM: 5000, aM: 12000, ritardo: Duration(minutes: 7), livello: 2)],
+    traffico7 || strade => const [Coda(daM: 5000, aM: 12000, ritardo: Duration(minutes: 7), livello: 2)],
     traffico18 => const [
       Coda(daM: 4000, aM: 9000, ritardo: Duration(minutes: 8), livello: 3),
       Coda(daM: 20000, aM: 26000, ritardo: Duration(minutes: 10), livello: 2),
@@ -49,26 +55,31 @@ enum Dimostrazione {
   };
 
   /// La strada senza traffico: un punto ogni chilometro, a 120 km/h, con
-  /// una manovra all'inizio, l'uscita al km 34 e l'arrivo.
-  static PercorsoCalcolato strada() {
-    final punti = [for (var i = 0; i <= lunghezzaKm; i++) Punto(partenza.lat + i * 0.009, partenza.lon)];
+  /// una manovra all'inizio, l'uscita al km 34 e l'arrivo. Le altre strade
+  /// di [strade] vanno più piano ([kmh]), si scostano a metà ([scarto], in
+  /// gradi verso est) e hanno il loro nome.
+  static PercorsoCalcolato strada({double kmh = 120, double scarto = 0, String nome = 'A1', bool autostrada = true}) {
+    final punti = [
+      for (var i = 0; i <= lunghezzaKm; i++)
+        Punto(partenza.lat + i * 0.009, partenza.lon + scarto * math.sin(math.pi * i / lunghezzaKm)),
+    ];
     final linea = Linea(punti);
     final tratti = [
       for (var i = 1; i < punti.length; i++)
-        Tratto(lunghezzaM: linea.cumulate[i] - linea.cumulate[i - 1], velocitaKmh: 120),
+        Tratto(lunghezzaM: linea.cumulate[i] - linea.cumulate[i - 1], velocitaKmh: kmh),
     ];
     double metri(int da, int a) => linea.cumulate[a] - linea.cumulate[da];
-    double secondi(int da, int a) => metri(da, a) / (120 / 3.6);
+    double secondi(int da, int a) => metri(da, a) / (kmh / 3.6);
     const uscita = 34;
     return PercorsoCalcolato(
       punti: punti,
       tratti: tratti,
       manovre: [
         Manovra(
-          istruzione: 'Continua sulla A1 verso Firenze',
+          istruzione: 'Continua sulla $nome verso Firenze',
           tipo: 8,
-          strada: 'A1',
-          verso: 'A1 · Firenze',
+          strada: nome,
+          verso: '$nome · Firenze',
           lunghezzaM: metri(0, uscita),
           secondi: secondi(0, uscita),
           inizio: 0,
@@ -83,10 +94,18 @@ enum Dimostrazione {
         ),
         Manovra(istruzione: 'Sei arrivato', tipo: 4, lunghezzaM: 0, secondi: 0, inizio: lunghezzaKm),
       ],
-      limiti: [for (var i = 0; i < lunghezzaKm; i++) 130],
-      conAutostrade: true,
+      limiti: [for (var i = 0; i < lunghezzaKm; i++) autostrada ? 130 : 90],
+      conAutostrade: autostrada,
     );
   }
+
+  /// Le strade fra cui scegliere in [strade]: l'autostrada con la coda, la
+  /// statale più lenta e una provinciale in mezzo.
+  List<PercorsoCalcolato> scelte() => [
+    percorso(),
+    strada(kmh: 85, scarto: 0.05, nome: 'SS71', autostrada: false),
+    strada(kmh: 75, scarto: -0.06, nome: 'SP44', autostrada: false),
+  ];
 
   /// La strada con le code di questa dimostrazione.
   PercorsoCalcolato percorso() => strada().conTraffico(code);
@@ -96,6 +115,7 @@ enum Dimostrazione {
   CostruisciPianificatore get pianificatore =>
       (_, profilo, preferenze, _) => PianificatoreViaggio(
         percorsi: (_) async => percorso(),
+        alternative: this == strade ? (_, _) async => scelte() : null,
         colonnine: const _NessunaColonnina(),
         profilo: profilo,
         preferenze: preferenze,
@@ -118,9 +138,12 @@ enum Dimostrazione {
   }) async {
     // Solo in memoria: l'archivio del telefono resta com'era.
     auto.elettrica = false;
-    viaggio.trafficoFinto = (_) async => percorso();
+    // Il traffico è già nelle strade: per le strade da scegliere ognuna
+    // resta la sua.
+    viaggio.trafficoFinto = this == strade ? (p) async => p : (_) async => percorso();
     await viaggio.vaiA(meta);
-    if (viaggio.stato is! ViaggioPronto) return;
+    // Le strade: calcolate, e si resta lì a sceglierle.
+    if (viaggio.stato is! ViaggioPronto || this == strade) return;
     guida.avvia();
     prova.percorri(percorso(), daM: 2000);
   }

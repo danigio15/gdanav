@@ -86,7 +86,8 @@ export async function apri(browser, { porta, cartella, rotta, caso, notte, largh
   await page.exposeFunction('__ascolta', (t) => messaggi.push(JSON.parse(t)));
   await page.goto(`http://127.0.0.1:${porta}/index.html?prova=1&software=1`);
   const manda = (m) => page.evaluate((x) => window.gdanav3d.ricevi(x), { v: 1, ...m });
-  await manda({ tipo: 'opzioni', notte, vista, auto: '#d62a26' });
+  // ICONA=freccia: la freccia al posto dell'auto rossa.
+  await manda({ tipo: 'opzioni', notte, vista, auto: '#d62a26', icona: process.env.ICONA ?? 'auto_rossa' });
   await manda({ tipo: 'stile', stile: stile(cartella, notte) });
   for (const [n, png] of Object.entries(await icone(page))) await manda({ tipo: 'immagine', nome: n, png, ratio: 3 });
   const punti = rotta.punti;

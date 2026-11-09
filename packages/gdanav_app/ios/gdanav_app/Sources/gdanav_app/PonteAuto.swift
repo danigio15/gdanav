@@ -119,6 +119,57 @@ struct StradaAuto {
     var testo: String?
 }
 
+/// Una delle strade fra cui scegliere prima di partire, come la carta del
+/// telefono: il nome (più rapida, risparmia energia…), la durata, da dove
+/// passa, i km, la batteria all'arrivo, il consumo, il pedaggio, il traffico.
+struct VoceStradaAuto {
+    var nome: String
+    var eco: Bool
+    var durataS: Double
+    var metri: Double
+    var via: String
+    var km: String
+    var arrivo: Int?
+    var consumo: String?
+    var risparmio: String?
+    var pedaggio: String?
+    var paga: Bool
+    var traffico: String?
+
+    init?(_ x: [String: Any]) {
+        guard let nome = x["nome"] as? String else { return nil }
+        self.nome = nome
+        eco = (x["eco"] as? Bool) == true
+        durataS = (x["durata_s"] as? NSNumber)?.doubleValue ?? 0
+        metri = (x["metri"] as? NSNumber)?.doubleValue ?? 0
+        via = x["via"] as? String ?? ""
+        km = x["km"] as? String ?? ""
+        arrivo = (x["arrivo"] as? NSNumber)?.intValue
+        consumo = x["consumo"] as? String
+        risparmio = x["risparmio"] as? String
+        pedaggio = x["pedaggio"] as? String
+        paga = (x["paga"] as? Bool) == true
+        traffico = x["traffico"] as? String
+    }
+}
+
+/// Le strade del viaggio calcolato, prima di partire: «quando c'è il calcolo
+/// percorso questo non esce su CarPlay». `id` cambia con un viaggio nuovo: le
+/// risposte valgono per quello.
+struct StradeAuto: Equatable {
+    var id: String
+    var meta: String
+    var lat: Double?
+    var lon: Double?
+    var scelta: Int
+    var voci: [VoceStradaAuto]
+
+    static func == (a: StradeAuto, b: StradeAuto) -> Bool {
+        a.id == b.id && a.scelta == b.scelta && a.voci.map(\.nome) == b.voci.map(\.nome)
+            && a.voci.map(\.durataS) == b.voci.map(\.durataS)
+    }
+}
+
 /// Manca la batteria (nessuna auto elettrica, o la batteria non si sa): il
 /// telefono propone l'auto termica. `primaria`: senza auto elettrica è la
 /// proposta principale. Senza id, nessuna proposta.
@@ -166,6 +217,9 @@ final class PonteAuto {
     private(set) var cruscotto = CruscottoAuto()
     private(set) var avviso = AvvisoAuto()
     private(set) var strada = StradaAuto()
+
+    /// Le strade fra cui scegliere, prima di partire; `nil` se non ce ne sono.
+    private(set) var strade: StradeAuto?
 
     /// Le opzioni del percorso e la voce, per il menu.
     private(set) var opzioni: [String: Any] = [:]
@@ -314,6 +368,20 @@ final class PonteAuto {
             avviso = prossimo
         case "strada":
             strada = StradaAuto(id: a["id"] as? String, titolo: a["titolo"] as? String, testo: a["testo"] as? String)
+        case "strade":
+            let voci = (a["voci"] as? [[String: Any]] ?? []).compactMap { VoceStradaAuto($0) }
+            if let id = a["id"] as? String, !voci.isEmpty {
+                strade = StradeAuto(
+                    id: id,
+                    meta: a["meta"] as? String ?? "",
+                    lat: numero(a["lat"]),
+                    lon: numero(a["lon"]),
+                    scelta: (a["scelta"] as? NSNumber)?.intValue ?? 0,
+                    voci: voci
+                )
+            } else {
+                strade = nil
+            }
         case "opzioni":
             opzioni = a
         case "svincolo":
@@ -428,11 +496,15 @@ final class PonteAuto {
     }
 
     /// Una meta scelta sull'auto: il telefono calcola e parte la guida.
-    func vai(_ l: LuogoAuto) {
+    /// Calcolato, l'auto mostra le strade con «Avvia»; con [subito] (a
+    /// voce) si parte senza.
+    func vai(_ l: LuogoAuto, subito: Bool = false) {
         messaggio = "Calcolo il percorso per \(l.etichetta)…"
         versioneModello += 1
         avvisa()
-        chiedi("vai", l.comeMappa)
+        var dati = l.comeMappa
+        if subito { dati["subito"] = true }
+        chiedi("vai", dati)
     }
 
     /// «Usa auto termica»: l'auto diventa termica, il viaggio si rifà e, se
@@ -473,6 +545,16 @@ final class PonteAuto {
 
     func ancora(_ id: String, si: Bool) {
         chiedi("ancora", ["id": id, "si": si])
+    }
+
+    /// Una delle strade toccata sull'auto: si sceglie anche sul telefono.
+    func scegliStrada(_ id: String, indice: Int) {
+        chiedi("scegli_strada", ["id": id, "indice": indice])
+    }
+
+    /// «Avvia» sulle strade: si parte con quella scelta.
+    func avvia(_ id: String, indice: Int) {
+        chiedi("avvia", ["id": id, "indice": indice])
     }
 
     /// «Prendila» (o «Resto qui») sulla strada proposta.
@@ -517,7 +599,8 @@ final class PonteAuto {
     /// dall'app quando il motore è acceso, e fino ad allora si aspetta.
     func vaiA(_ trova: @escaping () -> LuogoAuto?, tentativi: Int = 40, fatto: @escaping (Bool) -> Void) {
         if let l = trova() {
-            vai(l)
+            // A voce si parte subito, senza le strade da scegliere.
+            vai(l, subito: true)
             return fatto(true)
         }
         guard tentativi > 1 else { return fatto(false) }
