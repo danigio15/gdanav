@@ -1,0 +1,315 @@
+getpwuid_r did not find a match for uid 501
+Timestamp               Ty Process[PID:TID]
+2026-11-09 13:01:52.782 Df Runner[27298:14f76] [com.apple.KeyboardArbiter:Client] RX sceneBecameFocused:(null)
+2026-11-09 13:02:00.745 A  Runner[27298:14fa8] (RunningBoardServices) didChangeInheritances
+2026-11-09 13:02:00.749 Df Runner[27298:14fac] [com.apple.BoardServices:XPCErrors] [C:3] Alloc 28854:FBWorkspace-com.apple.CarPlayTemplateUIHost
+2026-11-09 13:02:00.750 Df Runner[27298:14fac] [com.apple.xpc:connection] [0x105146ae0] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-11-09 13:02:00.750 Df Runner[27298:14fac] [com.apple.FrontBoard:Common] FBSWorkspace registering source: 28854:FBWorkspace-com.apple.CarPlayTemplateUIHost
+2026-11-09 13:02:00.751 Df Runner[27298:14fac] [com.apple.FrontBoard:Common] FBSWorkspace connected to endpoint : <BSServiceConnectionEndpoint: 0x6000003015a0; target: 28854:FBWorkspace-com.apple.CarPlayTemplateUIHost; service: com.apple.frontboard.workspace-service>
+2026-11-09 13:02:00.751 Df Runner[27298:14fac] [com.apple.FrontBoard:Common] <FBSWorkspaceScenesClient:0x600003019320 28854:FBWorkspace-com.apple.CarPlayTemplateUIHost> attempting immediate handshake from activate
+2026-11-09 13:02:00.752 Df Runner[27298:14fac] [com.apple.FrontBoard:Common] <FBSWorkspaceScenesClient:0x600003019320 28854:FBWorkspace-com.apple.CarPlayTemplateUIHost> sent handshake
+2026-11-09 13:02:00.754 E  Runner[27298:0] [com.apple.os_debug_log:] assertion failed: 24H232 23C54: libxpc.dylib + 56152 [5D3B42DD-89E9-36F1-8E20-F4BBF2B7644E]: 0x87
+2026-11-09 13:02:00.824 Df Runner[27298:160b3] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneCarPlaySessionSettings on FBSSceneSettings
+2026-11-09 13:02:00.827 Df Runner[27298:160b3] [com.apple.FrontBoard:SceneExtension] CPUIMutableTemplateApplicationSceneSettings setting counterpart class: CPUITemplateApplicationSceneSettings
+2026-11-09 13:02:00.831 Df Runner[27298:14f76] [com.apple.UIKit:UIScreen] Evaluated capturing state as 0 on <UIScreen: 0x1053fd750> for initial
+2026-11-09 13:02:00.832 Df Runner[27298:14f76] [com.apple.UIKit:UIScreen] Evaluated capturing state as 0 on <UIScreen: 0x1053fd750> for CADisplay KVO
+2026-11-09 13:02:00.846 E  Runner[27298:160b3] [com.apple.carkit:General] Provided status bar edge is invalid, assigning default
+2026-11-09 13:02:00.847 Df Runner[27298:160b3] [com.apple.carkit:DisplayScale] Physical size is zero, applying default size Result({0, 0}) = PointSize({0, 0})/CROptimalPointsPerMM(0.376647834274953)
+2026-11-09 13:02:00.851 Df Runner[27298:160b3] [com.apple.carkit:General] connected session <CARSession: 0x6000021a5950> configuration: [<CARSessionConfiguration: 0x1336121c0> session: (null), name: (null), modelName: (null), manufacturer: (null), serialNumber: (null), transport: USB, ETC supported: NO, right hand drive: NO, limitableUserInterfaces: (), manufacturerIconLabel: OEM, manufacturerIconVisible: YES, night mode supported: NO, supports AC_BACK: YES, screens: (
+    "<CARScreenInfo: 0x600003780900>, identifier: PurpleTVOut, availableInteractionModels: Touch, Knob, primaryInteractionModel: Knob, isLimited: NO, isNightMode: NO, supportsHiFi: NO, maxFPS: 0, physicalSize: {w: 0.000000, h: 0.000000}, pixelSize: {w: 0.000000, h: 0.000000}, wantsCornerMasks: NO, initialFocusOwner: YES, viewAreas: (\134n    \134"<CARScreenViewArea: 0x600003321400> {visibleFrame: {x: 0.000000, y: 0.000000, w: 800.000000, h: 480.000000} safeFrame: {x: 0.000000, y: 0.000000, w: 800.000000, h: 480.000000} displaysTransitionControl: 0 statusBarEdge: 0 supportsFocusTransfer: no}\134"\134n), displayScaleInfo: DisplayInfo: phys
+2026-11-09 13:02:00.852 Df Runner[27298:14f76] [com.apple.carkit:General] disconnected session <CARSession: 0x6000021a5950>
+2026-11-09 13:02:00.853 E  Runner[27298:14f76] [com.apple.carkit:General] Provided status bar edge is invalid, assigning default
+2026-11-09 13:02:00.853 Df Runner[27298:14f76] [com.apple.carkit:DisplayScale] Physical size is zero, applying default size Result({0, 0}) = PointSize({0, 0})/CROptimalPointsPerMM(0.376647834274953)
+2026-11-09 13:02:00.854 Df Runner[27298:14f76] [com.apple.carkit:General] connected session <CARSession: 0x60000219ae90> configuration: [<CARSessionConfiguration: 0x1054aceb0> session: (null), name: (null), modelName: (null), manufacturer: (null), serialNumber: (null), transport: USB, ETC supported: NO, right hand drive: NO, limitableUserInterfaces: (), manufacturerIconLabel: OEM, manufacturerIconVisible: YES, night mode supported: NO, supports AC_BACK: YES, screens: (
+    "<CARScreenInfo: 0x600003780840>, identifier: PurpleTVOut, availableInteractionModels: Touch, Knob, primaryInteractionModel: Knob, isLimited: NO, isNightMode: NO, supportsHiFi: NO, maxFPS: 0, physicalSize: {w: 0.000000, h: 0.000000}, pixelSize: {w: 0.000000, h: 0.000000}, wantsCornerMasks: NO, initialFocusOwner: YES, viewAreas: (\134n    \134"<CARScreenViewArea: 0x600003321cc0> {visibleFrame: {x: 0.000000, y: 0.000000, w: 800.000000, h: 480.000000} safeFrame: {x: 0.000000, y: 0.000000, w: 800.000000, h: 480.000000} displaysTransitionControl: 0 statusBarEdge: 0 supportsFocusTransfer: no}\134"\134n), displayScaleInfo: DisplayInfo: phys
+2026-11-09 13:02:00.887 Df Runner[27298:14f76] [com.apple.carplayframework:General] Template scene content style updated to dark
+2026-11-09 13:02:00.888 Df Runner[27298:14f76] [com.apple.carplayframework:General] Template app scene updated to unrestricted frame rate
+2026-11-09 13:02:00.889 Df Runner[27298:14f76] [com.apple.UIKit:HomeAffordanceObservation] Initializing: <_UIHomeAffordanceSceneNotifier: 0x60000294cd20>; with scene: <CPTemplateApplicationScene: 0x1051d3e10>
+2026-11-09 13:02:00.890 Df Runner[27298:14f76] [com.apple.BacklightServices:scenes] 0x600000c701e0 setDelegate:<0x600000c72d30 _UIBacklightEnvironment> hasDelegate:YES for environment:Car[2-3]:it.gdanav.gdanav
+2026-11-09 13:02:00.890 Df Runner[27298:14f76] [com.apple.UIKit:EventDeferring] [0x60000294ccb0] Initialized with scene: <CPTemplateApplicationScene: 0x1051d3e10>; behavior: <_UIEventDeferringBehavior_CarPlay: 0x6000003069c0>; availableForProcess: 1, systemShellManagesKeyboardFocus: 0
+2026-11-09 13:02:00.902 Df Runner[27298:14f76] [com.apple.carplayframework:General] Application declares maps entitlement.
+2026-11-09 13:02:00.917 Df Runner[27298:14f76] [com.apple.carplayframework:General] Application declares maps entitlement.
+2026-11-09 13:02:00.917 Df Runner[27298:14f76] [com.apple.carplayframework:General] Connecting to listener endpoint for scene identifier: Car[2-3]:it.gdanav.gdanav
+2026-11-09 13:02:00.921 Df Runner[27298:14f76] [com.apple.xpc:connection] [0x1051cdec0] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-11-09 13:02:00.922 Df Runner[27298:14f76] [com.apple.carplayframework:General] Scene will connect observer fired
+2026-11-09 13:02:00.922 Df Runner[27298:14f76] [com.apple.carplayframework:General] Attempting to deliver interface controller...
+2026-11-09 13:02:00.922 Df Runner[27298:14f76] [com.apple.carplayframework:General] App ready to receive interface controller
+2026-11-09 13:02:00.922 Df Runner[27298:14f76] [com.apple.carplayframework:General] App supports CPTemplateApplicationScene method with window
+2026-11-09 13:02:00.948 Df Runner[27298:14f76] [com.apple.network:path] nw_path_evaluator_start [D5FBFF83-96FD-4CC7-BDC1-144C480BB79A <NULL> generic, attribution: developer]
+	path: satisfied (Path is satisfied), interface: en0
+2026-11-09 13:02:00.948 A  Runner[27298:14f76] (CoreLocation) CL: CLLocationManager
+2026-11-09 13:02:00.948 Df Runner[27298:14f76] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":initWithEffectiveBundleIdentifier:bundlePath:websiteIdentifier:delegate:silo:, "self":"0x600000054390", "identifier":(null), "bundlePath":(null)}
+2026-11-09 13:02:00.949 Df Runner[27298:14f76] [com.apple.locationd.Core:Client] {"msg":"client allocated", "client":"0x1339336e0"}
+2026-11-09 13:02:00.949 A  Runner[27298:14f76] (CoreLocation) CL: _CLClientCreateConnection
+2026-11-09 13:02:00.949 Df Runner[27298:14f76] [com.apple.locationd.Core:Client] {"msg":"_CLClientCreateConnection", "event":activity, "client":"0x1339336e0"}
+2026-11-09 13:02:00.949 A  Runner[27298:160b3] (LocationSupport) CL: Sending cached messages to daemon
+2026-11-09 13:02:00.949 Df Runner[27298:160b3] [com.apple.LocationSupport:Connection] {"msg":"Sending cached messages to daemon", "event":activity}
+2026-11-09 13:02:00.949 Df Runner[27298:160b3] [com.apple.xpc:connection] [0x1053d6be0] activating connection: mach=true listener=false peer=false name=com.apple.locationd.registration
+2026-11-09 13:02:00.949 A  Runner[27298:14f76] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-09 13:02:00.949 A  Runner[27298:160b3] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-09 13:02:00.949 A  Runner[27298:14f76] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-09 13:02:00.949 A  Runner[27298:14f76] (CoreLocation) CL: CLLocationManager
+2026-11-09 13:02:00.949 Df Runner[27298:14f76] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":setDelegate:, "self":"0x600000054390", "delegate":"0x6000002a6420"}
+2026-11-09 13:02:00.949 A  Runner[27298:160b3] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-09 13:02:01.036 Df Runner[27298:14f76] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-09 13:02:01.043 Df Runner[27298:14f76] [com.apple.coreanimation:WindowServer] CADisplayLink: new link for external display id 2
+2026-11-09 13:02:01.053 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: Set automatically hides navigation bar: 0
+2026-11-09 13:02:01.053 Df Runner[27298:14f76] [com.apple.carplayframework:General] Setting root template <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0> animated 0
+2026-11-09 13:02:01.053 Df Runner[27298:14f76] [com.apple.carplayframework:General] Application declares maps entitlement.
+2026-11-09 13:02:01.053 Df Runner[27298:14f76] [com.apple.carplayframework:General] Creating template: <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>; presentation style: 1; animated: NO
+2026-11-09 13:02:01.062 Df Runner[27298:14f76] [com.apple.carplayframework:General] Template did push, stack count: 1
+2026-11-09 13:02:01.104 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021923a0> {UUID: 65144883-01D8-42D3-A9FC-7679A23B5526, enabled: YES}"
+)
+2026-11-09 13:02:01.104 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x600002192350> {UUID: 1E8052D3-9E22-494E-8D8A-C098684C34BE, enabled: YES}",
+    "<CPBarButton: 0x6000021929e0> {UUID: 48293FE0-D9BE-412B-8C8F-ED08105C89CC, enabled: YES}"
+)
+2026-11-09 13:02:01.237 Df Runner[27298:14f76] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:it.gdanav.gdanav-DF09878E-D578-4340-B26A-C685785C349F  persistentID: DF09878E-D578-4340-B26A-C685785C349F
+2026-11-09 13:02:01.239 Df Runner[27298:14f76] [com.apple.FrontBoard:SceneExtension] Ingesting properties from CPUITemplateApplicationSceneSettings...
+2026-11-09 13:02:01.239 Df Runner[27298:14f76] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <CPUITemplateApplicationSceneSettings[derived]> on FBSSceneSettings
+2026-11-09 13:02:01.239 Df Runner[27298:14f76] [com.apple.FrontBoard:SceneExtension] Ingesting properties from UIApplicationSceneSettings...
+2026-11-09 13:02:01.241 Df Runner[27298:14f76] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <UIApplicationSceneSettings[derived]> on FBSSceneSettings
+2026-11-09 13:02:01.242 A  Runner[27298:14f76] (CoreLocation) CL: CLLocationManager
+2026-11-09 13:02:01.242 Df Runner[27298:14f76] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":onClientEventRegistration:, "self":"0x600000054390", "clientKey":iit.gdanav.gdanav:}
+2026-11-09 13:02:01.242 Df Runner[27298:14f76] [com.apple.locationd.Core:Client] {"msg":"#CLLocationManager invoking #delegate", "self":"0x600000054390", "delegate":"0x6000002a6420", "selector":locationManagerDidChangeAuthorization:, "authorizationStatus":4, "limitsPrecision":0, "isAuthorizedForWidgetUpdates":0}
+2026-11-09 13:02:01.242 A  Runner[27298:14f76] (CoreLocation) CL: CLLocationManager
+2026-11-09 13:02:01.242 Df Runner[27298:14f76] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingLocation, "self":"0x600000054390"}
+2026-11-09 13:02:01.243 A  Runner[27298:14f76] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-09 13:02:01.243 A  Runner[27298:14f76] (CoreLocation) CL: CLLocationManager
+2026-11-09 13:02:01.243 A  Runner[27298:160b3] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-09 13:02:01.243 Df Runner[27298:14f76] [com.apple.locationd.Core:Client] {"msg":"CLLocationManager", "event":activity, "_cmd":stopUpdatingHeading, "self":"0x600000054390"}
+2026-11-09 13:02:01.243 Df Runner[27298:14f76] [com.apple.locationd.Core:Client] Stop updating heading
+2026-11-09 13:02:01.244 A  Runner[27298:14f76] (LocationSupport) CL: CLConnectionClient::sendMessage(cache)
+2026-11-09 13:02:01.244 A  Runner[27298:160b3] (LocationSupport) CL: CLConnection::sendMessage
+2026-11-09 13:02:01.244 Df Runner[27298:14f76] [com.apple.carplayframework:General] Fetched interface controller image sizes.
+2026-11-09 13:02:01.245 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021a5950> {UUID: CBB0798C-26D1-4E76-A641-82C8C8D4839C, enabled: YES}"
+)
+2026-11-09 13:02:01.245 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021a7110> {UUID: 05D6C91A-22C6-463A-8B89-83ED1901CDAF, enabled: YES}",
+    "<CPBarButton: 0x6000021a6440> {UUID: B9A637C4-2CDA-450E-B5D9-33CB92A21F49, enabled: YES}"
+)
+2026-11-09 13:02:01.246 Df Runner[27298:14f76] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:it.gdanav.gdanav-DF09878E-D578-4340-B26A-C685785C349F  persistentID: DF09878E-D578-4340-B26A-C685785C349F
+2026-11-09 13:02:01.250 A  Runner[27298:160b3] (Security) SecItemCopyMatching_ios
+2026-11-09 13:02:01.250 Df Runner[27298:160b3] [com.apple.securityd:thread-local-client-debug] SecSecurityClientGet new thread!
+2026-11-09 13:02:01.255 A  Runner[27298:160b3] (Security) SecItemCopyMatching_ios
+2026-11-09 13:02:01.261 A  Runner[27298:160b3] (Security) SecItemCopyMatching_ios
+2026-11-09 13:02:01.262 A  Runner[27298:160b3] (Security) SecItemCopyMatching_ios
+2026-11-09 13:02:01.265 A  Runner[27298:160b3] (Security) SecItemCopyMatching_ios
+2026-11-09 13:02:01.267 A  Runner[27298:160b3] (Security) SecItemCopyMatching_ios
+2026-11-09 13:02:01.310 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021afac0> {UUID: 90EF2113-7E74-469A-A18F-67559AC4EBD8, enabled: YES}"
+)
+2026-11-09 13:02:01.310 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021af7a0> {UUID: F4236263-561B-4A2D-A17E-1F2C35C32EC2, enabled: YES}",
+    "<CPBarButton: 0x6000021af7f0> {UUID: 0E73C790-1ED9-4D72-9CC0-6F012EDC1E86, enabled: YES}"
+)
+2026-11-09 13:02:01.311 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021af750> {UUID: C2633937-89A0-479C-AB8C-77E1009DF6F8, enabled: YES}"
+)
+2026-11-09 13:02:01.311 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021ae3f0> {UUID: BF4B5EA8-C859-46BC-BA86-4CD1A9EF591C, enabled: YES}",
+    "<CPBarButton: 0x6000021af430> {UUID: 626650BB-B55F-4D57-966E-5087B9A7CECF, enabled: YES}"
+)
+2026-11-09 13:02:01.321 A  Runner[27298:160b3] (Metal) Metal Compiling Shader
+2026-11-09 13:02:01.749 A  Runner[27298:14fa8] (Metal) Metal Compiling Shader
+2026-11-09 13:02:01.753 A  Runner[27298:14fa8] (Metal) Metal Compiling Shader
+2026-11-09 13:02:06.033 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b8dc0> {UUID: 3345CC77-6846-433B-A3E7-5E3CCD9194AD, enabled: YES}"
+)
+2026-11-09 13:02:06.034 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b8e10> {UUID: 21DA3E46-7445-400D-B134-A107F6FD0548, enabled: YES}",
+    "<CPBarButton: 0x6000021b8e60> {UUID: B8182170-A0B8-4DEF-8B4D-252E7BD1E076, enabled: YES}"
+)
+2026-11-09 13:02:11.033 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021af520> {UUID: 76A89E82-7BA4-4DF8-951D-9EC6B59E52B3, enabled: YES}"
+)
+2026-11-09 13:02:11.033 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021afca0> {UUID: 2C1E1C8F-DDC8-4AF9-9FB7-394B038A85C6, enabled: YES}",
+    "<CPBarButton: 0x6000021aff70> {UUID: 05B14AB7-B418-4DD9-8037-C9CA0F3697EC, enabled: YES}"
+)
+2026-11-09 13:02:16.023 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b6a30> {UUID: 7D0A33B2-27B4-4285-A8DF-C9E8388F8A8E, enabled: YES}"
+)
+2026-11-09 13:02:16.023 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b6fd0> {UUID: 0C83C055-021C-47E1-A592-71127634041C, enabled: YES}",
+    "<CPBarButton: 0x6000021b7020> {UUID: EDA0B415-DCBC-4AF8-AFDD-5C0B53E1035D, enabled: YES}"
+)
+2026-11-09 13:02:21.019 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b73e0> {UUID: D3E92F91-D24F-4636-A1D3-C1F4BD2F048B, enabled: YES}"
+)
+2026-11-09 13:02:21.019 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b7390> {UUID: 1570C143-521B-437D-AB48-F0FEEE07A514, enabled: YES}",
+    "<CPBarButton: 0x6000021b71b0> {UUID: ED168C3D-71A1-4646-B0A3-9DB5BAA5CFAB, enabled: YES}"
+)
+2026-11-09 13:02:26.034 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b9400> {UUID: 0716DD03-CADE-41AD-9EE6-8924167EE640, enabled: YES}"
+)
+2026-11-09 13:02:26.035 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b94a0> {UUID: 1F5F6F9B-172E-47DF-8846-EB1534615F22, enabled: YES}",
+    "<CPBarButton: 0x6000021b98b0> {UUID: CD9EFEAC-55CB-4C0E-8838-EB4762EEC9F4, enabled: YES}"
+)
+2026-11-09 13:02:31.013 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021a51d0> {UUID: B0E894F3-0C1C-49B1-9FB6-D083CDA1F307, enabled: YES}"
+)
+2026-11-09 13:02:31.014 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021a4b40> {UUID: 393D5B8C-5D73-4C36-8232-B8D833016F69, enabled: YES}",
+    "<CPBarButton: 0x6000021a55e0> {UUID: 1D93751C-4205-47DA-8253-FB14B04E6571, enabled: YES}"
+)
+2026-11-09 13:02:36.020 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021bc640> {UUID: 4511BAA1-3162-49FF-8836-C6269E465F26, enabled: YES}"
+)
+2026-11-09 13:02:36.020 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021bc690> {UUID: D2143783-4602-41F2-96C1-ACDF1799DE14, enabled: YES}",
+    "<CPBarButton: 0x6000021bc6e0> {UUID: 238401AD-7F04-474E-99C2-C8A433E75C71, enabled: YES}"
+)
+2026-11-09 13:02:41.026 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b7200> {UUID: 19DCA435-6AF4-4B57-9494-193A0EC19B6F, enabled: YES}"
+)
+2026-11-09 13:02:41.026 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b7250> {UUID: 5333FD9B-3FB8-4FCE-981B-835B5297F287, enabled: YES}",
+    "<CPBarButton: 0x6000021b72a0> {UUID: CF4498BA-F0D4-48A4-BE80-83A9A4B8F83C, enabled: YES}"
+)
+2026-11-09 13:02:46.022 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b7110> {UUID: 92556302-FA4B-45FA-B5E6-D9427B41B103, enabled: YES}"
+)
+2026-11-09 13:02:46.023 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b7160> {UUID: B4477FA3-A0FE-406A-8DBA-3791DC1AB4AD, enabled: YES}",
+    "<CPBarButton: 0x6000021b70c0> {UUID: 968C8011-6464-47FD-9FDA-FC904E48E339, enabled: YES}"
+)
+2026-11-09 13:02:51.034 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021bc5f0> {UUID: E045C38C-FA22-41EE-ACB0-A166CCD4500C, enabled: YES}"
+)
+2026-11-09 13:02:51.034 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021bc140> {UUID: C5254A59-D562-407B-A33D-AF1CAC4820B6, enabled: YES}",
+    "<CPBarButton: 0x6000021bccd0> {UUID: 88791E50-DCB8-49FB-951C-DFD380FCD3CF, enabled: YES}"
+)
+2026-11-09 13:02:52.591 A  Runner[27298:160b3] (RunningBoardServices) didChangeInheritances
+2026-11-09 13:02:52.602 A  Runner[27298:17b6c] (RunningBoardServices) didChangeInheritances
+2026-11-09 13:02:52.609 Df Runner[27298:14f76] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: Car[2-3]:it.gdanav.gdanav  persistentID: Car[2-3]:it.gdanav.gdanav
+2026-11-09 13:02:52.618 Df Runner[27298:14f76] [com.apple.UIKit:UpdateScheduler] Target list changed: <CADisplay:TVOut PurpleTVOut>, <CADisplay:LCD PurpleMain>
+2026-11-09 13:02:52.994 Df Runner[27298:14f76] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: Car[2-3]:it.gdanav.gdanav  persistentID: Car[2-3]:it.gdanav.gdanav
+2026-11-09 13:02:53.112 A  Runner[27298:17b6c] (CoreFoundation) Loading Preferences From User Session CFPrefsD
+2026-11-09 13:02:53.113 A  Runner[27298:17b6c] (CoreFoundation) Loading Preferences From User Session CFPrefsD
+2026-11-09 13:02:53.164 Df Runner[27298:17b6c] [com.apple.xpc:connection] [0x1053a5290] activating connection: mach=true listener=false peer=false name=com.apple.geod
+2026-11-09 13:02:53.178 Df Runner[27298:14f76] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: Car[2-3]:it.gdanav.gdanav  persistentID: Car[2-3]:it.gdanav.gdanav
+2026-11-09 13:02:53.180 Df Runner[27298:14f76] [com.apple.UIKit:UIScreen] CarPlay session settings updated for scene: 28854:FBWorkspace-com.apple.CarPlayTemplateUIHost/FBSceneManager:Car%5B2-3%5D%3Ait.gdanav.gdanav, availableInteractionModels: touch|knob, primaryInteractionModel: knob, touchLevel: lowFidelity
+2026-11-09 13:02:53.182 Df Runner[27298:14f76] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x105122300> (DF09878E-D578-4340-B26A-C685785C349F)
+2026-11-09 13:02:53.183 Df Runner[27298:17b6c] [com.apple.xpc:connection] [0x10532e490] activating connection: mach=true listener=false peer=false name=com.apple.geod
+2026-11-09 13:02:53.212 Df Runner[27298:160b3] [com.apple.xpc:connection] [0x1054d9710] activating connection: mach=true listener=false peer=false name=com.apple.geod
+2026-11-09 13:02:53.215 Df Runner[27298:17b6c] [com.apple.xpc:connection] [0x134c3a470] activating connection: mach=true listener=false peer=false name=com.apple.geod
+2026-11-09 13:02:53.896 Df Runner[27298:14f76] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: Car[2-3]:it.gdanav.gdanav  persistentID: Car[2-3]:it.gdanav.gdanav
+2026-11-09 13:02:54.111 Df Runner[27298:14f76] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: Car[2-3]:it.gdanav.gdanav  persistentID: Car[2-3]:it.gdanav.gdanav
+2026-11-09 13:02:56.030 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b7160> {UUID: 7ECD1391-AD92-4DEB-A139-440B1880A5FB, enabled: YES}"
+)
+2026-11-09 13:02:56.030 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b7110> {UUID: 21C9C0E3-9841-460B-A0F1-980F96161E60, enabled: YES}",
+    "<CPBarButton: 0x6000021b7250> {UUID: 17324F6B-46D0-4CB4-A536-111A0E0D048D, enabled: YES}"
+)
+2026-11-09 13:03:01.019 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b72f0> {UUID: 600F2B22-97CA-4240-9D40-73327BB10973, enabled: YES}"
+)
+2026-11-09 13:03:01.020 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b72a0> {UUID: 54CD9206-EC63-4933-B6AB-0B950375D974, enabled: YES}",
+    "<CPBarButton: 0x6000021b73e0> {UUID: 65E3FD67-AB42-4842-8195-96B196A7C015, enabled: YES}"
+)
+2026-11-09 13:03:06.013 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021bcaa0> {UUID: EC1A03C6-D70F-4604-AC38-BCAD6442D5D6, enabled: YES}"
+)
+2026-11-09 13:03:06.013 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021bd540> {UUID: B45693BD-B08B-485D-B9A3-5F750B6755F2, enabled: YES}",
+    "<CPBarButton: 0x6000021bd220> {UUID: 36996B30-C66C-4DB9-B785-B329AF0EC4B6, enabled: YES}"
+)
+2026-11-09 13:03:11.024 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b9f40> {UUID: A963AF93-2F6C-4E6D-BA3F-497E12D41FD3, enabled: YES}"
+)
+2026-11-09 13:03:11.025 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b9e00> {UUID: 365BEE78-27B7-4AAC-8DE2-AEEEA754FD09, enabled: YES}",
+    "<CPBarButton: 0x6000021b9720> {UUID: 2D735CC4-3424-4359-A56D-25B01DEBD188, enabled: YES}"
+)
+2026-11-09 13:03:16.020 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021a6620> {UUID: F7CAF245-7499-4CDF-B622-9FFD1EA5ED60, enabled: YES}"
+)
+2026-11-09 13:03:16.020 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021a52c0> {UUID: 7A61E469-437A-410B-BFCA-C3EDAD76AEEE, enabled: YES}",
+    "<CPBarButton: 0x6000021a4230> {UUID: C8D8E796-B042-409D-9999-65F041A61DD7, enabled: YES}"
+)
+2026-11-09 13:03:21.020 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021bcc30> {UUID: E82CEF50-6A26-4A89-8032-1DA287CD4E3A, enabled: YES}"
+)
+2026-11-09 13:03:21.023 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021bccd0> {UUID: AE925079-7B68-45AA-96F5-8B1D2B44164A, enabled: YES}",
+    "<CPBarButton: 0x6000021bc140> {UUID: 4F1004EF-68F8-49B0-BFCE-FD1EE53D5F24, enabled: YES}"
+)
+2026-11-09 13:03:26.014 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021bcaa0> {UUID: 1B25BFBC-14C1-4498-A8EB-9A5C00FA0931, enabled: YES}"
+)
+2026-11-09 13:03:26.015 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021bd220> {UUID: A86F0494-7201-45E9-A3B8-46CF3E47F546, enabled: YES}",
+    "<CPBarButton: 0x6000021bcdc0> {UUID: 20C90AA7-0007-47C0-AF74-45DE6ED1AC21, enabled: YES}"
+)
+2026-11-09 13:03:31.012 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021bc500> {UUID: 6F2EC9E1-17A9-4C5F-A28C-11BC7268DB2E, enabled: YES}"
+)
+2026-11-09 13:03:31.013 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021bcb40> {UUID: 0E5553D0-20C2-4D17-A59F-ECBC9FB2628B, enabled: YES}",
+    "<CPBarButton: 0x6000021bcaf0> {UUID: AB0E73CD-9F9F-4F12-92A3-F5E5DDEFEE5F, enabled: YES}"
+)
+2026-11-09 13:03:36.031 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021bc370> {UUID: 6CCD68C6-1D73-44DE-AE51-9B4DF24B3F8A, enabled: YES}"
+)
+2026-11-09 13:03:36.032 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021bd540> {UUID: B3FBA334-2AB4-4319-AAE5-4187B190D160, enabled: YES}",
+    "<CPBarButton: 0x6000021bddb0> {UUID: A3EBC8A1-D84E-4D17-8E6D-8B8FC630A6BA, enabled: YES}"
+)
+2026-11-09 13:03:41.024 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021af520> {UUID: 9787D7BD-D6B4-4E1B-953F-D3747EC22E52, enabled: YES}"
+)
+2026-11-09 13:03:41.025 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021afca0> {UUID: C6A36155-F8BB-4584-8AB7-8217576DD972, enabled: YES}",
+    "<CPBarButton: 0x6000021af430> {UUID: 7A4AAC0B-EA74-476B-AF33-8228B87FC17B, enabled: YES}"
+)
+2026-11-09 13:03:46.024 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b9ef0> {UUID: 5D63C4D0-D894-4DD1-BD2D-517725748503, enabled: YES}"
+)
+2026-11-09 13:03:46.024 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b83c0> {UUID: F2FC2936-5E1B-428A-A399-580D7319A1FC, enabled: YES}",
+    "<CPBarButton: 0x6000021b9040> {UUID: 212A1575-7E0C-45D1-BE41-F20F56A84D85, enabled: YES}"
+)
+2026-11-09 13:03:51.017 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b8050> {UUID: 6BF126BD-79BF-4EF5-8A4B-3506422038AD, enabled: YES}"
+)
+2026-11-09 13:03:51.017 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b8960> {UUID: E49F3EB3-3FCF-429A-9EB6-D7A8927A1B2E, enabled: YES}",
+    "<CPBarButton: 0x6000021b9fe0> {UUID: 9F120BCD-366B-4797-81AF-4055F85DC5D6, enabled: YES}"
+)
+2026-11-09 13:03:56.019 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021bc370> {UUID: 4A24E583-BED4-4D6E-B970-DA6B0317FE9B, enabled: YES}"
+)
+2026-11-09 13:03:56.020 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021bd220> {UUID: C13A6761-A578-4F2B-B241-26A4C46133C8, enabled: YES}",
+    "<CPBarButton: 0x6000021bce10> {UUID: C0B7AB73-639A-488E-BAFC-8521917339B1, enabled: YES}"
+)
+2026-11-09 13:04:01.016 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021bcb40> {UUID: 86386F38-1924-4FE2-B723-6353E0C9E494, enabled: YES}"
+)
+2026-11-09 13:04:01.017 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021bdef0> {UUID: 21FF15DA-D1EE-4601-A406-167E963AA0F8, enabled: YES}",
+    "<CPBarButton: 0x6000021bd360> {UUID: D02543E5-01B7-4208-A1B7-267116CE68BA, enabled: YES}"
+)
+2026-11-09 13:04:06.023 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021a4b90> {UUID: 8442571D-8CB7-4B97-9E92-8C5737AC7E1E, enabled: YES}"
+)
+2026-11-09 13:04:06.024 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021a6d50> {UUID: 8DF19E1D-9A90-4FE1-B050-E7B3856C2B7B, enabled: YES}",
+    "<CPBarButton: 0x6000021a7ac0> {UUID: 65D08A08-EE15-4FB0-9C2D-B0F61B9C20E1, enabled: YES}"
+)
+2026-11-09 13:04:11.036 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New leading bar buttons: (
+    "<CPBarButton: 0x6000021b8190> {UUID: 5FF4CC2B-5D13-483D-86F9-919C8F75BA2B, enabled: YES}"
+)
+2026-11-09 13:04:11.037 Df Runner[27298:14f76] [com.apple.carplayframework:General] <CPMapTemplate: 0x600003777000> <identifier: 5C2F9542-6AA1-460C-A466-8C2A1EC69371, userInfo: (null), tabTitle: (null), tabImage: (null), showsTabBadge: 0>: New trailing bar buttons: (
+    "<CPBarButton: 0x6000021b83c0> {UUID: B6E49ABF-01E7-45C3-A2BF-EA06C7F93776, enabled: YES}",
+    "<CPBarButton: 0x6000021b8780> {UUID: 636D41B7-0EB1-4EBC-B0BD-11E51C64BF5A, enabled: YES}"
+)
