@@ -289,8 +289,32 @@ final class MappaCarPlay: UIViewController, MLNMapViewDelegate {
         for id in ["gdanav-percorso", "gdanav-alternative"] {
             if let d = ponte.sorgenti[id] { punti += MappaCarPlay.coordinate(d) }
         }
-        if let q = ponte.qui { punti.append(CLLocationCoordinate2D(latitude: q.lat, longitude: q.lon)) }
-        if let la = s.lat, let lo = s.lon { punti.append(CLLocationCoordinate2D(latitude: la, longitude: lo)) }
+        // La posizione e la meta solo se il percorso non c'è ancora: la
+        // posizione può essere lontana dalla partenza (nelle foto di prova
+        // l'iPhone era a Napoli e il viaggio a Orte, e si vedeva mezza Italia).
+        let meta = s.lat.flatMap { la in s.lon.map { CLLocationCoordinate2D(latitude: la, longitude: $0) } }
+        if punti.isEmpty {
+            // Senza le linee: la posizione e la meta, ma solo se la posizione
+            // sta a una distanza credibile (al più una volta e mezza la
+            // strada); se no la meta con attorno la lunghezza del viaggio.
+            let lunghezza = s.voci.indices.contains(s.scelta) ? s.voci[s.scelta].metri : 0
+            if let q = ponte.qui, let m = meta {
+                let qui = CLLocationCoordinate2D(latitude: q.lat, longitude: q.lon)
+                let d = CLLocation(latitude: qui.latitude, longitude: qui.longitude)
+                    .distance(from: CLLocation(latitude: m.latitude, longitude: m.longitude))
+                if lunghezza <= 0 || d <= lunghezza * 1.5 + 2_000 {
+                    punti.append(qui)
+                } else {
+                    let dLat = lunghezza / 111_000
+                    let dLon = lunghezza / (111_000 * max(cos(m.latitude * .pi / 180), 0.2))
+                    punti.append(CLLocationCoordinate2D(latitude: m.latitude - dLat, longitude: m.longitude - dLon))
+                    punti.append(CLLocationCoordinate2D(latitude: m.latitude + dLat, longitude: m.longitude + dLon))
+                }
+            } else if let q = ponte.qui {
+                punti.append(CLLocationCoordinate2D(latitude: q.lat, longitude: q.lon))
+            }
+        }
+        if let m = meta { punti.append(m) }
         guard let primo = punti.first else { return false }
         let chiave = "\(s.id)|\(s.scelta)|\(punti.count)"
         if stradeInquadrate == chiave { return true }
