@@ -910,7 +910,8 @@ function aggiornaFreccia() {
   }
   scena.impostaNastro('freccia', nastro(p.linea, p.profilo, inizio, fine, 3.0, 0.7, { passo: 1.5 }), 'freccia', 6);
   const [x, y] = p.linea.a(fine);
-  scena.impostaPunta([x, y, p.profilo.quota(fine) + 0.72, p.linea.direzione(fine, 3)]);
+  const [sx, sy] = p.profilo.sposta(fine);
+  scena.impostaPunta([x + sx, y + sy, p.profilo.quota(fine) + 0.72, p.linea.direzione(fine, 3)]);
   S.frecciaDa = inizio;
 }
 
@@ -1377,6 +1378,12 @@ function muovi(adesso, dt) {
     const s = Math.min(pos.s, p.linea.lunghezza);
     [x, y] = p.linea.a(s);
     const prof = p.profilo;
+    // Sulla strada come la linea (vedi `spostamenti` in percorso.js).
+    if (prof) {
+      const [sx, sy] = prof.sposta(s);
+      x += sx;
+      y += sy;
+    }
     const q = (v) => (prof && v >= prof.s0 && v <= prof.s1 ? prof.quota(v) : 0);
     z = q(s);
     dir = p.linea.direzione(s, 4);

@@ -15,15 +15,47 @@ test("l'auto va avanti con la velocità fra una lettura e l'altra", () => {
   assert.equal(m.passo(0).s, 100);
   let s = 100;
   for (let t = 33; t <= 1000; t += 33) s = m.passo(t).s;
-  assert.ok(s > 105 && s <= 120, `avanti (${s})`);
+  assert.ok(s > 105 && s <= 120.5, `avanti (${s})`);
+});
+
+test('a velocità costante la freccia sta sulla posizione, non dietro', () => {
+  // «Alcune volte è prima e altre dopo la posizione reale.»
+  const m = new Moto();
+  let s = 0;
+  for (let t = 0; t <= 10000; t += 33) {
+    if (t % 1000 < 33) m.posizione({ metri: 14 * (t / 1000), v: 14, quando: t });
+    s = m.passo(t).s;
+  }
+  assert.ok(Math.abs(s - 140) < 1, `a 10 s deve stare a 140 m, sta a ${s.toFixed(1)}`);
+});
+
+test('frenando si ferma dove si ferma l\'auto, e oltre va solo quanto non si può sapere', () => {
+  const m = new Moto();
+  let s = 0;
+  let massimo = 0;
+  // 14 m/s per 5 s, poi frena fino a fermarsi a 80 m.
+  for (let t = 0; t <= 13000; t += 33) {
+    if (t % 1000 < 33) {
+      const k = t / 1000;
+      const metri = k <= 5 ? 14 * k : Math.min(80, 70 + 10 * (1 - Math.pow(1 - Math.min(1, (k - 5) / 2), 2)));
+      const v = k <= 5 ? 14 : Math.max(0, 14 * (1 - (k - 5) / 2));
+      m.posizione({ metri, v, quando: t });
+    }
+    s = m.passo(t).s;
+    massimo = Math.max(massimo, s);
+  }
+  // Fino alla lettura dopo (un secondo) la frenata non si sa: l'ultima
+  // lettura (70 m a 14 m/s) porta a 84 m. Oltre quello, poco.
+  assert.ok(massimo < 87.5, `troppo oltre: ${massimo.toFixed(1)}`);
+  assert.ok(Math.abs(s - 80) <= 3.2, `ferma a 80, sta a ${s.toFixed(1)}`);
 });
 
 test('non torna mai indietro per poco, salta per tanto', () => {
   const m = new Moto();
   m.posizione({ metri: 100, v: 0, quando: 0 });
   m.passo(0);
-  m.posizione({ metri: 95, v: 0, quando: 100 });
-  assert.equal(m.passo(200).s, 100, 'resta lì');
+  m.posizione({ metri: 98, v: 0, quando: 100 });
+  assert.equal(m.passo(200).s, 100, 'resta lì: da ferma il GPS balla di qualche metro');
   m.posizione({ metri: 400, v: 0, quando: 300 });
   assert.equal(m.passo(300).s, 400, 'salta avanti');
 });
