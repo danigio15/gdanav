@@ -781,7 +781,12 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
       for (const [px, py] of anello.pts) piatti.push(px, py);
     }
     const facce = earcut(piatti, buchi.length ? buchi : null, 2);
-    const rp = stile === 'industria' ? [TETTI.industriaGiorno, TETTI.industriaNotte] : [TETTI.giorno, TETTI.notte];
+    const rp =
+      stile === 'industria'
+        ? [TETTI.industriaGiorno, TETTI.industriaNotte]
+        : stile === 'uffici'
+          ? [TETTI.ufficiGiorno, TETTI.ufficiNotte]
+          : [TETTI.giorno, TETTI.notte];
     const ri = Math.floor(r() * rp[0].length);
     const rg = rgb(rp[0][ri]);
     const rn = rgb(rp[1][ri]);

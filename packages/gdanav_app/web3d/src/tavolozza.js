@@ -2,11 +2,14 @@
 // spostati un poco per la luce del 3D (il prototipo approvato).
 
 export const GIORNO = {
-  sfondo: '#E5E7E1',
-  abitato: '#E1E3DE',
-  industria: '#D6D9D8',
-  prato: '#CBE2BA',
-  bosco: '#B7D6A3',
+  // Il suolo caldo e chiaro, come le mappe vere: «non hanno caricato
+  // l'immagine, sono grigi» — il grigio-verde uniforme di prima sembrava una
+  // mappa che non si era ancora disegnata.
+  sfondo: '#EEE9DF',
+  abitato: '#E9E3D7',
+  industria: '#E2DED6',
+  prato: '#C3DEA4',
+  bosco: '#A7CC8A',
   acqua: '#A9D7F6',
   cielo: '#5d9be0',
   orizzonte: '#d9e7f4',
@@ -73,10 +76,14 @@ export const FACCIATE = {
 };
 
 export const TETTI = {
-  // Più chiari dei muri: da sopra l'edificio si legge.
-  giorno: ['#c7cacf', '#d0cdc8', '#c08a7a', '#cbc6bf', '#c0c4c9'],
-  notte: ['#3c414b', '#424852', '#3c414b', '#424852', '#3c414b'],
-  industriaGiorno: ['#cdd0d4', '#d4d2cd', '#c6cacf', '#d6d3cd', '#c2c6ca'],
+  // I coppi delle case italiane, in tante sfumature; qualche tetto piano
+  // chiaro. Da sopra l'edificio si legge, e la città non è grigia.
+  giorno: ['#b8654c', '#c4775b', '#a95b45', '#c9866a', '#b56f57', '#c08a74', '#d6d1c8', '#bd6a4f'],
+  notte: ['#4a3d3b', '#4f4240', '#463a38', '#524542', '#4a3e3c', '#4f4341', '#424852', '#4a3d3b'],
+  industriaGiorno: ['#d9d6cf', '#dedbd4', '#d2d0cb', '#e0ddd6', '#cfcdc8'],
+  // Gli uffici e le torri: tetti piani, chiari e freddi.
+  ufficiGiorno: ['#d3d8dd', '#dce0e4', '#cdd3d9', '#d8dcdf'],
+  ufficiNotte: ['#3c414b', '#424852', '#3c414b', '#424852'],
   industriaNotte: ['#4a4f58', '#4a4f58', '#4a4f58', '#4a4f58', '#4a4f58'],
 };
 
