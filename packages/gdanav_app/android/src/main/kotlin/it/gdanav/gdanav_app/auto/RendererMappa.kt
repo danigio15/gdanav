@@ -127,6 +127,7 @@ class RendererMappa(
          * più dentro, si dimentica: la rimanda Android Auto, e intanto vale
          * tutta la superficie. */
         areaVisibile?.let { if (it.right > larghezza || it.bottom > altezza) areaVisibile = null }
+        areaStabile?.let { if (it.right > larghezza || it.bottom > altezza) areaStabile = null }
         densita = contenitore.dpi / 160f
         // Sotto i 900 punti di larghezza la scheda del viaggio è stretta; e
         // anche quando la mappa è poco più larga che alta, cioè a mezzo
@@ -239,10 +240,29 @@ class RendererMappa(
     /** L'area non coperta dalle schede di Android Auto. */
     private var areaVisibile: Rect? = null
 
+    /** L'area che le schede fisse di Android Auto non coprono mai. */
+    private var areaStabile: Rect? = null
+
     /** L'area libera, sempre dentro la superficie di adesso. */
-    private fun areaLibera(): Rect {
+    private fun areaLibera(): Rect = dentroLaSuperficie(areaVisibile)
+
+    /**
+     * L'area dove centrare l'auto in larghezza: quella stabile.
+     *
+     * «In navigazione si sposta verso destra, come se gli oggetti che
+     * compaiono a sinistra spostassero tutta la visuale; e con lo schermo
+     * diviso la navigazione si nasconde sotto l'altro pezzo di schermo.»
+     * L'area visibile toglie anche le schede passeggere (la manovra in alto a
+     * sinistra, l'arrivo in basso): centrare lì spingeva l'auto a destra. Quella
+     * stabile toglie solo quello che copre sempre (l'altra app dello schermo
+     * diviso): lì l'auto sta in mezzo, e le schede non coprono la colonna
+     * centrale. In altezza si usa sempre quella visibile.
+     */
+    private fun areaPerIlCentro(): Rect = dentroLaSuperficie(areaStabile ?: areaVisibile)
+
+    private fun dentroLaSuperficie(area: Rect?): Rect {
         val tutta = Rect(0, 0, larghezza, altezza)
-        val a = areaVisibile ?: return tutta
+        val a = area ?: return tutta
         val dentro = Rect(a)
         return if (dentro.intersect(tutta) && !dentro.isEmpty) dentro else tutta
     }
@@ -256,10 +276,12 @@ class RendererMappa(
     }
 
     override fun onStableAreaChanged(area: Rect) {
+        areaStabile = Rect(area)
         if (areaVisibile == null) {
             areaVisibile = Rect(area)
             pannello?.area = areaVisibile
         }
+        aggiorna()
     }
 
     /** Un punto toccato sulla mappa: proprietà, latitudine, longitudine. */
@@ -594,15 +616,17 @@ class RendererMappa(
      */
     private fun diciLoStato3d() {
         val a = areaLibera()
+        val c = areaPerIlCentro()
         val notte = carContext.isDarkMode
         val v = if (vista == Vista.IMMERSIVA) "immersiva" else "inclinata"
         val scala = scena?.scala ?: densita
         val sopra = (a.top / scala).toDouble()
-        val sinistra = (a.left / scala).toDouble()
-        val chiave = "$notte|$v|$sopra|$sinistra"
+        val sinistra = (c.left / scala).toDouble()
+        val destra = ((larghezza - c.right).coerceAtLeast(0) / scala).toDouble()
+        val chiave = "$notte|$v|$sopra|$sinistra|$destra"
         if (chiave == stato3dDetto) return
         stato3dDetto = chiave
-        PonteAuto.stato3d(notte, v, sopra, sinistra)
+        PonteAuto.stato3d(notte, v, sopra, sinistra, destra)
     }
 
     private val sorgentiCaricate = HashMap<String, String>()
@@ -764,9 +788,10 @@ class RendererMappa(
         }
         inclinazioneVoluta = vista.inclinazione
         bussolaInclinata = inclinata
-        marginiVoluti[0] = a.left.toDouble()
+        val centro = areaPerIlCentro()
+        marginiVoluti[0] = centro.left.toDouble()
         marginiVoluti[1] = a.top + a.height() * sopra
-        marginiVoluti[2] = (larghezza - a.right).toDouble().coerceAtLeast(0.0)
+        marginiVoluti[2] = (larghezza - centro.right).toDouble().coerceAtLeast(0.0)
         marginiVoluti[3] = (altezza - a.bottom).toDouble().coerceAtLeast(0.0)
         val ora = System.nanoTime()
         if (!moto.stessaPosizione(qui[0], qui[1])) {

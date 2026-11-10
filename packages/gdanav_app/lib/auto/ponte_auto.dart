@@ -220,6 +220,7 @@ class PonteAuto {
           vista: a['vista'] == 'immersiva' ? VistaMappa.immersiva : VistaMappa.inclinata,
           sopra: (a['sopra'] as num?)?.toDouble() ?? 0,
           sinistra: (a['sinistra'] as num?)?.toDouble() ?? 0,
+          destra: (a['destra'] as num?)?.toDouble() ?? 0,
         );
         _regia3d?.comandi();
       case 'dalla3d':
@@ -664,11 +665,12 @@ class PonteAuto {
    * e per questa sessione ci resta. */
   Regia3d? _regia3d;
   var _treDNonVa = false;
-  ({bool notte, VistaMappa vista, double sopra, double sinistra}) _stato3d = (
+  ({bool notte, VistaMappa vista, double sopra, double sinistra, double destra}) _stato3d = (
     notte: false,
     vista: VistaMappa.inclinata,
     sopra: 0,
     sinistra: 0,
+    destra: 0,
   );
 
   void _vuoi3d() => _manda('web3d_vuoi', {'si': _aspetto3d && !_treDNonVa});
@@ -687,7 +689,7 @@ class PonteAuto {
     manda: (m) => _manda('web3d', {'js': chiamata3d(m)}),
     notte: () => _stato3d.notte,
     vista: () => _stato3d.vista,
-    inquadratura: () => (libera: false, sopra: _stato3d.sopra, sinistra: _stato3d.sinistra),
+    inquadratura: () => (libera: false, sopra: _stato3d.sopra, sinistra: _stato3d.sinistra, destra: _stato3d.destra),
     onNonVa: (motivo, {required ricorda}) {
       _treDNonVa = true;
       _regia3d?.ferma();

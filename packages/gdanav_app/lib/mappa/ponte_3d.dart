@@ -163,12 +163,14 @@ Map<String, Object?> msgCamera(
   ModoCamera3d modo, {
   double sopra = 0,
   double sinistra = 0,
+  double destra = 0,
   double? pitch,
   (Punto, Punto)? riquadro,
 }) => _m('camera', {
   'modo': modo.name,
   'sopra': sopra,
   if (sinistra > 0) 'sinistra': sinistra,
+  if (destra > 0) 'destra': destra,
   'pitch': ?pitch,
   if (riquadro case (final so, final ne)?) 'riquadro': [so.lat, so.lon, ne.lat, ne.lon],
 });

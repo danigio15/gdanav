@@ -175,6 +175,9 @@ void main() {
       // Di traverso il cruscotto copre la sinistra: la pagina sposta l'auto.
       expect(msgCamera(ModoCamera3d.segui, sinistra: 435)['sinistra'], 435);
       expect(msgCamera(ModoCamera3d.segui).containsKey('sinistra'), isFalse);
+      // Lo schermo diviso: l'altra app copre la destra.
+      expect(msgCamera(ModoCamera3d.segui, destra: 300)['destra'], 300);
+      expect(msgCamera(ModoCamera3d.segui).containsKey('destra'), isFalse);
       final c = ControlloMappa();
       var avvisi = 0;
       c.addListener(() => avvisi++);

@@ -51,7 +51,7 @@ const S = {
   risparmio: null,
   posizione: null,
   zoomVoluto: null,
-  camera: { modo: 'segui', sopra: 0, sinistra: 0, riquadro: null },
+  camera: { modo: 'segui', sopra: 0, sinistra: 0, destra: 0, riquadro: null },
   pausa: false,
   grezze: new Map(),
   /** Gli edifici di Overture dall'app, per tessera: `{dati, quando}` (dati null: non ci sono). */
@@ -224,7 +224,7 @@ const GESTORI = {
   },
   camera(m) {
     const prima = S.camera.modo;
-    S.camera = { modo: m.modo, sopra: m.sopra ?? S.camera.sopra, sinistra: m.sinistra ?? S.camera.sinistra ?? 0, pitch: m.pitch ?? null, riquadro: m.riquadro ?? null };
+    S.camera = { modo: m.modo, sopra: m.sopra ?? S.camera.sopra, sinistra: m.sinistra ?? 0, destra: m.destra ?? 0, pitch: m.pitch ?? null, riquadro: m.riquadro ?? null };
     if (m.modo === 'segui' && prima !== 'segui') S.transizione = { da: performance.now(), dur: 900, partenza: null };
     if (m.modo === 'panoramica' && m.riquadro && S.mappa) {
       const [s, o, n, e] = m.riquadro;
@@ -1539,8 +1539,13 @@ function muovi(adesso, dt) {
     // Lo spazio delle schede, mai più di metà schermo: con misure sbagliate
     // (l'auto le dà in punti suoi) l'auto finiva in un angolo, lontana.
     const sopra = Math.min(H * 0.12 + S.camera.sopra * 0.8, H * 0.5);
+    // In larghezza l'auto sta in mezzo alla parte libera: a sinistra il
+    // cruscotto di traverso sul telefono, a destra l'altra app dello schermo
+    // diviso sull'auto («la navigazione si nasconde sotto l'altro pezzo di
+    // schermo»).
     const sinistra = Math.min(S.camera.sinistra ?? 0, W * 0.45);
-    let voluta = { center: [lon, lat], zoom: c.zoom, pitch: c.pitch, bearing: c.rotta, padding: { top: sopra, bottom: 0, left: sinistra, right: 0 } };
+    const destra = Math.min(S.camera.destra ?? 0, W * 0.45);
+    let voluta = { center: [lon, lat], zoom: c.zoom, pitch: c.pitch, bearing: c.rotta, padding: { top: sopra, bottom: 0, left: sinistra, right: destra } };
     const tr = S.transizione;
     if (tr) {
       tr.partenza ??= { center: m.getCenter().toArray(), zoom: m.getZoom(), pitch: m.getPitch(), bearing: m.getBearing() };
