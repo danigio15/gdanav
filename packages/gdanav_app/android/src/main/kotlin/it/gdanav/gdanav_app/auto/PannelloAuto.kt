@@ -509,8 +509,11 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val basso = a.bottom - margine - sotto
         val barra = basso - alto
         if (barra < dp(90f)) return
-        val w = dp(10f)
-        val cx = a.right - margine - dp(14f)
+        /* «La linea del traffico è troppo sottile»: a dieci dp, sullo schermo
+         * dell'auto, era un filo azzurro sopra una mappa chiara. Più larga, e
+         * con un bordo scuro dietro che la stacca dalla mappa. */
+        val w = dp(18f)
+        val cx = a.right - margine - dp(20f)
         fun y(f: Float) = alto + barra * (1f - f)
         fun colore(livello: Int) = when {
             livello >= 4 -> Color.rgb(156, 163, 175)
@@ -519,15 +522,18 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         }
         val contorno = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = dp(1.5f)
+            strokeWidth = dp(2f)
             color = Color.WHITE
         }
-        pieno.color = Color.rgb(58, 176, 255)
         val tubo = RectF(cx - w / 2, alto, cx + w / 2, basso)
+        val bordo = RectF(tubo).apply { inset(-dp(3.5f), -dp(3.5f)) }
+        pieno.color = Color.argb(150, 15, 23, 42)
+        canvas.drawRoundRect(bordo, bordo.width() / 2, bordo.width() / 2, pieno)
+        pieno.color = Color.rgb(58, 176, 255)
         canvas.drawRoundRect(tubo, w / 2, w / 2, pieno)
         canvas.drawRoundRect(tubo, w / 2, w / 2, contorno)
         for (c in g.striscia) {
-            val r = RectF(cx - w / 2, y(c.a), cx + w / 2, max(y(c.da), y(c.a) + dp(5f)))
+            val r = RectF(cx - w / 2, y(c.a), cx + w / 2, max(y(c.da), y(c.a) + dp(9f)))
             pieno.color = colore(c.livello)
             canvas.drawRoundRect(r, w / 2, w / 2, pieno)
             canvas.drawRoundRect(r, w / 2, w / 2, contorno)
@@ -551,15 +557,15 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         }
         // In basso: l'auto.
         pieno.color = Color.rgb(58, 176, 255)
-        canvas.drawCircle(cx, basso + dp(14f), dp(10f), pieno)
-        contorno.strokeWidth = dp(2f)
-        canvas.drawCircle(cx, basso + dp(14f), dp(10f), contorno)
+        canvas.drawCircle(cx, basso + dp(16f), dp(13f), pieno)
+        contorno.strokeWidth = dp(2.5f)
+        canvas.drawCircle(cx, basso + dp(16f), dp(13f), contorno)
         pieno.color = Color.WHITE
         val punta = android.graphics.Path().apply {
             moveTo(cx, basso + dp(8f))
-            lineTo(cx + dp(5f), basso + dp(19f))
-            lineTo(cx, basso + dp(16f))
-            lineTo(cx - dp(5f), basso + dp(19f))
+            lineTo(cx + dp(6.5f), basso + dp(22f))
+            lineTo(cx, basso + dp(18f))
+            lineTo(cx - dp(6.5f), basso + dp(22f))
             close()
         }
         canvas.drawPath(punta, pieno)

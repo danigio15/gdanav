@@ -51,10 +51,16 @@ export const STILI_FACCIATA = Object.entries(VARIANTI_FACCIATA).flatMap(([s, n])
 /** Quanto sopra il terreno sta ogni classe di strada (per non litigare col suolo). */
 const SOPRA = { motorway: 0.24, trunk: 0.23, primary: 0.21, secondary: 0.2, tertiary: 0.18, minor: 0.16, service: 0.14, rail: 0.12 };
 
-/** I limiti di una tessera, per non chiedere troppo al telefono. */
+/** I limiti di una tessera, per non chiedere troppo al telefono.
+ *
+ * «Qui è pieno di case.» Una tessera di paese (Carinaro, 1631 edifici)
+ * ridotta ne teneva 736: le case piccole restavano fuori appena la tessera non
+ * era quella dell'auto. Con 100 000 ne entrano quasi tutte; il tetto di tutta
+ * la scena (`BUDGET.triangoli`) resta quello, e se non ci si sta si lasciano
+ * le tessere più lontane. */
 export const LIMITI = {
   pieno: { alberi: 1800, triangoliEdifici: 140000, lampioni: 400, margine: 450 },
-  ridotto: { alberi: 0, triangoliEdifici: 60000, lampioni: 0, margine: 250 },
+  ridotto: { alberi: 0, triangoliEdifici: 100000, lampioni: 0, margine: 250 },
 };
 
 const tipoDi = (f) =>
