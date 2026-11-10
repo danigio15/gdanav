@@ -198,6 +198,8 @@ void main() {
       expect(citta, 17.9);
       expect(zoom3d(VistaMappa.immersiva, velocitaStradaKmh: 50, allaProssimaM: 200), greaterThan(citta));
       expect(zoom3d(VistaMappa.inclinata, velocitaStradaKmh: 130, allaProssimaM: 20000), lessThan(citta));
+      // «In navigazione su autostrada lo zoom è troppo lontano»: al più mezzo livello.
+      expect(zoom3d(VistaMappa.inclinata, velocitaStradaKmh: 130, allaProssimaM: 20000), closeTo(citta - 0.5, 1e-9));
     });
   });
 

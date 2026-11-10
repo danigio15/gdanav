@@ -215,14 +215,17 @@ class PonteAuto {
       // l'auto (giorno o notte, la vista, quanto coprono le schede), e quello
       // che la pagina dice.
       case 'stato3d':
+        final zoomPrima = _stato3d.zoom;
         _stato3d = (
           notte: a['notte'] == true,
           vista: a['vista'] == 'immersiva' ? VistaMappa.immersiva : VistaMappa.inclinata,
           sopra: (a['sopra'] as num?)?.toDouble() ?? 0,
           sinistra: (a['sinistra'] as num?)?.toDouble() ?? 0,
           destra: (a['destra'] as num?)?.toDouble() ?? 0,
+          zoom: (a['zoom'] as num?)?.toDouble() ?? 0,
         );
         _regia3d?.comandi();
+        if (zoomPrima != _stato3d.zoom) _regia3d?.nuovoZoom();
       case 'dalla3d':
         (_regia3d ??= _nuovaRegia3d()).dallaMappa(a['testo'] as String? ?? '');
       case 'chiusa3d':
@@ -665,12 +668,13 @@ class PonteAuto {
    * e per questa sessione ci resta. */
   Regia3d? _regia3d;
   var _treDNonVa = false;
-  ({bool notte, VistaMappa vista, double sopra, double sinistra, double destra}) _stato3d = (
+  ({bool notte, VistaMappa vista, double sopra, double sinistra, double destra, double zoom}) _stato3d = (
     notte: false,
     vista: VistaMappa.inclinata,
     sopra: 0,
     sinistra: 0,
     destra: 0,
+    zoom: 0,
   );
 
   void _vuoi3d() => _manda('web3d_vuoi', {'si': _aspetto3d && !_treDNonVa});
@@ -702,6 +706,7 @@ class PonteAuto {
     persone: persone,
     orologio: _ora,
     piuVicina: piuVicina3dInAuto,
+    zoomScelto: () => _stato3d.zoom,
     inclinazione: inclinazione3dInAuto,
   )..avvia();
 

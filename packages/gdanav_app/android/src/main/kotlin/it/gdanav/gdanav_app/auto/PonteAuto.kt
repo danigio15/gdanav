@@ -804,12 +804,20 @@ object PonteAuto {
     fun dalla3d(testo: String) = principale.post { canale?.invokeMethod("dalla3d", mapOf("testo" to testo)) }
 
     /** Come la vede l'auto: giorno o notte, la vista, quanto coprono le schede (in punti). */
-    fun stato3d(notte: Boolean, vista: String, sopra: Double, sinistra: Double, destra: Double) = principale.post {
-        canale?.invokeMethod(
-            "stato3d",
-            mapOf("notte" to notte, "vista" to vista, "sopra" to sopra, "sinistra" to sinistra, "destra" to destra),
-        )
-    }
+    fun stato3d(notte: Boolean, vista: String, sopra: Double, sinistra: Double, destra: Double, zoom: Double) =
+        principale.post {
+            canale?.invokeMethod(
+                "stato3d",
+                mapOf(
+                    "notte" to notte,
+                    "vista" to vista,
+                    "sopra" to sopra,
+                    "sinistra" to sinistra,
+                    "destra" to destra,
+                    "zoom" to zoom,
+                ),
+            )
+        }
 
     /** La scena 3D è chiusa: la regia sul telefono smette. */
     fun chiusa3d() = principale.post { canale?.invokeMethod("chiusa3d", null) }

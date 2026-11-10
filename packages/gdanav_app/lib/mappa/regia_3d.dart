@@ -57,6 +57,7 @@ class Regia3d {
     this.orologio,
     this.attesa = const Duration(seconds: 15),
     this.piuVicina = 0,
+    this.zoomScelto,
     this.inclinazione,
     Future<Uint8List?> Function(int z, int x, int y)? edifici,
   }) : edifici = edifici ?? GestoreEdifici.attuale?.tessera;
@@ -99,6 +100,17 @@ class Regia3d {
   /// largo e basso: allo zoom del telefono l'auto era piccola, lontana, e la
   /// scena piatta («lo zoom troppo lontano e piatto»).
   final double piuVicina;
+
+  /// Lo zoom scelto da chi guida (i tasti, le dita), in livelli in più o in
+  /// meno: sull'auto la scena 3D non ha altro modo di saperlo.
+  final double Function()? zoomScelto;
+
+  /// Lo zoom scelto è cambiato: la posizione si rimanda subito, con lui.
+  void nuovoZoom() {
+    _letturaMandata = null;
+    _lettaMandata = null;
+    dallaGuida();
+  }
 
   /// L'inclinazione della telecamera, in gradi; `null`: quella della vista.
   /// Sull'auto più dall'alto: «voglio vederla un po' più dall'alto».
@@ -363,7 +375,8 @@ class Regia3d {
               velocitaStradaKmh: a?.velocitaStradaKmh ?? 0,
               allaProssimaM: a == null ? 0 : (a.prossima == null ? a.restantiM : a.allaProssimaM),
             ) +
-            piuVicina,
+            piuVicina +
+            (zoomScelto?.call() ?? 0),
         // La stima è già portata ad adesso (`metriStimati`).
         quando: _ora(),
         lettura: g.letturaSulPercorso,

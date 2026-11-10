@@ -104,6 +104,20 @@ class RendererMappa(
      */
     private var scartoLibero = preferenze.getFloat("auto_zoom_libero_scarto", 0f).toDouble()
 
+    /**
+     * Lo zoom scelto per la scena 3D, in livelli rispetto al suo: «nella
+     * modalità immersiva lo zoom non funziona per niente». Con la scena 3D i
+     * tasti + e − e le dita muovevano la mappa di sotto, che non si vede; lo
+     * zoom della scena lo decide la regia sul telefono, e ora le arriva questo.
+     */
+    private var scarto3d = preferenze.getFloat("auto_zoom_3d_scarto", 0f).toDouble()
+
+    private fun cambiaScarto3d(passo: Double) {
+        scarto3d = (scarto3d + passo).coerceIn(SCARTO_3D_MIN, SCARTO_3D_MAX)
+        preferenze.edit().putFloat("auto_zoom_3d_scarto", scarto3d.toFloat()).apply()
+        diciLoStato3d()
+    }
+
     private val torna = Runnable { segui() }
 
     override fun onSurfaceAvailable(contenitore: SurfaceContainer) {
@@ -353,12 +367,16 @@ class RendererMappa(
     }
 
     override fun onScale(focusX: Float, focusY: Float, scaleFactor: Float) {
-        // Con la scena 3D la mappa sotto non si sposta: la scena segue l'auto.
-        if (scena != null) return
-        val m = mappa ?: return
         // Il doppio tocco arriva con un fattore negativo: si ingrandisce di uno.
         val passo = if (scaleFactor <= 0f) 1.0 else ln(scaleFactor.toDouble()) / ln(2.0)
         if (passo == 0.0) return
+        // Con la scena 3D la mappa sotto non si sposta (la scena segue
+        // l'auto), ma lo zoom sì: lo cambia la scena.
+        if (scena != null) {
+            cambiaScarto3d(passo)
+            return
+        }
+        val m = mappa ?: return
         liberaPerUnPo()
         if (focusX < 0 || focusY < 0) {
             m.moveCamera(CameraUpdateFactory.zoomBy(passo))
@@ -369,6 +387,11 @@ class RendererMappa(
 
     /** I tasti + e −: seguendo l'auto cambiano lo zoom (in guida, o lo scarto senza percorso), e si ricorda. */
     fun zoom(passo: Double) {
+        // Nella scena 3D un tasto è mezzo livello: un livello intero era un salto.
+        if (scena != null) {
+            cambiaScarto3d(passo / 2)
+            return
+        }
         val m = mappa ?: return
         if (libera) {
             liberaPerUnPo()
@@ -623,10 +646,10 @@ class RendererMappa(
         val sopra = (a.top / scala).toDouble()
         val sinistra = (c.left / scala).toDouble()
         val destra = ((larghezza - c.right).coerceAtLeast(0) / scala).toDouble()
-        val chiave = "$notte|$v|$sopra|$sinistra|$destra"
+        val chiave = "$notte|$v|$sopra|$sinistra|$destra|$scarto3d"
         if (chiave == stato3dDetto) return
         stato3dDetto = chiave
-        PonteAuto.stato3d(notte, v, sopra, sinistra, destra)
+        PonteAuto.stato3d(notte, v, sopra, sinistra, destra, scarto3d)
     }
 
     private val sorgentiCaricate = HashMap<String, String>()
@@ -1075,6 +1098,13 @@ class RendererMappa(
         private const val INIZIO_SVOLTA_M = 600.0
         private const val VICINO_SVOLTA_M = 150.0
 
+        /** Di quanti livelli al più si allontana la mappa su una strada veloce. */
+        private const val ZOOM_LONTANO_AL_PIU = 0.5
+
+        /** Quanto i tasti e le dita spostano lo zoom della scena 3D. */
+        private const val SCARTO_3D_MIN = -2.0
+        private const val SCARTO_3D_MAX = 1.5
+
         /** Il cerchio intorno al punto della scheda aperta (`stile.dart`). */
         private const val SORGENTE_EVIDENZA = "gdanav-evidenza"
         private val NOMI_SEGNAPOSTO = listOf("freccia", "auto_blu", "auto_bianca", "auto_rossa", "auto_nera", "auto_grigia")
@@ -1144,7 +1174,9 @@ class RendererMappa(
             }
             val v = morbido((kmh - 50.0) / (95.0 - 50.0))
             val d = if (allaProssimaM.isFinite()) morbido((allaProssimaM - 800.0) / (2500.0 - 800.0)) else 1.0
-            return -1.0 * v * d
+            // Come zoomLontanoInGuida nel motore: mezzo livello al più
+            // («in autostrada lo zoom è troppo lontano»).
+            return -ZOOM_LONTANO_AL_PIU * v * d
         }
 
         private fun zoomInSvolta(g: PonteAuto.Guida?): Double {
