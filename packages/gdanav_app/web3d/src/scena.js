@@ -842,7 +842,16 @@ export class Scena {
     }
     const nastro = (frammento, uniformi, extra = {}) =>
       new THREE.ShaderMaterial({ uniforms: uniformi, vertexShader: VERTICE_NASTRO, fragmentShader: frammento, transparent: true, depthWrite: false, ...extra });
-    m.percorso = nastro(FRAMMENTO_NASTRO, this.uniformiPercorso, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+    /* Le linee sulla strada: spinte verso la telecamera di poco e sempre di
+     * quel poco (`polygonOffsetUnits`), non di più quando la strada si vede
+     * di sbieco (`polygonOffsetFactor`, a zero). «Guarda sotto il ponte,
+     * continua il glitch»: con la vista inclinata dell'auto la spinta che
+     * cresce con l'inclinazione bastava a portare il percorso, la strada
+     * fatta e le code davanti a un ponte basso che ci passa sopra, e cambiando
+     * l'angolo cambiava chi vinceva — la linea compariva e spariva
+     * sull'impalcato. Sull'asfalto in piano non cambia niente: lì basta la
+     * spinta fissa, e le linee stanno già qualche centimetro sopra. */
+    m.percorso = nastro(FRAMMENTO_NASTRO, this.uniformiPercorso, { polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -4 });
     // Spinto verso la telecamera: compare solo dove qualcosa sta davvero
     // davanti (un ponte, un palazzo). A pari con l'asfalto lì sotto il
     // confronto di profondità vinceva e perdeva a chiazze: l'«effetto glitch»
@@ -858,11 +867,11 @@ export class Scena {
     m.alone = nastro(FRAMMENTO_ALONE, this.uniformiPercorso, { blending: notte ? THREE.AdditiveBlending : THREE.NormalBlending });
     m.freccia = nastro(FRAMMENTO_FRECCIA, {}, { polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
     m.punta = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false });
-    m.risparmio = nastro(FRAMMENTO_NASTRO, this.uniformiRisparmio, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -3 });
+    m.risparmio = nastro(FRAMMENTO_NASTRO, this.uniformiRisparmio, { polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -3 });
     // La strada già fatta: un blu più tenue e stretto, senza frecce, sotto il
     // percorso (come `percorso-fatto` sulla mappa piatta).
-    m.fatto = nastro(FRAMMENTO_NASTRO, this.uniformiFatto, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
-    m.traffico = nastro(FRAMMENTO_CODA, { uNotte: { value: notte ? 1 : 0 } }, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+    m.fatto = nastro(FRAMMENTO_NASTRO, this.uniformiFatto, { polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 });
+    m.traffico = nastro(FRAMMENTO_CODA, { uNotte: { value: notte ? 1 : 0 } }, { polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 });
     return m;
   }
 
