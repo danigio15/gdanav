@@ -175,6 +175,10 @@ class Guida {
   final double anticipaDaM;
   final double anticipoGradi;
 
+  /// Sotto questa velocità (m/s, quella del GPS) la mappa non guarda avanti:
+  /// si è fermi, e guarda la strada su cui si è.
+  static const fermoPerLaMappaMs = 1.5;
+
   /* Quanto vicini alla linea per posare il segnaposto sulla strada, e quanto
    * lontani per toglierlo.
    *
@@ -346,7 +350,13 @@ class Guida {
       /* La telecamera guarda avanti anche da fuori percorso — e' da li' che
        * si vede dove si sarebbe dovuti andare — ma sempre restando appesa
        * alla strada che si sta percorrendo: vedi _rottaAvanti. */
-      rottaMappa: _rottaAvanti(_punto(i, p.t), percorsi, prossima == null ? null : alla, _rotta(i)),
+      /* Da fermi la mappa guarda la strada su cui si è: «alle svolte, se sto
+       * fermo, lui ha già girato». Fermi davanti a un incrocio, guardare
+       * oltre la manovra ruotava la mappa verso la strada dopo, e sembrava
+       * di aver già svoltato. Andando si guarda avanti come sempre. */
+      rottaMappa: qui is PuntoInMoto && (qui.velocitaMs ?? double.infinity) < fermoPerLaMappaMs
+          ? (_agganciato ? _rotta(i) : null)
+          : _rottaAvanti(_punto(i, p.t), percorsi, prossima == null ? null : alla, _rotta(i)),
       // In fondo a un segmento si è già all'inizio del prossimo.
       limiteKmh: percorso.limiteSul(p.t > 0.999 ? i + 1 : i),
       daDire: arrivato ? _una('arrivo', 'Sei arrivato.') : _annuncio(prossima, alla),

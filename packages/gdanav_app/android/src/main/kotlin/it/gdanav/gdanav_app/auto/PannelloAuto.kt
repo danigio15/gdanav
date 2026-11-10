@@ -531,6 +531,12 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         canvas.drawRoundRect(bordo, bordo.width() / 2, bordo.width() / 2, pieno)
         pieno.color = Color.rgb(58, 176, 255)
         canvas.drawRoundRect(tubo, w / 2, w / 2, pieno)
+        // Il viaggio già fatto, in grigio: da lì in su la strada che resta.
+        val qui = y(g.strisciaQui)
+        if (g.strisciaQui > 0f) {
+            pieno.color = Color.rgb(148, 163, 184)
+            canvas.drawRoundRect(RectF(cx - w / 2, qui, cx + w / 2, basso), w / 2, w / 2, pieno)
+        }
         canvas.drawRoundRect(tubo, w / 2, w / 2, contorno)
         for (c in g.striscia) {
             val r = RectF(cx - w / 2, y(c.a), cx + w / 2, max(y(c.da), y(c.a) + dp(9f)))
@@ -555,17 +561,20 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
                 canvas.drawRect(x0, y0, x0 + q, y0 + q, pieno)
             }
         }
-        // In basso: l'auto.
+        /* L'auto, sulla striscia dove si è: «la linea del traffico laterale
+         * non fa vedere dove mi trovo io». Prima stava sempre sotto, in
+         * fondo; adesso sale col viaggio, e dentro una coda ci sta sopra. */
+        val ay = if (g.strisciaQui > 0f) qui else basso + dp(16f)
         pieno.color = Color.rgb(58, 176, 255)
-        canvas.drawCircle(cx, basso + dp(16f), dp(13f), pieno)
+        canvas.drawCircle(cx, ay, dp(13f), pieno)
         contorno.strokeWidth = dp(2.5f)
-        canvas.drawCircle(cx, basso + dp(16f), dp(13f), contorno)
+        canvas.drawCircle(cx, ay, dp(13f), contorno)
         pieno.color = Color.WHITE
         val punta = android.graphics.Path().apply {
-            moveTo(cx, basso + dp(8f))
-            lineTo(cx + dp(6.5f), basso + dp(22f))
-            lineTo(cx, basso + dp(18f))
-            lineTo(cx - dp(6.5f), basso + dp(22f))
+            moveTo(cx, ay - dp(8f))
+            lineTo(cx + dp(6.5f), ay + dp(6f))
+            lineTo(cx, ay + dp(2f))
+            lineTo(cx - dp(6.5f), ay + dp(6f))
             close()
         }
         canvas.drawPath(punta, pieno)

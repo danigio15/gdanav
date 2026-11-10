@@ -32,6 +32,10 @@ const RECUPERO_S = 0.9;
 const VELOCITA_IN_PIU = 8;
 /** Quanto può restare avanti la freccia ferma, senza tornare indietro (m). */
 const AVANTI_TOLLERATO_M = 3;
+/** Sotto questa velocità la freccia non passa una svolta prima del GPS (m/s). */
+const PIANO_MS = 3;
+/** Una svolta è passata quando il GPS è oltre l'angolo di tanto (m). */
+const SVOLTA_PASSATA_M = 2;
 /** Quanto morbidamente cambia la velocità della freccia (ms). */
 const TAU_VELOCITA = 220;
 
@@ -42,6 +46,10 @@ export class Moto {
     this.tau = tau;
     this.filtro = new FiltroSullaStrada();
     this.colFiltro = false;
+    /** I metri delle svolte strette del percorso ([svolteDi]). */
+    this.svolte = [];
+    /** I metri dell'ultima lettura del GPS così com'era (o la stima, senza). */
+    this.ultimoFix = null;
     this.lettura = null;
     this.s = null;
     this.x = null;
@@ -71,6 +79,8 @@ export class Moto {
     this.colFiltro = metri !== null && lettura !== null && Number.isFinite(lettura?.metri);
     if (this.colFiltro) this.filtro.misura(lettura, adesso);
     else this.filtro.reset();
+    this.ultimoFix = this.colFiltro ? lettura.metri : metri;
+    this.vFix = this.colFiltro && Number.isFinite(lettura.v) ? lettura.v : v || 0;
     const prima = this.lettura;
     const vel = Math.max(0, v || 0);
     // Frenando, il punto portato avanti con la velocità di adesso va oltre
@@ -103,8 +113,14 @@ export class Moto {
     this.ultimo = adesso;
     if (!v) return null;
     if (v.s !== undefined && this.colFiltro) {
-      const s = this.filtro.passo(adesso);
+      let s = this.filtro.passo(adesso);
       if (s !== null) {
+        const fino = this.primaDellaSvolta(s);
+        if (s > fino) {
+          s = fino;
+          this.filtro.mostrato = s;
+          this.filtro.velMostrata = Math.min(this.filtro.velMostrata, 0);
+        }
         this.s = s;
         return { s };
       }
@@ -134,6 +150,7 @@ export class Moto {
       // Solo oltre [AVANTI_TOLLERATO_M]: da fermi il GPS balla di qualche
       // metro, e una freccia che va avanti e indietro al semaforo è peggio.
       if (lv < 1.5 && v.s < this.s - AVANTI_TOLLERATO_M) this.s = smorza(this.s, v.s + AVANTI_TOLLERATO_M, dt, 1200);
+      this.s = Math.min(this.s, this.primaDellaSvolta(this.s));
       return { s: this.s };
     }
     if (this.x === null || Math.hypot(v.x - this.x, v.y - this.y) > 150) {
@@ -148,6 +165,35 @@ export class Moto {
     return { x: this.x, y: this.y, rotta: this.rotta };
   }
 
+  /**
+   * Fin dove può arrivare la freccia, adesso.
+   *
+   * «Alle svolte, se sto fermo, lui ha già girato.» Fermi o quasi davanti a
+   * un incrocio, una stima un po' avanti — o il GPS che balla e si aggancia
+   * alla strada dopo l'angolo — faceva girare la freccia prima dell'auto. Da
+   * piano (sotto [PIANO_MS]) la freccia non passa una svolta stretta finché
+   * una lettura del GPS non dice che l'auto l'ha passata davvero: si ferma
+   * un metro prima dell'angolo e aspetta. Andando non si tiene: a quella
+   * velocità la svolta la si fa, e fermare la freccia la farebbe restare
+   * indietro.
+   */
+  primaDellaSvolta(s) {
+    if (this.ultimoFix === null || !this.svolte.length) return Infinity;
+    const vel = Math.max(this.vFix ?? 0, this.colFiltro ? this.filtro.velocita : 0);
+    if (vel >= PIANO_MS) return Infinity;
+    for (const svolta of this.svolte) {
+      if (svolta <= this.ultimoFix + SVOLTA_PASSATA_M) continue;
+      return s > svolta - 1 ? svolta - 1 : Infinity;
+    }
+    return Infinity;
+  }
+
+  /** Quanto si va, secondo quello che si disegna (m/s). */
+  get velocita() {
+    if (this.colFiltro) return Math.max(0, this.filtro.velMostrata ?? 0);
+    return Math.max(0, this.vel ?? this.lettura?.v ?? 0);
+  }
+
   /** Ferma e arrivata: niente fotogrammi fino alla lettura dopo. */
   get fermo() {
     const l = this.lettura;
@@ -156,4 +202,32 @@ export class Moto {
     if (l.metri !== null) return this.s !== null && Math.abs(l.metri - this.s) < 0.05;
     return this.x !== null && Math.hypot(l.x - this.x, l.y - this.y) < 0.05;
   }
+}
+
+/**
+ * I metri delle svolte strette di [linea] (`Linea` di percorso.js): dove la
+ * strada gira di più di [gradi] fra gli otto metri prima e gli otto dopo.
+ * Una curva lunga non è una svolta: lì la strada gira piano.
+ */
+export function svolteDi(linea, gradi = 40) {
+  const out = [];
+  if (!linea || linea.lunghezza < 20) return out;
+  const soglia = (gradi * Math.PI) / 180;
+  const angolo = (u, w) => Math.abs(Math.atan2(Math.sin(w - u), Math.cos(w - u)));
+  for (let i = 1; i < linea.s.length - 1; i++) {
+    const m = linea.s[i];
+    if (m < 8 || m > linea.lunghezza - 8) continue;
+    const [ax, ay] = linea.a(m - 8);
+    const [bx, by] = linea.a(m);
+    const [cx, cy] = linea.a(m + 8);
+    const g = angolo(Math.atan2(by - ay, bx - ax), Math.atan2(cy - by, cx - bx));
+    if (g < soglia) continue;
+    const ultima = out[out.length - 1];
+    if (ultima && m - ultima.m < 15) {
+      if (g > ultima.g) out[out.length - 1] = { m, g };
+    } else {
+      out.push({ m, g });
+    }
+  }
+  return out.map((x) => x.m);
 }

@@ -222,6 +222,19 @@ void main() {
     expect(gira, closeTo(-25, 1));
   });
 
+  test('fermi davanti al bivio la mappa guarda la strada su cui si e\'', () {
+    // «Alle svolte, se sto fermo, lui ha già girato.»
+    final percorso = rampa();
+    final g = Guida(percorso);
+    g.aggiorna(percorso.punti[20]);
+    final p = percorso.punti[27];
+    final fermo = g.aggiorna(PuntoInMoto(p.lat, p.lon, velocitaMs: 0.2));
+    expect(giroDi(fermo.rottaMappa), closeTo(0, 1));
+    // Ripartendo, sbircia di nuovo.
+    final andando = g.aggiorna(PuntoInMoto(p.lat, p.lon, velocitaMs: 6));
+    expect(giroDi(andando.rottaMappa), closeTo(-25, 1));
+  });
+
   test('il tetto si puo\' spostare: a novanta gradi la mappa guarda dove guardava prima', () {
     final percorso = rampa();
     final g = Guida(percorso, anticipoGradi: 90);

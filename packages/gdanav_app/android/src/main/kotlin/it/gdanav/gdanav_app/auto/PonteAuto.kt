@@ -54,9 +54,11 @@ object PonteAuto {
         val striscia: List<CodaInStriscia> = emptyList(),
         /** Il viaggio va oltre la cima della striscia: in cima niente bandiera. */
         val strisciaTagliata: Boolean = false,
+        /** Dove si è sulla striscia, da 0 (in fondo) a 1 (la meta): il viaggio fatto fin qui. */
+        val strisciaQui: Float = 0f,
     )
 
-    /** Una coda sulla striscia: da 0 (l'auto) a 1 (la cima), coi minuti e «12 km» o «ci sei». */
+    /** Una coda sulla striscia: da 0 (in fondo) a 1 (la cima), coi minuti e «12 km» o «ci sei». */
     data class CodaInStriscia(val da: Float, val a: Float, val livello: Int, val minuti: Int, val sotto: String)
 
     /** Una corsia prima dello svincolo: le frecce, se è giusta, quale seguire. */
@@ -497,6 +499,8 @@ object PonteAuto {
                                 )
                             },
                         strisciaTagliata = (call.argument<Map<String, Any?>>("striscia"))?.get("tagliata") == true,
+                        strisciaQui = ((call.argument<Map<String, Any?>>("striscia"))?.get("qui") as? Number)
+                            ?.toFloat()?.coerceIn(0f, 1f) ?: 0f,
                     )
                 } else {
                     null

@@ -1209,7 +1209,8 @@ class PonteAuto {
       // Quanti minuti dell'arrivo sono traffico: l'auto colora il tempo
       // che resta (arancio, rosso da dieci minuti). Zero: niente colore.
       'traffico_minuti': minutiDiTraffico,
-      if (striscia != null && striscia.code.isNotEmpty) 'striscia': datiStriscia(striscia),
+      if (striscia != null && striscia.code.isNotEmpty)
+        'striscia': datiStriscia(striscia, percorsiM: a?.percorsiM ?? 0, lunghezzaM: p.viaggio.percorso.lunghezzaM),
       'destinazione': p.destinazione.nome,
       // Dove si arriva: CarPlay vuole il viaggio con partenza e arrivo.
       'destinazione_lat': p.destinazione.posizione.lat,
@@ -1465,16 +1466,29 @@ String iconaSullAuto(Segnaposto s, {required bool aspetto3d}) => s.immagine;
 /// La striscia del traffico per l'auto: le code dal basso (l'auto, 0) verso
 /// l'alto (la meta, o la cima se il viaggio è più lungo, 1), coi minuti e
 /// quanto mancano, già scritti come sul telefono.
-Map<String, Object> datiStriscia(StrisciaTraffico s) => {
-  'tagliata': s.tagliata,
-  'code': [
-    for (final c in s.code)
-      {
-        'da': c.da,
-        'a': c.a,
-        'livello': c.livello,
-        'minuti': c.minuti,
-        'sotto': c.dentro ? 'ci sei' : distanzaBreve(c.distanzaM),
-      },
-  ],
-};
+///
+/// «La linea del traffico laterale non fa vedere dove mi trovo io.» La
+/// striscia era la strada che resta, con l'auto sempre in fondo: non si
+/// vedeva a che punto del viaggio si è, né dove si è dentro una coda. Adesso,
+/// quando il viaggio ci sta tutto ([StrisciaTraffico.tagliata] no), la
+/// striscia è il viaggio intero, dalla partenza (0) all'arrivo (1): `qui` è
+/// dove si è, e le code stanno al loro posto sul viaggio. Un viaggio più
+/// lungo della striscia resta com'era: l'auto in fondo (`qui` 0).
+Map<String, Object> datiStriscia(StrisciaTraffico s, {double percorsiM = 0, double lunghezzaM = 0}) {
+  final qui = !s.tagliata && lunghezzaM > 0 ? (percorsiM / lunghezzaM).clamp(0.0, 1.0) : 0.0;
+  double sulViaggio(double f) => qui + f * (1 - qui);
+  return {
+    'tagliata': s.tagliata,
+    'qui': qui,
+    'code': [
+      for (final c in s.code)
+        {
+          'da': sulViaggio(c.da),
+          'a': sulViaggio(c.a),
+          'livello': c.livello,
+          'minuti': c.minuti,
+          'sotto': c.dentro ? 'ci sei' : distanzaBreve(c.distanzaM),
+        },
+    ],
+  };
+}

@@ -11,7 +11,7 @@ import { BUDGET, daDisegnare, pianoTessere } from './budget.js';
 import { valutaPrestazioni, valutaWebgl } from './capacita.js';
 import { chiave as chiaveTessera, daChiave, mercPerMetro, latDaMerc } from './geo.js';
 import { codeOrdinate, decodifica } from './messaggi.js';
-import { angoloVerso, Moto, smorza } from './moto.js';
+import { angoloVerso, Moto, smorza, svolteDi } from './moto.js';
 import { IndiceSegmenti, Linea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote } from './percorso.js';
 import { BIT_OMBRA, Scena } from './scena.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
@@ -166,6 +166,7 @@ const GESTORI = {
       if (quale !== S.qualePercorso) moto.nuovoPercorso();
       S.qualePercorso = quale;
       S.percorso = { lonlat: m.punti, metri: m.metri ?? null, linea: lineaDi(m.punti, m.metri), code: codeOrdinate(m.code), profilo: null, da: null };
+      moto.svolte = svolteDi(S.percorso.linea);
     }
     S.sporco.profilo = true;
     sveglia();
@@ -1405,11 +1406,23 @@ function muovi(adesso, dt) {
     }
     const q = (v) => (prof && v >= prof.s0 && v <= prof.s1 ? prof.quota(v) : 0);
     z = q(s);
-    dir = p.linea.direzione(s, 4);
+    // La strada su cui si sta, non quella dove si andrà: da cinque metri
+    // dietro a uno avanti. Centrata, la freccia girava prima dell'angolo.
+    const [dx0, dy0] = p.linea.a(s - 5);
+    const [dx1, dy1] = p.linea.a(s + 1);
+    // All'inizio e in fondo al percorso i due punti si toccano: lì la direzione di sempre.
+    dir = Math.hypot(dx1 - dx0, dy1 - dy0) > 0.5 ? Math.atan2(dy1 - dy0, dx1 - dx0) : p.linea.direzione(s, 4);
     const pendenza = Math.atan2(q(s + 3) - q(s - 3), 6);
     scena.mettiAuto(x, y, z, dir, pendenza);
-    // La mappa guarda un poco avanti: in curva la strada che arriva resta in vista.
-    rottaCamera = 90 - (p.linea.direzione(s + 20, 26) * 180) / Math.PI;
+    // La mappa guarda un poco avanti: in curva la strada che arriva resta in
+    // vista. Quanto avanti lo dice la velocità — un secondo e mezzo di
+    // strada, al più venti metri — e da fermi niente: fermi davanti a una
+    // svolta la mappa girava già sulla strada dopo, venti metri più in là.
+    const avanti = Math.min(20, Math.max(0, moto.velocita * 1.5));
+    const [cx0, cy0] = p.linea.a(s - 6);
+    const [cx1, cy1] = p.linea.a(s + 1 + 2 * avanti);
+    const versoCamera = Math.hypot(cx1 - cx0, cy1 - cy0) > 0.5 ? Math.atan2(cy1 - cy0, cx1 - cx0) : dir;
+    rottaCamera = 90 - (versoCamera * 180) / Math.PI;
     S.auto = { x, y, z, s };
     if (scena.mat.percorso) scena.uniformiPercorso.uInizio.value = s + 1.5;
     // Il fantasma comincia oltre il muso dell'auto (lunga nove metri, in scala).
