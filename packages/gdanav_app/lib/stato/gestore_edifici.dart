@@ -23,6 +23,12 @@ import '../sorgenti/pmtiles.dart';
 /// volta, su una rete che non si paga a consumo, e poi si legge dal telefono:
 /// nessun server da chiamare a ogni tessera, e va anche senza rete. Finché
 /// non c'è, la scena usa gli edifici di sempre.
+///
+/// Ogni mese il pacchetto si rifà con l'ultimo rilascio di Overture. Ognuno
+/// sul telefono si ricorda da che versione viene (un file accanto, `.versione`):
+/// quando l'indice ne dice un'altra, lo si riscarica alle stesse condizioni, e
+/// intanto la scena continua con quello di prima finché il nuovo non è
+/// arrivato intero.
 class GestoreEdifici {
   GestoreEdifici({
     http.Client? client,
@@ -30,6 +36,7 @@ class GestoreEdifici {
     Future<bool> Function()? aConsumo,
     Uri? base,
     this.indiceValido = const Duration(days: 1),
+    this.riprovaIndice = const Duration(minutes: 5),
   }) : _http = client ?? http.Client(),
        _cartellaDi = cartella ?? (() async => Directory('${(await getApplicationSupportDirectory()).path}/edifici')),
        _aConsumo = aConsumo ?? reteAConsumo,
@@ -56,8 +63,19 @@ class GestoreEdifici {
 
   /// Gli scaricamenti in corso: chi chiede la stessa cella aspetta quello.
   final _inArrivo = <String, Future<bool>>{};
-  Map<String, int>? _indice;
+  Map<String, VocePacchetto>? _indice;
   DateTime? _indiceLetto;
+
+  /// L'ultima volta che si è chiesto l'indice, riuscita o no: senza rete non
+  /// lo si richiede a ogni tessera.
+  DateTime? _indiceChiesto;
+
+  /// Ogni quanto si riprova a leggere l'indice quando non è arrivato.
+  final Duration riprovaIndice;
+
+  /// Le celle già confrontate con l'indice di adesso: si riguardano quando
+  /// l'indice si rilegge (una volta al giorno), non a ogni tessera.
+  final _controllate = <String>{};
 
   /// La cella z8 che contiene la tessera [z]/[x]/[y] (z ≥ 8), come «8/x/y».
   static String cellaDi(int z, int x, int y) {
@@ -79,6 +97,8 @@ class GestoreEdifici {
         unawaited(scarica(cella));
         return null;
       }
+      // C'è: si guarda, una volta per indice, se ne è uscito uno più nuovo.
+      if (!_controllate.contains(cella) || _daRileggere) unawaited(scarica(cella));
       return await l.tessera(z, x, y);
     } catch (e) {
       debugPrint('edifici $cella: $e');
@@ -102,59 +122,114 @@ class GestoreEdifici {
     }
   }();
 
-  /// Scarica il pacchetto di [cella] se c'è nell'indice, non c'è già, e la
-  /// rete non si paga a consumo. Torna `true` se adesso c'è.
+  /// Scarica il pacchetto di [cella] se c'è nell'indice, la rete non si paga
+  /// a consumo, e sul telefono non c'è già (o c'è di una versione vecchia).
+  /// Torna `true` se adesso un pacchetto c'è.
   Future<bool> scarica(String cella) => _inArrivo[cella] ??= _scarica(cella).whenComplete(() {
     // Senza graffe tornerebbe il futuro tolto, cioè questo: si aspetterebbe da solo.
     _inArrivo.remove(cella);
   });
 
+  static File _fileVersione(File pacchetto) => File('${pacchetto.path}.versione');
+
   Future<bool> _scarica(String cella) async {
+    var presente = false;
     try {
       final dir = await _cartellaDi();
       final f = File('${dir.path}/${fileDi(cella)}');
-      if (await f.exists()) return true;
+      presente = await f.exists();
       final indice = await _leggiIndice();
-      final byte = indice?[cella];
-      if (byte == null) return false;
-      if (await _aConsumo()) return false;
+      _controllate.add(cella);
+      final voce = indice?[cella];
+      // Senza indice (niente rete) o senza la cella si tiene quello che c'è.
+      if (voce == null) return presente;
+      if (presente && await _aggiornato(f, voce)) return true;
+      if (await _aConsumo()) return presente;
       await dir.create(recursive: true);
       final mezzo = File('${f.path}.mezzo');
       final r = await _http.send(http.Request('GET', _base.resolve(fileDi(cella))));
-      if (r.statusCode != 200) return false;
+      if (r.statusCode != 200) return presente;
       final s = mezzo.openWrite();
       await r.stream.pipe(s);
-      if (await mezzo.length() != byte) {
+      if (await mezzo.length() != voce.byte) {
         await mezzo.delete();
-        return false;
+        return presente;
       }
+      // Il nuovo al posto del vecchio: chi legge il vecchio lo finisce (il
+      // file aperto resta suo), le tessere dopo vengono dal nuovo.
       await mezzo.rename(f.path);
-      _lettori.remove(cella);
+      await _fileVersione(f).writeAsString(voce.versione);
+      final vecchio = _lettori.remove(cella);
+      if (vecchio != null) unawaited(_chiudiPoi(vecchio));
       return true;
     } catch (e) {
       debugPrint('edifici: non scaricato $cella: $e');
-      return false;
+      return presente;
     }
   }
 
-  /// L'indice dei pacchetti: cella → byte. Si rilegge una volta al giorno.
-  Future<Map<String, int>?> _leggiIndice() async {
-    final letto = _indiceLetto;
-    if (_indice != null && letto != null && DateTime.now().difference(letto) < indiceValido) return _indice;
+  /// Se il pacchetto [f] sul telefono è quello che dice l'indice.
+  Future<bool> _aggiornato(File f, VocePacchetto voce) async {
+    final v = _fileVersione(f);
+    if (await v.exists()) return (await v.readAsString()).trim() == voce.versione;
+    // Scaricato prima che si segnasse la versione: se pesa uguale è lui.
+    if (await f.length() == voce.byte) {
+      await v.writeAsString(voce.versione);
+      return true;
+    }
+    return false;
+  }
+
+  /// Chiude un lettore sostituito, dopo che chi ci stava leggendo ha finito.
+  Future<void> _chiudiPoi(Future<LettorePmtiles?> lettore) async {
+    await Future<void>.delayed(const Duration(seconds: 10));
+    try {
+      await (await lettore)?.chiudi();
+    } catch (_) {}
+  }
+
+  /// Se è ora di rileggere l'indice: è vecchio, e non lo si è appena chiesto.
+  bool get _daRileggere {
+    final adesso = DateTime.now();
+    final letto = _indiceLetto, chiesto = _indiceChiesto;
+    if (letto != null && adesso.difference(letto) < indiceValido) return false;
+    return chiesto == null || adesso.difference(chiesto) >= riprovaIndice;
+  }
+
+  /// L'indice dei pacchetti: cella → byte e versione. Si rilegge una volta al
+  /// giorno; a ogni rilettura le celle si riconfrontano.
+  Future<Map<String, VocePacchetto>?> _leggiIndice() async {
+    if (!_daRileggere) return _indice;
+    _indiceChiesto = DateTime.now();
     try {
       final r = await _http.get(_base.resolve('indice.json')).timeout(const Duration(seconds: 20));
       if (r.statusCode != 200) return _indice;
       final j = jsonDecode(utf8.decode(r.bodyBytes));
       final celle = j is Map ? j['celle'] : null;
       if (celle is! Map) return _indice;
+      final rilascio = '${j['rilascio_overture'] ?? ''}';
       _indice = {
         for (final MapEntry(:key, :value) in celle.entries)
-          if (value is Map && value['byte'] is num) '$key': (value['byte'] as num).toInt(),
+          if (value is Map && value['byte'] is num)
+            '$key': VocePacchetto(
+              byte: (value['byte'] as num).toInt(),
+              // Il rilascio e il peso: un pacchetto rifatto con lo stesso
+              // rilascio ma diverso (lo strumento è cambiato) si riscarica.
+              versione: '$rilascio/${(value['byte'] as num).toInt()}',
+            ),
       };
       _indiceLetto = DateTime.now();
+      _controllate.clear();
     } catch (_) {}
     return _indice;
   }
+}
+
+/// Un pacchetto nell'indice: quanto pesa e di che versione è.
+class VocePacchetto {
+  const VocePacchetto({required this.byte, required this.versione});
+  final int byte;
+  final String versione;
 }
 
 /// Se la rete di adesso si paga a consumo (i dati del telefono, un hotspot).
