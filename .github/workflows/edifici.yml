@@ -71,6 +71,7 @@ jobs:
       - name: Il pacchetto della cella
         id: p
         run: |
+          set -o pipefail
           python strumenti/edifici/prepara.py --cella "${{ matrix.cella }}" --rilascio "${{ needs.celle.outputs.rilascio }}" --uscita pacchetti | tee esito.json
           echo "nome=$(echo '${{ matrix.cella }}' | tr / -)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
@@ -93,15 +94,19 @@ jobs:
       - name: L'indice dei pacchetti
         run: |
           mkdir -p uscita
-          find tutti -name '*.pmtiles' -exec mv {} uscita/ \;
+          # Solo i pacchetti veri: un file vuoto o rovinato la release lo rifiuta.
+          find tutti -name '*.pmtiles' -size +126c -exec mv {} uscita/ \;
           python3 - <<'PY'
           import json, glob, os
           voci = {}
           for f in glob.glob("tutti/*/esito.json"):
               for riga in open(f):
+                  if not riga.strip():
+                      continue
                   e = json.loads(riga)
                   nome = "edifici-" + e["cella"].replace("/", "-") + ".pmtiles"
-                  if os.path.exists("uscita/" + nome):
+                  p = "uscita/" + nome
+                  if os.path.exists(p) and open(p, "rb").read(8) == b"PMTiles\x03":
                       voci[e["cella"]] = {"file": nome, "byte": os.path.getsize("uscita/" + nome), "edifici": e["edifici"]}
           json.dump({"rilascio_overture": "${{ needs.celle.outputs.rilascio }}", "zoom_celle": 8, "celle": voci,
                      "attribuzione": "© OpenStreetMap, Overture Maps Foundation, Microsoft (ODbL)"},
@@ -115,4 +120,17 @@ jobs:
           gh release view edifici > /dev/null 2>&1 || gh release create edifici --prerelease \
             --title "GdANav · edifici per la scena 3D (non è l'app)" \
             --notes "Gli edifici d'Italia da Overture Maps, un pacchetto PMTiles per cella z8, per la scena 3D di GdANav. Dati ODbL: © OpenStreetMap, Overture Maps Foundation, Microsoft."
-          gh release upload edifici uscita/* --clobber
+          # Uno alla volta, riprovando: con un centinaio di pacchetti un caricamento
+          # che cade non deve fermare gli altri. L'indice per ultimo, cosi' l'app
+          # non chiede mai un pacchetto che non c'e' ancora.
+          falliti=0
+          for f in uscita/*.pmtiles uscita/indice.json; do
+            [ -e "$f" ] || continue
+            ok=0
+            for prova in 1 2 3 4; do
+              if gh release upload edifici "$f" --clobber; then ok=1; break; fi
+              sleep $((prova * 5))
+            done
+            [ $ok = 1 ] || { echo "::error::non caricato: $f"; falliti=$((falliti + 1)); }
+          done
+          [ $falliti = 0 ]
