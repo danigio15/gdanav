@@ -160,6 +160,11 @@ const GESTORI = {
       S.percorso = null;
     } else {
       if (!S.origine) S.origine = new Origine(m.punti[0], m.punti[1]);
+      // Un percorso nuovo (un ricalcolo, non le code aggiornate): i metri
+      // ripartono da capo, e il filtro della posizione con loro.
+      const quale = `${m.punti.length}:${m.punti[0]}:${m.punti[1]}:${m.punti[m.punti.length - 2]}`;
+      if (quale !== S.qualePercorso) moto.nuovoPercorso();
+      S.qualePercorso = quale;
       S.percorso = { lonlat: m.punti, metri: m.metri ?? null, linea: lineaDi(m.punti, m.metri), code: codeOrdinate(m.code), profilo: null, da: null };
     }
     S.sporco.profilo = true;
@@ -181,7 +186,21 @@ const GESTORI = {
     const [x, y] = S.origine.daLonLat(m.lon, m.lat);
     S.posizione = m;
     if (m.zoom !== undefined) S.zoomVoluto = m.zoom;
-    moto.posizione({ metri: S.percorso ? m.metri : null, v: m.velocita, x, y, rotta: m.rotta, quando: m.quando });
+    moto.posizione({
+      metri: S.percorso ? m.metri : null,
+      v: m.velocita,
+      x,
+      y,
+      rotta: m.rotta,
+      quando: m.quando,
+      lettura: S.percorso && m.lettura ? m.lettura : null,
+      adesso: S.orologioProva ?? Date.now(),
+    });
+    sveglia();
+  },
+  /** La velocità dell'auto dal cruscotto (Android Auto, il dongle): più volte al secondo. */
+  velocita(m) {
+    moto.velocitaAuto(m.ms, m.alle, S.orologioProva ?? Date.now());
     sveglia();
   },
   camera(m) {

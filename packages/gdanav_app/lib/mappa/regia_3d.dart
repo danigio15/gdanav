@@ -138,6 +138,7 @@ class Regia3d {
     vicini?.addListener(_vicini);
     persone?.addListener(_persone);
     guida.risparmio?.addListener(_risparmio);
+    guida.auto.addListener(_dalCruscotto);
     _attesa = Timer(attesa, () {
       if (!_pronta) nonVa('tempo', ricorda: false);
     });
@@ -155,6 +156,7 @@ class Regia3d {
     vicini?.removeListener(_vicini);
     persone?.removeListener(_persone);
     guida.risparmio?.removeListener(_risparmio);
+    guida.auto.removeListener(_dalCruscotto);
     _attesa?.cancel();
     _guardia?.cancel();
   }
@@ -354,8 +356,21 @@ class Regia3d {
             piuVicina,
         // La stima è già portata ad adesso (`metriStimati`).
         quando: _ora(),
+        lettura: g.letturaSulPercorso,
       ),
     );
+  }
+
+  /* La velocità dell'auto dal cruscotto, alla pagina ogni volta che cambia:
+   * il filtro della scena la usa per muovere la freccia senza il ritardo del
+   * GPS. */
+  DateTime? _velocitaMandata;
+  void _dalCruscotto() {
+    final auto = guida.auto;
+    final kmh = auto.velocitaAuto(), alle = auto.velocitaLettaAlle;
+    if (kmh == null || alle == null || alle == _velocitaMandata) return;
+    _velocitaMandata = alle;
+    _manda(msgVelocita(ms: kmh / 3.6, alle: alle));
   }
 
   /// Senza guida agganciata la posizione la dà il GPS.

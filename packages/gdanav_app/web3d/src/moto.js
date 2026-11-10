@@ -1,5 +1,11 @@
 // L'auto che scorre fra una posizione e l'altra.
 //
+// Sul percorso, quando l'app manda la lettura del GPS com'era (i metri, l'ora
+// del fix, la precisione) la fa il filtro di Kalman (`filtro.js`), con la
+// velocità dell'auto se il cruscotto la dice. Quello che segue qui sotto
+// resta per le app che quella lettura non la mandano ancora, e fuori dal
+// percorso.
+//
 // L'app manda la posizione quando la sa (una volta al secondo, di solito):
 // i metri lungo il percorso, la velocità, e quando l'ha letta. Qui, a ogni
 // fotogramma, l'auto va verso dove è adesso (la lettura portata avanti con
@@ -29,9 +35,13 @@ const AVANTI_TOLLERATO_M = 3;
 /** Quanto morbidamente cambia la velocità della freccia (ms). */
 const TAU_VELOCITA = 220;
 
+import { FiltroSullaStrada } from './filtro.js';
+
 export class Moto {
   constructor({ tau = 320 } = {}) {
     this.tau = tau;
+    this.filtro = new FiltroSullaStrada();
+    this.colFiltro = false;
     this.lettura = null;
     this.s = null;
     this.x = null;
@@ -41,8 +51,26 @@ export class Moto {
     this.vel = null;
   }
 
-  /** Una lettura nuova. [metri] lungo il percorso (o null), [x, y] in metri della scena. */
-  posizione({ metri = null, v = 0, x = null, y = null, rotta = 0, quando }) {
+  /** Un percorso nuovo: i metri ripartono da capo. */
+  nuovoPercorso() {
+    this.filtro.reset();
+    this.s = null;
+  }
+
+  /** La velocità dell'auto stessa, dal cruscotto: [v] m/s letta [alle], arrivata [adesso]. */
+  velocitaAuto(v, alle, adesso) {
+    if (this.colFiltro) this.filtro.velocitaAuto(v, alle, adesso);
+  }
+
+  /**
+   * Una lettura nuova. [metri] lungo il percorso (o null), [x, y] in metri
+   * della scena. [lettura]: il GPS com'era (`{metri, alle, v, precisione}`),
+   * se l'app la manda; [adesso]: quando è arrivata.
+   */
+  posizione({ metri = null, v = 0, x = null, y = null, rotta = 0, quando, lettura = null, adesso = quando }) {
+    this.colFiltro = metri !== null && lettura !== null && Number.isFinite(lettura?.metri);
+    if (this.colFiltro) this.filtro.misura(lettura, adesso);
+    else this.filtro.reset();
     const prima = this.lettura;
     const vel = Math.max(0, v || 0);
     // Frenando, il punto portato avanti con la velocità di adesso va oltre
@@ -74,6 +102,13 @@ export class Moto {
     const dt = this.ultimo === null ? 0 : adesso - this.ultimo;
     this.ultimo = adesso;
     if (!v) return null;
+    if (v.s !== undefined && this.colFiltro) {
+      const s = this.filtro.passo(adesso);
+      if (s !== null) {
+        this.s = s;
+        return { s };
+      }
+    }
     if (v.s !== undefined) {
       const lv = this.lettura.v;
       if (this.s === null || v.s - this.s > 150 || v.s < this.s - 40) {
@@ -116,6 +151,7 @@ export class Moto {
   /** Ferma e arrivata: niente fotogrammi fino alla lettura dopo. */
   get fermo() {
     const l = this.lettura;
+    if (this.colFiltro && l) return this.filtro.velocita < 0.05 && Math.abs(this.filtro.velMostrata) < 0.05;
     if (!l || l.v > 0.3) return !l;
     if (l.metri !== null) return this.s !== null && Math.abs(l.metri - this.s) < 0.05;
     return this.x !== null && Math.hypot(l.x - this.x, l.y - this.y) < 0.05;

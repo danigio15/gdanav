@@ -524,6 +524,20 @@ class GestoreGuida extends ChangeNotifier {
   /// GPS), all'ultima posizione; `null` se non si sa.
   double? get velocitaMs => _velocitaMs;
 
+  /// La lettura del GPS com'era, sul percorso: dov'era l'auto (metri lungo
+  /// il percorso), quando il GPS l'ha letta, a che velocità (del GPS, letta
+  /// insieme alla posizione) e con che precisione. Senza portarla avanti:
+  /// lo fa il filtro della scena 3D (`web3d/src/filtro.js`), che sa il
+  /// ritardo del GPS e ha la velocità del cruscotto. `null` fuori percorso.
+  ({double metri, DateTime alle, double? velocitaMs, double? precisioneM})? get letturaSulPercorso {
+    final a = avanzamento, alle = _lettaAlle;
+    if (a == null || _guida == null || a.posizioneSulPercorso == null || alle == null) return null;
+    return (metri: a.percorsiM, alle: alle, velocitaMs: _velocitaGps, precisioneM: _precisioneM);
+  }
+
+  double? _velocitaGps;
+  double? _precisioneM;
+
   /// Dove disegnare l'auto adesso e la direzione della strada lì; `null`
   /// se non si è agganciati alla strada (si disegna il punto del GPS).
   ({Punto punto, double rotta})? posizioneStimata() {
@@ -562,7 +576,9 @@ class GestoreGuida extends ChangeNotifier {
         ? letta
         : ora;
     final kmh = auto.velocitaAuto();
-    _velocitaMs = kmh != null ? kmh / 3.6 : (qui is PuntoInMoto ? qui.velocitaMs : null);
+    _velocitaGps = qui is PuntoInMoto ? qui.velocitaMs : null;
+    _precisioneM = qui is PuntoInMoto ? qui.precisioneM : null;
+    _velocitaMs = kmh != null ? kmh / 3.6 : _velocitaGps;
     _forseChiediDati();
     final g = _guida;
     if (g == null || !attiva) return;

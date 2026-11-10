@@ -103,6 +103,9 @@ Map<String, Object?> msgRisparmio(PropostaStrada? p) {
 /// Dove si è: il punto, la rotta, i metri lungo il percorso (o `null` fuori
 /// dal percorso), la velocità in m/s, lo zoom voluto e quando è stata letta
 /// (ms dall'epoca: la pagina la porta avanti fino ad adesso).
+///
+/// [lettura] è il GPS com'era (`GestoreGuida.letturaSulPercorso`): con lei
+/// la pagina fa da sé, col suo filtro, dove sta l'auto adesso.
 Map<String, Object?> msgPosizione({
   required Punto qui,
   required double rotta,
@@ -110,6 +113,7 @@ Map<String, Object?> msgPosizione({
   required double velocitaMs,
   required double zoom,
   required DateTime quando,
+  ({double metri, DateTime alle, double? velocitaMs, double? precisioneM})? lettura,
 }) => _m('posizione', {
   'lat': _sei(qui.lat),
   'lon': _sei(qui.lon),
@@ -118,7 +122,22 @@ Map<String, Object?> msgPosizione({
   'velocita': velocitaMs.isFinite ? math.max(0.0, (velocitaMs * 10).roundToDouble() / 10) : 0.0,
   'zoom': (zoom * 100).roundToDouble() / 100,
   'quando': quando.millisecondsSinceEpoch,
+  if (lettura != null && lettura.metri.isFinite)
+    'lettura': {
+      'metri': (lettura.metri * 10).roundToDouble() / 10,
+      'alle': lettura.alle.millisecondsSinceEpoch,
+      if (lettura.velocitaMs case final v? when v.isFinite) 'v': (math.max(0.0, v) * 100).roundToDouble() / 100,
+      if (lettura.precisioneM case final p? when p.isFinite && p > 0) 'precisione': (p * 10).roundToDouble() / 10,
+    },
 });
+
+/// La velocità dell'auto dal cruscotto (Android Auto, il dongle, Home
+/// Assistant), [ms] m/s letta [alle]: più volte al secondo e senza il
+/// ritardo del GPS, muove la freccia in partenza e in frenata.
+///
+/// Il campo è `ms` e non `v`: `v` è la versione del messaggio ([_m]).
+Map<String, Object?> msgVelocita({required double ms, required DateTime alle}) =>
+    _m('velocita', {'ms': (math.max(0.0, ms) * 100).roundToDouble() / 100, 'alle': alle.millisecondsSinceEpoch});
 
 /// Come si muove la telecamera.
 enum ModoCamera3d { segui, libera, panoramica }

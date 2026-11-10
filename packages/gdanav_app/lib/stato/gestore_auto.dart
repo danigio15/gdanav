@@ -485,7 +485,10 @@ class GestoreAuto extends ChangeNotifier {
   void _aggiorna() {
     stato = arbitro.statoAttuale(DateTime.now());
     _veicolo = _scheda.conCapacitaDi(stato);
-    if (stato?.velocitaKmh case final v?) _velocita(v, notifica: false);
+    if (stato?.velocitaKmh case final v?) {
+      _velocita(v, notifica: false);
+      _velocitaMisurata = stato?.letto;
+    }
     notifyListeners();
   }
 
@@ -511,6 +514,12 @@ class GestoreAuto extends ChangeNotifier {
     _velocitaLetta = DateTime.now();
     if (notifica) notifyListeners();
   }
+
+  /// Quando l'auto ha MISURATO l'ultima velocità (non quando è arrivata):
+  /// la scena 3D la usa solo se è fresca. Una sorgente lenta (Home Assistant
+  /// che si aggiorna ogni tanto) ha un'ora vecchia, e lì viene scartata.
+  DateTime? get velocitaLettaAlle => _velocitaMisurata ?? _velocitaLetta;
+  DateTime? _velocitaMisurata;
 
   /// `null` se l'auto non la dice o tace da più di tre secondi.
   double? velocitaAuto() {
