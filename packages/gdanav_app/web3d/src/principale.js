@@ -12,7 +12,7 @@ import { valutaPrestazioni, valutaWebgl } from './capacita.js';
 import { chiave as chiaveTessera, daChiave, mercPerMetro, latDaMerc } from './geo.js';
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { angoloVerso, Moto, smorza, svolteDi } from './moto.js';
-import { IndiceSegmenti, Linea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote } from './percorso.js';
+import { IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, spostamenti } from './percorso.js';
 import { BIT_OMBRA, Scena } from './scena.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
 import { GIORNO, NOTTE } from './tavolozza.js';
@@ -1045,7 +1045,14 @@ function aggiornaTraffico(adesso) {
       const passo = 5;
       const punti = [];
       for (let s = 0; s <= L; s += passo) punti.push(linea.a(s).slice(0, 2));
-      const prof = new Profilo(0, passo, riempiQuote(quote(punti, indice)));
+      // Lungo il percorso il traffico lo dice già lui, coi suoi colori.
+      const pr = S.percorso;
+      if (pr?.linea && lungoLaLinea(pr.linea, punti, pr.profilo?.s0 ?? 0, pr.profilo?.s1 ?? Infinity)) continue;
+      // La geometria del traffico è di chi lo fornisce, non della mappa: ci si
+      // appoggia sulle strade come il percorso.
+      const grezze = quote(punti, indice);
+      const [sx, sy] = spostamenti(grezze.dx, grezze.dy);
+      const prof = new Profilo(0, passo, riempiQuote(grezze), null, sx, sy);
       parti.push(nastro(linea, prof, 0, L, 2.4, 0.34, { passo, code: [[0, L + 1, lento < 0.3 ? 2 : 1]] }));
     }
   }

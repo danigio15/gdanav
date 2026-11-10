@@ -138,11 +138,26 @@ export class IndiceSegmenti {
   }
 }
 
+/** Quante strade candidate si tengono per punto, le più vicine. */
+const CANDIDATI_MAX = 6;
+
+/** Quanto costa, per metro, saltare di lato da una strada all'altra. */
+const SALTO_DI_LATO = 0.8;
+
 /**
  * Le quote di una linea campionata: [punti] `[x, y]` ogni pochi metri. Per
- * ogni punto le quote candidate (raggruppate entro 0,8 m); poi la sequenza
- * che costa meno: lontananza dalla strada più salti di quota. Dove non c'è
+ * ogni punto le strade candidate, ognuna per sé (stessa quota e stesso posto
+ * entro un metro e mezzo: la stessa strada); poi la sequenza che costa meno:
+ * lontananza dalla strada, salti di quota e salti di lato. Dove non c'è
  * nessuna strada costruita la quota resta `NaN` (si decide dopo).
+ *
+ * Il salto di lato è la continuità: «agli svincoli, se non devo uscire, la
+ * linea del percorso non è diritta: va allo svincolo e poi ritorna al
+ * centro». Prima ogni punto prendeva la strada più vicina alla sua quota, e
+ * dove la rampa si stacca dalla carreggiata (o sull'altro lato di una
+ * rotonda) un metro più vicino bastava a spostarlo di là; la levigatura
+ * faceva il resto, una curva verso lo svincolo e ritorno. Adesso cambiare
+ * strada costa quanto il salto: si resta su quella su cui si era.
  */
 export function quote(punti, indice) {
   const n = punti.length;
@@ -151,23 +166,18 @@ export function quote(punti, indice) {
     const a = punti[Math.max(0, i - 1)];
     const b = punti[Math.min(n - 1, i + 1)];
     const lista = indice.candidati(punti[i][0], punti[i][1], b[0] - a[0], b[1] - a[1]);
-    const gruppi = [];
+    const strade = [];
     for (const c of lista) {
-      // Le strade piccole contano meno, se ci sono anche quelle grandi.
-      const piccola = (c.codice & 15) >= 6 ? 1.5 : 0;
+      // Le strade piccole contano un po' meno, se ci sono anche quelle grandi.
+      const piccola = (c.codice & 15) >= 6 ? 0.6 : 0;
       const costo = c.d * 0.15 + piccola;
-      const g = gruppi.find((q) => Math.abs(q.h - c.h) < 0.8);
+      const g = strade.find((q) => Math.abs(q.h - c.h) < 0.8 && Math.hypot(q.px - c.px, q.py - c.py) < 1.5);
       if (g) {
-        if (costo < g.costo) {
-          g.costo = costo;
-          g.h = c.h;
-          g.galleria = c.galleria;
-          g.px = c.px;
-          g.py = c.py;
-        }
-      } else gruppi.push({ h: c.h, costo, galleria: c.galleria, px: c.px, py: c.py });
+        if (costo < g.costo) Object.assign(g, { h: c.h, costo, galleria: c.galleria, px: c.px, py: c.py });
+      } else strade.push({ h: c.h, costo, galleria: c.galleria, px: c.px, py: c.py });
     }
-    cand[i] = gruppi;
+    strade.sort((x, y) => x.costo - y.costo);
+    cand[i] = strade.slice(0, CANDIDATI_MAX);
   }
   const h = new Float64Array(n).fill(NaN);
   // Quali punti passano in galleria (sotto qualcosa): il nastro lì è «dentro».
@@ -197,7 +207,13 @@ export function quote(punti, indice) {
           // Un salto di quota fra due punti vicini (4 m) costa molto più
           // della salita di una rampa vera, che sale poco a ogni passo.
           const salto = Math.abs(c.h - prev[q].h);
-          const v = costi[k - 1 - i][q] + salto * (salto > 1.5 ? 4 : 1);
+          // E un salto di lato: lo spostamento verso la strada cambia piano
+          // lungo la stessa strada, di colpo passando a un'altra.
+          const lato = Math.hypot(
+            c.px - punti[k][0] - (prev[q].px - punti[k - 1][0]),
+            c.py - punti[k][1] - (prev[q].py - punti[k - 1][1]),
+          );
+          const v = costi[k - 1 - i][q] + salto * (salto > 1.5 ? 4 : 1) + lato * SALTO_DI_LATO;
           if (v < meglio) {
             meglio = v;
             quale = q;
@@ -321,6 +337,26 @@ export class Linea {
   }
 }
 
+/**
+ * Se una linea di [punti] `[x, y]` corre lungo [linea] fra [da] e [a]: se
+ * almeno [quota] dei suoi punti (al più dodici, presi a intervalli) sta entro
+ * [entro] metri. Il traffico lungo il percorso lo dice già il percorso coi
+ * suoi colori: disegnato una seconda volta, con la geometria di chi lo
+ * fornisce, correva accanto alla linea («la linea del traffico non segue la
+ * linea del percorso ma è decentrata»).
+ */
+export function lungoLaLinea(linea, punti, da, a, entro = 12, quota = 0.6) {
+  if (!linea || !punti.length) return false;
+  const passo = Math.max(1, Math.floor(punti.length / 12));
+  let vicini = 0;
+  let visti = 0;
+  for (let k = 0; k < punti.length; k += passo) {
+    visti++;
+    if (linea.proietta(punti[k][0], punti[k][1], da, a).d < entro) vicini++;
+  }
+  return vicini >= visti * quota;
+}
+
 /** Il profilo delle quote di un tratto della linea: un campione ogni [passo] metri. */
 export class Profilo {
   constructor(s0, passo, h, galleria = null, dx = null, dy = null) {
@@ -387,8 +423,11 @@ export function profiloDi(linea, s0, s1, indice, passo = 4) {
   return new Profilo(s0, passo, riempiQuote(grezze), grezze.galleria, dx, dy);
 }
 
-/** Più di così non si sposta: oltre, la strada giusta è un'altra. */
-export const SPOSTAMENTO_MAX_M = 6;
+/** Più di così non si sposta: oltre, la strada giusta è un'altra. La
+ * geometria del percorso (Valhalla) è quella delle stesse strade della mappa:
+ * le differenze sono di un paio di metri, e sei bastavano a finire sulla
+ * strada accanto. */
+export const SPOSTAMENTO_MAX_M = 4.5;
 
 /**
  * Lo spostamento di ogni punto sul mezzo della strada sotto, morbido.
