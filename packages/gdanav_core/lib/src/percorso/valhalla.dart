@@ -569,6 +569,7 @@ class OpzioniPercorso {
     this.evitaPedaggi = false,
     this.evitaAutostrade = false,
     this.evitaTraghetti = false,
+    this.evitaZtl = true,
     this.ricalcoloAutomatico = true,
     this.classePedaggio = ClassePedaggio.a,
     this.euroAlKm = TariffaPedaggio.euroAlKmPredefinito,
@@ -586,6 +587,7 @@ class OpzioniPercorso {
         evitaPedaggi: j['evita_pedaggi'] as bool? ?? false,
         evitaAutostrade: j['evita_autostrade'] as bool? ?? false,
         evitaTraghetti: j['evita_traghetti'] as bool? ?? false,
+        evitaZtl: j['evita_ztl'] as bool? ?? true,
         ricalcoloAutomatico: j['ricalcolo_automatico'] as bool? ?? true,
         classePedaggio: ClassePedaggio.da(j['classe_pedaggio']),
         euroAlKm: switch (j['euro_al_km']) {
@@ -606,6 +608,11 @@ class OpzioniPercorso {
   final bool evitaPedaggi;
   final bool evitaAutostrade;
   final bool evitaTraghetti;
+
+  /// Girare al largo le ZTL attive per cui non si ha il permesso (o non si è
+  /// ancora risposto): «Evita ZTL», acceso di serie. Spento, il percorso ci
+  /// passa e la guida avvisa prima del varco, come sempre.
+  final bool evitaZtl;
 
   /// In guida, se il consumo vero si allontana dal previsto: ricalcolare da
   /// soli le soste, o chiederlo prima. Fuori percorso si ricalcola sempre.
@@ -629,13 +636,15 @@ class OpzioniPercorso {
       o.modo == modo &&
       o.evitaPedaggi == evitaPedaggi &&
       o.evitaAutostrade == evitaAutostrade &&
-      o.evitaTraghetti == evitaTraghetti;
+      o.evitaTraghetti == evitaTraghetti &&
+      o.evitaZtl == evitaZtl;
 
   OpzioniPercorso copia({
     ModoGuida? modo,
     bool? evitaPedaggi,
     bool? evitaAutostrade,
     bool? evitaTraghetti,
+    bool? evitaZtl,
     bool? ricalcoloAutomatico,
     ClassePedaggio? classePedaggio,
     double? euroAlKm,
@@ -647,6 +656,7 @@ class OpzioniPercorso {
         evitaPedaggi: evitaPedaggi ?? this.evitaPedaggi,
         evitaAutostrade: evitaAutostrade ?? this.evitaAutostrade,
         evitaTraghetti: evitaTraghetti ?? this.evitaTraghetti,
+        evitaZtl: evitaZtl ?? this.evitaZtl,
         ricalcoloAutomatico: ricalcoloAutomatico ?? this.ricalcoloAutomatico,
         classePedaggio: classePedaggio ?? this.classePedaggio,
         euroAlKm: euroAlKm ?? this.euroAlKm,
@@ -659,6 +669,7 @@ class OpzioniPercorso {
         'evita_pedaggi': evitaPedaggi,
         'evita_autostrade': evitaAutostrade,
         'evita_traghetti': evitaTraghetti,
+        'evita_ztl': evitaZtl,
         'ricalcolo_automatico': ricalcoloAutomatico,
         'classe_pedaggio': classePedaggio.name,
         'euro_al_km': euroAlKm,
@@ -681,6 +692,7 @@ class OpzioniPercorso {
         if (evitaPedaggi) 'senza pedaggi',
         if (evitaAutostrade) 'senza autostrade',
         if (evitaTraghetti) 'senza traghetti',
+        if (!evitaZtl) 'anche nelle ZTL',
       ].join(' · ');
 }
 
@@ -697,12 +709,20 @@ class ClienteValhalla {
   Map<String, String> get _intestazioni =>
       {'content-type': 'application/json', if (chiave != null) 'x-gdanav-chiave': chiave!};
 
-  Map<String, Object?> _corpo(List<Map<String, Object?>> luoghi, String lingua, OpzioniPercorso opzioni) {
+  Map<String, Object?> _corpo(
+    List<Map<String, Object?>> luoghi,
+    String lingua,
+    OpzioniPercorso opzioni, {
+    List<Rettangolo> evita = const [],
+  }) {
     final costi = opzioni.valhalla;
     return {
       'locations': luoghi,
       'costing': 'auto',
       if (costi.isNotEmpty) 'costing_options': {'auto': costi},
+      // Le ZTL da girare al largo (`PercorsiConZtl`), come le «aree da
+      // evitare» di TomTom.
+      if (evita.isNotEmpty) 'exclude_polygons': [for (final r in evita) r.perValhalla()],
       'units': 'kilometers',
       'language': lingua,
       'elevation_interval': 30,
@@ -728,15 +748,17 @@ class ClienteValhalla {
   }
 
   /// Il percorso fra le [tappe] (partenza, tappe intermedie, arrivo), con
-  /// corsie e limiti di velocità.
+  /// corsie e limiti di velocità, lontano dai rettangoli di [evita] (le ZTL
+  /// senza permesso).
   Future<PercorsoCalcolato> calcola(
     List<Punto> tappe, {
     String lingua = 'it-IT',
     OpzioniPercorso opzioni = const OpzioniPercorso(),
+    List<Rettangolo> evita = const [],
   }) =>
       _calcola([
         for (final (i, p) in tappe.indexed) _luogo(p, partenza: i == 0),
-      ], lingua, opzioni);
+      ], lingua, opzioni, evita: evita);
 
   /// Un luogo per Valhalla. La partenza, se si sa dove si sta andando, con la
   /// direzione: il percorso nuovo parte nel verso in cui si va (vedi
@@ -748,8 +770,13 @@ class ClienteValhalla {
           if (direzioneDiPartenza(p) case final verso?) ...{'heading': verso, 'heading_tolerance': 60},
       };
 
-  Future<PercorsoCalcolato> _calcola(List<Map<String, Object?>> luoghi, String lingua, OpzioniPercorso opzioni) async {
-    final corpo = _corpo(luoghi, lingua, opzioni);
+  Future<PercorsoCalcolato> _calcola(
+    List<Map<String, Object?>> luoghi,
+    String lingua,
+    OpzioniPercorso opzioni, {
+    List<Rettangolo> evita = const [],
+  }) async {
+    final corpo = _corpo(luoghi, lingua, opzioni, evita: evita);
     final json = await _route(corpo);
     return _arricchisci(PercorsoCalcolato.daValhalla(json), json, corpo);
   }
@@ -763,12 +790,13 @@ class ClienteValhalla {
     int quante = 2,
     String lingua = 'it-IT',
     OpzioniPercorso opzioni = const OpzioniPercorso(),
+    List<Rettangolo> evita = const [],
   }) async {
     final json = await _route({
       ..._corpo([
         _luogo(da, partenza: true),
         _luogo(a),
-      ], lingua, opzioni),
+      ], lingua, opzioni, evita: evita),
       'alternates': quante,
     });
     return [

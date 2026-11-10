@@ -185,15 +185,25 @@ PianificatoreViaggio pianificatoreVero(
     return conStradaEco(rapide, e);
   }
 
-  // Le ZTL: TomTom non le conosce. Le gira al largo chi chiede il percorso,
-  // con le «aree da evitare», quando sono attive e non si ha il permesso.
-  final ztl = tomtom == null
+  // Le ZTL: né TomTom né Valhalla le conoscono. Le gira al largo chi chiede
+  // il percorso, con le «aree da evitare», quando sono attive e non si ha il
+  // permesso. Prima solo con TomTom: col server gratuito il percorso ci
+  // passava dentro («Sarebbe utilissimo aggiungere anche "Evita ZTL"»).
+  // Con «Evita ZTL» spento ci si passa, e la guida avvisa al varco.
+  final ztl = !opzioni.evitaZtl
       ? null
-      : PercorsiConZtl(
+      : tomtom != null
+      ? PercorsiConZtl(
           zone: archivioZtl,
           permessi: () async => GestoreZtl.attuale?.permessi ?? const {},
           calcola: (tappe, evita) => tomtom.calcola(tappe, opzioni: opzioni, evita: evita),
           alternative: strade,
+        )
+      : PercorsiConZtl(
+          zone: archivioZtl,
+          permessi: () async => GestoreZtl.attuale?.permessi ?? const {},
+          calcola: (tappe, evita) => valhalla!.calcola(tappe, opzioni: opzioni, evita: evita),
+          alternative: (da, a, evita) => valhalla!.alternative(da, a, opzioni: opzioni, evita: evita),
         );
   // I pedaggi veri da HERE, se c'è la chiave, sul percorso già scelto: se
   // HERE non risponde resta la stima.

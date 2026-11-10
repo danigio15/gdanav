@@ -31,6 +31,15 @@ class Rettangolo {
   }
 
   /// Per le `avoidAreas` di TomTom.
+  /// Per Valhalla (`exclude_polygons`): l'anello chiuso, `[lon, lat]`.
+  List<List<double>> perValhalla() => [
+        [ovest, sud],
+        [est, sud],
+        [est, nord],
+        [ovest, nord],
+        [ovest, sud],
+      ];
+
   Map<String, Object?> perTomTom() => {
         'southWestCorner': {'latitude': sud, 'longitude': ovest},
         'northEastCorner': {'latitude': nord, 'longitude': est},
