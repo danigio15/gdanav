@@ -42,6 +42,9 @@ const CONTROLLI = {
     (m.pitch === undefined || (numero(m.pitch) && m.pitch >= 0 && m.pitch <= 85)) &&
     (m.riquadro === undefined || (Array.isArray(m.riquadro) && m.riquadro.length === 4 && m.riquadro.every(numero))),
   pausa: (m) => typeof m.si === 'boolean',
+  velocita: (m) => numero(m.ms) && m.ms >= 0 && numero(m.alle),
+  edifici: (m) =>
+    [m.z, m.x, m.y].every((n) => Number.isInteger(n) && n >= 0) && (m.dati === null || m.dati === undefined || typeof m.dati === 'string'),
 };
 
 /** Il messaggio se è buono, altrimenti null. */

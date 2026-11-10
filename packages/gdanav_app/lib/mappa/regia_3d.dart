@@ -8,6 +8,7 @@ import '../componenti/icona_manovra.dart' show bandieraArrivoPng, puntaManovraPn
 import '../componenti/icone_punti.dart';
 import '../componenti/icone_segnalazioni.dart';
 import '../servizi.dart';
+import '../stato/gestore_edifici.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_persone.dart';
 import '../stato/gestore_posizione.dart';
@@ -57,7 +58,12 @@ class Regia3d {
     this.attesa = const Duration(seconds: 15),
     this.piuVicina = 0,
     this.inclinazione,
-  });
+    Future<Uint8List?> Function(int z, int x, int y)? edifici,
+  }) : edifici = edifici ?? GestoreEdifici.attuale?.tessera;
+
+  /// Gli edifici di Overture di una tessera ([GestoreEdifici]), se l'app li
+  /// ha; `null`: la pagina usa quelli di sempre.
+  final Future<Uint8List?> Function(int z, int x, int y)? edifici;
 
   final GestoreViaggio gestore;
   final GestorePosizione posizione;
@@ -138,6 +144,7 @@ class Regia3d {
     vicini?.addListener(_vicini);
     persone?.addListener(_persone);
     guida.risparmio?.addListener(_risparmio);
+    guida.auto.addListener(_dalCruscotto);
     _attesa = Timer(attesa, () {
       if (!_pronta) nonVa('tempo', ricorda: false);
     });
@@ -155,6 +162,7 @@ class Regia3d {
     vicini?.removeListener(_vicini);
     persone?.removeListener(_persone);
     guida.risparmio?.removeListener(_risparmio);
+    guida.auto.removeListener(_dalCruscotto);
     _attesa?.cancel();
     _guardia?.cancel();
   }
@@ -196,6 +204,9 @@ class Regia3d {
         onToccata?.call();
       case Tocco3d(:final elementi):
         onTocco?.call(elementi);
+      case ChiestiEdifici3d(:final z, :final x, :final y):
+        final e = edifici;
+        if (e != null) unawaited(e(z, x, y).then((dati) => _manda(msgEdifici(z, x, y, dati))));
       case null:
         break;
     }
@@ -235,7 +246,7 @@ class Regia3d {
     _notte = n;
     _vistaMandata = v;
     _segnapostoMandato = segnaposto;
-    _manda(msgOpzioni(notte: n, vista: v, segnaposto: segnaposto));
+    _manda(msgOpzioni(notte: n, vista: v, segnaposto: segnaposto, edifici: edifici != null));
     if (cambiaNotte) _stile();
   }
 
@@ -354,8 +365,21 @@ class Regia3d {
             piuVicina,
         // La stima è già portata ad adesso (`metriStimati`).
         quando: _ora(),
+        lettura: g.letturaSulPercorso,
       ),
     );
+  }
+
+  /* La velocità dell'auto dal cruscotto, alla pagina ogni volta che cambia:
+   * il filtro della scena la usa per muovere la freccia senza il ritardo del
+   * GPS. */
+  DateTime? _velocitaMandata;
+  void _dalCruscotto() {
+    final auto = guida.auto;
+    final kmh = auto.velocitaAuto(), alle = auto.velocitaLettaAlle;
+    if (kmh == null || alle == null || alle == _velocitaMandata) return;
+    _velocitaMandata = alle;
+    _manda(msgVelocita(ms: kmh / 3.6, alle: alle));
   }
 
   /// Senza guida agganciata la posizione la dà il GPS.

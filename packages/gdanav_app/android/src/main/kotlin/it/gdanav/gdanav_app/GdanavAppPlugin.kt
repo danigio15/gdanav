@@ -1,6 +1,9 @@
 package it.gdanav.gdanav_app
 
 import android.app.Activity
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.view.WindowManager
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
@@ -25,6 +28,7 @@ import it.gdanav.gdanav_app.auto.PosizioneInAuto
 class GdanavAppPlugin : FlutterPlugin, ActivityAware {
     private var canale: MethodChannel? = null
     private var schermo: MethodChannel? = null
+    private var rete: MethodChannel? = null
     private var attivita: Activity? = null
     private var permessi: Permessi? = null
 
@@ -36,6 +40,15 @@ class GdanavAppPlugin : FlutterPlugin, ActivityAware {
      * accesa: si rimette com'era.
      */
     private var primaDellaGuida: Boolean? = null
+
+    /** A consumo: i dati del telefono, un hotspot. Nel dubbio sì. */
+    private fun aConsumo(contesto: Context): Boolean = try {
+        val cm = contesto.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val c = cm.getNetworkCapabilities(cm.activeNetwork)
+        c == null || !c.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+    } catch (_: Exception) {
+        true
+    }
 
     private fun tieniAcceso(acceso: Boolean): Boolean {
         val finestra = attivita?.window ?: return false
@@ -71,6 +84,15 @@ class GdanavAppPlugin : FlutterPlugin, ActivityAware {
                 if (p == null) risultato.success(false) else p.chiama(call, risultato)
             }
         }
+        // Se la rete si paga a consumo: gli edifici della scena 3D si scaricano
+        // solo su una rete che non costa (`stato/gestore_edifici.dart`).
+        val contesto = binding.applicationContext
+        rete = MethodChannel(binding.binaryMessenger, "gdanav/rete").also {
+            it.setMethodCallHandler { call, risultato ->
+                if (call.method != "aConsumo") return@setMethodCallHandler risultato.notImplemented()
+                risultato.success(aConsumo(contesto))
+            }
+        }
         schermo = MethodChannel(binding.binaryMessenger, "gdanav/schermo").also {
             it.setMethodCallHandler { call, risultato ->
                 if (call.method != "acceso") return@setMethodCallHandler risultato.notImplemented()
@@ -84,6 +106,8 @@ class GdanavAppPlugin : FlutterPlugin, ActivityAware {
         canale = null
         schermo?.setMethodCallHandler(null)
         schermo = null
+        rete?.setMethodCallHandler(null)
+        rete = null
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {

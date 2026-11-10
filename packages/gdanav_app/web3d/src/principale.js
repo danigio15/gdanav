@@ -11,7 +11,7 @@ import { BUDGET, daDisegnare, pianoTessere } from './budget.js';
 import { valutaPrestazioni, valutaWebgl } from './capacita.js';
 import { chiave as chiaveTessera, daChiave, mercPerMetro, latDaMerc } from './geo.js';
 import { codeOrdinate, decodifica } from './messaggi.js';
-import { angoloVerso, Moto, smorza } from './moto.js';
+import { angoloVerso, Moto, smorza, svolteDi } from './moto.js';
 import { IndiceSegmenti, Linea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote } from './percorso.js';
 import { BIT_OMBRA, Scena } from './scena.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
@@ -54,6 +54,10 @@ const S = {
   camera: { modo: 'segui', sopra: 0, sinistra: 0, riquadro: null },
   pausa: false,
   grezze: new Map(),
+  /** Gli edifici di Overture dall'app, per tessera: `{dati, quando}` (dati null: non ci sono). */
+  edifici: new Map(),
+  edificiDallApp: false,
+  attesaEdifici: null,
   costruite: new Map(),
   lavoro: null,
   numeroLavoro: 0,
@@ -117,6 +121,7 @@ const GESTORI = {
     S.notte = m.notte;
     if (m.vista) S.vista = m.vista;
     if (m.icona) S.icona = m.icona;
+    S.edificiDallApp = m.edifici === true;
     // La freccia, se è quella scelta; l'auto del suo colore, altrimenti.
     const forma = S.icona === 'freccia' ? 'freccia' : 'auto';
     if ((m.auto && m.auto !== S.colorAuto) || forma !== (scena.formaAuto ?? 'auto')) {
@@ -160,7 +165,13 @@ const GESTORI = {
       S.percorso = null;
     } else {
       if (!S.origine) S.origine = new Origine(m.punti[0], m.punti[1]);
+      // Un percorso nuovo (un ricalcolo, non le code aggiornate): i metri
+      // ripartono da capo, e il filtro della posizione con loro.
+      const quale = `${m.punti.length}:${m.punti[0]}:${m.punti[1]}:${m.punti[m.punti.length - 2]}`;
+      if (quale !== S.qualePercorso) moto.nuovoPercorso();
+      S.qualePercorso = quale;
       S.percorso = { lonlat: m.punti, metri: m.metri ?? null, linea: lineaDi(m.punti, m.metri), code: codeOrdinate(m.code), profilo: null, da: null };
+      moto.svolte = svolteDi(S.percorso.linea);
     }
     S.sporco.profilo = true;
     sveglia();
@@ -181,7 +192,34 @@ const GESTORI = {
     const [x, y] = S.origine.daLonLat(m.lon, m.lat);
     S.posizione = m;
     if (m.zoom !== undefined) S.zoomVoluto = m.zoom;
-    moto.posizione({ metri: S.percorso ? m.metri : null, v: m.velocita, x, y, rotta: m.rotta, quando: m.quando });
+    moto.posizione({
+      metri: S.percorso ? m.metri : null,
+      v: m.velocita,
+      x,
+      y,
+      rotta: m.rotta,
+      quando: m.quando,
+      lettura: S.percorso && m.lettura ? m.lettura : null,
+      adesso: S.orologioProva ?? Date.now(),
+    });
+    sveglia();
+  },
+  /** Gli edifici di Overture di una tessera, dall'app (risposta a «edifici?»). */
+  edifici(m) {
+    const k = chiaveTessera(m.z, m.x, m.y);
+    let dati = null;
+    if (typeof m.dati === 'string') {
+      const b = atob(m.dati);
+      const u = new Uint8Array(b.length);
+      for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+      dati = u.buffer;
+    }
+    if (S.attesaEdifici?.chiave === k) S.attesaEdifici.fatto(dati);
+    else ricordaEdifici(k, dati);
+  },
+  /** La velocità dell'auto dal cruscotto (Android Auto, il dongle): più volte al secondo. */
+  velocita(m) {
+    moto.velocitaAuto(m.ms, m.alle, S.orologioProva ?? Date.now());
     sveglia();
   },
   camera(m) {
@@ -309,7 +347,11 @@ function creaMappa(stile) {
   S.mappa = mappa;
   window.__mappa = mappa;
   window.__scena = scena;
-  mappa.addControl(new maplibregl.AttributionControl({ compact: true }), 'top-left');
+  // Con gli edifici di Overture (dati ODbL) si dice anche da dove vengono.
+  mappa.addControl(
+    new maplibregl.AttributionControl({ compact: true, customAttribution: S.edificiDallApp ? '© Overture Maps Foundation, Microsoft' : undefined }),
+    'top-left',
+  );
   mappa.on('style.load', alloStile);
   // L'attribuzione chiusa: si apre toccando la «i».
   mappa.once('load', () => mappa.getContainer().querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'));
@@ -733,7 +775,51 @@ function vicineDi(k) {
   return out;
 }
 
+/* Gli edifici veri, da Overture.
+ *
+ * «Lungo il percorso voglio vedere le cose reali.» Gli edifici delle tessere
+ * di OpenFreeMap sono quelli di OpenStreetMap, e in tanti paesi non ci sono.
+ * L'app ha, per la zona, quelli di Overture (OpenStreetMap più quelli che
+ * Microsoft ha ricavato dalle foto dal satellite, con l'altezza), in un
+ * pacchetto sul telefono: prima di costruire una tessera li si chiede, e se
+ * arrivano prendono il posto di quelli di sempre. Si aspetta poco: senza
+ * pacchetto (non ancora scaricato, o zona che non c'è) la tessera si fa con
+ * quelli di sempre, e la risposta «niente» si richiede dopo un minuto (il
+ * pacchetto intanto può essere arrivato). */
+const ATTESA_EDIFICI_MS = 1500;
+const RIPROVA_EDIFICI_MS = 60000;
+const EDIFICI_TENUTI = 48;
+
+function ricordaEdifici(k, dati) {
+  S.edifici.delete(k);
+  S.edifici.set(k, { dati, quando: performance.now() });
+  while (S.edifici.size > EDIFICI_TENUTI) S.edifici.delete(S.edifici.keys().next().value);
+}
+
+function edificiDa(k) {
+  const e = S.edifici.get(k);
+  if (!e) return undefined;
+  if (e.dati === null && performance.now() - e.quando > RIPROVA_EDIFICI_MS) return undefined;
+  return e.dati;
+}
+
 function chiedi(k, dettaglio) {
+  if (S.edificiDallApp && edificiDa(k) === undefined) {
+    const { z, x, y } = daChiave(k);
+    // Fermi come un lavoro in corso: la pianificazione aspetta questa tessera.
+    S.lavoro = { id: 0, chiave: k, dettaglio, vicine: new Set(), da: performance.now() };
+    const fatto = (dati) => {
+      if (S.attesaEdifici?.chiave !== k) return;
+      clearTimeout(S.attesaEdifici.timer);
+      S.attesaEdifici = null;
+      ricordaEdifici(k, dati);
+      S.lavoro = null;
+      chiedi(k, dettaglio);
+    };
+    S.attesaEdifici = { chiave: k, fatto, timer: setTimeout(() => fatto(null), ATTESA_EDIFICI_MS) };
+    manda('edifici?', { z, x, y });
+    return;
+  }
   const { z, x, y } = daChiave(k);
   const tessere = {};
   const vicine = new Set();
@@ -748,7 +834,11 @@ function chiedi(k, dettaglio) {
   }
   const id = ++S.numeroLavoro;
   S.lavoro = { id, chiave: k, dettaglio, vicine, da: performance.now() };
-  lavoratore.postMessage({ id, z, x, y, tessere, dettaglio }, Object.values(tessere).map((t) => t.dati));
+  const e = S.edificiDallApp ? edificiDa(k) : null;
+  const edifici = e ? e.slice(0) : null;
+  const trasferiti = Object.values(tessere).map((t) => t.dati);
+  if (edifici) trasferiti.push(edifici);
+  lavoratore.postMessage({ id, z, x, y, tessere, dettaglio, edifici }, trasferiti);
 }
 
 function allaTessera({ id, tessera, errore }) {
@@ -1386,11 +1476,23 @@ function muovi(adesso, dt) {
     }
     const q = (v) => (prof && v >= prof.s0 && v <= prof.s1 ? prof.quota(v) : 0);
     z = q(s);
-    dir = p.linea.direzione(s, 4);
+    // La strada su cui si sta, non quella dove si andrà: da cinque metri
+    // dietro a uno avanti. Centrata, la freccia girava prima dell'angolo.
+    const [dx0, dy0] = p.linea.a(s - 5);
+    const [dx1, dy1] = p.linea.a(s + 1);
+    // All'inizio e in fondo al percorso i due punti si toccano: lì la direzione di sempre.
+    dir = Math.hypot(dx1 - dx0, dy1 - dy0) > 0.5 ? Math.atan2(dy1 - dy0, dx1 - dx0) : p.linea.direzione(s, 4);
     const pendenza = Math.atan2(q(s + 3) - q(s - 3), 6);
     scena.mettiAuto(x, y, z, dir, pendenza);
-    // La mappa guarda un poco avanti: in curva la strada che arriva resta in vista.
-    rottaCamera = 90 - (p.linea.direzione(s + 20, 26) * 180) / Math.PI;
+    // La mappa guarda un poco avanti: in curva la strada che arriva resta in
+    // vista. Quanto avanti lo dice la velocità — un secondo e mezzo di
+    // strada, al più venti metri — e da fermi niente: fermi davanti a una
+    // svolta la mappa girava già sulla strada dopo, venti metri più in là.
+    const avanti = Math.min(20, Math.max(0, moto.velocita * 1.5));
+    const [cx0, cy0] = p.linea.a(s - 6);
+    const [cx1, cy1] = p.linea.a(s + 1 + 2 * avanti);
+    const versoCamera = Math.hypot(cx1 - cx0, cy1 - cy0) > 0.5 ? Math.atan2(cy1 - cy0, cx1 - cx0) : dir;
+    rottaCamera = 90 - (versoCamera * 180) / Math.PI;
     S.auto = { x, y, z, s };
     if (scena.mat.percorso) scena.uniformiPercorso.uInizio.value = s + 1.5;
     // Il fantasma comincia oltre il muso dell'auto (lunga nove metri, in scala).

@@ -76,3 +76,37 @@ test('senza percorso: x, y e la rotta', () => {
   const p = m.passo(1000);
   assert.ok(Math.abs(p.x - 10) < 1e-6 && Math.abs(p.y) < 1e-6);
 });
+
+test('alle svolte, fermi o quasi, la freccia non gira prima dell\'auto', async () => {
+  const { svolteDi } = await import('../src/moto.js');
+  // Una L: 100 m verso est, poi 100 m verso nord. La svolta a 100 m.
+  const linea = {
+    s: [0, 100, 200],
+    lunghezza: 200,
+    a(m) {
+      const q = Math.max(0, Math.min(200, m));
+      return q <= 100 ? [q, 0] : [100, q - 100];
+    },
+  };
+  const svolte = svolteDi(linea);
+  assert.equal(svolte.length, 1);
+  assert.ok(Math.abs(svolte[0] - 100) < 1);
+
+  // Fermi a 6 m dall'angolo, col GPS che si aggancia oltre l'angolo e la
+  // stima che va avanti: la freccia aspetta prima della svolta.
+  const m = new Moto();
+  m.svolte = svolte;
+  m.posizione({ metri: 94, v: 0.2, quando: 1000, lettura: { metri: 94, alle: 950, v: 0.2 }, adesso: 1000 });
+  m.passo(1000);
+  m.posizione({ metri: 104, v: 0.2, quando: 2000, lettura: { metri: 104, alle: 1950, v: 0.2 }, adesso: 2000 });
+  // Il GPS dice 104 (oltre l'angolo) ma andando piano: è passata davvero?
+  // Sì, l'ultima lettura è oltre: la freccia può andare.
+  assert.equal(m.primaDellaSvolta(103), Infinity);
+  // Una stima avanti con l'ultima lettura prima dell'angolo: si aspetta.
+  m.posizione({ metri: 95, v: 0.2, quando: 3000, lettura: { metri: 95, alle: 2950, v: 0.2 }, adesso: 3000 });
+  assert.equal(m.primaDellaSvolta(103), 99);
+  for (let t = 3000; t < 6000; t += 16) assert.ok(m.passo(t).s <= 99.01, `a ${t} ms oltre l'angolo`);
+  // Andando (sopra 3 m/s) la svolta si fa, e non si tiene.
+  m.posizione({ metri: 95, v: 8, quando: 7000, lettura: { metri: 95, alle: 6950, v: 8 }, adesso: 7000 });
+  assert.equal(m.primaDellaSvolta(103), Infinity);
+});

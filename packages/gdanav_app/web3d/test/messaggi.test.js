@@ -20,6 +20,15 @@ test('i messaggi buoni passano, quelli storti no', () => {
   assert.equal(decodifica({ v: 1, tipo: 'camera', modo: 'vola' }), null);
 });
 
+test("la velocità dall'auto e gli edifici dall'app passano (prima si scartavano)", () => {
+  // Come li manda l'app: `msgVelocita` e `msgEdifici` in lib/mappa/ponte_3d.dart.
+  assert.ok(decodifica({ v: 1, tipo: 'velocita', ms: 13.4, alle: 1731234567890 }));
+  assert.equal(decodifica({ v: 1, tipo: 'velocita', ms: -1, alle: 1 }), null);
+  assert.ok(decodifica({ v: 1, tipo: 'edifici', z: 14, x: 8838, y: 6144, dati: 'GtfwBQ==' }));
+  assert.ok(decodifica({ v: 1, tipo: 'edifici', z: 14, x: 8838, y: 6144, dati: null }));
+  assert.equal(decodifica({ v: 1, tipo: 'edifici', z: 14, x: 1.5, y: 6144, dati: null }), null);
+});
+
 test('le code ordinate, con livelli da 1 a 4', () => {
   assert.deepEqual(codeOrdinate([[50, 60, 9], [10, 20, 1], [30, 30, 2], [5, 8, 0]]), [[10, 20, 1], [50, 60, 4]]);
 });

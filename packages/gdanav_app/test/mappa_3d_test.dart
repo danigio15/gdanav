@@ -129,6 +129,41 @@ void main() {
       );
       expect(fuori['metri'], isNull);
       expect(fuori['velocita'], 0.0);
+      expect(fuori.containsKey('lettura'), isFalse);
+    });
+
+    test('la lettura del GPS com\'era, per il filtro della pagina, e la velocità del cruscotto', () {
+      final m = msgPosizione(
+        qui: const Punto(45, 9),
+        rotta: 0,
+        metri: 1250,
+        velocitaMs: 13.9,
+        zoom: 18,
+        quando: DateTime.fromMillisecondsSinceEpoch(1700000001000),
+        lettura: (
+          metri: 1236.04,
+          alle: DateTime.fromMillisecondsSinceEpoch(1700000000200),
+          velocitaMs: 13.876,
+          precisioneM: 4.27,
+        ),
+      );
+      expect(m['lettura'], {'metri': 1236.0, 'alle': 1700000000200, 'v': 13.88, 'precisione': 4.3});
+      // Senza velocità né precisione del GPS: solo dove e quando.
+      final senza = msgPosizione(
+        qui: const Punto(45, 9),
+        rotta: 0,
+        metri: 10,
+        velocitaMs: 0,
+        zoom: 18,
+        quando: DateTime(2026),
+        lettura: (metri: 10, alle: DateTime.fromMillisecondsSinceEpoch(5), velocitaMs: null, precisioneM: null),
+      );
+      expect(senza['lettura'], {'metri': 10.0, 'alle': 5});
+      final v = msgVelocita(ms: -0.4, alle: DateTime.fromMillisecondsSinceEpoch(77));
+      expect(v['tipo'], 'velocita');
+      expect(v['v'], versionePonte3d, reason: 'la versione resta: la velocità sta in «ms»');
+      expect(v['ms'], 0.0);
+      expect(v['alle'], 77);
     });
 
     test('la telecamera: segui, libera, panoramica col riquadro', () {

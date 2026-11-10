@@ -37,13 +37,27 @@ double _sei(double x) => (x * 1e6).roundToDouble() / 1e6;
 
 /// Giorno o notte, la vista, il colore dell'auto e il segnaposto (per la
 /// mappa vista da lontano, dove l'auto 3D non si vede).
-Map<String, Object?> msgOpzioni({required bool notte, required VistaMappa vista, required Segnaposto segnaposto}) =>
-    _m('opzioni', {
-      'notte': notte,
-      'vista': vista == VistaMappa.immersiva ? 'immersiva' : 'inclinata',
-      'auto': coloreAuto3d(segnaposto),
-      'icona': segnaposto.immagine,
-    });
+///
+/// [edifici]: l'app sa dare gli edifici di Overture ([msgEdifici]); la
+/// pagina li chiede per ogni tessera che costruisce.
+Map<String, Object?> msgOpzioni({
+  required bool notte,
+  required VistaMappa vista,
+  required Segnaposto segnaposto,
+  bool edifici = false,
+}) => _m('opzioni', {
+  'notte': notte,
+  'vista': vista == VistaMappa.immersiva ? 'immersiva' : 'inclinata',
+  'auto': coloreAuto3d(segnaposto),
+  'icona': segnaposto.immagine,
+  if (edifici) 'edifici': true,
+});
+
+/// Gli edifici di Overture della tessera [z]/[x]/[y] (una tessera vettoriale
+/// col solo livello `building`), o `null` se non ci sono: la pagina usa
+/// allora quelli di sempre.
+Map<String, Object?> msgEdifici(int z, int x, int y, Uint8List? dati) =>
+    _m('edifici', {'z': z, 'x': x, 'y': y, 'dati': dati == null ? null : base64Encode(dati)});
 
 /// Lo stile di sempre (`stileMappa`): la pagina lo adatta al 3D da sé.
 Map<String, Object?> msgStile(Map<String, Object> stile) => _m('stile', {'stile': stile});
@@ -103,6 +117,9 @@ Map<String, Object?> msgRisparmio(PropostaStrada? p) {
 /// Dove si è: il punto, la rotta, i metri lungo il percorso (o `null` fuori
 /// dal percorso), la velocità in m/s, lo zoom voluto e quando è stata letta
 /// (ms dall'epoca: la pagina la porta avanti fino ad adesso).
+///
+/// [lettura] è il GPS com'era (`GestoreGuida.letturaSulPercorso`): con lei
+/// la pagina fa da sé, col suo filtro, dove sta l'auto adesso.
 Map<String, Object?> msgPosizione({
   required Punto qui,
   required double rotta,
@@ -110,6 +127,7 @@ Map<String, Object?> msgPosizione({
   required double velocitaMs,
   required double zoom,
   required DateTime quando,
+  ({double metri, DateTime alle, double? velocitaMs, double? precisioneM})? lettura,
 }) => _m('posizione', {
   'lat': _sei(qui.lat),
   'lon': _sei(qui.lon),
@@ -118,7 +136,22 @@ Map<String, Object?> msgPosizione({
   'velocita': velocitaMs.isFinite ? math.max(0.0, (velocitaMs * 10).roundToDouble() / 10) : 0.0,
   'zoom': (zoom * 100).roundToDouble() / 100,
   'quando': quando.millisecondsSinceEpoch,
+  if (lettura != null && lettura.metri.isFinite)
+    'lettura': {
+      'metri': (lettura.metri * 10).roundToDouble() / 10,
+      'alle': lettura.alle.millisecondsSinceEpoch,
+      if (lettura.velocitaMs case final v? when v.isFinite) 'v': (math.max(0.0, v) * 100).roundToDouble() / 100,
+      if (lettura.precisioneM case final p? when p.isFinite && p > 0) 'precisione': (p * 10).roundToDouble() / 10,
+    },
 });
+
+/// La velocità dell'auto dal cruscotto (Android Auto, il dongle, Home
+/// Assistant), [ms] m/s letta [alle]: più volte al secondo e senza il
+/// ritardo del GPS, muove la freccia in partenza e in frenata.
+///
+/// Il campo è `ms` e non `v`: `v` è la versione del messaggio ([_m]).
+Map<String, Object?> msgVelocita({required double ms, required DateTime alle}) =>
+    _m('velocita', {'ms': (math.max(0.0, ms) * 100).roundToDouble() / 100, 'alle': alle.millisecondsSinceEpoch});
 
 /// Come si muove la telecamera.
 enum ModoCamera3d { segui, libera, panoramica }
@@ -184,6 +217,10 @@ sealed class MessaggioDalla3d {
         triangoli: (j['triangoli'] as num?)?.toInt() ?? 0,
       ),
       'toccata' => const Toccata3d(),
+      'edifici?' => switch ((j['z'], j['x'], j['y'])) {
+        (final int z, final int x, final int y) => ChiestiEdifici3d(z, x, y),
+        _ => null,
+      },
       'tocco' => Tocco3d([
         for (final e in (j['elementi'] as List?) ?? const [])
           if (e is Map) e.cast<Object?, Object?>(),
@@ -239,6 +276,12 @@ class Toccata3d extends MessaggioDalla3d {
 
 /// Un tocco su qualcosa (colonnina, distributore, punto): gli elementi come
 /// li dà MapLibre (`properties`, `geometry`).
+/// La pagina chiede gli edifici di Overture della tessera [z]/[x]/[y].
+class ChiestiEdifici3d extends MessaggioDalla3d {
+  const ChiestiEdifici3d(this.z, this.x, this.y);
+  final int z, x, y;
+}
+
 class Tocco3d extends MessaggioDalla3d {
   const Tocco3d(this.elementi);
   final List<Map<Object?, Object?>> elementi;

@@ -26,6 +26,7 @@ import 'stato/gestore_segnalazioni.dart';
 import 'stato/gestore_vicini.dart';
 import 'stato/licenza.dart';
 import 'stato/gestore_viaggio.dart';
+import 'stato/gestore_edifici.dart';
 import 'stato/gestore_ztl.dart';
 import 'stato/viaggi_pianificati.dart';
 import 'stato/prova_di_guida.dart';
@@ -118,6 +119,9 @@ Future<GdanavApp> preparaGdanav({
   final ztl = GestoreZtl(archivio);
   await ztl.carica();
   GestoreZtl.attuale = ztl;
+  // Gli edifici veri della scena 3D, da Overture: il pacchetto della zona si
+  // scarica quando serve, su una rete che non si paga a consumo.
+  GestoreEdifici.attuale ??= GestoreEdifici();
   final viaggio = GestoreViaggio(
     archivio: archivio,
     auto: auto,

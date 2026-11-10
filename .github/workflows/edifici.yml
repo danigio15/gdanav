@@ -1,0 +1,118 @@
+# Gli edifici d'Italia per la scena 3D, da Overture Maps.
+#
+# «Lungo il percorso voglio vedere le cose reali.» OpenStreetMap in molti
+# paesi gli edifici non li ha; Overture unisce i suoi a quelli che Microsoft
+# ha ricavato dalle foto dal satellite. Qui si preparano i pacchetti, uno per
+# cella z8 (circa 150 km di lato), e si mettono nella release «edifici» di
+# questo repository: l'app scarica quello della zona una volta e lo legge dal
+# telefono (nessun server da chiamare, nessun limite). Dati ODbL.
+#
+# Si rifà una volta al mese (Overture esce ogni mese) o a mano, scegliendo
+# il rilascio di Overture.
+name: edifici
+
+on:
+  workflow_dispatch:
+    inputs:
+      rilascio:
+        description: "Rilascio di Overture (es. 2026-10-21.0); vuoto: l'ultimo"
+        required: false
+        default: ""
+  schedule:
+    - cron: "17 3 2 * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: edifici
+  cancel-in-progress: false
+
+jobs:
+  celle:
+    runs-on: ubuntu-latest
+    outputs:
+      celle: ${{ steps.c.outputs.celle }}
+      rilascio: ${{ steps.r.outputs.rilascio }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyarrow shapely mapbox-vector-tile pmtiles
+      - id: r
+        name: Il rilascio di Overture
+        run: |
+          r="${{ github.event.inputs.rilascio }}"
+          if [ -z "$r" ]; then
+            r=$(curl -s "https://overturemaps-us-west-2.s3.us-west-2.amazonaws.com/?list-type=2&prefix=release/&delimiter=/" \
+              | grep -o '<Prefix>release/[^<]*/</Prefix>' | sed 's#<Prefix>release/##; s#/</Prefix>##' | sort | tail -1)
+          fi
+          echo "rilascio=$r" >> "$GITHUB_OUTPUT"
+          echo "Overture $r"
+      - id: c
+        run: echo "celle=$(python strumenti/edifici/prepara.py --italia --elenco)" >> "$GITHUB_OUTPUT"
+
+  prepara:
+    needs: celle
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        cella: ${{ fromJson(needs.celle.outputs.celle) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyarrow shapely mapbox-vector-tile pmtiles
+      - name: Il pacchetto della cella
+        id: p
+        run: |
+          python strumenti/edifici/prepara.py --cella "${{ matrix.cella }}" --rilascio "${{ needs.celle.outputs.rilascio }}" --uscita pacchetti | tee esito.json
+          echo "nome=$(echo '${{ matrix.cella }}' | tr / -)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: edifici-${{ steps.p.outputs.nome }}
+          path: |
+            pacchetti/
+            esito.json
+          if-no-files-found: ignore
+
+  pubblica:
+    needs: [celle, prepara]
+    if: always() && needs.celle.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: tutti
+      - name: L'indice dei pacchetti
+        run: |
+          mkdir -p uscita
+          find tutti -name '*.pmtiles' -exec mv {} uscita/ \;
+          python3 - <<'PY'
+          import json, glob, os
+          voci = {}
+          for f in glob.glob("tutti/*/esito.json"):
+              for riga in open(f):
+                  e = json.loads(riga)
+                  nome = "edifici-" + e["cella"].replace("/", "-") + ".pmtiles"
+                  if os.path.exists("uscita/" + nome):
+                      voci[e["cella"]] = {"file": nome, "byte": os.path.getsize("uscita/" + nome), "edifici": e["edifici"]}
+          json.dump({"rilascio_overture": "${{ needs.celle.outputs.rilascio }}", "zoom_celle": 8, "celle": voci,
+                     "attribuzione": "© OpenStreetMap, Overture Maps Foundation, Microsoft (ODbL)"},
+                    open("uscita/indice.json", "w"))
+          print(len(voci), "pacchetti", round(sum(v["byte"] for v in voci.values()) / 1e9, 2), "GB")
+          PY
+      - name: Nella release «edifici»
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view edifici > /dev/null 2>&1 || gh release create edifici --prerelease \
+            --title "GdANav · edifici per la scena 3D (non è l'app)" \
+            --notes "Gli edifici d'Italia da Overture Maps, un pacchetto PMTiles per cella z8, per la scena 3D di GdANav. Dati ODbL: © OpenStreetMap, Overture Maps Foundation, Microsoft."
+          gh release upload edifici uscita/* --clobber

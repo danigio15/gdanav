@@ -51,10 +51,16 @@ export const STILI_FACCIATA = Object.entries(VARIANTI_FACCIATA).flatMap(([s, n])
 /** Quanto sopra il terreno sta ogni classe di strada (per non litigare col suolo). */
 const SOPRA = { motorway: 0.24, trunk: 0.23, primary: 0.21, secondary: 0.2, tertiary: 0.18, minor: 0.16, service: 0.14, rail: 0.12 };
 
-/** I limiti di una tessera, per non chiedere troppo al telefono. */
+/** I limiti di una tessera, per non chiedere troppo al telefono.
+ *
+ * «Qui è pieno di case.» Una tessera di paese (Carinaro, 1631 edifici)
+ * ridotta ne teneva 736: le case piccole restavano fuori appena la tessera non
+ * era quella dell'auto. Con 100 000 ne entrano quasi tutte; il tetto di tutta
+ * la scena (`BUDGET.triangoli`) resta quello, e se non ci si sta si lasciano
+ * le tessere più lontane. */
 export const LIMITI = {
-  pieno: { alberi: 1800, triangoliEdifici: 140000, lampioni: 400, margine: 450 },
-  ridotto: { alberi: 0, triangoliEdifici: 60000, lampioni: 0, margine: 250 },
+  pieno: { alberi: 1800, triangoliEdifici: 200000, lampioni: 400, margine: 450 },
+  ridotto: { alberi: 0, triangoliEdifici: 100000, lampioni: 0, margine: 250 },
 };
 
 const tipoDi = (f) =>
@@ -834,7 +840,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   }
 
   // ── Gli alberi ────────────────────────────────────────────────────────
-  const alberi = lim.alberi > 0 ? piantaAlberi({ centro, sys, x, y, linee, visibili, edifici: edificiOut, limite: lim.alberi, seme, dentro }) : [];
+  const alberi = lim.alberi > 0 ? piantaAlberi({ centro, sys, x, y, linee, visibili, edifici: edificiOut, limite: lim.alberi, seme }) : [];
   // Le ombre degli alberi: macchie tonde e sfumate (una trama), non esagoni.
   const ombreAlberi = new Costruttore({ uv: true });
   const istanzeAlberi = istanzeDiAlberi(alberi, ombreAlberi);
@@ -1025,20 +1031,24 @@ export function stimaTriangoli(t) {
 }
 
 /**
- * Dove nascono gli alberi: dentro i boschi, i parchi e i prati veri della
- * tessera, lungo i viali e ai bordi delle autostrade; mai su una strada, in
- * un edificio o nell'acqua. Il seme è la tessera: tornandoci sono gli stessi.
+ * Dove nascono gli alberi: dentro i boschi e i parchi veri della tessera, e
+ * da nessun'altra parte; mai su una strada, in un edificio o nell'acqua. Il seme è la tessera: tornandoci sono gli stessi.
  */
-function piantaAlberi({ centro, sys, x, y, linee, visibili, edifici, limite, seme, dentro }) {
+function piantaAlberi({ centro, sys, x, y, linee, visibili, edifici, limite, seme }) {
   const rnd = generatore(seme ^ 0x9e3779b9);
   const meta = sys.lato / 2;
   const metriDi = (px, py) => sys.metri(x * ESTENSIONE + px, y * ESTENSIONE + py);
   const verde = [];
   const acqua = [];
+  /* «Lungo il percorso voglio vedere le cose reali, non alberi dove non ci
+   * sono.» Le tessere non hanno i singoli alberi: si sa solo dove c'è un
+   * bosco o un parco. Gli alberi nascono lì e basta. Prima nascevano anche nei
+   * prati, nei quartieri, nelle scuole, negli ospedali, nei campi sportivi,
+   * nei cimiteri, in filare lungo ogni strada principale e ai bordi delle
+   * autostrade: tutti inventati. */
   for (const [nome, tieni] of [
-    ['landcover', (c) => ['wood', 'grass', 'forest'].includes(c)],
+    ['landcover', (c) => ['wood', 'forest'].includes(c)],
     ['park', () => true],
-    ['landuse', (c) => ['cemetery', 'pitch', 'playground', 'residential', 'school', 'hospital'].includes(c)],
   ]) {
     const L = centro[nome];
     for (let i = 0; L && i < L.length; i++) {
@@ -1149,58 +1159,6 @@ function piantaAlberi({ centro, sys, x, y, linee, visibili, edifici, limite, sem
     celle.get(ck).push([px, py]);
     alberi.push([px, py, scala, conifera ? 1 : 0, Math.floor(rnd() * 100000)]);
   };
-  // Prima i viali e i bordi delle autostrade (pochi, e si vedono), poi il verde.
-  linee.forEach((pts, i) => {
-    const f = visibili[i];
-    if (alberi.length >= limite) return;
-    if (['primary', 'secondary', 'tertiary'].includes(f.cls) && !f.ponte) {
-      let acc = 0;
-      for (let k = 1; k < pts.length; k++) {
-        const [ax, ay, ah] = pts[k - 1];
-        const [bx, by, bh] = pts[k];
-        const d = Math.hypot(bx - ax, by - ay);
-        if (ah > 0.3 || bh > 0.3 || !d) {
-          acc += d;
-          continue;
-        }
-        const nx = -(by - ay) / d;
-        const ny = (bx - ax) / d;
-        for (let t = 11 - (acc % 11); t < d; t += 11) {
-          const x0 = ax + ((bx - ax) * t) / d;
-          const y0 = ay + ((by - ay) * t) / d;
-          if (!dentro(x0, y0) || mescola(Math.round(x0), Math.round(y0)) < 0.35) continue;
-          for (const lato of [-1, 1]) {
-            const off = f.w / 2 + 3.2;
-            const px = x0 + nx * off * lato;
-            const py = y0 + ny * off * lato;
-            if (!dentro(px, py) || bloccato(px, py, 6)) continue;
-            pianta(px, py, false, 0.75 + rnd() * 0.35);
-          }
-        }
-        acc += d;
-      }
-    }
-    if (['motorway', 'trunk'].includes(f.cls) && !f.ponte) {
-      for (let k = 1; k < pts.length; k++) {
-        const [ax, ay, ah] = pts[k - 1];
-        const [bx, by] = pts[k];
-        if (ah > 0.5 || !dentro(ax, ay)) continue;
-        const d = Math.hypot(bx - ax, by - ay);
-        if (!d || rnd() > 0.35) continue;
-        const nx = -(by - ay) / d;
-        const ny = (bx - ax) / d;
-        for (let j = 0; j < 4; j++) {
-          const lato = rnd() < 0.5 ? -1 : 1;
-          const off = f.w / 2 + 5 + rnd() * 14;
-          const t = rnd() * d;
-          const px = ax + ((bx - ax) * t) / d + nx * off * lato;
-          const py = ay + ((by - ay) * t) / d + ny * off * lato;
-          if (!dentro(px, py) || bloccato(px, py, 5)) continue;
-          pianta(px, py, rnd() < 0.25, 0.8 + rnd() * 0.5);
-        }
-      }
-    }
-  });
   for (const g of verde) {
     if (alberi.length >= limite) break;
     const r0 = g.anelli[0];
@@ -1215,18 +1173,8 @@ function piantaAlberi({ centro, sys, x, y, linee, visibili, edifici, limite, sem
       maxy = Math.max(maxy, py);
     }
     const a = Math.abs(area(r0));
-    const densita =
-      g.cls === 'wood' || g.cls === 'forest'
-        ? 1 / 45
-        : g.strato === 'park' || g.cls === 'park'
-          ? 1 / 110
-          : g.cls === 'cemetery'
-            ? 1 / 160
-            : g.cls === 'grass'
-              ? 1 / 260
-              : g.cls === 'residential'
-                ? 1 / 1400
-                : 1 / 600;
+    // Un bosco è fitto; un parco ha prati, viali e alberi, più radi.
+    const densita = g.cls === 'wood' || g.cls === 'forest' ? 1 / 45 : 1 / 110;
     const n = Math.min(4000, Math.round(a * densita));
     const spazio = g.cls === 'wood' ? 4.2 : 5.5;
     for (let k = 0; k < n * 2 && k < 8000 && alberi.length < limite; k++) {
