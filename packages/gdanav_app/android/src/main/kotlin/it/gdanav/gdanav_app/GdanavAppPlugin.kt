@@ -1,5 +1,7 @@
 package it.gdanav.gdanav_app
 
+import android.app.Activity
+import android.view.WindowManager
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -22,7 +24,32 @@ import it.gdanav.gdanav_app.auto.PosizioneInAuto
  */
 class GdanavAppPlugin : FlutterPlugin, ActivityAware {
     private var canale: MethodChannel? = null
+    private var schermo: MethodChannel? = null
+    private var attivita: Activity? = null
     private var permessi: Permessi? = null
+
+    /*
+     * Lo schermo acceso finché si guida (`lib/sorgenti/schermo_acceso.dart`):
+     * il telefono sul supporto non si tocca, e senza chiederlo Android lo
+     * scuriva fino al nero. Se la finestra era già accesa per conto dell'app
+     * ospite (il pannello a muro di GdAHome), alla fine della guida resta
+     * accesa: si rimette com'era.
+     */
+    private var primaDellaGuida: Boolean? = null
+
+    private fun tieniAcceso(acceso: Boolean): Boolean {
+        val finestra = attivita?.window ?: return false
+        val bandiera = WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        if (acceso) {
+            if (primaDellaGuida == null) primaDellaGuida = (finestra.attributes.flags and bandiera) != 0
+            finestra.addFlags(bandiera)
+        } else {
+            val prima = primaDellaGuida ?: return true
+            if (!prima) finestra.clearFlags(bandiera)
+            primaDellaGuida = null
+        }
+        return true
+    }
     private var ciclo: Lifecycle? = null
 
     /*
@@ -44,14 +71,23 @@ class GdanavAppPlugin : FlutterPlugin, ActivityAware {
                 if (p == null) risultato.success(false) else p.chiama(call, risultato)
             }
         }
+        schermo = MethodChannel(binding.binaryMessenger, "gdanav/schermo").also {
+            it.setMethodCallHandler { call, risultato ->
+                if (call.method != "acceso") return@setMethodCallHandler risultato.notImplemented()
+                risultato.success(tieniAcceso(call.arguments == true))
+            }
+        }
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         canale?.setMethodCallHandler(null)
         canale = null
+        schermo?.setMethodCallHandler(null)
+        schermo = null
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        attivita = binding.activity
         val p = Permessi(binding.activity)
         binding.addRequestPermissionsResultListener { codice, _, esiti -> p.risposta(codice, esiti) }
         permessi = p
@@ -64,6 +100,8 @@ class GdanavAppPlugin : FlutterPlugin, ActivityAware {
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) = onAttachedToActivity(binding)
 
     override fun onDetachedFromActivity() {
+        tieniAcceso(false)
+        attivita = null
         permessi = null
         ciclo?.removeObserver(davanti)
         ciclo = null

@@ -19,6 +19,7 @@ import '../mappa/dati_viaggio.dart' show puntoLungo;
 import '../mappa/scelta_vista.dart';
 import '../mappa/mappa_3d.dart';
 import '../mappa/mappa_viaggio.dart';
+import '../sorgenti/schermo_acceso.dart';
 import '../stato/avvisi_strada.dart';
 import '../stato/avvisi_ztl.dart';
 import '../stato/gestore_guida.dart';
@@ -151,6 +152,9 @@ class _SchermataGuidaState extends State<SchermataGuida> {
       unawaited(controllo.carica(a.vistaMappa(), nonVa: a.aumentataNonVa(), prima: a.vistaPrimaDellAumentata()));
     }
     widget.guida.avvia();
+    // Il telefono sul supporto non si tocca: senza chiederlo, il sistema
+    // abbassava lo schermo e poi lo spegneva (`SchermoAcceso`).
+    unawaited(SchermoAcceso.tieni(true));
     if (widget.segnalazioni case final seg?) _avvisi = AvvisiStrada.di(widget.guida, seg);
     if (widget.ztl case final z?) _ztl = AvvisiZtl.di(widget.guida, z);
   }
@@ -158,6 +162,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
   @override
   void dispose() {
     _battito?.cancel();
+    unawaited(SchermoAcceso.tieni(false));
     controllo.dispose();
     super.dispose();
   }
