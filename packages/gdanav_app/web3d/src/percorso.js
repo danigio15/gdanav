@@ -424,10 +424,13 @@ export function profiloDi(linea, s0, s1, indice, passo = 4) {
 }
 
 /** Più di così non si sposta: oltre, la strada giusta è un'altra. La
- * geometria del percorso (Valhalla) è quella delle stesse strade della mappa:
- * le differenze sono di un paio di metri, e sei bastavano a finire sulla
- * strada accanto. */
-export const SPOSTAMENTO_MAX_M = 4.5;
+ * geometria del percorso (Valhalla) è quella delle stesse strade della mappa,
+ * e le tessere la semplificano di poco: l'aggancio serve a quel poco. Con sei
+ * metri (e poi quattro e mezzo) la linea arrivava sulla strada accanto — la
+ * rampa, la complanare, l'altro lato della rotonda — e ci restava. */
+export const SPOSTAMENTO_MAX_M = 2.5;
+/** Fin qui lo spostamento è tutto; da qui al massimo si spegne. */
+export const SPOSTAMENTO_PIENO_M = 1.5;
 
 /**
  * Lo spostamento di ogni punto sul mezzo della strada sotto, morbido.
@@ -447,13 +450,13 @@ export function spostamenti(dxGrezzi, dyGrezzi) {
     let x = dxGrezzi[k];
     let y = dyGrezzi[k];
     if (Number.isNaN(x) || Number.isNaN(y)) continue;
+    // Verso il massimo lo spostamento si spegne piano: tagliato di netto,
+    // punti vicini al limite si agganciavano uno sì e uno no, e la linea
+    // ondeggiava.
     const l = Math.hypot(x, y);
-    if (l > SPOSTAMENTO_MAX_M) {
-      x = 0;
-      y = 0;
-    }
-    dx[k] = x;
-    dy[k] = y;
+    const peso = Math.min(1, Math.max(0, (SPOSTAMENTO_MAX_M - l) / (SPOSTAMENTO_MAX_M - SPOSTAMENTO_PIENO_M)));
+    dx[k] = x * peso;
+    dy[k] = y * peso;
   }
   const r = 4;
   const lisci = (a) => {
