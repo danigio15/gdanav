@@ -160,15 +160,27 @@ def prepara(cella, uscita: Path, rilascio: str) -> dict:
     per_tessera = tessere_di(cella, tabella)
     del tabella
     file = uscita / f"edifici-{cella[0]}-{cella[1]}-{cella[2]}.pmtiles"
-    scritte = 0
-    with open(file, "wb") as f:
+    # Le tessere prima, il file dopo: una cella senza tessere (mare, o
+    # edifici tutti nelle celle vicine) non ha pacchetto, e la libreria non sa
+    # chiuderne uno vuoto. Si scrive su un file a parte e si rinomina solo a
+    # pacchetto finito: un errore a metà non lascia un pacchetto rotto, che la
+    # release rifiuterebbe (o peggio, l'app scaricherebbe).
+    tessere = []
+    for tx, ty in sorted(per_tessera, key=lambda t: zxy_to_tileid(ZOOM, t[0], t[1])):
+        dati = tessera_mvt(tx, ty, per_tessera[(tx, ty)])
+        if dati is not None:
+            tessere.append((zxy_to_tileid(ZOOM, tx, ty), gzip.compress(dati)))
+    del per_tessera
+    scritte = len(tessere)
+    esito = {"cella": "/".join(map(str, cella)), "edifici": letti, "tessere": scritte, "megabyte": 0.0}
+    if not scritte:
+        esito["secondi"] = round(time.time() - t0)
+        return esito
+    mezzo = file.with_name(file.name + ".mezzo")
+    with open(mezzo, "wb") as f:
         w = Writer(f)
-        for tx, ty in sorted(per_tessera, key=lambda t: zxy_to_tileid(ZOOM, t[0], t[1])):
-            dati = tessera_mvt(tx, ty, per_tessera[(tx, ty)])
-            if dati is None:
-                continue
-            w.write_tile(zxy_to_tileid(ZOOM, tx, ty), gzip.compress(dati))
-            scritte += 1
+        for tid, dati in tessere:
+            w.write_tile(tid, dati)
         ow, os_, oe, on = confini(*cella)
         w.finalize(
             {
@@ -190,15 +202,9 @@ def prepara(cella, uscita: Path, rilascio: str) -> dict:
                 "vector_layers": [{"id": "building", "fields": {"render_height": "Number"}}],
             },
         )
-    esito = {
-        "cella": "/".join(map(str, cella)),
-        "edifici": letti,
-        "tessere": scritte,
-        "megabyte": round(file.stat().st_size / 1e6, 1),
-        "secondi": round(time.time() - t0),
-    }
-    if not scritte:
-        file.unlink()
+    mezzo.replace(file)
+    esito["megabyte"] = round(file.stat().st_size / 1e6, 1)
+    esito["secondi"] = round(time.time() - t0)
     return esito
 
 
