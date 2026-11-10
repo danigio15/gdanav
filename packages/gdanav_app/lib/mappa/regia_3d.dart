@@ -27,7 +27,7 @@ typedef Mappa3dNonVa = void Function(String motivo, {required bool ricorda});
 
 /// Come vuole stare la telecamera: libera (un dito l'ha spostata) o no, e
 /// quanto dello schermo coprono le schede, sopra e a sinistra (in punti).
-typedef Inquadratura3d = ({bool libera, double sopra, double sinistra});
+typedef Inquadratura3d = ({bool libera, double sopra, double sinistra, double destra});
 
 /// Cosa mandare alla mappa 3D, e quando: lo stile, il percorso con le code,
 /// la freccia della manovra, colonnine, meta, autovelox e segnalazioni, la
@@ -57,6 +57,7 @@ class Regia3d {
     this.orologio,
     this.attesa = const Duration(seconds: 15),
     this.piuVicina = 0,
+    this.zoomScelto,
     this.inclinazione,
     Future<Uint8List?> Function(int z, int x, int y)? edifici,
   }) : edifici = edifici ?? GestoreEdifici.attuale?.tessera;
@@ -100,6 +101,17 @@ class Regia3d {
   /// scena piatta («lo zoom troppo lontano e piatto»).
   final double piuVicina;
 
+  /// Lo zoom scelto da chi guida (i tasti, le dita), in livelli in più o in
+  /// meno: sull'auto la scena 3D non ha altro modo di saperlo.
+  final double Function()? zoomScelto;
+
+  /// Lo zoom scelto è cambiato: la posizione si rimanda subito, con lui.
+  void nuovoZoom() {
+    _letturaMandata = null;
+    _lettaMandata = null;
+    dallaGuida();
+  }
+
   /// L'inclinazione della telecamera, in gradi; `null`: quella della vista.
   /// Sull'auto più dall'alto: «voglio vederla un po' più dall'alto».
   final double? inclinazione;
@@ -120,6 +132,7 @@ class Regia3d {
   ModoCamera3d? _modoMandato;
   double? _sopraMandato;
   double? _sinistraMandata;
+  double? _destraMandata;
   VistaMappa? _vistaMandata;
   Segnaposto? _segnapostoMandato;
   Viaggio? _panoramicaDi;
@@ -362,7 +375,8 @@ class Regia3d {
               velocitaStradaKmh: a?.velocitaStradaKmh ?? 0,
               allaProssimaM: a == null ? 0 : (a.prossima == null ? a.restantiM : a.allaProssimaM),
             ) +
-            piuVicina,
+            piuVicina +
+            (zoomScelto?.call() ?? 0),
         // La stima è già portata ad adesso (`metriStimati`).
         quando: _ora(),
         lettura: g.letturaSulPercorso,
@@ -396,11 +410,18 @@ class Regia3d {
     final c = inquadratura();
     final modo = c.libera ? ModoCamera3d.libera : ModoCamera3d.segui;
     if (_panoramicaDi != null && !forza) return;
-    if (!forza && modo == _modoMandato && c.sopra == _sopraMandato && c.sinistra == _sinistraMandata) return;
+    if (!forza &&
+        modo == _modoMandato &&
+        c.sopra == _sopraMandato &&
+        c.sinistra == _sinistraMandata &&
+        c.destra == _destraMandata) {
+      return;
+    }
     _modoMandato = modo;
     _sopraMandato = c.sopra;
     _sinistraMandata = c.sinistra;
-    _manda(msgCamera(modo, sopra: c.sopra, sinistra: c.sinistra, pitch: inclinazione));
+    _destraMandata = c.destra;
+    _manda(msgCamera(modo, sopra: c.sopra, sinistra: c.sinistra, destra: c.destra, pitch: inclinazione));
   }
 
   void _segnalazioni() {

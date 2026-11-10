@@ -17,6 +17,52 @@
 /** Quanto si va verso [voluto] in [dt] ms, con costante [tau] ms. */
 export const smorza = (attuale, voluto, dt, tau) => attuale + (voluto - attuale) * (1 - Math.exp(-Math.max(0, dt) / tau));
 
+/**
+ * Il raccordo fra un profilo del percorso e il successivo, sotto la freccia.
+ *
+ * «La navigazione continua a non essere fluida: va a scatti.» La freccia sta
+ * sulla strada col profilo del percorso: lo spostamento di lato verso il
+ * mezzo della strada e la quota. Il profilo si rifà spesso (a ogni tessera
+ * nuova, e quando la finestra scorre), e dove si è il nuovo poteva dire due o
+ * tre metri diversi dal vecchio: freccia e telecamera saltavano di colpo.
+ * Adesso la differenza diventa una correzione che si spegne in mezzo
+ * secondo: si arriva al nuovo piano, e per il resto si segue la strada
+ * esattamente come prima (anche su una rampa che sale).
+ */
+export class Raccordo {
+  constructor(tau = 450, salto = 8) {
+    this.tau = tau;
+    this.salto = salto;
+    this.profilo = null;
+    this.x = 0;
+    this.y = 0;
+    this.z = 0;
+  }
+
+  /**
+   * La correzione `[x, y, z]` da aggiungere a [profilo] in [s], dopo [dt] ms.
+   * [valori] `(profilo, s)` dà `[dx, dy, quota]`, o `null` fuori dal profilo.
+   */
+  passo(profilo, s, valori, dt) {
+    const k = Math.exp(-Math.max(0, dt) / this.tau);
+    this.x *= k;
+    this.y *= k;
+    this.z *= k;
+    if (profilo !== this.profilo) {
+      const a = this.profilo && s !== null && s !== undefined ? valori(this.profilo, s) : null;
+      const b = a && profilo ? valori(profilo, s) : null;
+      // Oltre qualche metro non è lo stesso posto (un percorso nuovo): si va.
+      if (a && b && Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < this.salto) {
+        this.x += a[0] - b[0];
+        this.y += a[1] - b[1];
+        this.z += a[2] - b[2];
+      }
+      this.profilo = profilo;
+    }
+    return [this.x, this.y, this.z];
+  }
+}
+
 /** L'angolo (gradi) da [a] verso [b] per la via più corta, di [f]. */
 export function angoloVerso(a, b, f) {
   const d = ((((b - a) % 360) + 540) % 360) - 180;

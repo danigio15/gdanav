@@ -11,8 +11,8 @@ import { BUDGET, daDisegnare, pianoTessere } from './budget.js';
 import { valutaPrestazioni, valutaWebgl } from './capacita.js';
 import { chiave as chiaveTessera, daChiave, mercPerMetro, latDaMerc } from './geo.js';
 import { codeOrdinate, decodifica } from './messaggi.js';
-import { angoloVerso, Moto, smorza, svolteDi } from './moto.js';
-import { IndiceSegmenti, Linea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote } from './percorso.js';
+import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
+import { IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, spostamenti } from './percorso.js';
 import { BIT_OMBRA, Scena } from './scena.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
 import { GIORNO, NOTTE } from './tavolozza.js';
@@ -24,8 +24,23 @@ const TOCCABILI = ['persone', 'alternative-etichetta', 'alternative', 'gdanav-so
 /** Le viste: inclinazione e zoom di partenza (il prototipo approvato). */
 const VISTE = { inclinata: { pitch: 70, zoom: 17.9 }, immersiva: { pitch: 74, zoom: 18.3 } };
 
-/** Al più un fotogramma ogni tanto: trenta al secondo bastano. */
+/** Al più un fotogramma ogni tanto: trenta al secondo da fermi, o col
+ * telefono che fatica; sessanta andando, se il disegno costa poco. «Va a
+ * scatti»: a trenta, con la telecamera che segue l'auto e i fotogrammi che
+ * non arrivano sempre allo stesso passo, sullo schermo dell'auto si vedeva. */
 const FOTOGRAMMA_MS = 1000 / 30;
+const FOTOGRAMMA_SVELTO_MS = 1000 / 60;
+/** Il disegno di un fotogramma (ms) sotto cui si va a sessanta, e sopra cui si torna a trenta. */
+const SVELTO_SOTTO_MS = 6;
+const LENTO_SOPRA_MS = 10;
+let svelto = false;
+
+function intervalloDeiFotogrammi() {
+  const ms = S.msDisegno ?? Infinity;
+  if (svelto && ms > LENTO_SOPRA_MS) svelto = false;
+  else if (!svelto && ms < SVELTO_SOTTO_MS) svelto = true;
+  return svelto && moto.velocita > 2 ? FOTOGRAMMA_SVELTO_MS : FOTOGRAMMA_MS;
+}
 
 /** Fin dove davanti all'auto si fa il percorso in 3D, e da quanto dietro. */
 const FINESTRA_AVANTI = 2600;
@@ -51,7 +66,7 @@ const S = {
   risparmio: null,
   posizione: null,
   zoomVoluto: null,
-  camera: { modo: 'segui', sopra: 0, sinistra: 0, riquadro: null },
+  camera: { modo: 'segui', sopra: 0, sinistra: 0, destra: 0, riquadro: null },
   pausa: false,
   grezze: new Map(),
   /** Gli edifici di Overture dall'app, per tessera: `{dati, quando}` (dati null: non ci sono). */
@@ -71,6 +86,9 @@ const S = {
 const scena = new Scena();
 const indice = new IndiceSegmenti();
 const moto = new Moto();
+const raccordo = new Raccordo();
+/** Lo spostamento e la quota di un profilo in [s], se ci arriva (vedi [Raccordo]). */
+const valoriDelProfilo = (pr, s) => (pr && s >= pr.s0 && s <= pr.s1 ? [...pr.sposta(s), pr.quota(s)] : null);
 
 // ─── Il ponte con l'app ──────────────────────────────────────────────────
 
@@ -224,7 +242,7 @@ const GESTORI = {
   },
   camera(m) {
     const prima = S.camera.modo;
-    S.camera = { modo: m.modo, sopra: m.sopra ?? S.camera.sopra, sinistra: m.sinistra ?? S.camera.sinistra ?? 0, pitch: m.pitch ?? null, riquadro: m.riquadro ?? null };
+    S.camera = { modo: m.modo, sopra: m.sopra ?? S.camera.sopra, sinistra: m.sinistra ?? 0, destra: m.destra ?? 0, pitch: m.pitch ?? null, riquadro: m.riquadro ?? null };
     if (m.modo === 'segui' && prima !== 'segui') S.transizione = { da: performance.now(), dur: 900, partenza: null };
     if (m.modo === 'panoramica' && m.riquadro && S.mappa) {
       const [s, o, n, e] = m.riquadro;
@@ -1045,7 +1063,14 @@ function aggiornaTraffico(adesso) {
       const passo = 5;
       const punti = [];
       for (let s = 0; s <= L; s += passo) punti.push(linea.a(s).slice(0, 2));
-      const prof = new Profilo(0, passo, riempiQuote(quote(punti, indice)));
+      // Lungo il percorso il traffico lo dice già lui, coi suoi colori.
+      const pr = S.percorso;
+      if (pr?.linea && lungoLaLinea(pr.linea, punti, pr.profilo?.s0 ?? 0, pr.profilo?.s1 ?? Infinity)) continue;
+      // La geometria del traffico è di chi lo fornisce, non della mappa: ci si
+      // appoggia sulle strade come il percorso.
+      const grezze = quote(punti, indice);
+      const [sx, sy] = spostamenti(grezze.dx, grezze.dy);
+      const prof = new Profilo(0, passo, riempiQuote(grezze), null, sx, sy);
       parti.push(nastro(linea, prof, 0, L, 2.4, 0.34, { passo, code: [[0, L + 1, lento < 0.3 ? 2 : 1]] }));
     }
   }
@@ -1436,7 +1461,7 @@ function fotogramma(adesso) {
   richiesta = null;
   // Col tempo delle prove (i video) i fotogrammi li chiede il collaudo.
   if (S.pausa || !S.mappa || !S.stileCaricato || S.orologioProva !== undefined) return;
-  if (adesso - ultimoFotogramma < FOTOGRAMMA_MS - 2) {
+  if (adesso - ultimoFotogramma < intervalloDeiFotogrammi() - 2) {
     richiesta = requestAnimationFrame(fotogramma);
     return;
   }
@@ -1468,14 +1493,18 @@ function muovi(adesso, dt) {
     const s = Math.min(pos.s, p.linea.lunghezza);
     [x, y] = p.linea.a(s);
     const prof = p.profilo;
-    // Sulla strada come la linea (vedi `spostamenti` in percorso.js).
+    // Sulla strada come la linea (vedi `spostamenti` in percorso.js); quando
+    // il profilo si rifà, ci si arriva piano (vedi [Raccordo]).
+    const [cx, cy, cz] = raccordo.passo(prof, s, valoriDelProfilo, dt);
     if (prof) {
       const [sx, sy] = prof.sposta(s);
       x += sx;
       y += sy;
     }
+    x += cx;
+    y += cy;
     const q = (v) => (prof && v >= prof.s0 && v <= prof.s1 ? prof.quota(v) : 0);
-    z = q(s);
+    z = q(s) + cz;
     // La strada su cui si sta, non quella dove si andrà: da cinque metri
     // dietro a uno avanti. Centrata, la freccia girava prima dell'angolo.
     const [dx0, dy0] = p.linea.a(s - 5);
@@ -1532,8 +1561,13 @@ function muovi(adesso, dt) {
     // Lo spazio delle schede, mai più di metà schermo: con misure sbagliate
     // (l'auto le dà in punti suoi) l'auto finiva in un angolo, lontana.
     const sopra = Math.min(H * 0.12 + S.camera.sopra * 0.8, H * 0.5);
+    // In larghezza l'auto sta in mezzo alla parte libera: a sinistra il
+    // cruscotto di traverso sul telefono, a destra l'altra app dello schermo
+    // diviso sull'auto («la navigazione si nasconde sotto l'altro pezzo di
+    // schermo»).
     const sinistra = Math.min(S.camera.sinistra ?? 0, W * 0.45);
-    let voluta = { center: [lon, lat], zoom: c.zoom, pitch: c.pitch, bearing: c.rotta, padding: { top: sopra, bottom: 0, left: sinistra, right: 0 } };
+    const destra = Math.min(S.camera.destra ?? 0, W * 0.45);
+    let voluta = { center: [lon, lat], zoom: c.zoom, pitch: c.pitch, bearing: c.rotta, padding: { top: sopra, bottom: 0, left: sinistra, right: destra } };
     const tr = S.transizione;
     if (tr) {
       tr.partenza ??= { center: m.getCenter().toArray(), zoom: m.getZoom(), pitch: m.getPitch(), bearing: m.getBearing() };

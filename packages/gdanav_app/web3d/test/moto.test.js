@@ -110,3 +110,30 @@ test('alle svolte, fermi o quasi, la freccia non gira prima dell\'auto', async (
   m.posizione({ metri: 95, v: 8, quando: 7000, lettura: { metri: 95, alle: 6950, v: 8 }, adesso: 7000 });
   assert.equal(m.primaDellaSvolta(103), Infinity);
 });
+
+test('il profilo che si rifà non fa saltare la freccia: ci arriva piano', async () => {
+  const { Raccordo } = await import('../src/moto.js');
+  // «La navigazione continua a non essere fluida: va a scatti.» Il profilo
+  // nuovo, dove si è, sposta di tre metri più in là del vecchio.
+  const vecchio = { nome: 'vecchio' };
+  const nuovo = { nome: 'nuovo' };
+  const valori = (p, s) => (p === vecchio ? [0, 0, 1] : [3, 0, 1.5]);
+  const r = new Raccordo(450);
+  assert.deepEqual(r.passo(vecchio, 100, valori, 33), [0, 0, 0]);
+  // Al cambio la correzione è la differenza: si resta dov'era.
+  const [x, , z] = r.passo(nuovo, 100, valori, 33);
+  assert.ok(Math.abs(x + 3) < 1e-9 && Math.abs(z + 0.5) < 1e-9, `${x}, ${z}`);
+  // E si spegne: mai un passo più grande di quello di un fotogramma morbido.
+  let prima = x;
+  for (let t = 0; t < 3000; t += 33) {
+    const [cx] = r.passo(nuovo, 100, valori, 33);
+    assert.ok(Math.abs(cx - prima) < 0.25, `un salto di ${(cx - prima).toFixed(2)} m in un fotogramma`);
+    prima = cx;
+  }
+  assert.ok(Math.abs(prima) < 0.01, `dopo tre secondi resta ${prima}`);
+  // Un percorso nuovo (oltre otto metri) non si raccorda.
+  const lontano = { nome: 'lontano' };
+  const r2 = new Raccordo(450);
+  r2.passo(vecchio, 10, (p) => (p === vecchio ? [0, 0, 0] : [20, 0, 0]), 33);
+  assert.deepEqual(r2.passo(lontano, 10, (p) => (p === vecchio ? [0, 0, 0] : [20, 0, 0]), 33), [0, 0, 0]);
+});

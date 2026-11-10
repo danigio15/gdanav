@@ -102,6 +102,7 @@ class _Mappa3dState extends State<Mappa3d> {
         libera: widget.controllo.libera,
         sopra: widget.controllo.coperto,
         sinistra: widget.controllo.copertoSinistra,
+        destra: 0,
       ),
       onNonVa: (motivo, {required ricorda}) => widget.onNonVa(motivo, ricorda: ricorda),
       segnalazioni: widget.segnalazioni,

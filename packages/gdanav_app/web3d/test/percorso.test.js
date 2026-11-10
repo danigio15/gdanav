@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { IndiceSegmenti, Linea, Origine, Profilo, nastro, profiloDi, quote, riempiQuote } from '../src/percorso.js';
+import { IndiceSegmenti, Linea, Origine, Profilo, lungoLaLinea, nastro, profiloDi, quote, riempiQuote } from '../src/percorso.js';
 
 /** Segmenti finti: [x0,y0,z0,x1,y1,z1,w,codice]. */
 function indice(segmenti) {
@@ -60,21 +60,75 @@ test('sotto un cavalcavia di sbieco la linea resta a terra, anche cambiando carr
   assert.ok(Math.max(...h) < 0.5, `la linea sale sul ponte (${Math.max(...h).toFixed(1)} m)`);
 });
 
-test('la linea si appoggia sulla strada: tre metri di lato tornano in mezzo', () => {
+test('la linea si appoggia sulla strada: un metro di lato torna in mezzo', () => {
   // «In alcuni punti la linea del percorso non è sulla strada.»
   const i = indice([[-400, 0, 0, 400, 0, 0, 10, 1]]);
-  const l = new Linea([-300, 3, 300, 3]);
+  const l = new Linea([-300, 1.2, 300, 1.2]);
   const p = profiloDi(l, 0, 600, i);
   const [dx, dy] = p.sposta(300);
-  assert.ok(Math.abs(dx) < 0.1 && Math.abs(dy + 3) < 0.1, `spostamento ${dx.toFixed(2)}, ${dy.toFixed(2)}`);
+  assert.ok(Math.abs(dx) < 0.1 && Math.abs(dy + 1.2) < 0.1, `spostamento ${dx.toFixed(2)}, ${dy.toFixed(2)}`);
   const n = nastro(l, p, 250, 350, 4, 0.6);
   const ys = [];
   for (let k = 1; k < n.posizioni.length; k += 3) ys.push(n.posizioni[k]);
   const mezzo = (Math.max(...ys) + Math.min(...ys)) / 2;
   assert.ok(Math.abs(mezzo) < 0.2, `il nastro sta in mezzo alla strada (${mezzo.toFixed(2)})`);
-  // Lontano dalle strade (oltre sei metri) non si sposta.
+  // Lontano dalle strade (oltre due metri e mezzo) non si sposta: la strada
+  // giusta è un'altra.
+  const accanto = profiloDi(new Linea([-300, 4, 300, 4]), 0, 600, i);
+  assert.deepEqual(accanto.sposta(300), [0, 0]);
   const lontana = profiloDi(new Linea([-300, 20, 300, 20]), 0, 600, i);
   assert.deepEqual(lontana.sposta(300), [0, 0]);
+});
+
+test("allo svincolo, se non si esce, la linea resta diritta sulla carreggiata", () => {
+  // «Agli svincoli se non devo uscire comunque la linea del percorso non è
+  // diritta: va allo svincolo e poi ritorna al centro.» La carreggiata lungo
+  // x; da x = 0 la rampa si stacca verso il basso. Il percorso va dritto,
+  // un metro e venti sotto la carreggiata disegnata: dove la rampa si stacca
+  // è lei la più vicina.
+  const i = indice([
+    [-400, 0, 0, 400, 0, 0, 10, 1],
+    [0, -2, 0, 200, -30, 0, 7, 1],
+  ]);
+  const l = new Linea([-300, -1.2, 300, -1.2]);
+  const p = profiloDi(l, 0, 600, i);
+  for (let s = 250; s <= 350; s += 2) {
+    const [, dy] = p.sposta(s);
+    assert.ok(Math.abs(dy - 1.2) < 0.2, `a ${s - 300} m dalla rampa la linea va di ${dy.toFixed(2)} m invece di 1,2`);
+  }
+});
+
+test('fra due strade vicine la linea non salta da una all\'altra', () => {
+  // Due strade parallele a 4 m (una rotonda vista da vicino, una
+  // complanare): il percorso sta su quella sotto, con un rumore che a volte
+  // lo porta più vicino all'altra.
+  const i = indice([
+    [-400, 0, 0, 400, 0, 0, 6, 5],
+    [-400, 4, 0, 400, 4, 0, 6, 5],
+  ]);
+  const xy = [];
+  for (let x = -300; x <= 300; x += 10) xy.push(x, (x / 10) % 2 ? 2.2 : 0.4);
+  const l = new Linea(xy);
+  const p = profiloDi(l, 0, l.lunghezza, i);
+  for (let s = 20; s < l.lunghezza - 20; s += 4) {
+    const [x, y] = l.a(s);
+    const [, dy] = p.sposta(s);
+    // Mai sull'altra strada (a 4 m): al più il resto della levigatura.
+    assert.ok(y + dy < 2.3, `a ${x.toFixed(0)} m la linea è a ${(y + dy).toFixed(2)} m dalla sua strada`);
+  }
+});
+
+test('il traffico lungo il percorso non si disegna una seconda volta', () => {
+  // «La linea del traffico non segue la linea del percorso ma è decentrata.»
+  const percorso = new Linea([0, 0, 500, 0]);
+  const accanto = [];
+  for (let x = 50; x <= 300; x += 5) accanto.push([x, 6]);
+  assert.equal(lungoLaLinea(percorso, accanto, 0, 500), true, 'a sei metri, lungo il percorso');
+  const traversa = [];
+  for (let y = -200; y <= 200; y += 5) traversa.push([250, y]);
+  assert.equal(lungoLaLinea(percorso, traversa, 0, 500), false, 'una strada che lo incrocia resta');
+  const lontana = accanto.map(([x]) => [x, 40]);
+  assert.equal(lungoLaLinea(percorso, lontana, 0, 500), false, 'una strada parallela lontana resta');
 });
 
 test('i buchi: corti si riempiono, lunghi tornano a terra', () => {

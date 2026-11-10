@@ -175,6 +175,9 @@ void main() {
       // Di traverso il cruscotto copre la sinistra: la pagina sposta l'auto.
       expect(msgCamera(ModoCamera3d.segui, sinistra: 435)['sinistra'], 435);
       expect(msgCamera(ModoCamera3d.segui).containsKey('sinistra'), isFalse);
+      // Lo schermo diviso: l'altra app copre la destra.
+      expect(msgCamera(ModoCamera3d.segui, destra: 300)['destra'], 300);
+      expect(msgCamera(ModoCamera3d.segui).containsKey('destra'), isFalse);
       final c = ControlloMappa();
       var avvisi = 0;
       c.addListener(() => avvisi++);
@@ -195,6 +198,8 @@ void main() {
       expect(citta, 17.9);
       expect(zoom3d(VistaMappa.immersiva, velocitaStradaKmh: 50, allaProssimaM: 200), greaterThan(citta));
       expect(zoom3d(VistaMappa.inclinata, velocitaStradaKmh: 130, allaProssimaM: 20000), lessThan(citta));
+      // «In navigazione su autostrada lo zoom è troppo lontano»: al più mezzo livello.
+      expect(zoom3d(VistaMappa.inclinata, velocitaStradaKmh: 130, allaProssimaM: 20000), closeTo(citta - 0.5, 1e-9));
     });
   });
 
