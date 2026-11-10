@@ -114,6 +114,42 @@ void main() {
       expect(OpzioniPercorso.daJson(o.toJson()).toJson(), o.toJson());
     });
 
+    test('le ZTL da evitare vanno a Valhalla come aree escluse', () async {
+      // «Sarebbe utilissimo aggiungere anche "Evita ZTL"»: col server gratuito
+      // il percorso entrava nelle ZTL, perché solo TomTom riceveva le aree.
+      final chiesti = <Map<String, Object?>>[];
+      final client = MockClient((r) async {
+        if (r.url.path == '/trace_attributes') return http.Response('{"edges":[]}', 200);
+        chiesti.add(jsonDecode(r.body) as Map<String, Object?>);
+        return http.Response(jsonEncode(utrecht()), 200);
+      });
+      final v = ClienteValhalla(Uri.parse('https://valhalla.esempio.dev/'), client: client);
+      const ztl = Rettangolo(52.08, 5.11, 52.09, 5.13);
+      await v.calcola(const [Punto(52.0907, 5.1214), Punto(52.064, 5.19)]);
+      await v.calcola(const [Punto(52.0907, 5.1214), Punto(52.064, 5.19)], evita: const [ztl]);
+      await v.alternative(const Punto(52.0907, 5.1214), const Punto(52.064, 5.19), evita: const [ztl]);
+      expect(chiesti.first.containsKey('exclude_polygons'), isFalse);
+      final anello = [
+        [5.11, 52.08],
+        [5.13, 52.08],
+        [5.13, 52.09],
+        [5.11, 52.09],
+        [5.11, 52.08],
+      ];
+      expect(chiesti[chiesti.length - 2]['exclude_polygons'], [anello]);
+      expect(chiesti.last['exclude_polygons'], [anello]);
+    });
+
+    test('«Evita ZTL» è acceso di serie, si ricorda e cambia la strada', () {
+      const o = OpzioniPercorso();
+      expect(o.evitaZtl, isTrue);
+      expect(OpzioniPercorso.daJson(const {}).evitaZtl, isTrue, reason: 'chi aveva le opzioni di prima');
+      final spento = o.copia(evitaZtl: false);
+      expect(OpzioniPercorso.daJson(spento.toJson()).evitaZtl, isFalse);
+      expect(o.stessaStrada(spento), isFalse);
+      expect(spento.riassunto, 'Più veloce · anche nelle ZTL');
+    });
+
     test('i limiti di velocità arrivano da trace_attributes, lungo le stesse strade', () async {
       late Map<String, Object?> traccia;
       final client = MockClient((r) async {

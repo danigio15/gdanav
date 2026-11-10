@@ -77,6 +77,15 @@ class PannelloOpzioniPercorso extends StatelessWidget {
           value: o.evitaTraghetti,
           onChanged: (v) => onCambia(o.copia(evitaTraghetti: v)),
         ),
+        SwitchListTile(
+          key: const Key('evita-ztl'),
+          contentPadding: EdgeInsets.zero,
+          secondary: const Icon(Icons.block_outlined),
+          title: const Text('ZTL'),
+          subtitle: const Text('Quelle attive, se non hai il permesso'),
+          value: o.evitaZtl,
+          onChanged: (v) => onCambia(o.copia(evitaZtl: v)),
+        ),
         const SizedBox(height: 16),
         Text('Pedaggio', style: t.titleSmall),
         ListTile(
