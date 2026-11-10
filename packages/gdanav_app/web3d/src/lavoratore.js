@@ -24,10 +24,16 @@ function decodifica(chiave, dati) {
 }
 
 self.onmessage = (e) => {
-  const { id, z, x, y, tessere, dettaglio } = e.data;
+  const { id, z, x, y, tessere, dettaglio, edifici } = e.data;
   try {
     const livelli = {};
     for (const [off, { chiave, dati }] of Object.entries(tessere)) livelli[off] = decodifica(chiave, dati);
+    // Gli edifici di Overture dall'app, al posto di quelli di sempre (vedi
+    // `chiedi` in principale.js). Una copia: le tessere decodificate si tengono.
+    if (edifici && livelli['0,0']) {
+      const veri = new VectorTile(new Pbf(new Uint8Array(edifici))).layers.building;
+      if (veri) livelli['0,0'] = { ...livelli['0,0'], building: veri };
+    }
     const t = costruisciTessera({ z, x, y, livelli, dettaglio });
     self.postMessage({ id, tessera: t }, bufferDellaTessera(t));
   } catch (err) {

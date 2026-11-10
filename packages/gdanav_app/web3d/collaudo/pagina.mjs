@@ -61,9 +61,10 @@ export function lungo(punti, metri) {
 
 /**
  * Apre la pagina per [caso] (`{punti, code, manovra}`) e le manda tutto;
- * restituisce `{page, ctx, manda, posizione, messaggi}`.
+ * restituisce `{page, ctx, manda, posizione, messaggi}`. [opzioni] si
+ * aggiunge alle prime opzioni; [ascolta] riceve ogni messaggio della pagina.
  */
-export async function apri(browser, { porta, cartella, rotta, caso, notte, larghezza = 390, altezza = 844, vista = 'inclinata', nome, sinistra = 0 }) {
+export async function apri(browser, { porta, cartella, rotta, caso, notte, larghezza = 390, altezza = 844, vista = 'inclinata', nome, sinistra = 0, opzioni = {}, ascolta = null }) {
   const ctx = await browser.newContext({ viewport: { width: larghezza, height: altezza }, deviceScaleFactor: 2 });
   await ctx.route(/https:\/\/(tiles\.openfreemap\.org|api\.tomtom\.com)\/.*/, async (route) => {
     try {
@@ -83,11 +84,17 @@ export async function apri(browser, { porta, cartella, rotta, caso, notte, largh
     errori.push(e.message);
     console.log(`[${nome}] errore`, e.message, (e.stack ?? '').split('\n').slice(0, 3).join(' | '));
   });
-  await page.exposeFunction('__ascolta', (t) => messaggi.push(JSON.parse(t)));
+  // [ascolta]: chi fa la parte dell'app e risponde (es. agli «edifici?»).
+  let manda = null;
+  await page.exposeFunction('__ascolta', (t) => {
+    const m = JSON.parse(t);
+    messaggi.push(m);
+    if (ascolta && manda) ascolta(m, manda);
+  });
   await page.goto(`http://127.0.0.1:${porta}/index.html?prova=1&software=1`);
-  const manda = (m) => page.evaluate((x) => window.gdanav3d.ricevi(x), { v: 1, ...m });
+  manda = (m) => page.evaluate((x) => window.gdanav3d.ricevi(x), { v: 1, ...m });
   // ICONA=freccia: la freccia al posto dell'auto rossa.
-  await manda({ tipo: 'opzioni', notte, vista, auto: '#d62a26', icona: process.env.ICONA ?? 'auto_rossa' });
+  await manda({ tipo: 'opzioni', notte, vista, auto: '#d62a26', icona: process.env.ICONA ?? 'auto_rossa', ...opzioni });
   await manda({ tipo: 'stile', stile: stile(cartella, notte) });
   for (const [n, png] of Object.entries(await icone(page))) await manda({ tipo: 'immagine', nome: n, png, ratio: 3 });
   const punti = rotta.punti;

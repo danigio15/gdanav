@@ -4,6 +4,10 @@
          GdAHome). Android Auto invece lo dichiara l'app. -->
     <!-- Mappe, percorsi, relay di Home Assistant. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Sapere se la rete si paga a consumo: gli edifici della scena 3D (un
+         pacchetto per zona, anche cento megabyte) si scaricano solo su una
+         rete che non costa (`stato/gestore_edifici.dart`). -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- La posizione per navigare. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />

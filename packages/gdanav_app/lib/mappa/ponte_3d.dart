@@ -37,13 +37,27 @@ double _sei(double x) => (x * 1e6).roundToDouble() / 1e6;
 
 /// Giorno o notte, la vista, il colore dell'auto e il segnaposto (per la
 /// mappa vista da lontano, dove l'auto 3D non si vede).
-Map<String, Object?> msgOpzioni({required bool notte, required VistaMappa vista, required Segnaposto segnaposto}) =>
-    _m('opzioni', {
-      'notte': notte,
-      'vista': vista == VistaMappa.immersiva ? 'immersiva' : 'inclinata',
-      'auto': coloreAuto3d(segnaposto),
-      'icona': segnaposto.immagine,
-    });
+///
+/// [edifici]: l'app sa dare gli edifici di Overture ([msgEdifici]); la
+/// pagina li chiede per ogni tessera che costruisce.
+Map<String, Object?> msgOpzioni({
+  required bool notte,
+  required VistaMappa vista,
+  required Segnaposto segnaposto,
+  bool edifici = false,
+}) => _m('opzioni', {
+  'notte': notte,
+  'vista': vista == VistaMappa.immersiva ? 'immersiva' : 'inclinata',
+  'auto': coloreAuto3d(segnaposto),
+  'icona': segnaposto.immagine,
+  if (edifici) 'edifici': true,
+});
+
+/// Gli edifici di Overture della tessera [z]/[x]/[y] (una tessera vettoriale
+/// col solo livello `building`), o `null` se non ci sono: la pagina usa
+/// allora quelli di sempre.
+Map<String, Object?> msgEdifici(int z, int x, int y, Uint8List? dati) =>
+    _m('edifici', {'z': z, 'x': x, 'y': y, 'dati': dati == null ? null : base64Encode(dati)});
 
 /// Lo stile di sempre (`stileMappa`): la pagina lo adatta al 3D da sé.
 Map<String, Object?> msgStile(Map<String, Object> stile) => _m('stile', {'stile': stile});
@@ -203,6 +217,10 @@ sealed class MessaggioDalla3d {
         triangoli: (j['triangoli'] as num?)?.toInt() ?? 0,
       ),
       'toccata' => const Toccata3d(),
+      'edifici?' => switch ((j['z'], j['x'], j['y'])) {
+        (final int z, final int x, final int y) => ChiestiEdifici3d(z, x, y),
+        _ => null,
+      },
       'tocco' => Tocco3d([
         for (final e in (j['elementi'] as List?) ?? const [])
           if (e is Map) e.cast<Object?, Object?>(),
@@ -258,6 +276,12 @@ class Toccata3d extends MessaggioDalla3d {
 
 /// Un tocco su qualcosa (colonnina, distributore, punto): gli elementi come
 /// li dà MapLibre (`properties`, `geometry`).
+/// La pagina chiede gli edifici di Overture della tessera [z]/[x]/[y].
+class ChiestiEdifici3d extends MessaggioDalla3d {
+  const ChiestiEdifici3d(this.z, this.x, this.y);
+  final int z, x, y;
+}
+
 class Tocco3d extends MessaggioDalla3d {
   const Tocco3d(this.elementi);
   final List<Map<Object?, Object?>> elementi;

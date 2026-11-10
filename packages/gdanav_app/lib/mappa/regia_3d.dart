@@ -8,6 +8,7 @@ import '../componenti/icona_manovra.dart' show bandieraArrivoPng, puntaManovraPn
 import '../componenti/icone_punti.dart';
 import '../componenti/icone_segnalazioni.dart';
 import '../servizi.dart';
+import '../stato/gestore_edifici.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_persone.dart';
 import '../stato/gestore_posizione.dart';
@@ -57,7 +58,12 @@ class Regia3d {
     this.attesa = const Duration(seconds: 15),
     this.piuVicina = 0,
     this.inclinazione,
-  });
+    Future<Uint8List?> Function(int z, int x, int y)? edifici,
+  }) : edifici = edifici ?? GestoreEdifici.attuale?.tessera;
+
+  /// Gli edifici di Overture di una tessera ([GestoreEdifici]), se l'app li
+  /// ha; `null`: la pagina usa quelli di sempre.
+  final Future<Uint8List?> Function(int z, int x, int y)? edifici;
 
   final GestoreViaggio gestore;
   final GestorePosizione posizione;
@@ -198,6 +204,9 @@ class Regia3d {
         onToccata?.call();
       case Tocco3d(:final elementi):
         onTocco?.call(elementi);
+      case ChiestiEdifici3d(:final z, :final x, :final y):
+        final e = edifici;
+        if (e != null) unawaited(e(z, x, y).then((dati) => _manda(msgEdifici(z, x, y, dati))));
       case null:
         break;
     }
@@ -237,7 +246,7 @@ class Regia3d {
     _notte = n;
     _vistaMandata = v;
     _segnapostoMandato = segnaposto;
-    _manda(msgOpzioni(notte: n, vista: v, segnaposto: segnaposto));
+    _manda(msgOpzioni(notte: n, vista: v, segnaposto: segnaposto, edifici: edifici != null));
     if (cambiaNotte) _stile();
   }
 

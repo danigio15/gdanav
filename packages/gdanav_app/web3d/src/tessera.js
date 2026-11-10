@@ -59,7 +59,7 @@ const SOPRA = { motorway: 0.24, trunk: 0.23, primary: 0.21, secondary: 0.2, tert
  * la scena (`BUDGET.triangoli`) resta quello, e se non ci si sta si lasciano
  * le tessere più lontane. */
 export const LIMITI = {
-  pieno: { alberi: 1800, triangoliEdifici: 140000, lampioni: 400, margine: 450 },
+  pieno: { alberi: 1800, triangoliEdifici: 200000, lampioni: 400, margine: 450 },
   ridotto: { alberi: 0, triangoliEdifici: 100000, lampioni: 0, margine: 250 },
 };
 

@@ -1,4 +1,5 @@
 import Flutter
+import Network
 import UIKit
 
 /// Il lato iPhone di `gdanav_app`: quello che su Android fa `GdanavAppPlugin.kt`
@@ -22,6 +23,14 @@ public class GdanavAppPlugin: NSObject, FlutterPlugin {
             guard call.method == "acceso" else { return risultato(FlutterMethodNotImplemented) }
             SchermoAcceso.tieni(call.arguments as? Bool == true)
             risultato(nil)
+        }
+        // Se la rete si paga a consumo: gli edifici della scena 3D si scaricano
+        // solo su una rete che non costa (`stato/gestore_edifici.dart`).
+        ReteAConsumo.accendi()
+        let rete = FlutterMethodChannel(name: "gdanav/rete", binaryMessenger: registrar.messenger())
+        rete.setMethodCallHandler { call, risultato in
+            guard call.method == "aConsumo" else { return risultato(FlutterMethodNotImplemented) }
+            risultato(ReteAConsumo.adesso)
         }
         PonteAuto.shared.collega(registrar: registrar)
         // La guida per l'Apple Watch dell'app ospite (`GdanavOrologio`).
@@ -49,5 +58,23 @@ enum SchermoAcceso {
                 primaDellaGuida = nil
             }
         }
+    }
+}
+
+/// Se la rete di adesso si paga a consumo (i dati del telefono, un hotspot, il
+/// risparmio dati acceso). Nel dubbio sì.
+enum ReteAConsumo {
+    private static let monitor = NWPathMonitor()
+    private static var acceso = false
+
+    static func accendi() {
+        guard !acceso else { return }
+        acceso = true
+        monitor.start(queue: DispatchQueue(label: "gdanav.rete"))
+    }
+
+    static var adesso: Bool {
+        let p = monitor.currentPath
+        return p.status != .satisfied || p.isExpensive || p.isConstrained
     }
 }

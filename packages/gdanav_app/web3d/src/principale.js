@@ -54,6 +54,10 @@ const S = {
   camera: { modo: 'segui', sopra: 0, sinistra: 0, riquadro: null },
   pausa: false,
   grezze: new Map(),
+  /** Gli edifici di Overture dall'app, per tessera: `{dati, quando}` (dati null: non ci sono). */
+  edifici: new Map(),
+  edificiDallApp: false,
+  attesaEdifici: null,
   costruite: new Map(),
   lavoro: null,
   numeroLavoro: 0,
@@ -117,6 +121,7 @@ const GESTORI = {
     S.notte = m.notte;
     if (m.vista) S.vista = m.vista;
     if (m.icona) S.icona = m.icona;
+    S.edificiDallApp = m.edifici === true;
     // La freccia, se è quella scelta; l'auto del suo colore, altrimenti.
     const forma = S.icona === 'freccia' ? 'freccia' : 'auto';
     if ((m.auto && m.auto !== S.colorAuto) || forma !== (scena.formaAuto ?? 'auto')) {
@@ -198,6 +203,19 @@ const GESTORI = {
       adesso: S.orologioProva ?? Date.now(),
     });
     sveglia();
+  },
+  /** Gli edifici di Overture di una tessera, dall'app (risposta a «edifici?»). */
+  edifici(m) {
+    const k = chiaveTessera(m.z, m.x, m.y);
+    let dati = null;
+    if (typeof m.dati === 'string') {
+      const b = atob(m.dati);
+      const u = new Uint8Array(b.length);
+      for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+      dati = u.buffer;
+    }
+    if (S.attesaEdifici?.chiave === k) S.attesaEdifici.fatto(dati);
+    else ricordaEdifici(k, dati);
   },
   /** La velocità dell'auto dal cruscotto (Android Auto, il dongle): più volte al secondo. */
   velocita(m) {
@@ -329,7 +347,11 @@ function creaMappa(stile) {
   S.mappa = mappa;
   window.__mappa = mappa;
   window.__scena = scena;
-  mappa.addControl(new maplibregl.AttributionControl({ compact: true }), 'top-left');
+  // Con gli edifici di Overture (dati ODbL) si dice anche da dove vengono.
+  mappa.addControl(
+    new maplibregl.AttributionControl({ compact: true, customAttribution: S.edificiDallApp ? '© Overture Maps Foundation, Microsoft' : undefined }),
+    'top-left',
+  );
   mappa.on('style.load', alloStile);
   // L'attribuzione chiusa: si apre toccando la «i».
   mappa.once('load', () => mappa.getContainer().querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'));
@@ -753,7 +775,51 @@ function vicineDi(k) {
   return out;
 }
 
+/* Gli edifici veri, da Overture.
+ *
+ * «Lungo il percorso voglio vedere le cose reali.» Gli edifici delle tessere
+ * di OpenFreeMap sono quelli di OpenStreetMap, e in tanti paesi non ci sono.
+ * L'app ha, per la zona, quelli di Overture (OpenStreetMap più quelli che
+ * Microsoft ha ricavato dalle foto dal satellite, con l'altezza), in un
+ * pacchetto sul telefono: prima di costruire una tessera li si chiede, e se
+ * arrivano prendono il posto di quelli di sempre. Si aspetta poco: senza
+ * pacchetto (non ancora scaricato, o zona che non c'è) la tessera si fa con
+ * quelli di sempre, e la risposta «niente» si richiede dopo un minuto (il
+ * pacchetto intanto può essere arrivato). */
+const ATTESA_EDIFICI_MS = 1500;
+const RIPROVA_EDIFICI_MS = 60000;
+const EDIFICI_TENUTI = 48;
+
+function ricordaEdifici(k, dati) {
+  S.edifici.delete(k);
+  S.edifici.set(k, { dati, quando: performance.now() });
+  while (S.edifici.size > EDIFICI_TENUTI) S.edifici.delete(S.edifici.keys().next().value);
+}
+
+function edificiDa(k) {
+  const e = S.edifici.get(k);
+  if (!e) return undefined;
+  if (e.dati === null && performance.now() - e.quando > RIPROVA_EDIFICI_MS) return undefined;
+  return e.dati;
+}
+
 function chiedi(k, dettaglio) {
+  if (S.edificiDallApp && edificiDa(k) === undefined) {
+    const { z, x, y } = daChiave(k);
+    // Fermi come un lavoro in corso: la pianificazione aspetta questa tessera.
+    S.lavoro = { id: 0, chiave: k, dettaglio, vicine: new Set(), da: performance.now() };
+    const fatto = (dati) => {
+      if (S.attesaEdifici?.chiave !== k) return;
+      clearTimeout(S.attesaEdifici.timer);
+      S.attesaEdifici = null;
+      ricordaEdifici(k, dati);
+      S.lavoro = null;
+      chiedi(k, dettaglio);
+    };
+    S.attesaEdifici = { chiave: k, fatto, timer: setTimeout(() => fatto(null), ATTESA_EDIFICI_MS) };
+    manda('edifici?', { z, x, y });
+    return;
+  }
   const { z, x, y } = daChiave(k);
   const tessere = {};
   const vicine = new Set();
@@ -768,7 +834,11 @@ function chiedi(k, dettaglio) {
   }
   const id = ++S.numeroLavoro;
   S.lavoro = { id, chiave: k, dettaglio, vicine, da: performance.now() };
-  lavoratore.postMessage({ id, z, x, y, tessere, dettaglio }, Object.values(tessere).map((t) => t.dati));
+  const e = S.edificiDallApp ? edificiDa(k) : null;
+  const edifici = e ? e.slice(0) : null;
+  const trasferiti = Object.values(tessere).map((t) => t.dati);
+  if (edifici) trasferiti.push(edifici);
+  lavoratore.postMessage({ id, z, x, y, tessere, dettaglio, edifici }, trasferiti);
 }
 
 function allaTessera({ id, tessera, errore }) {
