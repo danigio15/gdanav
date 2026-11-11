@@ -1478,6 +1478,25 @@ function fotogramma(adesso) {
   if (ancora) richiesta = requestAnimationFrame(fotogramma);
 }
 
+/**
+ * A quanti metri del percorso [p] finisce la strada già fatta (la traccia
+ * dell'app, che arriva ogni tre secondi): da lì all'auto, a [s] metri, la
+ * strada fatta la disegna il nastro del percorso (`uniformiFattoVicino`).
+ * Senza traccia, o con la traccia che finisce lontano dal percorso (appena
+ * ricalcolato), gli ultimi centocinquanta metri.
+ */
+function doveFinisceIlFatto(p, s) {
+  const f = S.fatto;
+  if (!f) return s - 150;
+  if (p.fattoDi !== f) {
+    p.fattoDi = f;
+    const n = f.linea.x.length;
+    const q = p.linea.proietta(f.linea.x[n - 1], f.linea.y[n - 1], Math.max(0, s - 600), s + 60);
+    p.fattoFinoA = q.d < 25 ? q.s : null;
+  }
+  return p.fattoFinoA === null ? s - 150 : Math.min(s, p.fattoFinoA);
+}
+
 /** Muove auto e telecamera; dice se c'è ancora da muovere. */
 function muovi(adesso, dt) {
   const m = S.mappa;
@@ -1527,6 +1546,9 @@ function muovi(adesso, dt) {
     rottaCamera = 90 - (versoCamera * 180) / Math.PI;
     S.auto = { x, y, z, s };
     if (scena.mat.percorso) scena.uniformiPercorso.uInizio.value = s + 1.5;
+    // La strada fatta arriva fino all'auto, da dove finisce la traccia.
+    scena.uniformiFattoVicino.uInizio.value = doveFinisceIlFatto(p, s) - 6;
+    scena.uniformiFattoVicino.uFine.value = s + 1;
     // Il fantasma comincia oltre il muso dell'auto (lunga nove metri, in scala).
     scena.uniformiFantasma.uInizio.value = s + 6;
     if (S.manovra && S.frecciaDa !== undefined && s + 6 > S.frecciaDa + 4) aggiornaFreccia();
