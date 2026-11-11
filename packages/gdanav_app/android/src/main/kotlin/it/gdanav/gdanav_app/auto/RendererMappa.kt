@@ -594,6 +594,7 @@ class RendererMappa(
             // Sopra la mappa, sotto il segnaposto e il cruscotto.
             c.addView(nuova.vista, 1, FrameLayout.LayoutParams(tutto, tutto))
             scena = nuova
+            PonteAuto.lontana3dInUso = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && nuova is Scena3dLontana
             PonteAuto.scena3d = { js -> nuova.esegui(js) }
             // Misurata la pagina, lo spazio delle schede si ridice nei suoi punti.
             nuova.alMisurato = {
@@ -641,6 +642,7 @@ class RendererMappa(
     private fun scenaLontanaGuasta(motivo: String) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || scena !is Scena3dLontana) return
         PonteAuto.lontana3dNonVa = true
+        PonteAuto.lontana3dChiusaMs = SystemClock.elapsedRealtime()
         ricordaLaLontana(motivo)
         chiudiScena()
         aggiornaScena()
@@ -664,6 +666,7 @@ class RendererMappa(
         principale.removeCallbacks(attesaScena)
         val s = scena ?: return
         scena = null
+        PonteAuto.lontana3dInUso = false
         PonteAuto.scena3d = null
         contenuto?.removeView(s.vista)
         s.distruggi()

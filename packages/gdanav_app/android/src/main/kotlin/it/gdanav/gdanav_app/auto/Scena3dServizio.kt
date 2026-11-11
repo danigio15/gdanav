@@ -60,6 +60,9 @@ class Scena3dServizio : Service() {
     private var dallApp: DataInputStream? = null
     private var scrittura: ExecutorService? = null
 
+    /** A chi rispondere per la scena che si sta aprendo. */
+    private var versoChiAprire: Messenger? = null
+
     /** Ogni apertura ha il suo numero: quello che resta di una chiusa non tocca la nuova. */
     private var giro = 0
 
@@ -94,6 +97,7 @@ class Scena3dServizio : Service() {
         when (m.what) {
             APRI -> {
                 val risposta = m.replyTo
+                versoChiAprire = risposta
                 try {
                     apri(m.data)
                     val pacchetto = ospite?.surfacePackage ?: throw IllegalStateException("nessun pacchetto")
@@ -162,6 +166,19 @@ class Scena3dServizio : Service() {
         nuova.alMisurato = { nuova.scala?.let { scrivi(fili, uscita, SCALA, it.toString()) } }
         scena = nuova
         nuovo.setView(nuova.vista, larghezza, altezza)
+        // Senza la scheda grafica la scena non si disegna (WebGL): meglio
+        // dirlo subito, e l'app torna a quella dentro di sé.
+        val risposta = versoChiAprire
+        nuova.vista.post {
+            if (giro == mio && !nuova.vista.isHardwareAccelerated) {
+                try {
+                    risposta?.send(
+                        Message.obtain(null, GUASTO).apply { data = Bundle().apply { putString(CHIAVE_MOTIVO, "senza scheda grafica") } },
+                    )
+                } catch (_: Exception) {
+                }
+            }
+        }
 
         // I messaggi della regia: letti da un filo suo, eseguiti sul principale.
         Thread({

@@ -7,6 +7,7 @@ import android.graphics.BitmapFactory
 import android.location.Location
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
@@ -315,7 +316,16 @@ object PonteAuto {
         }
         when (call.method) {
             "web3d_vuoi" -> vuole3d = call.argument<Boolean>("si") == true
-            "web3d_no" -> nonVa3d = true
+            "web3d_no" -> if (lontana3dInUso || SystemClock.elapsedRealtime() - lontana3dChiusaMs < DOPO_LA_LONTANA_MS) {
+                // Lo dice la pagina nel suo processo (o l'ha detto un attimo
+                // prima che si chiudesse): non ci si arrende, si prova quella
+                // dentro l'app. Il telefono deve dimenticare il suo «non va».
+                lontana3dNonVa = true
+                lontana3dChiusaMs = 0L
+                canale?.invokeMethod("riprova3d", null)
+            } else {
+                nonVa3d = true
+            }
             "stili" -> {
                 stileChiaro = call.argument("chiaro")
                 stileScuro = call.argument("scuro")
@@ -802,6 +812,15 @@ object PonteAuto {
      * resta aperta si usa quella dentro l'app ([Scena3dAuto]).
      */
     @Volatile var lontana3dNonVa = false
+
+    /** La scena che si vede adesso è quella nel suo processo. */
+    @Volatile var lontana3dInUso = false
+
+    /** Quando la scena nel suo processo si è chiusa per un guasto (tempo dall'accensione). */
+    @Volatile var lontana3dChiusaMs = 0L
+
+    /** Un «non va» che arriva entro questo tempo dal guasto era ancora suo. */
+    private const val DOPO_LA_LONTANA_MS = 4_000L
 
     /** Chi la mostra: gli si consegna il JavaScript che arriva dal telefono. */
     @Volatile var scena3d: ((String) -> Unit)? = null
