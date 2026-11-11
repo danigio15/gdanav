@@ -98,6 +98,11 @@ export async function apri(browser, { porta, cartella, rotta, caso, notte, largh
   await manda({ tipo: 'stile', stile: stile(cartella, notte) });
   for (const [n, png] of Object.entries(await icone(page))) await manda({ tipo: 'immagine', nome: n, png, ratio: 3 });
   const punti = rotta.punti;
+  // [caso.origine] `[lon, lat]`: la scena nasce contata da lì, come in un
+  // viaggio cominciato a decine di chilometri (un percorso finto in quel
+  // punto, prima di quello vero): lontano dall'origine i numeri della scheda
+  // grafica perdono precisione, e il percorso non deve risentirne.
+  if (caso.origine) await manda({ tipo: 'percorso', punti: [caso.origine[0], caso.origine[1], caso.origine[0] + 0.001, caso.origine[1]], code: [] });
   await manda({ tipo: 'percorso', punti, code: caso.code ?? [] });
   if (caso.manovra) await manda({ tipo: 'manovra', da: caso.manovra[0], a: caso.manovra[1] });
   await manda({ tipo: 'sorgente', id: 'gdanav-arrivo', dati: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [punti.at(-2), punti.at(-1)] }, properties: { arrivo: true } }] } });

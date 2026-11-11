@@ -150,6 +150,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   );
   const ek = (p) => Math.round(p[0] * 10) + ',' + Math.round(p[1] * 10);
   const linee = visibili.map((f) => f.nodi.map((i) => [nodi[i].x, nodi[i].y, nodi[i].h]));
+  const sottopassi = iSottopassi(nodi, feats);
   const estremi = new Map();
   linee.forEach((pts, i) => {
     if (pts.length < 2) return;
@@ -228,8 +229,9 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   const nastri = Object.fromEntries(NASTRI.map((t) => [t, new Costruttore({ uv: true })]));
   const opere = new Costruttore({ colori: true });
   const ombre = new Costruttore();
-  // Sotto i ponti un'ombra in più, morbida: un alone largo e il nucleo
-  // (più in alto di un soffio, così dove si sovrappongono scurisce due volte).
+  // Sotto i ponti un'ombra in più, un po' più larga dell'impalcato. Uno
+  // strato solo: la scena scurisce ogni punto una volta (lo stencil), e due
+  // strati quasi alla stessa quota litigavano a righe.
   const ombrePonti = new Costruttore();
   const [sox, soy] = spostamentoOmbra();
   const piloni = [];
@@ -334,8 +336,9 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     }
 
     // Gli imbocchi delle gallerie, dove la galleria incontra la strada aperta:
-    // due spalle, l'architrave, il buio dentro e un pezzo di volta.
-    if (f.galleria) {
+    // due spalle, l'architrave, il buio dentro e un pezzo di volta. Non per
+    // un sottopasso ([iSottopassi]): lì la strada passa sotto e basta.
+    if (f.galleria && !sottopassi.has(f)) {
       for (const e of [0, n0 - 1]) {
         const nodo = nodi[f.nodi[e]];
         if (!nodo.feats.some((j) => !feats[j].galleria) || !dentro(nodo.x, nodo.y)) continue;
@@ -444,7 +447,6 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
             const nl1 = [-pezzo[k][4], pezzo[k][3]];
             const largo = (P0, nn, d2, z) => [P0[0] + nn[0] * d2, P0[1] + nn[1] * d2, z];
             ombrePonti.quad(largo(a, nl0, 2.6, 0), largo(b, nl1, 2.6, 0), largo(c, nl1, -2.6, 0), largo(d, nl0, -2.6, 0), [0, 0, 1]);
-            ombrePonti.quad(largo(a, nl0, 0.6, 0.04), largo(b, nl1, 0.6, 0.04), largo(c, nl1, -0.6, 0.04), largo(d, nl0, -0.6, 0.04), [0, 0, 1]);
           }
         }
         for (const lato of [1, -1]) {
@@ -1297,6 +1299,55 @@ function istanzeDiAlberi(alberi, ombre) {
     ombre.quad([cx - rr2, cy - rr2, 0, 0, 0], [cx + rr2, cy - rr2, 0, 1, 0], [cx + rr2, cy + rr2, 0, 1, 1], [cx - rr2, cy + rr2, 0, 0, 1], [0, 0, 1]);
   }
   return { tronchi, chiome, chiome2, coni, coloriChiome, coloriChiome2, coloriConi, foglie, coloriFoglie, abeti, coloriAbeti };
+}
+
+/** Una galleria più corta di così, da un capo all'altro, è un sottopasso. */
+const SOTTOPASSO_M = 70;
+
+/**
+ * Le gallerie che sono sottopassi: corte, con la strada aperta a tutti e due
+ * i capi.
+ *
+ * «Mancano i cavalcavia»: dove una stradina passa sotto l'autostrada la mappa
+ * la segna in galleria per quei venti, trenta metri, e la scena le metteva
+ * gli imbocchi di una galleria vera — due scatole di cemento alte cinque
+ * metri ai lati dell'autostrada, che sembravano le spalle di un cavalcavia a
+ * cui manca l'impalcato. Un sottopasso non ha niente sopra il piano della
+ * strada che lo copre: la stradina arriva al bordo, passa sotto (il nastro
+ * scuro delle gallerie) e riesce dall'altra parte.
+ *
+ * Una galleria tagliata dal bordo dei dati (un capo senza niente attaccato)
+ * non si sa quanto è lunga: resta una galleria, con i suoi imbocchi.
+ */
+export function iSottopassi(nodi, feats) {
+  const out = new Set();
+  const visti = new Set();
+  for (let i = 0; i < feats.length; i++) {
+    if (!feats[i].galleria || feats[i].cls === 'rail' || visti.has(i)) continue;
+    // La catena di pezzi in galleria attaccati l'uno all'altro.
+    const catena = [];
+    const coda = [i];
+    visti.add(i);
+    let lunga = 0;
+    let intera = true;
+    while (coda.length) {
+      const j = coda.pop();
+      const f = feats[j];
+      catena.push(f);
+      for (let k = 1; k < f.nodi.length; k++) lunga += Math.hypot(nodi[f.nodi[k]].x - nodi[f.nodi[k - 1]].x, nodi[f.nodi[k]].y - nodi[f.nodi[k - 1]].y);
+      for (const e of [f.nodi[0], f.nodi[f.nodi.length - 1]]) {
+        const altri = nodi[e].feats.filter((q) => q !== j);
+        if (!altri.length) intera = false;
+        for (const q of altri) {
+          if (!feats[q].galleria || feats[q].cls === 'rail' || visti.has(q)) continue;
+          visti.add(q);
+          coda.push(q);
+        }
+      }
+    }
+    if (intera && lunga < SOTTOPASSO_M) for (const f of catena) out.add(f);
+  }
+  return out;
 }
 
 /**

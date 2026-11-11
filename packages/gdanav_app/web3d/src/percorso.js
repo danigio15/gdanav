@@ -474,7 +474,7 @@ export function profiloDi(linea, s0, s1, indice, passo = 4, ancora = null) {
   }
   const ia = ancora ? Math.round((ancora.s - s0) / passo) : -1;
   const grezze = quote(punti, indice, ia >= 0 && ia < n ? { i: ia, h: ancora.h } : null);
-  const [dx, dy] = spostamenti(grezze.dx, grezze.dy, punti, passo);
+  const [dx, dy] = spostamenti(grezze.dx, grezze.dy, punti, passo, grezze.galleria);
   const profilo = new Profilo(s0, passo, riempiQuote(grezze), grezze.galleria, dx, dy);
   profilo.trovata = Uint8Array.from(grezze, (v) => (Number.isNaN(v) ? 0 : 1));
   return profilo;
@@ -518,7 +518,7 @@ const AGGANCIO_RAGGIO_M = SPOSTAMENTO_MAX_M;
  *
  * [punti] `[x, y]` della linea, uno per spostamento; [passo] i metri fra due.
  */
-export function spostamenti(dxGrezzi, dyGrezzi, punti, passo = 4) {
+export function spostamenti(dxGrezzi, dyGrezzi, punti, passo = 4, galleria = null) {
   const n = dxGrezzi.length;
   const dx = new Float64Array(n);
   const dy = new Float64Array(n);
@@ -603,7 +603,9 @@ export function spostamenti(dxGrezzi, dyGrezzi, punti, passo = 4) {
       if (v > massimo) massimo = v;
     }
     const scarto = visto[q] - andamento[q];
-    const stessa = massimo - minimo < 2 * SCARTO_DELLA_STESSA_STRADA_M && Math.abs(scarto) < SCARTO_DELLA_STESSA_STRADA_M;
+    // In galleria la strada non si vede: seguirne le pieghe (le strade
+    // interrate sono disegnate a mano, a spigoli) fa solo scalini sulla linea.
+    const stessa = !galleria?.[q] && massimo - minimo < 2 * SCARTO_DELLA_STESSA_STRADA_M && Math.abs(scarto) < SCARTO_DELLA_STESSA_STRADA_M;
     fine[q] = andamento[q] + (stessa ? scarto : 0);
   }
   for (let q = 0; q < n; q++) {
@@ -613,7 +615,86 @@ export function spostamenti(dxGrezzi, dyGrezzi, punti, passo = 4) {
     dx[q] = liscio * nx[q];
     dy[q] = liscio * ny[q];
   }
+  alleSvolte(dx, dy, visto, punti, passo);
   return [dx, dy];
+}
+
+/** Da quanti gradi in su, in una ventina di metri, è una svolta. */
+const SVOLTA_GRADI = 35;
+
+/**
+ * Alle svolte lo spostamento è un vettore intero, non solo di lato.
+ *
+ * «I punti per strada non sono corretti, soprattutto gli svincoli»: il
+ * percorso del calcolatore sta di lato rispetto alle strade della mappa, e
+ * di lato lo si rimette ([spostamenti]). Ma a una svolta «di lato» cambia
+ * verso: quello che prima era lungo la strada dopo è di traverso. Spostando
+ * solo di lato, lo spigolo del percorso restava dov'era: la linea superava
+ * l'incrocio di qualche metro e poi girava (o girava prima), e intorno la
+ * media mescolava i due lati e la portava fuori da tutte e due le strade.
+ *
+ * Qui, a ogni svolta, si prende quanto sta di lato la strada prima e quanto
+ * dopo, e si cerca l'unico spostamento che va bene per tutte e due: quello
+ * porta lo spigolo del percorso sull'incrocio vero. Attorno alla svolta
+ * tutta la linea si sposta di quel vettore (lungo una strada dritta uno
+ * spostamento in avanti non cambia niente), e più in là torna a quello di
+ * lato, piano.
+ */
+function alleSvolte(dx, dy, visto, punti, passo) {
+  const n = dx.length;
+  const braccio = Math.max(2, Math.round(12 / passo));
+  if (n < 4 * braccio + 3) return;
+  // Di quanto gira la linea attorno a ogni punto, fra dodici metri prima e dodici dopo.
+  const giro = new Float64Array(n);
+  const verso = (a, b) => {
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    return [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+  };
+  for (let k = braccio; k < n - braccio; k++) {
+    const u = verso(punti[k - braccio], punti[k]);
+    const w = verso(punti[k], punti[k + braccio]);
+    giro[k] = Math.abs(Math.atan2(u[0] * w[1] - u[1] * w[0], u[0] * w[0] + u[1] * w[1])) * (180 / Math.PI);
+  }
+  const mediana = (da, a) => {
+    const v = [];
+    for (let j = Math.max(0, da); j <= Math.min(n - 1, a); j++) if (!Number.isNaN(visto[j])) v.push(visto[j]);
+    if (v.length < 2) return NaN;
+    v.sort((x, y) => x - y);
+    return v[v.length >> 1];
+  };
+  const pieno = Math.round(20 / passo);
+  const largo = Math.round(36 / passo);
+  let ultima = -Infinity;
+  for (let k = braccio; k < n - braccio; k++) {
+    if (giro[k] < SVOLTA_GRADI || k - ultima < largo) continue;
+    // La cima del giro: lo spigolo.
+    let cima = k;
+    for (let j = k + 1; j <= Math.min(n - braccio - 1, k + 2 * braccio); j++) if (giro[j] > giro[cima]) cima = j;
+    ultima = cima;
+    k = cima;
+    // I due rami, lontano dallo spigolo quanto basta perché il lato sia il loro.
+    const prima = [Math.max(0, cima - 3 * braccio), Math.max(0, cima - braccio)];
+    const dopo = [Math.min(n - 1, cima + braccio), Math.min(n - 1, cima + 3 * braccio)];
+    const l1 = mediana(prima[0], prima[1]);
+    const l2 = mediana(dopo[0], dopo[1]);
+    if (Number.isNaN(l1) || Number.isNaN(l2)) continue;
+    const t1 = verso(punti[prima[0]], punti[prima[1]]);
+    const t2 = verso(punti[dopo[0]], punti[dopo[1]]);
+    const n1 = [-t1[1], t1[0]];
+    const n2 = [-t2[1], t2[0]];
+    const det = n1[0] * n2[1] - n1[1] * n2[0];
+    // Due rami quasi paralleli (una curva larga, un'inversione): niente da risolvere.
+    if (Math.abs(det) < 0.5) continue;
+    const vx = (l1 * n2[1] - l2 * n1[1]) / det;
+    const vy = (n1[0] * l2 - n2[0] * l1) / det;
+    if (Math.hypot(vx, vy) > SPOSTAMENTO_MAX_M * 1.3) continue;
+    for (let j = Math.max(0, cima - largo); j <= Math.min(n - 1, cima + largo); j++) {
+      const d = Math.abs(j - cima);
+      const peso = d <= pieno ? 1 : 1 - (d - pieno) / (largo - pieno);
+      dx[j] += (vx - dx[j]) * peso;
+      dy[j] += (vy - dy[j]) * peso;
+    }
+  }
 }
 
 /**
@@ -675,4 +756,76 @@ export function nastro(linea, profilo, s0, s1, largo, sopra, { passo = 2, code =
     livelli: new Float32Array(liv),
     indici: p.length / 3 > 65535 ? new Uint32Array(ind) : new Uint16Array(ind),
   };
+}
+
+/**
+ * Un nastro a pezzi corti, ognuno con le coordinate contate da un punto suo
+ * ([ancora], in metri della scena): i dati di [nastro] (o di più nastri
+ * uniti), tagliati dove ci si allontana più di [lato] metri dall'àncora.
+ *
+ * «I punti per strada non sono corretti, soprattutto gli svincoli.» I vertici
+ * del nastro erano contati dall'origine della scena, che può stare a decine
+ * di chilometri (si rinnova ogni quaranta); la scheda grafica fa i conti con
+ * sette cifre, e a quelle distanze la profondità del nastro sbagliava di più
+ * dei sessanta centimetri che lo tengono sopra l'asfalto: sulle rampe e sui
+ * ponti la linea usciva a pezzi, un triangolo sì e uno no, e cambiava a ogni
+ * movimento della mappa. Le strade non ne soffrono: ogni tessera ha già le
+ * sue coordinate contate dal suo centro. Così anche il nastro.
+ */
+export function pezziDelNastro(dati, lato = 800) {
+  const { posizioni: P, uv, livelli, indici } = dati;
+  const pezzi = [];
+  const nt = Math.floor(indici.length / 3);
+  let t0 = 0;
+  while (t0 < nt) {
+    const primo = indici[3 * t0];
+    const ax = Math.round(P[3 * primo]);
+    const ay = Math.round(P[3 * primo + 1]);
+    let vmin = Infinity;
+    let vmax = -Infinity;
+    let t1 = t0;
+    for (; t1 < nt; t1++) {
+      let dentro = true;
+      let a = Infinity;
+      let b = -Infinity;
+      for (let k = 0; k < 3; k++) {
+        const v = indici[3 * t1 + k];
+        if (Math.abs(P[3 * v] - ax) > lato || Math.abs(P[3 * v + 1] - ay) > lato) dentro = false;
+        if (v < a) a = v;
+        if (v > b) b = v;
+      }
+      // Il primo triangolo c'è comunque: un pezzo non resta mai vuoto.
+      if (!dentro && t1 > t0) break;
+      if (a < vmin) vmin = a;
+      if (b > vmax) vmax = b;
+    }
+    const nv = vmax - vmin + 1;
+    const posizioni = new Float32Array(nv * 3);
+    for (let v = 0; v < nv; v++) {
+      posizioni[3 * v] = P[3 * (vmin + v)] - ax;
+      posizioni[3 * v + 1] = P[3 * (vmin + v) + 1] - ay;
+      posizioni[3 * v + 2] = P[3 * (vmin + v) + 2];
+    }
+    const n = 3 * (t1 - t0);
+    const ind = nv > 65535 ? new Uint32Array(n) : new Uint16Array(n);
+    for (let k = 0; k < n; k++) ind[k] = indici[3 * t0 + k] - vmin;
+    pezzi.push({ ancora: [ax, ay], posizioni, uv: uv.slice(2 * vmin, 2 * (vmax + 1)), livelli: livelli.slice(vmin, vmax + 1), indici: ind });
+    t0 = t1;
+  }
+  return pezzi;
+}
+
+/**
+ * Di quanto alzare i nastri a questo [zoom], in metri.
+ *
+ * Il percorso sta sessanta centimetri sopra l'asfalto. Da vicino bastano; ma
+ * la profondità che la scheda grafica distingue cresce allontanandosi, e
+ * sotto lo zoom 17 quei centimetri sullo schermo sono meno di un punto: la
+ * linea e la strada si contendevano i punti. Più lontano si guarda, più la
+ * linea si alza, così che sullo schermo lo stacco resti quello dello zoom 17;
+ * mai più di tre metri (sotto un cavalcavia ci deve passare).
+ */
+export function alzataDeiNastri(zoom) {
+  if (!(zoom < 17)) return 0;
+  return Math.min(3, 0.62 * (2 ** (17 - zoom) - 1));
 }

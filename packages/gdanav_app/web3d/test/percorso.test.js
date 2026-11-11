@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { IndiceSegmenti, Linea, Origine, Profilo, lungoLaLinea, nastro, profiloDi, quote, riempiQuote } from '../src/percorso.js';
+import { IndiceSegmenti, Linea, Origine, Profilo, alzataDeiNastri, lungoLaLinea, nastro, pezziDelNastro, profiloDi, quote, riempiQuote } from '../src/percorso.js';
 
 /** Segmenti finti: [x0,y0,z0,x1,y1,z1,w,codice]. */
 function indice(segmenti) {
@@ -342,4 +342,156 @@ test('un punto che si aggancia altrove non fa una gobba; nel parcheggio niente s
   let salto = 0;
   for (let s = 40; s <= 360; s += 4) salto = Math.max(salto, Math.abs(q.sposta(s + 4)[1] - q.sposta(s)[1]));
   assert.ok(salto < 0.8, `fra due punti la linea si sposta di ${salto.toFixed(2)} m`);
+});
+
+test('il nastro va nella scena a pezzi, ognuno contato da un punto vicino', () => {
+  // «I punti per strada non sono corretti, soprattutto gli svincoli»: un
+  // percorso lontano dall'origine della scena (qui 150 km: la mappa appena
+  // aperta sta su Roma, e chi guida è a Napoli). I numeri che arrivano alla
+  // scheda grafica devono restare piccoli, e il nastro lo stesso di prima.
+  const x0 = 148600;
+  const y0 = -114300;
+  const xy = [];
+  for (let k = 0; k <= 300; k++) xy.push(x0 + k * 10, y0 + Math.sin(k / 20) * 200);
+  const linea = new Linea(xy);
+  const h = new Float64Array(Math.ceil(linea.lunghezza / 4) + 2).fill(8.24);
+  const profilo = new Profilo(0, 4, h);
+  const intero = nastro(linea, profilo, 0, linea.lunghezza, 4.6, 0.62, { code: [[500, 900, 2]] });
+  const pezzi = pezziDelNastro(intero);
+  assert.ok(pezzi.length >= 3, `un nastro di ${Math.round(linea.lunghezza)} m in più pezzi: ${pezzi.length}`);
+  // Nessun triangolo perso, e ogni vertice dov'era (a meno della precisione
+  // dei numeri a sette cifre da cui si parte: un centimetro e mezzo a 150 km).
+  assert.equal(pezzi.reduce((n, p) => n + p.indici.length, 0), intero.indici.length);
+  let grande = 0;
+  let t = 0;
+  for (const p of pezzi) {
+    assert.ok(Number.isInteger(p.ancora[0]) && Number.isInteger(p.ancora[1]));
+    assert.equal(p.uv.length / 2, p.posizioni.length / 3);
+    assert.equal(p.livelli.length, p.posizioni.length / 3);
+    for (let k = 0; k < p.posizioni.length; k += 3) grande = Math.max(grande, Math.abs(p.posizioni[k]), Math.abs(p.posizioni[k + 1]));
+    for (let k = 0; k < p.indici.length; k++, t++) {
+      const v = p.indici[k];
+      const w = intero.indici[t];
+      assert.ok(v < p.posizioni.length / 3);
+      assert.ok(Math.abs(p.ancora[0] + p.posizioni[3 * v] - intero.posizioni[3 * w]) < 0.02);
+      assert.ok(Math.abs(p.ancora[1] + p.posizioni[3 * v + 1] - intero.posizioni[3 * w + 1]) < 0.02);
+      assert.equal(p.posizioni[3 * v + 2], intero.posizioni[3 * w + 2]);
+      assert.equal(p.uv[2 * v + 1], intero.uv[2 * w + 1]);
+      assert.equal(p.livelli[v], intero.livelli[w]);
+    }
+  }
+  assert.ok(grande <= 830, `coordinate piccole in ogni pezzo: ${grande}`);
+  // Il nastro intero aveva numeri da centocinquantamila.
+  assert.ok(Math.abs(intero.posizioni[0]) > 100000);
+});
+
+test('più nastri uniti (le code) si tagliano anche dove saltano lontano', () => {
+  const striscia = (x) => ({
+    posizioni: new Float32Array([x, 0, 1, x, 4, 1, x + 10, 0, 1, x + 10, 4, 1]),
+    uv: new Float32Array([0, 0, 1, 0, 0, 10, 1, 10]),
+    livelli: new Float32Array([2, 2, 2, 2]),
+    indici: [0, 1, 3, 0, 3, 2],
+  });
+  const a = striscia(50000);
+  const b = striscia(56000);
+  const uniti = {
+    posizioni: new Float32Array([...a.posizioni, ...b.posizioni]),
+    uv: new Float32Array([...a.uv, ...b.uv]),
+    livelli: new Float32Array([...a.livelli, ...b.livelli]),
+    indici: new Uint16Array([...a.indici, ...b.indici.map((i) => i + 4)]),
+  };
+  const pezzi = pezziDelNastro(uniti);
+  assert.equal(pezzi.length, 2);
+  assert.deepEqual(pezzi.map((p) => p.ancora), [[50000, 0], [56000, 0]]);
+  assert.deepEqual([...pezzi[1].indici], [0, 1, 3, 0, 3, 2]);
+  assert.deepEqual([...pezzi[1].posizioni.slice(0, 6)], [0, 0, 1, 0, 4, 1]);
+  assert.deepEqual(pezziDelNastro({ posizioni: new Float32Array(0), uv: new Float32Array(0), livelli: new Float32Array(0), indici: new Uint16Array(0) }), []);
+});
+
+test('guardando da lontano i nastri si alzano, quanto basta e non di più', () => {
+  // Da vicino niente: i sessanta centimetri bastano.
+  assert.equal(alzataDeiNastri(18.4), 0);
+  assert.equal(alzataDeiNastri(17), 0);
+  // Sotto lo zoom 17 lo stacco sullo schermo resta quello dello zoom 17.
+  for (const zoom of [16.5, 16, 15.5]) {
+    const metri = 0.62 + alzataDeiNastri(zoom);
+    assert.ok(Math.abs(metri * 2 ** (zoom - 17) - 0.62) < 1e-9, `zoom ${zoom}: ${metri}`);
+  }
+  // Mai più di tre metri: sotto un cavalcavia il percorso ci deve passare.
+  assert.ok(alzataDeiNastri(14.5) > 2.8 && alzataDeiNastri(14.5) <= 3);
+  assert.equal(alzataDeiNastri(13), 3);
+  assert.equal(alzataDeiNastri(Number.NaN), 0);
+});
+
+test("alla svolta lo spigolo della linea sta sull'incrocio, non prima né dopo", () => {
+  // «I punti per strada non sono corretti, soprattutto gli svincoli»: il
+  // percorso del calcolatore sta sei metri a ovest e cinque a nord delle
+  // strade della mappa. Gira quindi sei metri prima dell'incrocio vero.
+  const i = indice([
+    [-300, 0, 0, 0, 0, 0, 7, 5],
+    [0, 0, 0, 0, 300, 0, 7, 5],
+  ]);
+  const l = new Linea([-306, 5, -6, 5, -6, 305]);
+  const p = profiloDi(l, 0, l.lunghezza, i);
+  const dove = (s) => {
+    const [x, y] = l.a(s);
+    const [dx, dy] = p.sposta(s);
+    return [x + dx, y + dy];
+  };
+  // Lo spigolo (a 300 m) sull'incrocio.
+  const [cx, cy] = dove(300);
+  assert.ok(Math.hypot(cx, cy) < 1, `lo spigolo a ${Math.hypot(cx, cy).toFixed(2)} m dall'incrocio`);
+  // Prima della svolta sulla prima strada (y = 0), dopo sulla seconda (x = 0):
+  // anche nei venti metri attorno, dove prima i due lati si mescolavano.
+  for (const s of [100, 250, 280, 292]) assert.ok(Math.abs(dove(s)[1]) < 0.8, `a ${s} m: ${dove(s)[1].toFixed(2)} m dalla prima strada`);
+  for (const s of [308, 320, 350, 500]) assert.ok(Math.abs(dove(s)[0]) < 0.8, `a ${s} m: ${dove(s)[0].toFixed(2)} m dalla seconda strada`);
+  // E la linea non torna indietro attorno allo spigolo.
+  for (let s = 260; s < 300; s += 4) assert.ok(dove(s + 4)[0] > dove(s)[0] - 0.01, `a ${s} m la linea torna indietro`);
+});
+
+test('una curva larga non è una svolta: lì la linea si sposta solo di lato', () => {
+  // Un arco di raggio 150 m, col percorso tre metri più interno della strada.
+  const strada = [];
+  const rotta = [];
+  for (let k = 0; k <= 60; k++) {
+    const a = (k / 60) * (Math.PI / 2);
+    const b = ((k + 1) / 60) * (Math.PI / 2);
+    if (k < 60) strada.push([150 * Math.sin(a), 150 - 150 * Math.cos(a), 0, 150 * Math.sin(b), 150 - 150 * Math.cos(b), 0, 7, 5]);
+    rotta.push(147 * Math.sin(a), 150 - 147 * Math.cos(a));
+  }
+  const l = new Linea(rotta);
+  const p = profiloDi(l, 0, l.lunghezza, indice(strada));
+  for (let s = 30; s < l.lunghezza - 30; s += 20) {
+    const [x, y] = l.a(s);
+    const [dx, dy] = p.sposta(s);
+    const r = Math.hypot(x + dx, y + dy - 150);
+    assert.ok(Math.abs(r - 150) < 0.6, `a ${s} m la linea sta a ${(r - 150).toFixed(2)} m dal mezzo della strada`);
+  }
+});
+
+test('in galleria la linea non segue le pieghe della strada disegnata a mano', () => {
+  // «La linea ancora la vedo non diritta»: sotto il centro direzionale le
+  // strade interrate della mappa sono a spigoli, un metro di qua e uno di là.
+  // Sopra non si vedono: la linea che le seguiva faceva scalini nel vuoto.
+  const pieghe = (codice) => {
+    const seg = [];
+    for (let k = 0; k < 30; k++) seg.push([k * 20, k % 2 ? 1 : -1, 0.06, (k + 1) * 20, k % 2 ? -1 : 1, 0.06, 7, codice]);
+    return seg;
+  };
+  const l = new Linea([0, 0, 600, 0]);
+  const escursione = (p) => {
+    let minimo = Infinity;
+    let massimo = -Infinity;
+    for (let s = 100; s <= 500; s += 2) {
+      const dy = p.sposta(s)[1];
+      minimo = Math.min(minimo, dy);
+      massimo = Math.max(massimo, dy);
+    }
+    return massimo - minimo;
+  };
+  const inGalleria = escursione(profiloDi(l, 0, 600, indice(pieghe(5 + 64))));
+  const allAperto = escursione(profiloDi(l, 0, 600, indice(pieghe(5))));
+  assert.ok(inGalleria < 0.3, `in galleria la linea balla di ${inGalleria.toFixed(2)} m`);
+  // All'aperto la strada si vede, e la linea le sta sopra: lì le pieghe si seguono.
+  assert.ok(allAperto > 0.8, `all'aperto segue la strada: ${allAperto.toFixed(2)} m`);
 });

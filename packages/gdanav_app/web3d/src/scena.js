@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { generatore } from './caso.js';
+import { pezziDelNastro } from './percorso.js';
 import { CAMPATA, NASTRI, PERIODO_STRADA, PIANO, STILI_FACCIATA } from './tessera.js';
 import { GIORNO, NOTTE, SOLE } from './tavolozza.js';
 
@@ -466,6 +467,14 @@ function trameFacciata(stile, seme, variante = 0) {
 
 /** Il bit dello stencil delle ombre a terra (vedi `Scena.materiali`). */
 export const BIT_OMBRA = 0x80;
+/** E quello del buio in più sotto i ponti. */
+export const BIT_OMBRA_PONTE = 0x40;
+/**
+ * La spinta in profondità che cresce con l'inclinazione
+ * (`polygonOffsetFactor`), per l'asfalto e per le linee che gli stanno sopra:
+ * nessuna (vedi `materiali`).
+ */
+const SPINTA_DI_SBIECO = 0;
 
 /** Una geometria three.js dai dati del lavoratore. */
 function geometria(d, notte) {
@@ -493,12 +502,15 @@ function istanze(geo, materiale, matrici, colori) {
 
 const VERTICE_NASTRO = `
 attribute float livello;
+uniform float uAlza;
 varying vec2 vUv;
 varying float vLivello;
 void main() {
   vUv = uv;
   vLivello = livello;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  // Prima la vista, poi la prospettiva (come i materiali di three.js): il
+  // prodotto delle due matrici, fatto qui con sette cifre, perdeva precisione.
+  gl_Position = projectionMatrix * (modelViewMatrix * vec4(position.xy, position.z + uAlza, 1.0));
 }`;
 
 /** Il nastro del percorso: celeste, bordo blu, frecce bianche, la coda in mezzo. */
@@ -715,6 +727,10 @@ export class Scena {
     // traccia e [uFine] l'auto, a ogni fotogramma.
     this.uniformiFattoVicino = { ...this.uniformiFatto, uInizio: { value: 1e9 }, uFine: { value: -1e9 }, uScala: { value: 4.6 / 3.6 } };
     this.nastri = {};
+    /* Di quanto i nastri (percorso, strada fatta, code, freccia) stanno più
+     * su del solito, in metri: zero da vicino, di più guardando da lontano
+     * (vedi [alzataDeiNastri]). Lo decide `principale.js` a ogni fotogramma. */
+    this.uAlza = { value: 0 };
     this.colorAuto = '#d62a26';
     this.impostaNotte(false);
   }
@@ -750,7 +766,7 @@ export class Scena {
   materiali(notte, P) {
     const m = {};
     for (const tipo of NASTRI) {
-      m['strada-' + tipo] = new THREE.MeshLambertMaterial({ map: tramaStrada(tipo, P, notte), polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+      m['strada-' + tipo] = new THREE.MeshLambertMaterial({ map: tramaStrada(tipo, P, notte), polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -2 });
     }
     // La galleria: la strada che passa sotto, scura e un poco trasparente.
     Object.assign(m['strada-galleria'], { transparent: true, opacity: notte ? 0.5 : 0.55, depthWrite: false });
@@ -768,22 +784,37 @@ export class Scena {
     };
     m.opere.customProgramCacheKey = () => 'opere-' + lucePropria;
     // Le ombre vincono sull'asfalto (che ha il suo polygonOffset), non sul resto.
-    m.ombre = new THREE.MeshBasicMaterial({ color: 0x0c1220, transparent: true, opacity: P.ombra, depthWrite: true, depthFunc: THREE.LessDepth, fog: true, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
-    m.ombrePonti = m.ombre.clone();
-    m.ombrePonti.opacity = P.ombraPonte;
     // Ogni punto del suolo si scurisce una volta sola: l'ombra di un muro e
     // quella del tetto si sovrappongono, e col solo depth test litigavano a
-    // righe («palazzi trasparenti»). Il bit alto dello stencil segna i punti
-    // già in ombra; `principale.js` lo pulisce prima e dopo la scena.
-    Object.assign(m.ombre, {
-      stencilWrite: true,
-      stencilRef: BIT_OMBRA,
-      stencilFuncMask: BIT_OMBRA,
-      stencilWriteMask: BIT_OMBRA,
-      stencilFunc: THREE.NotEqualStencilFunc,
-      stencilZPass: THREE.ReplaceStencilOp,
-      depthWrite: false,
-    });
+    // righe («palazzi trasparenti»). Un bit dello stencil segna i punti già
+    // in ombra; `principale.js` lo pulisce prima e dopo la scena.
+    //
+    // L'ombra in più sotto i ponti ha il suo bit: sotto un impalcato il suolo
+    // si scurisce due volte (l'ombra, e il buio del ponte), ma i pezzi del
+    // ponte che si sovrappongono (due carreggiate, un segmento e il seguente)
+    // una sola. Era una copia dell'ombra fatta prima dello stencil, e non
+    // l'aveva mai avuto: «guarda l'effetto sotto al ponte», chiazze a righe
+    // che cambiavano muovendo la mappa.
+    const ombra = (opacita, bit) =>
+      new THREE.MeshBasicMaterial({
+        color: 0x0c1220,
+        transparent: true,
+        opacity: opacita,
+        depthWrite: false,
+        depthFunc: THREE.LessDepth,
+        fog: true,
+        polygonOffset: true,
+        polygonOffsetFactor: -3,
+        polygonOffsetUnits: -6,
+        stencilWrite: true,
+        stencilRef: bit,
+        stencilFuncMask: bit,
+        stencilWriteMask: bit,
+        stencilFunc: THREE.NotEqualStencilFunc,
+        stencilZPass: THREE.ReplaceStencilOp,
+      });
+    m.ombre = ombra(P.ombra, BIT_OMBRA);
+    m.ombrePonti = ombra(P.ombraPonte, BIT_OMBRA_PONTE);
     // Sotto gli alberi una macchia tonda e sfumata: più scura al centro.
     const to = tela(64, 64);
     const tg = to.getContext('2d');
@@ -858,17 +889,22 @@ export class Scena {
       m.pozza = new THREE.MeshBasicMaterial({ map: trama(pc, false), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
     }
     const nastro = (frammento, uniformi, extra = {}) =>
-      new THREE.ShaderMaterial({ uniforms: uniformi, vertexShader: VERTICE_NASTRO, fragmentShader: frammento, transparent: true, depthWrite: false, ...extra });
-    /* Le linee sulla strada: spinte verso la telecamera di poco e sempre di
-     * quel poco (`polygonOffsetUnits`), non di più quando la strada si vede
-     * di sbieco (`polygonOffsetFactor`, a zero). «Guarda sotto il ponte,
-     * continua il glitch»: con la vista inclinata dell'auto la spinta che
-     * cresce con l'inclinazione bastava a portare il percorso, la strada
-     * fatta e le code davanti a un ponte basso che ci passa sopra, e cambiando
-     * l'angolo cambiava chi vinceva — la linea compariva e spariva
-     * sull'impalcato. Sull'asfalto in piano non cambia niente: lì basta la
-     * spinta fissa, e le linee stanno già qualche centimetro sopra. */
-    m.percorso = nastro(FRAMMENTO_NASTRO, this.uniformiPercorso, { polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -4 });
+      new THREE.ShaderMaterial({ uniforms: { ...uniformi, uAlza: this.uAlza }, vertexShader: VERTICE_NASTRO, fragmentShader: frammento, transparent: true, depthWrite: false, ...extra });
+    /* L'asfalto e le linee che gli stanno sopra (il percorso, la strada
+     * fatta, le code) hanno solo una spinta fissa verso la telecamera
+     * (`polygonOffsetUnits`), mai quella che cresce con l'inclinazione
+     * (`polygonOffsetFactor`): le linee stanno già sessanta centimetri sopra
+     * la strada, e la profondità vera basta.
+     *
+     * La spinta di sbieco si calcola triangolo per triangolo, e sui
+     * triangoli piccoli e lontani è un numero ballerino. Con più spinta alle
+     * linee («Guarda sotto il ponte, continua il glitch») il percorso passava
+     * davanti a un ponte basso che gli sta sopra. Tolta alle linee ma non
+     * all'asfalto (dalla 1.18.17) era l'asfalto a passare davanti al
+     * percorso: «agli svincoli i punti non sono corretti», la linea usciva a
+     * pezzi sulle rampe in quota, un triangolo sì e uno no, e in lontananza
+     * spariva. */
+    m.percorso = nastro(FRAMMENTO_NASTRO, this.uniformiPercorso, { polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -4 });
     // Spinto verso la telecamera: compare solo dove qualcosa sta davvero
     // davanti (un ponte, un palazzo). A pari con l'asfalto lì sotto il
     // confronto di profondità vinceva e perdeva a chiazze: l'«effetto glitch»
@@ -884,12 +920,12 @@ export class Scena {
     m.alone = nastro(FRAMMENTO_ALONE, this.uniformiPercorso, { blending: notte ? THREE.AdditiveBlending : THREE.NormalBlending });
     m.freccia = nastro(FRAMMENTO_FRECCIA, {}, { polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
     m.punta = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false });
-    m.risparmio = nastro(FRAMMENTO_NASTRO, this.uniformiRisparmio, { polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -3 });
+    m.risparmio = nastro(FRAMMENTO_NASTRO, this.uniformiRisparmio, { polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -3 });
     // La strada già fatta: un blu più tenue e stretto, senza frecce, sotto il
     // percorso (come `percorso-fatto` sulla mappa piatta).
-    m.fatto = nastro(FRAMMENTO_NASTRO, this.uniformiFatto, { polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 });
-    m.fattoVicino = nastro(FRAMMENTO_NASTRO, this.uniformiFattoVicino, { polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 });
-    m.traffico = nastro(FRAMMENTO_CODA, { uNotte: { value: notte ? 1 : 0 } }, { polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 });
+    m.fatto = nastro(FRAMMENTO_NASTRO, this.uniformiFatto, { polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -2 });
+    m.fattoVicino = nastro(FRAMMENTO_NASTRO, this.uniformiFattoVicino, { polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -2 });
+    m.traffico = nastro(FRAMMENTO_CODA, { uNotte: { value: notte ? 1 : 0 } }, { polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -2 });
     return m;
   }
 
@@ -1117,48 +1153,50 @@ export class Scena {
 
   /**
    * Un nastro (percorso, alone, freccia, risparmio, traffico) dai dati di
-   * `nastro()`; null lo toglie.
+   * `nastro()`; null lo toglie. Nella scena è un gruppo di pezzi corti, ognuno
+   * al suo posto (vedi [pezziDelNastro]).
    */
   impostaNastro(nome, dati, materiale, ordine) {
-    const vecchio = this.nastri[nome];
-    if (vecchio) {
+    const togli = (n, sue) => {
+      const vecchio = this.nastri[n];
+      if (!vecchio) return;
       this.mondo.remove(vecchio);
-      vecchio.geometry.dispose();
-      delete this.nastri[nome];
-    }
-    if (nome === 'percorso') {
-      for (const n of ['fantasma', 'fattoVicino']) {
-        if (!this.nastri[n]) continue;
-        this.mondo.remove(this.nastri[n]);
-        delete this.nastri[n];
-      }
-    }
+      // Il fantasma e la strada fatta vicina usano le geometrie del percorso.
+      if (sue) for (const m of vecchio.children) m.geometry.dispose();
+      delete this.nastri[n];
+    };
+    togli(nome, true);
+    if (nome === 'percorso') for (const n of ['fantasma', 'fattoVicino']) togli(n, false);
     if (!dati || !dati.indici.length) return;
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(dati.posizioni, 3));
-    g.setAttribute('uv', new THREE.BufferAttribute(dati.uv, 2));
-    g.setAttribute('livello', new THREE.BufferAttribute(dati.livelli, 1));
-    g.setIndex(new THREE.BufferAttribute(dati.indici, 1));
-    g.computeBoundingSphere();
-    const mesh = new THREE.Mesh(g, this.mat[materiale]);
-    mesh.userData.materiale = materiale;
-    mesh.renderOrder = ordine;
-    this.nastri[nome] = mesh;
-    this.mondo.add(mesh);
+    const geometrie = pezziDelNastro(dati).map((pezzo) => {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pezzo.posizioni, 3));
+      g.setAttribute('uv', new THREE.BufferAttribute(pezzo.uv, 2));
+      g.setAttribute('livello', new THREE.BufferAttribute(pezzo.livelli, 1));
+      g.setIndex(new THREE.BufferAttribute(pezzo.indici, 1));
+      g.computeBoundingSphere();
+      g.userData.ancora = pezzo.ancora;
+      return g;
+    });
+    const metti = (n, mat, ord) => {
+      const gruppo = new THREE.Group();
+      gruppo.userData.materiale = mat;
+      for (const g of geometrie) {
+        const mesh = new THREE.Mesh(g, this.mat[mat]);
+        mesh.position.set(g.userData.ancora[0], g.userData.ancora[1], 0);
+        mesh.renderOrder = ord;
+        mesh.matrixAutoUpdate = false;
+        mesh.updateMatrix();
+        gruppo.add(mesh);
+      }
+      this.nastri[n] = gruppo;
+      this.mondo.add(gruppo);
+    };
+    metti(nome, materiale, ordine);
     if (nome === 'percorso') {
-      const vecchio2 = this.nastri.fantasma;
-      if (vecchio2) this.mondo.remove(vecchio2);
-      const f = new THREE.Mesh(g, this.mat.percorsoFantasma);
-      f.userData.materiale = 'percorsoFantasma';
-      f.renderOrder = 40;
-      this.nastri.fantasma = f;
-      this.mondo.add(f);
+      metti('fantasma', 'percorsoFantasma', 40);
       // E la strada fatta fino all'auto (vedi `uniformiFattoVicino`).
-      const v = new THREE.Mesh(g, this.mat.fattoVicino);
-      v.userData.materiale = 'fattoVicino';
-      v.renderOrder = 3;
-      this.nastri.fattoVicino = v;
-      this.mondo.add(v);
+      metti('fattoVicino', 'fattoVicino', 3);
     }
   }
 
@@ -1176,16 +1214,18 @@ export class Scena {
     const tx = Math.cos(dir);
     const ty = Math.sin(dir);
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute([x + nx * 3.6, y + ny * 3.6, z, x - nx * 3.6, y - ny * 3.6, z, x + tx * 7, y + ty * 7, z], 3));
+    // Contata dal suo posto, non dall'origine della scena (vedi [pezziDelNastro]).
+    g.setAttribute('position', new THREE.Float32BufferAttribute([nx * 3.6, ny * 3.6, 0, -nx * 3.6, -ny * 3.6, 0, tx * 7, ty * 7, 0], 3));
     g.setIndex([0, 1, 2]);
     this.punta = new THREE.Mesh(g, this.mat.punta);
+    this.punta.position.set(x, y, z);
     this.punta.renderOrder = 7;
     this.mondo.add(this.punta);
   }
 
   /** I materiali nuovi anche per i nastri (dopo giorno ↔ notte). */
   rivestiNastri() {
-    for (const m of Object.values(this.nastri)) m.material = this.mat[m.userData.materiale];
+    for (const gruppo of Object.values(this.nastri)) for (const m of gruppo.children) m.material = this.mat[gruppo.userData.materiale];
     if (this.punta) this.punta.material = this.mat.punta;
   }
 
