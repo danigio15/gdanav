@@ -32,5 +32,11 @@
             android:name="it.gdanav.gdanav_app.auto.PosizioneInAuto"
             android:exported="false"
             android:foregroundServiceType="location" />
+        <!-- La scena 3D dell'auto in un processo suo: la plancia aperta sul
+             telefono non le toglie il motore web (vedi Scena3dServizio). -->
+        <service
+            android:name="it.gdanav.gdanav_app.auto.Scena3dServizio"
+            android:exported="false"
+            android:process=":mappa3d" />
     </application>
 </manifest>

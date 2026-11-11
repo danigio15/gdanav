@@ -512,10 +512,13 @@ uniform float uInizio;
 uniform float uFrecce;
 uniform float uOpacita;
 uniform float uSotto;
+uniform float uFine;
+uniform float uScala;
 varying vec2 vUv;
 varying float vLivello;
 void main() {
-  float e = abs(vUv.x - 0.5) * 2.0;
+  // [uScala] stringe il nastro (la strada fatta, più stretta, sul nastro del percorso).
+  float e = abs(vUv.x - 0.5) * 2.0 * uScala;
   // In galleria (+10): il percorso si vede «dentro», più tenue e tratteggiato.
   float galleria = vLivello > 9.5 ? 1.0 : 0.0;
   float livello = vLivello - galleria * 10.0;
@@ -534,6 +537,7 @@ void main() {
   c = mix(c, vec3(1.0), chev * 0.92);
   float a = 1.0 - smoothstep(0.93, 1.0, e);
   a *= smoothstep(uInizio, uInizio + 6.0, vUv.y);
+  a *= 1.0 - smoothstep(uFine - 3.0, uFine, vUv.y);
   // In galleria quasi piena, con un tratteggio leggero: «rendi più visibile la
   // linea nelle gallerie» (prima metà tenue, a strisce).
   a *= mix(1.0, 0.82 + 0.18 * step(0.5, fract(vUv.y / 8.0)), galleria);
@@ -658,6 +662,8 @@ export class Scena {
       uFrecce: { value: 1 },
       uOpacita: { value: 1 },
       uSotto: { value: 0 },
+      uFine: { value: 1e9 },
+      uScala: { value: 1 },
     };
     // Il «fantasma» del percorso: lo stesso nastro, disegnato solo dove
     // qualcosa ci sta davanti (un cavalcavia, un edificio), tenue e
@@ -685,6 +691,8 @@ export class Scena {
       uFrecce: { value: 0 },
       uOpacita: { value: 1 },
       uSotto: { value: 0 },
+      uFine: { value: 1e9 },
+      uScala: { value: 1 },
     };
     this.uniformiFatto = {
       uCore: { value: colore('#7f9fc9') },
@@ -696,7 +704,16 @@ export class Scena {
       uFrecce: { value: 0 },
       uOpacita: { value: 0.85 },
       uSotto: { value: 0 },
+      uFine: { value: 1e9 },
+      uScala: { value: 1 },
     };
+    // La strada fatta fino all'auto: il nastro del percorso, dietro l'auto,
+    // coi colori della strada fatta. «La striscia del percorso passato si
+    // ridisegna dopo e non è continua»: la traccia arriva dall'app ogni tre
+    // secondi (in autostrada cento metri), e fra la sua fine e l'auto restava
+    // un vuoto che si chiudeva a salti. Qui [uInizio] è dove finisce la
+    // traccia e [uFine] l'auto, a ogni fotogramma.
+    this.uniformiFattoVicino = { ...this.uniformiFatto, uInizio: { value: 1e9 }, uFine: { value: -1e9 }, uScala: { value: 4.6 / 3.6 } };
     this.nastri = {};
     this.colorAuto = '#d62a26';
     this.impostaNotte(false);
@@ -871,6 +888,7 @@ export class Scena {
     // La strada già fatta: un blu più tenue e stretto, senza frecce, sotto il
     // percorso (come `percorso-fatto` sulla mappa piatta).
     m.fatto = nastro(FRAMMENTO_NASTRO, this.uniformiFatto, { polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 });
+    m.fattoVicino = nastro(FRAMMENTO_NASTRO, this.uniformiFattoVicino, { polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 });
     m.traffico = nastro(FRAMMENTO_CODA, { uNotte: { value: notte ? 1 : 0 } }, { polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 });
     return m;
   }
@@ -1108,9 +1126,12 @@ export class Scena {
       vecchio.geometry.dispose();
       delete this.nastri[nome];
     }
-    if (nome === 'percorso' && this.nastri.fantasma) {
-      this.mondo.remove(this.nastri.fantasma);
-      delete this.nastri.fantasma;
+    if (nome === 'percorso') {
+      for (const n of ['fantasma', 'fattoVicino']) {
+        if (!this.nastri[n]) continue;
+        this.mondo.remove(this.nastri[n]);
+        delete this.nastri[n];
+      }
     }
     if (!dati || !dati.indici.length) return;
     const g = new THREE.BufferGeometry();
@@ -1132,6 +1153,12 @@ export class Scena {
       f.renderOrder = 40;
       this.nastri.fantasma = f;
       this.mondo.add(f);
+      // E la strada fatta fino all'auto (vedi `uniformiFattoVicino`).
+      const v = new THREE.Mesh(g, this.mat.fattoVicino);
+      v.userData.materiale = 'fattoVicino';
+      v.renderOrder = 3;
+      this.nastri.fattoVicino = v;
+      this.mondo.add(v);
     }
   }
 

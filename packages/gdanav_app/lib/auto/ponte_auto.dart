@@ -231,6 +231,12 @@ class PonteAuto {
       case 'chiusa3d':
         _regia3d?.ferma();
         _regia3d = null;
+      case 'riprova3d':
+        // La scena nel suo processo (Scena3dLontana) non ce l'ha fatta: prima
+        // di arrendersi l'auto prova quella dentro l'app. Qui si dimentica il
+        // «non va», che era di quella.
+        _treDNonVa = false;
+        _vuoi3d();
       case 'prova_fine':
         _conProva = false;
         _seguiProva();

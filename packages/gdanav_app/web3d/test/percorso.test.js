@@ -72,12 +72,39 @@ test('la linea si appoggia sulla strada: un metro di lato torna in mezzo', () =>
   for (let k = 1; k < n.posizioni.length; k += 3) ys.push(n.posizioni[k]);
   const mezzo = (Math.max(...ys) + Math.min(...ys)) / 2;
   assert.ok(Math.abs(mezzo) < 0.2, `il nastro sta in mezzo alla strada (${mezzo.toFixed(2)})`);
-  // Lontano dalle strade (oltre due metri e mezzo) non si sposta: la strada
+  // Lontano dalle strade (oltre tredici metri) non si sposta: la strada
   // giusta è un'altra.
-  const accanto = profiloDi(new Linea([-300, 4, 300, 4]), 0, 600, i);
-  assert.deepEqual(accanto.sposta(300), [0, 0]);
   const lontana = profiloDi(new Linea([-300, 20, 300, 20]), 0, 600, i);
   assert.deepEqual(lontana.sposta(300), [0, 0]);
+});
+
+test('il percorso di TomTom, otto metri di lato, torna sulla strada della mappa', () => {
+  // «Ancora è fuori strada la linea»: via Po, la linea del percorso a otto
+  // metri dalla strada, mentre la strada già fatta (il GPS) ci sta sopra. Il
+  // percorso è di TomTom, la mappa di OpenStreetMap.
+  const i = indice([[-400, 0, 0, 400, 0, 0, 7, 5]]);
+  const l = new Linea([-300, 8, 300, 8]);
+  const p = profiloDi(l, 0, 600, i);
+  for (const s of [100, 300, 500]) {
+    const [, dy] = p.sposta(s);
+    assert.ok(Math.abs(dy + 8) < 0.2, `a ${s} m la linea resta a ${(8 + dy).toFixed(2)} m dalla strada`);
+  }
+});
+
+test('fra due strade di un isolato la linea spostata resta sulla sua', () => {
+  // Un isolato: due strade parallele a trenta metri. Il percorso di TomTom sta
+  // otto metri verso l'altra: torna sulla sua, non salta dall'altra parte.
+  const i = indice([
+    [-400, 0, 0, 400, 0, 0, 7, 5],
+    [-400, 30, 0, 400, 30, 0, 7, 5],
+  ]);
+  const l = new Linea([-300, 8, 300, 8]);
+  const p = profiloDi(l, 0, 600, i);
+  for (let s = 20; s <= 580; s += 20) {
+    const [x, y] = l.a(s);
+    const [, dy] = p.sposta(s);
+    assert.ok(Math.abs(y + dy) < 0.5, `a ${x.toFixed(0)} m la linea è a ${(y + dy).toFixed(2)} m dalla sua strada`);
+  }
 });
 
 test("allo svincolo, se non si esce, la linea resta diritta sulla carreggiata", () => {
@@ -199,4 +226,79 @@ test('in galleria: i punti lo sanno, e il nastro lì ha il livello +10', () => {
   assert.ok(Math.abs(da - 250) < 5 && Math.abs(a - 350) < 5, `${da}..${a}`);
   const n = nastro(l, p, 0, 600, 4, 0.6);
   assert.ok([...n.livelli].some((v) => v >= 10) && [...n.livelli].some((v) => v === 0));
+});
+
+test("sulla strada a due carreggiate la linea va su quella del suo senso, non sull'altra", () => {
+  // SS7bis: TomTom passa nel mezzo, la carreggiata contromano (a 5 m) era più
+  // vicina di quella giusta (a 9 m) e la linea ci finiva sopra.
+  const i = indice([
+    [300, 5, 0, -100, 5, 0, 8, 2 + 128], // verso -x: contromano
+    [-100, -9, 0, 300, -9, 0, 8, 2 + 128], // verso +x: la nostra
+  ]);
+  const punti = [];
+  for (let x = 0; x <= 200; x += 4) punti.push([x, 0]);
+  const h = quote(punti, i);
+  for (let k = 0; k < punti.length; k++) assert.ok(Math.abs(h.dy[k] + 9) < 0.5, `al punto ${k} dy=${h.dy[k]}`);
+  // Senza senso unico (strada a doppio senso) vale ancora la più vicina.
+  const d = quote(punti, indice([[300, 5, 0, -100, 5, 0, 8, 2], [-100, -9, 0, 300, -9, 0, 8, 2]]));
+  assert.ok(Math.abs(d.dy[10] - 5) < 0.5);
+  // E con -1 (senso contrario alla linea) si gira.
+  const r = quote(punti, indice([[-100, 5, 0, 300, 5, 0, 8, 2 + 256], [300, -9, 0, -100, -9, 0, 8, 2 + 256]]));
+  assert.ok(Math.abs(r.dy[10] + 9) < 0.5);
+});
+
+test('sul viadotto, con una stradina più vicina sotto, la linea resta su', () => {
+  // SP335: il percorso (di TomTom) sta a 7 m dalla carreggiata sul viadotto
+  // (8 m di quota) e a 2 m da una stradina a terra che le corre sotto per
+  // seicento metri. Si parte da terra, sulla stessa strada prima del ponte.
+  const i = indice([
+    [-200, 7, 0, 0, 7, 0, 8, 2 + 128],
+    [0, 7, 0, 100, 7, 8, 8, 2 + 128],
+    [100, 7, 8, 1000, 7, 8, 8, 2 + 32 + 128],
+    [300, -2, 0, 900, -2, 0, 5, 6],
+  ]);
+  const punti = [];
+  for (let x = -100; x <= 950; x += 4) punti.push([x, 0]);
+  const h = quote(punti, i);
+  for (let k = 0; k < punti.length; k++) if (punti[k][0] > 150) assert.ok(Math.abs(h[k] - 8) < 0.3, `a x=${punti[k][0]} h=${h[k]}`);
+  // Il tratto si rifà più avanti, tutto sopra la stradina: da solo sceglierebbe
+  // quella (più vicina), con l'àncora dell'auto resta sul viadotto.
+  const l = new Linea([0, 0, 1000, 0]);
+  const solo = profiloDi(l, 320, 880, i);
+  assert.ok(solo.quota(600) < 1, 'senza àncora scende (è il caso che si corregge)');
+  const con = profiloDi(l, 320, 880, i, 4, { s: 400, h: 8 });
+  assert.ok(Math.abs(con.quota(600) - 8) < 0.3 && Math.abs(con.quota(860) - 8) < 0.3, `con l'àncora resta su (${con.quota(600)})`);
+  assert.equal(con.quotaVera(600) !== null, true);
+  assert.equal(profiloDi(l, 0, 100, indice([])).quotaVera(50), null);
+});
+
+test('tante stradine sotto il viadotto non tolgono la carreggiata dalle candidate', () => {
+  // Sette strade a terra più vicine della carreggiata (a 7 e a 11 m, in quota).
+  const seg = [[-200, 7, 8, 600, 7, 8, 8, 2 + 32 + 128]];
+  for (let k = 0; k < 7; k++) seg.push([100, -3 + k * 0.9 - 2.7, 0, 500, -3 + k * 0.9 - 2.7, 0, 4, 6]);
+  // (le strade a terra distano fra loro meno di un metro e mezzo: se ne
+  // fondono alcune; mettiamole più larghe)
+  const larghe = [[-200, 11, 8, 600, 11, 8, 8, 2 + 32 + 128]];
+  for (let k = 0; k < 7; k++) larghe.push([100, -6 + k * 1.7, 0, 500, -6 + k * 1.7, 0, 4, 6]);
+  for (const s of [seg, larghe]) {
+    const punti = [];
+    for (let x = -100; x <= 550; x += 4) punti.push([x, 0]);
+    const h = quote(punti, indice(s));
+    for (let k = 0; k < punti.length; k++) assert.ok(Math.abs(h[k] - 8) < 0.3, `a x=${punti[k][0]} h=${h[k]}`);
+  }
+});
+
+test('se in fondo il viadotto finisce (il bordo delle tessere) la linea resta su fin lì', () => {
+  // La carreggiata in quota finisce a x=600; la stradina a terra, più vicina
+  // al percorso, continua. Prima un punto solo a terra in fondo tirava giù
+  // la linea per centinaia di metri.
+  const i = indice([
+    [-200, 7, 8, 600, 7, 8, 8, 2 + 32 + 128],
+    [100, -2, 0, 700, -2, 0, 5, 6],
+  ]);
+  const punti = [];
+  for (let x = -100; x <= 640; x += 4) punti.push([x, 0]);
+  const h = quote(punti, i);
+  for (let k = 0; k < punti.length; k++) if (punti[k][0] < 590) assert.ok(Math.abs(h[k] - 8) < 0.3, `a x=${punti[k][0]} h=${h[k]}`);
+  assert.ok(h[punti.length - 1] < 1, 'in fondo, dove resta solo quella, a terra');
 });

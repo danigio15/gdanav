@@ -23,12 +23,20 @@ import android.webkit.WebViewClient
  * (`Gdanav3d.postMessage`) tornano alla regia ([PonteAuto.dalla3d]). Se la
  * pagina dice che non ce la fa, la regia lo dice all'auto
  * ([PonteAuto.nonVa3d]) e torna la mappa di sempre.
+ *
+ * [allaRegia]: dove vanno i messaggi della pagina. Dentro l'app è
+ * [PonteAuto.dalla3d]; nel processo della scena ([Scena3dServizio]) tornano
+ * all'app per il suo canale, e [PonteAuto] lì non si tocca.
  */
-internal class Scena3dAuto(context: Context, notte: Boolean) {
+internal class Scena3dAuto(
+    context: Context,
+    notte: Boolean,
+    private val allaRegia: (String) -> Unit = { PonteAuto.dalla3d(it) },
+) : Scena3d {
     private val principale = Handler(Looper.getMainLooper())
 
     @SuppressLint("SetJavaScriptEnabled")
-    val vista: WebView = WebView(context).apply {
+    override val vista: WebView = WebView(context).apply {
         // Prima che la pagina disegni: il colore della foschia, non un lampo bianco.
         setBackgroundColor(if (notte) Color.rgb(0x1D, 0x27, 0x40) else Color.rgb(0xE2, 0xEA, 0xF1))
         settings.javaScriptEnabled = true
@@ -52,7 +60,7 @@ internal class Scena3dAuto(context: Context, notte: Boolean) {
             }
 
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-                if (request.isForMainFrame) PonteAuto.dalla3d("{\"tipo\":\"errore\",\"motivo\":\"pagina\"}")
+                if (request.isForMainFrame) allaRegia("{\"tipo\":\"errore\",\"motivo\":\"pagina\"}")
             }
         }
         loadUrl(PAGINA)
@@ -71,11 +79,15 @@ internal class Scena3dAuto(context: Context, notte: Boolean) {
      * la pagina e l'auto finiva in un angolo, lontana («lo zoom troppo
      * lontano e piatto»). `null` finché non si sa.
      */
-    @Volatile var scala: Float? = null
+    @Volatile override var scala: Float? = null
         private set
 
     /** Chiamata quando [scala] cambia. */
-    var alMisurato: (() -> Unit)? = null
+    override var alMisurato: (() -> Unit)? = null
+
+    /** Dentro l'app la WebView si vede appena messa. */
+    override val visibile = true
+    override var alVisibile: (() -> Unit)? = null
 
     /** Misura [scala]; si rifà quando la WebView cambia grandezza. */
     fun misura() {
@@ -92,16 +104,16 @@ internal class Scena3dAuto(context: Context, notte: Boolean) {
     }
 
     /** La pagina ha detto qualcosa: è viva. */
-    @Volatile var haParlato = false
+    @Volatile override var haParlato = false
         private set
 
     /** Il JavaScript della regia (`window.gdanav3d.ricevi(…)`). */
-    fun esegui(js: String) {
+    override fun esegui(js: String) {
         if (finita) return
         vista.evaluateJavascript(js, null)
     }
 
-    fun distruggi() {
+    override fun distruggi() {
         if (finita) return
         finita = true
         vista.stopLoading()
@@ -115,7 +127,7 @@ internal class Scena3dAuto(context: Context, notte: Boolean) {
         fun postMessage(testo: String) {
             // Arriva dal filo di Chromium: alla regia dal filo principale.
             haParlato = true
-            principale.post { if (!finita) PonteAuto.dalla3d(testo) }
+            principale.post { if (!finita) allaRegia(testo) }
         }
     }
 

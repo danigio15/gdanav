@@ -321,7 +321,9 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
 
     // I segmenti con le quote, un poco oltre il bordo (per il percorso).
     if (f.cls !== 'rail') {
-      const codice = CODICI_CLASSE[f.cls] ?? 7;
+      // Il senso unico (OpenMapTiles: 1 come la linea, -1 al contrario): 128 o
+      // 256, perché il percorso non si agganci alla carreggiata opposta.
+      const codice = (CODICI_CLASSE[f.cls] ?? 7) + (f.senso > 0 ? 128 : f.senso < 0 ? 256 : 0);
       for (const pezzo of ritagliaLinea(ricca, -meta - 40, -meta - 40, meta + 40, meta + 40)) {
         for (let k = 1; k < pezzo.length; k++) {
           const a = pezzo[k - 1];

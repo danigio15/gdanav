@@ -61,6 +61,21 @@ void main() {
     await aspetta();
     expect((chiamate.lastWhere((c) => c.method == 'web3d_no').arguments as Map)['motivo'], 'webgl2');
     expect((chiamate.lastWhere((c) => c.method == 'web3d_vuoi').arguments as Map)['si'], isFalse);
+
+    // Ma se a non farcela era la scena nel suo processo (Scena3dLontana),
+    // l'auto chiede di riprovare con quella dentro l'app: il telefono
+    // dimentica il «non va» e la vuole di nuovo, con una regia nuova.
+    await dallAuto('chiusa3d');
+    await dallAuto('riprova3d');
+    await aspetta();
+    expect((chiamate.lastWhere((c) => c.method == 'web3d_vuoi').arguments as Map)['si'], isTrue);
+    chiamate.clear();
+    await dallAuto('dalla3d', {'testo': '{"tipo":"caricata"}'});
+    await aspetta();
+    expect(chiamate.where((c) => c.method == 'web3d'), isNotEmpty, reason: 'la regia nuova manda opzioni e stile');
+    // La scena si chiude: la regia si ferma coi suoi tempi.
+    await dallAuto('chiusa3d');
+    await aspetta();
   });
 
   testWidgets("senza il 3D aumentato l'auto non vuole la scena", (tester) async {
