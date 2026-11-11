@@ -302,3 +302,44 @@ test('se in fondo il viadotto finisce (il bordo delle tessere) la linea resta su
   for (let k = 0; k < punti.length; k++) if (punti[k][0] < 590) assert.ok(Math.abs(h[k] - 8) < 0.3, `a x=${punti[k][0]} h=${h[k]}`);
   assert.ok(h[punti.length - 1] < 1, 'in fondo, dove resta solo quella, a terra');
 });
+
+test('a undici, dodici metri dalla strada la linea non va a zig zag', () => {
+  // La tangenziale: il percorso di TomTom corre a 11,5 m dal mezzo della
+  // carreggiata, un metro più qua e uno più là. Lo spostamento si spegneva
+  // fra dieci e tredici metri, e la linea ballava di tre, quattro metri.
+  const i = indice([[-200, 0, 0, 900, 0, 0, 14, 1 + 128]]);
+  const l = new Linea(
+    Array.from({ length: 141 }, (_, k) => [k * 5, 11.5 + Math.sin((2 * Math.PI * k * 5) / 40)]).flat(),
+  );
+  const p = profiloDi(l, 0, 700, i);
+  let peggio = 0;
+  let salto = 0;
+  let prima = null;
+  for (let s = 60; s <= 640; s += 4) {
+    const [, y] = l.a(s);
+    const finale = y + p.sposta(s)[1];
+    peggio = Math.max(peggio, Math.abs(finale));
+    if (prima !== null) salto = Math.max(salto, Math.abs(finale - prima));
+    prima = finale;
+  }
+  assert.ok(peggio < 0.6, `la linea sta sulla strada (al più ${peggio.toFixed(2)} m dal mezzo)`);
+  assert.ok(salto < 0.4, `e non fa scalini (${salto.toFixed(2)} m fra due punti)`);
+});
+
+test('un punto che si aggancia altrove non fa una gobba; nel parcheggio niente salti di corsia', () => {
+  // Una strada a 6 m di lato; per due punti soli c'è una stradina dall'altra parte, più vicina.
+  const i = indice([
+    [-100, 6, 0, 600, 6, 0, 7, 5],
+    [196, -2, 0, 204, -2, 0, 4, 7],
+  ]);
+  const l = new Linea([0, 0, 500, 0]);
+  const p = profiloDi(l, 0, 500, i);
+  for (let s = 100; s <= 300; s += 4) assert.ok(Math.abs(p.sposta(s)[1] - 6) < 0.6, `a ${s} m: ${p.sposta(s)[1].toFixed(2)}`);
+  // Due corsie di parcheggio, a 4 m di qua e di là, a pezzi alterni di 12 m.
+  const pezzi = [];
+  for (let x = 0; x < 400; x += 24) pezzi.push([x, 4, 0, x + 12, 4, 0, 4, 7], [x + 12, -4, 0, x + 24, -4, 0, 4, 7]);
+  const q = profiloDi(l, 0, 400, indice(pezzi));
+  let salto = 0;
+  for (let s = 40; s <= 360; s += 4) salto = Math.max(salto, Math.abs(q.sposta(s + 4)[1] - q.sposta(s)[1]));
+  assert.ok(salto < 0.8, `fra due punti la linea si sposta di ${salto.toFixed(2)} m`);
+});
