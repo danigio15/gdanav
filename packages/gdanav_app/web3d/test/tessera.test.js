@@ -284,3 +284,33 @@ test('un casello: la pensilina sta su pilastri sopra le corsie, non è un palazz
   }
   assert.ok(pilastri >= 4 * 20, `i pilastri (${pilastri} vertici)`);
 });
+
+test('dove le corsie salgono, sopra non si mette né un palazzo né una pensilina', () => {
+  // Il casello di Corso Malta, sul viadotto della tangenziale di Napoli: le
+  // carreggiate e le rampe lì sotto stanno fra undici e ventiquattro metri.
+  // Un tetto solo finiva a trenta metri, su pilastri sottili come fili.
+  const livelli = {
+    '0,0': {
+      transportation: strato([
+        { p: { class: 'motorway', toll: 1 }, g: [[[2048, 4096], [2048, 2600]]] },
+        { p: { class: 'motorway', toll: 1, brunnel: 'bridge', layer: 1 }, g: [[[2048, 2600], [2048, 1500]]] },
+        { p: { class: 'motorway', toll: 1 }, g: [[[2048, 1500], [2048, 0]]] },
+        // Quella che il ponte scavalca.
+        { p: { class: 'primary' }, g: [[[0, 2048], [4096, 2048]]] },
+      ]),
+      // Sopra la salita al ponte.
+      building: strato([{ tipo: 3, p: { render_height: 8 }, g: [[[1950, 2620], [1950, 2900], [2150, 2900], [2150, 2620], [1950, 2620]]] }]),
+    },
+  };
+  const t = costruisciTessera({ z: 14, x: X, y: Y, livelli });
+  // La strada sale davvero, lì sotto.
+  const lat = Math.atan(Math.sinh(Math.PI * (1 - (2 * (Y + 0.5)) / 2 ** 14)));
+  const k = (40075016.686 * Math.cos(lat)) / 2 ** 14 / 4096;
+  const li = (x, y) => Math.abs(x) < 100 * k && Math.abs(y) > 570 * k && Math.abs(y) < 854 * k;
+  const quote = [];
+  for (let i = 0; i < t.segmenti.length; i += 8) if (li(t.segmenti[i], t.segmenti[i + 1])) quote.push(t.segmenti[i + 2]);
+  assert.ok(Math.max(...quote) - Math.min(...quote) > 3, `la salita: da ${Math.min(...quote)} a ${Math.max(...quote)} m`);
+  assert.equal(t.conti.edificiFatti, 0);
+  assert.equal(t.tetti, null);
+  for (const g of Object.values(t.facciate)) assert.equal(g, null);
+});

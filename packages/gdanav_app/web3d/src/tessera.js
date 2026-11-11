@@ -47,6 +47,8 @@ export const CAMPATA = 3.4;
 const LUCE_PENSILINA = 5.4;
 /** E quanto è spesso il suo tetto. */
 const SPESSORE_PENSILINA = 0.7;
+/** Se sotto le corsie salgono più di così, la pensilina non si fa. */
+const DISLIVELLO_PENSILINA = 3;
 /** I colori della pensilina, di giorno e di notte: il tetto, la fascia attorno, il ventre. */
 const PENSILINA = {
   tetto: [rgb('#dad7d0'), rgb('#3d4554')],
@@ -778,7 +780,13 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
       }
     }
   });
-  /** La quota della strada che passa sotto l'edificio (almeno sei metri di corsia), o `null`. */
+  /**
+   * La strada che passa sotto l'edificio (almeno sei metri di corsia), o
+   * `null`: la sua [quota] più alta lì sotto, e se è [piana]. Dove le corsie
+   * salgono o stanno a piani diversi (un casello su un viadotto con le sue
+   * rampe: fra undici e ventiquattro metri) un tetto solo non le copre, e
+   * finiva a trenta metri su pilastri sottili: lì non si disegna niente.
+   */
   const corsiaSotto = (anelli) => {
     if (!corsie.size) return null;
     let minx = 1e9;
@@ -792,17 +800,19 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
       maxy = Math.max(maxy, py);
     }
     let dentro = 0;
-    let quota = 0;
+    let quota = -Infinity;
+    let bassa = Infinity;
     for (let cx = Math.floor(minx / GP); cx <= Math.floor(maxx / GP); cx++) {
       for (let cy = Math.floor(miny / GP); cy <= Math.floor(maxy / GP); cy++) {
         for (const [px, py, ph] of corsie.get(cx + ',' + cy) || []) {
           if (!puntoDentroPoligono(px, py, anelli)) continue;
           dentro++;
           if (ph > quota) quota = ph;
+          if (ph < bassa) bassa = ph;
         }
       }
     }
-    return dentro >= 3 ? quota : null;
+    return dentro >= 3 ? { quota, piana: quota - bassa <= DISLIVELLO_PENSILINA } : null;
   };
   const sullaCorsia = (px, py) => {
     for (let ax = -1; ax <= 1; ax++) {
@@ -897,8 +907,9 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     // Una pensilina (un casello): la strada le passa sotto, a qualunque quota.
     const corsia = b.mh < 1 ? corsiaSotto(b.anelli.map((a) => a.pts)) : null;
     if (corsia !== null) {
+      if (!corsia.piana) continue;
       const prima = tetti.triangoli + ombre.triangoli + opere.triangoli;
-      pensilina(b, corsia + LUCE_PENSILINA);
+      pensilina(b, corsia.quota + LUCE_PENSILINA);
       triEdifici += tetti.triangoli + ombre.triangoli + opere.triangoli - prima;
       edificiFatti++;
       continue;
