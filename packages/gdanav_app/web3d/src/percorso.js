@@ -621,6 +621,8 @@ export function spostamenti(dxGrezzi, dyGrezzi, punti, passo = 4, galleria = nul
 
 /** Da quanti gradi in su, in una ventina di metri, è una svolta. */
 const SVOLTA_GRADI = 35;
+/** E fin dove, prima e dopo, i due rami devono andare dritti perché lo sia. */
+const RAMO_DRITTO_GRADI = 12;
 
 /**
  * Alle svolte lo spostamento è un vettore intero, non solo di lato.
@@ -662,6 +664,14 @@ function alleSvolte(dx, dy, visto, punti, passo) {
     v.sort((x, y) => x - y);
     return v[v.length >> 1];
   };
+  /** Fra i punti [da] e [a] la linea va dritta (gira meno di [RAMO_DRITTO_GRADI])? */
+  const dritto = (da, a) => {
+    if (a - da < 2) return false;
+    const m = (da + a) >> 1;
+    const u = verso(punti[da], punti[m]);
+    const w = verso(punti[m], punti[a]);
+    return Math.abs(Math.atan2(u[0] * w[1] - u[1] * w[0], u[0] * w[0] + u[1] * w[1])) * (180 / Math.PI) < RAMO_DRITTO_GRADI;
+  };
   const pieno = Math.round(20 / passo);
   const largo = Math.round(36 / passo);
   let ultima = -Infinity;
@@ -680,6 +690,11 @@ function alleSvolte(dx, dy, visto, punti, passo) {
     if (Number.isNaN(l1) || Number.isNaN(l2)) continue;
     const t1 = verso(punti[prima[0]], punti[prima[1]]);
     const t2 = verso(punti[dopo[0]], punti[dopo[1]]);
+    // Una svolta è uno spigolo fra due strade dritte. In una rotonda, in un
+    // tornante o in un'inversione i due rami girano anche loro: lì «di lato»
+    // non ha un verso solo, il conto dava spostamenti di una decina di metri
+    // e la linea faceva un giro largo fuori dalla rotonda.
+    if (!dritto(prima[0], prima[1]) || !dritto(dopo[0], dopo[1])) continue;
     const n1 = [-t1[1], t1[0]];
     const n2 = [-t2[1], t2[0]];
     const det = n1[0] * n2[1] - n1[1] * n2[0];
@@ -687,7 +702,7 @@ function alleSvolte(dx, dy, visto, punti, passo) {
     if (Math.abs(det) < 0.5) continue;
     const vx = (l1 * n2[1] - l2 * n1[1]) / det;
     const vy = (n1[0] * l2 - n2[0] * l1) / det;
-    if (Math.hypot(vx, vy) > SPOSTAMENTO_MAX_M * 1.3) continue;
+    if (Math.hypot(vx, vy) > SPOSTAMENTO_MAX_M) continue;
     for (let j = Math.max(0, cima - largo); j <= Math.min(n - 1, cima + largo); j++) {
       const d = Math.abs(j - cima);
       const peso = d <= pieno ? 1 : 1 - (d - pieno) / (largo - pieno);

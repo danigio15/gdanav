@@ -56,3 +56,25 @@ export function daChiave(k) {
   const [z, x, y] = k.split('/').map(Number);
   return { z, x, y };
 }
+
+/**
+ * Lo spazio che le schede coprono ai lati, in punti della pagina larga
+ * [larghezza]: `[sinistra, destra]`, mai più di sette decimi in tutto.
+ *
+ * Ognuno dei due era tagliato a 0,45 della larghezza: quando la parte libera
+ * è meno di metà superficie e tutta da un lato (lo schermo diviso dell'auto,
+ * con la mappa in un pannello stretto) l'auto non stava più in mezzo alla
+ * parte libera, ma spostata verso quella coperta. Tagliati insieme, in
+ * proporzione, il mezzo resta il mezzo.
+ */
+export function marginiAiLati(sinistra, destra, larghezza) {
+  let s = Number.isFinite(sinistra) ? Math.max(0, sinistra) : 0;
+  let d = Number.isFinite(destra) ? Math.max(0, destra) : 0;
+  const tetto = larghezza * 0.7;
+  if (s + d > tetto && s + d > 0) {
+    const k = tetto / (s + d);
+    s *= k;
+    d *= k;
+  }
+  return [s, d];
+}

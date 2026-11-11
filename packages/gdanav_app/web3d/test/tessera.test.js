@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { bufferDellaTessera, costruisciTessera, iSottopassi, LIMITI, NASTRI, stimaTriangoli } from '../src/tessera.js';
+import { bufferDellaTessera, costruisciTessera, iSottopassi, LIMITI, NASTRI, stimaTriangoli, stradaVera } from '../src/tessera.js';
 import { ALTEZZA_LIVELLO, SPESSORE_IMPALCATO, altezzaViadotto } from '../src/elevazione.js';
-import { cavalcavia, cavalcaviaConRampa, cavalcaviaDueCarreggiate, ponteLungo, sottopasso, sottopassoConNome } from './finte.js';
+import { cavalcavia, cavalcaviaConRampa, cavalcaviaDueCarreggiate, ponteLungo, sottopasso, sottopassoConNome, strato } from './finte.js';
 
 const X = 8605;
 const Y = 5860;
@@ -228,4 +228,123 @@ test('un sottopasso non ha gli imbocchi di una galleria', () => {
   assert.ok(!s.has(tagliata), 'tagliata dal bordo: non si sa');
   assert.ok(!s.has(treno));
   assert.equal(s.size, 2);
+});
+
+test('un casello: la pensilina sta su pilastri sopra le corsie, non è un palazzo', () => {
+  // «Verifica i caselli autostradali e tangenziale»: gli edifici veri hanno
+  // anche le pensiline dei caselli, e la scena le tirava su come palazzi con
+  // le finestre di traverso sulla strada.
+  const quadro = (x0, y0, x1, y1) => [[[x0, y0], [x0, y1], [x1, y1], [x1, y0], [x0, y0]]];
+  const livelli = {
+    '0,0': {
+      transportation: strato([
+        // La tangenziale a pedaggio, da ovest a est in mezzo alla tessera.
+        { p: { class: 'motorway', oneway: 1, toll: 1 }, g: [[[0, 2048], [4096, 2048]]] },
+        // E una stradina che entra in un capannone: quello resta un capannone.
+        { p: { class: 'minor' }, g: [[[3000, 0], [3000, 1000]]] },
+      ]),
+      building: strato([
+        { tipo: 3, p: { render_height: 8 }, g: quadro(1950, 2010, 2150, 2090) },
+        { tipo: 3, p: { render_height: 9 }, g: quadro(2960, 400, 3040, 500) },
+        { tipo: 3, p: { render_height: 12 }, g: quadro(300, 300, 400, 400) },
+      ]),
+    },
+  };
+  const t = costruisciTessera({ z: 14, x: X, y: Y, livelli });
+  assert.equal(t.conti.edificiFatti, 3);
+  // I metri di un punto della tessera, dal suo centro.
+  const lat = Math.atan(Math.sinh(Math.PI * (1 - (2 * (Y + 0.5)) / 2 ** 14)));
+  const k = (40075016.686 * Math.cos(lat)) / 2 ** 14 / 4096;
+  const sopraLaPensilina = (x, y) => Math.abs(x) < 102 * k && Math.abs(y) < 44 * k;
+  // Il tetto della pensilina: fra 5,4 e 6,1 metri, niente a terra.
+  const zPensilina = [];
+  const P = t.tetti.posizioni;
+  for (let i = 0; i < P.length; i += 3) if (sopraLaPensilina(P[i], P[i + 1])) zPensilina.push(P[i + 2]);
+  assert.ok(zPensilina.length > 12, 'il tetto e la fascia della pensilina');
+  assert.ok(Math.min(...zPensilina) > 5.3 && Math.max(...zPensilina) < 6.2, `la pensilina fra ${Math.min(...zPensilina)} e ${Math.max(...zPensilina)} m`);
+  // Nessuna facciata lì: sotto si passa. Le altre due case le hanno, da terra.
+  let facciateLi = 0;
+  let facciateATerra = 0;
+  for (const g of Object.values(t.facciate)) {
+    for (let i = 0; i < g.posizioni.length; i += 3) {
+      if (sopraLaPensilina(g.posizioni[i], g.posizioni[i + 1])) facciateLi++;
+      else if (g.posizioni[i + 2] < 0.5) facciateATerra++;
+    }
+  }
+  assert.equal(facciateLi, 0, 'nessun muro sulle corsie');
+  assert.ok(facciateATerra >= 16, `il capannone e la casa hanno i muri da terra (${facciateATerra})`);
+  // I pilastri: ci sono, arrivano al ventre della pensilina, e nessuno sta sulla corsia.
+  const O = t.opere.posizioni;
+  let pilastri = 0;
+  for (let i = 0; i < O.length; i += 3) {
+    if (!sopraLaPensilina(O[i], O[i + 1])) continue;
+    pilastri++;
+    assert.ok(O[i + 2] < 5.45, `un pilastro più alto della pensilina (${O[i + 2]})`);
+    assert.ok(Math.abs(O[i + 1]) > 6, `un pilastro in mezzo alla strada (${O[i + 1].toFixed(1)} m dal mezzo)`);
+  }
+  assert.ok(pilastri >= 4 * 20, `i pilastri (${pilastri} vertici)`);
+});
+
+test('dove le corsie salgono, sopra non si mette né un palazzo né una pensilina', () => {
+  // Il casello di Corso Malta, sul viadotto della tangenziale di Napoli: le
+  // carreggiate e le rampe lì sotto stanno fra undici e ventiquattro metri.
+  // Un tetto solo finiva a trenta metri, su pilastri sottili come fili.
+  const livelli = {
+    '0,0': {
+      transportation: strato([
+        { p: { class: 'motorway', toll: 1 }, g: [[[2048, 4096], [2048, 2600]]] },
+        { p: { class: 'motorway', toll: 1, brunnel: 'bridge', layer: 1 }, g: [[[2048, 2600], [2048, 1500]]] },
+        { p: { class: 'motorway', toll: 1 }, g: [[[2048, 1500], [2048, 0]]] },
+        // Quella che il ponte scavalca.
+        { p: { class: 'primary' }, g: [[[0, 2048], [4096, 2048]]] },
+      ]),
+      // Sopra la salita al ponte.
+      building: strato([{ tipo: 3, p: { render_height: 8 }, g: [[[1950, 2620], [1950, 2900], [2150, 2900], [2150, 2620], [1950, 2620]]] }]),
+    },
+  };
+  const t = costruisciTessera({ z: 14, x: X, y: Y, livelli });
+  // La strada sale davvero, lì sotto.
+  const lat = Math.atan(Math.sinh(Math.PI * (1 - (2 * (Y + 0.5)) / 2 ** 14)));
+  const k = (40075016.686 * Math.cos(lat)) / 2 ** 14 / 4096;
+  const li = (x, y) => Math.abs(x) < 100 * k && Math.abs(y) > 570 * k && Math.abs(y) < 854 * k;
+  const quote = [];
+  for (let i = 0; i < t.segmenti.length; i += 8) if (li(t.segmenti[i], t.segmenti[i + 1])) quote.push(t.segmenti[i + 2]);
+  assert.ok(Math.max(...quote) - Math.min(...quote) > 3, `la salita: da ${Math.min(...quote)} a ${Math.max(...quote)} m`);
+  assert.equal(t.conti.edificiFatti, 0);
+  assert.equal(t.tetti, null);
+  for (const g of Object.values(t.facciate)) assert.equal(g, null);
+});
+
+test('una strada segnata in costruzione si disegna come la strada che è', () => {
+  // «La linea del traffico a un punto completamente sconnesso dalla strada»:
+  // lo svincolo nuovo di via De Roberto la mappa lo dà ancora in costruzione,
+  // il percorso e il traffico ci passano già. La scena non lo disegnava.
+  assert.deepEqual(stradaVera({ class: 'trunk_construction', ramp: 1 }), { class: 'trunk', ramp: 1, cantiere: true });
+  const com = { class: 'minor', name: 'Via Roma' };
+  assert.equal(stradaVera(com), com);
+  const livelli = {
+    '0,0': {
+      transportation: strato([
+        { p: { class: 'motorway', oneway: 1 }, g: [[[0, 2048], [4096, 2048]]] },
+        // La rampa nuova: a terra, sul ponte sopra l'autostrada, di nuovo a terra.
+        { p: { class: 'trunk_construction', ramp: 1 }, g: [[[2048, 4096], [2048, 2600]]] },
+        { p: { class: 'trunk_construction', ramp: 1, brunnel: 'bridge', layer: 1 }, g: [[[2048, 2600], [2048, 1500]]] },
+        { p: { class: 'trunk_construction', ramp: 1 }, g: [[[2048, 1500], [2048, 0]]] },
+        // Un sentiero in costruzione resta fuori, come ogni sentiero.
+        { p: { class: 'path_construction' }, g: [[[100, 100], [900, 100]]] },
+      ]),
+    },
+  };
+  const t = costruisciTessera({ z: 14, x: X, y: Y, livelli });
+  const nastri = Object.keys(t.strade).filter((k) => t.strade[k]);
+  assert.ok(nastri.some((k) => k.endsWith('-ponte')), `il ponte della rampa ha il suo asfalto: ${nastri}`);
+  assert.ok(t.capitelli.length / 16 >= 2, 'e i suoi piloni');
+  // E il percorso ci si può appoggiare: i suoi segmenti ci sono, in quota.
+  let sopra = 0;
+  for (let i = 0; i < t.segmenti.length; i += 8) {
+    const mx = (t.segmenti[i] + t.segmenti[i + 3]) / 2;
+    const my = (t.segmenti[i + 1] + t.segmenti[i + 4]) / 2;
+    if (Math.abs(mx) < 3 && Math.abs(my) < 40) sopra = Math.max(sopra, t.segmenti[i + 2]);
+  }
+  assert.ok(sopra > 7, `la rampa in quota sopra l'autostrada (${sopra})`);
 });

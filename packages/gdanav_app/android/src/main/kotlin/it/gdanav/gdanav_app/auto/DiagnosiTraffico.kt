@@ -2,6 +2,7 @@ package it.gdanav.gdanav_app.auto
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.Rect
 import android.graphics.RectF
 import android.util.Log
 import org.json.JSONObject
@@ -40,6 +41,14 @@ object DiagnosiTraffico {
     @Volatile private var zoom = 0.0
     @Volatile private var quando = 0L
     @Volatile private var inizio = 0L
+
+    /* La scena 3D sull'auto, com'era l'ultima volta che ha detto il suo stato
+     * alla regia ([RendererMappa]): «schermo a metà non è centrata», «lo zoom
+     * non va». Sull'auto non si vede niente di tutto questo: qui si legge in
+     * che processo girava, quanti pixel fa un punto della pagina, quanto era
+     * grande la superficie e le aree che Android Auto ha lasciato libere. */
+    @Volatile private var scena: String? = null
+    private val sceneAperte = AtomicInteger()
     private var preferenze: SharedPreferences? = null
     private var ascoltaLog = false
 
@@ -55,8 +64,51 @@ object DiagnosiTraffico {
         massimo = 0
         zoom = 0.0
         quando = 0L
+        scena = null
+        sceneAperte.set(0)
         inizio = System.currentTimeMillis()
         ascoltaErrori()
+    }
+
+    /** Una scena 3D aperta sull'auto: a ogni cambio di superficie se ne apre una nuova. */
+    fun scenaAperta() {
+        sceneAperte.incrementAndGet()
+    }
+
+    /** Lo stato della scena 3D appena detto alla regia. */
+    fun scena3d(
+        dove: String,
+        scala: Float?,
+        densita: Float,
+        larghezza: Int,
+        altezza: Int,
+        visibile: Rect?,
+        stabile: Rect?,
+        sopra: Double,
+        sinistra: Double,
+        destra: Double,
+        zoom: Double,
+        guasto: String?,
+    ) {
+        fun area(r: Rect?) = if (r == null) JSONObject.NULL else "${r.left},${r.top},${r.right},${r.bottom}"
+        scena = runCatching {
+            JSONObject().apply {
+                put("dove", dove)
+                put("scala", scala?.toDouble() ?: JSONObject.NULL)
+                put("densita", densita.toDouble())
+                put("larghezza", larghezza)
+                put("altezza", altezza)
+                put("visibile", area(visibile))
+                put("stabile", area(stabile))
+                put("sopra", sopra)
+                put("sinistra", sinistra)
+                put("destra", destra)
+                put("zoom", zoom)
+                put("guasto", guasto ?: JSONObject.NULL)
+                put("aperte", sceneAperte.get())
+                put("quando", System.currentTimeMillis())
+            }.toString()
+        }.getOrNull()
     }
 
     /** Ogni riquadro chiesto, arrivato o sbagliato, di qualunque sorgente: si contano quelli del traffico. */
@@ -159,6 +211,8 @@ object DiagnosiTraffico {
         put("massimo", massimo)
         put("zoom", zoom)
         put("quando", quando)
+        // Un testo, non un oggetto: così passa dal canale com'è.
+        put("scena3d", scena ?: JSONObject.NULL)
     }
 
     private fun letto(): JSONObject? = try {

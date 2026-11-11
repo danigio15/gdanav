@@ -195,6 +195,8 @@ export function grafoStrade(strade, metri, { iterazioni = 1500 } = {}) {
       // Un viadotto alto (vedi `segnaViadotti` in tessera.js): più del livello.
       altezza: p.brunnel === 'bridge' && +p.altezza > 0 ? +p.altezza : null,
       senso: +(p.oneway ?? 0) || 0,
+      // A pagamento: sopra, ai caselli, c'è una pensilina (vedi `tessera.js`).
+      pedaggio: p.toll === 1 || p.toll === '1' || p.toll === true,
       w: larghezzaStrada(p),
       nodi: pieno,
       nome: p.name,

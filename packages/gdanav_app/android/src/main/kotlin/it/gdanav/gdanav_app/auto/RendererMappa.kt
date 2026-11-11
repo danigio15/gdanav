@@ -133,16 +133,25 @@ class RendererMappa(
             DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY,
         )
         display = d
+        val cambiata = contenitore.width != larghezza || contenitore.height != altezza
         larghezza = contenitore.width
         altezza = contenitore.height
         /* L'area libera di prima vale per la superficie di prima. Dal campo,
          * col video: a mezzo schermo (la mappa da una parte, la musica
          * dall'altra) l'auto finiva sul bordo destro della mappa, perché la
-         * si centrava ancora nell'area dello schermo intero. Se non ci sta
-         * più dentro, si dimentica: la rimanda Android Auto, e intanto vale
-         * tutta la superficie. */
-        areaVisibile?.let { if (it.right > larghezza || it.bottom > altezza) areaVisibile = null }
-        areaStabile?.let { if (it.right > larghezza || it.bottom > altezza) areaStabile = null }
+         * si centrava ancora nell'area dello schermo intero.
+         *
+         * Si dimenticava solo l'area che nella superficie nuova non ci stava
+         * più. Ma passando da una superficie piccola a una più grande quella
+         * vecchia ci sta, e restava: «schermo a metà, piccolo, non è centrata
+         * la navigazione» — l'auto in mezzo a un'area che era di un altro
+         * schermo, tutta da una parte. Cambiata la superficie si dimenticano
+         * tutte e due: le rimanda Android Auto, e intanto vale tutta la
+         * superficie, con l'auto in mezzo. */
+        if (cambiata) {
+            areaVisibile = null
+            areaStabile = null
+        }
         densita = contenitore.dpi / 160f
         // Sotto i 900 punti di larghezza la scheda del viaggio è stretta; e
         // anche quando la mappa è poco più larga che alta, cioè a mezzo
@@ -594,6 +603,7 @@ class RendererMappa(
             // Sopra la mappa, sotto il segnaposto e il cruscotto.
             c.addView(nuova.vista, 1, FrameLayout.LayoutParams(tutto, tutto))
             scena = nuova
+            if (!soloMappa) DiagnosiTraffico.scenaAperta()
             PonteAuto.lontana3dInUso = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && nuova is Scena3dLontana
             PonteAuto.scena3d = { js -> nuova.esegui(js) }
             // Misurata la pagina, lo spazio delle schede si ridice nei suoi punti.
@@ -693,6 +703,23 @@ class RendererMappa(
         if (chiave == stato3dDetto) return
         stato3dDetto = chiave
         PonteAuto.stato3d(notte, v, sopra, sinistra, destra, scarto3d)
+        // Da leggere poi sul telefono, nella scheda «Android Auto».
+        if (!soloMappa) {
+            DiagnosiTraffico.scena3d(
+                dove = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && scena is Scena3dLontana) "processo" else if (scena != null) "app" else "spenta",
+                scala = scena?.scala,
+                densita = densita,
+                larghezza = larghezza,
+                altezza = altezza,
+                visibile = areaVisibile,
+                stabile = areaStabile,
+                sopra = sopra,
+                sinistra = sinistra,
+                destra = destra,
+                zoom = scarto3d,
+                guasto = preferenze.getString("auto_3d_lontana", null),
+            )
+        }
     }
 
     private val sorgentiCaricate = HashMap<String, String>()

@@ -119,6 +119,19 @@ void main() {
       expect(m['velocita'], 0.0);
       expect(m['zoom'], 17.91);
       expect(m['quando'], 1700000000000);
+      // Lo zoom che cambia da sé non lo dice; quello scelto coi tasti sì, e
+      // la pagina ci va subito («zoom in e zoom out non va»).
+      expect(m.containsKey('zoomSubito'), isFalse);
+      final tasto = msgPosizione(
+        qui: const Punto(45.1, 9.9),
+        rotta: 0,
+        metri: 10,
+        velocitaMs: 0,
+        zoom: 18.4,
+        quando: DateTime.fromMillisecondsSinceEpoch(1700000000000),
+        zoomSubito: true,
+      );
+      expect(tasto['zoomSubito'], isTrue);
       final fuori = msgPosizione(
         qui: const Punto(45, 9),
         rotta: 0,

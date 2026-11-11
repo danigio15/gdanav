@@ -29,6 +29,33 @@ void main() {
   });
 
   group('la scheda «Android Auto» dice cosa ha visto la mappa dell\'auto', () {
+    test('la scena 3D dell\'auto: dove girava, la scala, le aree, lo zoom scelto', () {
+      // «Schermo a metà, piccolo, non è centrata la navigazione; zoom in e
+      // zoom out non va»: sull'auto non si vede perché, qui sì.
+      final voci = vociTraffico(const {
+        'inizio': 1790000000000,
+        'strato': true,
+        'arrivati': 3,
+        'scena3d':
+            '{"dove":"processo","scala":3.0,"densita":1.5,"larghezza":900,"altezza":1080,"visibile":"0,120,900,980",'
+            '"stabile":null,"sopra":40.0,"sinistra":0.0,"destra":166.7,"zoom":-0.5,"guasto":"tempo","aperte":3,"quando":1790000100000}',
+      });
+      final scena = voci.singleWhere((v) => v.$1 == 'Scena 3D sull\'auto');
+      expect(scena.$2, isTrue);
+      expect(scena.$3, contains('nel suo processo'));
+      expect(scena.$3, contains('aperta 3 volte'));
+      expect(scena.$3, contains('3,00 pixel'));
+      expect(scena.$3, contains('ne dichiara 1,50'));
+      expect(scena.$3, contains('Superficie 900×1080; libera 0,120,900,980; stabile tutta.'));
+      expect(scena.$3, contains('sopra 40, sinistra 0, destra 167 punti'));
+      expect(scena.$3, contains('−0,50 livelli'));
+      expect(scena.$3, contains('Ultimo guasto della scena nel suo processo: tempo.'));
+      // Senza la scena (la mappa di sempre, o un'app di prima) la riga non c'è.
+      expect(vociScena3d(null), isEmpty);
+      expect(vociScena3d('non è json'), isEmpty);
+      expect(vociTraffico(const {'inizio': 1, 'strato': true}).any((v) => v.$1.startsWith('Scena 3D')), isFalse);
+    });
+
     test('prima di un viaggio in auto: niente da dire', () {
       expect(vociTraffico(null).single.$1, 'Non ancora visto');
       expect(vociTraffico(const {}).single.$1, 'Non ancora visto');

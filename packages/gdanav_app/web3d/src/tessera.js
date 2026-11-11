@@ -43,6 +43,19 @@ export const PERIODO_STRADA = 12;
 export const PIANO = 3.2;
 export const CAMPATA = 3.4;
 
+/** Quanto resta libero sotto la pensilina di un casello, sopra la strada. */
+const LUCE_PENSILINA = 5.4;
+/** E quanto è spesso il suo tetto. */
+const SPESSORE_PENSILINA = 0.7;
+/** Se sotto le corsie salgono più di così, la pensilina non si fa. */
+const DISLIVELLO_PENSILINA = 3;
+/** I colori della pensilina, di giorno e di notte: il tetto, la fascia attorno, il ventre. */
+const PENSILINA = {
+  tetto: [rgb('#dad7d0'), rgb('#3d4554')],
+  fascia: [rgb('#f4f3ef'), rgb('#7a8494')],
+  ventre: [rgb('#96928b'), rgb('#272c37')],
+};
+
 /** Quanti modelli di facciata ha ogni tipo di edificio (vedi `trameFacciata`). */
 export const VARIANTI_FACCIATA = { residenziale: 4, uffici: 2, industria: 1 };
 /** Le facciate, una geometria e un materiale l'una: «residenziale-0» … */
@@ -117,7 +130,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     const maxy = (1 - dy) * ESTENSIONE + marginePx;
     for (let i = 0; i < T.length; i++) {
       const f = T.feature(i);
-      const p = f.properties;
+      const p = stradaVera(f.properties);
       if (f.type !== 2 || !CLASSI_STRADE.has(p.class)) continue;
       for (const linea of f.loadGeometry()) {
         const pts = linea.map((q) => [q.x, q.y]);
@@ -737,9 +750,150 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     }
     return basso;
   };
+  /* Le pensiline dei caselli.
+   *
+   * «Verifica i caselli autostradali e tangenziale»: gli edifici veri
+   * (Overture) hanno anche le pensiline dei caselli, ma senza dire che sono
+   * tettoie: la scena le tirava su come palazzi con le finestre, di traverso
+   * sulle corsie, e il percorso ci passava dentro. Un edificio attraversato
+   * da un'autostrada, una tangenziale o una strada a pedaggio (che non sia in
+   * galleria) non è un palazzo: è un tetto su pilastri, con la strada sotto.
+   * Solo quelle strade: una stradina di servizio che entra in un capannone, o
+   * un vicolo che l'impronta di una casa copre di un metro, restano com'erano.
+   */
+  const GP = 20;
+  const corsie = new Map();
+  linee.forEach((pts, i) => {
+    const f = visibili[i];
+    if (f.galleria || f.cls === 'rail' || !(f.cls === 'motorway' || f.cls === 'trunk' || f.pedaggio)) return;
+    for (let k = 1; k < pts.length; k++) {
+      const a = pts[k - 1];
+      const c = pts[k];
+      const n = Math.max(1, Math.ceil(Math.hypot(c[0] - a[0], c[1] - a[1]) / 3));
+      for (let q = k === 1 ? 0 : 1; q <= n; q++) {
+        const t = q / n;
+        const px = a[0] + (c[0] - a[0]) * t;
+        const py = a[1] + (c[1] - a[1]) * t;
+        const key = Math.floor(px / GP) + ',' + Math.floor(py / GP);
+        if (!corsie.has(key)) corsie.set(key, []);
+        corsie.get(key).push([px, py, a[2] + (c[2] - a[2]) * t, f.w / 2]);
+      }
+    }
+  });
+  /**
+   * La strada che passa sotto l'edificio (almeno sei metri di corsia), o
+   * `null`: la sua [quota] più alta lì sotto, e se è [piana]. Dove le corsie
+   * salgono o stanno a piani diversi (un casello su un viadotto con le sue
+   * rampe: fra undici e ventiquattro metri) un tetto solo non le copre, e
+   * finiva a trenta metri su pilastri sottili: lì non si disegna niente.
+   */
+  const corsiaSotto = (anelli) => {
+    if (!corsie.size) return null;
+    let minx = 1e9;
+    let miny = 1e9;
+    let maxx = -1e9;
+    let maxy = -1e9;
+    for (const [px, py] of anelli[0]) {
+      minx = Math.min(minx, px);
+      maxx = Math.max(maxx, px);
+      miny = Math.min(miny, py);
+      maxy = Math.max(maxy, py);
+    }
+    let dentro = 0;
+    let quota = -Infinity;
+    let bassa = Infinity;
+    for (let cx = Math.floor(minx / GP); cx <= Math.floor(maxx / GP); cx++) {
+      for (let cy = Math.floor(miny / GP); cy <= Math.floor(maxy / GP); cy++) {
+        for (const [px, py, ph] of corsie.get(cx + ',' + cy) || []) {
+          if (!puntoDentroPoligono(px, py, anelli)) continue;
+          dentro++;
+          if (ph > quota) quota = ph;
+          if (ph < bassa) bassa = ph;
+        }
+      }
+    }
+    return dentro >= 3 ? { quota, piana: quota - bassa <= DISLIVELLO_PENSILINA } : null;
+  };
+  const sullaCorsia = (px, py) => {
+    for (let ax = -1; ax <= 1; ax++) {
+      for (let ay = -1; ay <= 1; ay++) {
+        for (const [qx, qy, , hw] of corsie.get(Math.floor(px / GP) + ax + ',' + (Math.floor(py / GP) + ay)) || []) {
+          if (Math.hypot(qx - px, qy - py) < hw + 1.2) return true;
+        }
+      }
+    }
+    return false;
+  };
   const STILI = STILI_FACCIATA;
   const facciate = Object.fromEntries(STILI.map((s) => [s, new Costruttore({ uv: true, colori: true })]));
   const tetti = new Costruttore({ colori: true });
+  /** Una pensilina: il tetto di [b] a [sotto] metri, spesso [SPESSORE_PENSILINA], sui suoi pilastri. */
+  const pensilina = (b, sotto) => {
+    const sopra = sotto + SPESSORE_PENSILINA;
+    const piatti = [];
+    const buchi = [];
+    for (const [k, anello] of b.anelli.entries()) {
+      if (k) buchi.push(piatti.length / 2);
+      for (const [px, py] of anello.pts) piatti.push(px, py);
+    }
+    const facce = earcut(piatti, buchi.length ? buchi : null, 2);
+    const P = (i, z) => [piatti[2 * i], piatti[2 * i + 1], z];
+    for (let k = 0; k < facce.length; k += 3) {
+      const [i0, i1, i2] = [facce[k], facce[k + 1], facce[k + 2]];
+      tetti.triPunti(P(i0, sopra), P(i1, sopra), P(i2, sopra), [0, 0, 1], PENSILINA.tetto[0], PENSILINA.tetto[1]);
+      tetti.triPunti(P(i0, sotto), P(i1, sotto), P(i2, sotto), [0, 0, -1], PENSILINA.ventre[0], PENSILINA.ventre[1]);
+      // L'ombra: stesa col sole, e a piombo (sotto una pensilina è più scuro).
+      ombre.triPunti(
+        [piatti[2 * i0] + sox * sopra, piatti[2 * i0 + 1] + soy * sopra, 0],
+        [piatti[2 * i1] + sox * sopra, piatti[2 * i1 + 1] + soy * sopra, 0],
+        [piatti[2 * i2] + sox * sopra, piatti[2 * i2 + 1] + soy * sopra, 0],
+        [0, 0, 1],
+      );
+      ombre.triPunti(P(i0, 0), P(i1, 0), P(i2, 0), [0, 0, 1]);
+    }
+    // La fascia attorno, e i pilastri lungo il bordo: mai su una corsia.
+    let cx = 0;
+    let cy = 0;
+    for (const [px, py] of b.anelli[0].pts) {
+      cx += px / b.anelli[0].pts.length;
+      cy += py / b.anelli[0].pts.length;
+    }
+    let pilastri = 0;
+    let ultimo = null;
+    for (const [k, anello] of b.anelli.entries()) {
+      const p = anello.pts;
+      const ccw = area(p) < 0 !== k > 0;
+      for (let i = 0; i < p.length; i++) {
+        const a = p[i];
+        const c = p[(i + 1) % p.length];
+        const l = Math.hypot(c[0] - a[0], c[1] - a[1]);
+        if (!anello.muro[i] || l < 0.01) continue;
+        let nx = (c[1] - a[1]) / l;
+        let ny = -(c[0] - a[0]) / l;
+        if (!ccw) {
+          nx = -nx;
+          ny = -ny;
+        }
+        tetti.quad([a[0], a[1], sotto], [c[0], c[1], sotto], [c[0], c[1], sopra], [a[0], a[1], sopra], [nx, ny, 0], PENSILINA.fascia[0], PENSILINA.fascia[1]);
+        if (k) continue;
+        const passi = Math.max(1, Math.round(l / 12));
+        for (let q = 0; q < passi && pilastri < 24; q++) {
+          const t = q / passi;
+          // Un poco dentro il bordo, verso il mezzo della pensilina.
+          let px = a[0] + (c[0] - a[0]) * t;
+          let py = a[1] + (c[1] - a[1]) * t;
+          const d = Math.hypot(cx - px, cy - py) || 1;
+          px += ((cx - px) / d) * 0.7;
+          py += ((cy - py) / d) * 0.7;
+          if (ultimo && Math.hypot(px - ultimo[0], py - ultimo[1]) < 4) continue;
+          if (sullaCorsia(px, py)) continue;
+          scatola(px, py, 0, sotto, 1, 0, 0.3, 0.3, cCemento);
+          ultimo = [px, py];
+          pilastri++;
+        }
+      }
+    }
+  };
   let triEdifici = 0;
   let edificiFatti = 0;
   const seme = semeTessera(z, x, y);
@@ -750,6 +904,16 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     // prendeva il suo colore e la sua facciata («a destra la facciata
     // giusta, al centro un'altra: non è così il palazzo»).
     const r = generatore(b.seme);
+    // Una pensilina (un casello): la strada le passa sotto, a qualunque quota.
+    const corsia = b.mh < 1 ? corsiaSotto(b.anelli.map((a) => a.pts)) : null;
+    if (corsia !== null) {
+      if (!corsia.piana) continue;
+      const prima = tetti.triangoli + ombre.triangoli + opere.triangoli;
+      pensilina(b, corsia.quota + LUCE_PENSILINA);
+      triEdifici += tetti.triangoli + ombre.triangoli + opere.triangoli - prima;
+      edificiFatti++;
+      continue;
+    }
     const ventre = sottoIlPonte(b.anelli.map((a) => a.pts));
     const h = Math.min(b.h, ventre - 0.6);
     const m0 = b.mh;
@@ -1299,6 +1463,25 @@ function istanzeDiAlberi(alberi, ombre) {
     ombre.quad([cx - rr2, cy - rr2, 0, 0, 0], [cx + rr2, cy - rr2, 0, 1, 0], [cx + rr2, cy + rr2, 0, 1, 1], [cx - rr2, cy + rr2, 0, 0, 1], [0, 0, 1]);
   }
   return { tronchi, chiome, chiome2, coni, coloriChiome, coloriChiome2, coloriConi, foglie, coloriFoglie, abeti, coloriAbeti };
+}
+
+/**
+ * Le proprietà di una strada, con la classe che la scena conosce.
+ *
+ * «La linea del traffico a un punto completamente sconnesso dalla strada»: su
+ * via De Roberto, a Napoli, c'è uno svincolo nuovo — rampe e ponti da
+ * duecento metri — che la mappa segna ancora «in costruzione»
+ * (`trunk_construction`), e come lui decine di strade nella zona. Chi calcola
+ * il percorso e il traffico le dà già aperte e ci passa; la scena non le
+ * disegnava affatto, e la linea del percorso e quella del traffico correvano
+ * nel vuoto, dove «mancano i cavalcavia». Una strada in costruzione si
+ * disegna come la strada che sarà: se è ancora chiusa nessuno ci viene
+ * mandato, e se è aperta la si trova dov'è.
+ */
+export function stradaVera(p) {
+  const c = p.class;
+  if (typeof c !== 'string' || !c.endsWith('_construction')) return p;
+  return { ...p, class: c.slice(0, -'_construction'.length), cantiere: true };
 }
 
 /** Una galleria più corta di così, da un capo all'altro, è un sottopasso. */
