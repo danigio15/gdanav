@@ -9,6 +9,7 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -55,7 +56,7 @@ class RendererMappa(
     private var contenuto: FrameLayout? = null
 
     /** La scena 3D vera ([Scena3dAuto]), quando c'è: al posto della mappa. */
-    private var scena: Scena3dAuto? = null
+    private var scena: Scena3d? = null
     private var stato3dDetto: String? = null
     private var mappaView: MapView? = null
     private var pannello: PannelloAuto? = null
@@ -583,7 +584,7 @@ class RendererMappa(
         }
         if (scena == null) {
             val nuova = try {
-                Scena3dAuto(c.context, carContext.isDarkMode)
+                apriScena(c)
             } catch (e: Exception) {
                 // Nessuna WebView su questo telefono: la mappa di sempre.
                 PonteAuto.nonVa3d = true
@@ -603,12 +604,51 @@ class RendererMappa(
             }
             spegniFotogrammi()
             freccia?.nascondi()
-            mappaView?.visibility = View.INVISIBLE
+            // Quella nel suo processo si vede un attimo dopo: fino ad allora
+            // sotto resta la mappa, non un buco nero.
+            if (nuova.visibile) {
+                mappaView?.visibility = View.INVISIBLE
+            } else {
+                nuova.alVisibile = { if (scena === nuova) mappaView?.visibility = View.INVISIBLE }
+            }
             stato3dDetto = null
             principale.removeCallbacks(attesaScena)
             principale.postDelayed(attesaScena, ATTESA_SCENA_MS)
         }
         diciLoStato3d()
+    }
+
+    /**
+     * La scena: nel suo processo ([Scena3dLontana], da Android 11), così la
+     * plancia aperta sul telefono non la rallenta; se lì non va, o prima di
+     * Android 11, dentro l'app come sempre ([Scena3dAuto]).
+     */
+    private fun apriScena(c: FrameLayout): Scena3d {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !PonteAuto.lontana3dNonVa) {
+            try {
+                return Scena3dLontana(c.context, carContext.isDarkMode, { PonteAuto.dalla3d(it) }) { motivo ->
+                    principale.post { scenaLontanaGuasta(motivo) }
+                }
+            } catch (e: Exception) {
+                PonteAuto.lontana3dNonVa = true
+                ricordaLaLontana("non si crea: ${e.javaClass.simpleName}")
+            }
+        }
+        return Scena3dAuto(c.context, carContext.isDarkMode)
+    }
+
+    /** La scena nel suo processo non va: per questa volta quella dentro l'app. */
+    private fun scenaLontanaGuasta(motivo: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || scena !is Scena3dLontana) return
+        PonteAuto.lontana3dNonVa = true
+        ricordaLaLontana(motivo)
+        chiudiScena()
+        aggiornaScena()
+    }
+
+    /** Com'è andata l'ultima volta la scena nel suo processo: da leggere poi. */
+    private fun ricordaLaLontana(esito: String) {
+        preferenze.edit().putString("auto_3d_lontana", esito).apply()
     }
 
     /** La pagina non ha detto niente in tempo: per questa sessione la mappa di sempre. */

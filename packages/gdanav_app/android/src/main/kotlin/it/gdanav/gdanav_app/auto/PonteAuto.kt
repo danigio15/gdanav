@@ -797,6 +797,12 @@ object PonteAuto {
     /** Non va (WebGL che manca, troppo lenta): per questa sessione la mappa di sempre. */
     @Volatile var nonVa3d = false
 
+    /**
+     * La scena nel suo processo ([Scena3dLontana]) non è andata: finché l'app
+     * resta aperta si usa quella dentro l'app ([Scena3dAuto]).
+     */
+    @Volatile var lontana3dNonVa = false
+
     /** Chi la mostra: gli si consegna il JavaScript che arriva dal telefono. */
     @Volatile var scena3d: ((String) -> Unit)? = null
 
