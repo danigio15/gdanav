@@ -474,7 +474,7 @@ export function profiloDi(linea, s0, s1, indice, passo = 4, ancora = null) {
   }
   const ia = ancora ? Math.round((ancora.s - s0) / passo) : -1;
   const grezze = quote(punti, indice, ia >= 0 && ia < n ? { i: ia, h: ancora.h } : null);
-  const [dx, dy] = spostamenti(grezze.dx, grezze.dy);
+  const [dx, dy] = spostamenti(grezze.dx, grezze.dy, punti, passo);
   const profilo = new Profilo(s0, passo, riempiQuote(grezze), grezze.galleria, dx, dy);
   profilo.trovata = Uint8Array.from(grezze, (v) => (Number.isNaN(v) ? 0 : 1));
   return profilo;
@@ -488,12 +488,12 @@ export function profiloDi(linea, s0, s1, indice, passo = 4, ancora = null) {
  * dall'altra («ancora è fuori strada la linea», via Po: otto metri, mentre la
  * strada già fatta — il GPS — è sulla strada). Con sei metri non si
  * agganciava; per una notte, pensandolo di Valhalla, era sceso a due e mezzo.
- * Ora tredici, pieni fino a dieci: a non saltare sulla strada accanto ci pensa
+ * Ora tredici: a non saltare sulla strada accanto ci pensa
  * la continuità di [quote], che sceglie la strada su cui si resta lungo tutto
  * il tratto, non la più vicina punto per punto. */
 export const SPOSTAMENTO_MAX_M = 13;
-/** Fin qui lo spostamento è tutto; da qui al massimo si spegne. */
-export const SPOSTAMENTO_PIENO_M = 10;
+/** Fin qui, attorno all'andamento, uno scarto di lato è ancora la stessa strada. */
+const SCARTO_DELLA_STESSA_STRADA_M = 1.5;
 /** Fin dove si cercano le strade intorno a un punto del percorso. */
 const AGGANCIO_RAGGIO_M = SPOSTAMENTO_MAX_M;
 
@@ -504,41 +504,116 @@ const AGGANCIO_RAGGIO_M = SPOSTAMENTO_MAX_M;
  * del percorso arriva dal calcolatore dei percorsi, e in qualche tratto sta
  * qualche metro di lato rispetto alle strade della mappa. Le quote trovano
  * già la strada su cui si è ([quote]); qui la linea ci si appoggia sopra.
- * Dove non c'è una strada lo spostamento è zero; si leviga su una trentina
- * di metri, così agli incroci e ai cambi di strada non fa scalini.
+ *
+ * «La linea sembra che vada a zig zag, non è diritta sul percorso.» Lo
+ * spostamento si spegneva fra dieci e tredici metri, e lì un metro in più di
+ * distanza ne toglieva tre di spostamento: dove il percorso sta a undici,
+ * dodici metri dalla strada (le carreggiate larghe della tangenziale) la
+ * linea ballava; e nei parcheggi saltava da una corsia all'altra. Adesso
+ * conta solo quanto la strada sta **di lato** rispetto al percorso, un
+ * numero col segno (a sinistra o a destra), e quel numero si leviga lungo
+ * la linea: i buchi corti si riempiono, una mediana toglie i salti di un
+ * punto o due, una media su una cinquantina di metri fa il resto. La linea
+ * si sposta tutta insieme, come il percorso vero, e non fa più scalini.
+ *
+ * [punti] `[x, y]` della linea, uno per spostamento; [passo] i metri fra due.
  */
-export function spostamenti(dxGrezzi, dyGrezzi) {
+export function spostamenti(dxGrezzi, dyGrezzi, punti, passo = 4) {
   const n = dxGrezzi.length;
   const dx = new Float64Array(n);
   const dy = new Float64Array(n);
+  if (!n) return [dx, dy];
+  // La normale della linea in ogni punto (a sinistra del verso di marcia).
+  const nx = new Float64Array(n);
+  const ny = new Float64Array(n);
   for (let k = 0; k < n; k++) {
-    let x = dxGrezzi[k];
-    let y = dyGrezzi[k];
-    if (Number.isNaN(x) || Number.isNaN(y)) continue;
-    // Verso il massimo lo spostamento si spegne piano: tagliato di netto,
-    // punti vicini al limite si agganciavano uno sì e uno no, e la linea
-    // ondeggiava.
-    const l = Math.hypot(x, y);
-    const peso = Math.min(1, Math.max(0, (SPOSTAMENTO_MAX_M - l) / (SPOSTAMENTO_MAX_M - SPOSTAMENTO_PIENO_M)));
-    dx[k] = x * peso;
-    dy[k] = y * peso;
+    const a = punti[Math.max(0, k - 1)];
+    const b = punti[Math.min(n - 1, k + 1)];
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    nx[k] = -(b[1] - a[1]) / l;
+    ny[k] = (b[0] - a[0]) / l;
   }
-  const r = 4;
-  const lisci = (a) => {
-    const out = new Float64Array(n);
-    for (let k = 0; k < n; k++) {
-      let somma = 0;
-      let peso = 0;
-      for (let j = Math.max(0, k - r); j <= Math.min(n - 1, k + r); j++) {
-        const w = r + 1 - Math.abs(j - k);
-        somma += a[j] * w;
-        peso += w;
-      }
-      out[k] = somma / peso;
+  // Quanto sta di lato la strada, col segno; NaN dove non c'è.
+  const lato = new Float64Array(n).fill(NaN);
+  for (let k = 0; k < n; k++) {
+    const x = dxGrezzi[k];
+    const y = dyGrezzi[k];
+    if (Number.isNaN(x) || Number.isNaN(y)) continue;
+    lato[k] = x * nx[k] + y * ny[k];
+  }
+  const visto = Float64Array.from(lato);
+  // I buchi corti (una trentina di metri) fra due tratti con la strada si
+  // riempiono; dove la strada non c'è per davvero, zero.
+  const buco = Math.max(1, Math.round(32 / passo));
+  let k = 0;
+  while (k < n) {
+    if (!Number.isNaN(lato[k])) {
+      k++;
+      continue;
     }
-    return out;
-  };
-  return [lisci(dx), lisci(dy)];
+    let j = k;
+    while (j < n && Number.isNaN(lato[j])) j++;
+    const prima = k > 0 ? lato[k - 1] : NaN;
+    const dopo = j < n ? lato[j] : NaN;
+    const ponte = !Number.isNaN(prima) && !Number.isNaN(dopo) && j - k <= buco;
+    for (let q = k; q < j; q++) lato[q] = ponte ? prima + ((dopo - prima) * (q - k + 1)) / (j - k + 1) : 0;
+    k = j;
+  }
+  // La mediana toglie i salti corti (un punto che si aggancia altrove).
+  const m = Math.max(1, Math.round(18 / passo));
+  const mediato = new Float64Array(n);
+  const finestra = [];
+  for (let q = 0; q < n; q++) {
+    finestra.length = 0;
+    for (let j = Math.max(0, q - m); j <= Math.min(n - 1, q + m); j++) finestra.push(lato[j]);
+    finestra.sort((a, b) => a - b);
+    mediato[q] = finestra[finestra.length >> 1];
+  }
+  // E la media, a triangolo, fa il raccordo: è l'andamento.
+  const r = Math.max(1, Math.round(24 / passo));
+  const andamento = new Float64Array(n);
+  for (let q = 0; q < n; q++) {
+    let somma = 0;
+    let peso = 0;
+    for (let j = Math.max(0, q - r); j <= Math.min(n - 1, q + r); j++) {
+      const w = r + 1 - Math.abs(j - q);
+      somma += mediato[j] * w;
+      peso += w;
+    }
+    andamento[q] = somma / peso;
+  }
+  /* Attorno all'andamento, gli scarti piccoli sono la stessa strada vista
+   * dal percorso, che la taglia a corde dove lei curva: quelli si seguono, e
+   * la linea prende la curva della strada. Quelli grandi sono un'altra
+   * strada (la corsia accanto, un punto agganciato altrove): si lasciano. */
+  const fine = new Float64Array(n);
+  for (let q = 0; q < n; q++) {
+    // Solo dove tutti i punti intorno vedono la stessa strada: se lì attorno
+    // gli scarti ballano (due corsie di un parcheggio, un punto altrove) o
+    // la strada manca, resta l'andamento e basta.
+    let minimo = Infinity;
+    let massimo = -Infinity;
+    for (let j = Math.max(0, q - m); j <= Math.min(n - 1, q + m); j++) {
+      const v = visto[j];
+      if (Number.isNaN(v)) {
+        massimo = Infinity;
+        break;
+      }
+      if (v < minimo) minimo = v;
+      if (v > massimo) massimo = v;
+    }
+    const scarto = visto[q] - andamento[q];
+    const stessa = massimo - minimo < 2 * SCARTO_DELLA_STESSA_STRADA_M && Math.abs(scarto) < SCARTO_DELLA_STESSA_STRADA_M;
+    fine[q] = andamento[q] + (stessa ? scarto : 0);
+  }
+  for (let q = 0; q < n; q++) {
+    const a = fine[Math.max(0, q - 1)];
+    const b = fine[Math.min(n - 1, q + 1)];
+    const liscio = (a + 2 * fine[q] + b) / 4;
+    dx[q] = liscio * nx[q];
+    dy[q] = liscio * ny[q];
+  }
+  return [dx, dy];
 }
 
 /**

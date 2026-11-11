@@ -42,9 +42,25 @@ function intervalloDeiFotogrammi() {
   return svelto && moto.velocita > 2 ? FOTOGRAMMA_SVELTO_MS : FOTOGRAMMA_MS;
 }
 
-/** Fin dove davanti all'auto si fa il percorso in 3D, e da quanto dietro. */
-const FINESTRA_AVANTI = 2600;
+/*
+ * Fin dove davanti all'auto si fa il percorso in 3D, e da quanto dietro.
+ *
+ * «A un certo punto scompare quella grande, si vede una sottile, ma non è
+ * nemmeno coerente con il percorso e con il traffico.» Il nastro in 3D
+ * arrivava a 2600 metri dall'auto quando si rifaceva, e prima di rifarsi
+ * scendeva a 900; ma la scena in 3D (strade, viadotti, case) attorno all'auto
+ * può arrivare più in là. Spostando la mappa lungo la strada da fare, dentro
+ * la scena, il nastro finiva e restava la linea piatta della mappa: a terra
+ * sotto i viadotti, e non appoggiata sulle strade. Adesso il nastro arriva
+ * fin dove c'è la scena ([finDoveCELaScena]), e la linea piatta comincia
+ * dove la mappa torna piatta.
+ */
+const FINESTRA_AVANTI = 6500;
 const FINESTRA_DIETRO = 80;
+/** Davanti all'auto il nastro c'è sempre almeno per tanto, anche se la scena deve ancora arrivare. */
+const AVANTI_SEMPRE = 1200;
+/** Quando davanti all'auto ne resta meno di così, il tratto si rifà. */
+const AVANTI_ALMENO = 700;
 
 /** L'angolo verticale dell'obiettivo della mappa, in gradi (MapLibre: 36,87). */
 const OBIETTIVO_GRADI = 16;
@@ -188,7 +204,7 @@ const GESTORI = {
       const quale = `${m.punti.length}:${m.punti[0]}:${m.punti[1]}:${m.punti[m.punti.length - 2]}`;
       if (quale !== S.qualePercorso) moto.nuovoPercorso();
       S.qualePercorso = quale;
-      S.percorso = { lonlat: m.punti, metri: m.metri ?? null, linea: lineaDi(m.punti, m.metri), code: codeOrdinate(m.code), profilo: null, da: null };
+      S.percorso = { lonlat: m.punti, metri: m.metri ?? null, linea: lineaDi(m.punti, m.metri), code: codeOrdinate(m.code), profilo: null, da: null, a: 0 };
       moto.svolte = svolteDi(S.percorso.linea);
     }
     S.sporco.profilo = true;
@@ -769,6 +785,10 @@ function pianifica() {
     S.sporco.profilo = true;
   }
   const disegno = daDisegnare(S.costruite, qui[0], qui[1], BUDGET, S.disegnate);
+  // Cambiate le tessere che si disegnano, cambia fin dove arriva il nastro
+  // del percorso (vedi `finDoveCELaScena`).
+  const prima = S.disegnate ?? new Set();
+  if (disegno.si.size !== prima.size || [...disegno.si].some((k) => !prima.has(k))) S.sporco.profilo = true;
   S.disegnate = disegno.si;
   for (const k of S.costruite.keys()) scena.mostraTessera(k, disegno.si.has(k));
   if (S.lavoro || !lavoratore) return;
@@ -933,7 +953,11 @@ const FATTO_M = 1500;
 function aggiornaPercorso(adesso) {
   const p = S.percorso;
   const s = S.auto?.s ?? (p ? 0 : null);
-  const fuori = p && p.da !== null && s !== null && (s > p.da + FINESTRA_AVANTI - 900 || s < p.da);
+  const lungo = p?.linea.lunghezza ?? 0;
+  const finoA = p?.a ?? 0;
+  // Fuori dal tratto fatto: dietro il suo inizio, o con troppo poco davanti
+  // (se il percorso continua oltre).
+  const fuori = p && p.da !== null && s !== null && (s < p.da || (finoA < lungo - 1 && finoA - s < AVANTI_ALMENO));
   if (!S.sporco.profilo && !fuori) return;
   if (adesso - ultimoProfilo < 1200 && !fuori && p?.profilo) return;
   ultimoProfilo = adesso;
@@ -944,9 +968,10 @@ function aggiornaPercorso(adesso) {
     scriviOltre(null, 0);
   } else {
     const da = Math.max(0, (s ?? 0) - FINESTRA_DIETRO);
-    const a = Math.min(p.linea.lunghezza, da + FINESTRA_AVANTI);
+    const a = finDoveCELaScena(p, da);
     scriviOltre(p, a);
     p.da = da;
+    p.a = a;
     // Dove sta l'auto la quota si sa già (dal profilo di prima): chi è sul
     // viadotto ci resta, anche con una strada più vicina sotto.
     const qui = s !== null && p.profilo ? p.profilo.quotaVera(s) : null;
@@ -972,6 +997,34 @@ function aggiornaPercorso(adesso) {
     const prof = profiloDi(r.linea, da, a, indice);
     scena.impostaNastro('risparmio', nastro(r.linea, prof, da, a, 4, 0.5), 'risparmio', 3);
   } else scena.impostaNastro('risparmio', null);
+}
+
+/**
+ * Fin dove, lungo il percorso [p] da [da] metri, c'è la scena in 3D: l'ultimo
+ * punto dentro una tessera che si sta disegnando, al più [FINESTRA_AVANTI]
+ * più avanti. Un buco corto (una tessera che deve ancora arrivare) non ferma;
+ * e davanti all'auto il nastro c'è comunque per [AVANTI_SEMPRE].
+ */
+function finDoveCELaScena(p, da) {
+  const lungo = p.linea.lunghezza;
+  const massimo = Math.min(lungo, da + FINESTRA_AVANTI);
+  const minimo = Math.min(lungo, da + AVANTI_SEMPRE);
+  const quadri = [...(S.disegnate ?? [])].map((k) => S.costruite.get(k)).filter(Boolean);
+  if (!quadri.length) return minimo;
+  const dentro = (x, y) => quadri.some((c) => Math.abs(x - c.cx) <= c.lato / 2 + 30 && Math.abs(y - c.cy) <= c.lato / 2 + 30);
+  let fine = minimo;
+  let fuoriDa = null;
+  for (let v = da; v <= massimo; v += 40) {
+    const [x, y] = p.linea.a(v);
+    if (dentro(x, y)) {
+      fine = Math.max(fine, v + 40);
+      fuoriDa = null;
+    } else {
+      fuoriDa ??= v;
+      if (v - fuoriDa > 400 && v > minimo) break;
+    }
+  }
+  return Math.min(massimo, fine);
 }
 
 /**
@@ -1066,13 +1119,16 @@ function aggiornaTraffico(adesso) {
       const passo = 5;
       const punti = [];
       for (let s = 0; s <= L; s += passo) punti.push(linea.a(s).slice(0, 2));
-      // Lungo il percorso il traffico lo dice già lui, coi suoi colori.
+      // Lungo il percorso il traffico lo dice già lui, coi suoi colori: in
+      // 3D, e oltre con la linea piatta (che porta gli stessi colori). Un
+      // nastro del traffico lì sopra, in quota e appoggiato alle strade,
+      // stava accanto alla linea piatta: «non è coerente col traffico».
       const pr = S.percorso;
-      if (pr?.linea && lungoLaLinea(pr.linea, punti, pr.profilo?.s0 ?? 0, pr.profilo?.s1 ?? Infinity)) continue;
+      if (pr?.linea && lungoLaLinea(pr.linea, punti, pr.profilo?.s0 ?? 0, (pr.profilo?.s1 ?? Infinity) + 8000)) continue;
       // La geometria del traffico è di chi lo fornisce, non della mappa: ci si
       // appoggia sulle strade come il percorso.
       const grezze = quote(punti, indice);
-      const [sx, sy] = spostamenti(grezze.dx, grezze.dy);
+      const [sx, sy] = spostamenti(grezze.dx, grezze.dy, punti, passo);
       const prof = new Profilo(0, passo, riempiQuote(grezze), null, sx, sy);
       parti.push(nastro(linea, prof, 0, L, 2.4, 0.34, { passo, code: [[0, L + 1, lento < 0.3 ? 2 : 1]] }));
     }
