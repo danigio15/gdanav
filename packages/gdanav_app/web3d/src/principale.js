@@ -12,8 +12,8 @@ import { valutaPrestazioni, valutaWebgl } from './capacita.js';
 import { chiave as chiaveTessera, daChiave, mercPerMetro, latDaMerc } from './geo.js';
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
-import { IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, spostamenti } from './percorso.js';
-import { BIT_OMBRA, Scena } from './scena.js';
+import { alzataDeiNastri, IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, spostamenti } from './percorso.js';
+import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
 import { GIORNO, NOTTE } from './tavolozza.js';
 import './gdanav3d.css';
@@ -61,6 +61,21 @@ const FINESTRA_DIETRO = 80;
 const AVANTI_SEMPRE = 1200;
 /** Quando davanti all'auto ne resta meno di così, il tratto si rifà. */
 const AVANTI_ALMENO = 700;
+/*
+ * Con la mappa spostata a mano, lontano dall'auto.
+ *
+ * «Poi all'improvviso scompare»: la scena in 3D si costruiva solo attorno
+ * all'auto. Guardando più avanti lungo il percorso si usciva dalla scena:
+ * niente strade (in 3D le fa la scena, e lì non c'era), e del percorso la
+ * sola linea piatta e sottile. Adesso la scena si costruisce dove si guarda
+ * ([doveGuardo]), e il nastro arriva fin lì ([finDoveCELaScena]).
+ */
+/** Più lontano di così dall'auto, col dito sulla mappa, si guarda altrove. */
+const GUARDO_ALTROVE_M = 600;
+/** Il nastro arriva tanto oltre il punto che si guarda. */
+const AVANTI_GUARDANDO = 2500;
+/** E mai più lungo di così, dall'auto. */
+const NASTRO_MASSIMO = 40000;
 
 /** L'angolo verticale dell'obiettivo della mappa, in gradi (MapLibre: 36,87). */
 const OBIETTIVO_GRADI = 16;
@@ -199,6 +214,8 @@ const GESTORI = {
       S.percorso = null;
     } else {
       if (!S.origine) S.origine = new Origine(m.punti[0], m.punti[1]);
+      // Senza ancora una posizione, la scena si conta dall'inizio del percorso.
+      if (!S.posizione) riorigina(m.punti[0], m.punti[1]);
       // Un percorso nuovo (un ricalcolo, non le code aggiornate): i metri
       // ripartono da capo, e il filtro della posizione con loro.
       const quale = `${m.punti.length}:${m.punti[0]}:${m.punti[1]}:${m.punti[m.punti.length - 2]}`;
@@ -578,16 +595,20 @@ function stratoAuto() {
 }
 
 /**
- * Pulisce solo il bit dello stencil delle ombre ([BIT_OMBRA]): prima della
- * scena, perché ogni punto si scurisca una volta; dopo, perché MapLibre
- * ritrovi lo stencil delle sue tessere com'era.
+ * Pulisce solo i bit dello stencil delle ombre ([BIT_OMBRA], [BIT_OMBRA_PONTE]):
+ * prima della scena, perché ogni punto si scurisca una volta; dopo, perché
+ * MapLibre ritrovi lo stencil delle sue tessere com'era.
  */
 function pulisciBitOmbra(gl) {
   gl.disable(gl.SCISSOR_TEST);
-  gl.stencilMask(BIT_OMBRA);
+  gl.stencilMask(BIT_OMBRA | BIT_OMBRA_PONTE);
   gl.clearStencil(0);
   gl.clear(gl.STENCIL_BUFFER_BIT);
   gl.stencilMask(0xff);
+  // I numeri delle tessere di MapLibre più alti usano anche quei bit: gli
+  // strati dopo la scena rifanno le loro maschere invece di fidarsi.
+  const pittore = S.mappa?.painter;
+  if (pittore) pittore.currentStencilSource = undefined;
 }
 
 /** La telecamera di three.js dalle matrici di MapLibre (metri della scena → schermo). */
@@ -637,6 +658,7 @@ function strato3d() {
       const ws = m.transform.worldSize;
       const zoom = m.getZoom();
       scena.mondo.visible = zoom >= ZOOM_3D - 0.05;
+      scena.uAlza.value = alzataDeiNastri(zoom);
       const Pm = new THREE.Matrix4().fromArray(args.projectionMatrix);
       const VP = new THREE.Matrix4().fromArray(args.modelViewProjectionMatrix);
       const V = Pm.clone().invert().multiply(VP);
@@ -750,12 +772,31 @@ function postoTessera(k) {
   return { cx, cy, lato: (1 / n / s) * scala, scala };
 }
 
-/** Dove sta l'auto (o il centro della mappa), nei metri della scena. */
+/**
+ * Il punto attorno a cui si costruisce la scena, nei metri della scena: dove
+ * sta l'auto, finché la si segue (o la si guarda da vicino); il centro della
+ * mappa quando la si è spostata a mano più in là, o senza auto.
+ */
 function doveGuardo() {
-  if (S.auto) return [S.auto.x, S.auto.y];
-  if (!S.mappa || !S.origine) return null;
+  const auto = S.auto ? [S.auto.x, S.auto.y] : null;
+  if (!S.mappa || !S.origine) return auto;
+  if (auto && S.camera.modo === 'segui') return auto;
   const c = S.mappa.getCenter();
-  return S.origine.daLonLat(c.lng, c.lat);
+  const centro = S.origine.daLonLat(c.lng, c.lat);
+  if (auto && Math.hypot(centro[0] - auto[0], centro[1] - auto[1]) < GUARDO_ALTROVE_M) return auto;
+  return centro;
+}
+
+/**
+ * Dove si guarda lungo il percorso [p], in metri, con la mappa spostata a
+ * mano lontano dall'auto; `null` se si segue l'auto o si guarda altrove.
+ */
+function fuocoSulPercorso(p) {
+  if (!p?.linea || !S.auto || S.camera.modo === 'segui') return null;
+  const qui = doveGuardo();
+  if (!qui || (qui[0] === S.auto.x && qui[1] === S.auto.y)) return null;
+  const q = p.linea.proietta(qui[0], qui[1]);
+  return q.d < 1500 ? q.s : null;
 }
 
 let presto = null;
@@ -789,6 +830,13 @@ function pianifica() {
   // del percorso (vedi `finDoveCELaScena`).
   const prima = S.disegnate ?? new Set();
   if (disegno.si.size !== prima.size || [...disegno.si].some((k) => !prima.has(k))) S.sporco.profilo = true;
+  // E cambia se, con la mappa spostata a mano, si guarda un altro tratto.
+  const fuoco = fuocoSulPercorso(S.percorso);
+  const fuocoDiPrima = S.percorso?.fuoco ?? null;
+  if ((fuoco === null) !== (fuocoDiPrima === null) || (fuoco !== null && Math.abs(fuoco - fuocoDiPrima) > 300)) {
+    S.sporco.profilo = true;
+    S.mappa.triggerRepaint();
+  }
   S.disegnate = disegno.si;
   for (const k of S.costruite.keys()) scena.mostraTessera(k, disegno.si.has(k));
   if (S.lavoro || !lavoratore) return;
@@ -805,6 +853,9 @@ function pianifica() {
   }
   if (prossima) chiedi(prossima.chiave, prossima.dettaglio);
 }
+
+/** Più lontano di così dall'origine della scena, la si sposta (vedi [riorigina]). */
+const RIORIGINA_OLTRE_M = 40000;
 
 function vicineDi(k) {
   const { z, x, y } = daChiave(k);
@@ -910,10 +961,19 @@ function allaTessera({ id, tessera, errore }) {
   pianificaPresto();
 }
 
-/** Lontani dall'origine i numeri perdono precisione: si riparte da qui. */
+/**
+ * Lontani dall'origine i numeri perdono precisione: si riparte da qui.
+ *
+ * Conta quanto è lontano il punto [lon, lat], non dove sta l'auto disegnata:
+ * l'origine nasce al centro della mappa appena aperta (che può essere a
+ * centinaia di chilometri), e aspettando l'auto — che si disegna dopo la
+ * prima posizione — fino alla seconda posizione tutta la scena restava
+ * contata da là.
+ */
 function riorigina(lon, lat) {
-  if (!S.origine || !S.auto) return;
-  if (Math.hypot(S.auto.x, S.auto.y) < 40000) return;
+  if (!S.origine) return;
+  const [dx, dy] = S.origine.daLonLat(lon, lat);
+  if (Math.hypot(dx, dy) < RIORIGINA_OLTRE_M) return;
   S.origine = new Origine(lon, lat);
   for (const c of S.costruite.values()) {
     const p = postoTessera(c.chiave);
@@ -968,7 +1028,8 @@ function aggiornaPercorso(adesso) {
     scriviOltre(null, 0);
   } else {
     const da = Math.max(0, (s ?? 0) - FINESTRA_DIETRO);
-    const a = finDoveCELaScena(p, da);
+    p.fuoco = fuocoSulPercorso(p);
+    const a = finDoveCELaScena(p, da, p.fuoco);
     scriviOltre(p, a);
     p.da = da;
     p.a = a;
@@ -1004,10 +1065,16 @@ function aggiornaPercorso(adesso) {
  * punto dentro una tessera che si sta disegnando, al più [FINESTRA_AVANTI]
  * più avanti. Un buco corto (una tessera che deve ancora arrivare) non ferma;
  * e davanti all'auto il nastro c'è comunque per [AVANTI_SEMPRE].
+ *
+ * [fuoco]: i metri del punto che si guarda con la mappa spostata a mano
+ * ([fuocoSulPercorso]). La scena lì è un'isola, staccata da quella attorno
+ * all'auto: il nastro arriva fino a lei e [AVANTI_GUARDANDO] oltre, anche
+ * attraverso il tratto in mezzo dove la scena non c'è.
  */
-function finDoveCELaScena(p, da) {
+function finDoveCELaScena(p, da, fuoco = null) {
   const lungo = p.linea.lunghezza;
-  const massimo = Math.min(lungo, da + FINESTRA_AVANTI);
+  const guardando = fuoco !== null && fuoco > da;
+  const massimo = Math.min(lungo, guardando ? Math.min(da + NASTRO_MASSIMO, Math.max(da + FINESTRA_AVANTI, fuoco + AVANTI_GUARDANDO)) : da + FINESTRA_AVANTI);
   const minimo = Math.min(lungo, da + AVANTI_SEMPRE);
   const quadri = [...(S.disegnate ?? [])].map((k) => S.costruite.get(k)).filter(Boolean);
   if (!quadri.length) return minimo;
@@ -1021,7 +1088,8 @@ function finDoveCELaScena(p, da) {
       fuoriDa = null;
     } else {
       fuoriDa ??= v;
-      if (v - fuoriDa > 400 && v > minimo) break;
+      // Prima del punto che si guarda un buco non ferma: oltre c'è la sua scena.
+      if (v - fuoriDa > 400 && v > minimo && !(guardando && v < fuoco)) break;
     }
   }
   return Math.min(massimo, fine);

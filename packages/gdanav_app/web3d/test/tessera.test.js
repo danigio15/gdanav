@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { LIMITI, NASTRI, costruisciTessera, stimaTriangoli, bufferDellaTessera } from '../src/tessera.js';
+import { bufferDellaTessera, costruisciTessera, iSottopassi, LIMITI, NASTRI, stimaTriangoli } from '../src/tessera.js';
 import { ALTEZZA_LIVELLO, SPESSORE_IMPALCATO, altezzaViadotto } from '../src/elevazione.js';
 import { cavalcavia, cavalcaviaConRampa, cavalcaviaDueCarreggiate, ponteLungo, sottopasso, sottopassoConNome } from './finte.js';
 
@@ -188,4 +188,44 @@ test('un viadotto lungo sta alto sulla valle; un ponte qualunque altrettanto lun
   let grosso = 0;
   for (let i = 0; i < alto.fusti.length; i += 16) grosso = Math.max(grosso, Math.hypot(alto.fusti[i], alto.fusti[i + 1]));
   assert.ok(grosso > 1.6, `pilone grosso: ${grosso}`);
+});
+
+test('un sottopasso non ha gli imbocchi di una galleria', () => {
+  // «Mancano i cavalcavia»: la stradina che passa sotto l'autostrada (in
+  // galleria per trenta metri) aveva due scatole di cemento ai lati.
+  const nodi = [];
+  const feats = [];
+  const strada = (punti, piu = {}) => {
+    const fi = feats.length;
+    const idx = punti.map(([x, y]) => {
+      let i = nodi.findIndex((n) => n.x === x && n.y === y);
+      if (i < 0) i = nodi.push({ x, y, feats: [] }) - 1;
+      if (!nodi[i].feats.includes(fi)) nodi[i].feats.push(fi);
+      return i;
+    });
+    feats.push({ cls: 'minor', galleria: false, nodi: idx, ...piu });
+    return feats[fi];
+  };
+  // Il sottopasso: strada aperta, due pezzi in galleria (uno per carreggiata), strada aperta.
+  strada([[-100, 0], [-25, 0]]);
+  const a = strada([[-25, 0], [0, 0]], { galleria: true });
+  const b = strada([[0, 0], [25, 0]], { galleria: true });
+  strada([[25, 0], [100, 0]]);
+  // Una galleria vera: trecento metri.
+  strada([[0, 500], [100, 500]]);
+  const lunga = strada([[100, 500], [400, 500]], { galleria: true });
+  strada([[400, 500], [500, 500]]);
+  // Una galleria tagliata dal bordo dei dati: corta qui, ma chissà quanto lunga.
+  strada([[0, 900], [50, 900]]);
+  const tagliata = strada([[50, 900], [90, 900]], { galleria: true });
+  // E una ferrovia in galleria non c'entra.
+  strada([[0, 1200], [10, 1200]], { cls: 'rail' });
+  const treno = strada([[10, 1200], [30, 1200]], { cls: 'rail', galleria: true });
+  strada([[30, 1200], [60, 1200]], { cls: 'rail' });
+  const s = iSottopassi(nodi, feats);
+  assert.ok(s.has(a) && s.has(b), 'i due pezzi del sottopasso');
+  assert.ok(!s.has(lunga), 'una galleria lunga resta una galleria');
+  assert.ok(!s.has(tagliata), 'tagliata dal bordo: non si sa');
+  assert.ok(!s.has(treno));
+  assert.equal(s.size, 2);
 });
