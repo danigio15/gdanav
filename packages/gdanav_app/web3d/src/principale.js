@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import codiceLavoratore from 'gdanav:lavoratore';
 import { BUDGET, daDisegnare, pianoTessere } from './budget.js';
 import { valutaPrestazioni, valutaWebgl } from './capacita.js';
-import { chiave as chiaveTessera, daChiave, mercPerMetro, latDaMerc } from './geo.js';
+import { chiave as chiaveTessera, daChiave, mercPerMetro, latDaMerc, marginiAiLati } from './geo.js';
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
 import { alzataDeiNastri, IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, spostamenti } from './percorso.js';
@@ -76,6 +76,13 @@ const GUARDO_ALTROVE_M = 600;
 const AVANTI_GUARDANDO = 2500;
 /** E mai più lungo di così, dall'auto. */
 const NASTRO_MASSIMO = 40000;
+
+/** In quanto tempo lo zoom arriva dove deve: scelto coi tasti, avvicinandosi da sé, allontanandosi da sé. */
+const ZOOM_DEL_TASTO_MS = 220;
+const ZOOM_SI_AVVICINA_MS = 2200;
+const ZOOM_SI_ALLONTANA_MS = 5000;
+/** Per quanto, dopo un tasto, lo zoom va svelto. */
+const ZOOM_SUBITO_MS = 1500;
 
 /** L'angolo verticale dell'obiettivo della mappa, in gradi (MapLibre: 36,87). */
 const OBIETTIVO_GRADI = 16;
@@ -243,6 +250,8 @@ const GESTORI = {
     const [x, y] = S.origine.daLonLat(m.lon, m.lat);
     S.posizione = m;
     if (m.zoom !== undefined) S.zoomVoluto = m.zoom;
+    // Lo zoom scelto coi tasti: subito, non piano come quello che cambia da sé.
+    if (m.zoomSubito) S.zoomSubitoFino = performance.now() + ZOOM_SUBITO_MS;
     moto.posizione({
       metri: S.percorso ? m.metri : null,
       v: m.velocita,
@@ -1702,7 +1711,16 @@ function muovi(adesso, dt) {
     const pitchVoluto = S.camera.pitch ?? vista.pitch;
     const c = (S.cam ??= { rotta: rottaCamera, zoom: zoomVoluto, quota: z, pitch: pitchVoluto });
     c.rotta = angoloVerso(c.rotta, rottaCamera, 1 - Math.exp(-dt / 400));
-    c.zoom = smorza(c.zoom, zoomVoluto, dt, 1500);
+    /* Lo zoom cambia da sé (in autostrada si allontana, vicino a una manovra
+     * torna) e a mano, coi tasti dell'auto. Prima andavano tutti e due con lo
+     * stesso passo, un secondo e mezzo: troppo svelto per quello che cambia da
+     * sé («ero in autostrada, e all'improvviso a uno svincolo ha fatto zoom
+     * out»: passata l'uscita la mappa si riallontanava di colpo), troppo lento
+     * per i tasti («zoom in e zoom out non va»: si preme e per un secondo non
+     * si muove niente). Allontanarsi da sé è la cosa più lenta; il tasto è
+     * subito. */
+    const passoZoom = adesso < (S.zoomSubitoFino ?? 0) ? ZOOM_DEL_TASTO_MS : zoomVoluto < c.zoom ? ZOOM_SI_ALLONTANA_MS : ZOOM_SI_AVVICINA_MS;
+    c.zoom = smorza(c.zoom, zoomVoluto, dt, passoZoom);
     c.quota = smorza(c.quota, z, dt, 300);
     c.pitch = smorza(c.pitch, pitchVoluto, dt, 600);
     const H = m.getCanvas().clientHeight;
@@ -1714,8 +1732,7 @@ function muovi(adesso, dt) {
     // cruscotto di traverso sul telefono, a destra l'altra app dello schermo
     // diviso sull'auto («la navigazione si nasconde sotto l'altro pezzo di
     // schermo»).
-    const sinistra = Math.min(S.camera.sinistra ?? 0, W * 0.45);
-    const destra = Math.min(S.camera.destra ?? 0, W * 0.45);
+    const [sinistra, destra] = marginiAiLati(S.camera.sinistra ?? 0, S.camera.destra ?? 0, W);
     let voluta = { center: [lon, lat], zoom: c.zoom, pitch: c.pitch, bearing: c.rotta, padding: { top: sopra, bottom: 0, left: sinistra, right: destra } };
     const tr = S.transizione;
     if (tr) {

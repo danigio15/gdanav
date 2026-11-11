@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -148,6 +150,53 @@ List<(String, bool?, String)> vociTraffico(Object? dati) {
         'I riquadri sono arrivati, ma dove sei passato non c\'era traffico da disegnare. '
             'Col tasto «−» sull\'auto si vedono più strade.',
       ),
+    ...vociScena3d(dati['scena3d']),
+  ];
+}
+
+/// La scena 3D sull'auto nell'ultimo viaggio (`DiagnosiTraffico.scena3d`): in
+/// che processo girava, quanti pixel fa un punto della pagina, la superficie
+/// e le aree che Android Auto ha lasciato libere, lo zoom scelto coi tasti.
+///
+/// «Schermo a metà, piccolo, non è centrata la navigazione; zoom in e zoom
+/// out non va»: sull'auto non si vede perché. Qui sì, e basta una foto di
+/// questa scheda per saperlo.
+List<(String, bool?, String)> vociScena3d(Object? testo) {
+  if (testo is! String || testo.isEmpty) return const [];
+  final Object? letto;
+  try {
+    letto = jsonDecode(testo);
+  } on FormatException {
+    return const [];
+  }
+  if (letto is! Map) return const [];
+  final Map j = letto;
+  double? n(String k) => (j[k] as num?)?.toDouble();
+  String uno(double? v) => v == null ? '?' : v.toStringAsFixed(2).replaceAll('.', ',');
+  final dove = switch (j['dove']) {
+    'processo' => 'nel suo processo',
+    'app' => 'dentro l\'app',
+    _ => 'spenta',
+  };
+  final zoom = n('zoom') ?? 0;
+  final guasto = j['guasto'] as String?;
+  final quando = (j['quando'] as num?)?.toInt() ?? 0;
+  return [
+    (
+      'Scena 3D sull\'auto',
+      j['dove'] == 'spenta' ? null : true,
+      [
+        'Girava $dove; aperta ${(j['aperte'] as num?)?.toInt() ?? 0} volte.',
+        'Un punto della pagina: ${uno(n('scala'))} pixel (l\'auto ne dichiara ${uno(n('densita'))}).',
+        'Superficie ${(j['larghezza'] as num?)?.toInt() ?? 0}×${(j['altezza'] as num?)?.toInt() ?? 0}; '
+            'libera ${j['visibile'] ?? 'tutta'}; stabile ${j['stabile'] ?? 'tutta'}.',
+        'Margini detti alla scena: sopra ${n('sopra')?.round() ?? 0}, sinistra ${n('sinistra')?.round() ?? 0}, '
+            'destra ${n('destra')?.round() ?? 0} punti.',
+        'Zoom scelto coi tasti: ${zoom >= 0 ? '+' : '−'}${uno(zoom.abs())} livelli.',
+        if (guasto != null && guasto.isNotEmpty) 'Ultimo guasto della scena nel suo processo: $guasto.',
+        if (quando > 0) 'Alle ${_ora(DateTime.fromMillisecondsSinceEpoch(quando))}.',
+      ].join('\n'),
+    ),
   ];
 }
 

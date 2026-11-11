@@ -109,8 +109,13 @@ class Regia3d {
   void nuovoZoom() {
     _letturaMandata = null;
     _lettaMandata = null;
+    _zoomSubito = true;
     dallaGuida();
   }
+
+  /// Lo zoom l'ha appena scelto chi guida: la prossima posizione lo dice
+  /// alla pagina, che ci va subito invece che piano.
+  var _zoomSubito = false;
 
   /// L'inclinazione della telecamera, in gradi; `null`: quella della vista.
   /// Sull'auto più dall'alto: «voglio vederla un po' più dall'alto».
@@ -380,8 +385,10 @@ class Regia3d {
         // La stima è già portata ad adesso (`metriStimati`).
         quando: _ora(),
         lettura: g.letturaSulPercorso,
+        zoomSubito: _zoomSubito,
       ),
     );
+    _zoomSubito = false;
   }
 
   /* La velocità dell'auto dal cruscotto, alla pagina ogni volta che cambia:
