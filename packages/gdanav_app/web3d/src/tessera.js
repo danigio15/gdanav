@@ -130,7 +130,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     const maxy = (1 - dy) * ESTENSIONE + marginePx;
     for (let i = 0; i < T.length; i++) {
       const f = T.feature(i);
-      const p = f.properties;
+      const p = stradaVera(f.properties);
       if (f.type !== 2 || !CLASSI_STRADE.has(p.class)) continue;
       for (const linea of f.loadGeometry()) {
         const pts = linea.map((q) => [q.x, q.y]);
@@ -1463,6 +1463,25 @@ function istanzeDiAlberi(alberi, ombre) {
     ombre.quad([cx - rr2, cy - rr2, 0, 0, 0], [cx + rr2, cy - rr2, 0, 1, 0], [cx + rr2, cy + rr2, 0, 1, 1], [cx - rr2, cy + rr2, 0, 0, 1], [0, 0, 1]);
   }
   return { tronchi, chiome, chiome2, coni, coloriChiome, coloriChiome2, coloriConi, foglie, coloriFoglie, abeti, coloriAbeti };
+}
+
+/**
+ * Le proprietà di una strada, con la classe che la scena conosce.
+ *
+ * «La linea del traffico a un punto completamente sconnesso dalla strada»: su
+ * via De Roberto, a Napoli, c'è uno svincolo nuovo — rampe e ponti da
+ * duecento metri — che la mappa segna ancora «in costruzione»
+ * (`trunk_construction`), e come lui decine di strade nella zona. Chi calcola
+ * il percorso e il traffico le dà già aperte e ci passa; la scena non le
+ * disegnava affatto, e la linea del percorso e quella del traffico correvano
+ * nel vuoto, dove «mancano i cavalcavia». Una strada in costruzione si
+ * disegna come la strada che sarà: se è ancora chiusa nessuno ci viene
+ * mandato, e se è aperta la si trova dov'è.
+ */
+export function stradaVera(p) {
+  const c = p.class;
+  if (typeof c !== 'string' || !c.endsWith('_construction')) return p;
+  return { ...p, class: c.slice(0, -'_construction'.length), cantiere: true };
 }
 
 /** Una galleria più corta di così, da un capo all'altro, è un sottopasso. */

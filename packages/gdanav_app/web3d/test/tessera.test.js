@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { bufferDellaTessera, costruisciTessera, iSottopassi, LIMITI, NASTRI, stimaTriangoli } from '../src/tessera.js';
+import { bufferDellaTessera, costruisciTessera, iSottopassi, LIMITI, NASTRI, stimaTriangoli, stradaVera } from '../src/tessera.js';
 import { ALTEZZA_LIVELLO, SPESSORE_IMPALCATO, altezzaViadotto } from '../src/elevazione.js';
 import { cavalcavia, cavalcaviaConRampa, cavalcaviaDueCarreggiate, ponteLungo, sottopasso, sottopassoConNome, strato } from './finte.js';
 
@@ -313,4 +313,38 @@ test('dove le corsie salgono, sopra non si mette né un palazzo né una pensilin
   assert.equal(t.conti.edificiFatti, 0);
   assert.equal(t.tetti, null);
   for (const g of Object.values(t.facciate)) assert.equal(g, null);
+});
+
+test('una strada segnata in costruzione si disegna come la strada che è', () => {
+  // «La linea del traffico a un punto completamente sconnesso dalla strada»:
+  // lo svincolo nuovo di via De Roberto la mappa lo dà ancora in costruzione,
+  // il percorso e il traffico ci passano già. La scena non lo disegnava.
+  assert.deepEqual(stradaVera({ class: 'trunk_construction', ramp: 1 }), { class: 'trunk', ramp: 1, cantiere: true });
+  const com = { class: 'minor', name: 'Via Roma' };
+  assert.equal(stradaVera(com), com);
+  const livelli = {
+    '0,0': {
+      transportation: strato([
+        { p: { class: 'motorway', oneway: 1 }, g: [[[0, 2048], [4096, 2048]]] },
+        // La rampa nuova: a terra, sul ponte sopra l'autostrada, di nuovo a terra.
+        { p: { class: 'trunk_construction', ramp: 1 }, g: [[[2048, 4096], [2048, 2600]]] },
+        { p: { class: 'trunk_construction', ramp: 1, brunnel: 'bridge', layer: 1 }, g: [[[2048, 2600], [2048, 1500]]] },
+        { p: { class: 'trunk_construction', ramp: 1 }, g: [[[2048, 1500], [2048, 0]]] },
+        // Un sentiero in costruzione resta fuori, come ogni sentiero.
+        { p: { class: 'path_construction' }, g: [[[100, 100], [900, 100]]] },
+      ]),
+    },
+  };
+  const t = costruisciTessera({ z: 14, x: X, y: Y, livelli });
+  const nastri = Object.keys(t.strade).filter((k) => t.strade[k]);
+  assert.ok(nastri.some((k) => k.endsWith('-ponte')), `il ponte della rampa ha il suo asfalto: ${nastri}`);
+  assert.ok(t.capitelli.length / 16 >= 2, 'e i suoi piloni');
+  // E il percorso ci si può appoggiare: i suoi segmenti ci sono, in quota.
+  let sopra = 0;
+  for (let i = 0; i < t.segmenti.length; i += 8) {
+    const mx = (t.segmenti[i] + t.segmenti[i + 3]) / 2;
+    const my = (t.segmenti[i + 1] + t.segmenti[i + 4]) / 2;
+    if (Math.abs(mx) < 3 && Math.abs(my) < 40) sopra = Math.max(sopra, t.segmenti[i + 2]);
+  }
+  assert.ok(sopra > 7, `la rampa in quota sopra l'autostrada (${sopra})`);
 });
