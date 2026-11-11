@@ -93,10 +93,10 @@ export class IndiceSegmenti {
   }
 
   /**
-   * Le quote delle strade vicine al punto che vanno come [dx, dy] (senza
-   * verso: anche contromano); ognuna con la sua distanza dal punto.
+   * Le quote delle strade vicine al punto che vanno come [dx, dy] (anche
+   * contromano, ma non sui sensi unici); ognuna con la sua distanza dal punto.
    */
-  candidati(x, y, dx, dy, raggio = 9) {
+  candidati(x, y, dx, dy, raggio = 9, margine = 4) {
     const out = [];
     const c = this.cella;
     const visti = new Set();
@@ -120,8 +120,14 @@ export class IndiceSegmenti {
             const py = s[o + 1] + sy * u;
             const d = Math.hypot(x - px, y - py);
             const w = s[o + 6];
-            if (d > w / 2 + 4 || d > raggio) continue;
-            const coseno = dx || dy ? Math.abs((sx * dx + sy * dy) / Math.sqrt(l2) / (Math.hypot(dx, dy) || 1)) : 1;
+            if (d > w / 2 + margine || d > raggio) continue;
+            const cod = s[o + 7];
+            const prodotto = dx || dy ? (sx * dx + sy * dy) / Math.sqrt(l2) / (Math.hypot(dx, dy) || 1) : 1;
+            // Contromano su un senso unico: la carreggiata opposta di una
+            // strada a due carreggiate. «La linea è sull'altra carreggiata»
+            // (SS7bis): TomTom passa nel mezzo e l'altra era più vicina.
+            if (cod & 384 && (cod & 256 ? -prodotto : prodotto) < -0.2) continue;
+            const coseno = Math.abs(prodotto);
             const h = s[o + 2] + (s[o + 5] - s[o + 2]) * u;
             // Una strada in quota vale solo se va quasi come il percorso
             // (entro 23°): «la linea non può salire sul ponte se la strada è
@@ -129,7 +135,7 @@ export class IndiceSegmenti {
             // dei 45°, e dove il percorso cambia carreggiata (sotto, nessuna
             // strada abbastanza vicina) la linea saliva sull'impalcato.
             if (coseno < (h > 2.5 ? 0.92 : 0.7)) continue;
-            out.push({ h, d, px, py, codice: s[o + 7], galleria: (s[o + 7] & 64) !== 0 });
+            out.push({ h, d, px, py, codice: s[o + 7], galleria: (cod & 64) !== 0 });
           }
         }
       }
@@ -139,10 +145,41 @@ export class IndiceSegmenti {
 }
 
 /** Quante strade candidate si tengono per punto, le più vicine. */
-const CANDIDATI_MAX = 6;
+const CANDIDATI_MAX = 9;
+/** E quante per piano (quote entro un metro e mezzo). */
+const CANDIDATI_PER_PIANO = 3;
+
+/**
+ * Le candidate da tenere, le meno care ma di ogni piano: prendendo solo le
+ * sei più vicine, sotto un viadotto con tante stradine a terra la
+ * carreggiata vera (più lontana: il percorso di TomTom sta di lato) restava
+ * fuori, e la linea era costretta a scendere sotto il ponte.
+ */
+function scegliCandidate(strade) {
+  strade.sort((x, y) => x.costo - y.costo);
+  const out = [];
+  for (const c of strade) {
+    if (out.length >= CANDIDATI_MAX) break;
+    let delPiano = 0;
+    for (const q of out) if (Math.abs(q.h - c.h) < 1.5) delPiano++;
+    if (delPiano < CANDIDATI_PER_PIANO) out.push(c);
+  }
+  return out;
+}
 
 /** Quanto costa, per metro, saltare di lato da una strada all'altra. */
 const SALTO_DI_LATO = 0.8;
+
+/**
+ * Quanto costa un salto di quota fra due punti vicini (4 m): poco finché è
+ * la salita di una rampa, tanto quando è un altro piano. Era quattro al
+ * metro; ma cercando le strade fino a tredici metri (il percorso di TomTom
+ * sta di lato) sotto un viadotto la stradina a terra è spesso più vicina
+ * della carreggiata vera, e dopo qualche centinaio di metri scendere costava
+ * meno che restare su: linea e freccia finivano sotto il ponte.
+ */
+const SALTO_DI_QUOTA = 12;
+const costoDelSalto = (d) => d * (d > 1.5 ? SALTO_DI_QUOTA : 1);
 
 /**
  * Le quote di una linea campionata: [punti] `[x, y]` ogni pochi metri. Per
@@ -158,14 +195,18 @@ const SALTO_DI_LATO = 0.8;
  * rotonda) un metro più vicino bastava a spostarlo di là; la levigatura
  * faceva il resto, una curva verso lo svincolo e ritorno. Adesso cambiare
  * strada costa quanto il salto: si resta su quella su cui si era.
+ *
+ * [ancora] `{i, h}`: al punto [i] si sa già a che quota si è (l'auto, dal
+ * profilo di prima): le strade a un'altra quota lì costano come un salto.
+ * Chi è sul viadotto ci resta anche quando il tratto si rifà.
  */
-export function quote(punti, indice) {
+export function quote(punti, indice, ancora = null) {
   const n = punti.length;
   const cand = new Array(n);
   for (let i = 0; i < n; i++) {
     const a = punti[Math.max(0, i - 1)];
     const b = punti[Math.min(n - 1, i + 1)];
-    const lista = indice.candidati(punti[i][0], punti[i][1], b[0] - a[0], b[1] - a[1]);
+    const lista = indice.candidati(punti[i][0], punti[i][1], b[0] - a[0], b[1] - a[1], AGGANCIO_RAGGIO_M, AGGANCIO_RAGGIO_M);
     const strade = [];
     for (const c of lista) {
       // Le strade piccole contano un po' meno, se ci sono anche quelle grandi.
@@ -176,8 +217,8 @@ export function quote(punti, indice) {
         if (costo < g.costo) Object.assign(g, { h: c.h, costo, galleria: c.galleria, px: c.px, py: c.py });
       } else strade.push({ h: c.h, costo, galleria: c.galleria, px: c.px, py: c.py });
     }
-    strade.sort((x, y) => x.costo - y.costo);
-    cand[i] = strade.slice(0, CANDIDATI_MAX);
+    if (ancora && ancora.i === i) for (const q of strade) q.costo += costoDelSalto(Math.abs(q.h - ancora.h));
+    cand[i] = scegliCandidate(strade);
   }
   const h = new Float64Array(n).fill(NaN);
   // Quali punti passano in galleria (sotto qualcosa): il nastro lì è «dentro».
@@ -200,20 +241,25 @@ export function quote(punti, indice) {
       const prev = cand[k - 1];
       const cc = [];
       const dd = [];
+      // Il piano di prima continua qui? Se no (la strada finisce: il bordo
+      // delle tessere costruite, un buco nei dati) il salto è obbligato e
+      // costa poco; altrimenti un solo punto in fondo senza il viadotto
+      // tirava giù la linea per tutto il tratto, fino a dove conveniva.
+      const continua = prev.map((p) => cand[k].some((x) => Math.abs(x.h - p.h) < 1.5));
       for (const c of cand[k]) {
         let meglio = Infinity;
         let quale = 0;
         for (let q = 0; q < prev.length; q++) {
           // Un salto di quota fra due punti vicini (4 m) costa molto più
           // della salita di una rampa vera, che sale poco a ogni passo.
-          const salto = Math.abs(c.h - prev[q].h);
+          const salto = continua[q] ? costoDelSalto(Math.abs(c.h - prev[q].h)) : Math.abs(c.h - prev[q].h);
           // E un salto di lato: lo spostamento verso la strada cambia piano
           // lungo la stessa strada, di colpo passando a un'altra.
           const lato = Math.hypot(
             c.px - punti[k][0] - (prev[q].px - punti[k - 1][0]),
             c.py - punti[k][1] - (prev[q].py - punti[k - 1][1]),
           );
-          const v = costi[k - 1 - i][q] + salto * (salto > 1.5 ? 4 : 1) + lato * SALTO_DI_LATO;
+          const v = costi[k - 1 - i][q] + salto + lato * SALTO_DI_LATO;
           if (v < meglio) {
             meglio = v;
             quale = q;
@@ -399,6 +445,11 @@ export class Profilo {
   get s1() {
     return this.s0 + (this.h.length - 1) * this.passo;
   }
+  /** La quota a [s] se lì sotto si è trovata una strada, altrimenti `null`. */
+  quotaVera(s) {
+    const i = Math.round((s - this.s0) / this.passo);
+    return this.trovata && i >= 0 && i < this.trovata.length && this.trovata[i] ? this.quota(s) : null;
+  }
   quota(s) {
     const n = this.h.length;
     if (!n) return 0;
@@ -410,27 +461,41 @@ export class Profilo {
   }
 }
 
-/** Il profilo di [linea] fra [s0] e [s1], con le strade di [indice]. */
-export function profiloDi(linea, s0, s1, indice, passo = 4) {
+/**
+ * Il profilo di [linea] fra [s0] e [s1], con le strade di [indice].
+ * [ancora] `{s, h}`: la quota che si sa già a [s] metri (vedi [quote]).
+ */
+export function profiloDi(linea, s0, s1, indice, passo = 4, ancora = null) {
   const n = Math.max(2, Math.ceil((s1 - s0) / passo) + 1);
   const punti = [];
   for (let k = 0; k < n; k++) {
     const p = linea.a(s0 + k * passo);
     punti.push([p[0], p[1]]);
   }
-  const grezze = quote(punti, indice);
+  const ia = ancora ? Math.round((ancora.s - s0) / passo) : -1;
+  const grezze = quote(punti, indice, ia >= 0 && ia < n ? { i: ia, h: ancora.h } : null);
   const [dx, dy] = spostamenti(grezze.dx, grezze.dy);
-  return new Profilo(s0, passo, riempiQuote(grezze), grezze.galleria, dx, dy);
+  const profilo = new Profilo(s0, passo, riempiQuote(grezze), grezze.galleria, dx, dy);
+  profilo.trovata = Uint8Array.from(grezze, (v) => (Number.isNaN(v) ? 0 : 1));
+  return profilo;
 }
 
-/** Più di così non si sposta: oltre, la strada giusta è un'altra. La
- * geometria del percorso (Valhalla) è quella delle stesse strade della mappa,
- * e le tessere la semplificano di poco: l'aggancio serve a quel poco. Con sei
- * metri (e poi quattro e mezzo) la linea arrivava sulla strada accanto — la
- * rampa, la complanare, l'altro lato della rotonda — e ci restava. */
-export const SPOSTAMENTO_MAX_M = 2.5;
+/** Più di così non si sposta: oltre, la strada giusta è un'altra.
+ *
+ * Il percorso arriva da TomTom (`ClienteTomTom`, per il traffico nei tempi),
+ * e la sua geometria è quella delle strade di TomTom, non di OpenStreetMap che
+ * la mappa disegna: in tante zone le due stanno a cinque, dieci metri l'una
+ * dall'altra («ancora è fuori strada la linea», via Po: otto metri, mentre la
+ * strada già fatta — il GPS — è sulla strada). Con sei metri non si
+ * agganciava; per una notte, pensandolo di Valhalla, era sceso a due e mezzo.
+ * Ora tredici, pieni fino a dieci: a non saltare sulla strada accanto ci pensa
+ * la continuità di [quote], che sceglie la strada su cui si resta lungo tutto
+ * il tratto, non la più vicina punto per punto. */
+export const SPOSTAMENTO_MAX_M = 13;
 /** Fin qui lo spostamento è tutto; da qui al massimo si spegne. */
-export const SPOSTAMENTO_PIENO_M = 1.5;
+export const SPOSTAMENTO_PIENO_M = 10;
+/** Fin dove si cercano le strade intorno a un punto del percorso. */
+const AGGANCIO_RAGGIO_M = SPOSTAMENTO_MAX_M;
 
 /**
  * Lo spostamento di ogni punto sul mezzo della strada sotto, morbido.

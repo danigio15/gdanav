@@ -947,7 +947,10 @@ function aggiornaPercorso(adesso) {
     const a = Math.min(p.linea.lunghezza, da + FINESTRA_AVANTI);
     scriviOltre(p, a);
     p.da = da;
-    p.profilo = profiloDi(p.linea, da, a, indice);
+    // Dove sta l'auto la quota si sa già (dal profilo di prima): chi è sul
+    // viadotto ci resta, anche con una strada più vicina sotto.
+    const qui = s !== null && p.profilo ? p.profilo.quotaVera(s) : null;
+    p.profilo = profiloDi(p.linea, da, a, indice, 4, qui === null ? null : { s, h: qui });
     S.sporco.segni = true;
     scena.impostaNastro('alone', nastro(p.linea, p.profilo, da, a, 15, 0.55), 'alone', 4);
     scena.impostaNastro('percorso', nastro(p.linea, p.profilo, da, a, 4.6, 0.62, { code: p.code }), 'percorso', 5);
