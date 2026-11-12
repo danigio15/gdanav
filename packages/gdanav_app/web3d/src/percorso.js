@@ -831,6 +831,58 @@ export function pezziDelNastro(dati, lato = 800) {
 }
 
 /**
+ * I due sensi di marcia del traffico, ognuno nella sua metà di strada.
+ *
+ * «Guarda le linee del traffico»: su una strada a doppio senso TomTom manda
+ * una linea per senso, sulla stessa geometria. Appoggiate tutte e due sulla
+ * strada finivano una sopra l'altra — si vedeva solo l'ultima, o una treccia
+ * dove gli scarti di qualche metro le facevano incrociare.
+ *
+ * [linee]: per ognuna i punti `[x, y]` già appoggiati sulla strada, nel verso
+ * di marcia. Una linea ha «l'altro senso» quando almeno [quota] dei suoi punti
+ * ha, entro [raggio] metri, un punto di un'altra linea che va al contrario.
+ * Ritorna, per ogni linea, di quanti metri spostarla a destra del suo verso:
+ * [mezzaCorsia] se ha l'altro senso, zero se è sola (un senso unico resta in
+ * mezzo alla strada).
+ */
+export function sensiDiMarcia(linee, { raggio = 6, quota = 0.3, mezzaCorsia = 1.3 } = {}) {
+  const cella = raggio;
+  const griglia = new Map();
+  const versi = linee.map((punti) =>
+    punti.map((_, k) => {
+      const a = punti[Math.max(0, k - 1)];
+      const b = punti[Math.min(punti.length - 1, k + 1)];
+      const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      return [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+    }),
+  );
+  linee.forEach((punti, i) =>
+    punti.forEach(([x, y], k) => {
+      const c = `${Math.floor(x / cella)},${Math.floor(y / cella)}`;
+      if (!griglia.has(c)) griglia.set(c, []);
+      griglia.get(c).push([x, y, i, versi[i][k]]);
+    }),
+  );
+  return linee.map((punti, i) => {
+    if (punti.length < 2) return 0;
+    let accoppiati = 0;
+    punti.forEach(([x, y], k) => {
+      const [vx, vy] = versi[i][k];
+      const cx = Math.floor(x / cella);
+      const cy = Math.floor(y / cella);
+      for (let ox = -1; ox <= 1; ox++)
+        for (let oy = -1; oy <= 1; oy++)
+          for (const [px, py, j, [wx, wy]] of griglia.get(`${cx + ox},${cy + oy}`) ?? []) {
+            if (j === i || Math.hypot(px - x, py - y) > raggio || vx * wx + vy * wy > -0.6) continue;
+            accoppiati++;
+            return;
+          }
+    });
+    return accoppiati >= quota * punti.length ? mezzaCorsia : 0;
+  });
+}
+
+/**
  * Di quanto alzare i nastri a questo [zoom], in metri.
  *
  * Il percorso sta sessanta centimetri sopra l'asfalto. Da vicino bastano; ma
