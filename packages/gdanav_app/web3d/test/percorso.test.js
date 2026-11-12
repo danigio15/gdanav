@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { IndiceSegmenti, Linea, Origine, Profilo, alzataDeiNastri, lungoLaLinea, nastro, pezziDelNastro, profiloDi, quote, riempiQuote } from '../src/percorso.js';
+import { IndiceSegmenti, Linea, Origine, Profilo, alzataDeiNastri, lungoLaLinea, nastro, pezziDelNastro, profiloDi, quote, riempiQuote, sensiDiMarcia } from '../src/percorso.js';
 
 /** Segmenti finti: [x0,y0,z0,x1,y1,z1,w,codice]. */
 function indice(segmenti) {
@@ -494,4 +494,24 @@ test('in galleria la linea non segue le pieghe della strada disegnata a mano', (
   assert.ok(inGalleria < 0.3, `in galleria la linea balla di ${inGalleria.toFixed(2)} m`);
   // All'aperto la strada si vede, e la linea le sta sopra: lì le pieghe si seguono.
   assert.ok(allAperto > 0.8, `all'aperto segue la strada: ${allAperto.toFixed(2)} m`);
+});
+
+// «Guarda le linee del traffico»: TomTom manda una linea per senso, sulla
+// stessa strada. Appoggiate sulla strada finivano una sopra l'altra.
+test('i due sensi di una strada vanno ognuno nella sua metà', () => {
+  const dritta = (da, a, scarto = 0) => Array.from({ length: 21 }, (_, k) => [scarto + Math.sin(k) * 0.4, da + ((a - da) * k) / 20]);
+  // Andata e ritorno sulla stessa strada, con qualche decimetro di scarto.
+  const [andata, ritorno] = sensiDiMarcia([dritta(0, 100), dritta(100, 0, 0.6)]);
+  assert.ok(andata > 1 && andata < 2, `andata ${andata}`);
+  assert.equal(ritorno, andata);
+  // Un senso unico resta in mezzo alla strada.
+  assert.deepEqual(sensiDiMarcia([dritta(0, 100)]), [0]);
+  // Due code nello stesso verso non sono due sensi.
+  assert.deepEqual(sensiDiMarcia([dritta(0, 100), dritta(0, 100, 0.5)]), [0, 0]);
+  // Due strade parallele lontane nemmeno.
+  assert.deepEqual(sensiDiMarcia([dritta(0, 100), dritta(100, 0, 30)]), [0, 0]);
+  // Il ritorno su un pezzo solo dell'andata: la parte lunga è sola.
+  const [lunga, corta] = sensiDiMarcia([dritta(0, 400), dritta(60, 40)]);
+  assert.equal(lunga, 0);
+  assert.ok(corta > 1);
 });

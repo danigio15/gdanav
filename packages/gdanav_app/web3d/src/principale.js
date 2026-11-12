@@ -12,7 +12,7 @@ import { valutaPrestazioni, valutaWebgl } from './capacita.js';
 import { chiave as chiaveTessera, daChiave, mercPerMetro, latDaMerc, marginiAiLati } from './geo.js';
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
-import { alzataDeiNastri, IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, spostamenti } from './percorso.js';
+import { alzataDeiNastri, IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti } from './percorso.js';
 import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
 import { GIORNO, NOTTE } from './tavolozza.js';
@@ -1169,6 +1169,7 @@ function aggiornaTraffico(adesso) {
   } catch {
     return;
   }
+  const passo = 5;
   const parti = [];
   const viste = new Set();
   for (const f of elementi) {
@@ -1193,7 +1194,6 @@ function aggiornaTraffico(adesso) {
       const linea = new Linea(xy);
       const L = linea.lunghezza;
       if (L < 5) continue;
-      const passo = 5;
       const punti = [];
       for (let s = 0; s <= L; s += passo) punti.push(linea.a(s).slice(0, 2));
       // Lungo il percorso il traffico lo dice già lui, coi suoi colori: in
@@ -1206,11 +1206,28 @@ function aggiornaTraffico(adesso) {
       // appoggia sulle strade come il percorso.
       const grezze = quote(punti, indice);
       const [sx, sy] = spostamenti(grezze.dx, grezze.dy, punti, passo);
-      const prof = new Profilo(0, passo, riempiQuote(grezze), null, sx, sy);
-      parti.push(nastro(linea, prof, 0, L, 2.4, 0.34, { passo, code: [[0, L + 1, lento < 0.3 ? 2 : 1]] }));
+      parti.push({ linea, L, punti, grezze, sx, sy, lento });
     }
   }
-  scena.impostaNastro('traffico', unisciNastri(parti), 'traffico', 3);
+  // I due sensi di una strada, ognuno nella sua metà (vedi [sensiDiMarcia]):
+  // a destra del verso di marcia, dove sono le auto di quel senso.
+  const destra = sensiDiMarcia(parti.map(({ punti, sx, sy }) => punti.map(([x, y], k) => [x + sx[k], y + sy[k]])));
+  const nastri = parti.map(({ linea, L, punti, grezze, sx, sy, lento }, i) => {
+    const d = destra[i];
+    if (d) {
+      for (let k = 0; k < punti.length; k++) {
+        const a = punti[Math.max(0, k - 1)];
+        const b = punti[Math.min(punti.length - 1, k + 1)];
+        const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        sx[k] += ((b[1] - a[1]) / l) * d;
+        sy[k] -= ((b[0] - a[0]) / l) * d;
+      }
+    }
+    const prof = new Profilo(0, passo, riempiQuote(grezze), null, sx, sy);
+    // Coi due sensi la strada si divide: ogni nastro sta nella sua metà.
+    return nastro(linea, prof, 0, L, d ? 1.7 : 2.4, 0.34, { passo, code: [[0, L + 1, lento < 0.3 ? 2 : 1]] });
+  });
+  scena.impostaNastro('traffico', unisciNastri(nastri), 'traffico', 3);
 }
 
 function unisciNastri(parti) {
