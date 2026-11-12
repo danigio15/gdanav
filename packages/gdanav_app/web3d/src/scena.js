@@ -590,7 +590,10 @@ varying vec2 vUv;
 varying float vLivello;
 void main() {
   float e = abs(vUv.x - 0.5) * 2.0;
-  vec3 c = vLivello < 1.5 ? vec3(0.961, 0.651, 0.137) : vec3(0.898, 0.188, 0.165);
+  // 1 rallenta, 2-3 fermo; 4 strada chiusa (bordeaux) e 5 lavori (arancio),
+  // gli eventi di TomTom: a tratti col bianco, come una transenna.
+  vec3 c = vLivello < 1.5 ? vec3(0.961, 0.651, 0.137) : vLivello < 3.5 ? vec3(0.898, 0.188, 0.165) : vLivello < 4.5 ? vec3(0.600, 0.090, 0.090) : vec3(0.976, 0.451, 0.086);
+  if (vLivello > 3.5) c = mix(vec3(1.0), c, step(0.42, fract(vUv.y / 5.0)));
   float a = (1.0 - smoothstep(0.75, 1.0, e)) * 0.92;
   gl_FragColor = vec4(c * (1.0 + 0.2 * uNotte), a);
   #include <colorspace_fragment>

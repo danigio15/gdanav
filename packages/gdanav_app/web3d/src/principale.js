@@ -420,7 +420,7 @@ function creaMappa(stile) {
   mappa.on('error', (e) => annota('mappa', e?.error?.message ?? e));
   mappa.on('sourcedata', (e) => {
     if (e.sourceId === 'openmaptiles' && e.tile) pianificaPresto();
-    if (e.sourceId === 'traffico' && e.tile) S.sporco.traffico = true;
+    if ((e.sourceId === 'traffico' || e.sourceId === 'eventi') && e.tile) S.sporco.traffico = true;
   });
   mappa.on('moveend', pianificaPresto);
   for (const evento of ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart']) {
@@ -1169,13 +1169,26 @@ function aggiornaTraffico(adesso) {
   } catch {
     return;
   }
+  // I tratti chiusi e coi lavori (gli eventi di TomTom): la mappa piatta li
+  // disegna sotto la strada 3D, dove non si vedono. Qui, come le code, con
+  // un colore loro, a tratti col bianco: bordeaux la chiusura (4), arancio i
+  // lavori (5) — vedi FRAMMENTO_CODA in scena.js.
+  if (S.mappa.getSource('eventi')) {
+    try {
+      for (const f of S.mappa.querySourceFeatures('eventi', { sourceLayer: 'Traffic incidents flow' })) {
+        const tipo = +(f.properties?.icon_category ?? 0);
+        if (tipo === 8 || tipo === 9) elementi.push({ ...f, geometry: f.geometry, properties: { ...f.properties, evento: tipo } });
+      }
+    } catch {}
+  }
   const passo = 5;
   const parti = [];
   const viste = new Set();
   for (const f of elementi) {
     const p = f.properties ?? {};
-    const lento = +(p.traffic_level ?? p.trafficLevel ?? 1);
-    if (!(lento < 0.6)) continue;
+    const evento = p.evento ?? 0;
+    const lento = evento ? 0 : +(p.traffic_level ?? p.trafficLevel ?? 1);
+    if (!evento && !(lento < 0.6)) continue;
     const g = f.geometry;
     const linee = g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : [];
     for (const l of linee) {
@@ -1206,13 +1219,15 @@ function aggiornaTraffico(adesso) {
       // appoggia sulle strade come il percorso.
       const grezze = quote(punti, indice);
       const [sx, sy] = spostamenti(grezze.dx, grezze.dy, punti, passo);
-      parti.push({ linea, L, punti, grezze, sx, sy, lento });
+      parti.push({ linea, L, punti, grezze, sx, sy, lento, evento });
     }
   }
   // I due sensi di una strada, ognuno nella sua metà (vedi [sensiDiMarcia]):
   // a destra del verso di marcia, dove sono le auto di quel senso.
-  const destra = sensiDiMarcia(parti.map(({ punti, sx, sy }) => punti.map(([x, y], k) => [x + sx[k], y + sy[k]])));
-  const nastri = parti.map(({ linea, L, punti, grezze, sx, sy, lento }, i) => {
+  const code = parti.filter((p) => !p.evento);
+  const lati = sensiDiMarcia(code.map(({ punti, sx, sy }) => punti.map(([x, y], k) => [x + sx[k], y + sy[k]])));
+  const destra = parti.map((p) => (p.evento ? 0 : lati[code.indexOf(p)]));
+  const nastri = parti.map(({ linea, L, punti, grezze, sx, sy, lento, evento }, i) => {
     const d = destra[i];
     if (d) {
       for (let k = 0; k < punti.length; k++) {
@@ -1225,7 +1240,8 @@ function aggiornaTraffico(adesso) {
     }
     const prof = new Profilo(0, passo, riempiQuote(grezze), null, sx, sy);
     // Coi due sensi la strada si divide: ogni nastro sta nella sua metà.
-    return nastro(linea, prof, 0, L, d ? 1.7 : 2.4, 0.34, { passo, code: [[0, L + 1, lento < 0.3 ? 2 : 1]] });
+    const livello = evento === 8 ? 4 : evento === 9 ? 5 : lento < 0.3 ? 2 : 1;
+    return nastro(linea, prof, 0, L, d ? 1.7 : evento ? 2.8 : 2.4, 0.34, { passo, code: [[0, L + 1, livello]] });
   });
   scena.impostaNastro('traffico', unisciNastri(nastri), 'traffico', 3);
 }
