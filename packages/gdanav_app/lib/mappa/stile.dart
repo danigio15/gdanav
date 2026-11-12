@@ -55,6 +55,14 @@ const motivoPedonale = 'pedonale-puntini';
 /// mette lo schermo dell'auto (`RendererMappa.mostra`), non il telefono.
 const sorgenteEvidenza = 'gdanav-evidenza';
 const stratoTraffico = 'traffico';
+
+/// Gli eventi di TomTom: incidenti, strade chiuse, lavori, veicoli in panne,
+/// pericoli. Con la stessa chiave del traffico, come tessere: «le
+/// segnalazioni di Waze su GdANav». Quelle di Waze non si possono prendere
+/// (contratto solo per gli enti pubblici); queste sono ufficiali.
+const sorgenteEventi = 'eventi';
+const stratoEventi = 'eventi';
+const stratoEventiTratti = 'eventi-tratti';
 const stratoTrafficoLocale = 'traffico-locale';
 const stratiToccabili = [
   'persone',
@@ -795,6 +803,16 @@ Map<String, Object> stileMappa({
         },
       },
       if (traffico.isNotEmpty)
+        sorgenteEventi: {
+          'type': 'vector',
+          'maxzoom': 22,
+          'attribution': '© TomTom',
+          'tiles': [
+            'https://api.tomtom.com/traffic/map/4/tile/incidents/{z}/{x}/{y}.pbf'
+                '?key=${Uri.encodeQueryComponent(traffico)}',
+          ],
+        },
+      if (traffico.isNotEmpty)
         'traffico': {
           'type': 'vector',
           'maxzoom': 22,
@@ -943,6 +961,7 @@ Map<String, Object> stileMappa({
       if (traffico.isNotEmpty && !immersiva) ...[
         _coda(stratoTraffico, principali: true, minzoom: 7, spessore: perAuto ? 1.6 : 1),
         _coda(stratoTrafficoLocale, principali: false, minzoom: 13, spessore: perAuto ? 1.6 : 1),
+        _trattiDegliEventi(spessore: perAuto ? 1.6 : 1),
       ],
       {
         'id': stratoEdifici2d,
@@ -1231,6 +1250,7 @@ Map<String, Object> stileMappa({
           minzoom: 13,
           larghezza: _largo(larghezzaCoda.$1, larghezzaCoda.$2),
         ),
+        _trattiDegliEventi(spessore: 1),
       ],
       // Le code di adesso dentro il percorso: dal giallo (rallenta) al rosso
       // (fermo), bordeaux se è chiusa. Sopra la linea, sotto le frecce.
@@ -1771,6 +1791,7 @@ Map<String, Object> stileMappa({
           'icon-ignore-placement': true,
         },
       },
+      if (traffico.isNotEmpty) _iconeDegliEventi(perAuto: perAuto),
       {
         // Le segnalazioni: i fumetti colorati di Waze, in piedi anche con la
         // mappa inclinata.
@@ -2151,3 +2172,131 @@ List<Object> _numeroCorto(List<Object> numero) => [
   ],
   ['to-string', numero],
 ];
+
+/// Il tipo di evento di TomTom (`icon_category`) come la segnalazione della
+/// comunità che gli somiglia, per l'icona: 1 incidente, 8 strada chiusa,
+/// 9 lavori; corsia chiusa, veicolo in panne, condizioni pericolose, nebbia,
+/// pioggia, ghiaccio, vento, allagamento e i gruppi misti sono un pericolo.
+/// Le code (6) no: le disegna già il traffico. Ne' quelli senza tipo (0).
+const tipiDegliEventi = {
+  1: 'incidente',
+  8: 'chiusura',
+  9: 'lavori',
+  2: 'pericolo',
+  3: 'pericolo',
+  4: 'pericolo',
+  5: 'pericolo',
+  7: 'pericolo',
+  10: 'pericolo',
+  11: 'pericolo',
+  13: 'pericolo',
+  14: 'pericolo',
+};
+
+/// Le icone degli eventi di TomTom: gli stessi fumetti delle segnalazioni,
+/// un po' piu' piccoli, sotto quelli della comunita'. Sopra i nomi delle
+/// strade, e prima quelli che pesano di piu' (`magnitude`: 4 indefinito,
+/// cioe' chiusure, 3 grave…).
+Map<String, Object> _iconeDegliEventi({required bool perAuto}) {
+  final grande = perAuto ? 1.25 : 1.0;
+  return {
+    'id': stratoEventi,
+    'type': 'symbol',
+    'source': sorgenteEventi,
+    'source-layer': 'Traffic incidents POI',
+    'minzoom': 11,
+    'filter': [
+      'in',
+      [
+        'to-number',
+        ['get', 'icon_category'],
+        0,
+      ],
+      ['literal', tipiDegliEventi.keys.toList()],
+    ],
+    'layout': {
+      'icon-image': [
+        'match',
+        [
+          'to-number',
+          ['get', 'icon_category'],
+          0,
+        ],
+        for (final MapEntry(:key, :value) in tipiDegliEventi.entries) ...[key, 'segnala-$value'],
+        'segnala-pericolo',
+      ],
+      'icon-anchor': 'bottom',
+      'icon-size': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        11,
+        0.4 * grande,
+        15,
+        0.6 * grande,
+        18,
+        0.8 * grande,
+      ],
+      'symbol-sort-key': [
+        '-',
+        0,
+        [
+          'to-number',
+          ['get', 'magnitude'],
+          0,
+        ],
+      ],
+      // Sopra i nomi delle strade: un evento nascosto da un nome non serve.
+      'icon-allow-overlap': true,
+    },
+  };
+}
+
+/// I tratti chiusi e quelli coi lavori, sulla strada: rosso a tratti la
+/// chiusura, arancio a tratti i lavori, come le loro icone.
+Map<String, Object> _trattiDegliEventi({double spessore = 1}) => {
+  'id': stratoEventiTratti,
+  'type': 'line',
+  'source': sorgenteEventi,
+  'source-layer': 'Traffic incidents flow',
+  'minzoom': 12,
+  'filter': [
+    'in',
+    [
+      'to-number',
+      ['get', 'icon_category'],
+      0,
+    ],
+    [
+      'literal',
+      [8, 9],
+    ],
+  ],
+  'layout': {'line-cap': 'butt', 'line-join': 'round'},
+  'paint': {
+    'line-color': [
+      'match',
+      [
+        'to-number',
+        ['get', 'icon_category'],
+        0,
+      ],
+      8,
+      '#B91C1C',
+      '#F97316',
+    ],
+    'line-width': [
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      12,
+      2 * spessore,
+      16,
+      5 * spessore,
+      18,
+      8 * spessore,
+    ],
+    'line-dasharray': [1.4, 1],
+    'line-opacity': 0.95,
+  },
+};

@@ -26,6 +26,8 @@ export const STRATI_SOSTITUITI = [
   'autostrade',
   'traffico',
   'traffico-locale',
+  // I tratti chiusi e coi lavori di TomTom: sulla strada, come il traffico.
+  'eventi-tratti',
   'edifici',
   'edifici-3d',
   'edifici-immersivi',
