@@ -78,3 +78,21 @@ test('gli indirizzi delle segnalazioni', () => {
   assert.equal(leggiIndirizzo('DELETE', `${base}/v1/segnalazioni`).stato, 405);
   assert.equal(leggiIndirizzo('GET', `${base}/altro`).stato, 404);
 });
+
+test('un voto per indirizzo: due smentite dallo stesso non tolgono niente, e le conferme hanno un tetto', () => {
+  const ora = Date.UTC(2026, 10, 13, 8);
+  const s = crea({ tipo: 'polizia', lat: 40.9, lon: 14.2 }, ora, 'z~abcdefgh');
+  const una = vota(s, false, ora, 'aaaa');
+  assert.notEqual(una, null);
+  assert.equal(vota(una, false, ora, 'aaaa'), una, 'lo stesso indirizzo non vota due volte');
+  assert.equal(vota(una, false, ora, 'bbbb'), null, 'due indirizzi diversi la tolgono');
+  let c = s;
+  for (let i = 0; i < 1000; i++) c = vota(c, true, ora, `v${i}`);
+  assert.ok(c.scade <= ora + 3 * 60 * 60_000, 'una «polizia» non vive oltre tre ore');
+  assert.ok(c.votanti.length <= 200);
+});
+
+test('fuori dal mondo non si legge', () => {
+  assert.equal(leggiIndirizzo('GET', 'https://x/v1/segnalazioni?lat=1e300&lon=14').stato, 400);
+  assert.equal(leggiIndirizzo('GET', 'https://x/v1/segnalazioni?lat=40.9&lon=14.2').azione, 'elenco');
+});

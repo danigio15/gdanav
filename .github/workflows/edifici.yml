@@ -42,8 +42,13 @@ jobs:
       - run: pip install pyarrow shapely mapbox-vector-tile pmtiles
       - id: r
         name: Il rilascio di Overture
+        # L'input passa da una variabile, non dentro lo script: scritto lì,
+        # una virgoletta nel campo diventava un comando.
+        env:
+          RILASCIO: ${{ github.event.inputs.rilascio }}
         run: |
-          r="${{ github.event.inputs.rilascio }}"
+          r="$RILASCIO"
+          if [ -n "$r" ] && ! [[ "$r" =~ ^[0-9A-Za-z._-]+$ ]]; then echo "rilascio non valido: $r"; exit 1; fi
           if [ -z "$r" ]; then
             r=$(curl -s "https://overturemaps-us-west-2.s3.us-west-2.amazonaws.com/?list-type=2&prefix=release/&delimiter=/" \
               | grep -o '<Prefix>release/[^<]*/</Prefix>' | sed 's#<Prefix>release/##; s#/</Prefix>##' | sort | tail -1)

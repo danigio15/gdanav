@@ -67,12 +67,31 @@ export function crea({ tipo, lat, lon }, ora, id) {
   return { id, tipo, lat, lon, creata: ora, scade: ora + DURATA_MIN[tipo] * 60_000, conferme: 0, smentite: 0 };
 }
 
-/** Il voto di chi passa: `ancora` vero se c'è ancora. Restituisce la nuova, o null se va tolta. */
-export function vota(s, ancora, ora) {
+/** Al più quante volte la sua durata può vivere una segnalazione, con le conferme. */
+export const VITA_MASSIMA = 3;
+
+/** Quanti votanti si ricordano per segnalazione (le loro impronte, accorciate). */
+export const VOTANTI_RICORDATI = 200;
+
+/**
+ * Il voto di chi passa: `ancora` vero se c'è ancora. Restituisce la nuova, o
+ * null se va tolta.
+ *
+ * Un voto per chi vota ([chi], l'impronta dell'indirizzo): prima due smentite
+ * dallo stesso indirizzo toglievano qualunque segnalazione, e mille conferme
+ * tenevano viva una «polizia» per tre settimane. Chi ha già votato non conta
+ * più, e le conferme non allungano oltre [VITA_MASSIMA] volte la durata.
+ */
+export function vota(s, ancora, ora, chi = null) {
+  const votanti = Array.isArray(s.votanti) ? s.votanti : [];
+  const breve = chi ? String(chi).slice(0, 16) : null;
+  if (breve && votanti.includes(breve)) return s;
   const n = { ...s };
+  if (breve) n.votanti = [...votanti, breve].slice(-VOTANTI_RICORDATI);
   if (ancora) {
     n.conferme += 1;
-    n.scade = Math.max(n.scade, ora) + DURATA_MIN[s.tipo] * 60_000 * PROROGA;
+    const durata = DURATA_MIN[s.tipo] * 60_000;
+    n.scade = Math.min(Math.max(n.scade, ora) + durata * PROROGA, s.creata + durata * VITA_MASSIMA);
   } else {
     n.smentite += 1;
     if (n.smentite >= SMENTITE_PER_TOGLIERE + n.conferme) return null;
@@ -103,6 +122,8 @@ export function leggiIndirizzo(metodo, url) {
       const lat = Number(u.searchParams.get('lat') ?? NaN);
       const lon = Number(u.searchParams.get('lon') ?? NaN);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return { errore: 'lat e lon', stato: 400 };
+      // Dentro il mondo: con 1e300 si accendevano zone (e oggetti) a piacere.
+      if (!(lat >= -85 && lat <= 85 && lon >= -180 && lon <= 180)) return { errore: 'lat e lon', stato: 400 };
       return { azione: 'elenco', lat, lon };
     }
     if (metodo === 'POST') return { azione: 'nuova' };

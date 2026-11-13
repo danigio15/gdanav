@@ -11,7 +11,7 @@ import {
 } from './colonnine.js';
 import { PRIVACY } from './privacy.js';
 import { DURATA_CODICE_MS, bustaValida, codiceVivo, leggiIndirizzoCodice } from './codici.js';
-import { MASSIMO_BYTE, destinatari, impronta, leggiRichiesta, presenza, puoEntrare } from './regole.js';
+import { MASSIMO_BYTE, destinatari, impronta, leggiRichiesta, presenza, puoEntrare, reteDi } from './regole.js';
 import {
   FINESTRA_MS,
   MASSIMO_PER_FINESTRA,
@@ -117,8 +117,16 @@ async function segnalazioni(richiesta, env) {
   const r = leggiIndirizzo(richiesta.method, richiesta.url);
   if (r.errore) return json({ errore: r.errore }, r.stato);
   const zonaDo = (z) => env.ZONE.get(env.ZONE.idFromName(z));
-  // Solo per contare le segnalazioni di ciascuno: l'indirizzo non si salva.
-  const chi = await impronta(richiesta.headers.get('cf-connecting-ip') ?? 'anonimo');
+  // Solo per contare le segnalazioni e i voti di ciascuno: l'indirizzo non
+  // si salva. Con IPv6 conta la rete (/64), non l'indirizzo: dalla stessa
+  // rete se ne cambiano a volontà.
+  const chi = await impronta(reteDi(richiesta.headers.get('cf-connecting-ip') ?? 'anonimo'));
+  // Le scritture solo in JSON dichiarato: una pagina web qualunque poteva
+  // mandarle dal browser di chi la apre (una POST «text/plain» non chiede
+  // permesso al server).
+  if (richiesta.method === 'POST' && !(richiesta.headers.get('content-type') ?? '').startsWith('application/json')) {
+    return json({ errore: 'serve application/json' }, 415);
+  }
 
   if (r.azione === 'elenco') {
     const liste = await Promise.all(zoneVicine(r.lat, r.lon).map((z) => zonaDo(z).elenco()));
@@ -143,13 +151,11 @@ async function segnalazioni(richiesta, env) {
     return json({ errore: 'JSON non valido' }, 400);
   }
   if (typeof corpo?.ancora !== 'boolean') return json({ errore: 'ancora: vero o falso' }, 400);
-  return json(await zonaDo(r.zona).vota(r.id, corpo.ancora), 200);
+  return json(await zonaDo(r.zona).vota(r.id, corpo.ancora, chi), 200);
 }
 
 /** Una zona di 0,2°: le sue segnalazioni, e chi ne ha fatte troppe di fila. */
 export class Zona extends DurableObject {
-  #recenti = new Map();
-
   async elenco() {
     const ora = Date.now();
     const vive = [];
@@ -164,19 +170,23 @@ export class Zona extends DurableObject {
 
   async aggiungi(nuova, chi) {
     const ora = Date.now();
-    const sue = (this.#recenti.get(chi) ?? []).filter((t) => ora - t < FINESTRA_MS);
+    // Sul disco della zona, non in memoria: scaricato l'oggetto, il conto
+    // ripartiva da zero.
+    const chiave = `r:${String(chi).slice(0, 32)}`;
+    const sue = ((await this.ctx.storage.get(chiave)) ?? []).filter((t) => ora - t < FINESTRA_MS);
     if (sue.length >= MASSIMO_PER_FINESTRA) return { errore: 'troppe segnalazioni, riprova tra poco' };
-    this.#recenti.set(chi, [...sue, ora]);
+    await this.ctx.storage.put(chiave, [...sue, ora]);
     const id = `${zona(nuova.lat, nuova.lon)}~${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`;
     const s = crea(nuova, ora, id);
     await this.ctx.storage.put(`s:${id}`, s);
     return pubblica(s);
   }
 
-  async vota(id, ancora) {
+  async vota(id, ancora, chi = null) {
     const s = await this.ctx.storage.get(`s:${id}`);
     if (!s) return { tolta: true };
-    const n = vota(s, ancora, Date.now());
+    const n = vota(s, ancora, Date.now(), chi);
+    if (n === s) return pubblica(s);
     if (n === null) {
       await this.ctx.storage.delete(`s:${id}`);
       return { tolta: true };

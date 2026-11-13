@@ -63,3 +63,11 @@ test('la presenza ha la forma che leggono app e casa', () => {
   assert.deepEqual(JSON.parse(presenza('app', true)), { relay: 'presente', ruolo: 'app' });
   assert.deepEqual(JSON.parse(presenza('casa', false)), { relay: 'assente', ruolo: 'casa' });
 });
+
+test('la rete che conta per i limiti: IPv4 intero, IPv6 il suo /64', async () => {
+  const { reteDi } = await import('../src/regole.js');
+  assert.equal(reteDi('203.0.113.7'), '203.0.113.7');
+  assert.equal(reteDi('2001:db8:1:2:aaaa::1'), '2001:db8:1:2::/64');
+  assert.equal(reteDi('2001:db8:1:2:bbbb:cccc:dddd:eeee'), '2001:db8:1:2::/64');
+  assert.equal(reteDi('2001:db8::1'), '2001:db8:0:0::/64');
+});
