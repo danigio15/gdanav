@@ -153,15 +153,12 @@ class RendererMappa(
             areaStabile = null
         }
         densita = contenitore.dpi / 160f
-        // Sotto i 900 punti di larghezza la scheda del viaggio è stretta; e
+        // Sotto i 1000 punti di larghezza la scheda del viaggio è stretta; e
         // anche quando la mappa è poco più larga che alta, cioè a mezzo
         // schermo su uno schermo largo («a mezzo schermo si continuano a
-        // tagliare le info nel quadrato di sinistra»: lì la metà passava i
-        // 900 punti e la riga restava quella lunga, tagliata).
-        if (!soloMappa) {
-            PonteAuto.mappaStretta = larghezza / densita < LARGHEZZA_STRETTA_DP ||
-                (altezza > 0 && larghezza.toFloat() / altezza < PROPORZIONE_STRETTA)
-        }
+        // tagliare le info nel quadrato di sinistra»). E si riguarda quando
+        // arriva l'area stabile: vedi [misuraLaScheda].
+        misuraLaScheda()
         MapLibre.getInstance(carContext)
         val p = Presentation(carContext, d.display)
         val contenuto = FrameLayout(p.context)
@@ -305,7 +302,28 @@ class RendererMappa(
             areaVisibile = Rect(area)
             pannello?.area = areaVisibile
         }
+        misuraLaScheda()
         aggiorna()
+    }
+
+    /**
+     * Quanto è stretta la scheda del viaggio ([PonteAuto.strettezza]), dalla
+     * larghezza della mappa.
+     *
+     * «Schermo diviso a metà con la parte grande il quadrato dei dati di
+     * viaggio continua ad essere tagliato»: si guardava solo la superficie,
+     * e solo quando arrivava. Ma a schermo diviso l'altra app può stare sopra
+     * la superficie di tutto lo schermo, e lo dice solo l'area stabile
+     * ([areaPerIlCentro]); e l'area stabile arriva dopo la superficie, o
+     * cambia senza che la superficie cambi. Allora si guarda anche lei, ogni
+     * volta che arriva, e se la scheda cambia il modello si rifà.
+     */
+    private fun misuraLaScheda() {
+        if (soloMappa) return
+        val stabile = areaStabile?.let { dentroLaSuperficie(it).width() }
+        val prima = PonteAuto.strettezza
+        PonteAuto.strettezza = RigaDelViaggioAuto.strettezza(larghezza, altezza, densita, stabile)
+        if (PonteAuto.strettezza != prima && PonteAuto.guida != null) alCambio()
     }
 
     /** Un punto toccato sulla mappa: proprietà, latitudine, longitudine. */
@@ -1117,12 +1135,6 @@ class RendererMappa(
     }
 
     companion object {
-        /** Sotto questa larghezza (in punti) la mappa è a mezzo schermo. */
-        private const val LARGHEZZA_STRETTA_DP = 900f
-
-        /** Larga meno di 1,75 volte l'altezza: è mezzo schermo (lo schermo intero di un'auto è più largo). */
-        private const val PROPORZIONE_STRETTA = 1.75f
-
         private const val VUOTA = "{\"type\":\"FeatureCollection\",\"features\":[]}"
         private const val SORGENTE_IO = "gdanav-io"
         private const val SORGENTE_PERCORSO = "gdanav-percorso"

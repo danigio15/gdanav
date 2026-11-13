@@ -100,6 +100,8 @@ object DiagnosiTraffico {
                 put("altezza", altezza)
                 put("visibile", area(visibile))
                 put("stabile", area(stabile))
+                // La riga del viaggio: 0 lunga, 1 a mezzo schermo, 2 a un terzo.
+                put("scheda", PonteAuto.strettezza)
                 put("sopra", sopra)
                 put("sinistra", sinistra)
                 put("destra", destra)

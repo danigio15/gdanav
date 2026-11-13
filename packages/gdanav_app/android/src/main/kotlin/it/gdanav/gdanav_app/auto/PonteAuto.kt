@@ -178,11 +178,13 @@ object PonteAuto {
     @Volatile var pedaggioNellaStima = false
 
     /**
-     * La mappa ha poco spazio in larghezza (mezzo schermo, accanto a un'altra
-     * app): la riga del viaggio si accorcia ([GuidaAuto.testoDelViaggio]).
-     * Lo dice [RendererMappa] dalla superficie che Android Auto gli dà.
+     * Quanto spazio ha la mappa in larghezza, da [RigaDelViaggioAuto.LARGA]
+     * a [RigaDelViaggioAuto.STRETTISSIMA] (mezzo schermo, un terzo, accanto
+     * a un'altra app): la riga del viaggio si accorcia
+     * ([GuidaAuto.testoDelViaggio]). Lo dice [RendererMappa] dalla superficie
+     * e dall'area stabile che Android Auto gli dà.
      */
-    @Volatile var mappaStretta = false
+    @Volatile var strettezza = RigaDelViaggioAuto.LARGA
 
     /** Le opzioni del percorso e la voce, per il menu. */
     @Volatile var opzioni: Map<String, Any?> = emptyMap()

@@ -19,7 +19,6 @@ import androidx.car.app.navigation.model.TravelEstimate
 import androidx.car.app.navigation.model.Trip
 import androidx.core.graphics.drawable.IconCompat
 import java.util.TimeZone
-import kotlin.math.roundToInt
 
 /**
  * La guida nei modi di Android Auto, gli stessi per tutti: la scheda della
@@ -123,7 +122,7 @@ class GuidaAuto(private val context: Context) {
             g.trafficoMin >= 10 -> stima.setRemainingTimeColor(CarColor.RED)
             g.trafficoMin >= 1 -> stima.setRemainingTimeColor(CarColor.YELLOW)
         }
-        if (conTesto) testoDelViaggio(PonteAuto.cruscotto, g.pedaggio)?.let { stima.setTripText(CarText.create(it)) }
+        if (conTesto) testoDelViaggio(PonteAuto.cruscotto, g.pedaggio)?.let { stima.setTripText(it) }
         return stima.build()
     }
 
@@ -173,72 +172,55 @@ class GuidaAuto(private val context: Context) {
          * rosso sotto il 10%), il pedaggio in ambra come sul telefono; i
          * colori l'auto può ignorarli, il testo resta. `null` se non c'è
          * niente da dire.
-         */
-        /*
-         * [stretto]: la mappa ha mezzo schermo (accanto la musica, il
-         * telefono), e la scheda è più stretta. «Quando sta messo a riquadro
-         * doppio non entra tutto nel riquadro delle info viaggio»: il
-         * pedaggio finiva tagliato («1,0…»). Allora la riga si accorcia:
-         * «🔋 99% → 93%» al posto di «🔋 99% · arrivo 93%», e il pedaggio
-         * senza la parola («1,05 €», in ambra).
+         *
+         * La riga va su una riga sola, e Android Auto taglia coi puntini
+         * quello che non ci sta («Quando sta messo a riquadro doppio non
+         * entra tutto nel riquadro delle info viaggio»: «… · 21° · 1,0…»).
+         * Allora le varianti, dalla più lunga alla più corta
+         * ([RigaDelViaggioAuto.varianti]): l'auto mostra la prima che ci sta.
+         * La prima la sceglie [strettezza], dallo spazio della mappa
+         * (`RendererMappa`), per le auto che guardano solo quella.
          */
         fun testoDelViaggio(
             c: PonteAuto.Cruscotto,
             pedaggio: String?,
-            stretto: Boolean = PonteAuto.mappaStretta,
-        ): CharSequence? {
+            strettezza: Int = PonteAuto.strettezza,
+        ): CarText? {
+            val varianti = RigaDelViaggioAuto.varianti(
+                batteria = c.batteria,
+                stimata = c.batteriaStimata,
+                autonomiaKm = c.autonomiaKm,
+                arrivo = c.arrivoBatteria,
+                meteoEmoji = c.meteoEmoji,
+                temperatura = c.meteoTemperatura,
+                pedaggioLungo = pedaggio,
+                pedaggioBreve = c.pedaggio,
+                strettezza = strettezza,
+            )
+            if (varianti.isEmpty()) return null
+            val testo = CarText.Builder(colorata(varianti.first()))
+            for (v in varianti.drop(1)) testo.addVariant(colorata(v))
+            return testo.build()
+        }
+
+        /** Una variante coi colori dell'auto. */
+        private fun colorata(tratti: List<RigaDelViaggioAuto.Tratto>): CharSequence {
             val testo = android.text.SpannableStringBuilder()
-            fun pezzo(t: String, colore: CarColor? = null) {
-                if (testo.isNotEmpty()) testo.append(" · ")
+            for (t in tratti) {
                 val da = testo.length
-                testo.append(t)
+                testo.append(t.testo)
+                val colore = when (t.colore) {
+                    RigaDelViaggioAuto.Colore.ROSSO -> CarColor.RED
+                    RigaDelViaggioAuto.Colore.VERDE -> CarColor.GREEN
+                    RigaDelViaggioAuto.Colore.AMBRA -> CarColor.createCustom(AMBRA_GIORNO, AMBRA_NOTTE)
+                    null -> null
+                }
                 colore?.let {
                     testo.setSpan(ForegroundCarColorSpan.create(it), da, testo.length, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
                 }
             }
-            val circa = if (c.batteriaStimata) "~" else ""
-            c.batteria?.let { b ->
-                pezzo("🔋$NBSP$circa${b.roundToInt()}%", if (b < 20) CarColor.RED else null)
-                // Stretta: la batteria all'arrivo subito dopo quella di adesso.
-                val arrivo = c.arrivoBatteria
-                if (stretto && arrivo != null) {
-                    testo.append("${NBSP}→$NBSP")
-                    val da = testo.length
-                    testo.append("${arrivo.roundToInt()}%")
-                    testo.setSpan(
-                        ForegroundCarColorSpan.create(if (arrivo < 10) CarColor.RED else CarColor.GREEN),
-                        da,
-                        testo.length,
-                        Spanned.SPAN_INCLUSIVE_EXCLUSIVE,
-                    )
-                }
-                c.autonomiaKm?.let { pezzo("$circa${it.roundToInt()}${NBSP}km") }
-                c.arrivoBatteria?.takeIf { !stretto }?.let { v ->
-                    if (testo.isNotEmpty()) testo.append(" · ")
-                    testo.append("arrivo$NBSP")
-                    val da = testo.length
-                    testo.append("${v.roundToInt()}%")
-                    testo.setSpan(
-                        ForegroundCarColorSpan.create(if (v < 10) CarColor.RED else CarColor.GREEN),
-                        da,
-                        testo.length,
-                        Spanned.SPAN_INCLUSIVE_EXCLUSIVE,
-                    )
-                }
-            }
-            c.meteoTemperatura?.let { m -> pezzo("${c.meteoEmoji?.let { "$it$NBSP" } ?: ""}${m.roundToInt()}°") }
-            val costo = if (stretto) c.pedaggio ?: pedaggio?.removeSuffix(" pedaggio") else pedaggio
-            if (!costo.isNullOrEmpty()) pezzo(costo, CarColor.createCustom(AMBRA_GIORNO, AMBRA_NOTTE))
-            return testo.takeIf { it.isNotEmpty() }
+            return testo
         }
-
-        /**
-         * Lo spazio che non va a capo: «Guarda il meteo», il sole restava in
-         * fondo a una riga e i gradi andavano sotto. Dentro un pezzo (il sole e
-         * i gradi, «arrivo» e la percentuale, i km) non si va a capo; si va a
-         * capo solo fra un pezzo e l'altro, dove c'è il «·».
-         */
-        private const val NBSP = "\u00A0"
 
         /** L'ambra della pastiglia del pedaggio sul telefono, di giorno e di notte. */
         private val AMBRA_GIORNO = android.graphics.Color.rgb(138, 83, 0)
