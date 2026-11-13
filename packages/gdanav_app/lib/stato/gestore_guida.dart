@@ -248,6 +248,18 @@ class GestoreGuida extends ChangeNotifier {
     return k == null ? null : (km: k, dallAuto: false);
   }
 
+  /// I km di autonomia che resteranno all'arrivo: l'autonomia di adesso
+  /// ([autonomiaOra]) in proporzione alla batteria che resterà
+  /// ([batteriaArrivo]), soste comprese. Nella riga del viaggio, al posto dei
+  /// km di adesso: «nel riquadro info viaggi cambia i km auto con quelli
+  /// attuali in quelli all'arrivo». `null` se manca uno dei tre.
+  double? get autonomiaArrivoKm {
+    final km = autonomiaOra?.km, arrivo = batteriaArrivo;
+    final ora = batteriaOra?.valore ?? auto.stato?.batteria;
+    if (km == null || arrivo == null || ora == null || ora <= 0) return null;
+    return math.max(0, km * arrivo / ora);
+  }
+
   /// Il consumo in kWh ogni 100 km: quello vero dopo qualche chilometro con i
   /// dati dell'auto, altrimenti quello previsto per il viaggio.
   double? get consumoKwh100 => _consumoMisurato ?? _consumoDelPiano;

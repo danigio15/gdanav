@@ -189,7 +189,8 @@ class GuidaAuto(private val context: Context) {
             val varianti = RigaDelViaggioAuto.varianti(
                 batteria = c.batteria,
                 stimata = c.batteriaStimata,
-                autonomiaKm = c.autonomiaKm,
+                // I km che resteranno all'arrivo; senza, quelli di adesso.
+                autonomiaKm = c.autonomiaArrivoKm ?: c.autonomiaKm,
                 arrivo = c.arrivoBatteria,
                 meteoEmoji = c.meteoEmoji,
                 temperatura = c.meteoTemperatura,

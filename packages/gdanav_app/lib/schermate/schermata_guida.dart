@@ -1043,7 +1043,8 @@ class _Fondo extends StatelessWidget {
     return pezziDelViaggio(
       batteria: ora?.valore,
       stimata: ora != null && !ora.misurata,
-      autonomiaKm: elettrica ? guida.autonomiaOra?.km : null,
+      // I km che resteranno all'arrivo; senza la batteria all'arrivo, quelli di adesso.
+      autonomiaKm: elettrica ? guida.autonomiaArrivoKm ?? guida.autonomiaOra?.km : null,
       arrivo: elettrica ? guida.batteriaArrivo : null,
       meteoEmoji: previsione?.cielo.emoji,
       temperaturaC: previsione?.temperaturaC,

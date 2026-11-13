@@ -7,7 +7,7 @@ import 'package:gdanav_app/componenti/riga_del_viaggio.dart';
 void main() {
   String riga(List<PezzoViaggio> pezzi) => [for (final p in pezzi) '${p.prima}${p.testo}'].join(' · ');
 
-  test('come in auto: batteria, km, arrivo e meteo', () {
+  test('come in auto: batteria, arrivo, km all\'arrivo e meteo', () {
     final pezzi = pezziDelViaggio(
       batteria: 51.4,
       autonomiaKm: 200.2,
@@ -15,15 +15,15 @@ void main() {
       meteoEmoji: '☀',
       temperaturaC: 12.3,
     );
-    expect(riga(pezzi), '🔋 51% · 200 km · arrivo 46% · ☀ 12°');
+    expect(riga(pezzi), '🔋 51% · arrivo 46% · 200 km · ☀ 12°');
     expect(pezzi.firstWhere((p) => p.chiave == 'batteria-arrivo').tono, TonoPezzo.verde);
   });
 
   test('una stima si scrive col «~», e sotto il 20% la batteria è rossa', () {
     final pezzi = pezziDelViaggio(batteria: 18, stimata: true, autonomiaKm: 60, arrivo: 7);
-    expect(riga(pezzi), '🔋 ~18% · ~60 km · arrivo 7%');
+    expect(riga(pezzi), '🔋 ~18% · arrivo 7% · ~60 km');
     expect(pezzi.first.tono, TonoPezzo.rosso);
-    expect(pezzi.last.tono, TonoPezzo.rosso);
+    expect(pezzi.firstWhere((p) => p.chiave == 'batteria-arrivo').tono, TonoPezzo.rosso);
   });
 
   test("l'auto termica: niente batteria, il meteo resta", () {

@@ -79,10 +79,10 @@ object RigaDelViaggioAuto {
      * Le varianti della riga, dalla più lunga che serve a [strettezza] alla
      * più corta; vuota se non c'è niente da dire.
      *
-     * - larga: «🔋 41% · 169 km · arrivo 38% · ☀ 21° · ~1,05 € pedaggio»
-     * - stretta: «🔋 41% → 38% · 169 km · ☀ 21° · ~1,05 €»
-     * - più stretta: «41%→38% · 169 km · 21° · ~1,05 €»
-     * - la più corta: «41%→38% 169km 21° ~1,05€»
+     * - larga: «🔋 41% · arrivo 38% · 155 km · ☀ 21° · ~1,05 € pedaggio»
+     * - stretta: «🔋 41% → 38% · 155 km · ☀ 21° · ~1,05 €»
+     * - più stretta: «41%→38% · 155 km · 21° · ~1,05 €»
+     * - la più corta: «41%→38% 155km 21° ~1,05€»
      *
      * [pedaggioLungo] è quello della scheda («~1,05 € pedaggio»),
      * [pedaggioBreve] quello della barra («~1,05 €»).
@@ -140,8 +140,10 @@ object RigaDelViaggioAuto {
             val ora = Tratto("$pila$circa${b.roundToInt()}%", if (b < 20) Colore.ROSSO else null)
             val dopo = arrivo?.let { Tratto("${it.roundToInt()}%", if (it < 10) Colore.ROSSO else Colore.VERDE) }
             if (dopo != null && !conParole) pezzo(ora, Tratto(freccia), dopo) else pezzo(ora)
-            autonomiaKm?.let { pezzo(Tratto("$circa${it.roundToInt()}${spazio}km")) }
+            // I km dopo l'arrivo: sono quelli che resteranno all'arrivo
+            // («cambia i km auto con quelli attuali in quelli all'arrivo»).
             if (dopo != null && conParole) pezzo(Tratto("arrivo$NBSP"), dopo)
+            autonomiaKm?.let { pezzo(Tratto("$circa${it.roundToInt()}${spazio}km")) }
         }
         temperatura?.let { m ->
             val sole = meteoEmoji?.takeIf { conSimboli && it.isNotEmpty() }?.let { "$it$NBSP" } ?: ""

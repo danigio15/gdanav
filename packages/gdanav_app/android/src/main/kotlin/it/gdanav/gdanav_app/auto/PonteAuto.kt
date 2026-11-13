@@ -129,6 +129,8 @@ object PonteAuto {
         val velocita: Double? = null,
         val limite: Int? = null,
         val arrivoBatteria: Double? = null,
+        /** I km di autonomia che resteranno all'arrivo (la riga del viaggio). */
+        val autonomiaArrivoKm: Double? = null,
         val sostaNome: String? = null,
         val sostaKm: Double? = null,
         val sostaBatteria: Double? = null,
@@ -404,6 +406,7 @@ object PonteAuto {
                 velocita = numero(call, "velocita"),
                 limite = numero(call, "limite")?.toInt(),
                 arrivoBatteria = numero(call, "arrivo_batteria"),
+                autonomiaArrivoKm = numero(call, "autonomia_arrivo_km"),
                 sostaNome = call.argument<String>("sosta_nome"),
                 sostaKm = numero(call, "sosta_km"),
                 sostaBatteria = numero(call, "sosta_batteria"),

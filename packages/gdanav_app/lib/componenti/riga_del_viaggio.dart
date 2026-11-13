@@ -17,7 +17,8 @@ const _nbsp = '\u00A0';
 const _pila = '🔋$_nbsp';
 
 /// La riga del viaggio, la stessa della scheda dell'arrivo di Android Auto
-/// (`GuidaAuto.testoDelViaggio`): «🔋 51% · 200 km · arrivo 46% · ☀ 12°».
+/// (`GuidaAuto.testoDelViaggio`): «🔋 51% · arrivo 46% · 180 km · ☀ 12°», coi
+/// km che resteranno all'arrivo.
 ///
 /// «Dati auto e km all'arrivo sul telefono devono essere uguali ad Android
 /// Auto»: le regole stanno qui, una volta sola. La batteria «~51%» se è una
@@ -42,8 +43,6 @@ List<PezzoViaggio> pezziDelViaggio({
         testo: '$_pila$circa${batteria.round()}%',
         tono: batteria < 20 ? TonoPezzo.rosso : TonoPezzo.normale,
       ),
-      if (autonomiaKm != null)
-        (chiave: 'autonomia', prima: '', testo: '$circa${autonomiaKm.round()}${_nbsp}km', tono: TonoPezzo.normale),
       if (arrivo != null)
         (
           chiave: 'batteria-arrivo',
@@ -51,6 +50,10 @@ List<PezzoViaggio> pezziDelViaggio({
           testo: '${arrivo.round()}%',
           tono: arrivo < 10 ? TonoPezzo.rosso : TonoPezzo.verde,
         ),
+      // Dopo l'arrivo: in guida sono i km che resteranno all'arrivo
+      // (`GestoreGuida.autonomiaArrivoKm`).
+      if (autonomiaKm != null)
+        (chiave: 'autonomia', prima: '', testo: '$circa${autonomiaKm.round()}${_nbsp}km', tono: TonoPezzo.normale),
     ],
     if (temperaturaC != null)
       (
