@@ -59,6 +59,7 @@ class Regia3d {
     this.piuVicina = 0,
     this.zoomScelto,
     this.inclinazione,
+    this.inAuto = false,
     Future<Uint8List?> Function(int z, int x, int y)? edifici,
   }) : edifici = edifici ?? GestoreEdifici.attuale?.tessera;
 
@@ -120,6 +121,9 @@ class Regia3d {
   /// L'inclinazione della telecamera, in gradi; `null`: quella della vista.
   /// Sull'auto più dall'alto: «voglio vederla un po' più dall'alto».
   final double? inclinazione;
+
+  /// La pagina è quella dello schermo dell'auto (vedi `msgOpzioni`).
+  final bool inAuto;
 
   var _caricata = false;
   var _pronta = false;
@@ -201,7 +205,17 @@ class Regia3d {
   }
 
   /// La pagina che va in secondo piano (o torna): smette di disegnare.
-  void pausa(bool si) => _manda(msgPausa(si));
+  ///
+  /// Si ricorda anche prima che la pagina sia caricata: la sezione nascosta
+  /// (il navigatore montato dietro la plancia di GdAHome) chiede la pausa
+  /// subito, quando la pagina ancora non c'è, e quel messaggio andava perso:
+  /// la scena partiva e disegnava, nascosta. La riceve in [_tutto].
+  void pausa(bool si) {
+    _pausa = si;
+    _manda(msgPausa(si));
+  }
+
+  var _pausa = false;
 
   /// Un messaggio dalla pagina, così come arriva.
   void dallaMappa(String testo) {
@@ -240,6 +254,8 @@ class Regia3d {
     _lettaMandata = null;
     _modoMandato = null;
     _sopraMandato = null;
+    // La pausa prima di tutto: la mappa non deve partire a disegnare.
+    if (_pausa) _manda(msgPausa(true));
     opzioni(forza: true);
     _stile();
     // Le persone sono un cerchio e due scritte, senza immagini: subito.
@@ -264,7 +280,7 @@ class Regia3d {
     _notte = n;
     _vistaMandata = v;
     _segnapostoMandato = segnaposto;
-    _manda(msgOpzioni(notte: n, vista: v, segnaposto: segnaposto, edifici: edifici != null));
+    _manda(msgOpzioni(notte: n, vista: v, segnaposto: segnaposto, edifici: edifici != null, inAuto: inAuto));
     if (cambiaNotte) _stile();
   }
 

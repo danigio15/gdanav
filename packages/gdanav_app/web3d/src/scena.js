@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { generatore } from './caso.js';
 import { pezziDelNastro } from './percorso.js';
+import { Condivise } from './scorte.js';
 import { CAMPATA, NASTRI, PERIODO_STRADA, PIANO, STILI_FACCIATA } from './tessera.js';
 import { GIORNO, NOTTE, SOLE } from './tavolozza.js';
 
@@ -762,7 +763,16 @@ export class Scena {
     this.rivestiNastri();
     // Le tessere già costruite: materiali nuovi, colori della notte o del giorno.
     for (const t of this.tessere.values()) this.vestiTessera(t);
-    if (vecchi) for (const m of Object.values(vecchi)) if (m.dispose) m.dispose();
+    // I materiali di prima e le loro trame (asfalto, facciate, ombre, luci):
+    // `dispose()` del materiale non libera le trame, che restavano nella
+    // scheda grafica a ogni giorno ↔ notte. L'atlante degli alberi no: è lo
+    // stesso per giorno e notte.
+    if (vecchi) {
+      for (const m of Object.values(vecchi)) {
+        for (const t of [m.map, m.emissiveMap, m.alphaMap]) if (t && t !== this.atlanteAlberi) t.dispose();
+        m.dispose?.();
+      }
+    }
     if (this.auto) this.creaAuto(this.colorAuto);
   }
 
@@ -1104,6 +1114,8 @@ export class Scena {
     for (const o of voce.luci ?? []) {
       voce.gruppo.remove(o);
       if (o.isPoints) o.geometry.dispose();
+      // Le pozze: la geometria è in comune, le matrici sono loro.
+      else if (o.isInstancedMesh) o.dispose();
     }
     voce.luci = [];
     const l = voce.dati.luci;
@@ -1135,7 +1147,13 @@ export class Scena {
     for (const o of [...v.mesh, ...(v.luci ?? [])]) {
       // Le geometrie delle istanze sono in comune: si buttano solo le matrici.
       if (o.isInstancedMesh) o.dispose();
-      else o.geometry.dispose();
+      else {
+        // I colori dell'altra ora del giorno (vedi [geometria]): se sono già
+        // stati nella scheda grafica, si buttano con gli altri.
+        const c = o.geometry.userData.colori;
+        if (c) o.geometry.setAttribute('coloreAltro', c[o.geometry.getAttribute('color') === c[0] ? 1 : 0]);
+        o.geometry.dispose();
+      }
     }
     this.tessere.delete(chiave);
   }
@@ -1437,20 +1455,25 @@ export class Scena {
    */
   impostaSegni(segni) {
     this.segni ??= new Map();
-    this.trameSegni ??= new Map();
+    // Una trama per immagine, contata: quando l'ultimo segno che la usa se ne
+    // va, si libera anche nella scheda grafica (`material.dispose()` non lo fa).
+    this.trameSegni ??= new Condivise(
+      (immagine) => {
+        const t = new THREE.Texture(immagine);
+        t.colorSpace = THREE.SRGBColorSpace;
+        t.needsUpdate = true;
+        return t;
+      },
+      (t) => t.dispose(),
+    );
     const tieni = new Set();
     for (const g of segni) {
       tieni.add(g.chiave);
       let sp = this.segni.get(g.chiave);
       if (!sp) {
-        let t = this.trameSegni.get(g.immagine);
-        if (!t) {
-          t = new THREE.Texture(g.immagine);
-          t.colorSpace = THREE.SRGBColorSpace;
-          t.needsUpdate = true;
-          this.trameSegni.set(g.immagine, t);
-        }
+        const t = this.trameSegni.prendi(g.immagine);
         sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, depthWrite: false, sizeAttenuation: false, transparent: true, fog: false }));
+        sp.userData.immagine = g.immagine;
         sp.center.set(0.5, g.centro ?? 0);
         this.segni.set(g.chiave, sp);
         this.mondo.add(sp);
@@ -1467,6 +1490,7 @@ export class Scena {
       if (tieni.has(k)) continue;
       this.mondo.remove(sp);
       sp.material.dispose();
+      this.trameSegni.lascia(sp.userData.immagine);
       this.segni.delete(k);
     }
   }

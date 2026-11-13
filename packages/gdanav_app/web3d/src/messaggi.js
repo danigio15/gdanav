@@ -15,7 +15,8 @@ const CONTROLLI = {
   opzioni: (m) =>
     typeof m.notte === 'boolean' &&
     (m.vista === undefined || ['inclinata', 'immersiva'].includes(m.vista)) &&
-    (m.auto === undefined || /^#[0-9a-fA-F]{6}$/.test(m.auto)),
+    (m.auto === undefined || /^#[0-9a-fA-F]{6}$/.test(m.auto)) &&
+    (m.inAuto === undefined || typeof m.inAuto === 'boolean'),
   stile: (m) => m.stile && typeof m.stile === 'object' && Array.isArray(m.stile.layers),
   immagine: (m) => typeof m.nome === 'string' && typeof m.png === 'string' && (m.ratio === undefined || numero(m.ratio)),
   sorgente: (m) => typeof m.id === 'string' && m.dati && typeof m.dati === 'object',

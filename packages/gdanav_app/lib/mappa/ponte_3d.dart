@@ -40,17 +40,22 @@ double _sei(double x) => (x * 1e6).roundToDouble() / 1e6;
 ///
 /// [edifici]: l'app sa dare gli edifici di Overture ([msgEdifici]); la
 /// pagina li chiede per ogni tessera che costruisce.
+///
+/// [inAuto]: la pagina è quella dello schermo dell'auto (Android Auto): lì
+/// disegna sempre a trenta fotogrammi al secondo.
 Map<String, Object?> msgOpzioni({
   required bool notte,
   required VistaMappa vista,
   required Segnaposto segnaposto,
   bool edifici = false,
+  bool inAuto = false,
 }) => _m('opzioni', {
   'notte': notte,
   'vista': vista == VistaMappa.immersiva ? 'immersiva' : 'inclinata',
   'auto': coloreAuto3d(segnaposto),
   'icona': segnaposto.immagine,
   if (edifici) 'edifici': true,
+  if (inAuto) 'inAuto': true,
 });
 
 /// Gli edifici di Overture della tessera [z]/[x]/[y] (una tessera vettoriale

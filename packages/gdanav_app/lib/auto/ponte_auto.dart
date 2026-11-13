@@ -714,6 +714,7 @@ class PonteAuto {
     piuVicina: piuVicina3dInAuto,
     zoomScelto: () => _stato3d.zoom,
     inclinazione: inclinazione3dInAuto,
+    inAuto: true,
   )..avvia();
 
   void _stili() {

@@ -78,3 +78,22 @@ export function marginiAiLati(sinistra, destra, larghezza) {
   }
   return [s, d];
 }
+
+/**
+ * Gli ultimi [metri] (almeno) della linea `[lon, lat, lon, lat, …]`
+ * [lonlat], contati a ritroso dall'ultimo punto; la linea intera se è più
+ * corta. Le distanze sono quelle piatte (un metro su qualche migliaio):
+ * basta per sapere da dove cominciare.
+ */
+export function codaDi(lonlat, metri) {
+  const n = lonlat.length;
+  if (n < 4) return lonlat;
+  const mLat = (Math.PI / 180) * RAGGIO_TERRA;
+  let s = 0;
+  for (let i = n - 4; i >= 0; i -= 2) {
+    const mLon = mLat * Math.cos((lonlat[i + 1] * Math.PI) / 180);
+    s += Math.hypot((lonlat[i + 2] - lonlat[i]) * mLon, (lonlat[i + 3] - lonlat[i + 1]) * mLat);
+    if (s >= metri) return i === 0 ? lonlat : lonlat.slice(i);
+  }
+  return lonlat;
+}
