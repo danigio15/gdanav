@@ -193,11 +193,17 @@ String coloreAuto3d(Segnaposto s) => switch (s) {
 };
 
 /// Lo zoom della mappa 3D in guida: vicino come il prototipo approvato, più
-/// lontano su una strada veloce con la prossima manovra lontana
-/// ([zoomLontanoInGuida], lo stesso della mappa di sempre e dell'auto).
-double zoom3d(VistaMappa vista, {required double velocitaStradaKmh, required double allaProssimaM}) =>
+/// lontano su una strada veloce con la prossima manovra lontana e, poco, in
+/// marcia in città; più vicino arrivando a una svolta di tipo
+/// [tipoProssima] ([zoomInGuida]).
+double zoom3d(
+  VistaMappa vista, {
+  required double velocitaStradaKmh,
+  required double allaProssimaM,
+  int? tipoProssima,
+}) =>
     (vista == VistaMappa.immersiva ? 18.3 : 17.9) +
-    zoomLontanoInGuida(velocitaStradaKmh: velocitaStradaKmh, allaProssimaM: allaProssimaM);
+    zoomInGuida(velocitaStradaKmh: velocitaStradaKmh, allaProssimaM: allaProssimaM, tipoProssima: tipoProssima);
 
 /// Un messaggio dalla pagina.
 sealed class MessaggioDalla3d {

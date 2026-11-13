@@ -18,7 +18,7 @@ import 'package:gdanav_core/gdanav_core.dart'
         diQuantoSiGira,
         telecameraLibera,
         versoDiLa,
-        zoomLontanoInGuida;
+        zoomInGuida;
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../componenti/icona_manovra.dart' show bandieraArrivoPng, puntaManovraPng;
@@ -413,15 +413,17 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
   /// Quanto ci mette lo zoom a cambiare: lento, che non sembri un salto.
   static const _tauZoom = 1500.0;
 
-  /// Lo zoom che si vuole in guida: vicino, e più lontano su una strada veloce
-  /// con la prossima manovra lontana (`zoomLontanoInGuida`, come sull'auto).
-  /// La strada la dice il percorso, non il tachimetro: frenando in autostrada
-  /// la mappa non si avvicina.
+  /// Lo zoom che si vuole in guida: vicino, più lontano su una strada veloce
+  /// con la prossima manovra lontana, un poco in marcia in città, e più
+  /// vicino arrivando a una svolta (`zoomInGuida`, come sull'auto). La strada
+  /// la dice il percorso, non il tachimetro: frenando in autostrada la mappa
+  /// non si avvicina.
   double _zoomInGuida(GestoreGuida g) =>
       (_immersiva ? 18.0 : (_inclinata ? 17.0 : 16.0)) +
-      zoomLontanoInGuida(
+      zoomInGuida(
         velocitaStradaKmh: g.avanzamento?.velocitaStradaKmh ?? 0,
         allaProssimaM: _allaProssima(g.avanzamento),
+        tipoProssima: g.avanzamento?.prossima?.tipo,
       );
 
   /// Fin dove non si gira: la prossima manovra, o l'arrivo se non ce ne sono più.

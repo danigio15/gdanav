@@ -379,6 +379,7 @@ class Regia3d {
               vista(),
               velocitaStradaKmh: a?.velocitaStradaKmh ?? 0,
               allaProssimaM: a == null ? 0 : (a.prossima == null ? a.restantiM : a.allaProssimaM),
+              tipoProssima: a?.prossima?.tipo,
             ) +
             piuVicina +
             (zoomScelto?.call() ?? 0),
