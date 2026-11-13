@@ -152,11 +152,24 @@ class _SchermataGuidaState extends State<SchermataGuida> {
       unawaited(controllo.carica(a.vistaMappa(), nonVa: a.aumentataNonVa(), prima: a.vistaPrimaDellAumentata()));
     }
     widget.guida.avvia();
-    // Il telefono sul supporto non si tocca: senza chiederlo, il sistema
-    // abbassava lo schermo e poi lo spegneva (`SchermoAcceso`).
-    unawaited(SchermoAcceso.tieni(true));
     if (widget.segnalazioni case final seg?) _avvisi = AvvisiStrada.di(widget.guida, seg);
     if (widget.ztl case final z?) _ztl = AvvisiZtl.di(widget.guida, z);
+  }
+
+  /* Il telefono sul supporto non si tocca: senza chiederlo, il sistema
+   * abbassava lo schermo e poi lo spegneva (`SchermoAcceso`). Ma solo quando
+   * la guida si vede: dentro GdAHome, con la guida partita dall'auto e la
+   * sezione del navigatore nascosta ([TickerMode] spento), lo schermo restava
+   * acceso per sempre sopra la plancia («surriscaldamento atroce»). */
+  bool? _schermoTenuto;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final siVede = TickerMode.valuesOf(context).enabled;
+    if (siVede == _schermoTenuto) return;
+    _schermoTenuto = siVede;
+    unawaited(SchermoAcceso.tieni(siVede));
   }
 
   @override

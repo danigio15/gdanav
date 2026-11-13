@@ -115,7 +115,16 @@ class _Mappa3dState extends State<Mappa3d> {
     )..avvia();
     unawaited(_avvia());
     widget.controllo.addListener(_comandi);
-    _vita = AppLifecycleListener(onHide: () => _regia.pausa(true), onShow: () => _regia.pausa(false));
+    _vita = AppLifecycleListener(
+      onHide: () {
+        _inSecondoPiano = true;
+        _aggiornaPausa();
+      },
+      onShow: () {
+        _inSecondoPiano = false;
+        _aggiornaPausa();
+      },
+    );
   }
 
   Future<void> _avvia() async {
@@ -177,6 +186,32 @@ class _Mappa3dState extends State<Mappa3d> {
     // Il tema (giorno o notte) arriva da qui.
     _notte = Theme.of(context).brightness == Brightness.dark;
     _regia.opzioni();
+    _nascosta = !TickerMode.valuesOf(context).enabled;
+    _aggiornaPausa();
+  }
+
+  /* La scena si ferma anche quando non si vede, non solo con l'app in
+   * secondo piano.
+   *
+   * Dal campo: «surriscaldamento atroce del telefono, e improvvisamente è
+   * crashato», con GdAHome aperta sulla plancia e la guida in auto. Dentro
+   * GdAHome il navigatore è una sezione che resta montata anche quando se ne
+   * guarda un'altra, e quando la guida parte dall'auto anche il telefono
+   * apre la sua: la scena 3D del telefono continuava a disegnare, nascosta
+   * dietro la plancia, insieme a quella dell'auto — due scene 3D intere, più
+   * la plancia animata. GdAHome le sezioni nascoste le dice con [TickerMode]
+   * spento (la stessa cosa che ferma le animazioni di Flutter): qui lo si
+   * legge, e la scena va in pausa finché non torna a vedersi. Fuori da
+   * GdAHome [TickerMode] non c'è, e vale «si vede». */
+  bool _inSecondoPiano = false;
+  bool _nascosta = false;
+  bool _inPausa = false;
+
+  void _aggiornaPausa() {
+    final pausa = _inSecondoPiano || _nascosta;
+    if (pausa == _inPausa) return;
+    _inPausa = pausa;
+    _regia.pausa(pausa);
   }
 
   @override
