@@ -623,8 +623,8 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         canvas.drawText("$limite", cx, cy + numero.textSize * 0.35f, numero)
     }
 
-    private fun distanza(m: Double): String =
-        if (m < 1000) "${(Math.round(m / 10.0) * 10)} m" else String.format(java.util.Locale.ITALY, "%.1f km", m / 1000)
+    /** Come sul telefono: vedi [GuidaAuto.distanzaTesto]. */
+    private fun distanza(m: Double): String = GuidaAuto.distanzaTesto(m)
 
     private fun accorcia(s: String, n: Int) = if (s.length <= n) s else s.take(n - 1) + "…"
 

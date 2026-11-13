@@ -33,6 +33,20 @@ export function leggiRichiesta(url) {
   return { canale, ruolo, accesso };
 }
 
+/**
+ * L'indirizzo che conta per i limiti: con IPv4 l'indirizzo, con IPv6 la sua
+ * rete /64 (i primi quattro gruppi), che chi ce l'ha cambia a volontà.
+ */
+export function reteDi(ip) {
+  const t = String(ip ?? '').trim().toLowerCase();
+  if (!t.includes(':')) return t;
+  const [prima, dopo] = t.split('::');
+  const a = prima ? prima.split(':') : [];
+  const b = dopo !== undefined ? (dopo ? dopo.split(':') : []) : [];
+  const gruppi = dopo !== undefined ? [...a, ...Array(Math.max(0, 8 - a.length - b.length)).fill('0'), ...b] : a;
+  return gruppi.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, '')).join(':') + '::/64';
+}
+
 export async function impronta(testo) {
   const byte = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(testo));
   return [...new Uint8Array(byte)].map((b) => b.toString(16).padStart(2, '0')).join('');

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { marginiAiLati } from '../src/geo.js';
+import { codaDi, marginiAiLati } from '../src/geo.js';
 
 test("l'auto sta in mezzo alla parte libera, anche quando è meno di metà schermo", () => {
   // Lo schermo intero: le schede di Android Auto a sinistra, per un terzo.
@@ -17,4 +17,19 @@ test("l'auto sta in mezzo alla parte libera, anche quando è meno di metà scher
   assert.ok(Math.abs(a + b - 630) < 1e-9);
   assert.ok(Math.abs(a / b - 3) < 1e-9);
   assert.deepEqual(marginiAiLati(Number.NaN, -5, 900), [0, 0]);
+});
+
+test('la coda di una traccia: gli ultimi metri, non tutta', () => {
+  // Diecimila punti verso est, uno ogni otto metri circa all'equatore.
+  const passo = 8 / 111195;
+  const lonlat = [];
+  for (let i = 0; i < 10000; i++) lonlat.push(i * passo, 0);
+  const c = codaDi(lonlat, 1800);
+  assert.equal(c.length % 2, 0);
+  assert.deepEqual(c.slice(-2), lonlat.slice(-2), "finisce dove finisce la traccia");
+  const metri = (c.at(-2) - c[0]) * 111195;
+  assert.ok(metri >= 1799.9 && metri < 1820, `${metri}`);
+  // Più corta: tutta.
+  assert.equal(codaDi(lonlat.slice(0, 40), 1800).length, 40);
+  assert.deepEqual(codaDi([], 100), []);
 });

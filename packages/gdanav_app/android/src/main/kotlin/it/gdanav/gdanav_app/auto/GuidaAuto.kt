@@ -19,7 +19,6 @@ import androidx.car.app.navigation.model.TravelEstimate
 import androidx.car.app.navigation.model.Trip
 import androidx.core.graphics.drawable.IconCompat
 import java.util.TimeZone
-import kotlin.math.roundToInt
 
 /**
  * La guida nei modi di Android Auto, gli stessi per tutti: la scheda della
@@ -123,7 +122,7 @@ class GuidaAuto(private val context: Context) {
             g.trafficoMin >= 10 -> stima.setRemainingTimeColor(CarColor.RED)
             g.trafficoMin >= 1 -> stima.setRemainingTimeColor(CarColor.YELLOW)
         }
-        if (conTesto) testoDelViaggio(PonteAuto.cruscotto, g.pedaggio)?.let { stima.setTripText(CarText.create(it)) }
+        if (conTesto) testoDelViaggio(PonteAuto.cruscotto, g.pedaggio)?.let { stima.setTripText(it) }
         return stima.build()
     }
 
@@ -173,86 +172,97 @@ class GuidaAuto(private val context: Context) {
          * rosso sotto il 10%), il pedaggio in ambra come sul telefono; i
          * colori l'auto può ignorarli, il testo resta. `null` se non c'è
          * niente da dire.
-         */
-        /*
-         * [stretto]: la mappa ha mezzo schermo (accanto la musica, il
-         * telefono), e la scheda è più stretta. «Quando sta messo a riquadro
-         * doppio non entra tutto nel riquadro delle info viaggio»: il
-         * pedaggio finiva tagliato («1,0…»). Allora la riga si accorcia:
-         * «🔋 99% → 93%» al posto di «🔋 99% · arrivo 93%», e il pedaggio
-         * senza la parola («1,05 €», in ambra).
+         *
+         * La riga va su una riga sola, e Android Auto taglia coi puntini
+         * quello che non ci sta («Quando sta messo a riquadro doppio non
+         * entra tutto nel riquadro delle info viaggio»: «… · 21° · 1,0…»).
+         * Allora le varianti, dalla più lunga alla più corta
+         * ([RigaDelViaggioAuto.varianti]): l'auto mostra la prima che ci sta.
+         * La prima la sceglie [strettezza], dallo spazio della mappa
+         * (`RendererMappa`), per le auto che guardano solo quella.
          */
         fun testoDelViaggio(
             c: PonteAuto.Cruscotto,
             pedaggio: String?,
-            stretto: Boolean = PonteAuto.mappaStretta,
-        ): CharSequence? {
+            strettezza: Int = PonteAuto.strettezza,
+        ): CarText? {
+            val varianti = RigaDelViaggioAuto.varianti(
+                batteria = c.batteria,
+                stimata = c.batteriaStimata,
+                // I km che resteranno all'arrivo; senza, quelli di adesso.
+                autonomiaKm = c.autonomiaArrivoKm ?: c.autonomiaKm,
+                arrivo = c.arrivoBatteria,
+                meteoEmoji = c.meteoEmoji,
+                temperatura = c.meteoTemperatura,
+                pedaggioLungo = pedaggio,
+                pedaggioBreve = c.pedaggio,
+                strettezza = strettezza,
+            )
+            if (varianti.isEmpty()) return null
+            val testo = CarText.Builder(colorata(varianti.first()))
+            for (v in varianti.drop(1)) testo.addVariant(colorata(v))
+            return testo.build()
+        }
+
+        /** Una variante coi colori dell'auto. */
+        private fun colorata(tratti: List<RigaDelViaggioAuto.Tratto>): CharSequence {
             val testo = android.text.SpannableStringBuilder()
-            fun pezzo(t: String, colore: CarColor? = null) {
-                if (testo.isNotEmpty()) testo.append(" · ")
+            for (t in tratti) {
                 val da = testo.length
-                testo.append(t)
+                testo.append(t.testo)
+                val colore = when (t.colore) {
+                    RigaDelViaggioAuto.Colore.ROSSO -> CarColor.RED
+                    RigaDelViaggioAuto.Colore.VERDE -> CarColor.GREEN
+                    RigaDelViaggioAuto.Colore.AMBRA -> CarColor.createCustom(AMBRA_GIORNO, AMBRA_NOTTE)
+                    null -> null
+                }
                 colore?.let {
                     testo.setSpan(ForegroundCarColorSpan.create(it), da, testo.length, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
                 }
             }
-            val circa = if (c.batteriaStimata) "~" else ""
-            c.batteria?.let { b ->
-                pezzo("🔋$NBSP$circa${b.roundToInt()}%", if (b < 20) CarColor.RED else null)
-                // Stretta: la batteria all'arrivo subito dopo quella di adesso.
-                val arrivo = c.arrivoBatteria
-                if (stretto && arrivo != null) {
-                    testo.append("${NBSP}→$NBSP")
-                    val da = testo.length
-                    testo.append("${arrivo.roundToInt()}%")
-                    testo.setSpan(
-                        ForegroundCarColorSpan.create(if (arrivo < 10) CarColor.RED else CarColor.GREEN),
-                        da,
-                        testo.length,
-                        Spanned.SPAN_INCLUSIVE_EXCLUSIVE,
-                    )
-                }
-                c.autonomiaKm?.let { pezzo("$circa${it.roundToInt()}${NBSP}km") }
-                c.arrivoBatteria?.takeIf { !stretto }?.let { v ->
-                    if (testo.isNotEmpty()) testo.append(" · ")
-                    testo.append("arrivo$NBSP")
-                    val da = testo.length
-                    testo.append("${v.roundToInt()}%")
-                    testo.setSpan(
-                        ForegroundCarColorSpan.create(if (v < 10) CarColor.RED else CarColor.GREEN),
-                        da,
-                        testo.length,
-                        Spanned.SPAN_INCLUSIVE_EXCLUSIVE,
-                    )
-                }
-            }
-            c.meteoTemperatura?.let { m -> pezzo("${c.meteoEmoji?.let { "$it$NBSP" } ?: ""}${m.roundToInt()}°") }
-            val costo = if (stretto) c.pedaggio ?: pedaggio?.removeSuffix(" pedaggio") else pedaggio
-            if (!costo.isNullOrEmpty()) pezzo(costo, CarColor.createCustom(AMBRA_GIORNO, AMBRA_NOTTE))
-            return testo.takeIf { it.isNotEmpty() }
+            return testo
         }
-
-        /**
-         * Lo spazio che non va a capo: «Guarda il meteo», il sole restava in
-         * fondo a una riga e i gradi andavano sotto. Dentro un pezzo (il sole e
-         * i gradi, «arrivo» e la percentuale, i km) non si va a capo; si va a
-         * capo solo fra un pezzo e l'altro, dove c'è il «·».
-         */
-        private const val NBSP = "\u00A0"
 
         /** L'ambra della pastiglia del pedaggio sul telefono, di giorno e di notte. */
         private val AMBRA_GIORNO = android.graphics.Color.rgb(138, 83, 0)
         private val AMBRA_NOTTE = android.graphics.Color.rgb(255, 207, 112)
 
-        fun distanza(metri: Double): Distance =
-            if (metri < 1000) {
-                Distance.create((Math.round(metri / 10.0) * 10).toDouble(), Distance.UNIT_METERS)
-            } else {
-                Distance.create(metri / 1000.0, Distance.UNIT_KILOMETERS)
-            }
+        /*
+         * Le distanze con gli stessi passi del telefono (distanzaBreve in
+         * gdanav_core, guida.dart): sotto i cento metri di dieci in dieci,
+         * sotto il chilometro di cinquanta in cinquanta, sotto i dieci
+         * chilometri di cento metri in cento, poi a chilometri interi. E si
+         * arrotonda prima di scegliere l'unità: 975 metri sono «1 km», non
+         * «1000 m». Prima l'auto arrotondava a dieci metri e il telefono a
+         * cinquanta, e i due schermi dicevano numeri diversi.
+         */
 
-        /** La distanza a parole, per la notifica: «300 m», «1,2 km». */
-        fun distanzaTesto(m: Double): String =
-            if (m < 1000) "${Math.round(m / 10.0) * 10} m" else String.format(java.util.Locale.ITALY, "%.1f km", m / 1000)
+        /** I metri arrotondati al passo della loro distanza. */
+        private fun metriArrotondati(metri: Double): Long =
+            if (metri < 100) Math.round(metri / 10.0) * 10 else Math.round(metri / 50.0) * 50
+
+        /** I decimi di chilometro (sotto i dieci) o i chilometri interi. */
+        private fun chilometri(metri: Double): Double {
+            val decimi = Math.round(metri / 100.0)
+            return if (decimi < 100) decimi / 10.0 else Math.round(metri / 1000.0).toDouble()
+        }
+
+        fun distanza(metri: Double): Distance {
+            val m = metriArrotondati(metri)
+            return if (m < 1000) {
+                Distance.create(m.toDouble(), Distance.UNIT_METERS)
+            } else {
+                Distance.create(chilometri(metri), Distance.UNIT_KILOMETERS)
+            }
+        }
+
+        /** La distanza a parole, per la notifica e il pannello: «300 m», «1,2 km», «16 km». */
+        fun distanzaTesto(metri: Double): String {
+            val m = metriArrotondati(metri)
+            if (m < 1000) return "$m m"
+            val decimi = Math.round(metri / 100.0)
+            if (decimi >= 100) return "${Math.round(metri / 1000.0)} km"
+            return if (decimi % 10 == 0L) "${decimi / 10} km" else "${decimi / 10},${decimi % 10} km"
+        }
     }
 }

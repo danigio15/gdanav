@@ -572,3 +572,62 @@ double zoomLontanoInGuida({required double velocitaStradaKmh, required double al
   final d = allaProssimaM.isFinite ? morbido((allaProssimaM - lontanoDaM) / (lontanoTuttoOltreM - lontanoDaM)) : 1.0;
   return -zoomLontanoAlPiu * v * d;
 }
+
+/* ─── In guida, in marcia in città e arrivando a una svolta ───────────────
+ *
+ * Dal campo, in auto con la scena 3D: «lo zoom in e out automatico non
+ * funziona: devi calibrare lo zoom in in prossimità degli incroci, e zoom out
+ * quando si cammina, ma non troppo lontano». Nella scena 3D lo zoom si
+ * allontanava solo su una strada veloce ([zoomLontanoInGuida]) e non si
+ * avvicinava mai a una svolta: la mappa 2D dell'auto lo faceva già, il 3D
+ * no. Adesso:
+ *  - in marcia su una strada di città, con la prossima svolta lontana, la
+ *    mappa si allarga di poco ([zoomInMarciaAlPiu]);
+ *  - arrivando a una svolta (non a un «prosegui») si avvicina, piano, da
+ *    [svoltaDaM] a [svoltaVicinaM] metri ([zoomInSvoltaAlPiu]); passata la
+ *    svolta torna com'era, piano (lo smorzamento lo fa la scena). */
+
+/// Di quanti livelli si allarga la mappa in marcia su una strada di città.
+const zoomInMarciaAlPiu = 0.25;
+
+/// Da che velocità della strada (prevista dal percorso) conta la marcia.
+const inMarciaDaKmh = 15.0;
+const inMarciaTuttoSopraKmh = 30.0;
+
+/// Con la prossima svolta più vicina di così non ci si allarga; da
+/// [inMarciaTuttoOltreM] del tutto.
+const inMarciaDaM = 300.0;
+const inMarciaTuttoOltreM = 900.0;
+
+/// Di quanti livelli si avvicina la mappa arrivando a una svolta.
+const zoomInSvoltaAlPiu = 0.6;
+
+/// Da dove comincia ad avvicinarsi, e dove è vicina del tutto.
+const svoltaDaM = 450.0;
+const svoltaVicinaM = 130.0;
+
+/// Se il tipo di manovra (di Valhalla) è una svolta, da guardare da vicino:
+/// a destra, a sinistra, inversioni, rampe, uscite, bivi, rotonde,
+/// immissioni. Le stesse della mappa 2D dell'auto (`RendererMappa.kt`).
+bool eUnaSvolta(int tipo) => (tipo >= 9 && tipo <= 27) || tipo == 37 || tipo == 38;
+
+/// Lo zoom da aggiungere in guida: si allontana su una strada veloce
+/// ([zoomLontanoInGuida]) o, poco, in marcia in città; si avvicina arrivando
+/// a una svolta di tipo [tipoProssima] fra [allaProssimaM] metri.
+double zoomInGuida({required double velocitaStradaKmh, required double allaProssimaM, int? tipoProssima}) {
+  double morbido(double t) {
+    final x = t.clamp(0.0, 1.0);
+    return x * x * (3 - 2 * x);
+  }
+
+  final kmh = velocitaStradaKmh.isFinite && velocitaStradaKmh > 0 ? velocitaStradaKmh : 0.0;
+  final m = allaProssimaM.isFinite ? allaProssimaM : double.infinity;
+  final veloce = zoomLontanoInGuida(velocitaStradaKmh: kmh, allaProssimaM: m);
+  final marcia = -zoomInMarciaAlPiu *
+      morbido((kmh - inMarciaDaKmh) / (inMarciaTuttoSopraKmh - inMarciaDaKmh)) *
+      (m.isFinite ? morbido((m - inMarciaDaM) / (inMarciaTuttoOltreM - inMarciaDaM)) : 1.0);
+  final svolta = tipoProssima != null && eUnaSvolta(tipoProssima) && m.isFinite
+      ? zoomInSvoltaAlPiu * morbido((svoltaDaM - m) / (svoltaDaM - svoltaVicinaM))
+      : 0.0;
+  return math.min(veloce, marcia) + svolta;
+}

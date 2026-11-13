@@ -63,11 +63,23 @@ void main() {
       ),
       closeTo(40, 0.001), // 80 - (80 - 60) * 2
     );
-    // E senza fattore resta lo spostamento in parallelo di prima.
+    /* E senza fattore si arriva dove dice il piano. Prima restava lo
+     * spostamento in parallelo (45%): i quindici punti sotto il piano di
+     * adesso finivano all'arrivo, ma alla colonnina si ricarica fino
+     * all'80% e quei punti non si portano dietro. */
     expect(
       batteriaAllArrivo(adesso: 35, pianoAdesso: 50, pianoArrivo: 60, dopoLUltimaSosta: 80),
-      closeTo(45, 0.001),
+      closeTo(60, 0.001),
     );
+  });
+
+  test('senza fattore, la sosta davanti riporta la carica al piano', () {
+    // Il piano: si parte all'80, la sosta ricarica fino all'80, si arriva al
+    // 40. L'auto dice 70 dove il piano diceva 80, e non si è misurato
+    // abbastanza per un fattore: all'arrivo si è al 40, non al 30.
+    expect(batteriaAllArrivo(adesso: 70, pianoAdesso: 80, pianoArrivo: 40, dopoLUltimaSosta: 80), closeTo(40, 0.5));
+    // Senza la sosta, lo spostamento in parallelo resta.
+    expect(batteriaAllArrivo(adesso: 70, pianoAdesso: 80, pianoArrivo: 40), closeTo(30, 0.5));
   });
 
   group('quanto beve davvero', () {

@@ -129,6 +129,8 @@ object PonteAuto {
         val velocita: Double? = null,
         val limite: Int? = null,
         val arrivoBatteria: Double? = null,
+        /** I km di autonomia che resteranno all'arrivo (la riga del viaggio). */
+        val autonomiaArrivoKm: Double? = null,
         val sostaNome: String? = null,
         val sostaKm: Double? = null,
         val sostaBatteria: Double? = null,
@@ -178,11 +180,13 @@ object PonteAuto {
     @Volatile var pedaggioNellaStima = false
 
     /**
-     * La mappa ha poco spazio in larghezza (mezzo schermo, accanto a un'altra
-     * app): la riga del viaggio si accorcia ([GuidaAuto.testoDelViaggio]).
-     * Lo dice [RendererMappa] dalla superficie che Android Auto gli dà.
+     * Quanto spazio ha la mappa in larghezza, da [RigaDelViaggioAuto.LARGA]
+     * a [RigaDelViaggioAuto.STRETTISSIMA] (mezzo schermo, un terzo, accanto
+     * a un'altra app): la riga del viaggio si accorcia
+     * ([GuidaAuto.testoDelViaggio]). Lo dice [RendererMappa] dalla superficie
+     * e dall'area stabile che Android Auto gli dà.
      */
-    @Volatile var mappaStretta = false
+    @Volatile var strettezza = RigaDelViaggioAuto.LARGA
 
     /** Le opzioni del percorso e la voce, per il menu. */
     @Volatile var opzioni: Map<String, Any?> = emptyMap()
@@ -402,6 +406,7 @@ object PonteAuto {
                 velocita = numero(call, "velocita"),
                 limite = numero(call, "limite")?.toInt(),
                 arrivoBatteria = numero(call, "arrivo_batteria"),
+                autonomiaArrivoKm = numero(call, "autonomia_arrivo_km"),
                 sostaNome = call.argument<String>("sosta_nome"),
                 sostaKm = numero(call, "sosta_km"),
                 sostaBatteria = numero(call, "sosta_batteria"),

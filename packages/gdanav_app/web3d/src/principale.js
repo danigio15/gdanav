@@ -8,12 +8,13 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import * as THREE from 'three';
 import codiceLavoratore from 'gdanav:lavoratore';
 import { BUDGET, daDisegnare, pianoTessere } from './budget.js';
-import { valutaPrestazioni, valutaWebgl } from './capacita.js';
-import { chiave as chiaveTessera, daChiave, mercPerMetro, latDaMerc, marginiAiLati } from './geo.js';
+import { Ritmo, valutaPrestazioni, valutaWebgl } from './capacita.js';
+import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, marginiAiLati } from './geo.js';
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
 import { alzataDeiNastri, IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti } from './percorso.js';
 import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
+import { dallaScorta, nellaScorta } from './scorte.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
 import { GIORNO, NOTTE } from './tavolozza.js';
 import './gdanav3d.css';
@@ -25,21 +26,15 @@ const TOCCABILI = ['persone', 'alternative-etichetta', 'alternative', 'gdanav-so
 const VISTE = { inclinata: { pitch: 70, zoom: 17.9 }, immersiva: { pitch: 74, zoom: 18.3 } };
 
 /** Al più un fotogramma ogni tanto: trenta al secondo da fermi, o col
- * telefono che fatica; sessanta andando, se il disegno costa poco. «Va a
- * scatti»: a trenta, con la telecamera che segue l'auto e i fotogrammi che
- * non arrivano sempre allo stesso passo, sullo schermo dell'auto si vedeva. */
-const FOTOGRAMMA_MS = 1000 / 30;
-const FOTOGRAMMA_SVELTO_MS = 1000 / 60;
-/** Il disegno di un fotogramma (ms) sotto cui si va a sessanta, e sopra cui si torna a trenta. */
-const SVELTO_SOTTO_MS = 6;
-const LENTO_SOPRA_MS = 10;
-let svelto = false;
+ * telefono che fatica; sessanta andando, se il telefono ci sta dietro (lo
+ * dice [Ritmo], dall'intervallo vero fra i fotogrammi). «Va a scatti»: a
+ * trenta, con la telecamera che segue l'auto e i fotogrammi che non arrivano
+ * sempre allo stesso passo, si vedeva. Sull'auto (`opzioni.inAuto`) sempre
+ * trenta, fissi. */
+const ritmo = new Ritmo();
 
 function intervalloDeiFotogrammi() {
-  const ms = S.msDisegno ?? Infinity;
-  if (svelto && ms > LENTO_SOPRA_MS) svelto = false;
-  else if (!svelto && ms < SVELTO_SOTTO_MS) svelto = true;
-  return svelto && moto.velocita > 2 ? FOTOGRAMMA_SVELTO_MS : FOTOGRAMMA_MS;
+  return ritmo.intervallo(moto.velocita);
 }
 
 /*
@@ -114,7 +109,11 @@ const S = {
   costruite: new Map(),
   lavoro: null,
   numeroLavoro: 0,
-  sporco: { profilo: true, traffico: true, segni: true },
+  /* Cosa rifare: il profilo del percorso (e con lui tutti i nastri), solo la
+   * strada fatta, solo la freccia, il traffico, i segni in quota. */
+  sporco: { profilo: true, fatto: true, freccia: true, traffico: true, segni: true },
+  /** Quante volte si è rifatto cosa (per [diagnosi]). */
+  rifatti: { profilo: 0, fatto: 0, freccia: 0 },
   bitmap: new Map(),
   intervalli: [],
   sondato: false,
@@ -178,6 +177,8 @@ const GESTORI = {
     if (m.vista) S.vista = m.vista;
     if (m.icona) S.icona = m.icona;
     S.edificiDallApp = m.edifici === true;
+    ritmo.fisso30 = m.inAuto === true;
+    if (ritmo.fisso30) ritmo.svelto = false;
     // La freccia, se è quella scelta; l'auto del suo colore, altrimenti.
     const forma = S.icona === 'freccia' ? 'freccia' : 'auto';
     if ((m.auto && m.auto !== S.colorAuto) || forma !== (scena.formaAuto ?? 'auto')) {
@@ -207,10 +208,14 @@ const GESTORI = {
       // La strada già fatta anche in 3D, all'altezza della strada: piatta a
       // terra, dove la rampa è in quota, finiva sotto il viadotto («controlla
       // ancora le linee del percorso»).
+      // Arriva ogni tre secondi, ed è tutta la traccia del viaggio (fino a
+      // seimila punti, per la mappa piatta da lontano): il 3D ne disegna solo
+      // gli ultimi [FATTO_M] metri, e si rifà solo il suo nastro, non il
+      // profilo del percorso coi suoi.
       const c = (m.dati?.features ?? []).find((f) => f.geometry?.type === 'LineString')?.geometry.coordinates ?? [];
-      const lonlat = c.flat();
+      const lonlat = codaDi(c.flat(), FATTO_M + 300);
       S.fatto = lonlat.length >= 4 && S.origine ? { lonlat, linea: lineaDi(lonlat) } : null;
-      S.sporco.profilo = true;
+      S.sporco.fatto = true;
       sveglia();
     }
     if (IN_QUOTA[m.id]) S.sporco.segni = true;
@@ -236,7 +241,8 @@ const GESTORI = {
   },
   manovra(m) {
     S.manovra = m.da === null ? null : [m.da, m.a];
-    S.sporco.profilo = true;
+    // Solo la freccia: il profilo del percorso è quello di prima.
+    S.sporco.freccia = true;
     sveglia();
   },
   risparmio(m) {
@@ -488,12 +494,21 @@ function scriviSorgente(id, dati) {
 
 async function aggiungiImmagine({ nome, png, ratio }) {
   try {
-    const byte = Uint8Array.from(atob(png), (c) => c.charCodeAt(0));
-    const bmp = await createImageBitmap(new Blob([byte], { type: 'image/png' }));
+    // A ogni stile nuovo (giorno ↔ notte) le immagini si rimettono tutte: la
+    // stessa si riusa, invece di farne un'altra (e un'altra trama per i segni
+    // in quota) ogni volta.
+    const prima = S.bitmap.get(nome);
+    let bmp = prima?.png === png ? prima.bmp : null;
+    if (!bmp) {
+      const byte = Uint8Array.from(atob(png), (c) => c.charCodeAt(0));
+      bmp = await createImageBitmap(new Blob([byte], { type: 'image/png' }));
+    }
     const m = S.mappa;
     if (!m || !S.stileCaricato) return;
-    S.bitmap.set(nome, { bmp, ratio: ratio ?? 3 });
-    S.sporco.segni = true;
+    if (S.bitmap.get(nome)?.bmp !== bmp) {
+      S.bitmap.set(nome, { bmp, png, ratio: ratio ?? 3 });
+      S.sporco.segni = true;
+    }
     if (m.hasImage(nome)) m.removeImage(nome);
     m.addImage(nome, bmp, { pixelRatio: ratio ?? 3 });
   } catch (e) {
@@ -638,8 +653,28 @@ function matriciCamera(camera, args) {
   return Pm;
 }
 
+/*
+ * Un renderer di three.js solo, per tutta la vita della mappa.
+ *
+ * A ogni stile nuovo (giorno ↔ notte) MapLibre rifà lo strato 3D e chiama il
+ * suo `onAdd`, ma non `onRemove` di quello di prima: ogni volta nasceva un
+ * renderer nuovo, e quello vecchio restava vivo con le sue copie nella
+ * scheda grafica. E il nuovo non sapeva niente delle geometrie e dei
+ * programmi già caricati dal vecchio: ricaricava tutta la scena, una seconda
+ * copia. Il contesto WebGL è sempre lo stesso (quello della mappa): il
+ * renderer si fa al primo `onAdd` e si riusa.
+ */
+function rendererDellaMappa(m, gl) {
+  if (!S.renderer) {
+    const r = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true });
+    r.autoClear = false;
+    r.outputColorSpace = THREE.SRGBColorSpace;
+    S.renderer = r;
+  }
+  return S.renderer;
+}
+
 function strato3d() {
-  let renderer = null;
   const camera = new THREE.Camera();
   camera.matrixAutoUpdate = false;
   camera.matrixWorldAutoUpdate = false;
@@ -649,19 +684,12 @@ function strato3d() {
     type: 'custom',
     renderingMode: '3d',
     onAdd(m, gl) {
-      renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true });
-      renderer.autoClear = false;
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-      S.renderer = renderer;
-    },
-    onRemove() {
-      renderer?.dispose();
-      renderer = null;
-      S.renderer = null;
+      rendererDellaMappa(m, gl);
     },
     render(gl, args) {
       const m = S.mappa;
       const o = S.origine;
+      const renderer = S.renderer;
       if (!renderer || !o) return;
       const t0 = performance.now();
       const ws = m.transform.worldSize;
@@ -710,6 +738,9 @@ function strato3d() {
       S.camera3d = camera;
       const ora = performance.now();
       S.msDisegno = smorza(S.msDisegno ?? ora - t0, ora - t0, 1, 10);
+      // Trenta o sessanta: dall'intervallo vero fra questo fotogramma e il
+      // precedente, mentre la guida muove la mappa e non appena arrivata una tessera.
+      ritmo.disegnato(ora, intervalloDeiFotogrammi(), !!S.anima && ora - (S.ultimaTessera ?? 0) > 1500);
       // La sonda: gli intervalli fra i fotogrammi mentre la mappa si muove.
       // Appena arrivata una tessera la GPU riceve le geometrie: quei
       // fotogrammi lenti non dicono quanto va il telefono.
@@ -1027,10 +1058,17 @@ function aggiornaPercorso(adesso) {
   // Fuori dal tratto fatto: dietro il suo inizio, o con troppo poco davanti
   // (se il percorso continua oltre).
   const fuori = p && p.da !== null && s !== null && (s < p.da || (finoA < lungo - 1 && finoA - s < AVANTI_ALMENO));
-  if (!S.sporco.profilo && !fuori) return;
-  if (adesso - ultimoProfilo < 1200 && !fuori && p?.profilo) return;
+  if ((!S.sporco.profilo && !fuori) || (adesso - ultimoProfilo < 1200 && !fuori && p?.profilo)) {
+    // Il profilo resta quello di prima: si rifà solo quello che è cambiato.
+    // La strada fatta arriva ogni tre secondi, e rifare per lei il profilo e
+    // i nastri di sei chilometri e mezzo di percorso costava ogni volta.
+    if (S.sporco.fatto) aggiornaFatto();
+    if (S.sporco.freccia) aggiornaFreccia();
+    return;
+  }
   ultimoProfilo = adesso;
   S.sporco.profilo = false;
+  S.rifatti.profilo++;
   if (!p || p.linea.lunghezza < 2) {
     for (const n of ['percorso', 'alone', 'freccia']) scena.impostaNastro(n, null);
     scena.impostaPunta(null);
@@ -1051,13 +1089,8 @@ function aggiornaPercorso(adesso) {
     scena.impostaNastro('percorso', nastro(p.linea, p.profilo, da, a, 4.6, 0.62, { code: p.code }), 'percorso', 5);
     aggiornaFreccia();
   }
-  // La strada già fatta: gli ultimi [FATTO_M] metri, all'altezza giusta.
-  const f = S.fatto;
-  if (f && f.linea.lunghezza > 2) {
-    const a = f.linea.lunghezza;
-    const da = Math.max(0, a - FATTO_M);
-    scena.impostaNastro('fatto', nastro(f.linea, profiloDi(f.linea, da, a, indice), da, a, 3.6, 0.5), 'fatto', 3);
-  } else scena.impostaNastro('fatto', null);
+  // Con le tessere cambiate cambiano le quote anche della strada fatta.
+  aggiornaFatto();
   const r = S.risparmio;
   if (r && r.linea.lunghezza > 2) {
     // La strada proposta: verde, all'altezza giusta, vicino all'auto.
@@ -1067,6 +1100,18 @@ function aggiornaPercorso(adesso) {
     const prof = profiloDi(r.linea, da, a, indice);
     scena.impostaNastro('risparmio', nastro(r.linea, prof, da, a, 4, 0.5), 'risparmio', 3);
   } else scena.impostaNastro('risparmio', null);
+}
+
+/** La strada già fatta: gli ultimi [FATTO_M] metri, all'altezza giusta. */
+function aggiornaFatto() {
+  S.sporco.fatto = false;
+  S.rifatti.fatto++;
+  const f = S.fatto;
+  if (f && f.linea.lunghezza > 2) {
+    const a = f.linea.lunghezza;
+    const da = Math.max(0, a - FATTO_M);
+    scena.impostaNastro('fatto', nastro(f.linea, profiloDi(f.linea, da, a, indice), da, a, 3.6, 0.5), 'fatto', 3);
+  } else scena.impostaNastro('fatto', null);
 }
 
 /**
@@ -1134,6 +1179,8 @@ function pezzoDi(p, da, fino) {
 }
 
 function aggiornaFreccia() {
+  S.sporco.freccia = false;
+  S.rifatti.freccia++;
   const p = S.percorso;
   if (!p?.profilo || !S.manovra) {
     scena.impostaNastro('freccia', null);
@@ -1328,7 +1375,7 @@ function segnoPersona(p) {
   const riempi = colore('persone', 'circle-color', p);
   const bordo = colore('persone', 'circle-stroke-color', p);
   const chiave = ['persona', S.notte, riempi, bordo, p.iniziali ?? '', nome].join('|');
-  let c = teleCerchi.get(chiave);
+  let c = dallaScorta(teleCerchi, chiave);
   if (c) return c;
   const k = 2;
   const r = 15;
@@ -1367,8 +1414,7 @@ function segnoPersona(p) {
   }
   // Il centro del cerchio, da sotto (come `center` degli sprite di three.js).
   c = { bmp, ratio: k, centro: 1 - cy / bmp.height, chiave };
-  if (teleCerchi.size > 200) teleCerchi.clear();
-  teleCerchi.set(chiave, c);
+  nellaScorta(teleCerchi, chiave, c, TETTO_CERCHI);
   return c;
 }
 
@@ -1391,9 +1437,12 @@ function colore(strato, proprieta, p) {
 
 /** Un cerchio col bordo e (se c'è) il numero, disegnato al doppio come le etichette. */
 const teleCerchi = new Map();
+/** Quante tele di cerchi e di nomi si tengono pronte (le meno usate di recente se ne vanno). */
+const TETTO_CERCHI = 200;
+const TETTO_ETICHETTE = 120;
 function cerchio(r, riempi, bordo, spessore, testo = '', coloreTesto = '#FFFFFF', corpo = 13) {
   const chiave = [r, riempi, bordo, spessore, testo, coloreTesto, corpo].join('|');
-  let c = teleCerchi.get(chiave);
+  let c = dallaScorta(teleCerchi, chiave);
   if (c) return c;
   const k = 2;
   const lato = Math.ceil((r + spessore) * 2 * k) + 4;
@@ -1416,8 +1465,7 @@ function cerchio(r, riempi, bordo, spessore, testo = '', coloreTesto = '#FFFFFF'
     g.fillText(testo, lato / 2, lato / 2 + k);
   }
   c = { bmp, ratio: k, centro: 0.5, chiave };
-  if (teleCerchi.size > 200) teleCerchi.clear();
-  teleCerchi.set(chiave, c);
+  nellaScorta(teleCerchi, chiave, c, TETTO_CERCHI);
   return c;
 }
 
@@ -1535,7 +1583,9 @@ function aggiornaSegni(adesso) {
     if (messi.length >= 8 || messi.some((m) => m.testo === testo && Math.hypot(m.x - e.x, m.y - e.y) < 250)) continue;
     messi.push({ ...e, testo });
     const tela = etichetta(testo, !e.nome);
-    segni.push({ chiave: `nome:${testo}:${Math.round(e.x)}:${Math.round(e.y)}`, x: e.x, y: e.y, z: e.h + 1.2, immagine: tela, w: tela.width / 2, h: tela.height / 2, centro: 0.5 });
+    // La notte nella chiave: passando al buio il nome si riscrive coi suoi
+    // colori (lo stesso segno, riusato, restava scuro sull'alone bianco).
+    segni.push({ chiave: `nome:${testo}:${Math.round(e.x)}:${Math.round(e.y)}:${S.notte ? 'notte' : 'giorno'}`, x: e.x, y: e.y, z: e.h + 1.2, immagine: tela, w: tela.width / 2, h: tela.height / 2, centro: 0.5 });
   }
   scena.impostaSegni(segni);
 }
@@ -1580,7 +1630,7 @@ function segnoToccato(px, py, margine = 8) {
 const teleEtichette = new Map();
 function etichetta(testo, cartello) {
   const chiave = `${S.notte}|${cartello}|${testo}`;
-  let c = teleEtichette.get(chiave);
+  let c = dallaScorta(teleEtichette, chiave);
   if (c) return c;
   c = document.createElement('canvas');
   const g = c.getContext('2d');
@@ -1611,7 +1661,7 @@ function etichetta(testo, cartello) {
     g.fillStyle = S.notte ? '#E8ECF2' : '#3E434A';
     g.fillText(testo, c.width / 2, c.height / 2);
   }
-  teleEtichette.set(chiave, c);
+  nellaScorta(teleEtichette, chiave, c, TETTO_ETICHETTE);
   return c;
 }
 
@@ -1870,6 +1920,8 @@ function diagnosi() {
     triangoli: scena.triangoli,
     budget: BUDGET.triangoli,
     msDisegno: S.msDisegno,
+    ritmo: { media: ritmo.media, passo: ritmo.passo, svelto: ritmo.svelto, auto: ritmo.fisso30 },
+    rifatti: S.rifatti,
     intervalli: S.intervalli.length,
     auto: S.auto,
     camera: S.camera.modo,

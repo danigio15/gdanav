@@ -468,6 +468,10 @@ class GestoreViaggio extends ChangeNotifier {
     final s = stato;
     final t = _trafficoAdesso;
     if (s is! ViaggioPronto || t == null) return null;
+    // Il traffico a parte è per Valhalla, che non lo conosce. I tempi di
+    // TomTom lo hanno già: rileggerlo lo sommava una seconda volta, e ogni
+    // cinque minuti l'arrivo si spostava di tutto il ritardo.
+    if (TrafficoTomTom.haGiaIlTraffico(s.viaggio.percorso)) return null;
     final PercorsoCalcolato p;
     try {
       p = await t(s.viaggio.percorso).timeout(const Duration(seconds: 25));
@@ -612,11 +616,12 @@ class GestoreViaggio extends ChangeNotifier {
   }
 
   /// La strada proposta in guida, e presa: il viaggio si rifà su quella da
-  /// dove si è, soste comprese.
-  Future<void> seguiStrada(PercorsoCalcolato strada, {Punto? partenza}) async {
+  /// dove si è, soste comprese. In guida ([inGuida]) il viaggio di prima
+  /// resta finché non arriva il nuovo: vedi [pianifica].
+  Future<void> seguiStrada(PercorsoCalcolato strada, {Punto? partenza, bool inGuida = false}) async {
     final d = destinazione;
     if (d == null) return;
-    await pianifica(d, strada: strada, partenza: partenza);
+    await pianifica(d, strada: strada, partenza: partenza, inGuida: inGuida);
   }
 
   /// [conScelte]: si cercano anche le strade alternative (una meta nuova,
@@ -624,20 +629,40 @@ class GestoreViaggio extends ChangeNotifier {
   /// percorso c'è già (una strada a risparmio presa in guida). [partenza]:
   /// dove si è, se lo si sa già (in guida): niente posizione nuova da
   /// chiedere al GPS, che può metterci fino a dieci secondi.
+  ///
+  /// [inGuida]: si calcola senza togliere il viaggio di adesso, come
+  /// [ricalcolaDa]. Con lo stato «Calcolo» in mezzo, in guida («Prendila»,
+  /// «passa da», una tappa chiesta a voce) sparivano la linea e la scheda, e
+  /// sull'auto restava «Calcolo il percorso…». Il viaggio nuovo si mette
+  /// solo alla fine; se il calcolo non riesce resta quello di prima, senza
+  /// errori sullo schermo.
   Future<void> pianifica(
     Luogo destinazione, {
     bool conScelte = false,
     PercorsoCalcolato? strada,
     Punto? partenza,
+    bool inGuida = false,
   }) async {
+    final prima = stato;
+    final tieni = inGuida && prima is ViaggioPronto;
     final impostazioni = await archivio.impostazioni();
-    if (impostazioni.mancante case final m?) return _imposta(ErroreViaggio(m, destinazione: destinazione));
+    if (impostazioni.mancante case final m?) {
+      if (!tieni) _imposta(ErroreViaggio(m, destinazione: destinazione));
+      return;
+    }
     if (conScelte) {
       _scelte = const [];
       _scelta = 0;
     }
     if (!auto.elettrica) {
-      return _percorsoSolo(destinazione, impostazioni, conScelte: conScelte, strada: strada, partenza: partenza);
+      return _percorsoSolo(
+        destinazione,
+        impostazioni,
+        conScelte: conScelte,
+        strada: strada,
+        partenza: partenza,
+        tieni: tieni ? prima : null,
+      );
     }
     // Le soste di ricarica sono Premium: senza, l'elettrica ha il percorso
     // come la termica (e la scheda dice che le soste sono con Premium).
@@ -649,10 +674,12 @@ class GestoreViaggio extends ChangeNotifier {
         senzaSoste: true,
         strada: strada,
         partenza: partenza,
+        tieni: tieni ? prima : null,
       );
     }
     final batteria = auto.stato?.batteria;
     if (batteria == null) {
+      if (tieni) return;
       // «Nel caso non trova vettura elettrica devi mostrare avviso»: senza
       // un'auto elettrica configurata chiedere la batteria era un vicolo
       // cieco. Si propone la termica; con l'elettrica, di scriverla.
@@ -661,6 +688,7 @@ class GestoreViaggio extends ChangeNotifier {
     }
     final da = partenza ?? await posizione();
     if (da == null) {
+      if (tieni) return;
       return _imposta(ErroreViaggio('Non so dove sei: attiva la posizione per GdANav.', destinazione: destinazione));
     }
     ultimaPosizione = da;
@@ -668,7 +696,10 @@ class GestoreViaggio extends ChangeNotifier {
     minimoArrivo = preferenze.minimoArrivo;
     opzioni = await archivio.opzioniPercorso();
     final calcolo = Calcolo(destinazione);
-    _imposta(calcolo);
+    // In guida il viaggio di prima resta, e il nuovo vale solo se nel
+    // frattempo nessuno l'ha cambiato.
+    final segno = tieni ? prima : calcolo;
+    if (!tieni) _imposta(calcolo);
     try {
       var condizioni = consumo?.condizioni(auto.stato, veicolo: auto.veicolo) ?? const Condizioni();
       if (await stimaMeteo?.call(da, destinazione.posizione) case final m?) {
@@ -703,7 +734,7 @@ class GestoreViaggio extends ChangeNotifier {
           )
           .timeout(tempoMassimo);
       // Nel frattempo l'utente può aver annullato o scelto un'altra meta.
-      if (identical(stato, calcolo)) {
+      if (identical(stato, segno)) {
         _imposta(
           ViaggioPronto(
             destinazione,
@@ -840,15 +871,19 @@ class GestoreViaggio extends ChangeNotifier {
     bool senzaSoste = false,
     PercorsoCalcolato? strada,
     Punto? partenza,
+    StatoViaggio? tieni,
   }) async {
     partenza ??= await posizione();
     if (partenza == null) {
+      if (tieni != null) return;
       return _imposta(ErroreViaggio('Non so dove sei: attiva la posizione per GdANav.', destinazione: destinazione));
     }
     ultimaPosizione = partenza;
     opzioni = await archivio.opzioniPercorso();
     final calcolo = Calcolo(destinazione);
-    _imposta(calcolo);
+    // [tieni]: il viaggio in guida, che resta sullo schermo (vedi pianifica).
+    final segno = tieni ?? calcolo;
+    if (tieni == null) _imposta(calcolo);
     condizioni = null;
     try {
       final pianificatore = costruisci(impostazioni, auto.veicolo, _preferenze = await archivio.preferenze(), opzioni);
@@ -861,7 +896,7 @@ class GestoreViaggio extends ChangeNotifier {
             scelto: scelto,
           )
           .timeout(tempoMassimo);
-      if (identical(stato, calcolo)) {
+      if (identical(stato, segno)) {
         _imposta(
           ViaggioPronto(
             destinazione,

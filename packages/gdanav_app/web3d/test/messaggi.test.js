@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { codeOrdinate, decodifica } from '../src/messaggi.js';
-import { valutaPrestazioni, valutaWebgl } from '../src/capacita.js';
+import { PASSO_30, PASSO_60, Ritmo, valutaPrestazioni, valutaWebgl } from '../src/capacita.js';
 
 test('i messaggi buoni passano, quelli storti no', () => {
   assert.ok(decodifica({ v: 1, tipo: 'opzioni', notte: false, vista: 'inclinata', auto: '#d62a26' }));
@@ -52,4 +52,54 @@ test('le prestazioni: lento sotto i 20 fotogrammi', () => {
 test('il percorso coi metri: tanti quanti i punti', () => {
   assert.ok(decodifica({ v: 1, tipo: 'percorso', punti: [9, 45, 9.1, 45.1], metri: [0, 13000] }));
   assert.equal(decodifica({ v: 1, tipo: 'percorso', punti: [9, 45, 9.1, 45.1], metri: [0] }), null);
+});
+
+test("le opzioni dicono se la pagina è sull'auto", () => {
+  assert.ok(decodifica({ v: 1, tipo: 'opzioni', notte: false, inAuto: true }));
+  assert.equal(decodifica({ v: 1, tipo: 'opzioni', notte: false, inAuto: 'si' }), null);
+});
+
+test('trenta o sessanta: dal passo vero dei fotogrammi, non dal tempo dei comandi', () => {
+  // Un telefono che disegna un fotogramma al più ogni [capace] ms: va al
+  // passo voluto, o più piano se non ce la fa.
+  const r = new Ritmo();
+  let t = 0;
+  const corri = (secondi, capace, v = 10) => {
+    for (const fine = t + secondi * 1000; t < fine; ) {
+      t += Math.max(r.intervallo(v), capace);
+      r.disegnato(t, r.intervallo(v));
+    }
+  };
+  corri(3, 10);
+  assert.equal(r.intervallo(10), PASSO_60, 'ce la fa: sessanta');
+  assert.equal(r.intervallo(1), PASSO_30, 'da fermi trenta');
+  corri(5, 10);
+  assert.equal(r.intervallo(10), PASSO_60);
+  // La scheda grafica non ci sta più dietro (un fotogramma ogni 25 ms, anche
+  // se i comandi costano poco): si torna a trenta, e non si riprova subito.
+  corri(3, 25);
+  assert.equal(r.intervallo(10), PASSO_30);
+  corri(10, 25);
+  assert.equal(r.intervallo(10), PASSO_30, 'si riprova più tardi');
+  // Passato il tempo si riprova; va male di nuovo, e si aspetta il doppio.
+  corri(12, 25);
+  assert.equal(r.attesa, 80000);
+  // Un telefono che non sta dietro nemmeno a trenta: trenta, sempre.
+  const lento = new Ritmo();
+  t = 0;
+  for (let i = 0; i < 2000; i++) {
+    t += 45;
+    lento.disegnato(t, lento.intervallo(10));
+  }
+  assert.equal(lento.intervallo(10), PASSO_30);
+  // Le pause (la mappa ferma) non contano.
+  const p = new Ritmo();
+  for (let i = 0; i < 100; i++) p.disegnato(i * 1000, PASSO_30);
+  assert.equal(p.campioni, 0);
+});
+
+test("sull'auto sempre trenta", () => {
+  const r = new Ritmo({ fisso30: true });
+  for (let i = 1; i < 300; i++) r.disegnato(i * PASSO_30, r.intervallo(20));
+  assert.equal(r.intervallo(20), PASSO_30);
 });

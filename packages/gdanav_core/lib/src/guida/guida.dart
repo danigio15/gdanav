@@ -278,8 +278,10 @@ class Guida {
      * continuo, e bastava girare in una traversa per proiettarsi su un tratto
      * lontanissimo: la distanza restava piccola, il cursore saltava in avanti,
      * e il navigatore diceva che quella strada l'avevi già fatta. */
-    final p = _linea.proiettaTra(qui, _indietro(), _segmento + _quantiAvanti(qui));
     final passo = _precedente == null ? null : distanzaM(_precedente!, qui);
+    final p = _precedente == null
+        ? _primaProiezione(qui)
+        : _linea.proiettaTra(qui, _indietro(), _segmento + _quantiAvanti(qui), preferito: _preferito(qui, passo));
     /* Una lettura che non può dire «sei fuori strada» non lo dice.
      *
      * «Durante la navigazione all'improvviso perde il percorso e lo
@@ -328,7 +330,13 @@ class Guida {
     final prossima = k < 0 ? null : manovre[k];
     final dopo = k < 0 || k + 1 >= manovre.length ? null : manovre[k + 1];
     final alla = prossima == null ? 0.0 : _linea.cumulate[_indice(prossima)] - percorsi;
-    final arrivato = restanti < 25;
+    /* Arrivati: a pochi metri dalla fine E sulla strada. Senza la seconda
+     * condizione chi tirava dritto all'ultima svolta, su un'altra via a cento
+     * metri dalla meta, si proiettava sulla fine del percorso e si sentiva
+     * dire «Sei arrivato»: la guida si chiudeva invece di ricalcolare. La
+     * vicinanza è quella del fuori percorso (con un GPS largo la sua
+     * precisione, ma mai oltre quella che si accetta). */
+    final arrivato = restanti < 25 && p.lontanoM <= math.min(soglia, precisioneMassimaM);
 
     /* Si aggancia stando vicini, ci si stacca solo andando via davvero. */
     _agganciato = p.lontanoM <= (_agganciato ? sogliaSgancioM : sogliaAggancioM);
@@ -387,6 +395,44 @@ class Guida {
   Punto _punto(int i, double t) {
     final a = _linea.punti[i], b = _linea.punti[math.min(i + 1, _linea.punti.length - 1)];
     return Punto(a.lat + t * (b.lat - a.lat), a.lon + t * (b.lon - a.lon));
+  }
+
+  /* La prima lettura: il primo pezzo di percorso vicino, non il più vicino.
+   *
+   * Alla prima lettura si guarda tutto il percorso (vedi _quantiAvanti), e
+   * su un giro che torna dove è partito la fine passa a pochi metri dalla
+   * partenza: bastava che il GPS cadesse un metro più vicino all'ultimo
+   * tratto per agganciarsi lì, a zero metri dalla meta, e sentirsi dire
+   * «Sei arrivato» prima di partire. Si prende il primo segmento entro la
+   * soglia di aggancio e, da lì, il più vicino nei duecento metri dopo. Se
+   * nessuno è così vicino, il più vicino di tutti, come prima. */
+  Proiezione _primaProiezione(Punto qui) {
+    final da = _indietro();
+    final tutto = _linea.proiettaTra(qui, da, _linea.punti.length);
+    if (tutto.lontanoM > sogliaAggancioM) return tutto;
+    final c = _linea.cumulate;
+    for (var i = da; i < _linea.punti.length - 1 && i < tutto.segmento; i++) {
+      if (_linea.proiettaTra(qui, i, i + 1).lontanoM > sogliaAggancioM) continue;
+      var j = i + 1;
+      while (j < c.length - 1 && c[j] - c[i] <= 200) {
+        j++;
+      }
+      return _linea.proiettaTra(qui, i, j);
+    }
+    return tutto;
+  }
+
+  /* A parità di distanza, quale pezzo di percorso.
+   *
+   * Un'inversione a U sulla stessa strada: andata e ritorno sono la stessa
+   * linea, e il GPS cade alla stessa distanza dai due. Si sceglieva sempre il
+   * primo, l'andata: tornando indietro si era «contromano» sulla propria
+   * strada, i metri fatti calavano, e dopo tre letture si ricalcolava. Andando,
+   * vale il segmento che va dove si va; fermi, quello attuale o uno dopo. */
+  bool Function(int segmento) _preferito(Punto qui, double? passo) {
+    if (passo == null || passo < movimentoCheContaM) return (i) => i >= _segmento;
+    final siVa = rottaGradi(_precedente!, qui);
+    return (i) => diQuantoSiGira(_rotta(i), siVa).abs() < 90;
   }
 
   /// La direzione del segmento [i]; se è cortissimo, quella dei successivi.
@@ -615,12 +661,15 @@ String distanzaParlata(double metri) {
 }
 
 /// «300 m», «1,2 km»: come si scrive sullo schermo.
+///
+/// Si arrotonda prima di scegliere l'unità: 975 metri arrotondati ai
+/// cinquanta sono mille, e si scrivono «1 km», non «1000 m». Gli stessi
+/// passi li usa l'auto (`GuidaAuto.distanza` e `distanzaTesto`, in Kotlin):
+/// telefono e cruscotto devono dire lo stesso numero.
 String distanzaBreve(double metri) {
-  if (metri < 1000) {
-    final m = metri < 100 ? (metri / 10).round() * 10 : (metri / 50).round() * 50;
-    return '$m m';
-  }
-  return metri < 10000
-      ? '${(metri / 1000).toStringAsFixed(1).replaceAll('.', ',')} km'
-      : '${(metri / 1000).round()} km';
+  final m = metri < 100 ? (metri / 10).round() * 10 : (metri / 50).round() * 50;
+  if (m < 1000) return '$m m';
+  final decimi = (metri / 100).round();
+  if (decimi < 100) return decimi % 10 == 0 ? '${decimi ~/ 10} km' : '${decimi ~/ 10},${decimi % 10} km';
+  return '${(metri / 1000).round()} km';
 }

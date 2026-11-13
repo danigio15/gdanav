@@ -118,6 +118,12 @@ void main() {
     final cruscotto = chiamate.lastWhere((c) => c.method == 'cruscotto').arguments as Map;
     expect(cruscotto['autonomia_km'], closeTo(a.guida.autonomiaOra!.km, 0.01));
     expect(cruscotto['autonomia_auto'], isTrue);
+    // «Nel riquadro info viaggi i km all'arrivo»: l'autonomia di adesso in
+    // proporzione alla batteria all'arrivo, e all'auto lo stesso numero.
+    final arrivo = a.guida.batteriaArrivo!;
+    expect(a.guida.autonomiaArrivoKm, closeTo(a.guida.autonomiaOra!.km * arrivo / adesso.valore, 0.01));
+    expect(a.guida.autonomiaArrivoKm, lessThan(a.guida.autonomiaOra!.km));
+    expect(cruscotto['autonomia_arrivo_km'], closeTo(a.guida.autonomiaArrivoKm!, 0.5));
     await tester.runAsync(a.guida.ferma);
   });
 

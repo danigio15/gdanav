@@ -28,7 +28,7 @@ void main() {
     expect(vicine, hasLength(1));
     expect(vicine.single.tipo, TipoSegnalazione.polizia);
     expect(vicine.single.conferme, 2);
-    expect(chieste.last.url.toString(), 'https://relay.esempio.dev/v1/segnalazioni?lat=45.46&lon=9.2');
+    expect(chieste.last.url.toString(), 'https://relay.esempio.dev/v1/segnalazioni?lat=45.46&lon=9.20');
 
     final nuova = await c.invia(TipoSegnalazione.incidente, const Punto(45.4, 9.3));
     expect(nuova.tipo, TipoSegnalazione.incidente);

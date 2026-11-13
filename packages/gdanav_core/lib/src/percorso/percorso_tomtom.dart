@@ -340,22 +340,14 @@ class ClienteTomTom {
 
   /// Una rotta di TomTom (`routes[i]`) nel percorso che usa il motore.
   static PercorsoCalcolato leggi(Map<String, Object?> rotta) {
-    final punti = <Punto>[];
-    for (final leg in ((rotta['legs'] as List?) ?? const []).whereType<Map>()) {
-      final forma = [
-        for (final p in ((leg['points'] as List?) ?? const []).whereType<Map>())
-          Punto((p['latitude'] as num).toDouble(), (p['longitude'] as num).toDouble()),
-      ];
-      // Fra un pezzo e l'altro l'ultimo punto è ripetuto.
-      punti.addAll(punti.isEmpty ? forma : forma.skip(1));
-    }
-    final linea = punti.length > 1 ? Linea(punti) : null;
     final istruzioni = (((rotta['guidance'] as Map?)?['instructions'] as List?) ?? const [])
         .whereType<Map>()
         .map((i) => i.cast<String, Object?>())
         .toList();
     final sommario = (rotta['summary'] as Map?)?.cast<String, Object?>() ?? const {};
     final sezioni = ((rotta['sections'] as List?) ?? const []).whereType<Map>().toList();
+    final punti = _punti(rotta, istruzioni, sezioni);
+    final linea = punti.length > 1 ? Linea(punti) : null;
 
     final manovre = <Manovra>[];
     final tratti = <Tratto>[];
@@ -364,8 +356,18 @@ class ClienteTomTom {
       final dopo = k + 1 < istruzioni.length ? istruzioni[k + 1] : null;
       final da = (i['pointIndex'] as num?)?.toInt() ?? 0;
       final a = (dopo?['pointIndex'] as num?)?.toInt() ?? (punti.isEmpty ? 0 : punti.length - 1);
-      final metri = _num(dopo?['routeOffsetInMeters']) - _num(i['routeOffsetInMeters']);
-      final secondi = _num(dopo?['travelTimeInSeconds']) - _num(i['travelTimeInSeconds']);
+      // L'ultima (l'arrivo) arriva fino in fondo: quello che resta del
+      // sommario, cioè niente. Prima era zero meno la sua distanza dalla
+      // partenza: una manovra d'arrivo lunga meno centoventi chilometri.
+      final metri = math.max(
+        0.0,
+        _num(dopo == null ? sommario['lengthInMeters'] : dopo['routeOffsetInMeters']) - _num(i['routeOffsetInMeters']),
+      );
+      final secondi = math.max(
+        0.0,
+        _num(dopo == null ? sommario['travelTimeInSeconds'] : dopo['travelTimeInSeconds']) -
+            _num(i['travelTimeInSeconds']),
+      );
       manovre.add(_manovra(i, lunghezzaM: metri, secondi: secondi, inizio: da, corsie: _corsie(sezioni, da)));
       if (linea == null || a <= da || metri <= 0 || secondi <= 0) continue;
       final kmh = metri / secondi * 3.6;
@@ -404,6 +406,44 @@ class ClienteTomTom {
     );
   }
 
+  /* I punti della rotta, pezzo (leg) dopo pezzo.
+   *
+   * Con le tappe la rotta arriva a pezzi, e l'ultimo punto di un pezzo è
+   * anche il primo del successivo. Toglierlo sembra ovvio, ma gli indici di
+   * TomTom — `pointIndex` delle istruzioni, `startPointIndex` ed
+   * `endPointIndex` delle sezioni — sono «nella polilinea della rotta», e
+   * la documentazione non dice se il punto ripetuto lo contano. Se lo
+   * contano, toglierlo fa scivolare indietro di un punto, dopo ogni tappa,
+   * tutte le manovre e le corsie: la svolta disegnata all'incrocio prima.
+   *
+   * Lo dice la risposta stessa: l'arrivo sta sull'ultimo punto, e così
+   * l'ultima sezione. Se l'indice più alto è quello dell'ultimo punto
+   * contando i ripetuti, i ripetuti si tengono (un segmento lungo zero non
+   * disturba nessuno); altrimenti si tolgono, come prima. */
+  static List<Punto> _punti(Map<String, Object?> rotta, List<Map<String, Object?>> istruzioni, List<Map> sezioni) {
+    final pezzi = [
+      for (final leg in ((rotta['legs'] as List?) ?? const []).whereType<Map>())
+        [
+          for (final p in ((leg['points'] as List?) ?? const []).whereType<Map>())
+            Punto((p['latitude'] as num).toDouble(), (p['longitude'] as num).toDouble()),
+        ],
+    ];
+    final tutti = [for (final f in pezzi) ...f];
+    if (pezzi.length < 2) return tutti;
+    final indici = [
+      for (final i in istruzioni) (i['pointIndex'] as num?)?.toInt(),
+      for (final s in sezioni) (s['endPointIndex'] as num?)?.toInt(),
+    ].nonNulls;
+    final ultimo = indici.isEmpty ? -1 : indici.reduce(math.max);
+    if (ultimo == tutti.length - 1) return tutti;
+    final punti = <Punto>[];
+    for (final forma in pezzi) {
+      // Fra un pezzo e l'altro l'ultimo punto è ripetuto.
+      punti.addAll(punti.isEmpty ? forma : forma.skip(1));
+    }
+    return punti;
+  }
+
   /// Quanto si perde in tutto per il traffico. TomTom dà
   /// `trafficDelayInSeconds` solo per gli eventi segnalati; il rallentamento
   /// normale sta nella differenza col tempo senza traffico.
@@ -439,8 +479,8 @@ class ClienteTomTom {
 
   /// Le corsie arrivando alla manovra che parte dal punto [punto], da
   /// sinistra a destra. Il tratto `LANES` che le descrive finisce sul punto
-  /// della manovra; se sono più d'uno, vale quello che finisce più vicino.
-  /// Un tratto senza manovra dentro — resta in corsia passando un'uscita —
+  /// della manovra (o la contiene, cominciando prima); se sono più d'uno,
+  /// vale quello che finisce più vicino. Un tratto senza manovra dentro — resta in corsia passando un'uscita —
   /// non si attacca a niente.
   static List<Corsia> _corsie(List<Map> sezioni, int punto) {
     Map? scelto;
@@ -449,7 +489,10 @@ class ClienteTomTom {
       if ('${s['sectionType']}'.toUpperCase() != 'LANES') continue;
       final da = (s['startPointIndex'] as num?)?.toInt();
       final a = (s['endPointIndex'] as num?)?.toInt();
-      if (da == null || a == null || punto < da || punto > a) continue;
+      // Il tratto deve arrivare alla manovra: uno che comincia lì è della
+      // strada dopo (restare a sinistra passando un'uscita, appena girati),
+      // e sulla freccia della svolta disegnava le corsie sbagliate.
+      if (da == null || a == null || punto < da || punto > a || (da == punto && a > punto)) continue;
       if (a - punto < distanza) {
         scelto = s;
         distanza = a - punto;

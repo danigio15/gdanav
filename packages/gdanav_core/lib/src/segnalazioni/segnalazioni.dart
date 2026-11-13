@@ -96,10 +96,14 @@ class ClienteSegnalazioni {
   Uri _uri(String percorso) => indirizzo.resolve(percorso);
 
   /// Quelle intorno a [qui], per una ventina di chilometri.
+  ///
+  /// Al relay basta la zona (0,2°): la posizione va arrotondata a 0,01°
+  /// (un chilometro circa), non quella del GPS. Si chiede ogni due minuti, e
+  /// col GPS intero il relay avrebbe potuto ricostruire il viaggio.
   Future<List<Segnalazione>> vicine(Punto qui) async {
-    final r = await _http.get(
-      _uri('v1/segnalazioni').replace(queryParameters: {'lat': '${qui.lat}', 'lon': '${qui.lon}'}),
-    );
+    String due(double x) => ((x * 100).round() / 100).toStringAsFixed(2);
+    final r =
+        await _http.get(_uri('v1/segnalazioni').replace(queryParameters: {'lat': due(qui.lat), 'lon': due(qui.lon)}));
     if (r.statusCode != 200) throw Exception('segnalazioni: ${r.statusCode}');
     final j = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, Object?>;
     return ((j['segnalazioni'] as List?) ?? const []).map(Segnalazione.daJson).whereType<Segnalazione>().toList();

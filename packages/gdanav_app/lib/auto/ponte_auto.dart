@@ -714,6 +714,7 @@ class PonteAuto {
     piuVicina: piuVicina3dInAuto,
     zoomScelto: () => _stato3d.zoom,
     inclinazione: inclinazione3dInAuto,
+    inAuto: true,
   )..avvia();
 
   void _stili() {
@@ -1401,6 +1402,8 @@ class PonteAuto {
       // In guida quello del percorso; senza, quello della strada di adesso.
       'limite': guida.attiva ? a?.limiteKmh : posizione.limiteKmh,
       'arrivo_batteria': p == null || !elettrica ? null : guida.batteriaArrivo,
+      // I km che resteranno all'arrivo, per la riga del viaggio dell'auto.
+      'autonomia_arrivo_km': p == null || !elettrica ? null : guida.autonomiaArrivoKm,
       // Il pedaggio che resta, breve («~12,40 €»), sulla barra dell'auto.
       if (guida.attiva)
         if (guida.pedaggioDavanti case final c? when c.conPrezzo || c.vignetta || c.kmNonStimati > 0)

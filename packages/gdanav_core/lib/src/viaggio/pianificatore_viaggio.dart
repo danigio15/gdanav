@@ -173,11 +173,13 @@ class PianificatoreViaggio {
   }) async {
     var p = scelto ?? await percorsi([partenza, ...tappe, arrivo]);
     // Uno scelto fra le alternative si rifà con corsie e limiti; il
-    // traffico già letto resta.
+    // traffico già letto resta. Se il rifatto ha già il suo (TomTom, che
+    // ridà la stessa strada coi tempi di adesso) non lo si rimette sopra:
+    // si sommava due volte, e il viaggio durava il doppio del ritardo in più.
     if (scelto != null && seguendo != null) {
       try {
         final rifatto = await seguendo!(scelto);
-        p = scelto.trafficoVero
+        p = scelto.trafficoVero && !rifatto.trafficoVero
             ? rifatto.conTraffico(_riporta(scelto, rifatto), totale: scelto.ritardoDichiarato ?? scelto.ritardoTraffico)
             : rifatto;
       } catch (_) {}
