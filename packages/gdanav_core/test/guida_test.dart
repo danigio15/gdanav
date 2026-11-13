@@ -170,6 +170,19 @@ void main() {
     expect(distanzaBreve(15600), '16 km');
   });
 
+  test('si arrotonda prima di scegliere l\'unità: niente «1000 m»', () {
+    // 975 metri, arrotondati ai cinquanta, sono mille: un chilometro.
+    expect(distanzaBreve(975), '1 km');
+    expect(distanzaBreve(974), '950 m');
+    expect(distanzaBreve(99), '100 m');
+    expect(distanzaBreve(1000), '1 km');
+    expect(distanzaBreve(1040), '1 km');
+    expect(distanzaBreve(1050), '1,1 km');
+    // 9,96 km con un decimale sarebbero «10,0 km»: sono dieci.
+    expect(distanzaBreve(9960), '10 km');
+    expect(distanzaBreve(9940), '9,9 km');
+  });
+
   /* ── «Se la strada e' dritta la mappa deve seguire la vettura» ───────────
    *
    * Due foto dal campo, la stessa causa: la telecamera guardava sempre

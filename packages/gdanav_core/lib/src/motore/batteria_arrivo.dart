@@ -41,7 +41,8 @@ double? fattoreDelConsumo({
 /// vera, quindi lo scostamento di adesso è già dentro.
 ///
 /// Con [fattore] a `null` — non si è ancora misurato abbastanza — si torna
-/// allo spostamento in parallelo, che è meglio di niente.
+/// allo spostamento in parallelo, che è meglio di niente; con una sosta
+/// davanti, al piano com'è (vedi [dopoLUltimaSosta]).
 ///
 /// [dopoLUltimaSosta] è la batteria con cui il piano riparte dall'ultima
 /// colonnina ancora davanti, se ce n'è una. Da lì in poi quello che hai
@@ -55,7 +56,13 @@ double batteriaAllArrivo({
   double? fattore,
   double? dopoLUltimaSosta,
 }) {
-  if (fattore == null) return (pianoArrivo + adesso - pianoAdesso).clamp(0, 100).toDouble();
+  if (fattore == null) {
+    // Con una sosta davanti lo scostamento di adesso si perde alla colonnina,
+    // dove si carica fino a quanto dice il piano: senza una pendenza
+    // misurata, all'arrivo si è dove dice il piano.
+    if (dopoLUltimaSosta != null) return pianoArrivo.clamp(0, 100).toDouble();
+    return (pianoArrivo + adesso - pianoAdesso).clamp(0, 100).toDouble();
+  }
   final da = dopoLUltimaSosta ?? adesso;
   final pianoDa = dopoLUltimaSosta ?? pianoAdesso;
   return (da - (pianoDa - pianoArrivo) * fattore).clamp(0, 100).toDouble();

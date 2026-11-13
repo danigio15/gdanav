@@ -23,7 +23,13 @@ class TrafficoTomTom {
 
   /// Il percorso coi tempi del traffico di adesso e le sue code; se TomTom
   /// non risponde, eccezione (chi chiama tiene il percorso com'era).
+  ///
+  /// Un percorso coi tempi del traffico già dentro e niente da cui
+  /// ripartire ([PercorsoCalcolato.senzaTraffico] vuoto: quello di TomTom)
+  /// torna com'è. Rileggerci sopra il traffico lo contava due volte: le code
+  /// rallentavano tempi che le avevano già.
   Future<PercorsoCalcolato> applica(PercorsoCalcolato percorso) async {
+    if (haGiaIlTraffico(percorso)) return percorso;
     final p = percorso.base;
     if (p.punti.length < 2) return p;
     final punti = _dirada(p.punti);
@@ -55,6 +61,10 @@ class TrafficoTomTom {
     // percorso (code più rallentamento sparso) per l'arrivo.
     return p.conTraffico(codeDa(json, p.punti), totale: totaleDa(json));
   }
+
+  /// I tempi di [p] vengono già col traffico dal motore dei percorsi
+  /// (TomTom): non c'è un percorso senza traffico su cui rimetterlo.
+  static bool haGiaIlTraffico(PercorsoCalcolato p) => p.trafficoVero && p.senzaTraffico == null;
 
   /// Quanto si perde in tutto per il traffico, dal sommario della prima
   /// rotta; `null` se la risposta non ha sommario.

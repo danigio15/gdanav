@@ -186,7 +186,23 @@ class Linea {
 
   /// Come [proietta], ma solo sui segmenti da [da] ad [a] (esclusi i punti
   /// oltre): chi guida non salta dall'altra parte di un anello.
-  Proiezione proiettaTra(Punto q, int da, int a) {
+  ///
+  /// [preferito]: se il segmento più vicino non lo è, fra quelli lontani
+  /// quanto lui (entro [pari] metri) vince il primo che lo è. Serve dove la stessa
+  /// strada si fa due volte, all'andata e al ritorno di un'inversione: le
+  /// due proiezioni sono alla stessa distanza, e scegliere sempre la prima
+  /// rimandava chi torna indietro sul segmento dell'andata, contromano.
+  Proiezione proiettaTra(Punto q, int da, int a, {bool Function(int segmento)? preferito, double pari = 1}) {
+    if (preferito != null) {
+      final vicina = proiettaTra(q, da, a);
+      if (vicina.lontanoM.isInfinite || preferito(vicina.segmento)) return vicina;
+      for (var i = math.max(0, da); i < math.min(a, punti.length - 1); i++) {
+        if (!preferito(i)) continue;
+        final s = proiettaTra(q, i, i + 1);
+        if (s.lontanoM <= vicina.lontanoM + pari) return s;
+      }
+      return vicina;
+    }
     final kx = math.cos(_rad(q.lat)) * _raggioTerraM * math.pi / 180;
     const ky = _raggioTerraM * math.pi / 180;
     var migliore = const Proiezione(lungoM: 0, lontanoM: double.infinity);

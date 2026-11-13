@@ -191,7 +191,9 @@ class GestoreGuida extends ChangeNotifier {
 
   /// Il piano di cui sono quei chilometri. Durante un ricalcolo il viaggio
   /// nuovo arriva prima della guida nuova: finché la guida è quella di prima,
-  /// i suoi chilometri non sono del piano nuovo, e non si contano.
+  /// i suoi chilometri non sono del piano nuovo, e non si contano. Il
+  /// traffico riletto dà un viaggio nuovo con lo stesso piano e la stessa
+  /// strada: lì il conto continua ([aggiornaTraffico]).
   ViaggioPronto? _pianoConsumo;
 
   /// Quanto si è consumato da [_kmConsumo] a [km], secondo il piano: lo si
@@ -359,6 +361,8 @@ class GestoreGuida extends ChangeNotifier {
     traccia.clear();
     versioneTraccia++;
     _vicinoDetto = false;
+    // Una proposta di ricalcolo del viaggio di prima non vale per questo.
+    proposta = null;
     _guida = Guida(p.viaggio.percorso);
     // Il riepilogo dell'arrivo comincia qui.
     riepilogo = null;
@@ -397,8 +401,11 @@ class GestoreGuida extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> ferma() async {
+  /// Chiude la guida. [zittisci]: quello che si sta dicendo si ferma; non
+  /// all'arrivo, dove la frase che si sta dicendo è proprio «Sei arrivato.».
+  Future<void> ferma({bool zittisci = true}) async {
     attiva = false;
+    proposta = null;
     traccia.clear();
     versioneTraccia++;
     _giroStrade++;
@@ -408,7 +415,7 @@ class GestoreGuida extends ChangeNotifier {
     _misuratore = null;
     await _iscrizione?.cancel();
     _iscrizione = null;
-    await voce.zitta();
+    if (zittisci) await voce.zitta();
     _racconta(inViaggio: false);
     notifyListeners();
   }
@@ -613,7 +620,7 @@ class GestoreGuida extends ChangeNotifier {
         riepilogo = _ilRiepilogo(p, a);
       }
       notifyListeners();
-      await ferma();
+      await ferma(zittisci: false);
       return;
     }
     if (!_vicinoDetto && a.restante.inMinutes < 10) {
@@ -654,6 +661,15 @@ class GestoreGuida extends ChangeNotifier {
 
   /// Una guida nuova sullo stesso viaggio (un ricalcolo, una strada presa):
   /// quello fatto sulla vecchia resta nel conto del riepilogo.
+  ///
+  /// E l'avanzamento si rifà sul percorso nuovo, dall'ultima posizione.
+  /// Restava quello del vecchio: [posizioneStimata] ne prendeva i metri e li
+  /// portava sul nuovo, che parte da dove si è, e fino alla lettura dopo la
+  /// freccia stava chilometri più avanti (a telefono e in auto). E un secondo
+  /// cambio prima di quella lettura contava quei metri due volte nel
+  /// riepilogo. Lo si rifà con una guida da buttare: quella vera non deve
+  /// segnare come già dette le frasi di quella posizione, che la lettura dopo
+  /// dirà.
   void _cambiaGuida(PercorsoCalcolato nuovo) {
     final vecchia = _guida, fatti = avanzamento?.percorsiM ?? 0;
     if (vecchia != null && attiva) {
@@ -665,6 +681,8 @@ class GestoreGuida extends ChangeNotifier {
       );
     }
     _guida = Guida(nuovo);
+    final qui = _ultimaPosizione;
+    avanzamento = qui == null ? null : Guida(nuovo).aggiorna(qui);
   }
 
   /* ─── Le ricariche: quella di casa e quelle per strada ───────────────────
@@ -913,6 +931,7 @@ class GestoreGuida extends ChangeNotifier {
   Future<void> passaDa(Luogo l) async {
     final d = viaggio.destinazione;
     if (d == null) return;
+    final vecchio = pronto, tappaDiPrima = viaggio.tappa;
     viaggio.tappa = l;
     _giroStrade++;
     risparmio?.lascia();
@@ -921,10 +940,14 @@ class GestoreGuida extends ChangeNotifier {
     notifyListeners();
     try {
       if (!muto) unawaited(voce.parla('Passo da ${l.nome}, poi proseguo.'));
-      await viaggio.pianifica(d, partenza: _ultimaPosizione);
-      if (pronto case final p?) {
+      // In guida: il viaggio di adesso resta finché non arriva quello nuovo.
+      await viaggio.pianifica(d, partenza: _ultimaPosizione, inGuida: attiva);
+      if (pronto case final p? when !identical(p, vecchio)) {
         _cambiaGuida(p.viaggio.percorso);
         _nuovoPiano(p);
+      } else if (identical(pronto, vecchio)) {
+        // Non è arrivato: si resta sulla strada di prima, senza la tappa.
+        viaggio.tappa = tappaDiPrima;
       }
     } catch (e) {
       debugPrint('passa da ${l.nome}: $e');
@@ -945,11 +968,15 @@ class GestoreGuida extends ChangeNotifier {
   /// aggiorna, le code sulla mappa pure; se il ritardo cambia di parecchio
   /// lo si dice.
   Future<void> aggiornaTraffico() async {
-    final prima = pronto?.viaggio.percorso;
+    final vecchio = pronto, prima = vecchio?.viaggio.percorso;
     final nuovo = await viaggio.aggiornaTraffico();
     final g = _guida;
     if (nuovo == null || g == null || !attiva) return;
     _guida = g.conTempi(nuovo.viaggio.percorso);
+    // Stessa strada e stesso piano: il consumo continua a contare sul viaggio
+    // nuovo. Senza, dopo il primo traffico riletto la batteria stimata
+    // restava ferma per il resto del viaggio.
+    if (identical(_pianoConsumo, vecchio)) _pianoConsumo = nuovo;
     final ritardo = nuovo.viaggio.percorso.ritardoTraffico;
     final differenza = ritardo - (prima?.ritardoTraffico ?? Duration.zero);
     if (differenza.inMinutes.abs() >= 5 && !muto) {
@@ -1021,11 +1048,14 @@ class GestoreGuida extends ChangeNotifier {
       }
       // Le ZTL restano quelle di prima: la strada nuova le gira al largo uguale.
       final z = p.viaggio.percorso.ztl;
+      // Il viaggio di adesso resta sullo schermo (e in auto) finché non
+      // arriva quello sulla strada nuova; se non arriva, resta lui.
       await viaggio.seguiStrada(
         z == null ? pr.percorso : pr.percorso.conZtl(z.senzaDomanda()),
         partenza: _ultimaPosizione,
+        inGuida: true,
       );
-      if (pronto case final nuovo?) {
+      if (pronto case final nuovo? when !identical(nuovo, p)) {
         _cambiaGuida(nuovo.viaggio.percorso);
         _nuovoPiano(nuovo);
       }

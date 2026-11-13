@@ -227,15 +227,42 @@ class GuidaAuto(private val context: Context) {
         private val AMBRA_GIORNO = android.graphics.Color.rgb(138, 83, 0)
         private val AMBRA_NOTTE = android.graphics.Color.rgb(255, 207, 112)
 
-        fun distanza(metri: Double): Distance =
-            if (metri < 1000) {
-                Distance.create((Math.round(metri / 10.0) * 10).toDouble(), Distance.UNIT_METERS)
-            } else {
-                Distance.create(metri / 1000.0, Distance.UNIT_KILOMETERS)
-            }
+        /*
+         * Le distanze con gli stessi passi del telefono (distanzaBreve in
+         * gdanav_core, guida.dart): sotto i cento metri di dieci in dieci,
+         * sotto il chilometro di cinquanta in cinquanta, sotto i dieci
+         * chilometri di cento metri in cento, poi a chilometri interi. E si
+         * arrotonda prima di scegliere l'unità: 975 metri sono «1 km», non
+         * «1000 m». Prima l'auto arrotondava a dieci metri e il telefono a
+         * cinquanta, e i due schermi dicevano numeri diversi.
+         */
 
-        /** La distanza a parole, per la notifica: «300 m», «1,2 km». */
-        fun distanzaTesto(m: Double): String =
-            if (m < 1000) "${Math.round(m / 10.0) * 10} m" else String.format(java.util.Locale.ITALY, "%.1f km", m / 1000)
+        /** I metri arrotondati al passo della loro distanza. */
+        private fun metriArrotondati(metri: Double): Long =
+            if (metri < 100) Math.round(metri / 10.0) * 10 else Math.round(metri / 50.0) * 50
+
+        /** I decimi di chilometro (sotto i dieci) o i chilometri interi. */
+        private fun chilometri(metri: Double): Double {
+            val decimi = Math.round(metri / 100.0)
+            return if (decimi < 100) decimi / 10.0 else Math.round(metri / 1000.0).toDouble()
+        }
+
+        fun distanza(metri: Double): Distance {
+            val m = metriArrotondati(metri)
+            return if (m < 1000) {
+                Distance.create(m.toDouble(), Distance.UNIT_METERS)
+            } else {
+                Distance.create(chilometri(metri), Distance.UNIT_KILOMETERS)
+            }
+        }
+
+        /** La distanza a parole, per la notifica e il pannello: «300 m», «1,2 km», «16 km». */
+        fun distanzaTesto(metri: Double): String {
+            val m = metriArrotondati(metri)
+            if (m < 1000) return "$m m"
+            val decimi = Math.round(metri / 100.0)
+            if (decimi >= 100) return "${Math.round(metri / 1000.0)} km"
+            return if (decimi % 10 == 0L) "${decimi / 10} km" else "${decimi / 10},${decimi % 10} km"
+        }
     }
 }
