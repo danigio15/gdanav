@@ -31,6 +31,11 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('audi-a6-e-tron-83', 'Audi', 'A6 Sportback e-tron 83 kWh', kwh: 75.8, kg: 2100, cda: 0.48, dc: 225),
   _auto('audi-a6-sportback-e-tron', 'Audi', 'A6 Sportback e-tron 100 kWh', kwh: 94.9, kg: 2150, cda: 0.48, dc: 270),
   _auto('audi-a6-avant-e-tron', 'Audi', 'A6 Avant e-tron 100 kWh', kwh: 94.9, kg: 2170, cda: 0.54, dc: 270),
+  // A2 e-tron (ordini da settembre 2026): Audi dà 52, 61 e 84 kWh lordi, i pacchi
+  // della ID.3 Neo; qui i netti di quella. Fonte: audi.com, comunicato «A2 e-tron».
+  _auto('audi-a2-e-tron-52', 'Audi', 'A2 e-tron 52 kWh', kwh: 50, kg: 1700, cda: 0.56, dc: 105),
+  _auto('audi-a2-e-tron-61', 'Audi', 'A2 e-tron 61 kWh', kwh: 58, kg: 1750, cda: 0.56, dc: 105),
+  _auto('audi-a2-e-tron-84', 'Audi', 'A2 e-tron 84 kWh', kwh: 79, kg: 1850, cda: 0.56, dc: 183),
   _auto('audi-e-tron-50', 'Audi', 'e-tron 50 quattro', kwh: 64.7, kg: 2520, cda: 0.74, dc: 120),
   _auto('audi-e-tron-55', 'Audi', 'e-tron 55 quattro', kwh: 86.5, kg: 2595, cda: 0.74, dc: 150),
   _auto('audi-e-tron-sportback-50', 'Audi', 'e-tron Sportback 50 quattro', kwh: 64.7, kg: 2525, cda: 0.70, dc: 120),
@@ -79,6 +84,9 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('byd-atto2-45', 'BYD', 'Atto 2 45 kWh', kwh: 45.1, kg: 1580, cda: 0.70, dc: 65),
   _auto('byd-atto2-64', 'BYD', 'Atto 2 64 kWh', kwh: 64, kg: 1735, cda: 0.70, dc: 130),
   _auto('byd-atto3', 'BYD', 'Atto 3', kwh: 60.5, kg: 1825, cda: 0.73, dc: 88),
+  // Atto 3 Evo (2026): 74,8 kWh, 220 kW in continua, 800 V. Fonte: comunicato BYD Europe, febbraio 2026.
+  _auto('byd-atto3-evo', 'BYD', 'Atto 3 Evo', kwh: 74.8, kg: 1900, cda: 0.73, dc: 220),
+  _auto('byd-atto3-evo-awd', 'BYD', 'Atto 3 Evo AWD', kwh: 74.8, kg: 2050, cda: 0.73, dc: 220),
   _auto('byd-dolphin-44', 'BYD', 'Dolphin 44 kWh', kwh: 44.9, kg: 1480, cda: 0.69, dc: 60),
   _auto('byd-dolphin-60', 'BYD', 'Dolphin 60 kWh', kwh: 60.4, kg: 1733, cda: 0.69, dc: 88),
   _auto('byd-dolphin-surf-30', 'BYD', 'Dolphin Surf 30 kWh', kwh: 30, kg: 1285, cda: 0.66, dc: 65),
@@ -116,6 +124,12 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('cupra-tavascan-vz', 'Cupra', 'Tavascan VZ', kwh: 77, kg: 2255, cda: 0.66, dc: 135),
   // Dacia
   _auto('dacia-spring', 'Dacia', 'Spring', kwh: 26.8, kg: 1050, cda: 0.76, dc: 30, ac: 7),
+  // Spring 2026: nuova batteria LFP da 24,3 kWh, 40 kW in continua. Fonte: comunicato Dacia, 2025.
+  _auto('dacia-spring-2026', 'Dacia', 'Spring 24,3 kWh (2026)', kwh: 24.3, kg: 1060, cda: 0.76, dc: 40, ac: 7),
+  // Denza (BYD), in Europa da aprile 2026. Picco dichiarato 1500 kW (Flash Charging BYD): qui
+  // 400, il massimo delle colonnine CCS che si trovano per strada.
+  // Fonte: comunicato Denza Europe, aprile 2026 (122,5 kWh lordi, circa 120 utili).
+  _auto('denza-z9-gt', 'Denza', 'Z9 GT', kwh: 120, kg: 2700, cda: 0.62, dc: 400),
   // DS
   _auto('ds-3-e-tense-50', 'DS', '3 E-Tense 50 kWh', kwh: 46.3, kg: 1600, cda: 0.70, dc: 100),
   _auto('ds-3-e-tense-54', 'DS', '3 E-Tense 54 kWh', kwh: 51, kg: 1650, cda: 0.70, dc: 100),
@@ -151,6 +165,11 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
       kwh: 91, kg: 2255, cda: 0.73, dc: 150),
   _auto('ford-mustang-mach-e-gt', 'Ford', 'Mustang Mach-E GT', kwh: 91, kg: 2350, cda: 0.74, dc: 150),
   _auto('ford-puma-gen-e', 'Ford', 'Puma Gen-E', kwh: 43, kg: 1615, cda: 0.72, dc: 100),
+  // Geely, in Europa dal 2026. Fonti: comunicati Geely Auto Europe (E5 marzo 2026, E2 settembre 2026).
+  _auto('geely-e2-35', 'Geely', 'E2 35 kWh', kwh: 35, kg: 1350, cda: 0.66, dc: 60),
+  _auto('geely-e2-47', 'Geely', 'E2 47 kWh', kwh: 47, kg: 1420, cda: 0.66, dc: 80),
+  _auto('geely-e5-60', 'Geely', 'E5 (EX5) 60,2 kWh', kwh: 60.2, kg: 1800, cda: 0.72, dc: 100),
+  _auto('geely-e5-68', 'Geely', 'E5 (EX5) 68,4 kWh', kwh: 68.4, kg: 1850, cda: 0.72, dc: 100),
   // Genesis
   _auto('genesis-g80-electrified', 'Genesis', 'Electrified G80', kwh: 84, kg: 2340, cda: 0.62, dc: 187),
   _auto('genesis-gv60-standard', 'Genesis', 'GV60 Standard', kwh: 74, kg: 2060, cda: 0.70, dc: 235),
@@ -165,6 +184,10 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   // Hyundai
   _auto('hyundai-inster-42', 'Hyundai', 'Inster 42 kWh', kwh: 42, kg: 1385, cda: 0.74, dc: 73),
   _auto('hyundai-inster-49', 'Hyundai', 'Inster 49 kWh', kwh: 49, kg: 1415, cda: 0.74, dc: 85),
+  // Ioniq 3 (2026): 42,2 e 61 kWh. Hyundai non dà il picco in continua (10-80% in 29-30 min):
+  // quello qui è di ev-database.org, misurato. Fonte: hyundai.news, press kit «All-new IONIQ 3».
+  _auto('hyundai-ioniq3-42', 'Hyundai', 'Ioniq 3 42 kWh', kwh: 42.2, kg: 1500, cda: 0.58, dc: 100),
+  _auto('hyundai-ioniq3-61', 'Hyundai', 'Ioniq 3 61 kWh', kwh: 61, kg: 1600, cda: 0.58, dc: 115),
   _auto('hyundai-ioniq-28', 'Hyundai', 'Ioniq Electric 28 kWh', kwh: 28, kg: 1495, cda: 0.53, dc: 70, ac: 7.2),
   _auto('hyundai-ioniq-38', 'Hyundai', 'Ioniq Electric 38 kWh', kwh: 38.3, kg: 1600, cda: 0.53, dc: 44, ac: 7.2),
   _auto('hyundai-ioniq5-58', 'Hyundai', 'Ioniq 5 58 kWh', kwh: 54, kg: 1985, cda: 0.75, dc: 175),
@@ -176,6 +199,8 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('hyundai-ioniq6-53', 'Hyundai', 'Ioniq 6 53 kWh', kwh: 50, kg: 1875, cda: 0.46, dc: 175),
   _auto('hyundai-ioniq6-77', 'Hyundai', 'Ioniq 6 77 kWh', kwh: 74, kg: 1985, cda: 0.46, dc: 235),
   _auto('hyundai-ioniq6-84-awd', 'Hyundai', 'Ioniq 6 84 kWh AWD', kwh: 80, kg: 2090, cda: 0.47, dc: 240),
+  // Fonte: hyundai.news, press kit «IONIQ 6 N» (84 kWh lordi, 260 kW).
+  _auto('hyundai-ioniq6-n', 'Hyundai', 'Ioniq 6 N', kwh: 80, kg: 2200, cda: 0.50, dc: 260),
   _auto('hyundai-ioniq9', 'Hyundai', 'Ioniq 9 RWD', kwh: 105, kg: 2620, cda: 0.78, dc: 250),
   _auto('hyundai-ioniq9-awd', 'Hyundai', 'Ioniq 9 AWD', kwh: 105, kg: 2730, cda: 0.78, dc: 250),
   _auto('hyundai-kona-39', 'Hyundai', 'Kona Electric 39 kWh (2018)', kwh: 39.2, kg: 1610, cda: 0.68, dc: 44, ac: 7.2),
@@ -183,6 +208,9 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
       kwh: 64, kg: 1760, cda: 0.70, dc: 77, ac: 7.2),
   _auto('hyundai-kona-48', 'Hyundai', 'Kona Electric 48 kWh', kwh: 48.4, kg: 1695, cda: 0.65, dc: 73),
   _auto('hyundai-kona-65', 'Hyundai', 'Kona Electric 65 kWh', kwh: 64.8, kg: 1815, cda: 0.65, dc: 102),
+  // Jaecoo (Chery)
+  // 5 EV (J5 EV): 60,9 kWh lordi, 58,9 utili, 80 kW. Fonte: brochure Omoda & Jaecoo UK, 2025.
+  _auto('jaecoo-5-ev', 'Jaecoo', '5 EV', kwh: 58.9, kg: 1700, cda: 0.75, dc: 80),
   // Jaguar
   _auto('jaguar-i-pace', 'Jaguar', 'I-Pace', kwh: 84.7, kg: 2280, cda: 0.75, dc: 100),
   // Jeep
@@ -197,11 +225,19 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('kia-e-niro-64', 'Kia', 'e-Niro 64 kWh', kwh: 64, kg: 1810, cda: 0.72, dc: 77, ac: 7.2),
   _auto('kia-e-soul-39', 'Kia', 'e-Soul 39 kWh', kwh: 39.2, kg: 1690, cda: 0.80, dc: 50, ac: 7.2),
   _auto('kia-e-soul-64', 'Kia', 'e-Soul 64 kWh', kwh: 64, kg: 1760, cda: 0.80, dc: 77, ac: 7.2),
+  // EV2 (2026): 42,2 e 61 kWh, 400 V. Kia non dà il picco in continua (10-80% in 29-30 min): quello
+  // qui è di ev-database.org, misurato. Fonte: kia.com/eu, pagina EV2; electrive.com, gennaio 2026.
+  _auto('kia-ev2-42', 'Kia', 'EV2 42 kWh', kwh: 42.2, kg: 1620, cda: 0.70, dc: 100),
+  _auto('kia-ev2-61', 'Kia', 'EV2 61 kWh', kwh: 61, kg: 1625, cda: 0.70, dc: 115),
   _auto('kia-ev3-58', 'Kia', 'EV3 58 kWh', kwh: 55, kg: 1765, cda: 0.66, dc: 102),
   _auto('kia-ev3-81', 'Kia', 'EV3 81 kWh', kwh: 78, kg: 1885, cda: 0.66, dc: 128),
+  // EV3, EV4 ed EV5 GT (2026): 81,4 kWh lordi. Fonte: Kia Europe, comunicato di settembre 2026.
+  _auto('kia-ev3-gt', 'Kia', 'EV3 GT', kwh: 78, kg: 2000, cda: 0.66, dc: 128),
   _auto('kia-ev4-58', 'Kia', 'EV4 58 kWh', kwh: 55, kg: 1685, cda: 0.55, dc: 101),
   _auto('kia-ev4-81', 'Kia', 'EV4 81 kWh', kwh: 78, kg: 1770, cda: 0.55, dc: 127),
+  _auto('kia-ev4-gt', 'Kia', 'EV4 GT', kwh: 78, kg: 1950, cda: 0.56, dc: 127),
   _auto('kia-ev5', 'Kia', 'EV5', kwh: 78, kg: 2070, cda: 0.75, dc: 140),
+  _auto('kia-ev5-gt', 'Kia', 'EV5 GT', kwh: 78, kg: 2200, cda: 0.75, dc: 140),
   _auto('kia-ev6-58', 'Kia', 'EV6 58 kWh', kwh: 54, kg: 1955, cda: 0.67, dc: 180),
   _auto('kia-ev6-77', 'Kia', 'EV6 77 kWh', kwh: 74, kg: 2130, cda: 0.67, dc: 235),
   _auto('kia-ev6-84', 'Kia', 'EV6 84 kWh', kwh: 80, kg: 2100, cda: 0.67, dc: 258),
@@ -217,11 +253,22 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('lancia-ypsilon-elettrica', 'Lancia', 'Ypsilon Elettrica', kwh: 51, kg: 1580, cda: 0.66, dc: 100),
   _auto('lancia-ypsilon-hf', 'Lancia', 'Ypsilon HF', kwh: 51, kg: 1620, cda: 0.66, dc: 100),
   // Leapmotor
+  // B03X (ordini da luglio 2026): LFP da 39,8 e 53 kWh, 100 e 133 kW in continua, Cx 0,26.
+  // Fonte: comunicato Leapmotor International, 7 luglio 2026; massa da auto-data.net.
+  _auto('leapmotor-b03x-40', 'Leapmotor', 'B03X 39,8 kWh', kwh: 39.8, kg: 1525, cda: 0.62, dc: 100),
+  _auto('leapmotor-b03x-53', 'Leapmotor', 'B03X 53 kWh', kwh: 53, kg: 1625, cda: 0.62, dc: 133),
+  // B05 (ordini da aprile 2026): le batterie della B10. 174 kW è il picco dichiarato per la 67,1;
+  // per la 56,2 non c'è, e si tiene quello della B10. Fonte: comunicato Leapmotor, 28 aprile 2026.
+  _auto('leapmotor-b05-56', 'Leapmotor', 'B05 56,2 kWh', kwh: 56.2, kg: 1700, cda: 0.60, dc: 140),
+  _auto('leapmotor-b05-67', 'Leapmotor', 'B05 67,1 kWh', kwh: 67.1, kg: 1750, cda: 0.60, dc: 174),
   _auto('leapmotor-b10-56', 'Leapmotor', 'B10 56 kWh', kwh: 56.2, kg: 1750, cda: 0.70, dc: 140),
   _auto('leapmotor-b10-67', 'Leapmotor', 'B10 67,1 kWh (Design, Pro Max)', kwh: 67.1, kg: 1800, cda: 0.70, dc: 168),
   _auto('leapmotor-c10', 'Leapmotor', 'C10', kwh: 67, kg: 1980, cda: 0.80, dc: 84),
-  _auto('leapmotor-t03', 'Leapmotor', 'T03', kwh: 36.3, kg: 1250, cda: 0.68, dc: 48, ac: 6.6),
+  _auto('leapmotor-t03', 'Leapmotor', 'T03', kwh: 36, kg: 1250, cda: 0.68, dc: 48, ac: 6.6),
   // Lexus
+  // ES elettrica (2026): 77 e 75 kWh lordi, 150 kW. Fonte: lexus.eu, pagina ES.
+  _auto('lexus-es-350e', 'Lexus', 'ES 350e', kwh: 72, kg: 2100, cda: 0.55, dc: 150),
+  _auto('lexus-es-500e', 'Lexus', 'ES 500e', kwh: 71, kg: 2250, cda: 0.55, dc: 150),
   _auto('lexus-rz-350e', 'Lexus', 'RZ 350e', kwh: 55, kg: 2100, cda: 0.72, dc: 150),
   _auto('lexus-rz-450e', 'Lexus', 'RZ 450e', kwh: 64, kg: 2200, cda: 0.72, dc: 150),
   _auto('lexus-rz-500e', 'Lexus', 'RZ 500e', kwh: 72, kg: 2275, cda: 0.72, dc: 150),
@@ -251,6 +298,9 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('mazda-mx-30', 'Mazda', 'MX-30', kwh: 30, kg: 1720, cda: 0.72, dc: 50, ac: 6.6),
   // Mercedes-Benz
   _auto('mercedes-amg-eqe-53', 'Mercedes-Benz', 'AMG EQE 53 4MATIC+', kwh: 90.6, kg: 2600, cda: 0.55, dc: 170),
+  // Classe C elettrica (2026): 94 kWh utili, 330 kW. Fonte: comunicato Mercedes-Benz, IAA 2025.
+  _auto('mercedes-c-400-4matic', 'Mercedes-Benz', 'C 400 4MATIC con tecnologia EQ',
+      kwh: 94, kg: 2350, cda: 0.50, dc: 330),
   _auto('mercedes-cla-200', 'Mercedes-Benz', 'CLA 200 (58 kWh)', kwh: 58, kg: 1990, cda: 0.46, dc: 180),
   _auto('mercedes-cla-250-plus', 'Mercedes-Benz', 'CLA 250+ (85 kWh)', kwh: 85, kg: 2130, cda: 0.46, dc: 320),
   _auto('mercedes-cla-350-4matic', 'Mercedes-Benz', 'CLA 350 4MATIC', kwh: 85, kg: 2210, cda: 0.46, dc: 320),
@@ -279,6 +329,10 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('mercedes-g-580', 'Mercedes-Benz', 'G 580 con tecnologia EQ', kwh: 116, kg: 3160, cda: 1.40, dc: 200),
   _auto('mercedes-glc-400-4matic', 'Mercedes-Benz', 'GLC 400 4MATIC con tecnologia EQ',
       kwh: 94, kg: 2530, cda: 0.72, dc: 330),
+  // GLB elettrica (2026): 85 kWh, 320 kW. Fonte: comunicato Mercedes-Benz, 8 dicembre 2025.
+  _auto('mercedes-glb-250-plus', 'Mercedes-Benz', 'GLB 250+ con tecnologia EQ', kwh: 85, kg: 2200, cda: 0.68, dc: 320),
+  _auto('mercedes-glb-350-4matic', 'Mercedes-Benz', 'GLB 350 4MATIC con tecnologia EQ',
+      kwh: 85, kg: 2300, cda: 0.68, dc: 320),
   _auto('mercedes-maybach-eqs-680', 'Mercedes-Benz', 'Maybach EQS 680 SUV', kwh: 108.4, kg: 3010, cda: 0.80, dc: 200),
   // MG
   _auto('mg-cyberster', 'MG', 'Cyberster', kwh: 74, kg: 1960, cda: 0.55, dc: 144),
@@ -289,6 +343,9 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('mg4-64', 'MG', 'MG4 64 kWh', kwh: 61.7, kg: 1835, cda: 0.67, dc: 135),
   _auto('mg4-77', 'MG', 'MG4 77 kWh', kwh: 74.4, kg: 1785, cda: 0.67, dc: 144),
   _auto('mg4-xpower', 'MG', 'MG4 XPOWER', kwh: 61.7, kg: 1875, cda: 0.68, dc: 135),
+  // MG4 Urban (2026): 43 e 54 kWh (41,9 e 52,8 utili), 82 e 87 kW. Fonte: comunicato MG Motor Europe, 2026.
+  _auto('mg4-urban-43', 'MG', 'MG4 Urban 43 kWh', kwh: 41.9, kg: 1500, cda: 0.66, dc: 82),
+  _auto('mg4-urban-54', 'MG', 'MG4 Urban 54 kWh', kwh: 52.8, kg: 1550, cda: 0.66, dc: 87),
   _auto('mg5', 'MG', 'MG5 Electric', kwh: 57.4, kg: 1625, cda: 0.66, dc: 87),
   _auto('mg-s5-49', 'MG', 'MGS5 49 kWh', kwh: 46, kg: 1675, cda: 0.72, dc: 87),
   _auto('mg-s5-64', 'MG', 'MGS5 64 kWh', kwh: 60, kg: 1735, cda: 0.72, dc: 139),
@@ -304,7 +361,13 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('mini-countryman-e', 'Mini', 'Countryman E', kwh: 64.6, kg: 2050, cda: 0.70, dc: 130),
   _auto('mini-countryman-se-all4', 'Mini', 'Countryman SE ALL4', kwh: 64.6, kg: 2160, cda: 0.70, dc: 130),
   _auto('mini-jcw-electric', 'Mini', 'John Cooper Works Electric', kwh: 49.2, kg: 1715, cda: 0.61, dc: 95),
+  // Fonte: BMW Group PressClub, «MINI John Cooper Works Aceman» (54,2 kWh lordi, 95 kW).
+  _auto('mini-aceman-jcw', 'Mini', 'John Cooper Works Aceman', kwh: 49.2, kg: 1800, cda: 0.65, dc: 95),
   // Mitsubishi
+  // Eclipse Cross EV (2025), sorella della Scénic: 87 kWh, 150 kW, 22 kW in alternata.
+  // Fonte: comunicato Mitsubishi Motors Europe, settembre 2025.
+  _auto('mitsubishi-eclipse-cross-ev', 'Mitsubishi', 'Eclipse Cross EV 87 kWh',
+      kwh: 87, kg: 1900, cda: 0.68, dc: 150, ac: 22),
   _auto('mitsubishi-i-miev', 'Mitsubishi', 'i-MiEV',
       kwh: 14.5, kg: 1185, cda: 0.72, dc: 40, ac: 3.7, connettori: _chademo),
   // NIO
@@ -344,6 +407,8 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('opel-grandland-electric-97', 'Opel', 'Grandland Electric 97 kWh', kwh: 92, kg: 2265, cda: 0.72, dc: 160),
   _auto('opel-mokka-e-50', 'Opel', 'Mokka-e 50 kWh', kwh: 46.3, kg: 1675, cda: 0.72, dc: 100),
   _auto('opel-mokka-electric-54', 'Opel', 'Mokka Electric 54 kWh', kwh: 51, kg: 1700, cda: 0.72, dc: 100),
+  // Fonte: comunicato Opel, luglio 2025 (54 kWh, 207 kW).
+  _auto('opel-mokka-gse', 'Opel', 'Mokka GSE', kwh: 51, kg: 1650, cda: 0.72, dc: 100),
   _auto('opel-zafira-e-life', 'Opel', 'Zafira-e Life 75 kWh', kwh: 68, kg: 2360, cda: 1.20, dc: 100),
   // Peugeot
   _auto('peugeot-e-rifter-50', 'Peugeot', 'e-Rifter 50 kWh', kwh: 46.3, kg: 1765, cda: 1.05, dc: 100),
@@ -351,6 +416,8 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('peugeot-e-traveller', 'Peugeot', 'e-Traveller 75 kWh', kwh: 68, kg: 2360, cda: 1.20, dc: 100),
   _auto('peugeot-e208-50', 'Peugeot', 'e-208 50 kWh', kwh: 46.3, kg: 1530, cda: 0.64, dc: 100),
   _auto('peugeot-e208-51', 'Peugeot', 'e-208 51 kWh', kwh: 48, kg: 1605, cda: 0.64, dc: 100),
+  // Fonte: comunicato Peugeot, 12 giugno 2026 (54 kWh lordi, 51 utili).
+  _auto('peugeot-e208-gti', 'Peugeot', 'e-208 GTi', kwh: 51, kg: 1600, cda: 0.64, dc: 100),
   _auto('peugeot-e2008-50', 'Peugeot', 'e-2008 50 kWh', kwh: 46.3, kg: 1625, cda: 0.72, dc: 100),
   _auto('peugeot-e2008-54', 'Peugeot', 'e-2008 54 kWh', kwh: 51, kg: 1700, cda: 0.72, dc: 100),
   _auto('peugeot-e308-54', 'Peugeot', 'e-308 54 kWh', kwh: 51, kg: 1760, cda: 0.62, dc: 100),
@@ -372,6 +439,9 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('polestar-3-dual', 'Polestar', '3 Long Range Dual Motor', kwh: 107, kg: 2670, cda: 0.78, dc: 250),
   _auto('polestar-4-single', 'Polestar', '4 Long Range Single Motor', kwh: 94, kg: 2310, cda: 0.64, dc: 200),
   _auto('polestar-4-dual', 'Polestar', '4 Long Range Dual Motor', kwh: 94, kg: 2430, cda: 0.64, dc: 200),
+  // 5 (2026): 112 kWh lordi, 106 utili, 800 V, 350 kW. Fonte: comunicato Polestar, settembre 2025.
+  _auto('polestar-5-dual', 'Polestar', '5 Dual Motor', kwh: 106, kg: 2500, cda: 0.55, dc: 350),
+  _auto('polestar-5-performance', 'Polestar', '5 Performance', kwh: 106, kg: 2550, cda: 0.56, dc: 350),
   // Porsche
   _auto('porsche-cayenne-electric', 'Porsche', 'Cayenne Electric', kwh: 108, kg: 2720, cda: 0.72, dc: 400),
   _auto('porsche-macan-electric', 'Porsche', 'Macan Electric', kwh: 95, kg: 2405, cda: 0.66, dc: 270),
@@ -427,6 +497,11 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   // Subaru
   _auto('subaru-solterra', 'Subaru', 'Solterra', kwh: 64, kg: 2095, cda: 0.72, dc: 150),
   _auto('subaru-solterra-2025', 'Subaru', 'Solterra 74 kWh (2025)', kwh: 72, kg: 2150, cda: 0.72, dc: 150),
+  // Uncharted ed E-Outback (2026): le sorelle della C-HR+ e della bZ4X Touring.
+  // Fonte: comunicato Subaru Europe, luglio 2025.
+  _auto('subaru-uncharted-57', 'Subaru', 'Uncharted 57,7 kWh', kwh: 55, kg: 1890, cda: 0.65, dc: 100),
+  _auto('subaru-uncharted-77', 'Subaru', 'Uncharted 77 kWh', kwh: 74, kg: 1990, cda: 0.65, dc: 150),
+  _auto('subaru-e-outback', 'Subaru', 'E-Outback', kwh: 71, kg: 2150, cda: 0.74, dc: 150),
   // Suzuki
   _auto('suzuki-e-vitara-49', 'Suzuki', 'e Vitara 49 kWh', kwh: 49, kg: 1775, cda: 0.72, dc: 70),
   _auto('suzuki-e-vitara-61', 'Suzuki', 'e Vitara 61 kWh', kwh: 61, kg: 1840, cda: 0.72, dc: 70),
@@ -437,6 +512,9 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('tesla-model-3-lr-rwd', 'Tesla', 'Model 3 Long Range RWD', kwh: 78, kg: 1845, cda: 0.49, dc: 250),
   _auto('tesla-model-3-performance', 'Tesla', 'Model 3 Performance', kwh: 75, kg: 1910, cda: 0.49, dc: 250),
   _auto('tesla-model-3-performance-2024', 'Tesla', 'Model 3 Performance (2024)', kwh: 78, kg: 1920, cda: 0.49, dc: 250),
+  // Model 3 Standard (2025): 534 km WLTP, 175 kW. Tesla non dà la capacità: quella qui è stimata
+  // (evkx.net, 60,5 kWh netti). Fonte: tesla.com/eu/model3.
+  _auto('tesla-model-3-standard', 'Tesla', 'Model 3 Standard', kwh: 60.5, kg: 1760, cda: 0.48, dc: 175),
   _auto('tesla-model-s-75d', 'Tesla', 'Model S 75D', kwh: 72.6, kg: 2180, cda: 0.55, dc: 120),
   _auto('tesla-model-s-100d', 'Tesla', 'Model S 100D', kwh: 95, kg: 2290, cda: 0.55, dc: 145),
   _auto('tesla-model-s-lr', 'Tesla', 'Model S Long Range', kwh: 95, kg: 2145, cda: 0.49, dc: 250),
@@ -455,6 +533,8 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('toyota-bz4x-awd', 'Toyota', 'bZ4X AWD', kwh: 64, kg: 2125, cda: 0.72, dc: 150),
   _auto('toyota-bz4x-2025-57', 'Toyota', 'bZ4X 57 kWh (2025)', kwh: 55, kg: 2000, cda: 0.72, dc: 150),
   _auto('toyota-bz4x-2025-74', 'Toyota', 'bZ4X 74 kWh (2025)', kwh: 72, kg: 2100, cda: 0.72, dc: 150),
+  // bZ4X Touring (2026): 74,7 kWh lordi, 71 utili, 150 kW. Fonte: comunicato Toyota Europe, 13 maggio 2026.
+  _auto('toyota-bz4x-touring', 'Toyota', 'bZ4X Touring', kwh: 71, kg: 2150, cda: 0.74, dc: 150),
   _auto('toyota-c-hr-plus-57', 'Toyota', 'C-HR+ 57 kWh', kwh: 55, kg: 1890, cda: 0.65, dc: 100),
   _auto('toyota-c-hr-plus-77', 'Toyota', 'C-HR+ 77 kWh', kwh: 74, kg: 1990, cda: 0.65, dc: 150),
   _auto('toyota-proace-city-verso', 'Toyota', 'Proace City Verso Electric', kwh: 46.3, kg: 1785, cda: 1.05, dc: 100),
@@ -469,6 +549,10 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('volkswagen-id-buzz-pro', 'Volkswagen', 'ID. Buzz Pro 77 kWh', kwh: 77, kg: 2500, cda: 0.95, dc: 170),
   _auto('volkswagen-id-buzz-lwb', 'Volkswagen', 'ID. Buzz passo lungo 86 kWh', kwh: 86, kg: 2710, cda: 0.95, dc: 200),
   _auto('volkswagen-id-buzz-gtx', 'Volkswagen', 'ID. Buzz GTX', kwh: 86, kg: 2750, cda: 0.96, dc: 200),
+  // ID. Cross (autunno 2026): 37 kWh LFP a 90 kW, 52 kWh NMC a 105 kW, netti.
+  // Fonte: volkswagen-newsroom.com, «The all-new ID. Cross».
+  _auto('volkswagen-id-cross-37', 'Volkswagen', 'ID. Cross 37 kWh', kwh: 37, kg: 1550, cda: 0.68, dc: 90),
+  _auto('volkswagen-id-cross-52', 'Volkswagen', 'ID. Cross 52 kWh', kwh: 52, kg: 1620, cda: 0.68, dc: 105),
   _auto('volkswagen-id-polo-37', 'Volkswagen', 'ID. Polo (ID.2) 37 kWh', kwh: 37, kg: 1450, cda: 0.62, dc: 90),
   _auto('volkswagen-id-polo-52', 'Volkswagen', 'ID. Polo (ID.2) 52 kWh', kwh: 52, kg: 1550, cda: 0.62, dc: 125),
   _auto('volkswagen-id3-45', 'Volkswagen', 'ID.3 Pure 45 kWh', kwh: 45, kg: 1795, cda: 0.63, dc: 100),
@@ -476,6 +560,11 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('volkswagen-id3-58', 'Volkswagen', 'ID.3 Pro 58 kWh', kwh: 58, kg: 1887, cda: 0.63, dc: 120),
   _auto('volkswagen-id3-77', 'Volkswagen', 'ID.3 Pro S 77 kWh', kwh: 77, kg: 2010, cda: 0.63, dc: 175),
   _auto('volkswagen-id3-gtx', 'Volkswagen', 'ID.3 GTX', kwh: 79, kg: 2050, cda: 0.63, dc: 185),
+  // ID.3 Neo (2026): 50 e 58 kWh LFP a 105 kW, 79 kWh NMC a 183 kW, netti.
+  // Fonte: volkswagen-newsroom.com, «World premiere of the ID.3 Neo».
+  _auto('volkswagen-id3-neo-50', 'Volkswagen', 'ID.3 Neo 50 kWh', kwh: 50, kg: 1800, cda: 0.62, dc: 105),
+  _auto('volkswagen-id3-neo-58', 'Volkswagen', 'ID.3 Neo 58 kWh', kwh: 58, kg: 1830, cda: 0.62, dc: 105),
+  _auto('volkswagen-id3-neo-79', 'Volkswagen', 'ID.3 Neo 79 kWh', kwh: 79, kg: 1950, cda: 0.62, dc: 183),
   _auto('volkswagen-id4-52', 'Volkswagen', 'ID.4 Pure 52 kWh', kwh: 52, kg: 2025, cda: 0.73, dc: 110),
   _auto('volkswagen-id4-77', 'Volkswagen', 'ID.4 Pro 77 kWh', kwh: 77, kg: 2200, cda: 0.73, dc: 135),
   _auto('volkswagen-id4-4motion', 'Volkswagen', 'ID.4 Pro 4MOTION', kwh: 77, kg: 2305, cda: 0.73, dc: 175),
@@ -501,6 +590,10 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('volvo-ex40-69', 'Volvo', 'EX40 Single Motor 69 kWh', kwh: 67, kg: 2045, cda: 0.78, dc: 130),
   _auto('volvo-ex40-82', 'Volvo', 'EX40 Single Motor 82 kWh', kwh: 79, kg: 2105, cda: 0.78, dc: 200),
   _auto('volvo-ex40-twin', 'Volvo', 'EX40 Twin Motor', kwh: 79, kg: 2255, cda: 0.78, dc: 200),
+  // EX60 (2026): 80, 91 e 112 kWh utili; 320 kW la P6, 370 le altre. Fonte: comunicato Volvo Cars, gennaio 2026.
+  _auto('volvo-ex60-p6', 'Volvo', 'EX60 P6', kwh: 80, kg: 2200, cda: 0.66, dc: 320),
+  _auto('volvo-ex60-p10', 'Volvo', 'EX60 P10 AWD', kwh: 91, kg: 2350, cda: 0.66, dc: 370),
+  _auto('volvo-ex60-p12', 'Volvo', 'EX60 P12 AWD', kwh: 112, kg: 2450, cda: 0.66, dc: 370),
   _auto('volvo-ex90', 'Volvo', 'EX90 Twin Motor', kwh: 104, kg: 2890, cda: 0.80, dc: 250),
   _auto('volvo-xc40-recharge-p8', 'Volvo', 'XC40 Recharge P8 (2020)', kwh: 75, kg: 2265, cda: 0.78, dc: 150),
   // Xpeng
@@ -511,10 +604,24 @@ final List<ProfiloVeicolo> catalogoVeicoli = [
   _auto('xpeng-g9-lr', 'Xpeng', 'G9 Long Range', kwh: 93.1, kg: 2355, cda: 0.75, dc: 300),
   _auto('xpeng-g9-awd', 'Xpeng', 'G9 Performance AWD', kwh: 93.1, kg: 2475, cda: 0.76, dc: 300),
   _auto('xpeng-p7', 'Xpeng', 'P7 AWD', kwh: 86.2, kg: 2190, cda: 0.46, dc: 175),
+  // P7+ (2026): 61,7 e 74,9 kWh lordi; la grande arriva a 446 kW, qui 400 come per le altre.
+  // Fonte: comunicato XPENG Europe, gennaio 2026.
+  _auto('xpeng-p7-plus-sr', 'Xpeng', 'P7+ Standard Range', kwh: 60, kg: 2000, cda: 0.52, dc: 350),
+  _auto('xpeng-p7-plus-lr', 'Xpeng', 'P7+ Long Range', kwh: 73, kg: 2060, cda: 0.52, dc: 400),
+  _auto('xpeng-p7-plus-awd', 'Xpeng', 'P7+ Performance AWD', kwh: 73, kg: 2160, cda: 0.53, dc: 400),
+  // X9 (giugno 2026): 94,8 kWh LFP e 110 kWh NMC (106 utili); 537-542 kW dichiarati, qui 400.
+  // Fonte: comunicato XPENG Europe, 16 giugno 2026.
+  _auto('xpeng-x9-sr', 'Xpeng', 'X9 Standard Range', kwh: 94.8, kg: 2600, cda: 0.85, dc: 400),
+  _auto('xpeng-x9-lr', 'Xpeng', 'X9 Long Range', kwh: 106, kg: 2650, cda: 0.85, dc: 400),
+  _auto('xpeng-x9-awd', 'Xpeng', 'X9 Performance AWD', kwh: 106, kg: 2750, cda: 0.86, dc: 400),
   // Zeekr
   _auto('zeekr-001', 'Zeekr', '001 100 kWh', kwh: 100, kg: 2425, cda: 0.58, dc: 200),
   _auto('zeekr-7x-75', 'Zeekr', '7X 75 kWh', kwh: 75, kg: 2155, cda: 0.68, dc: 360),
   _auto('zeekr-7x-100', 'Zeekr', '7X 100 kWh', kwh: 100, kg: 2325, cda: 0.68, dc: 400),
+  // 7GT (2026): le batterie e la ricarica della 7X. Fonte: zeekr.eu, pagina 7GT.
+  _auto('zeekr-7gt-75', 'Zeekr', '7GT 75 kWh', kwh: 75, kg: 2140, cda: 0.56, dc: 360),
+  _auto('zeekr-7gt-100', 'Zeekr', '7GT 100 kWh', kwh: 97, kg: 2260, cda: 0.56, dc: 400),
+  _auto('zeekr-7gt-awd', 'Zeekr', '7GT 100 kWh AWD', kwh: 97, kg: 2360, cda: 0.57, dc: 400),
   _auto('zeekr-x-rwd', 'Zeekr', 'X RWD', kwh: 66, kg: 1910, cda: 0.64, dc: 150),
   _auto('zeekr-x-awd', 'Zeekr', 'X AWD', kwh: 66, kg: 2020, cda: 0.64, dc: 150),
 ];

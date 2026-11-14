@@ -92,6 +92,17 @@ void main() {
       expect(veicoloPerNome('fiat', '500e', kwh: 37.3)?.marca, 'Fiat');
     });
 
+    test('le auto nuove della plancia (catalogo di novembre 2026) si ritrovano', () {
+      // «Si può aggiungere la LEAPMOTOR B03X?»: la plancia la scrive così.
+      expect(veicoloPerNome('Leapmotor', 'B03X', kwh: 53)?.id, 'leapmotor-b03x-53');
+      expect(veicoloPerNome('Leapmotor', 'B03X 39,8 kWh')?.id, 'leapmotor-b03x-40');
+      expect(veicoloPerNome('Leapmotor', 'B05')?.marca, 'Leapmotor');
+      expect(veicoloPerNome('Kia', 'EV2')?.id, startsWith('kia-ev2-'));
+      expect(veicoloPerNome('Volvo', 'EX60')?.id, startsWith('volvo-ex60-'));
+      expect(veicoloPerNome('Geely', 'EX5')?.id, startsWith('geely-e5-'));
+      expect(veicoloPerNome('Zeekr', 'Zeekr X')?.id, startsWith('zeekr-x-'));
+    });
+
     test('a parità di parole vince la batteria più vicina', () {
       expect(veicoloPerNome('Renault', '5 E-Tech', kwh: 52)?.id, 'renault-5-52');
       expect(veicoloPerNome('Renault', '5 E-Tech', kwh: 40)?.id, 'renault-5-40');
