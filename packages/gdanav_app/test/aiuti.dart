@@ -168,7 +168,8 @@ class Ambiente {
 /// guardano il GPS tacere gli passano quello finto della prova
 /// (`tester.binding.clock.now`), che va avanti con `pump`. [dove] è dove si
 /// è quando si calcola il viaggio, per le prove che lo vogliono diverso da
-/// [posizione]: un GPS che una volta non risponde, per esempio. [GdAHome]:
+/// [posizione]: un GPS che una volta non risponde, per esempio. [orologioGuida]
+/// è quello della guida (la stima senza GPS in galleria). [GdAHome]:
 /// la fonte dei dati dell'auto quando GdANav gira dentro GdAHome.
 Future<Ambiente> ambiente(
   WidgetTester tester, {
@@ -181,6 +182,7 @@ Future<Ambiente> ambiente(
   CercaStrade? strade,
   Duration durataProposta = const Duration(seconds: 20),
   DateTime Function()? orologio,
+  DateTime Function()? orologioGuida,
   Future<Punto?> Function()? dove,
   SorgenteGdahome? gdahome,
 }) async {
@@ -220,6 +222,8 @@ Future<Ambiente> ambiente(
     risparmio: risparmio,
     archivio: archivio,
     audioIniziale: await archivio.modoAudio(),
+    orologio: orologioGuida,
+    stimaInGalleria: orologioGuida != null,
   );
   addTearDown(guida.dispose);
   final gps = StreamController<Lettura>.broadcast();

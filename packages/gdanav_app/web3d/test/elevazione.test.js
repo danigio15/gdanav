@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ALTEZZA_LIVELLO, PENDENZA, altezzaLivello, grafoStrade, larghezzaStrada, livelloStrada, uniscIBordi } from '../src/elevazione.js';
+import { ALTEZZA_LIVELLO, PENDENZA, altezzaLivello, grafoStrade, larghezzaStrada, livelloStrada, segnaRotonde, uniscIBordi } from '../src/elevazione.js';
 
 // Metri = pixel, per semplicità.
 const metri = (x, y) => [x, -y];
@@ -83,4 +83,72 @@ test('i capi tagliati sul bordo delle tessere si uniscono', () => {
   ];
   assert.equal(uniscIBordi(strade), 1);
   assert.deepEqual(strade[0].g[1], strade[1].g[0]);
+});
+
+/** Un anello di raggio [r] attorno a [cx, cy], a [n] lati, come strada a sé. */
+function anello(cx, cy, r, n = 16, p = { class: 'secondary' }) {
+  const g = [];
+  for (let k = 0; k <= n; k++) {
+    const a = (2 * Math.PI * (k % n)) / n;
+    g.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+  }
+  return { p, g };
+}
+
+/*
+ * «Mi è capitato in due rotonde che erano a livello strada ma le faceva
+ * vedere sopraelevate.» Una rotonda a terra, coi suoi bracci, a una
+ * quarantina di metri dal capo di un cavalcavia: il rilassamento la tirava su
+ * quasi all'altezza del ponte (era a sei, sette metri).
+ */
+function rotondaVicinoAlPonte() {
+  return [
+    // Il cavalcavia, da 100 a 400, a terra dopo.
+    { p: { class: 'primary', brunnel: 'bridge', layer: 1 }, g: [[100, 0], [400, 0]] },
+    { p: { class: 'primary' }, g: [[400, 0], [800, 0]] },
+    // Il braccio verso la rotonda (centro a 0,0, raggio 18): 82 m dal ponte all'anello.
+    { p: { class: 'primary' }, g: [[18, 0], [100, 0]] },
+    anello(0, 0, 18),
+    // Gli altri bracci, corti, verso le case.
+    { p: { class: 'secondary' }, g: [[-18, 0], [-120, 0]] },
+    { p: { class: 'secondary' }, g: [[0, 18], [0, 120]] },
+    { p: { class: 'secondary' }, g: [[0, -18], [0, -120]] },
+    // E un isolato fra i bracci, che chiude il giro.
+    { p: { class: 'minor' }, g: [[-120, 0], [-120, 120], [0, 120]] },
+  ];
+}
+
+test('una rotonda a terra vicino a un cavalcavia resta a terra; la salita è nel braccio', () => {
+  const g = grafoStrade(rotondaVicinoAlPonte(), metri);
+  const sullAnello = g.nodi.filter((n) => Math.abs(Math.hypot(n.x, n.y) - 18) < 0.5);
+  assert.ok(sullAnello.length >= 16);
+  for (const n of sullAnello) assert.ok(n.h < 0.05, `l'anello a terra (${n.x.toFixed(0)},${n.y.toFixed(0)}: ${n.h.toFixed(2)} m)`);
+  // Il ponte resta in quota, e il braccio sale da terra al ponte.
+  assert.ok(Math.abs(quotaA(g, 250) - ALTEZZA_LIVELLO) < 0.05);
+  const meta = g.nodi.filter((n) => Math.abs(n.y) < 0.5 && n.x > 50 && n.x < 70)[0];
+  assert.ok(meta.h > 1 && meta.h < ALTEZZA_LIVELLO - 1, `a metà braccio a metà salita (${meta.h})`);
+  // Gli altri bracci, oltre la rotonda, a terra.
+  for (const n of g.nodi.filter((q) => q.x < -20 && Math.abs(q.y) < 0.5)) assert.equal(n.h, 0);
+});
+
+test('una rotonda con un pezzo di ponte suo resta in quota', () => {
+  // L'anello passa sopra una strada: metà è ponte.
+  const sopra = { class: 'secondary', brunnel: 'bridge', layer: 1 };
+  const a = anello(0, 0, 25, 16).g;
+  const strade = [
+    { p: { class: 'secondary' }, g: a.slice(0, 9) },
+    { p: sopra, g: a.slice(8) },
+    { p: { class: 'primary' }, g: [[0, -300], [0, 300]] },
+  ];
+  const g = grafoStrade(strade, metri);
+  const sullAnello = g.nodi.filter((n) => Math.abs(Math.hypot(n.x, n.y) - 25) < 1 && n.y < -5);
+  assert.ok(sullAnello.length > 3);
+  for (const n of sullAnello) assert.ok(n.h > ALTEZZA_LIVELLO - 0.5, `la metà sul ponte in quota (${n.h})`);
+});
+
+test('le rotonde: un anello tondo sì, un isolato quadrato no', () => {
+  const g = grafoStrade([anello(0, 0, 15, 12), { p: { class: 'minor' }, g: [[200, 0], [260, 0], [260, 60], [200, 60], [200, 0]] }], metri);
+  assert.ok(g.nodi.filter((n) => n.rotonda).every((n) => Math.hypot(n.x, n.y) < 16));
+  assert.ok(g.nodi.some((n) => n.rotonda));
+  assert.equal(segnaRotonde([], []), 0);
 });

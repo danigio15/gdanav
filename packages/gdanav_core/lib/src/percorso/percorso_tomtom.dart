@@ -621,6 +621,7 @@ class ClienteTomTom {
         if ('${i['signpostText'] ?? ''}'.isNotEmpty) '${i['signpostText']}',
       ].join(' · '),
       uscitaRotonda: rotonda != null && rotonda > 0 ? rotonda : null,
+      angoloRotonda: angoloDellaRotondaTomTom('${i['maneuver'] ?? ''}'),
       corsie: corsie,
     );
   }
@@ -630,6 +631,17 @@ class ClienteTomTom {
   /// etichette servono solo a chi vuole scriverle in grassetto: qui si
   /// tolgono, il testo resta quello.
   static String _senzaEtichette(String s) => s.replaceAll(RegExp(r'</?[a-zA-Z]+>'), '').trim();
+
+  /// Di quanto si gira nella rotonda, dalla manovra di TomTom: tutte e
+  /// quattro diventano il 26 di Valhalla, e senza questo si perdeva da che
+  /// parte si esce (vedi [Manovra.angoloRotonda]). Si guida a destra.
+  static int? angoloDellaRotondaTomTom(String manovra) => switch (manovra.toUpperCase()) {
+        'ROUNDABOUT_RIGHT' => 90,
+        'ROUNDABOUT_CROSS' => 180,
+        'ROUNDABOUT_LEFT' => 270,
+        'ROUNDABOUT_BACK' => 360,
+        _ => null,
+      };
 
   /// La manovra di TomTom nel numero di Valhalla, che è quello che l'app usa
   /// per scegliere l'icona e disegnare lo svincolo. Si tiene la numerazione

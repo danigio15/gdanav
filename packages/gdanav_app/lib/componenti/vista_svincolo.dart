@@ -84,7 +84,7 @@ class PopupSvincolo extends StatelessWidget {
                           color: const Color(0xFF3A4458),
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: Icon(iconaManovra(manovra.tipo), color: Colors.white, size: 42),
+                        child: SimboloManovra.di(manovra, size: 42),
                       ),
                       const SizedBox(width: 12),
                       Expanded(

@@ -1,0 +1,22 @@
+# Chi tiene d'occhio le azioni dei workflow.
+#
+# Le azioni sono fissate al commit, non all'etichetta: un'etichetta si puo'
+# spostare, un commit no. Il prezzo e' che nessuno le aggiorna piu' da se' —
+# e qui entra questo file: una volta al mese guarda se c'e' una versione nuova
+# e apre una richiesta di modifica col commit nuovo e il suo numero accanto.
+#
+# Una richiesta sola per tutte, e niente salti di versione grossi (un v4 → v6
+# cambia il modo di usare l'azione, e va fatto a mano). E' la stessa regola di
+# gdahomeapp.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      azioni:
+        patterns: ["*"]

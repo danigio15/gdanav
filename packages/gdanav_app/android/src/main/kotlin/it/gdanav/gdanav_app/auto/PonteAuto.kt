@@ -34,11 +34,14 @@ object PonteAuto {
         val uscita: String = "",
         val verso: String = "",
         val rotonda: Int? = null,
+        /** Di quanto si gira nella rotonda, in senso antiorario (90 a destra, 180 dritto, 270 a sinistra). */
+        val rotondaAngolo: Int? = null,
         val corsie: List<CorsiaAuto> = emptyList(),
         val dopoTipo: Int? = null,
         val dopoStrada: String = "",
         /** L'uscita della rotonda dopo, per il tipo giusto della manovra. */
         val dopoRotonda: Int? = null,
+        val dopoRotondaAngolo: Int? = null,
         /** Le frasi della manovra dalla più lunga alla più corta (`frasiManovra` dell'app). */
         val frasi: List<String> = emptyList(),
         /** Le frasi del «poi», dalla più lunga: «Poi a destra · Via Roma», «Poi». */
@@ -483,6 +486,7 @@ object PonteAuto {
                         uscita = call.argument<String>("uscita") ?: "",
                         verso = call.argument<String>("verso") ?: "",
                         rotonda = numero(call, "rotonda")?.toInt(),
+                        rotondaAngolo = numero(call, "rotonda_angolo")?.toInt(),
                         corsie = (call.argument<List<Map<String, Any?>>>("corsie") ?: emptyList()).map { c ->
                             CorsiaAuto(
                                 direzioni = (c["direzioni"] as? List<*>)?.map { "$it" } ?: emptyList(),
@@ -493,6 +497,7 @@ object PonteAuto {
                         dopoTipo = numero(call, "dopo_tipo")?.toInt(),
                         dopoStrada = call.argument<String>("dopo_strada") ?: "",
                         dopoRotonda = numero(call, "dopo_rotonda")?.toInt(),
+                        dopoRotondaAngolo = numero(call, "dopo_rotonda_angolo")?.toInt(),
                         frasi = frasi(call, "frasi"),
                         dopoFrasi = frasi(call, "dopo_frasi"),
                         svincolo = numero(call, "svincolo")?.toInt(),

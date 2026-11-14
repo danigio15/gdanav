@@ -26,6 +26,7 @@ class GestoreGuida extends ChangeNotifier {
     ModoAudio audioIniziale = ModoAudio.tutto,
     ScelteAvvisi? avvisi,
     DateTime Function()? orologio,
+    this.stimaInGalleria = true,
   }) : _ora = orologio ?? DateTime.now,
        avvisi = avvisi ?? ScelteAvvisi() {
     audio = audioIniziale;
@@ -415,6 +416,9 @@ class GestoreGuida extends ChangeNotifier {
     _misuratore = null;
     await _iscrizione?.cancel();
     _iscrizione = null;
+    _svegliaStima?.cancel();
+    _svegliaStima = null;
+    _stima.dimentica();
     if (zittisci) await voce.zitta();
     _racconta(inViaggio: false);
     notifyListeners();
@@ -585,7 +589,91 @@ class GestoreGuida extends ChangeNotifier {
   /// ([MotoSullaStrada]): agli svincoli e nelle rotonde non esce di strada.
   Linea? get strada => _guida?.linea;
 
-  Future<void> _posizione(Punto qui) async {
+  /* ─── In galleria, senza GPS ──────────────────────────────────────────────
+   *
+   * «In galleria si perde, va per un po' nel vuoto e poi si blocca, per poi
+   * riprendersi quando si esce.» Senza GPS la stima qui sopra si fermava dopo
+   * due secondi e sessanta metri; e le posizioni larghe che il telefono manda
+   * in galleria (dalle celle, centinaia di metri) staccavano l'auto dal
+   * percorso: la mappa la disegnava dove diceva il telefono, nel vuoto.
+   *
+   * Adesso ([StimaSenzaGps], in gdanav_core): una lettura larga, avendone una
+   * buona sulla strada da poco, non si usa; e senza letture buone da due
+   * secondi l'auto va avanti lungo il percorso alla velocità di prima (o a
+   * quella del tachimetro dell'auto, se la dice), una «lettura stimata» al
+   * secondo, come se il GPS ci fosse: le manovre, la voce, la scena 3D e
+   * l'auto vanno avanti con lei. Per al più tre minuti; poi ci si ferma, e
+   * sullo schermo «GPS assente». Quando il GPS torna, la freccia si
+   * riallinea piano ([MotoSullaStrada]). */
+  final _stima = StimaSenzaGps();
+  Timer? _svegliaStima;
+
+  /// Se senza GPS si stima la posizione (vedi sopra). Spenta solo nelle
+  /// prove che non la guardano: la sveglia della stima è un `Timer`.
+  final bool stimaInGalleria;
+  DateTime? _tachimetroVisto;
+
+  /// Si sta stimando la posizione senza GPS (in galleria): la si mostra, ma
+  /// senza dire «GPS assente».
+  bool get stimaSenzaGps => attiva && _stima.stima(_ora());
+
+  /// La stima senza GPS è finita (tre minuti senza letture buone).
+  bool get gpsPersoInGuida => attiva && _stima.persa(_ora());
+
+  void _armaStima(Duration fra) {
+    _svegliaStima?.cancel();
+    if (!stimaInGalleria) return;
+    _svegliaStima = Timer(fra, _passoDiStima);
+  }
+
+  /// Una «lettura stimata»: dove si è, senza GPS, lungo il percorso.
+  void _passoDiStima() {
+    _svegliaStima = null;
+    final g = _guida;
+    if (!attiva || g == null) return;
+    final ora = _ora();
+    final kmh = auto.velocitaAuto(), letto = auto.velocitaLettaAlle;
+    if (kmh != null && letto != null && letto != _tachimetroVisto) {
+      _tachimetroVisto = letto;
+      _stima.tachimetro(kmh / 3.6, letto);
+    }
+    if (_stima.persa(ora)) {
+      // Finita: si dice una volta, e si aspetta il GPS.
+      notifyListeners();
+      return;
+    }
+    if (!_stima.stima(ora)) {
+      _armaStima(const Duration(milliseconds: 500));
+      return;
+    }
+    final metri = _stima.metri(ora, lunghezzaM: g.lunghezzaM);
+    if (metri != null) {
+      final dove = g.avanti(metri, 0);
+      final v = kmh != null ? kmh / 3.6 : (_velocitaMs ?? 0);
+      unawaited(
+        _posizione(
+          PuntoInMoto(dove.punto.lat, dove.punto.lon, rotta: dove.rotta, velocitaMs: v, alle: ora),
+          stimata: true,
+        ),
+      );
+    }
+    _armaStima(const Duration(seconds: 1));
+  }
+
+  Future<void> _posizione(Punto qui, {bool stimata = false}) async {
+    if (!stimata) {
+      final precisione = qui is PuntoInMoto ? qui.precisioneM : null;
+      // Una lettura larga (in galleria, dalle celle) con una buona sulla
+      // strada da poco: non dice niente di più della stima, e staccherebbe
+      // l'auto dal percorso.
+      if (!_stima.buona(precisione) &&
+          _guida != null &&
+          attiva &&
+          !_stima.persa(_ora()) &&
+          _stima.metri(_ora()) != null) {
+        return;
+      }
+    }
     _ultimaPosizione = qui;
     _letture++;
     final ora = _ora();
@@ -603,6 +691,16 @@ class GestoreGuida extends ChangeNotifier {
     if (g == null || !attiva) return;
     final a = g.aggiorna(qui);
     avanzamento = a;
+    if (!stimata) {
+      if (a.posizioneSulPercorso != null && _stima.buona(_precisioneM)) {
+        _stima.lettura(metri: a.percorsiM, alle: _lettaAlle!, velocitaMs: _velocitaMs);
+        _armaStima(_stima.dopo + const Duration(milliseconds: 100));
+      } else if (a.posizioneSulPercorso == null) {
+        // Fuori dal percorso non si stima lungo il percorso.
+        _stima.dimentica();
+        _svegliaStima?.cancel();
+      }
+    }
     _allungaTraccia(qui);
     if (pronto case final p?) _consuma(p, a.percorsiM / 1000);
     _controllaLimite(a.limiteKmh, _velocitaKmh(qui));
@@ -1188,6 +1286,7 @@ class GestoreGuida extends ChangeNotifier {
   @override
   void dispose() {
     _iscrizione?.cancel();
+    _svegliaStima?.cancel();
     super.dispose();
   }
 }

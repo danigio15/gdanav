@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -26,6 +27,105 @@ IconData iconaManovra(int tipo) => switch (tipo) {
   28 || 29 => Icons.directions_boat,
   _ => Icons.straight,
 };
+
+/// Il simbolo della manovra [m]: l'icona di [iconaManovra], e per le rotonde
+/// una rotonda disegnata che gira in senso antiorario fino alla sua uscita.
+///
+/// «Alla rotonda la freccia è errata»: `Icons.roundabout_right` sale, fa
+/// tutto il giro a sinistra e in alto ed esce a destra — è la rotonda
+/// inglese, in senso orario. Da noi la prima uscita a destra è subito.
+class SimboloManovra extends StatelessWidget {
+  const SimboloManovra({super.key, required this.tipo, this.manovra, this.size = 24, this.color = Colors.white});
+
+  /// Dalla manovra: il tipo e, nelle rotonde, da che parte si esce.
+  SimboloManovra.di(Manovra m, {Key? key, double size = 24, Color color = Colors.white})
+    : this(key: key, tipo: m.tipo, manovra: m, size: size, color: color);
+
+  final int tipo;
+  final Manovra? manovra;
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    if (tipo != 26 && tipo != 27) return Icon(iconaManovra(tipo), color: color, size: size);
+    // Uscendo dalla rotonda (27) si esce alla prima; senza niente, dritto.
+    final m = manovra;
+    final gradi = m == null ? null : angoloDellaRotonda(m);
+    return CustomPaint(
+      key: const Key('simbolo-rotonda'),
+      size: Size.square(size),
+      painter: DisegnoRotonda(gradi: gradi ?? (tipo == 27 ? 90 : 180), colore: color),
+    );
+  }
+}
+
+/// La rotonda vista dall'alto: si entra dal basso e si gira in senso
+/// antiorario (si guida a destra) di [gradi] fino all'uscita, con la punta;
+/// il resto dell'anello leggero.
+class DisegnoRotonda extends CustomPainter {
+  const DisegnoRotonda({required this.gradi, required this.colore});
+
+  /// Di quanto si gira dentro: 90 a destra, 180 dritto, 270 a sinistra.
+  final int gradi;
+  final Color colore;
+
+  /// Il punto dell'anello a [g] gradi dall'ingresso, girando in senso
+  /// antiorario sullo schermo: 0 in basso, 90 a destra, 180 in alto.
+  static Offset sulCerchio(Offset c, double r, double g) {
+    final a = g * math.pi / 180;
+    return Offset(c.dx + r * math.sin(a), c.dy + r * math.cos(a));
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final l = size.shortestSide;
+    final c = Offset(l * 0.5, l * 0.5);
+    final r = l * 0.17;
+    final spessore = l * 0.085;
+    final pennello = Paint()
+      ..color = colore
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = spessore
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..color = colore.withValues(alpha: 0.35)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = spessore * 0.8,
+    );
+    final g = gradi.clamp(20, 345).toDouble();
+    // Sullo schermo l'angolo di Flutter parte da destra e cresce in senso
+    // orario: il basso è 90°, e girare in senso antiorario è sottrarre.
+    final giro = Path()
+      ..moveTo(c.dx, l * 0.95)
+      ..lineTo(c.dx, c.dy + r)
+      ..arcTo(Rect.fromCircle(center: c, radius: r), math.pi / 2, -g * math.pi / 180, false);
+    final fine = sulCerchio(c, r + l * 0.15, g);
+    giro.lineTo(fine.dx, fine.dy);
+    canvas.drawPath(giro, pennello);
+    // La punta, verso fuori.
+    final a = g * math.pi / 180;
+    final avanti = Offset(math.sin(a), math.cos(a));
+    final lato = Offset(-avanti.dy, avanti.dx);
+    final punta = sulCerchio(c, r + l * 0.29, g);
+    final base = fine - avanti * (l * 0.02);
+    canvas.drawPath(
+      Path()
+        ..moveTo(punta.dx, punta.dy)
+        ..lineTo(base.dx + lato.dx * l * 0.13, base.dy + lato.dy * l * 0.13)
+        ..lineTo(base.dx - lato.dx * l * 0.13, base.dy - lato.dy * l * 0.13)
+        ..close(),
+      Paint()..color = colore,
+    );
+  }
+
+  @override
+  bool shouldRepaint(DisegnoRotonda vecchio) => vecchio.gradi != gradi || vecchio.colore != colore;
+}
 
 /// La freccia dipinta su una corsia.
 IconData iconaCorsia(DirezioneCorsia d) => switch (d) {

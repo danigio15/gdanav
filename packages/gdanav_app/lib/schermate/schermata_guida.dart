@@ -319,7 +319,9 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                   ),
                 );
                 final avvisi = <Widget>[
-                  if (widget.posizione.tace()) const _GpsAssente(),
+                  // In galleria la posizione si stima lungo il percorso (`StimaSenzaGps`):
+                  // «GPS assente» solo quando la stima è finita.
+                  if (widget.posizione.tace() && !g.stimaSenzaGps) const _GpsAssente(),
                   if (_ztl?.avviso case final z?) _AvvisoZtl(avviso: z),
                   if (_avvisi?.davanti case (final s, final m)) AvvisoSegnalazione(segnalazione: s, metri: m),
                   if (_avvisi?.tutor case final t?) AvvisoTutor(stato: t),
@@ -938,7 +940,9 @@ class _Banner extends StatelessWidget {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        Icon(iconaManovra(m?.tipo ?? 8), color: Colors.white, size: 54),
+                        m == null
+                            ? Icon(iconaManovra(8), color: Colors.white, size: 54)
+                            : SimboloManovra.di(m, size: 54),
                         // Nelle rotonde, quale uscita.
                         if (m?.uscitaRotonda case final n?)
                           Positioned(
@@ -996,7 +1000,7 @@ class _Banner extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text('Poi ', style: t.labelLarge?.copyWith(color: Colors.white70)),
-                    Icon(iconaManovra(dopo.tipo), color: Colors.white, size: 20),
+                    SimboloManovra.di(dopo, size: 20),
                     if (dopo.strada.isNotEmpty)
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 200),

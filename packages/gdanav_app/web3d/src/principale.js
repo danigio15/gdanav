@@ -11,8 +11,9 @@ import { BUDGET, daDisegnare, pianoTessere } from './budget.js';
 import { Ritmo, valutaPrestazioni, valutaWebgl } from './capacita.js';
 import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, marginiAiLati } from './geo.js';
 import { codeOrdinate, decodifica } from './messaggi.js';
+import { AggancioStrada, SOGLIA_M } from './aggancio.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
-import { alzataDeiNastri, IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti } from './percorso.js';
+import { alzataDeiNastri, direzioneDisegnata, IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti } from './percorso.js';
 import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
 import { dallaScorta, nellaScorta } from './scorte.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
@@ -122,6 +123,8 @@ const S = {
 
 const scena = new Scena();
 const indice = new IndiceSegmenti();
+/** L'auto sulla strada fuori dal percorso (`aggancio.js`). */
+const aggancio = new AggancioStrada();
 const moto = new Moto();
 const raccordo = new Raccordo();
 /** Lo spostamento e la quota di un profilo in [s], se ci arriva (vedi [Raccordo]). */
@@ -253,8 +256,19 @@ const GESTORI = {
   posizione(m) {
     if (!S.origine) S.origine = new Origine(m.lon, m.lat);
     riorigina(m.lon, m.lat);
-    const [x, y] = S.origine.daLonLat(m.lon, m.lat);
-    S.posizione = m;
+    let [x, y] = S.origine.daLonLat(m.lon, m.lat);
+    let rotta = m.rotta;
+    // Fuori dal percorso (o senza): sulla strada più vicina, se è vicina e va
+    // come l'auto (`aggancio.js`), non accanto dove dice il GPS.
+    if (!(S.percorso && m.metri !== null && m.metri !== undefined)) {
+      const su = aggancio.aggancia(x, y, m.rotta, m.velocita ?? 0, indice.vicini(x, y, SOGLIA_M));
+      if (su) {
+        x = su.x;
+        y = su.y;
+        rotta = su.rotta;
+      }
+    } else aggancio.dimentica();
+    S.posizione = rotta === m.rotta ? m : { ...m, rotta };
     if (m.zoom !== undefined) S.zoomVoluto = m.zoom;
     // Lo zoom scelto coi tasti: subito, non piano come quello che cambia da sé.
     if (m.zoomSubito) S.zoomSubitoFino = performance.now() + ZOOM_SUBITO_MS;
@@ -263,7 +277,7 @@ const GESTORI = {
       v: m.velocita,
       x,
       y,
-      rotta: m.rotta,
+      rotta,
       quando: m.quando,
       lettura: S.percorso && m.lettura ? m.lettura : null,
       adesso: S.orologioProva ?? Date.now(),
@@ -1199,7 +1213,9 @@ function aggiornaFreccia() {
   scena.impostaNastro('freccia', nastro(p.linea, p.profilo, inizio, fine, 3.0, 0.7, { passo: 1.5 }), 'freccia', 6);
   const [x, y] = p.linea.a(fine);
   const [sx, sy] = p.profilo.sposta(fine);
-  scena.impostaPunta([x + sx, y + sy, p.profilo.quota(fine) + 0.72, p.linea.direzione(fine, 3)]);
+  // La punta guarda come il nastro che chiude, non come la linea di TomTom
+  // sotto: dove la linea si sposta di più (alla rotonda) erano due versi.
+  scena.impostaPunta([x + sx, y + sy, p.profilo.quota(fine) + 0.72, direzioneDisegnata(p.linea, p.profilo, fine)]);
   S.frecciaDa = inizio;
 }
 
