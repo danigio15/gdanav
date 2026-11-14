@@ -319,7 +319,9 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                   ),
                 );
                 final avvisi = <Widget>[
-                  if (widget.posizione.tace()) const _GpsAssente(),
+                  // In galleria la posizione si stima lungo il percorso (`StimaSenzaGps`):
+                  // «GPS assente» solo quando la stima è finita.
+                  if (widget.posizione.tace() && !g.stimaSenzaGps) const _GpsAssente(),
                   if (_ztl?.avviso case final z?) _AvvisoZtl(avviso: z),
                   if (_avvisi?.davanti case (final s, final m)) AvvisoSegnalazione(segnalazione: s, metri: m),
                   if (_avvisi?.tutor case final t?) AvvisoTutor(stato: t),

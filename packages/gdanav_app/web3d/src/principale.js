@@ -11,6 +11,7 @@ import { BUDGET, daDisegnare, pianoTessere } from './budget.js';
 import { Ritmo, valutaPrestazioni, valutaWebgl } from './capacita.js';
 import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, marginiAiLati } from './geo.js';
 import { codeOrdinate, decodifica } from './messaggi.js';
+import { AggancioStrada, SOGLIA_M } from './aggancio.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
 import { alzataDeiNastri, direzioneDisegnata, IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti } from './percorso.js';
 import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
@@ -122,6 +123,8 @@ const S = {
 
 const scena = new Scena();
 const indice = new IndiceSegmenti();
+/** L'auto sulla strada fuori dal percorso (`aggancio.js`). */
+const aggancio = new AggancioStrada();
 const moto = new Moto();
 const raccordo = new Raccordo();
 /** Lo spostamento e la quota di un profilo in [s], se ci arriva (vedi [Raccordo]). */
@@ -253,8 +256,19 @@ const GESTORI = {
   posizione(m) {
     if (!S.origine) S.origine = new Origine(m.lon, m.lat);
     riorigina(m.lon, m.lat);
-    const [x, y] = S.origine.daLonLat(m.lon, m.lat);
-    S.posizione = m;
+    let [x, y] = S.origine.daLonLat(m.lon, m.lat);
+    let rotta = m.rotta;
+    // Fuori dal percorso (o senza): sulla strada più vicina, se è vicina e va
+    // come l'auto (`aggancio.js`), non accanto dove dice il GPS.
+    if (!(S.percorso && m.metri !== null && m.metri !== undefined)) {
+      const su = aggancio.aggancia(x, y, m.rotta, m.velocita ?? 0, indice.vicini(x, y, SOGLIA_M));
+      if (su) {
+        x = su.x;
+        y = su.y;
+        rotta = su.rotta;
+      }
+    } else aggancio.dimentica();
+    S.posizione = rotta === m.rotta ? m : { ...m, rotta };
     if (m.zoom !== undefined) S.zoomVoluto = m.zoom;
     // Lo zoom scelto coi tasti: subito, non piano come quello che cambia da sé.
     if (m.zoomSubito) S.zoomSubitoFino = performance.now() + ZOOM_SUBITO_MS;
@@ -263,7 +277,7 @@ const GESTORI = {
       v: m.velocita,
       x,
       y,
-      rotta: m.rotta,
+      rotta,
       quando: m.quando,
       lettura: S.percorso && m.lettura ? m.lettura : null,
       adesso: S.orologioProva ?? Date.now(),

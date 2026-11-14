@@ -93,6 +93,34 @@ export class IndiceSegmenti {
   }
 
   /**
+   * I segmenti delle strade (non i binari) entro [raggio] metri da [x, y],
+   * `{x0, y0, x1, y1, senso}` (senso 1 come i punti, -1 al contrario, 0
+   * tutti e due): per agganciare l'auto alla strada (`aggancio.js`).
+   */
+  vicini(x, y, raggio = 25) {
+    const out = [];
+    const c = this.cella;
+    for (const [chiave, t] of this.tessere) {
+      if (x < t.minx - raggio || x > t.maxx + raggio || y < t.miny - raggio || y > t.maxy + raggio) continue;
+      const visti = new Set();
+      for (let cx = Math.floor((x - raggio) / c); cx <= Math.floor((x + raggio) / c); cx++) {
+        for (let cy = Math.floor((y - raggio) / c); cy <= Math.floor((y + raggio) / c); cy++) {
+          for (const i of t.griglia.get(cx * 100003 + cy) || []) {
+            if (visti.has(i)) continue;
+            visti.add(i);
+            const o = 8 * i;
+            const s = t.s;
+            const cod = s[o + 7];
+            if ((cod & 15) === 8) continue;
+            out.push({ x0: s[o], y0: s[o + 1], x1: s[o + 3], y1: s[o + 4], senso: cod & 128 ? 1 : cod & 256 ? -1 : 0, chiave });
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  /**
    * Le quote delle strade vicine al punto che vanno come [dx, dy] (anche
    * contromano, ma non sui sensi unici); ognuna con la sua distanza dal punto.
    */

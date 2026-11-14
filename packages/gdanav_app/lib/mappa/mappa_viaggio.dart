@@ -8,6 +8,8 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:gdanav_core/gdanav_core.dart'
     show
+        AggancioStrada,
+        Agganciato,
         Avanzamento,
         MotoFluido,
         MotoSullaStrada,
@@ -38,6 +40,7 @@ import 'controllo_mappa.dart';
 import 'dati_viaggio.dart';
 import 'segnaposto.dart';
 import 'stile.dart';
+import 'strade_attorno.dart';
 
 /// La mappa vera: MapLibre con lo stile di GdANav (chiaro o scuro come il
 /// telefono), gli edifici in 3D quando è inclinata, e il viaggio sopra.
@@ -643,8 +646,22 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     unawaited(_traccia(m));
     final a = widget.guida?.avanzamento;
     final stimata = widget.guida?.posizioneStimata();
-    final qui = stimata?.punto ?? a?.posizioneSulPercorso ?? widget.posizione.qui;
-    final rotta = stimata?.rotta ?? a?.rotta ?? widget.posizione.rotta;
+    var qui = stimata?.punto ?? a?.posizioneSulPercorso ?? widget.posizione.qui;
+    var rotta = stimata?.rotta ?? a?.rotta ?? widget.posizione.rotta;
+    // Fuori dal percorso, o senza: sulla strada più vicina, se è vicina e va
+    // come l'auto ([AggancioStrada]), non accanto dove dice il GPS.
+    // (Non in guida prima della sua prima posizione: arriva subito dopo.)
+    final inAttesaDellaGuida = widget.guida?.attiva == true && a == null;
+    if (stimata == null && a?.posizioneSulPercorso == null && qui != null && !inAttesaDellaGuida) {
+      final su = await _sullaStrada(m, qui, rotta);
+      if (su != null) {
+        qui = su.punto;
+        rotta = su.rotta;
+      }
+      // Nel frattempo è cambiato qualcosa (la guida si è agganciata): ci
+      // pensa il giro dopo, con i dati nuovi.
+      if (!identical(m, _mappa) || !mounted || !identical(a, widget.guida?.avanzamento)) return;
+    }
     // In guida, con l'auto agganciata alla strada, segnaposto e telecamera li
     // muovono i fotogrammi: qui solo la freccia della manovra.
     if (_scorre) {
@@ -712,6 +729,37 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     } catch (e) {
       debugPrint('mappa, telecamera: $e');
     }
+  }
+
+  /* ─── L'auto sulla strada, anche senza percorso ───────────────────────────
+   *
+   * «Capita che il simbolino dell'auto non sia sulla strada ma a fianco.» In
+   * guida l'auto si aggancia al percorso; fuori (senza destinazione, o uscendo
+   * dal percorso) andava dove diceva il GPS. Adesso si aggancia alle strade
+   * che la mappa sta disegnando attorno ([stradeAttorno]), con le prudenze di
+   * [AggancioStrada]: mai oltre venticinque metri, mai di traverso né
+   * contromano, e senza saltare fra due strade parallele. Una lettura alla
+   * volta, la stessa lettura una volta sola. */
+  final _aggancio = AggancioStrada();
+  (DateTime?, Agganciato?)? _agganciataPer;
+
+  Future<Agganciato?> _sullaStrada(MapLibreMapController m, Punto qui, double rotta) async {
+    final letta = widget.posizione.lettoAlle;
+    if (_agganciataPer case (final l, final r) when l == letta) return r;
+    Agganciato? r;
+    try {
+      final strade = await stradeAttorno(m, qui);
+      r = _aggancio.aggancia(
+        qui,
+        rotta: widget.posizione.rottaConosciuta ? rotta : null,
+        velocitaMs: widget.posizione.velocitaAdesso() / 3.6,
+        strade: strade,
+      );
+    } catch (e) {
+      debugPrint('mappa, strade attorno: $e');
+    }
+    _agganciataPer = (letta, r);
+    return r;
   }
 
   Future<void> _telecamera(MapLibreMapController m, Avanzamento? a, Punto? qui, double rotta) async {

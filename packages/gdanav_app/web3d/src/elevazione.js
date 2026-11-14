@@ -290,8 +290,99 @@ export function grafoStrade(strade, metri, { iterazioni = 1500 } = {}) {
     }
   }
 
+  segnaRotonde(nodi, feats);
   altezze(nodi, feats, iterazioni);
   return { nodi, feats };
+}
+
+/** Quanto può essere grande (raggio, in metri) una rotonda. */
+const ROTONDA_RAGGIO_MAX = 45;
+/** Di quanto può girare l'anello a ogni nodo (gradi): agli spigoli di un isolato sono 90. */
+const ROTONDA_SVOLTA_MAX = 75;
+
+/**
+ * Le rotonde a terra.
+ *
+ * «Mi è capitato in due rotonde che erano a livello strada ma le faceva
+ * vedere sopraelevate.» Le tessere non dicono che una strada è una rotonda,
+ * e una rotonda a qualche decina di metri dal capo di un cavalcavia stava
+ * tutta dentro la salita: ogni nodo libero è la media dei vicini, e in un
+ * anello con quattro, cinque bracci la terra (a 145 m dal ponte) è lontana
+ * da tutti; l'anello finiva a sei, sette metri. Un anello piccolo e tondo di
+ * strade che non sono ponti (girando sempre dalla stessa parte, niente
+ * spigoli da isolato) è una rotonda, e senza un ponte suo sta a terra: la
+ * salita è nei bracci, fra la rotonda e il ponte. Una rotonda sopraelevata
+ * vera passa sopra le strade coi suoi pezzi di ponte, e resta com'è.
+ * Segna `rotonda` sui nodi; restituisce quante ne ha trovate.
+ */
+export function segnaRotonde(nodi, feats) {
+  const buona = (f) => !f.ponte && !f.galleria && !f.rampa && f.cls !== 'rail';
+  const sMax = (ROTONDA_SVOLTA_MAX * Math.PI) / 180;
+  const sMin = (-8 * Math.PI) / 180;
+  const lunghezzaMax = 2 * Math.PI * ROTONDA_RAGGIO_MAX * 1.15;
+  const svolta = (a, b, c) => {
+    const t = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(b.y - a.y, b.x - a.x);
+    return Math.atan2(Math.sin(t), Math.cos(t));
+  };
+  const tonda = (giro) => {
+    let cx = 0;
+    let cy = 0;
+    for (const i of giro) {
+      cx += nodi[i].x / giro.length;
+      cy += nodi[i].y / giro.length;
+    }
+    let rMin = Infinity;
+    let rMax = 0;
+    for (const i of giro) {
+      const r = Math.hypot(nodi[i].x - cx, nodi[i].y - cy);
+      rMin = Math.min(rMin, r);
+      rMax = Math.max(rMax, r);
+    }
+    return rMax <= ROTONDA_RAGGIO_MAX && rMax > 3 && rMin >= 0.55 * rMax;
+  };
+  let trovate = 0;
+  // Si parte dai nodi dove la strada gira (in mezzo a un rettilineo no):
+  // il giro, dalla parte dove gira.
+  const cerca = (a, b, verso) => {
+    const pila = [[a, b, Math.hypot(nodi[b].x - nodi[a].x, nodi[b].y - nodi[a].y), 0, [a, b]]];
+    let passi = 0;
+    while (pila.length && passi++ < 2000) {
+      const [p, c, l, giro, cam] = pila.pop();
+      for (const e of nodi[c].adj) {
+        if (e.to === p || !buona(feats[e.f])) continue;
+        const t = verso * svolta(nodi[p], nodi[c], nodi[e.to]);
+        if (t < sMin || t > sMax) continue;
+        const nl = l + e.d;
+        const ng = giro + t;
+        if (e.to === a) {
+          const chiusa = verso * svolta(nodi[c], nodi[a], nodi[b]);
+          const tutto = ((ng + chiusa) * 180) / Math.PI;
+          if (chiusa >= sMin && chiusa <= sMax && Math.abs(tutto - 360) < 45 && nl > 20 && cam.length >= 4 && tonda(cam)) return cam;
+          continue;
+        }
+        // Un anello di [ROTONDA_RAGGIO_MAX] metri gira almeno di un radiante ogni tanti metri.
+        if (nl > lunghezzaMax || ng > 2.3 * Math.PI || ng < (nl - 25) / (1.3 * ROTONDA_RAGGIO_MAX) || cam.includes(e.to)) continue;
+        pila.push([c, e.to, nl, ng, [...cam, e.to]]);
+      }
+    }
+    return null;
+  };
+  for (const f of feats) {
+    if (!buona(f) || f.nodi.length < 3) continue;
+    for (let k = 1; k < f.nodi.length - 1; k++) {
+      const a = f.nodi[k];
+      if (nodi[a].rotonda) continue;
+      const t = svolta(nodi[f.nodi[k - 1]], nodi[a], nodi[f.nodi[k + 1]]);
+      if (Math.abs(t) < 0.05 || Math.abs(t) > sMax) continue;
+      const anello = cerca(a, f.nodi[k + 1], Math.sign(t));
+      if (!anello) continue;
+      // Con un pezzo di ponte suo (un nodo in comune con un ponte) la rotonda è in quota.
+      if (anello.some((i) => nodi[i].feats.some((fi) => feats[fi].livello > 0))) continue;
+      for (const i of anello) nodi[i].rotonda = true;
+      trovate++;
+    }
+  }
+  return trovate;
 }
 
 /** Le altezze dei nodi del grafo (vedi in cima). */
@@ -335,6 +426,8 @@ export function altezze(nodi, feats, iterazioni = 1500) {
     }
   }
   for (const n of nodi) if (n.fisso === null && n.feats.length && n.feats.every((fi) => feats[fi].galleria)) n.fisso = 0;
+  // Le rotonde a terra (vedi `segnaRotonde`): la salita resta nei bracci.
+  for (const n of nodi) if (n.fisso === null && n.rotonda) n.fisso = 0;
   const principale = (f) => (f.cls === 'motorway' || f.cls === 'trunk') && !f.rampa && f.livello === 0;
   for (const n of nodi) {
     if (n.fisso !== null) continue;
