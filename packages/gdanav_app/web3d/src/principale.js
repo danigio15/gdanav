@@ -12,7 +12,7 @@ import { Ritmo, valutaPrestazioni, valutaWebgl } from './capacita.js';
 import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, marginiAiLati } from './geo.js';
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
-import { alzataDeiNastri, IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti } from './percorso.js';
+import { alzataDeiNastri, direzioneDisegnata, IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti } from './percorso.js';
 import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
 import { dallaScorta, nellaScorta } from './scorte.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
@@ -1199,7 +1199,9 @@ function aggiornaFreccia() {
   scena.impostaNastro('freccia', nastro(p.linea, p.profilo, inizio, fine, 3.0, 0.7, { passo: 1.5 }), 'freccia', 6);
   const [x, y] = p.linea.a(fine);
   const [sx, sy] = p.profilo.sposta(fine);
-  scena.impostaPunta([x + sx, y + sy, p.profilo.quota(fine) + 0.72, p.linea.direzione(fine, 3)]);
+  // La punta guarda come il nastro che chiude, non come la linea di TomTom
+  // sotto: dove la linea si sposta di più (alla rotonda) erano due versi.
+  scena.impostaPunta([x + sx, y + sy, p.profilo.quota(fine) + 0.72, direzioneDisegnata(p.linea, p.profilo, fine)]);
   S.frecciaDa = inizio;
 }
 

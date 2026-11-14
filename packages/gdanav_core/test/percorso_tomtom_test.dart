@@ -91,6 +91,16 @@ void main() {
       expect(p.manovre[1].uscitaRotonda, 1);
     });
 
+    // «Alla rotonda la freccia è errata»: le quattro manovre di rotonda di
+    // TomTom diventavano tutte il 26, e da che parte si esce si perdeva;
+    // l'icona girava sempre a destra facendo tutto il giro (all'inglese).
+    test('la rotonda dice anche da che parte si esce: qui subito a destra', () {
+      final p = ClienteTomTom.leggi(primaRotta());
+      expect(p.manovre[1].tipo, 26);
+      expect(p.manovre[1].angoloRotonda, 90);
+      expect(angoloDellaRotonda(p.manovre[1]), 90);
+    });
+
     test('le manovre puntano dentro il tracciato', () {
       final p = ClienteTomTom.leggi(primaRotta());
       expect(p.manovre.every((m) => m.inizio >= 0 && m.inizio < p.punti.length), isTrue);
@@ -335,6 +345,30 @@ void main() {
       expect(ClienteTomTom.tipoDellaManovra('TAKE_FERRY'), 28);
       expect(ClienteTomTom.tipoDellaManovra('FOLLOW'), 8);
       expect(ClienteTomTom.tipoDellaManovra('qualcosa_di_nuovo'), 0);
+    });
+
+    test('nelle rotonde, di quanto si gira (in senso antiorario)', () {
+      expect(ClienteTomTom.angoloDellaRotondaTomTom('ROUNDABOUT_RIGHT'), 90);
+      expect(ClienteTomTom.angoloDellaRotondaTomTom('ROUNDABOUT_CROSS'), 180);
+      expect(ClienteTomTom.angoloDellaRotondaTomTom('ROUNDABOUT_LEFT'), 270);
+      expect(ClienteTomTom.angoloDellaRotondaTomTom('ROUNDABOUT_BACK'), 360);
+      expect(ClienteTomTom.angoloDellaRotondaTomTom('TURN_RIGHT'), isNull);
+      // Senza il verso del motore (Valhalla) si stima dall'uscita.
+      Manovra r(int? uscita, {int? angolo, int tipo = 26}) => Manovra(
+          istruzione: '',
+          lunghezzaM: 0,
+          secondi: 0,
+          inizio: 0,
+          tipo: tipo,
+          uscitaRotonda: uscita,
+          angoloRotonda: angolo);
+      expect(angoloDellaRotonda(r(1)), 90);
+      expect(angoloDellaRotonda(r(2)), 180);
+      expect(angoloDellaRotonda(r(3)), 270);
+      expect(angoloDellaRotonda(r(5)), 330);
+      expect(angoloDellaRotonda(r(2, angolo: 90)), 90);
+      expect(angoloDellaRotonda(r(null)), isNull);
+      expect(angoloDellaRotonda(r(1, tipo: 10)), isNull);
     });
 
     test('l\'inversione si fa dalla parte giusta per il paese', () {

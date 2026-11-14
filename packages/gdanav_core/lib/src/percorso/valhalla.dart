@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 
 import '../geo/geo.dart';
+import '../guida/frasi_manovra.dart' show uscitaDallaFrase;
 import '../motore/modello_consumo.dart';
 import '../ztl/ztl.dart';
 import 'pedaggi.dart';
@@ -66,6 +67,7 @@ class Manovra {
     this.uscita = '',
     this.verso = '',
     this.uscitaRotonda,
+    this.angoloRotonda,
   });
 
   final String istruzione;
@@ -98,6 +100,13 @@ class Manovra {
   /// Nelle rotonde: quale uscita prendere.
   final int? uscitaRotonda;
 
+  /// Nelle rotonde: di quanto si gira dentro, in gradi nel verso di marcia
+  /// (si guida a destra, quindi in senso antiorario): 90 l'uscita a destra,
+  /// 180 dritto, 270 a sinistra, 360 si torna indietro. Lo dice TomTom
+  /// (`ROUNDABOUT_RIGHT`, `_CROSS`, `_LEFT`, `_BACK`); `null` se non si sa.
+  /// Vedi [angoloDellaRotonda].
+  final int? angoloRotonda;
+
   /// Le corsie servono solo se non vanno bene tutte.
   bool get corsieUtili => corsie.length > 1 && corsie.any((c) => c.giusta) && corsie.any((c) => !c.giusta);
 
@@ -113,7 +122,32 @@ class Manovra {
         uscita: uscita,
         verso: verso,
         uscitaRotonda: uscitaRotonda,
+        angoloRotonda: angoloRotonda,
       );
+}
+
+/// Di quanto si gira nella rotonda della manovra [m], in gradi nel verso di
+/// marcia (antiorario): quello che dice il motore ([Manovra.angoloRotonda])
+/// o, se non lo dice, una stima dall'uscita — la prima a destra, la seconda
+/// dritto, la terza a sinistra, dalla quarta quasi indietro (come le icone di
+/// CarPlay). `null` se non è una rotonda o non si sa niente.
+///
+/// «Alla rotonda la freccia è errata»: l'icona era quella di Material
+/// (`roundabout_right`), che gira in senso orario come in Inghilterra e
+/// prima di uscire a destra fa tutto il giro; qui si gira in senso
+/// antiorario e la prima uscita a destra è subito.
+int? angoloDellaRotonda(Manovra m) {
+  if (m.tipo != 26 && m.tipo != 27) return null;
+  final a = m.angoloRotonda;
+  if (a != null && a > 0 && a <= 360) return a;
+  final n = m.uscitaRotonda ?? uscitaDallaFrase(m.istruzione);
+  if (n == null || n <= 0) return null;
+  return switch (n) {
+    1 => 90,
+    2 => 180,
+    3 => 270,
+    _ => 330,
+  };
 }
 
 /// Una coda sul percorso, dal traffico in tempo reale: da dove a dove

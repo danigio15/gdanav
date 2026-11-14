@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icona di manovra per Android Auto: rotonda, si torna indietro. Si guida a destra: si
+     entra dal basso e si gira in senso antiorario fino all'uscita (come
+     `DisegnoRotonda` dell'app e `disegnaRotonda` di CarPlay). Bianca, la
+     colora l'auto. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:strokeColor="#59FFFFFF" android:strokeWidth="1.63" android:pathData="M12,7.92 A4.08,4.08 0 1,0 12,16.08 A4.08,4.08 0 1,0 12,7.92"/>
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2.04" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M12,22.8 L12,16.08 A4.08,4.08 0 1,0 9.96,15.53 L8.16,18.65"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M6.48,21.56 L5.7,16.68 L11.1,19.8 Z"/>
+</vector>

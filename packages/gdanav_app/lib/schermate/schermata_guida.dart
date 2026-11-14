@@ -938,7 +938,9 @@ class _Banner extends StatelessWidget {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        Icon(iconaManovra(m?.tipo ?? 8), color: Colors.white, size: 54),
+                        m == null
+                            ? Icon(iconaManovra(8), color: Colors.white, size: 54)
+                            : SimboloManovra.di(m, size: 54),
                         // Nelle rotonde, quale uscita.
                         if (m?.uscitaRotonda case final n?)
                           Positioned(
@@ -996,7 +998,7 @@ class _Banner extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text('Poi ', style: t.labelLarge?.copyWith(color: Colors.white70)),
-                    Icon(iconaManovra(dopo.tipo), color: Colors.white, size: 20),
+                    SimboloManovra.di(dopo, size: 20),
                     if (dopo.strada.isNotEmpty)
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 200),

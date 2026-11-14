@@ -616,7 +616,86 @@ export function spostamenti(dxGrezzi, dyGrezzi, punti, passo = 4, galleria = nul
     dy[q] = liscio * ny[q];
   }
   alleSvolte(dx, dy, visto, punti, passo);
+  senzaPieghe(dx, dy, punti);
   return [dx, dy];
+}
+
+/** Fin dove (punti per parte) si cerca il raccordo attorno a una piega. */
+const PIEGA_MAX_PUNTI = 6;
+
+/**
+ * La linea spostata non torna mai indietro.
+ *
+ * «Alla rotonda la freccia è errata»: arrivando a una rotonda il percorso di
+ * TomTom stava sette, dieci metri dentro la curva (una carreggiata sola fino
+ * all'anello, dove OpenStreetMap ne ha due), e girava di colpo verso
+ * l'uscita. Spostando ogni punto di lato, di dieci metri, all'interno di uno
+ * spigolo stretto la linea spostata faceva un cappio: andava avanti, poi
+ * indietro e di traverso per qualche metro, poi di nuovo avanti — una V sul
+ * nastro, e la punta della freccia lì in mezzo che guardava all'indietro.
+ *
+ * Dove un tratto della linea spostata va contro il verso del percorso, si
+ * cerca il più corto raccordo attorno che vada avanti dappertutto e i punti
+ * in mezzo si mettono in fila su quello: il cappio sparisce, lo spigolo resta.
+ */
+function senzaPieghe(dx, dy, punti) {
+  const n = dx.length;
+  if (n < 3) return;
+  const qx = (k) => punti[k][0] + dx[k];
+  const qy = (k) => punti[k][1] + dy[k];
+  // Il verso del percorso fra k e k+1, e se la linea spostata lo segue.
+  const tx = (k) => punti[Math.min(n - 1, k + 1)][0] - punti[Math.max(0, k)][0];
+  const ty = (k) => punti[Math.min(n - 1, k + 1)][1] - punti[Math.max(0, k)][1];
+  const indietro = (k) => k >= 0 && k < n - 1 && (qx(k + 1) - qx(k)) * tx(k) + (qy(k + 1) - qy(k)) * ty(k) < 0;
+  for (let k = 0; k < n - 1; k++) {
+    if (!indietro(k)) continue;
+    let fine = k;
+    while (fine + 1 < n - 1 && indietro(fine + 1)) fine++;
+    let fatto = false;
+    // Il raccordo da i a j: la corda va avanti rispetto a tutto il percorso fra i due.
+    for (let g = 0; g <= 2 * PIEGA_MAX_PUNTI && !fatto; g++) {
+      for (let a = Math.max(0, g - PIEGA_MAX_PUNTI); a <= Math.min(g, PIEGA_MAX_PUNTI) && !fatto; a++) {
+        const i = k - a;
+        const j = fine + 1 + (g - a);
+        if (i < 0 || j > n - 1 || indietro(i - 1) || indietro(j)) continue;
+        const cx = qx(j) - qx(i);
+        const cy = qy(j) - qy(i);
+        let avanti = true;
+        for (let q = i; q < j && avanti; q++) if (cx * tx(q) + cy * ty(q) <= 0) avanti = false;
+        if (!avanti) continue;
+        const [x0, y0] = [qx(i), qy(i)];
+        for (let q = i + 1; q < j; q++) {
+          const t = (q - i) / (j - i);
+          dx[q] = x0 + cx * t - punti[q][0];
+          dy[q] = y0 + cy * t - punti[q][1];
+        }
+        fatto = true;
+        k = j - 1;
+      }
+    }
+    if (!fatto) k = fine;
+  }
+}
+
+/**
+ * Il verso della linea disegnata (il percorso spostato sulla strada) a [s]
+ * metri, guardando gli ultimi [campo] metri: quello della punta della
+ * freccia. Il verso del percorso di TomTom, sotto, può essere un altro
+ * proprio dove la linea si sposta di più (agli spigoli, alle rotonde): la
+ * punta guardava di traverso o all'indietro rispetto al nastro che chiude.
+ */
+export function direzioneDisegnata(linea, profilo, s, campo = 4) {
+  const dove = (v) => {
+    const [x, y] = linea.a(v);
+    const [sx, sy] = profilo?.sposta ? profilo.sposta(v) : [0, 0];
+    return [x + sx, y + sy];
+  };
+  const [bx, by] = dove(s);
+  for (const c of [campo, 2 * campo, 4 * campo]) {
+    const [ax, ay] = dove(Math.max(0, s - c));
+    if (Math.hypot(bx - ax, by - ay) > 0.5) return Math.atan2(by - ay, bx - ax);
+  }
+  return linea.direzione(s, 3);
 }
 
 /** Da quanti gradi in su, in una ventina di metri, è una svolta. */
@@ -753,7 +832,10 @@ export function nastro(linea, profilo, s0, s1, largo, sopra, { passo = 2, code =
     const [sx, sy] = profilo.sposta ? profilo.sposta(s) : [0, 0];
     const x = x0 + sx;
     const y = y0 + sy;
-    const dir = linea.direzione(s, 3);
+    // Di traverso alla linea disegnata, non a quella di TomTom sotto: allo
+    // spigolo dell'ingresso di una rotonda le due andavano diverse e il
+    // nastro lì si strozzava.
+    const dir = profilo.sposta ? direzioneDisegnata(linea, profilo, s + 1.5, 3) : linea.direzione(s, 3);
     const nx = -Math.sin(dir);
     const ny = Math.cos(dir);
     const z = profilo.quota(s) + sopra;

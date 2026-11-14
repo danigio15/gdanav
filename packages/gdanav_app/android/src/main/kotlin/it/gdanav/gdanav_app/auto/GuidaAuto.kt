@@ -38,9 +38,9 @@ class GuidaAuto(private val context: Context) {
      * con quella giusta evidenziata.
      */
     fun passo(g: PonteAuto.Guida, conCorsie: Boolean = true): Step {
-        val manovra = Maneuver.Builder(IconeManovra.tipo(g.tipo, g.rotonda)).setIcon(icona(IconeManovra.icona(g.tipo)))
-        val rotonda = g.rotonda
-        if (g.tipo == 26 && rotonda != null && rotonda > 0) manovra.setRoundaboutExitNumber(rotonda)
+        val manovra = Maneuver.Builder(IconeManovra.tipo(g.tipo, g.rotonda, g.rotondaAngolo))
+            .setIcon(icona(IconeManovra.icona(g.tipo, g.rotondaAngolo)))
+        IconeManovra.uscitaEAngolo(manovra, g.tipo, g.rotonda, g.rotondaAngolo)
         // Le frasi dalla più lunga alla più corta: sugli schermi piccoli
         // l'auto prende quella che ci sta («2ª uscita»).
         val passo = Step.Builder(cue(g.frasi, testo(g))).setManeuver(manovra.build())
@@ -90,9 +90,9 @@ class GuidaAuto(private val context: Context) {
      */
     private fun dopo(g: PonteAuto.Guida): Step? {
         val tipo = g.dopoTipo ?: return null
-        val manovra = Maneuver.Builder(IconeManovra.tipo(tipo, g.dopoRotonda)).setIcon(icona(IconeManovra.icona(tipo)))
-        val rotonda = g.dopoRotonda
-        if (tipo == 26 && rotonda != null && rotonda > 0) manovra.setRoundaboutExitNumber(rotonda)
+        val manovra = Maneuver.Builder(IconeManovra.tipo(tipo, g.dopoRotonda, g.dopoRotondaAngolo))
+            .setIcon(icona(IconeManovra.icona(tipo, g.dopoRotondaAngolo)))
+        IconeManovra.uscitaEAngolo(manovra, tipo, g.dopoRotonda, g.dopoRotondaAngolo)
         return Step.Builder(cue(g.dopoFrasi, g.dopoStrada.ifEmpty { " " }))
             .setManeuver(manovra.build())
             .build()

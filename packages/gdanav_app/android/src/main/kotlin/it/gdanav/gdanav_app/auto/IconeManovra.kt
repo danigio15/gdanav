@@ -6,9 +6,13 @@ import it.gdanav.gdanav_app.R
 /**
  * Dal tipo di manovra di Valhalla al tipo e all'icona di Android Auto. Si
  * guida a destra: le rotonde girano in senso antiorario.
+ *
+ * [angoloRotonda]: di quanto si gira nella rotonda, in senso antiorario (90
+ * l'uscita a destra, 180 dritto, 270 a sinistra, 360 indietro), come lo
+ * manda l'app (`angoloDellaRotonda`).
  */
 object IconeManovra {
-    fun tipo(valhalla: Int, uscitaRotonda: Int? = null): Int = when (valhalla) {
+    fun tipo(valhalla: Int, uscitaRotonda: Int? = null, angoloRotonda: Int? = null): Int = when (valhalla) {
         1, 2, 3 -> Maneuver.TYPE_DEPART
         4 -> Maneuver.TYPE_DESTINATION
         5 -> Maneuver.TYPE_DESTINATION_RIGHT
@@ -31,17 +35,43 @@ object IconeManovra {
         25 -> Maneuver.TYPE_MERGE_SIDE_UNSPECIFIED
         37 -> Maneuver.TYPE_MERGE_RIGHT
         38 -> Maneuver.TYPE_MERGE_LEFT
-        26 -> if (uscitaRotonda != null && uscitaRotonda > 0) {
-            Maneuver.TYPE_ROUNDABOUT_ENTER_AND_EXIT_CCW
-        } else {
-            Maneuver.TYPE_ROUNDABOUT_ENTER_CCW
+        26 -> when {
+            uscitaRotonda == null || uscitaRotonda <= 0 -> Maneuver.TYPE_ROUNDABOUT_ENTER_CCW
+            angoloValido(angoloRotonda) -> Maneuver.TYPE_ROUNDABOUT_ENTER_AND_EXIT_CCW_WITH_ANGLE
+            else -> Maneuver.TYPE_ROUNDABOUT_ENTER_AND_EXIT_CCW
         }
         27 -> Maneuver.TYPE_ROUNDABOUT_EXIT_CCW
         28 -> Maneuver.TYPE_FERRY_BOAT
         else -> Maneuver.TYPE_STRAIGHT
     }
 
-    fun icona(valhalla: Int): Int = when (valhalla) {
+    private fun angoloValido(a: Int?) = a != null && a in 1..360
+
+    /**
+     * L'uscita e l'angolo della rotonda sulla manovra: il tipo «con l'angolo»
+     * li vuole tutti e due (vedi [tipo]).
+     */
+    fun uscitaEAngolo(manovra: Maneuver.Builder, valhalla: Int, uscitaRotonda: Int?, angoloRotonda: Int?) {
+        if (valhalla != 26 || uscitaRotonda == null || uscitaRotonda <= 0) return
+        manovra.setRoundaboutExitNumber(uscitaRotonda)
+        if (angoloRotonda != null && angoloValido(angoloRotonda)) manovra.setRoundaboutExitAngle(angoloRotonda)
+    }
+
+    /**
+     * L'icona della rotonda per da che parte si esce. «Alla rotonda la
+     * freccia è errata»: l'icona di prima era la rotonda di Material che gira
+     * in senso orario (all'inglese) e, per uscire a destra, faceva tutto il
+     * giro; queste girano in senso antiorario fino all'uscita.
+     */
+    private fun iconaRotonda(angolo: Int?): Int = when {
+        angolo == null -> R.drawable.manovra_rotonda_dritto
+        angolo < 135 -> R.drawable.manovra_rotonda_destra
+        angolo < 225 -> R.drawable.manovra_rotonda_dritto
+        angolo < 315 -> R.drawable.manovra_rotonda_sinistra
+        else -> R.drawable.manovra_rotonda_indietro
+    }
+
+    fun icona(valhalla: Int, angoloRotonda: Int? = null): Int = when (valhalla) {
         4, 5, 6 -> R.drawable.manovra_arrivo
         9 -> R.drawable.manovra_leggera_destra
         2, 10 -> R.drawable.manovra_destra
@@ -55,7 +85,9 @@ object IconeManovra {
         23 -> R.drawable.manovra_bivio_destra
         24 -> R.drawable.manovra_bivio_sinistra
         25, 37, 38 -> R.drawable.manovra_immissione
-        26, 27 -> R.drawable.manovra_rotonda
+        26 -> iconaRotonda(angoloRotonda)
+        // Uscendo dalla rotonda si esce alla prima.
+        27 -> iconaRotonda(angoloRotonda ?: 90)
         28, 29 -> R.drawable.manovra_traghetto
         else -> R.drawable.manovra_dritto
     }

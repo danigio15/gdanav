@@ -81,7 +81,7 @@ object NotificaGuida {
         val chiave = "${g.tipo}|$testo"
         val nuova = chiave != ultimaManovra
         ultimaManovra = chiave
-        val icona = IconeManovra.icona(g.tipo)
+        val icona = IconeManovra.icona(g.tipo, g.rotondaAngolo)
         val grande = bitmap(context, icona)
         val apri = context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
             PendingIntent.getActivity(context, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)

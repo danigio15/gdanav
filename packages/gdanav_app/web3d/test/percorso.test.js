@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { IndiceSegmenti, Linea, Origine, Profilo, alzataDeiNastri, lungoLaLinea, nastro, pezziDelNastro, profiloDi, quote, riempiQuote, sensiDiMarcia } from '../src/percorso.js';
+import { IndiceSegmenti, Linea, Origine, Profilo, alzataDeiNastri, direzioneDisegnata, lungoLaLinea, nastro, pezziDelNastro, profiloDi, quote, riempiQuote, sensiDiMarcia } from '../src/percorso.js';
 
 /** Segmenti finti: [x0,y0,z0,x1,y1,z1,w,codice]. */
 function indice(segmenti) {
@@ -514,4 +514,74 @@ test('i due sensi di una strada vanno ognuno nella sua metà', () => {
   const [lunga, corta] = sensiDiMarcia([dritta(0, 400), dritta(60, 40)]);
   assert.equal(lunga, 0);
   assert.ok(corta > 1);
+});
+
+// Una rotonda piccola come quella della segnalazione (anello di undici metri):
+// da sud la strada si divide in due sensi unici, l'ingresso a destra e
+// l'uscita a sinistra; si esce subito, a nord-est, su un altro senso unico.
+// Le polilinee: [codice, x0, y0, x1, y1, …] (5 strada, +128 senso unico).
+const ROTONDA = [
+  [5, -18.5, -160, -16.5, -49.5],
+  [133, -16.5, -49.5, -1.7, -21.5, 6.4, -9.4],
+  [133, -9.8, -4, -16.5, -49.5],
+  [5, -9.8, -4, -4.4, -9.4, -0.8, -10.7, 3.3, -10.7, 6.4, -9.4, 10, -6.7, 12.3, -3.1, 13.2, 1, 12.3, 5.1, 10.5, 8.7, 7.8, 11.4, 4.2, 12.7, -2.1, 12.7, -5.7, 10.9, -8.4, 8.2, -10.2, 5.1, -10.7, -1.3, -9.8, -4],
+  [133, 10, -6.7, 19, 2.8, 33, 12.3, 57.3, 24.9],
+  [5, 57.3, 24.9, 113.3, 40.9, 194.5, 77.1],
+  [133, 57.3, 24.9, 4.2, 12.7],
+  [133, -7.5, 30.3, -10.7, 15.9, -10.2, 5.1],
+  [133, 1.5, 13.2, -7.5, 30.3],
+  [5, -7.5, 30.3, -5.2, 73.6],
+];
+function indiceRotonda() {
+  const seg = [];
+  for (const [codice, ...xy] of ROTONDA) for (let k = 2; k < xy.length; k += 2) seg.push([xy[k - 2], xy[k - 1], 0, xy[k], xy[k + 1], 0, 7, codice]);
+  return indice(seg);
+}
+// Il percorso di TomTom: una carreggiata sola fino all'anello, poi l'uscita;
+// sette metri a ovest e sette a nord delle strade della mappa, un punto ogni 4 m.
+function percorsoRotonda() {
+  const base = [[-18.5, -160], [-16.5, -49.5], [-3, -11.5], [3.3, -10.7], [6.4, -9.4], [10, -6.7], [19, 2.8], [33, 12.3], [57.3, 24.9], [113.3, 40.9], [194.5, 77.1]];
+  const xy = [];
+  for (let i = 1; i < base.length; i++) {
+    const [a, b] = [base[i - 1], base[i]];
+    const n = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / 4));
+    for (let k = 0; k < n; k++) xy.push(a[0] + ((b[0] - a[0]) * k) / n - 7, a[1] + ((b[1] - a[1]) * k) / n + 7);
+  }
+  xy.push(194.5 - 7, 77.1 + 7);
+  return new Linea(xy);
+}
+
+test('alla rotonda la linea spostata sulla strada non torna indietro (niente V)', () => {
+  // «Alla rotonda la freccia è errata»: il percorso dentro la curva di sette,
+  // dieci metri; spostato di lato, allo spigolo dell'ingresso faceva un
+  // cappio (avanti, indietro, avanti): una V sul nastro e sulla freccia.
+  const l = percorsoRotonda();
+  const p = profiloDi(l, 0, l.lunghezza, indiceRotonda());
+  const dove = (s) => {
+    const [x, y] = l.a(s);
+    const [dx, dy] = p.sposta(s);
+    return [x + dx, y + dy];
+  };
+  for (let s = 60; s < l.lunghezza - 60; s += 1) {
+    const [a, b] = [dove(s), dove(s + 1)];
+    const t = l.direzione(s + 0.5, 1);
+    const avanti = (b[0] - a[0]) * Math.cos(t) + (b[1] - a[1]) * Math.sin(t);
+    assert.ok(avanti > -0.05, `a ${s.toFixed(0)} m la linea torna indietro di ${(-avanti).toFixed(2)} m`);
+  }
+});
+
+test('la punta della freccia guarda come il nastro che chiude, non come la linea di TomTom', () => {
+  // Una linea spostata di lato sempre di più (da zero a dieci metri in
+  // venti): il nastro va di sbieco, mentre la linea di TomTom va dritta.
+  const l = new Linea([0, 0, 100, 0]);
+  const passo = 4;
+  const dy = Float64Array.from({ length: 26 }, (_, k) => Math.min(10, Math.max(0, (k * passo - 40) / 2)));
+  const p = new Profilo(0, passo, new Float64Array(26), null, new Float64Array(26), dy);
+  // A 50 m il nastro sale di mezzo metro per metro: 26,6 gradi.
+  const gradi = (direzioneDisegnata(l, p, 50) * 180) / Math.PI;
+  assert.ok(Math.abs(gradi - 26.6) < 1, `la punta guarda a ${gradi.toFixed(1)}°`);
+  // Dove il nastro va dritto, la punta pure.
+  assert.ok(Math.abs(direzioneDisegnata(l, p, 90)) < 1e-6);
+  // Senza spostamenti è il verso della linea.
+  assert.ok(Math.abs(direzioneDisegnata(l, new Profilo(0, 4, new Float64Array(26)), 50)) < 1e-6);
 });

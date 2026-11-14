@@ -1241,6 +1241,9 @@ class PonteAuto {
       'uscita': m?.uscita ?? '',
       'verso': m?.verso ?? '',
       'rotonda': m?.uscitaRotonda ?? (m != null && m.tipo == 26 ? uscitaDallaFrase(m.istruzione) : null),
+      // Di quanto si gira nella rotonda (antiorario, 90 = a destra): per
+      // l'icona giusta e per il tipo «con l'angolo» di Android Auto.
+      'rotonda_angolo': ?(m == null ? null : angoloDellaRotonda(m)),
       // Le frasi della scheda dalla più lunga alla più corta: sugli schermi
       // piccoli (CarPlay a 400×240) l'auto prende quella che ci sta.
       if (m != null) 'frasi': frasiManovra(m),
@@ -1253,6 +1256,7 @@ class PonteAuto {
         'dopo_tipo': d.tipo,
         'dopo_strada': d.strada.isNotEmpty ? d.strada : d.istruzione,
         'dopo_rotonda': ?d.uscitaRotonda,
+        'dopo_rotonda_angolo': ?angoloDellaRotonda(d),
         'dopo_frasi': frasiPoi(d),
       },
       if (m != null && _svincoloPronto == m.inizio && (a?.allaProssimaM ?? m.lunghezzaM) <= PopupSvincolo.daMetri)
