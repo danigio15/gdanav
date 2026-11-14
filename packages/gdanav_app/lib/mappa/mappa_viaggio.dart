@@ -349,16 +349,20 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     unawaited(_io());
   }
 
-  /// Fuori dalla guida, in 3D, la mappa segue chi guida: girata come va,
-  /// inclinata, come in guida. Non mentre si guarda un viaggio da fare (la
-  /// sua strada intera), né quando la si è spostata col dito o si guarda una
-  /// persona di casa ([ControlloMappa.libera]).
+  /// Fuori dalla guida la mappa segue chi va, in auto o a piedi: in 3D
+  /// girata come va e inclinata, come in guida; in 2D dall'alto, col nord in
+  /// su. Non mentre si guarda un viaggio da fare (la sua strada intera), né
+  /// quando la si è spostata col dito o si guarda una persona di casa
+  /// ([ControlloMappa.libera]: «Dove sono» la fa seguire di nuovo).
+  ///
+  /// «Se non metto una destinazione, se cammino resta fermo alla posizione»:
+  /// prima in 2D la mappa andava sulla prima posizione e lì restava, e il
+  /// segnaposto usciva dallo schermo. E dopo aver guardato una persona di
+  /// casa non seguiva più nemmeno in 3D, neanche con «Dove sono»: la persona
+  /// mostrata restava quella, e la si contava ancora qui. A tenere ferma la
+  /// mappa sulla persona basta [ControlloMappa.libera].
   bool get _seguiFuoriGuida =>
-      widget.guida == null &&
-      _inclinata &&
-      !widget.controllo.libera &&
-      widget.gestore.stato is! ViaggioPronto &&
-      widget.persone?.daMostrare == null;
+      widget.guida == null && !widget.controllo.libera && widget.gestore.stato is! ViaggioPronto;
 
   /* ─── In guida, l'auto che scorre ───────────────────────────────────────
    *
@@ -537,7 +541,13 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
         _zoomMostrato = zoom;
         await m.moveCamera(
           CameraUpdate.newCameraPosition(
-            CameraPosition(target: LatLng(f.punto.lat, f.punto.lon), zoom: zoom, tilt: _inclinazione, bearing: f.rotta),
+            CameraPosition(
+              target: LatLng(f.punto.lat, f.punto.lon),
+              zoom: zoom,
+              tilt: _inclinazione,
+              // In 2D il nord resta in su.
+              bearing: _inclinata ? f.rotta : 0,
+            ),
           ),
         );
         _seguita = widget.posizione.lettoAlle;
@@ -1212,7 +1222,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
       onMapLongClick: (_, p) => widget.onPuntoScelto(p),
     );
     // Un dito che muove la mappa la rende libera (zoom, spostamenti): in
-    // guida, e fuori quando in 3D la mappa ti segue. «Dove sono», o venti
+    // guida, e fuori quando la mappa ti segue. «Dove sono», o venti
     // secondi senza tocchi, e si torna a seguire.
     return Listener(onPointerMove: (_) => widget.controllo.toccata(), child: mappa);
   }

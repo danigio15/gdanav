@@ -161,7 +161,7 @@ class GestorePosizione extends ChangeNotifier {
      * quei metri si ricavava una direzione che non esisteva. */
     final vaKmh = velocitaDellAuto?.call() ?? dalGps;
 
-    _dovePunta(prima, l, vaKmh);
+    _dovePunta(l, vaKmh);
 
     qui = l.punto;
     lettoAlle = ora;
@@ -205,27 +205,63 @@ class GestorePosizione extends ChangeNotifier {
   /// secondo, con 0,6 una curva di 90° è finita in tre secondi.
   static const double _quantoSiGira = 0.6;
 
+  /// Quanto ci si deve spostare, a piedi o in coda, perché sia strada fatta e
+  /// non il GPS che balla: due volte quanto il telefono dice di potersi
+  /// sbagliare, fra [_aPiediAlmeno] e [_troppoPerEsserRumore].
+  static const double _aPiediAlmeno = 10;
+
   bool _rottaConosciuta = false;
+
+  /// Da dove si conta lo spostamento per la direzione: l'ultima lettura da
+  /// cui la si è presa (o la prima).
+  ///
+  /// Prima si guardavano solo due letture di fila. A piedi, a uno o quattro
+  /// km/h, fra una lettura e l'altra passa un metro: mai gli otto, figurarsi
+  /// i venticinque, e la bussola sotto i 5,4 km/h non conta. La direzione
+  /// restava quella di partenza (il nord, o l'ultima strada fatta in auto),
+  /// e camminando dall'altra parte la freccia, con il punto «dietro» di sé,
+  /// non si muoveva: «se cammino resta fermo alla posizione e non cammina».
+  /// Contati da qui, i metri si sommano.
+  Punto? _daQui;
 
   /// Se [rotta] viene da letture vere, e non è lo zero di partenza.
   bool get rottaConosciuta => _rottaConosciuta;
 
-  void _dovePunta(Punto? prima, Lettura l, double vaKmh) {
+  void _dovePunta(Lettura l, double vaKmh) {
     // La bussola del telefono, quando c'è e si sta andando abbastanza.
     if (l.rotta != null && l.velocitaMs > 1.5) {
       _verso(l.rotta!);
+      _daQui = l.punto;
       return;
     }
-    if (prima == null) return;
-    /* Niente bussola: la direzione la danno i due punti. Ma ci si e' spostati
+    final da = _daQui;
+    if (da == null) {
+      _daQui = l.punto;
+      return;
+    }
+    /* Niente bussola: la direzione la dà la strada fatta da [_daQui]. Ma ci si e' spostati
      * davvero? Due modi di saperlo, e basta uno: o qualcuno dice che si va —
      * il tachimetro dell'auto, o il GPS — e allora anche otto metri contano;
      * o nessuno lo dice, e allora ci vuole un salto troppo grande per essere
      * il GPS che balla. La seconda strada serve ai telefoni che la velocita'
      * non la danno mai: senza, da quelli la direzione non arriverebbe piu'. */
-    final quanto = distanzaM(prima, l.punto);
-    final soglia = vaKmh >= _fermoSotto ? 8.0 : _troppoPerEsserRumore;
-    if (quanto > soglia) _verso(rottaGradi(prima, l.punto));
+    final quanto = distanzaM(da, l.punto);
+    final soglia = vaKmh >= _fermoSotto ? 8.0 : _sogliaDaFermo(l);
+    if (quanto > soglia) {
+      _verso(rottaGradi(da, l.punto));
+      _daQui = l.punto;
+    }
+  }
+
+  /* Quando nessuno dice che si va. Se lo dice l'auto (il suo tachimetro segna
+   * zero) si è fermi davvero, e ci vuole un salto troppo grande per essere il
+   * GPS. Senza l'auto (a piedi) decide quanto il telefono dice di sbagliarsi:
+   * all'aperto cinque metri, e dieci metri fatti sono strada; fra i palazzi
+   * venti, e si torna ai venticinque. */
+  double _sogliaDaFermo(Lettura l) {
+    final quanto = l.precisioneM;
+    if (velocitaDellAuto?.call() != null || quanto == null) return _troppoPerEsserRumore;
+    return (quanto * 2).clamp(_aPiediAlmeno, _troppoPerEsserRumore).toDouble();
   }
 
   void _verso(double gradi) {

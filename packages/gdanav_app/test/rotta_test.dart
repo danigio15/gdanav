@@ -142,6 +142,43 @@ void main() {
     expect(p.velocitaKmh, greaterThan(2));
   });
 
+  test('a piedi, un metro alla volta, la direzione arriva lo stesso', () async {
+    /* «Se cammino resta fermo.» Fra due letture a piedi c'è un metro: prima
+     * la direzione si prendeva solo da due letture di fila, e un metro non
+     * bastava mai. Adesso i metri si sommano, da dove la si è presa l'ultima
+     * volta: dieci metri fatti all'aperto sono strada. */
+    for (final velocita in [0.0, 0.4, 1.1]) {
+      daMandare = [
+        for (var i = 0; i < 15; i++)
+          Lettura(Punto(40.9700 - i * _dieciMetri / 10, 14.2060), velocitaMs: velocita, precisioneM: 5),
+      ];
+      final p = GestorePosizione(
+        archivio: Archivio(),
+        letture: () => Stream<Lettura>.fromIterable(daMandare),
+        orologio: () => adesso = adesso.add(const Duration(seconds: 1)),
+      );
+      p.avvia();
+      await Future<void>.delayed(Duration.zero);
+      expect(p.rottaConosciuta, isTrue, reason: 'a $velocita m/s');
+      expect(p.rotta, closeTo(180, 1), reason: 'si va verso sud, a $velocita m/s');
+    }
+  });
+
+  test('a piedi fermi, il GPS che balla di qualche metro non gira la freccia', () async {
+    daMandare = [
+      for (var i = 0; i < 20; i++)
+        Lettura(Punto(40.9700 + (i.isEven ? 1 : -1) * _dieciMetri * 0.2, 14.2060), precisioneM: 5),
+    ];
+    final p = GestorePosizione(
+      archivio: Archivio(),
+      letture: () => Stream<Lettura>.fromIterable(daMandare),
+      orologio: () => adesso = adesso.add(const Duration(seconds: 1)),
+    );
+    p.avvia();
+    await Future<void>.delayed(Duration.zero);
+    expect(p.rottaConosciuta, isFalse);
+  });
+
   test('la prima direzione non si smorza: se no si guarda a nord fino alla curva', () async {
     daMandare = [const Lettura(Punto(40.9700, 14.2060), rotta: 270, velocitaMs: 10)];
     final p = costruisci(auto: () => 50);

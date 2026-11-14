@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -10,6 +11,7 @@ import 'package:gdanav_app/mappa/controllo_mappa.dart';
 import 'package:gdanav_app/mappa/dati_viaggio.dart';
 import 'package:gdanav_app/mappa/mappa_viaggio.dart';
 import 'package:gdanav_app/mappa/stile.dart';
+import 'package:gdanav_app/stato/gestore_persone.dart';
 import 'package:gdanav_app/stato/gestore_posizione.dart';
 import 'package:gdanav_app/stato/gestore_viaggio.dart';
 import 'package:gdanav_core/gdanav_core.dart';
@@ -372,7 +374,7 @@ void main() {
     late Ambiente a;
     late ControlloMappa controllo;
 
-    Future<void> senzaGuida(WidgetTester tester, {bool inclinata = true}) async {
+    Future<void> senzaGuida(WidgetTester tester, {bool inclinata = true, GestorePersone? persone}) async {
       preparaPiattaforma(portachiavi: impostazioniComplete);
       final mappe = <MappaFinta>[];
       final prima = MapLibrePlatform.createInstance;
@@ -392,6 +394,7 @@ void main() {
               gestore: a.viaggio,
               controllo: controllo,
               posizione: a.posizione,
+              persone: persone,
               onPuntoScelto: (_) {},
               onColonnina: (_) {},
               orologio: () => tester.binding.clock.now(),
@@ -475,27 +478,106 @@ void main() {
       await via(tester);
     });
 
-    testWidgets('in 2D non segue, e mentre si guarda un viaggio da fare nemmeno', (tester) async {
+    testWidgets('in 2D segue anche lei, col nord in su; mentre si guarda un viaggio da fare no', (tester) async {
       await senzaGuida(tester, inclinata: false);
       await lettura(tester);
       await lettura(tester);
-      expect(m.seguite, isEmpty);
-
-      controllo.scegliVista(VistaMappa.inclinata);
-      await tester.pump();
-      await lettura(tester);
-      expect(m.seguite, isNotEmpty);
+      final ultimo = Punto(42 + n * 0.0001, 12);
+      for (var i = 0; i < 25; i++) {
+        await tester.pump(const Duration(milliseconds: 40));
+      }
+      final mosse = [...m.seguite.map((s) => s.$1), ...m.spostate];
+      expect(mosse, isNotEmpty, reason: 'senza destinazione la mappa segue anche dall\'alto');
+      final camera = m.spostate.isNotEmpty ? m.spostate.last : m.seguite.last.$1;
+      expect(camera.tilt, 0);
+      expect(camera.bearing, 0, reason: 'in 2D il nord resta in su');
+      expect(distanzaM(ultimo, Punto(camera.target.latitude, camera.target.longitude)), lessThan(25));
 
       a.auto.manuale.imposta(90);
       await tester.runAsync(() => a.viaggio.vaiA(const Luogo(nome: 'Nord', posizione: Punto(42.18, 12))));
       await tester.pump();
       expect(a.viaggio.stato, isA<ViaggioPronto>());
-      final prima = m.seguite.length;
+      final prima = m.seguite.length, spostatePrima = m.spostate.length;
       await lettura(tester);
       await lettura(tester);
       expect(m.seguite, hasLength(prima));
+      expect(m.spostate, hasLength(spostatePrima));
       await via(tester);
     });
+
+    testWidgets('guardata una persona di casa, «Dove sono» la fa seguire di nuovo', (tester) async {
+      final persone = GestorePersone();
+      addTearDown(persone.dispose);
+      await senzaGuida(tester, persone: persone);
+      await lettura(tester);
+      persone.mostra(const PersonaSullaMappa(id: 'm', nome: 'Mamma', posizione: Punto(41.9, 12.5)));
+      await tester.pump();
+      expect(controllo.libera, isTrue, reason: 'si guarda la persona, finché non si chiede «Dove sono»');
+      final prima = m.spostate.length;
+      await lettura(tester);
+      expect(m.spostate, hasLength(prima));
+
+      controllo.centra();
+      await tester.pump();
+      final dopo = m.spostate.length;
+      await lettura(tester);
+      for (var i = 0; i < 25; i++) {
+        await tester.pump(const Duration(milliseconds: 40));
+      }
+      expect(m.spostate.length, greaterThan(dopo), reason: 'la persona mostrata non tiene ferma la mappa per sempre');
+      await via(tester);
+    });
+
+    /* «Se non metto una destinazione, se cammino resta fermo alla posizione
+     * e non cammina.» A piedi il telefono la velocità la dà bassa o non la dà,
+     * e la bussola (sotto i 5 km/h) non conta: la direzione restava quella di
+     * partenza, e la freccia, con un punto «dietro» di sé, restava dov'era. */
+    Future<({Punto ultimo, CameraPosition camera, Punto segnaposto})> cammina(
+      WidgetTester tester, {
+      required double kmh,
+      required double versoGradi,
+      required int secondi,
+      bool velocitaDalTelefono = true,
+    }) async {
+      var qui = const Punto(42.05, 12.05);
+      final passo = kmh / 3.6;
+      final r = versoGradi * math.pi / 180;
+      for (var s = 0; s < secondi; s++) {
+        a.gps.add(Lettura(qui, velocitaMs: velocitaDalTelefono ? passo : 0, precisioneM: 5));
+        for (var i = 0; i < 25; i++) {
+          await tester.pump(const Duration(milliseconds: 40));
+        }
+        qui = Punto(
+          qui.lat + passo * math.cos(r) / 111195,
+          qui.lon + passo * math.sin(r) / (111195 * math.cos(qui.lat * math.pi / 180)),
+        );
+      }
+      final ultimo = a.posizione.qui!;
+      final io = m.scritture.lastWhere((s) => s.$1 == sorgenteIo).$2;
+      final c = ((io['features'] as List).single as Map)['geometry']['coordinates'] as List;
+      final camera = m.spostate.isNotEmpty ? m.spostate.last : m.seguite.last.$1;
+      return (ultimo: ultimo, camera: camera, segnaposto: Punto(c[1] as double, c[0] as double));
+    }
+
+    for (final (kmh, dalTelefono) in [(1.5, false), (1.5, true), (4.0, true)]) {
+      testWidgets('a piedi a $kmh km/h${dalTelefono ? '' : ' (il telefono non dice la velocità)'}, senza destinazione: '
+          'segnaposto e mappa camminano con te', (tester) async {
+        await senzaGuida(tester);
+        // Verso sud: il contrario del nord della partenza, senza bussola.
+        final f = await cammina(tester, kmh: kmh, versoGradi: 180, secondi: 40, velocitaDalTelefono: dalTelefono);
+        final fatti = 40 * kmh / 3.6;
+        expect(fatti, greaterThan(15));
+        expect(distanzaM(f.ultimo, f.segnaposto), lessThan(3), reason: 'il segnaposto è dove sei');
+        expect(
+          distanzaM(f.ultimo, Punto(f.camera.target.latitude, f.camera.target.longitude)),
+          lessThan(3),
+          reason: 'la mappa ti segue',
+        );
+        // E guarda dove si va: verso sud.
+        expect(diQuantoSiGira(f.camera.bearing, 180).abs(), lessThan(30));
+        await via(tester);
+      });
+    }
   });
 
   group('la scelta della vista: 2D, 3D, immersiva', () {
