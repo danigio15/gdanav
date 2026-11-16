@@ -497,6 +497,31 @@ class GestoreViaggio extends ChangeNotifier {
     return nuovo;
   }
 
+  /// Lo stesso viaggio con un pezzo di strada rifatto davanti (un senso
+  /// unico che il percorso faceva contromano, `correggiContromano`): stesse
+  /// soste, stessa meta, stesso arrivo. `null` se nel frattempo il percorso è
+  /// cambiato ([vecchio] non è più quello del viaggio).
+  ViaggioPronto? sostituisciPercorso(PercorsoCalcolato vecchio, PercorsoCalcolato nuovo) {
+    final s = stato;
+    if (s is! ViaggioPronto || !identical(s.viaggio.percorso, vecchio)) return null;
+    final scelte = [for (final p in s.scelte) identical(p, vecchio) ? nuovo : p];
+    _scelte = [for (final p in _scelte) identical(p, vecchio) ? nuovo : p];
+    final pronto = ViaggioPronto(
+      s.destinazione,
+      Viaggio(percorso: nuovo, colonnine: s.viaggio.colonnine, piano: s.viaggio.piano),
+      s.batteriaPartenza,
+      calcolatoAlle: s.calcolatoAlle,
+      termica: s.termica,
+      senzaSoste: s.senzaSoste,
+      scelte: scelte,
+      scelta: s.scelta,
+      tappe: s.tappe,
+      scartoTraffico: s.scartoTraffico,
+    );
+    _imposta(pronto);
+    return pronto;
+  }
+
   /// Partiti, le strade proposte non servono più: i ricalcoli partono da
   /// dove si è.
   void dimenticaScelte() {

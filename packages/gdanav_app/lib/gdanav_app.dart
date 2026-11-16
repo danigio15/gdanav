@@ -28,6 +28,7 @@ import 'stato/licenza.dart';
 import 'stato/gestore_viaggio.dart';
 import 'stato/gestore_edifici.dart';
 import 'stato/gestore_ztl.dart';
+import 'stato/strade_osm.dart';
 import 'stato/viaggi_pianificati.dart';
 import 'stato/prova_di_guida.dart';
 import 'stato/posizione.dart';
@@ -162,6 +163,8 @@ Future<GdanavApp> preparaGdanav({
     archivio: archivio,
     audioIniziale: await archivio.modoAudio(),
     avvisi: ScelteAvvisi(await archivio.scelteAvvisi(), (s) => unawaited(archivio.salvaScelteAvvisi(s))),
+    // Mai contromano: le strade vere (OpenStreetMap) dei prossimi chilometri.
+    strade: StradeOsm(TessereOpenFreeMap().call).attorno,
   );
   // La velocità dell'auto entra anche qui: serve a sapere se si è fermi, e da
   // fermi il segnaposto non deve girare dietro al ballonzolamento del GPS.

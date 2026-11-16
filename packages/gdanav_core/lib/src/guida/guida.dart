@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import '../geo/geo.dart';
 import '../motore/modello_consumo.dart' show Tratto;
+import '../percorso/contromano.dart' show PercorsoCorretto;
 import '../percorso/valhalla.dart';
 import '../traffico/ritardo_traffico.dart';
 
@@ -265,6 +266,46 @@ class Guida {
     g._precedente = _precedente;
     g._annunciate.addAll(_annunciate);
     g._ultimaAlle = _ultimaAlle;
+    return g;
+  }
+
+  /// Lo stesso viaggio con un pezzo di geometria rifatto davanti
+  /// (`correggiContromano`): si resta a che punto si era, le frasi già dette
+  /// restano dette (le manovre spostate di indice con loro, [indiceNuovo]
+  /// dice dove sono finiti i punti), e quelle nuove si diranno.
+  Guida conCorrezione(PercorsoCorretto c) {
+    final nuovo = c.percorso;
+    final g = Guida(
+      nuovo,
+      sogliaFuoriM: sogliaFuoriM,
+      lettureFuori: lettureFuori,
+      sogliaPrestoM: sogliaPrestoM,
+      sogliaAggancioM: sogliaAggancioM,
+      sogliaSgancioM: sogliaSgancioM,
+      sogliaControManoGradi: sogliaControManoGradi,
+      lettureContromano: lettureContromano,
+      movimentoCheContaM: movimentoCheContaM,
+      guardaAvantiM: guardaAvantiM,
+      anticipaDaM: anticipaDaM,
+      anticipoGradi: anticipoGradi,
+    );
+    g._segmento = math.min(c.indiceNuovo(_segmento), math.max(0, nuovo.punti.length - 2));
+    g._agganciato = _agganciato;
+    g._precedente = _precedente;
+    g._ultimaAlle = _ultimaAlle;
+    final inizi = {for (final m in nuovo.manovre) m.inizio};
+    for (final chiave in _annunciate) {
+      final trattino = chiave.indexOf('-');
+      final vecchio = trattino < 0 ? null : int.tryParse(chiave.substring(0, trattino));
+      if (vecchio == null) {
+        g._annunciate.add(chiave);
+        continue;
+      }
+      // Una manovra che non c'è più non tiene occupata la chiave di una nuova.
+      if (c.tolto(vecchio)) continue;
+      final i = c.indiceNuovo(vecchio);
+      if (inizi.contains(i)) g._annunciate.add('$i${chiave.substring(trattino)}');
+    }
     return g;
   }
 

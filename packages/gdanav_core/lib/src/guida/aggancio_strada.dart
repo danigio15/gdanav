@@ -27,10 +27,19 @@ import '../geo/geo.dart';
 /// Un pezzo di strada attorno all'auto: i suoi punti, e il verso in cui si
 /// può andare ([senso] 1 nel verso dei punti, -1 al contrario, 0 tutti e due).
 class TrattoStrada {
-  const TrattoStrada(this.punti, {this.senso = 0});
+  const TrattoStrada(this.punti, {this.senso = 0, this.classe = '', this.rampa = false, this.ponte = ''});
 
   final List<Punto> punti;
   final int senso;
+
+  /// La classe di OpenMapTiles («primary», «minor», «service»…), se si sa.
+  final String classe;
+
+  /// Una rampa di svincolo.
+  final bool rampa;
+
+  /// «bridge», «tunnel» o niente.
+  final String ponte;
 }
 
 /// Dove si è agganciati: il [punto] sulla strada, la [rotta] della strada
