@@ -35,6 +35,8 @@ import '../stato/gestore_posizione.dart';
 import '../stato/gestore_risparmio.dart' show sintesiProposta;
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_viaggio.dart';
+import '../stato/gestore_casa_in_guida.dart';
+import 'avvisi_di_casa_in_auto.dart';
 import '../stato/prova_di_guida.dart';
 import '../stato/scelte_avvisi.dart';
 import '../stato/viaggi_pianificati.dart';
@@ -67,6 +69,7 @@ class PonteAuto {
     this.prova,
     this.ztl,
     this.persone,
+    this.casaInGuida,
     this.gpsDellAuto,
     MethodChannel? canale,
     DateTime Function()? orologio,
@@ -104,6 +107,12 @@ class PonteAuto {
   /// dell'auto come su quella del telefono (vedi [PersoneInAuto]).
   final GestorePersone? persone;
   PersoneInAuto? _persone;
+
+  /// Gli avvisi di casa (dentro GdAHome): sull'auto come avvisi del sistema
+  /// (vedi [AvvisiDiCasaInAuto]). La musica no: l'auto la legge dal lettore
+  /// nativo, nello stesso processo.
+  final GestoreCasaInGuida? casaInGuida;
+  AvvisiDiCasaInAuto? _casa;
   final MethodChannel _canale;
   final DateTime Function() _ora;
   var _attivo = true;
@@ -159,6 +168,9 @@ class PonteAuto {
     }
     _segnalazioni();
     _vicini();
+    if (casaInGuida?.coda case final coda?) {
+      _casa = AvvisiDiCasaInAuto(coda, _manda)..avvia();
+    }
     if (persone case final g?) {
       _persone = PersoneInAuto(
         g,
@@ -243,6 +255,9 @@ class PonteAuto {
       // «Ok Google, naviga verso…» o un'altra app che chiede un percorso.
       case 'naviga':
         await naviga(a['uri'] as String? ?? '');
+      // Un tasto di un avviso di casa, toccato sull'auto.
+      case 'avviso_casa_tasto':
+        _casa?.tasto(a['id'] as String?, a['tasto'] as String?);
       // «Fine» premuto sullo schermo dell'auto.
       case 'ferma':
         // Anche dal riepilogo dell'arrivo: si chiude, come «Fine» sul telefono.
@@ -606,6 +621,8 @@ class PonteAuto {
     guida.risparmio?.removeListener(_strada);
     _persone?.ferma();
     _persone = null;
+    _casa?.ferma();
+    _casa = null;
     _regia3d?.ferma();
     _regia3d = null;
   }
