@@ -31,8 +31,13 @@ final class LettoreDiSistema {
     private(set) var permesso = false
     private(set) var brano: Brano?
 
-    /// Se CarPlay deve mostrare i comandi: accesa, col permesso, e un brano.
+    /// Se c'è un brano da dire: accesa, col permesso, e qualcosa in coda.
     var daMostrare: Bool { acceso && permesso && brano != nil }
+
+    /// Se CarPlay mette ⏯ nella barra, in guida e a mappa libera: accesa e
+    /// col permesso. Senza un brano ⏯ riprende la coda della Musica (il
+    /// lettore di sistema la ricorda), e ⏭ arriva quando c'è un brano.
+    var conTasti: Bool { acceso && permesso }
 
     private let lettore = MPMusicPlayerController.systemMusicPlayer
     private var osservatori: [NSObjectProtocol] = []

@@ -133,13 +133,17 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
         PonteAuto.lavoro()?.nome,
         PonteAuto.cruscotto.elettrica,
         conMusica(),
+        lenteSpostata(),
     )
 
     /**
-     * In guida con la musica la lente e la casa di GdAHome lasciano i tasti in
-     * alto a ⏯ e ⏭ (`SchermoNavigazione.azioni`): stanno qui, per prime.
+     * Con la musica la casa di GdAHome (e in guida anche la lente) lascia i
+     * tasti in alto a ⏯ e ⏭ (`SchermoNavigazione.azioni`): sta qui, per prima.
      */
-    private fun conMusica() = PonteAuto.guida != null && LettoreTelefono.daMostrare
+    private fun conMusica() = LettoreTelefono.conTasti
+
+    /** La lente sta in alto solo a mappa libera. */
+    private fun lenteSpostata() = conMusica() && PonteAuto.guida != null
 
     override fun schermata(): Template {
         val casa = PonteAuto.casa()
@@ -147,8 +151,12 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
         val blu = CarColor.BLUE
         val spostati = if (conMusica()) {
             listOfNotNull(
-                riga("Cerca", sfoglia = true, icona = icona(R.drawable.auto_cerca)) {
-                    screenManager.push(SchermoCerca(carContext))
+                if (lenteSpostata()) {
+                    riga("Cerca", sfoglia = true, icona = icona(R.drawable.auto_cerca)) {
+                        screenManager.push(SchermoCerca(carContext))
+                    }
+                } else {
+                    null
                 },
                 GdanavInAuto.casa?.let { schermo ->
                     riga("GdAHome", "La tua casa", sfoglia = true, icona = icona(R.drawable.auto_casa)) {
@@ -162,7 +170,7 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
         return sezioni(
             "Menu",
             listOf(
-                "Cerca e casa" to spostati,
+                (if (lenteSpostata()) "Cerca e casa" else "La casa") to spostati,
                 "Vai a" to listOf(
                     if (casa != null) {
                         riga("Casa", casa.nome, icona = icona(R.drawable.icona_casa, blu)) { vai(casa) }

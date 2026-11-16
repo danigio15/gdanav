@@ -7,20 +7,26 @@ import '../componenti/avviso_di_casa.dart';
 import '../componenti/mini_lettore.dart';
 import 'archivio.dart';
 
-/// La casa e la musica mentre si guida: gli avvisi di casa (le notifiche di
+/// La casa e la musica nel navigatore: gli avvisi di casa (le notifiche di
 /// GdAHome) e il lettore musicale, con le loro due scelte nelle impostazioni.
 ///
 /// - **Gli avvisi** arrivano da chi ospita GdANav come notifiche già aperte
 ///   ([notifiche], le stesse che il postino di GdAHome mostra sul telefono:
 ///   quindi già filtrate dalle preferenze delle notifiche della casa). Qui si
-///   tengono solo **in guida**, e solo se «Avvisi di casa durante la guida» è
-///   acceso ([scelta]); finita la guida la coda si svuota (restano sul
-///   telefono). Un tasto premuto torna a chi ospita ([onAzione]), che lo
-///   esegue come un tasto della notifica: passa dalle sue regole (il
-///   lucchetto, la casa giusta), qui non si scavalca niente.
+///   tengono **mentre il navigatore è in uso** ([inUso]): in guida, con lo
+///   schermo dell'auto acceso anche senza percorso ([schermoDellAuto]: la
+///   mappa libera di Android Auto e CarPlay), o con la mappa del telefono in
+///   vista ([mappaInVista]); e solo se «Avvisi di casa durante la guida» è
+///   acceso ([scelta]). Quando il navigatore non è più in uso la coda si
+///   svuota (restano sul telefono). A voce solo in guida o in auto: a mappa
+///   libera sul telefono basta la scheda. Un tasto premuto torna a chi
+///   ospita ([onAzione]), che lo esegue come un tasto della notifica: passa
+///   dalle sue regole (il lucchetto, la casa giusta), qui non si scavalca
+///   niente.
 /// - **La musica**: il [lettore] (di solito [LettoreDelTelefono]) si accende
-///   solo con «Musica nel navigatore» accesa ([musica]). Senza il permesso, il
-///   riquadro in guida propone l'invito una volta sola ([invitoDaMostrare]).
+///   solo con «Musica nel navigatore» accesa ([musica]), in guida e a mappa
+///   libera. Senza il permesso, da fermi, l'invito una volta sola
+///   ([invitoDaMostrare]).
 class GestoreCasaInGuida extends ChangeNotifier {
   GestoreCasaInGuida({
     required this.archivio,
@@ -37,8 +43,15 @@ class GestoreCasaInGuida extends ChangeNotifier {
     if (c != null) {
       c.onAzione = _azione;
       _ascolto = notifiche?.listen(arrivata);
+      // A voce solo in guida o in auto: col telefono in mano, a mappa
+      // libera, la scheda basta.
+      if (c.onVoce case final v?) {
+        c.onVoce = (frase) {
+          if (_inGuida() || _inAuto) v(frase);
+        };
+      }
     }
-    _guida?.addListener(_guidaCambiata);
+    _guida?.addListener(_usoCambiato);
   }
 
   static bool _sempre() => true;
@@ -67,6 +80,28 @@ class GestoreCasaInGuida extends ChangeNotifier {
   bool _musica = true;
   bool _invitoVisto = false;
   bool _caricato = false;
+  bool _inAuto = false;
+  bool _mappaInVista = false;
+
+  /// Se il navigatore è in uso: in guida, con lo schermo dell'auto acceso
+  /// (anche a mappa libera), o con la mappa del telefono davanti.
+  bool get inUso => _inGuida() || _inAuto || _mappaInVista;
+
+  /// Lo schermo di Android Auto o di CarPlay si è acceso o spento (`in_auto`
+  /// dal ponte): acceso, gli avvisi passano anche senza un percorso.
+  void schermoDellAuto(bool acceso) {
+    if (acceso == _inAuto) return;
+    _inAuto = acceso;
+    _usoCambiato();
+  }
+
+  /// La mappa del telefono è davanti (la schermata principale montata, con
+  /// l'app in primo piano) o no.
+  void mappaInVista(bool si) {
+    if (si == _mappaInVista) return;
+    _mappaInVista = si;
+    _usoCambiato();
+  }
 
   /// Quali avvisi di casa passano in guida. «Avvisi di casa durante la
   /// guida» spento è [NotificheNelNavigatore.nessuna].
@@ -78,11 +113,12 @@ class GestoreCasaInGuida extends ChangeNotifier {
   /// L'interruttore «Musica nel navigatore».
   bool get musica => _musica;
 
-  /// Il lettore da mostrare in guida: c'è, e la musica è accesa.
+  /// Il lettore da mostrare, in guida e a mappa libera: c'è, e la musica è
+  /// accesa.
   LettoreMusicale? get lettoreInGuida => _musica ? lettore : null;
 
-  /// Se in guida va proposto l'invito per il permesso della musica: una
-  /// volta sola.
+  /// Se va proposto l'invito per il permesso della musica (da fermi, in guida
+  /// o a mappa libera): una volta sola.
   bool get invitoDaMostrare => _musica && !_invitoVisto && lettore != null && !lettore!.permesso;
 
   /// Legge le scelte salvate e accende la musica se va.
@@ -101,11 +137,11 @@ class GestoreCasaInGuida extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Una notifica arrivata da chi ospita. Fuori dalla guida, o con gli
-  /// avvisi spenti, non si tiene: resta sul telefono come sempre.
+  /// Una notifica arrivata da chi ospita. Col navigatore non in uso, o con
+  /// gli avvisi spenti, non si tiene: resta sul telefono come sempre.
   void arrivata(Map<String, Object?> notifica) {
     final c = coda;
-    if (c == null || !_inGuida() || !avvisiAccesi) return;
+    if (c == null || !inUso || !avvisiAccesi) return;
     final casa = notifica['_casa'];
     final a = AvvisoDiCasa.daNotifica(notifica, casa: casa is String && casa.isNotEmpty ? casa : null);
     if (a == null) return;
@@ -120,8 +156,8 @@ class GestoreCasaInGuida extends ChangeNotifier {
     if (busta != null) onAzione?.call(busta, azione.id);
   }
 
-  void _guidaCambiata() {
-    if (!_inGuida()) {
+  void _usoCambiato() {
+    if (!inUso) {
       coda?.svuota();
       _buste.clear();
     }
@@ -172,7 +208,7 @@ class GestoreCasaInGuida extends ChangeNotifier {
   @override
   void dispose() {
     unawaited(_ascolto?.cancel());
-    _guida?.removeListener(_guidaCambiata);
+    _guida?.removeListener(_usoCambiato);
     coda?.dispose();
     super.dispose();
   }

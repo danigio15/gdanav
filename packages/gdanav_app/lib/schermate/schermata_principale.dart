@@ -7,7 +7,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../componenti/tachimetro.dart';
+import '../componenti/avviso_di_casa.dart' show SchedaAvvisoDiCasa;
 import '../componenti/avvisi_in_guida.dart';
+import '../componenti/mini_lettore.dart' show InvitoMusica, MiniLettore;
 import '../componenti/scheda_auto.dart';
 import '../componenti/vetro.dart';
 import '../mappa/controllo_mappa.dart';
@@ -207,6 +209,12 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
       if (ok) widget.posizione.avvia();
     });
     segnalazioni.avvia();
+    // La mappa davanti: gli avvisi di casa passano anche senza percorso.
+    final stato = WidgetsBinding.instance.lifecycleState;
+    widget.casaInGuida?.mappaInVista(stato == null || stato == AppLifecycleState.resumed);
+    _vita = AppLifecycleListener(
+      onStateChange: (s) => widget.casaInGuida?.mappaInVista(s == AppLifecycleState.resumed),
+    );
     widget.guida.addListener(_guidaDaFuori);
     widget.apriIlMenu?.addListener(_menuDaFuori);
     widget.apriIlPianificatore?.addListener(_pianificatoreDaFuori);
@@ -252,6 +260,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   }
 
   var _inGuida = false;
+  AppLifecycleListener? _vita;
 
   Future<void> _avvia() async {
     if (_inGuida) return;
@@ -291,6 +300,8 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   @override
   void dispose() {
     if (!widget.soloImpostazioni) {
+      _vita?.dispose();
+      widget.casaInGuida?.mappaInVista(false);
       widget.guida.removeListener(_guidaDaFuori);
       widget.apriIlMenu?.removeListener(_menuDaFuori);
       widget.apriIlPianificatore?.removeListener(_pianificatoreDaFuori);
@@ -766,6 +777,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
     }
     final alto = MediaQuery.paddingOf(context).top;
     final schermo = MediaQuery.sizeOf(context).height;
+    final traverso = MediaQuery.sizeOf(context).width > schermo;
     return Scaffold(
       body: Stack(
         children: [
@@ -833,21 +845,43 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
             ),
           ),
           // Senza percorso, in macchina: l'autovelox o la segnalazione che si
-          // ha davanti, come in guida.
+          // ha davanti, come in guida; sotto, l'avviso di casa (dentro
+          // GdAHome), a sinistra dei tasti della mappa.
+          // Di traverso il tachimetro sta in alto a sinistra: gli avvisi
+          // vanno in alto al centro, fra il menu e i tasti della mappa.
           Positioned(
-            left: 4,
-            right: 80,
-            top: alto + 74,
-            child: ListenableBuilder(
-              listenable: _avvisi,
-              builder: (context, _) => switch (_avvisi.davanti) {
-                (final s, final m) => AvvisoSegnalazione(
-                  key: const Key('avviso-senza-percorso'),
-                  segnalazione: s,
-                  metri: m,
+            left: traverso ? 160 : 4,
+            right: traverso ? 160 : 80,
+            top: traverso ? alto + 10 : alto + 74,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: traverso ? 440 : double.infinity),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ListenableBuilder(
+                      listenable: _avvisi,
+                      builder: (context, _) => switch (_avvisi.davanti) {
+                        (final s, final m) => AvvisoSegnalazione(
+                          key: const Key('avviso-senza-percorso'),
+                          segnalazione: s,
+                          metri: m,
+                        ),
+                        null => const SizedBox.shrink(),
+                      },
+                    ),
+                    if (widget.casaInGuida?.coda case final coda?)
+                      ListenableBuilder(
+                        listenable: Listenable.merge([viaggio, widget.posizione]),
+                        builder: (context, _) => viaggio.stato is NessunViaggio
+                            ? SchedaAvvisoDiCasa(coda: coda, inMovimento: widget.posizione.velocitaAdesso() >= 3)
+                            : const SizedBox.shrink(),
+                      ),
+                  ],
                 ),
-                null => const SizedBox.shrink(),
-              },
+              ),
             ),
           ),
           Positioned(
@@ -913,9 +947,22 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 440),
                   child: ListenableBuilder(
-                    listenable: Listenable.merge([g, viaggio, widget.guida, _avvisi, ?widget.premium]),
+                    listenable: Listenable.merge([
+                      g,
+                      viaggio,
+                      widget.guida,
+                      _avvisi,
+                      ?widget.premium,
+                      ?widget.casaInGuida?.coda,
+                    ]),
                     builder: (context, _) {
-                      final libero = viaggio.stato is NessunViaggio && !widget.guida.attiva && _avvisi.davanti == null;
+                      final coda = widget.casaInGuida?.coda;
+                      final libero =
+                          viaggio.stato is NessunViaggio &&
+                          !widget.guida.attiva &&
+                          _avvisi.davanti == null &&
+                          coda?.attuale == null &&
+                          coda?.gruppo == null;
                       if (!libero) return const SizedBox.shrink();
                       return SchedaPianificaIViaggi(
                         gestore: g,
@@ -967,6 +1014,16 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                             onPreferito: _preferito,
                             onNuovo: () => _imposta(TipoPreferito.altro),
                             onModificaPreferito: _modificaPreferito,
+                            // La musica, come in Waze: in cima al pannello,
+                            // larga quanto lui. Non copre la mappa né i tasti,
+                            // e si sposta col pannello.
+                            musica: switch (widget.casaInGuida) {
+                              final c? when c.lettore != null => _MusicaNelPannello(
+                                casa: c,
+                                posizione: widget.posizione,
+                              ),
+                              _ => null,
+                            },
                             schedaAuto: ListenableBuilder(
                               listenable: widget.posizione,
                               builder: (context, _) => SchedaAuto(
@@ -1006,6 +1063,32 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
       ),
     );
   }
+}
+
+/// A mappa libera, in cima al pannello di partenza: il mini-lettore, o da
+/// fermi l'invito per il permesso (una volta). Con «Musica nel navigatore»
+/// spenta, o senza un lettore aperto, niente.
+class _MusicaNelPannello extends StatelessWidget {
+  const _MusicaNelPannello({required this.casa, required this.posizione});
+
+  final GestoreCasaInGuida casa;
+  final GestorePosizione posizione;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: Listenable.merge([casa, posizione, ?casa.lettore]),
+    builder: (context, _) {
+      final v = posizione.velocitaAdesso();
+      final Widget? musica = switch (casa.lettoreInGuida) {
+        final l? when !l.permesso =>
+          casa.invitoDaMostrare && v < 3 ? InvitoMusica(lettore: l, onVisto: casa.segnaInvitoVisto) : null,
+        final l? => MiniLettore(lettore: l, inMovimento: v >= 3),
+        null => null,
+      };
+      if (musica == null) return const SizedBox.shrink();
+      return Padding(padding: const EdgeInsets.only(bottom: 6), child: musica);
+    },
+  );
 }
 
 class _BottoneMappa extends StatelessWidget {

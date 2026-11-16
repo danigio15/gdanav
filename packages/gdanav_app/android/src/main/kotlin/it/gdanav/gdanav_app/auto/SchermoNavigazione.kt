@@ -53,6 +53,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         PonteAuto.strade?.id,
         // La musica cambia i tasti in alto (⏯ ⏭) solo quando c'è o no, e
         // quando passa da play a pausa: non a ogni brano.
+        LettoreTelefono.conTasti,
         LettoreTelefono.daMostrare,
         LettoreTelefono.brano?.suona,
     )
@@ -64,6 +65,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         renderer.aggiorna()
         sincronizzaNavigazione()
         mostraAvvisoCasa()
+        avvisaPermessoMusica()
         // Il modello si rifà solo se cambia quello che mostra: l'auto concede
         // pochi aggiornamenti.
         val ora = firma()
@@ -174,6 +176,26 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             // Un'auto che non mostra gli avvisi: almeno il titolo.
             if (a != null) CarToast.makeText(carContext, a.titolo, CarToast.LENGTH_LONG).show()
         }
+    }
+
+    /** L'avviso del permesso della musica già dato: una volta per sessione. */
+    private var permessoDetto = false
+
+    /**
+     * «Musica nel navigatore» è accesa ma manca l'«Accesso alle notifiche»:
+     * chi usa GdANav solo in auto l'invito del telefono non lo vede mai. Una
+     * volta per sessione un messaggio breve sull'auto, e sul telefono una
+     * notifica che apre dritta la pagina del sistema. Con la musica spenta
+     * niente ([LettoreTelefono.senzaPermesso] è falso).
+     */
+    private fun avvisaPermessoMusica() {
+        if (permessoDetto || !LettoreTelefono.senzaPermesso) return
+        permessoDetto = true
+        try {
+            CarToast.makeText(carContext, "Per la musica: consenti l'accesso alle notifiche sul telefono", CarToast.LENGTH_LONG)
+                .show()
+        } catch (_: Exception) {}
+        LettoreTelefono.notificaPermesso(carContext)
     }
 
     /** Il riepilogo dell'arrivo già aperto ([SchermoRiepilogoArrivo]). */
@@ -287,6 +309,9 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     override fun onCreate(owner: LifecycleOwner) {
         PonteAuto.ascolta(aggiorna)
         LettoreTelefono.ascolta(musica)
+        // Il permesso e i lettori aperti si rileggono salendo in macchina: il
+        // permesso può essere stato dato mentre GdANav dormiva.
+        LettoreTelefono.ricontrolla(carContext)
         sincronizzaNavigazione()
     }
 
@@ -334,7 +359,11 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
     private fun tasto(id: Int, azione: () -> Unit) =
         Action.Builder().setIcon(icona(id)).setOnClickListener { azione() }.build()
 
-    /** In alto: Cerca, la casa (dentro GdAHome) e Menu (in guida anche Fine); appena passata una segnalazione, «C'è ancora?» Sì / No. */
+    /**
+     * In alto: Cerca, la casa (dentro GdAHome) e Menu (in guida anche Fine);
+     * con la musica ⏯ ⏭ per primi, e la casa passa nel Menu; appena passata
+     * una segnalazione, «C'è ancora?» Sì / No.
+     */
     private fun azioni(): ActionStrip {
         val striscia = ActionStrip.Builder()
         // La strada a risparmio, sulle auto senza gli avvisi di Android Auto.
@@ -354,21 +383,35 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             striscia.addAction(tasto(R.drawable.auto_no) { PonteAuto.ancora(ancora, false) })
             return striscia.build()
         }
-        if (PonteAuto.guida != null && LettoreTelefono.daMostrare) {
-            // In guida con la musica, come Waze: ⏯ e ⏭ al posto della lente
-            // e della casa (stanno nel Menu). Il brano è disegnato sulla mappa
-            // (`PannelloAuto`), solo da guardare. Al più quattro tasti.
-            val suona = LettoreTelefono.brano?.suona == true
-            striscia.addAction(
-                Action.Builder()
-                    .setIcon(icona(if (suona) R.drawable.auto_pausa else R.drawable.auto_play))
-                    .setOnClickListener { LettoreTelefono.comando("playPausa") }
-                    .build(),
-            )
-            striscia.addAction(tasto(R.drawable.auto_avanti) { LettoreTelefono.comando("successivo") })
-            striscia.addAction(tasto(R.drawable.auto_menu) { screenManager.push(SchermoMenu(carContext, renderer)) })
-            striscia.addAction(Action.Builder().setTitle("Fine").setOnClickListener { PonteAuto.fermaDallAuto() }.build())
-        } else if (PonteAuto.guida != null) {
+        val guida = PonteAuto.guida != null
+        if (LettoreTelefono.conTasti) {
+            // Con la musica, come Waze, in guida e a mappa libera: ⏯ e ⏭ per
+            // primi (⏭ solo se un'app ha un lettore aperto; senza, ⏯ riprende
+            // l'ultima). Il brano è disegnato sulla mappa (`PannelloAuto`),
+            // solo da guardare. Al più quattro tasti: in guida Menu e Fine
+            // (la lente e la casa stanno in cima al Menu); a mappa libera
+            // «Cerca» e «Menu», scritti, e la casa in cima al Menu.
+            tastiMusica(striscia)
+            if (!guida) {
+                striscia.addAction(
+                    Action.Builder()
+                        .setTitle("Cerca")
+                        .setIcon(icona(R.drawable.auto_cerca))
+                        .setOnClickListener { screenManager.push(SchermoCerca(carContext)) }
+                        .build(),
+                )
+                striscia.addAction(
+                    Action.Builder()
+                        .setTitle("Menu")
+                        .setIcon(icona(R.drawable.auto_menu))
+                        .setOnClickListener { screenManager.push(SchermoMenu(carContext, renderer)) }
+                        .build(),
+                )
+            } else {
+                striscia.addAction(tasto(R.drawable.auto_menu) { screenManager.push(SchermoMenu(carContext, renderer)) })
+                striscia.addAction(Action.Builder().setTitle("Fine").setOnClickListener { PonteAuto.fermaDallAuto() }.build())
+            }
+        } else if (guida) {
             // In guida c'è poco spazio: solo la lente.
             striscia.addAction(tasto(R.drawable.auto_cerca) { screenManager.push(SchermoCerca(carContext)) })
             casa(striscia)
@@ -393,6 +436,20 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             )
         }
         return striscia.build()
+    }
+
+    /** ⏯ (pausa se suona, play se no) e, se c'è un lettore aperto, ⏭. */
+    private fun tastiMusica(striscia: ActionStrip.Builder) {
+        val suona = LettoreTelefono.brano?.suona == true
+        striscia.addAction(
+            Action.Builder()
+                .setIcon(icona(if (suona) R.drawable.auto_pausa else R.drawable.auto_play))
+                .setOnClickListener { LettoreTelefono.comando("playPausa") }
+                .build(),
+        )
+        if (LettoreTelefono.brano != null) {
+            striscia.addAction(tasto(R.drawable.auto_avanti) { LettoreTelefono.comando("successivo") })
+        }
     }
 
     /**

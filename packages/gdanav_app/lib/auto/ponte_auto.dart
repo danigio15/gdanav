@@ -109,8 +109,9 @@ class PonteAuto {
   PersoneInAuto? _persone;
 
   /// Gli avvisi di casa (dentro GdAHome): sull'auto come avvisi del sistema
-  /// (vedi [AvvisiDiCasaInAuto]). La musica no: l'auto la legge dal lettore
-  /// nativo, nello stesso processo.
+  /// (vedi [AvvisiDiCasaInAuto]), in guida e a mappa libera. La musica no:
+  /// l'auto la legge dal lettore nativo, nello stesso processo (il servizio
+  /// dell'auto non ha un `android:process`: `test/processi_test.dart`).
   final GestoreCasaInGuida? casaInGuida;
   AvvisiDiCasaInAuto? _casa;
   final MethodChannel _canale;
@@ -215,6 +216,8 @@ class PonteAuto {
       // i dati dell'auto si chiedono freschi anche senza un percorso.
       case 'in_auto':
         auto?.schermoDellAuto(a['si'] == true);
+        // E gli avvisi di casa passano anche a mappa libera, senza percorso.
+        casaInGuida?.schermoDellAuto(a['si'] == true);
         // E i viaggi pianificati, letti freschi: quello pianificato poco fa
         // sul telefono deve esserci in «Dove andiamo?».
         if (a['si'] == true && pianificati != null) unawaited(pianificati!.carica());

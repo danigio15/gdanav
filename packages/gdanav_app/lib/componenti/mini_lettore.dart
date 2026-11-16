@@ -1,6 +1,7 @@
-/// Il mini-lettore musicale in guida, come in Waze: la copertina, il titolo,
-/// l'artista e ⏮ ⏯ ⏭, in un riquadro basso sopra la barra dell'arrivo, che
-/// non copre la manovra e si richiude in un bottone tondo.
+/// Il mini-lettore musicale, come in Waze, in guida e a mappa libera: la
+/// copertina, il titolo, l'artista e ⏮ ⏯ ⏭, in un riquadro basso (in guida
+/// sopra la barra dell'arrivo, a mappa libera sopra il pannello di partenza),
+/// che non copre la manovra e si richiude in un bottone tondo.
 ///
 /// Chi suona lo dice un [LettoreMusicale]:
 ///
@@ -19,11 +20,12 @@
 ///   altro [LettoreMusicale] con `fonte: FonteMusica.spotify`; il riquadro e
 ///   l'auto non cambiano.
 ///
-/// In auto lo stesso lettore nativo dà: su Android Auto ⏯ ⏭ nell'`ActionStrip`
-/// del template e il brano disegnato in alto sulla mappa (solo da guardare);
-/// su CarPlay ⏯ ⏭ come `CPBarButton`, e niente disegnato sulla mappa (Apple la
-/// vuole solo mappa: il brano lo mostra la scheda «In riproduzione» di
-/// sistema).
+/// In auto lo stesso lettore nativo dà, con o senza percorso: su Android Auto
+/// ⏯ ⏭ nell'`ActionStrip` del template e il brano disegnato in alto sulla
+/// mappa (solo da guardare); su CarPlay ⏯ ⏭ come `CPBarButton`, e niente
+/// disegnato sulla mappa (Apple la vuole solo mappa: il brano lo mostra la
+/// scheda «In riproduzione» di sistema). Col permesso ma senza un lettore
+/// aperto resta ⏯, che riprende l'ultima app che suonava.
 library;
 
 import 'dart:async';
@@ -456,8 +458,9 @@ class _MiniLettoreState extends State<MiniLettore> {
 }
 
 /// L'invito, una volta sola, a dare il permesso per la musica: al posto del
-/// riquadro, da fermi. «Consenti» apre la pagina del sistema, «Non ora» lo
-/// chiude; in tutti e due i casi (e se se ne va da solo) non torna più: lo
+/// riquadro, da fermi, in guida e a mappa libera. «Consenti» apre la pagina
+/// del sistema, «Non ora» lo chiude; in tutti e due i casi (e se se ne va da
+/// solo dopo essere rimasto in vista una decina di secondi) non torna più: lo
 /// dice [onVisto]. Le impostazioni del navigatore lo ripropongono a chi lo
 /// cerca.
 class InvitoMusica extends StatefulWidget {
@@ -473,6 +476,13 @@ class InvitoMusica extends StatefulWidget {
 class _InvitoMusicaState extends State<InvitoMusica> {
   var _detto = false;
 
+  /// Da quando è in vista: se se ne va dopo un'occhiata (si riparte), torna
+  /// la prossima volta da fermi; se è rimasto lì a lungo, è visto.
+  final _dal = DateTime.now();
+
+  /// Quanto deve restare in vista, senza un tocco, per non tornare più.
+  static const abbastanza = Duration(seconds: 10);
+
   void _visto() {
     if (_detto) return;
     _detto = true;
@@ -481,9 +491,11 @@ class _InvitoMusicaState extends State<InvitoMusica> {
 
   @override
   void dispose() {
-    // Se ne va senza un tocco (la guida finita): visto anche così. Dopo, non
-    // durante lo smontaggio, che non si cambia chi sta ascoltando.
-    if (!_detto) {
+    // Se ne va senza un tocco dopo essere rimasto in vista abbastanza: visto
+    // anche così. Sparito subito (si è ripartiti) no: dal campo, chi usa
+    // l'auto lo perdeva così senza averlo mai letto. Dopo, non durante lo
+    // smontaggio, che non si cambia chi sta ascoltando.
+    if (!_detto && DateTime.now().difference(_dal) >= abbastanza) {
       _detto = true;
       scheduleMicrotask(widget.onVisto);
     }
@@ -531,8 +543,12 @@ class _InvitoMusicaState extends State<InvitoMusica> {
                 ],
               ),
               const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              // Di lato non ci stanno sempre in riga (a mappa libera c'è
+              // «Segnala» accanto): vanno a capo.
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 4,
                 children: [
                   TextButton(
                     key: const Key('invito-musica-no'),
@@ -540,7 +556,6 @@ class _InvitoMusicaState extends State<InvitoMusica> {
                     onPressed: () => setState(_visto),
                     child: const Text('Non ora'),
                   ),
-                  const SizedBox(width: 8),
                   FilledButton(
                     key: const Key('invito-musica-si'),
                     style: FilledButton.styleFrom(minimumSize: const Size(64, 48)),

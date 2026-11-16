@@ -3,7 +3,8 @@
 /// banco (`web3d/collaudo`) e sopra le notifiche di casa (lavatrice,
 /// antifurto, la domanda «Sì / No», auto in carica, il gruppo, l'allarme, chi
 /// arriva) e la musica (anche l'invito per il permesso). In verticale e di
-/// traverso, di giorno e di notte. E la pagina «Casa e musica in guida».
+/// traverso, di giorno e di notte; e a mappa libera, senza percorso
+/// (`libera-…`). E la pagina «Casa e musica in guida».
 ///
 /// Quelle dell'auto (Android Auto, CarPlay) stanno in
 /// `avvisi_di_casa_auto_foto.dart`.
@@ -170,6 +171,7 @@ typedef _Caso = ({
   bool soloVerticale,
   bool soloGiorno,
   bool senzaPermesso,
+  bool libera,
   String? tocca,
 });
 
@@ -183,6 +185,7 @@ _Caso _caso(
   bool soloVerticale = false,
   bool soloGiorno = false,
   bool senzaPermesso = false,
+  bool libera = false,
   String? tocca,
 }) => (
   nome: nome,
@@ -194,6 +197,7 @@ _Caso _caso(
   soloVerticale: soloVerticale,
   soloGiorno: soloGiorno,
   senzaPermesso: senzaPermesso,
+  libera: libera,
   tocca: tocca,
 );
 
@@ -212,6 +216,13 @@ final _casi = <_Caso>[
   _caso('musica-da-fermo', () => [], musica: true, fermo: true),
   _caso('musica-chiusa', () => [_marta()], musica: true, chiusa: true, soloVerticale: true),
   _caso('musica-invito-da-fermo', () => [], musica: true, fermo: true, senzaPermesso: true),
+  // A mappa libera, senza percorso: la musica sopra il pannello, l'avviso
+  // sotto il menu.
+  _caso('libera-musica', () => [], musica: true, libera: true),
+  _caso('libera-musica-da-fermo', () => [], musica: true, fermo: true, libera: true),
+  _caso('libera-musica-lavatrice', () => [_lavatrice()], musica: true, libera: true),
+  _caso('libera-antifurto-da-fermo', () => [_antifurto()], musica: true, fermo: true, libera: true),
+  _caso('libera-invito-da-fermo', () => [], musica: true, fermo: true, senzaPermesso: true, libera: true),
 ];
 
 void main() {
@@ -277,9 +288,11 @@ void main() {
           a.posizione.avvia();
           a.auto.manuale.imposta(90);
           await tester.pump();
-          await tester.runAsync(() => a.viaggio.vaiA(const Luogo(nome: 'Villa Gialla', posizione: Punto(42.18, 12))));
-          await tester.pumpAndSettle();
-          await tester.tap(find.text('Avvia'));
+          if (!caso.libera) {
+            await tester.runAsync(() => a.viaggio.vaiA(const Luogo(nome: 'Villa Gialla', posizione: Punto(42.18, 12))));
+            await tester.pumpAndSettle();
+            await tester.tap(find.text('Avvia'));
+          }
           await tester.pumpAndSettle();
           // Di traverso si gira dopo «Avvia», come in macchina sul supporto.
           if (!verticale) {
@@ -320,7 +333,7 @@ void main() {
             matchesGoldenFile('$_dove/telefono-$verso-$luce-${caso.nome}.png'),
           );
           coda.scelta = SceltaAvvisiDiCasa.nessuna;
-          await tester.runAsync(a.guida.ferma);
+          if (!caso.libera) await tester.runAsync(a.guida.ferma);
           await tester.pumpWidget(const SizedBox());
         });
       }

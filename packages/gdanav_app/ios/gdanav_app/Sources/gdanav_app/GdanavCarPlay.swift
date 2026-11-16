@@ -254,15 +254,17 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                 tasto(titolo: "C'è ancora") { PonteAuto.shared.ancora(id, si: true) },
                 tasto(titolo: "No") { PonteAuto.shared.ancora(id, si: false) },
             ]
-        } else if ponte.guida != nil, LettoreDiSistema.shared.daMostrare {
-            // In guida con la musica: ⏯ e ⏭, come la barra di Mappe. Apple
-            // non vuole tasti disegnati sulla mappa, e il brano lo mostra la
-            // scheda «In riproduzione» di CarPlay. La lente passa nel Menu.
+        } else if LettoreDiSistema.shared.conTasti {
+            // Con la musica, in guida e a mappa libera: ⏯ e ⏭, come la barra
+            // di Mappe (⏭ solo con un brano). Apple non vuole tasti disegnati
+            // sulla mappa, e il brano lo mostra la scheda «In riproduzione» di
+            // CarPlay. In guida la lente passa nel Menu; a mappa libera la
+            // lente e la casa restano nei tasti di lato (`mapButtons`).
             let suona = LettoreDiSistema.shared.brano?.suona == true
-            sinistra = [
-                tasto(suona ? "pause.fill" : "play.fill") { LettoreDiSistema.shared.comando("playPausa") },
-                tasto("forward.fill") { LettoreDiSistema.shared.comando("successivo") },
-            ]
+            sinistra = [tasto(suona ? "pause.fill" : "play.fill") { LettoreDiSistema.shared.comando("playPausa") }]
+            if LettoreDiSistema.shared.brano != nil {
+                sinistra.append(tasto("forward.fill") { LettoreDiSistema.shared.comando("successivo") })
+            }
         } else {
             sinistra.append(tasto(titolo: ponte.guida == nil ? "Cerca" : "", simbolo: "magnifyingglass") { [weak self] in self?.apriCerca() })
             if GdanavCarPlay.casa != nil {

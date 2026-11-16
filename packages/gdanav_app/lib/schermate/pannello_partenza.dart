@@ -15,6 +15,7 @@ class PannelloPartenza extends StatelessWidget {
     required this.onNuovo,
     required this.onModificaPreferito,
     this.schedaAuto,
+    this.musica,
   });
 
   final GestoreLuoghi luoghi;
@@ -28,6 +29,10 @@ class PannelloPartenza extends StatelessWidget {
 
   /// La tua auto: batteria, foto, collegamento.
   final Widget? schedaAuto;
+
+  /// La musica (il mini-lettore), in cima: si vede col pannello basso e non
+  /// copre la mappa. `null`: niente.
+  final Widget? musica;
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +69,7 @@ class PannelloPartenza extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 14),
+                  ?musica,
                   Material(
                     color: s.surfaceContainerHighest.withValues(alpha: 0.6),
                     borderRadius: BorderRadius.circular(30),

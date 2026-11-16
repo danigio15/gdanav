@@ -71,9 +71,9 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         avviso(canvas, a.left + margine, a.right - margine, alto)
 
         // La musica, come in Waze: il brano in alto a destra, solo da
-        // guardare (i comandi sono i tasti del template). Sotto l'avviso, se
-        // c'è: non si coprono.
-        if (PonteAuto.guida != null && LettoreTelefono.daMostrare) {
+        // guardare (i comandi sono i tasti del template), in guida e a mappa
+        // libera. Sotto l'avviso, se c'è: non si coprono.
+        if (LettoreTelefono.daMostrare) {
             val av = PonteAuto.avviso
             val conAvviso = av.titolo != null || av.ancoraTesto != null || (PonteAuto.strada.id != null && !PonteAuto.conAvvisi)
             musica(canvas, a, margine, if (conAvviso) alto + dp(72f) else alto)
@@ -646,6 +646,9 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         val w = minOf(dp(330f), a.width() - margine * 2)
         if (w < dp(180f)) return
         val h = dp(64f)
+        // Un'area bassa (a mezzo schermo, di traverso): il brano non scende
+        // sulla barra dei dati dell'auto e sul tachimetro, in basso.
+        if (alto + h > a.bottom - dp(150f)) return
         val box = RectF(a.right - margine - w, alto, a.right - margine, alto + h)
         pieno.color = Color.argb(225, 15, 20, 30)
         canvas.drawRoundRect(box, dp(14f), dp(14f), pieno)

@@ -1,9 +1,14 @@
 package it.gdanav.gdanav_app.musica
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.media.AudioManager
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
@@ -12,7 +17,12 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.view.KeyEvent
+import androidx.core.app.NotificationChannelCompat
+import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import it.gdanav.gdanav_app.R
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import java.io.ByteArrayOutputStream
@@ -31,8 +41,12 @@ import java.util.concurrent.CopyOnWriteArrayList
  * Uno per il processo: lo usano il telefono (dal canale `gdanav/musica`,
  * `lib/componenti/mini_lettore.dart`) e lo schermo di Android Auto
  * (`auto/SchermoNavigazione.kt`, `auto/PannelloAuto.kt`), che lo leggono
- * direttamente. Si accende solo con «Musica nel navigatore» accesa
- * ([acceso], lo dice il telefono con `avvia`/`ferma`).
+ * direttamente. È lo stesso processo: il servizio dell'auto, il motore
+ * Flutter, [AscoltoNotifiche] e Firebase non hanno un `android:process`
+ * (solo la scena 3D, `Scena3dServizio`, ne ha uno suo), e lo controlla
+ * `test/processi_test.dart`. Si accende solo con «Musica nel navigatore»
+ * accesa ([acceso], lo dice il telefono con `avvia`/`ferma`), con o senza
+ * un percorso: come in Waze, la musica c'è anche a mappa libera.
  */
 object LettoreTelefono {
     /** Il brano come lo vede l'auto. */
@@ -54,8 +68,19 @@ object LettoreTelefono {
     @Volatile var brano: Brano? = null
         private set
 
-    /** Se l'auto deve mostrare la musica: accesa, col permesso, e qualcosa da dire. */
+    /** Se l'auto deve mostrare il brano: accesa, col permesso, e qualcosa da dire. */
     val daMostrare: Boolean get() = acceso && permesso && brano != null
+
+    /**
+     * Se l'auto mette ⏯ in alto: accesa e col permesso, anche se nessuna app
+     * ha un lettore aperto. Allora ⏯ fa come il tasto play del volante
+     * ([comando]): il sistema riprende l'ultima app che suonava, e appena
+     * suona arrivano il brano e ⏭.
+     */
+    val conTasti: Boolean get() = acceso && permesso
+
+    /** Manca solo il permesso: la musica è accesa, l'«Accesso alle notifiche» no. */
+    val senzaPermesso: Boolean get() = acceso && !permesso
 
     private val principale = Handler(Looper.getMainLooper())
     private val ascoltatori = CopyOnWriteArrayList<() -> Unit>()
@@ -117,21 +142,29 @@ object LettoreTelefono {
     fun haPermesso(context: Context): Boolean =
         NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
 
-    /** La pagina del sistema dove si dà il permesso, su GdANav se si può. */
-    fun apriPermesso(context: Context) {
+    /**
+     * La pagina del sistema dove si dà il permesso: dall'API 30 proprio
+     * quella del nostro servizio («GdANav: musica»), prima l'elenco.
+     */
+    fun intentPermesso(context: Context): Intent {
         val componente = ComponentName(context, AscoltoNotifiche::class.java)
         val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
                 .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, componente.flattenToString())
         } else {
-            Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")
+            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
         }
+        return intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+    /** La pagina del sistema dove si dà il permesso, su GdANav se si può. */
+    fun apriPermesso(context: Context) {
         try {
-            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            context.startActivity(intentPermesso(context))
         } catch (_: Exception) {
             try {
                 context.startActivity(
-                    Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
             } catch (_: Exception) {
                 // Un telefono senza quella pagina: resta senza musica.
@@ -148,7 +181,69 @@ object LettoreTelefono {
     private fun aggiornaPermesso(context: Context) {
         val prima = permesso
         permesso = haPermesso(context)
+        // Dato il permesso, l'invito sul telefono non serve più.
+        if (permesso && !prima) togliNotificaPermesso(context)
         if (prima != permesso) avvisa()
+    }
+
+    private const val CANALE = "gdanav_musica"
+    private const val ID_PERMESSO = 4202
+
+    /**
+     * Sul telefono, quando in auto manca il permesso: una notifica che apre
+     * dritta la pagina del sistema ([intentPermesso]). Chi usa GdANav solo in
+     * auto l'invito dell'app non lo vede mai. Senza il permesso delle
+     * notifiche (Android 13) non c'è, e resta l'invito nell'app.
+     */
+    @SuppressLint("MissingPermission")
+    fun notificaPermesso(context: Context) {
+        val ctx = context.applicationContext
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        val gestore = NotificationManagerCompat.from(ctx)
+        try {
+            gestore.createNotificationChannel(
+                NotificationChannelCompat.Builder(CANALE, NotificationManagerCompat.IMPORTANCE_DEFAULT)
+                    .setName("Musica nel navigatore")
+                    .setDescription("L'invito a consentire la musica nel navigatore")
+                    .setSound(null, null)
+                    .setVibrationEnabled(false)
+                    .build(),
+            )
+            val apri = PendingIntent.getActivity(
+                ctx,
+                ID_PERMESSO,
+                intentPermesso(ctx),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            val n = NotificationCompat.Builder(ctx, CANALE)
+                .setSmallIcon(R.drawable.auto_play)
+                .setContentTitle("Musica nel navigatore")
+                .setContentText("Tocca e consenti l'accesso alle notifiche a «GdANav: musica»")
+                .setStyle(
+                    NotificationCompat.BigTextStyle().bigText(
+                        "Per vedere e comandare la musica sullo schermo dell'auto: tocca qui e consenti " +
+                            "l'accesso alle notifiche a «GdANav: musica». GdANav non legge le notifiche.",
+                    ),
+                )
+                .setContentIntent(apri)
+                .setAutoCancel(true)
+                .setOnlyAlertOnce(true)
+                .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
+                .build()
+            gestore.notify(ID_PERMESSO, n)
+        } catch (_: Exception) {
+            // Un telefono che non la mostra: resta l'invito nell'app.
+        }
+    }
+
+    private fun togliNotificaPermesso(context: Context) {
+        try {
+            NotificationManagerCompat.from(context).cancel(ID_PERMESSO)
+        } catch (_: Exception) {}
     }
 
     private val sessioniCambiate = MediaSessionManager.OnActiveSessionsChangedListener { elenco ->
@@ -258,7 +353,14 @@ object LettoreTelefono {
     }
 
     fun comando(quale: String) {
-        val t = controllore?.transportControls ?: return
+        val t = controllore?.transportControls
+        if (t == null) {
+            // Nessun lettore aperto: ⏯ come il tasto play del volante, il
+            // sistema lo dà all'ultima app che suonava (Spotify chiusa da
+            // poco, la radio). Se suona, arriva la sua sessione.
+            if (quale == "playPausa" && conTasti) tastoPlay()
+            return
+        }
         try {
             when (quale) {
                 "precedente" -> t.skipToPrevious()
@@ -267,6 +369,16 @@ object LettoreTelefono {
             }
         } catch (_: Exception) {
             // L'app che suona non accetta il comando: resta com'è.
+        }
+    }
+
+    private fun tastoPlay() {
+        val audio = contesto?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+        try {
+            audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY))
+            audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PLAY))
+        } catch (_: Exception) {
+            // Nessuno che lo prenda: resta in silenzio.
         }
     }
 
