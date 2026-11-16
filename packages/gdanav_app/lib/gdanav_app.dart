@@ -20,6 +20,8 @@ import 'stato/gestore_guida.dart';
 import 'stato/gestore_risparmio.dart';
 import 'stato/gestore_luoghi.dart';
 import 'stato/gestore_meteo.dart';
+import 'componenti/mini_lettore.dart';
+import 'stato/gestore_casa_in_guida.dart';
 import 'stato/gestore_persone.dart';
 import 'stato/gestore_posizione.dart';
 import 'stato/gestore_segnalazioni.dart';
@@ -28,6 +30,7 @@ import 'stato/licenza.dart';
 import 'stato/gestore_viaggio.dart';
 import 'stato/gestore_edifici.dart';
 import 'stato/gestore_ztl.dart';
+import 'stato/strade_osm.dart';
 import 'stato/viaggi_pianificati.dart';
 import 'stato/prova_di_guida.dart';
 import 'stato/posizione.dart';
@@ -42,6 +45,10 @@ export 'package:gdanav_core/gdanav_core.dart' show Punto, StatoAuto, TipoSorgent
 export 'risorse.dart' show logoGdanav;
 export 'schermate/schermata_principale.dart' show VoceOspite;
 export 'sorgenti/sorgente_gdahome.dart';
+export 'componenti/avviso_di_casa.dart';
+export 'componenti/mini_lettore.dart';
+export 'schermate/notifiche_nel_navigatore.dart';
+export 'stato/gestore_casa_in_guida.dart' show GestoreCasaInGuida;
 export 'stato/gestore_persone.dart' show GestorePersone, PersonaSullaMappa;
 
 /// Accende tutto quello che GdANav tiene in piedi — l'auto, il viaggio, la
@@ -73,6 +80,15 @@ export 'stato/gestore_persone.dart' show GestorePersone, PersonaSullaMappa;
 ///
 /// [persone]: quelli di casa sulla mappa, li mette l'app ospite (GdAHome).
 ///
+/// [notificheDiCasa]: le notifiche della casa, già aperte, come le mostra il
+/// telefono (GdAHome): in guida diventano gli avvisi di casa sopra la mappa,
+/// sul telefono e sullo schermo dell'auto ([GestoreCasaInGuida]).
+/// [tastoDiCasa] riceve il tasto premuto su un avviso (la notifica e l'id del
+/// tasto): lo esegue l'app ospite, con le sue regole.
+///
+/// [lettore]: chi comanda la musica in guida; di serie il lettore del
+/// telefono ([LettoreDelTelefono]), dove c'è.
+///
 /// Le versioni troppo vecchie ([GestoreAggiornamento]) si fermano solo in
 /// GdANav da sola: dentro un'altra app ([premiumOspite], [GdAHome] o
 /// [senzaPremium]) ci pensa lei.
@@ -84,6 +100,9 @@ Future<GdanavApp> preparaGdanav({
   bool senzaPremium = false,
   ValueListenable<bool>? guidaInAutoSenzaPremium,
   GestorePersone? persone,
+  Stream<Map<String, Object?>>? notificheDiCasa,
+  void Function(Map<String, Object?> notifica, String tasto)? tastoDiCasa,
+  LettoreMusicale? lettore,
 }) async {
   final archivio = Archivio(portachiavi);
   // Solo nelle build per le foto della CI (GDANAV_DIMOSTRAZIONE): un viaggio
@@ -162,6 +181,8 @@ Future<GdanavApp> preparaGdanav({
     archivio: archivio,
     audioIniziale: await archivio.modoAudio(),
     avvisi: ScelteAvvisi(await archivio.scelteAvvisi(), (s) => unawaited(archivio.salvaScelteAvvisi(s))),
+    // Mai contromano: le strade vere (OpenStreetMap) dei prossimi chilometri.
+    strade: StradeOsm(TessereOpenFreeMap().call).attorno,
   );
   // La velocità dell'auto entra anche qui: serve a sapere se si è fermi, e da
   // fermi il segnaposto non deve girare dietro al ballonzolamento del GPS.
@@ -185,6 +206,17 @@ Future<GdanavApp> preparaGdanav({
     limiteSenzaGuida: () => !guida.attiva,
   );
   await posizione.carica();
+  // Gli avvisi di casa e la musica in guida.
+  final casaInGuida = GestoreCasaInGuida(
+    archivio: archivio,
+    notifiche: notificheDiCasa,
+    onAzione: tastoDiCasa,
+    lettore: lettore ?? (kIsWeb ? null : LettoreDelTelefono()),
+    inGuida: () => guida.attiva,
+    guida: guida,
+    voce: guida.annuncia,
+  );
+  await casaInGuida.carica();
   final segnalazioni = GestoreSegnalazioni(posizione: posizione, autovelox: archivioAutovelox());
   // Il meteo lungo la strada (per tutti): nel consumo e sullo schermo.
   final meteo = GestoreMeteo(viaggio: viaggio, posizione: posizione);
@@ -242,6 +274,8 @@ Future<GdanavApp> preparaGdanav({
       persone: persone,
       // Il GPS dell'auto, quando lo passa: davanti a quello del telefono.
       gpsDellAuto: gpsDellAuto,
+      // Gli avvisi di casa e la musica anche sullo schermo dell'auto.
+      casaInGuida: casaInGuida,
     )..avvia();
     // Una versione da aggiornare spegne anche l'auto: lì si dice di
     // aggiornare GdANav sul telefono.
@@ -284,6 +318,7 @@ Future<GdanavApp> preparaGdanav({
     chiediPosizione: chiediPosizione,
     ztl: ztl,
     persone: persone,
+    casaInGuida: casaInGuida,
   );
 }
 
@@ -333,6 +368,7 @@ class GdanavApp extends StatelessWidget {
     this.aggiornamento,
     this.ztl,
     this.persone,
+    this.casaInGuida,
   });
 
   final Archivio archivio;
@@ -368,6 +404,10 @@ class GdanavApp extends StatelessWidget {
   /// Le persone di casa sulla mappa: le mette chi ospita GdANav (GdAHome).
   /// `null` in GdANav da sola.
   final GestorePersone? persone;
+
+  /// Gli avvisi di casa sopra la mappa in guida (il campanello, il fumo:
+  /// li manda chi ospita GdANav) e il mini-lettore musicale.
+  final GestoreCasaInGuida? casaInGuida;
 
   /// Porta a un punto scelto da chi ospita GdANav: calcola il viaggio fin lì,
   /// e la meta si chiama [nome]. GdAHome lo usa per «Apri in mappa» sulla
@@ -427,6 +467,7 @@ class GdanavApp extends StatelessWidget {
     meteo: meteo,
     vicini: vicini,
     persone: persone,
+    casaInGuida: casaInGuida,
     luoghi: luoghi,
     pianificati: pianificati,
     consumo: consumo,

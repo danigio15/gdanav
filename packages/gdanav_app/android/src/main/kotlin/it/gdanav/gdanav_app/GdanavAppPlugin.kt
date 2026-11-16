@@ -15,6 +15,7 @@ import io.flutter.embedding.engine.plugins.lifecycle.HiddenLifecycleReference
 import io.flutter.plugin.common.MethodChannel
 import it.gdanav.gdanav_app.auto.Diagnosi
 import it.gdanav.gdanav_app.auto.PosizioneInAuto
+import it.gdanav.gdanav_app.musica.LettoreTelefono
 
 /**
  * Il pezzo nativo di GdANav che viaggia col pacchetto: i permessi Bluetooth
@@ -71,7 +72,12 @@ class GdanavAppPlugin : FlutterPlugin, ActivityAware {
      * Android la lascia partire, e da lì resta accesa fino a fine viaggio.
      */
     private val davanti = object : DefaultLifecycleObserver {
-        override fun onResume(owner: LifecycleOwner) = PosizioneInAuto.dalTelefono()
+        override fun onResume(owner: LifecycleOwner) {
+            PosizioneInAuto.dalTelefono()
+            // Tornando dalla pagina «Accesso alle notifiche»: il permesso
+            // della musica può essere appena arrivato.
+            attivita?.let { LettoreTelefono.ricontrolla(it) }
+        }
     }
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -87,6 +93,8 @@ class GdanavAppPlugin : FlutterPlugin, ActivityAware {
         // Se la rete si paga a consumo: gli edifici della scena 3D si scaricano
         // solo su una rete che non costa (`stato/gestore_edifici.dart`).
         val contesto = binding.applicationContext
+        // La musica in guida (`lib/componenti/mini_lettore.dart`).
+        LettoreTelefono.collega(binding.binaryMessenger, contesto)
         rete = MethodChannel(binding.binaryMessenger, "gdanav/rete").also {
             it.setMethodCallHandler { call, risultato ->
                 if (call.method != "aConsumo") return@setMethodCallHandler risultato.notImplemented()
@@ -102,6 +110,7 @@ class GdanavAppPlugin : FlutterPlugin, ActivityAware {
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        LettoreTelefono.scollega(binding.binaryMessenger)
         canale?.setMethodCallHandler(null)
         canale = null
         schermo?.setMethodCallHandler(null)

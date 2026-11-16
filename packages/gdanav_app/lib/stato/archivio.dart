@@ -192,6 +192,23 @@ class Archivio {
 
   Future<void> salvaScelteAvvisi(ScelteAvvisi s) => _p.write(key: _avvisiScelti, value: s.aJson());
 
+  /// Gli avvisi di casa in guida (dentro GdAHome): il JSON di
+  /// `SceltaAvvisiDiCasa`. `null` mai scelti: tutti, di serie.
+  Future<String?> avvisiDiCasa() => _p.read(key: 'avvisi_di_casa');
+
+  Future<void> salvaAvvisiDiCasa(String json) => _p.write(key: 'avvisi_di_casa', value: json);
+
+  /// La musica nel navigatore: accesa di serie, si scrive solo spenta.
+  Future<bool> musicaNelNavigatore() async => await _p.read(key: 'musica_nel_navigatore') != 'no';
+
+  Future<void> salvaMusicaNelNavigatore(bool si) =>
+      si ? _p.delete(key: 'musica_nel_navigatore') : _p.write(key: 'musica_nel_navigatore', value: 'no');
+
+  /// Se l'invito a dare il permesso per la musica si è già visto: una volta.
+  Future<bool> invitoMusicaVisto() async => await _p.read(key: 'invito_musica') == 'sì';
+
+  Future<void> salvaInvitoMusicaVisto() => _p.write(key: 'invito_musica', value: 'sì');
+
   /// Come si guarda la mappa: 2D, 3D, immersiva o 3D aumentato
   /// ([VistaMappa]). Si ricorda, e vale anche fuori dalla guida. Di partenza
   /// 3D, come sullo schermo dell'auto. Prima c'erano solo 2D e 3D, e si

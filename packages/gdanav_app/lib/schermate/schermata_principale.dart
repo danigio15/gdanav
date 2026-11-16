@@ -25,6 +25,7 @@ import '../stato/gestore_guida.dart';
 import '../stato/gestore_luoghi.dart';
 import '../stato/gestore_mappe_offline.dart';
 import '../stato/gestore_meteo.dart';
+import '../stato/gestore_casa_in_guida.dart';
 import '../stato/gestore_persone.dart';
 import '../stato/gestore_segnalazioni.dart';
 import '../stato/gestore_posizione.dart';
@@ -33,6 +34,7 @@ import '../stato/gestore_vicini.dart';
 import '../stato/gestore_ztl.dart';
 import 'abbina_home_assistant.dart';
 import 'avvisi_guida.dart';
+import 'notifiche_nel_navigatore.dart';
 import 'cerca_destinazione.dart';
 import 'dettaglio_colonnina.dart';
 import 'diagnosi_auto.dart';
@@ -75,6 +77,7 @@ class SchermataPrincipale extends StatefulWidget {
     this.meteo,
     this.vicini,
     this.persone,
+    this.casaInGuida,
     this.consumo,
     this.fotoAuto,
     this.premium,
@@ -140,6 +143,9 @@ class SchermataPrincipale extends StatefulWidget {
 
   /// Le persone di casa sulla mappa, quando GdANav sta dentro GdAHome.
   final GestorePersone? persone;
+
+  /// Gli avvisi di casa e la musica in guida ([GestoreCasaInGuida]).
+  final GestoreCasaInGuida? casaInGuida;
 
   /// Il consumo imparato, da mostrare in «La tua auto».
   final GestoreConsumo? consumo;
@@ -259,6 +265,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
           vicini: widget.vicini,
           ztl: widget.ztl,
           persone: widget.persone,
+          casaInGuida: widget.casaInGuida,
           mappa: widget.mappa,
           meteo: widget.meteo,
         ),
@@ -504,6 +511,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
         widget.guida.avvisi,
         ?widget.premium,
         ?widget.pianificati,
+        ?widget.casaInGuida,
       ]),
       builder: (contesto, _) {
         void vai(Widget w) {
@@ -585,6 +593,19 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                       sotto: widget.guida.avvisi.riassunto,
                       onTap: () => vai(AvvisiGuidaSchermata(scelte: widget.guida.avvisi)),
                     ),
+                    // Gli avvisi di casa (dentro GdAHome) e la musica in guida.
+                    if (widget.casaInGuida case final c? when c.coda != null || c.lettore != null)
+                      _VoceMenu(
+                        key: const Key('menu-casa-e-musica'),
+                        icona: c.coda != null ? Icons.notifications_active_rounded : Icons.music_note_rounded,
+                        colore: const Color(0xFFEA580C),
+                        titolo: c.coda != null ? 'Casa e musica in guida' : 'Musica in guida',
+                        sotto: [
+                          if (c.coda != null) c.avvisiAccesi ? 'Avvisi di casa accesi' : 'Avvisi di casa spenti',
+                          if (c.lettore != null) c.musica ? 'musica accesa' : 'musica spenta',
+                        ].join(' · ').replaceFirstMapped(RegExp(r'^m'), (m) => 'M'),
+                        onTap: () => vai(NotificheNelNavigatoreSchermata(gestore: c)),
+                      ),
                     if (widget.ztl case final z?)
                       _VoceMenu(
                         key: const Key('menu-ztl'),

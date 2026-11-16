@@ -121,6 +121,15 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     private var stradaMostrata: String?
     private weak var avvisoStrada: CPNavigationAlert?
 
+    /// L'avviso di casa mostrato (id e se era la domanda), il suo avviso di
+    /// CarPlay finché si vede, e se è stato chiuso da un suo tasto.
+    private var casaMostrata: String?
+    private weak var avvisoCasa: CPNavigationAlert?
+    private var casaToccata = false
+
+    /// La musica (il lettore di sistema): a ogni cambio si rifanno i tasti.
+    private var ascoltoMusica: UUID?
+
     // MARK: - La scena
 
     public func templateApplicationScene(
@@ -149,6 +158,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         }
 
         ascolto = PonteAuto.shared.ascolta { [weak self] in self?.novita() }
+        ascoltoMusica = LettoreDiSistema.shared.ascolta { PonteAuto.shared.rinfresca() }
         novita()
         // Come Android Auto: lo schermo dell'auto si è acceso. Il telefono
         // rilegge i dati dell'auto e i viaggi pianificati.
@@ -163,6 +173,8 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     ) {
         if let a = ascolto { PonteAuto.shared.smetti(a) }
         ascolto = nil
+        if let m = ascoltoMusica { LettoreDiSistema.shared.smetti(m) }
+        ascoltoMusica = nil
         // Come su Android Auto: la prova di guida finisce con l'auto.
         PonteAuto.shared.prova(false)
         sessione?.finishTrip()
@@ -191,6 +203,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         sincronizzaGuida()
         mostraAvviso()
         mostraStrada()
+        mostraAvvisoCasa()
         if !GdanavCarPlay.pannelliSullaMappa { avvisaLaSosta() }
         // I tasti si rifanno solo se cambia qualcosa che mostrano.
         if PonteAuto.shared.versioneModello != versione {
@@ -240,6 +253,15 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
             sinistra = [
                 tasto(titolo: "C'è ancora") { PonteAuto.shared.ancora(id, si: true) },
                 tasto(titolo: "No") { PonteAuto.shared.ancora(id, si: false) },
+            ]
+        } else if ponte.guida != nil, LettoreDiSistema.shared.daMostrare {
+            // In guida con la musica: ⏯ e ⏭, come la barra di Mappe. Apple
+            // non vuole tasti disegnati sulla mappa, e il brano lo mostra la
+            // scheda «In riproduzione» di CarPlay. La lente passa nel Menu.
+            let suona = LettoreDiSistema.shared.brano?.suona == true
+            sinistra = [
+                tasto(suona ? "pause.fill" : "play.fill") { LettoreDiSistema.shared.comando("playPausa") },
+                tasto("forward.fill") { LettoreDiSistema.shared.comando("successivo") },
             ]
         } else {
             sinistra.append(tasto(titolo: ponte.guida == nil ? "Cerca" : "", simbolo: "magnifyingglass") { [weak self] in self?.apriCerca() })
@@ -631,6 +653,65 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         } else {
             t.present(navigationAlert: alert, animated: true)
         }
+    }
+
+    /// Un avviso di casa (dentro GdAHome): un avviso di navigazione, come
+    /// quelli di Mappe, coi tasti scelti dal telefono (al più due). Gli
+    /// urgenti restano finché non li si chiude (durata 0); gli altri se ne
+    /// vanno da soli. Il tasto torna al telefono, che fa la domanda «Sì / No»
+    /// se serve e poi lo passa a GdAHome.
+    private func mostraAvvisoCasa() {
+        guard let t = modello else { return }
+        let a = PonteAuto.shared.avvisoCasa
+        let chiave = a.map { "\($0.id)|\($0.conferma)" }
+        guard chiave != casaMostrata else { return }
+        casaMostrata = chiave
+        guard let a else {
+            if let v = avvisoCasa, t.currentNavigationAlert === v {
+                t.dismissNavigationAlert(animated: true) { _ in }
+            }
+            avvisoCasa = nil
+            return
+        }
+        func azione(_ x: AvvisoCasaAuto.Tasto) -> CPAlertAction {
+            let stile: CPAlertAction.Style = x.principale ? .default : .cancel
+            return CPAlertAction(title: x.etichetta, style: stile) { [weak self] _ in
+                self?.casaToccata = true
+                PonteAuto.shared.tastoCasa(a.id, x.id)
+            }
+        }
+        let primo = a.tasti.first.map(azione) ?? CPAlertAction(title: "Chiudi", style: .cancel) { [weak self] _ in
+            self?.casaToccata = true
+            PonteAuto.shared.tastoCasa(a.id, "_chiudi")
+        }
+        let alert = CPNavigationAlert(
+            titleVariants: [a.titolo],
+            subtitleVariants: a.testo.isEmpty ? [] : [a.testo],
+            image: a.icona,
+            primaryAction: primo,
+            secondaryAction: a.tasti.count > 1 ? azione(a.tasti[1]) : nil,
+            duration: TimeInterval(a.secondi ?? 0)
+        )
+        casaToccata = false
+        avvisoCasa = alert
+        if t.currentNavigationAlert != nil {
+            t.dismissNavigationAlert(animated: false) { _ in t.present(navigationAlert: alert, animated: true) }
+        } else {
+            t.present(navigationAlert: alert, animated: true)
+        }
+    }
+
+    /// Un avviso di casa chiuso a mano su CarPlay (non da un suo tasto, non
+    /// scaduto): via anche dal telefono.
+    public func mapTemplate(
+        _ mapTemplate: CPMapTemplate,
+        didDismiss navigationAlert: CPNavigationAlert,
+        dismissalContext: CPNavigationAlert.DismissalContext
+    ) {
+        guard navigationAlert === avvisoCasa, dismissalContext == .userDismissed, !casaToccata,
+            let id = PonteAuto.shared.avvisoCasa?.id
+        else { return }
+        PonteAuto.shared.tastoCasa(id, "_chiudi")
     }
 
     /// La strada a risparmio (o più rapida) proposta dal telefono: un avviso di

@@ -246,6 +246,29 @@ object PonteAuto {
 
     @Volatile var termica = Termica()
 
+    /** Un tasto sotto un avviso di casa: [id] torna al telefono. */
+    data class TastoCasa(val id: String, val etichetta: String, val principale: Boolean)
+
+    /**
+     * L'avviso di casa in vista (dentro GdAHome: la lavatrice, l'antifurto,
+     * il fumo), come lo manda `lib/auto/avvisi_di_casa_in_auto.dart`. Al più
+     * due tasti, già scelti dal telefono. [secondi] `null`: resta finché non
+     * lo si chiude (gli urgenti). [conferma]: è la domanda «Sì / No» di un
+     * tasto che fa qualcosa da lontano.
+     */
+    data class AvvisoCasa(
+        val id: String,
+        val titolo: String,
+        val testo: String,
+        val urgente: Boolean,
+        val secondi: Int?,
+        val conferma: Boolean,
+        val icona: Bitmap?,
+        val tasti: List<TastoCasa>,
+    )
+
+    @Volatile var avvisoCasa: AvvisoCasa? = null
+
     /** GdANav Premium: l'app lo dice, l'auto lo ricorda anche a telefono spento. */
     private var preferenze: SharedPreferences? = null
 
@@ -427,6 +450,29 @@ object PonteAuto {
                 ancoraId = call.argument<String>("ancora_id"),
                 ancoraTesto = call.argument<String>("ancora_testo"),
             )
+            "avviso_casa" -> {
+                val m = call.arguments as? Map<*, *>
+                val id = m?.get("id") as? String
+                avvisoCasa = if (m == null || id == null) {
+                    null
+                } else {
+                    val png = m["icona"] as? ByteArray
+                    AvvisoCasa(
+                        id = id,
+                        titolo = m["titolo"] as? String ?: "",
+                        testo = m["testo"] as? String ?: "",
+                        urgente = m["urgente"] == true,
+                        secondi = (m["secondi"] as? Number)?.toInt(),
+                        conferma = m["conferma"] == true,
+                        icona = png?.let { BitmapFactory.decodeByteArray(it, 0, it.size) },
+                        tasti = (m["tasti"] as? List<*>).orEmpty().mapNotNull { t ->
+                            val x = t as? Map<*, *> ?: return@mapNotNull null
+                            val tid = x["id"] as? String ?: return@mapNotNull null
+                            TastoCasa(tid, x["etichetta"] as? String ?: tid, x["principale"] == true)
+                        }.take(2),
+                    )
+                }
+            }
             "strada" -> strada = Strada(
                 id = call.argument<String>("id"),
                 titolo = call.argument<String>("titolo"),
@@ -609,6 +655,12 @@ object PonteAuto {
 
     /** «Prendila» (o «Resto qui») sulla strada proposta. */
     fun rispondiStrada(id: String, si: Boolean) = chiedi("strada", mapOf("id" to id, "si" to si))
+
+    /** Un tasto di un avviso di casa, toccato sull'auto. */
+    fun tastoCasa(id: String, tasto: String) = chiedi("avviso_casa_tasto", mapOf("id" to id, "tasto" to tasto))
+
+    /** È cambiato qualcosa fuori dal telefono (la musica): gli schermi si rifanno. */
+    fun rinfresca() = avvisa()
 
     /** Le colonnine vicine, come luoghi da raggiungere. */
     /** Un punto toccato sulla mappa: il telefono dice cosa è e cosa sapere. */

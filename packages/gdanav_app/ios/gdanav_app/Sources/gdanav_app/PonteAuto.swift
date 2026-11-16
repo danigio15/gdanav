@@ -110,6 +110,42 @@ struct AvvisoAuto {
     var ancoraTesto: String?
 }
 
+/// Un avviso di casa (dentro GdAHome: la lavatrice, l'antifurto, il fumo),
+/// come lo manda `lib/auto/avvisi_di_casa_in_auto.dart`: al più due tasti,
+/// già scelti dal telefono. `secondi` nil: resta finché non lo si chiude.
+/// `conferma`: è la domanda «Sì / No» di un tasto che fa qualcosa da lontano.
+struct AvvisoCasaAuto {
+    struct Tasto {
+        let id: String
+        let etichetta: String
+        let principale: Bool
+    }
+
+    let id: String
+    let titolo: String
+    let testo: String
+    let urgente: Bool
+    let secondi: Int?
+    let conferma: Bool
+    let icona: UIImage?
+    let tasti: [Tasto]
+
+    init?(_ a: [String: Any], scala: CGFloat) {
+        guard let id = a["id"] as? String else { return nil }
+        self.id = id
+        titolo = a["titolo"] as? String ?? ""
+        testo = a["testo"] as? String ?? ""
+        urgente = (a["urgente"] as? Bool) == true
+        secondi = numero(a["secondi"]).map { Int($0) }
+        conferma = (a["conferma"] as? Bool) == true
+        icona = (a["icona"] as? FlutterStandardTypedData).flatMap { UIImage(data: $0.data, scale: scala) }
+        tasti = (a["tasti"] as? [[String: Any]] ?? []).compactMap { t in
+            guard let tid = t["id"] as? String else { return nil }
+            return Tasto(id: tid, etichetta: t["etichetta"] as? String ?? tid, principale: (t["principale"] as? Bool) == true)
+        }.prefix(2).map { $0 }
+    }
+}
+
 /// La strada a risparmio (o più rapida) proposta dal telefono: il titolo,
 /// «−1,8 kWh · +4 min · arrivi con il 31%», e l'id per la risposta. Senza
 /// id, nessuna.
@@ -217,6 +253,9 @@ final class PonteAuto {
     private(set) var cruscotto = CruscottoAuto()
     private(set) var avviso = AvvisoAuto()
     private(set) var strada = StradaAuto()
+
+    /// L'avviso di casa in vista; `nil` se non c'è.
+    private(set) var avvisoCasa: AvvisoCasaAuto?
 
     /// Le strade fra cui scegliere, prima di partire; `nil` se non ce ne sono.
     private(set) var strade: StradeAuto?
@@ -366,6 +405,8 @@ final class PonteAuto {
             // CarPlay lo mostra come avviso di navigazione.
             avvisoInArrivo = prossimo.titolo != nil && (prossimo.tipo != avviso.tipo || avviso.titolo == nil)
             avviso = prossimo
+        case "avviso_casa":
+            avvisoCasa = AvvisoCasaAuto(a, scala: PonteAuto.scalaImmagini)
         case "strada":
             strada = StradaAuto(id: a["id"] as? String, titolo: a["titolo"] as? String, testo: a["testo"] as? String)
         case "strade":
@@ -560,6 +601,11 @@ final class PonteAuto {
     /// «Prendila» (o «Resto qui») sulla strada proposta.
     func rispondiStrada(_ id: String, si: Bool) {
         chiedi("strada", ["id": id, "si": si])
+    }
+
+    /// Un tasto di un avviso di casa, toccato su CarPlay.
+    func tastoCasa(_ id: String, _ tasto: String) {
+        chiedi("avviso_casa_tasto", ["id": id, "tasto": tasto])
     }
 
     /// Le colonnine vicine, come luoghi da raggiungere.

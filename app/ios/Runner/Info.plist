@@ -12,6 +12,8 @@
 	<string>Per leggere la batteria dell'auto dal dongle OBD Bluetooth.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Per scegliere la foto della tua auto.</string>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>Per mostrarti nel navigatore il brano della Musica che stai ascoltando e cambiarlo mentre guidi. GdANav non legge né modifica la tua libreria.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UIBackgroundModes</key>

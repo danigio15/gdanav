@@ -110,6 +110,24 @@ class Manovra {
   /// Le corsie servono solo se non vanno bene tutte.
   bool get corsieUtili => corsie.length > 1 && corsie.any((c) => c.giusta) && corsie.any((c) => !c.giusta);
 
+  /// La stessa manovra da un altro punto del percorso ([inizio]), con la
+  /// strada fino alla prossima rimisurata: quando la geometria cambia sotto
+  /// (vedi `correggiContromano`).
+  Manovra spostata(int inizio, {double? lunghezzaM, double? secondi}) => Manovra(
+        istruzione: istruzione,
+        lunghezzaM: lunghezzaM ?? this.lunghezzaM,
+        secondi: secondi ?? this.secondi,
+        inizio: inizio,
+        tipo: tipo,
+        voce: voce,
+        strada: strada,
+        corsie: corsie,
+        uscita: uscita,
+        verso: verso,
+        uscitaRotonda: uscitaRotonda,
+        angoloRotonda: angoloRotonda,
+      );
+
   Manovra conCorsie(List<Corsia> c) => Manovra(
         istruzione: istruzione,
         lunghezzaM: lunghezzaM,
@@ -299,6 +317,38 @@ class PercorsoCalcolato {
       );
 
   PercorsoCalcolato conLimiti(List<int?> limiti) => _copia(limiti: limiti);
+
+  /// Lo stesso viaggio su una geometria ritoccata (un pezzo ridisegnato sulle
+  /// strade vere, vedi `correggiContromano`): punti, manovre, limiti e tutto
+  /// quello che si conta in metri sulla geometria. Tempi e consumi restano.
+  PercorsoCalcolato conGeometria({
+    required List<Punto> punti,
+    required List<Manovra> manovre,
+    required List<int?> limiti,
+    required List<Coda> code,
+    required List<TrattoPedaggio> pedaggi,
+    required List<PagamentoPedaggio>? pagamentiPedaggio,
+    required PercorsoCalcolato? senzaTraffico,
+  }) =>
+      PercorsoCalcolato(
+        punti: punti,
+        tratti: tratti,
+        manovre: manovre,
+        limiti: limiti,
+        conPedaggi: conPedaggi,
+        conAutostrade: conAutostrade,
+        conTraghetti: conTraghetti,
+        code: code,
+        ritardoTraffico: ritardoTraffico,
+        trafficoVero: trafficoVero,
+        senzaTraffico: senzaTraffico,
+        ritardoDichiarato: ritardoDichiarato,
+        ztl: ztl,
+        consumoTomTom: consumoTomTom,
+        pedaggi: pedaggi,
+        prezzoPedaggio: prezzoPedaggio,
+        pagamentiPedaggio: pagamentiPedaggio,
+      );
 
   /// Con le corsie di ogni manovra (dalla risposta OSRM dello stesso
   /// percorso): se le manovre non tornano una a una, niente corsie.

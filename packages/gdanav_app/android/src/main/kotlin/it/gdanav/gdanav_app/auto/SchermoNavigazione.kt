@@ -5,10 +5,12 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
+import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.Alert
+import androidx.car.app.model.AlertCallback
 import androidx.car.app.model.CarIcon
 import androidx.car.app.model.CarText
 import androidx.car.app.model.Template
@@ -21,6 +23,7 @@ import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import it.gdanav.gdanav_app.R
+import it.gdanav.gdanav_app.musica.LettoreTelefono
 
 /**
  * Lo schermo dell'auto: la mappa di GdANav sotto (con velocità, limite e dati
@@ -40,7 +43,19 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
      * fermi, la segnalazione appena passata. La mappa sotto si ridisegna per
      * conto suo, che il modello si rifaccia o no.
      */
-    private fun firma(): Any? = listOf(PonteAuto.guida, PonteAuto.messaggio, PonteAuto.avviso.ancoraId, PonteAuto.strada.id, PonteAuto.termica.id, PonteAuto.arrivo, PonteAuto.strade?.id)
+    private fun firma(): Any? = listOf(
+        PonteAuto.guida,
+        PonteAuto.messaggio,
+        PonteAuto.avviso.ancoraId,
+        PonteAuto.strada.id,
+        PonteAuto.termica.id,
+        PonteAuto.arrivo,
+        PonteAuto.strade?.id,
+        // La musica cambia i tasti in alto (⏯ ⏭) solo quando c'è o no, e
+        // quando passa da play a pausa: non a ogni brano.
+        LettoreTelefono.daMostrare,
+        LettoreTelefono.brano?.suona,
+    )
 
     private var disegnata: Any? = null
     private var daAggiornare = false
@@ -48,6 +63,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         fermaSeVecchia()
         renderer.aggiorna()
         sincronizzaNavigazione()
+        mostraAvvisoCasa()
         // Il modello si rifà solo se cambia quello che mostra: l'auto concede
         // pochi aggiornamenti.
         val ora = firma()
@@ -98,6 +114,65 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             app.showAlert(avviso.build())
         } catch (e: Exception) {
             // Un'auto che non mostra gli avvisi: restano i tasti in alto.
+        }
+    }
+
+    /** L'avviso di casa già mostrato (id e se era la domanda), e il suo numero. */
+    private var casaMostrata: Pair<String, Boolean>? = null
+    private var casaNumero: Int? = null
+
+    /**
+     * Un avviso di casa (dentro GdAHome): dalle auto con l'API 5 è l'avviso di
+     * Android Auto, sopra la mappa, coi suoi tasti (al più due, li sceglie il
+     * telefono). Gli urgenti restano finché non li si chiude; gli altri se ne
+     * vanno da soli. Il tasto torna al telefono, che fa la domanda «Sì / No»
+     * se serve e poi lo passa a GdAHome. Sulle auto più vecchie, solo il
+     * titolo in un messaggio breve.
+     */
+    private fun mostraAvvisoCasa() {
+        val a = PonteAuto.avvisoCasa
+        val chiave = a?.let { it.id to it.conferma }
+        if (chiave == casaMostrata) return
+        casaMostrata = chiave
+        val app = carContext.getCarService(AppManager::class.java)
+        if (carContext.carAppApiLevel < 5) {
+            if (a != null) CarToast.makeText(carContext, a.titolo, CarToast.LENGTH_LONG).show()
+            return
+        }
+        try {
+            casaNumero?.let { app.dismissAlert(it) }
+            casaNumero = null
+            if (a == null) return
+            val numero = "casa|${a.id}|${a.conferma}".hashCode()
+            // Gli urgenti «finché non li si chiude»: dieci minuti, e il
+            // telefono li tiene in coda anche dopo.
+            val durata = (a.secondi?.toLong() ?: 600L).coerceAtLeast(3L) * 1000L
+            val avviso = Alert.Builder(numero, CarText.create(a.titolo), durata)
+            if (a.testo.isNotEmpty()) avviso.setSubtitle(CarText.create(a.testo))
+            a.icona?.let { avviso.setIcon(CarIcon.Builder(IconCompat.createWithBitmap(it)).build()) }
+            var toccato = false
+            for (t in a.tasti) {
+                val b = Action.Builder().setTitle(t.etichetta).setOnClickListener {
+                    toccato = true
+                    PonteAuto.tastoCasa(a.id, t.id)
+                }
+                if (t.principale) b.setFlags(Action.FLAG_PRIMARY)
+                avviso.addAction(b.build())
+            }
+            avviso.setCallback(object : AlertCallback {
+                override fun onCancel(reason: Int) {
+                    // Chiuso a mano sull'auto: via anche dal telefono. Scaduto
+                    // da solo no: ci pensa il tempo del telefono.
+                    if (reason == AlertCallback.REASON_USER_ACTION && !toccato) PonteAuto.tastoCasa(a.id, "_chiudi")
+                }
+
+                override fun onDismiss() {}
+            })
+            app.showAlert(avviso.build())
+            casaNumero = numero
+        } catch (e: Exception) {
+            // Un'auto che non mostra gli avvisi: almeno il titolo.
+            if (a != null) CarToast.makeText(carContext, a.titolo, CarToast.LENGTH_LONG).show()
         }
     }
 
@@ -206,13 +281,18 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         })
     }
 
+    /** La musica cambia sul telefono (un brano, play/pausa): si rifà come una novità. */
+    private val musica: () -> Unit = { PonteAuto.rinfresca() }
+
     override fun onCreate(owner: LifecycleOwner) {
         PonteAuto.ascolta(aggiorna)
+        LettoreTelefono.ascolta(musica)
         sincronizzaNavigazione()
     }
 
     override fun onDestroy(owner: LifecycleOwner) {
         PonteAuto.smetti(aggiorna)
+        LettoreTelefono.smetti(musica)
         // Finita la sessione in auto finisce anche la prova di guida.
         PonteAuto.fineProva()
         if (navigando) navigazione.navigationEnded()
@@ -274,7 +354,21 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             striscia.addAction(tasto(R.drawable.auto_no) { PonteAuto.ancora(ancora, false) })
             return striscia.build()
         }
-        if (PonteAuto.guida != null) {
+        if (PonteAuto.guida != null && LettoreTelefono.daMostrare) {
+            // In guida con la musica, come Waze: ⏯ e ⏭ al posto della lente
+            // e della casa (stanno nel Menu). Il brano è disegnato sulla mappa
+            // (`PannelloAuto`), solo da guardare. Al più quattro tasti.
+            val suona = LettoreTelefono.brano?.suona == true
+            striscia.addAction(
+                Action.Builder()
+                    .setIcon(icona(if (suona) R.drawable.auto_pausa else R.drawable.auto_play))
+                    .setOnClickListener { LettoreTelefono.comando("playPausa") }
+                    .build(),
+            )
+            striscia.addAction(tasto(R.drawable.auto_avanti) { LettoreTelefono.comando("successivo") })
+            striscia.addAction(tasto(R.drawable.auto_menu) { screenManager.push(SchermoMenu(carContext, renderer)) })
+            striscia.addAction(Action.Builder().setTitle("Fine").setOnClickListener { PonteAuto.fermaDallAuto() }.build())
+        } else if (PonteAuto.guida != null) {
             // In guida c'è poco spazio: solo la lente.
             striscia.addAction(tasto(R.drawable.auto_cerca) { screenManager.push(SchermoCerca(carContext)) })
             casa(striscia)

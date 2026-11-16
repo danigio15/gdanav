@@ -16,6 +16,7 @@ import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import it.gdanav.gdanav_app.R
+import it.gdanav.gdanav_app.musica.LettoreTelefono
 
 /**
  * Uno schermo dell'auto che si rifà quando cambia quello che ha in pagina.
@@ -127,15 +128,41 @@ abstract class SchermoAggiornato(carContext: CarContext) : Screen(carContext), D
 class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) : SchermoAggiornato(carContext) {
     // In pagina: i nomi di Casa e Lavoro, e se l'auto è elettrica (colonnine
     // o distributori). Della guida non mostra niente.
-    override fun firma(): Any? = listOf(PonteAuto.casa()?.nome, PonteAuto.lavoro()?.nome, PonteAuto.cruscotto.elettrica)
+    override fun firma(): Any? = listOf(
+        PonteAuto.casa()?.nome,
+        PonteAuto.lavoro()?.nome,
+        PonteAuto.cruscotto.elettrica,
+        conMusica(),
+    )
+
+    /**
+     * In guida con la musica la lente e la casa di GdAHome lasciano i tasti in
+     * alto a ⏯ e ⏭ (`SchermoNavigazione.azioni`): stanno qui, per prime.
+     */
+    private fun conMusica() = PonteAuto.guida != null && LettoreTelefono.daMostrare
 
     override fun schermata(): Template {
         val casa = PonteAuto.casa()
         val lavoro = PonteAuto.lavoro()
         val blu = CarColor.BLUE
+        val spostati = if (conMusica()) {
+            listOfNotNull(
+                riga("Cerca", sfoglia = true, icona = icona(R.drawable.auto_cerca)) {
+                    screenManager.push(SchermoCerca(carContext))
+                },
+                GdanavInAuto.casa?.let { schermo ->
+                    riga("GdAHome", "La tua casa", sfoglia = true, icona = icona(R.drawable.auto_casa)) {
+                        screenManager.push(schermo(carContext))
+                    }
+                },
+            )
+        } else {
+            emptyList()
+        }
         return sezioni(
             "Menu",
             listOf(
+                "Cerca e casa" to spostati,
                 "Vai a" to listOf(
                     if (casa != null) {
                         riga("Casa", casa.nome, icona = icona(R.drawable.icona_casa, blu)) { vai(casa) }

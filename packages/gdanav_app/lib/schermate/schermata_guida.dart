@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../componenti/avvisi_in_guida.dart';
+import '../componenti/avviso_di_casa.dart';
+import '../componenti/mini_lettore.dart';
+import '../stato/gestore_casa_in_guida.dart';
 import '../componenti/icona_manovra.dart';
 import '../componenti/itinerario.dart' show BadgePedaggio;
 import '../componenti/riga_del_viaggio.dart';
@@ -51,6 +55,7 @@ class SchermataGuida extends StatefulWidget {
     this.persone,
     this.mappa,
     this.meteo,
+    this.casaInGuida,
   });
 
   final GestoreGuida guida;
@@ -70,6 +75,11 @@ class SchermataGuida extends StatefulWidget {
   /// Il meteo all'arrivo (o qui), nella riga del viaggio come in auto.
   final GestoreMeteo? meteo;
   final CostruisciMappa? mappa;
+
+  /// Gli avvisi di casa (il campanello, il fumo), sotto la manovra e il
+  /// «Poi»: la freccia e la prossima svolta restano in vista. E il
+  /// mini-lettore musicale, sopra la barra dell'arrivo.
+  final GestoreCasaInGuida? casaInGuida;
 
   @override
   State<SchermataGuida> createState() => _SchermataGuidaState();
@@ -289,7 +299,15 @@ class _SchermataGuidaState extends State<SchermataGuida> {
               ),
             ),
             ListenableBuilder(
-              listenable: Listenable.merge([g, widget.posizione, controllo, ?_avvisi, ?_ztl, ?g.risparmio]),
+              listenable: Listenable.merge([
+                g,
+                widget.posizione,
+                controllo,
+                ?_avvisi,
+                ?_ztl,
+                ?g.risparmio,
+                ?widget.casaInGuida,
+              ]),
               builder: (context, _) {
                 _copri(context, g);
                 final risparmio = g.risparmio;
@@ -434,8 +452,29 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                         onResta: g.restaQui,
                       )
                     : null;
+                // Gli avvisi di casa: in verticale per primi sotto
+                // la manovra; di traverso in alto sulla mappa, accanto al
+                // pannello, dove la freccia e il «Poi» restano liberi.
+                // Fermi (sotto i 3 km/h) il gruppo si apre e i tasti «da
+                // fermo» compaiono; in movimento no.
+                final inMovimento = widget.posizione.velocitaAdesso() >= 3;
+                final ospite = widget.casaInGuida;
+                final casa = switch (ospite?.coda) {
+                  final coda? => SchedaAvvisoDiCasa(coda: coda, inMovimento: inMovimento),
+                  null => null,
+                };
+                // La musica: il riquadro se c'è il permesso; se no, da fermi,
+                // l'invito una volta sola.
+                final musica = switch ((ospite, ospite?.lettoreInGuida)) {
+                  (final o?, final l?) when !l.permesso =>
+                    o.invitoDaMostrare && !inMovimento ? InvitoMusica(lettore: l, onVisto: o.segnaInvitoVisto) : null,
+                  (_, final l?) => MiniLettore(lettore: l, inMovimento: inMovimento, conPreferite: !traverso),
+                  _ => null,
+                };
                 if (traverso) {
                   return _DiTraverso(
+                    casa: casa,
+                    musica: musica,
                     larghezza: _larghezzaPannello(context),
                     alto: alto,
                     avvisi: [...avvisi, ?proposta],
@@ -455,6 +494,7 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                 return Column(
                   children: [
                     alto,
+                    ?casa,
                     ...avvisi,
                     // Lo spazio libero sopra il tachimetro: di lato la
                     // striscia del traffico. Il resto lascia passare i tocchi
@@ -466,6 +506,8 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                     // Una strada a risparmio (o più rapida): sopra la barra
                     // in basso, e la strada verde sulla mappa.
                     ?proposta,
+                    // La musica, se c'è: sopra la barra dell'arrivo.
+                    if (proposta == null) ?musica,
                     _Fondo(guida: g, onFine: _fine, meteo: widget.meteo),
                   ],
                 );
@@ -507,9 +549,17 @@ class _DiTraverso extends StatelessWidget {
     required this.striscia,
     required this.comandi,
     required this.fondo,
+    this.casa,
+    this.musica,
   });
 
   final double larghezza;
+
+  /// L'avviso di casa, in alto sulla mappa.
+  final Widget? casa;
+
+  /// Il mini-lettore, nel pannello sopra la barra dell'arrivo.
+  final Widget? musica;
   final Widget alto;
   final List<Widget> avvisi;
   final Widget striscia;
@@ -537,6 +587,7 @@ class _DiTraverso extends StatelessWidget {
                     child: Column(mainAxisSize: MainAxisSize.min, children: [alto, ...avvisi]),
                   ),
                 ),
+                ?musica,
                 fondo,
               ],
             ),
@@ -549,13 +600,25 @@ class _DiTraverso extends StatelessWidget {
           bottom: 0,
           child: SafeArea(
             left: false,
-            child: Column(
-              children: [
-                Expanded(
-                  child: Align(alignment: Alignment.centerRight, child: striscia),
-                ),
-                comandi,
-              ],
+            // L'avviso al più alto quanto lascia il tachimetro: il gruppo
+            // aperto, se non ci sta, scorre.
+            child: LayoutBuilder(
+              builder: (context, vincoli) => Column(
+                children: [
+                  if (casa case final c?)
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: 460, maxHeight: max(160, vincoli.maxHeight - 160)),
+                        child: c,
+                      ),
+                    ),
+                  Expanded(
+                    child: Align(alignment: Alignment.centerRight, child: striscia),
+                  ),
+                  comandi,
+                ],
+              ),
             ),
           ),
         ),

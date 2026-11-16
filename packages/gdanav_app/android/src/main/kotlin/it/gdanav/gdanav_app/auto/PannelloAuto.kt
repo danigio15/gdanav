@@ -9,6 +9,7 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.view.View
+import it.gdanav.gdanav_app.musica.LettoreTelefono
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -66,7 +67,17 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
 
         // In alto niente, per vedere la strada davanti: solo l'avviso che si
         // avvicina (autovelox, polizia, incidente…), finché serve.
-        avviso(canvas, a.left + margine, a.right - margine, (sottoIlCartello ?: a.top.toFloat()) + margine)
+        val alto = (sottoIlCartello ?: a.top.toFloat()) + margine
+        avviso(canvas, a.left + margine, a.right - margine, alto)
+
+        // La musica, come in Waze: il brano in alto a destra, solo da
+        // guardare (i comandi sono i tasti del template). Sotto l'avviso, se
+        // c'è: non si coprono.
+        if (PonteAuto.guida != null && LettoreTelefono.daMostrare) {
+            val av = PonteAuto.avviso
+            val conAvviso = av.titolo != null || av.ancoraTesto != null || (PonteAuto.strada.id != null && !PonteAuto.conAvvisi)
+            musica(canvas, a, margine, if (conAvviso) alto + dp(72f) else alto)
+        }
 
         // In basso a sinistra, dal lato di chi guida: velocità e limite, e
         // sopra una barra sottile coi dati dell'auto e il meteo.
@@ -625,6 +636,51 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
 
     /** Come sul telefono: vedi [GuidaAuto.distanzaTesto]. */
     private fun distanza(m: Double): String = GuidaAuto.distanzaTesto(m)
+
+    /**
+     * Il brano che suona: copertina, titolo, e «artista · app». Largo al più
+     * 330 punti, a destra nell'area libera; il testo lungo si taglia.
+     */
+    private fun musica(canvas: Canvas, a: Rect, margine: Float, alto: Float) {
+        val b = LettoreTelefono.brano ?: return
+        val w = minOf(dp(330f), a.width() - margine * 2)
+        if (w < dp(180f)) return
+        val h = dp(64f)
+        val box = RectF(a.right - margine - w, alto, a.right - margine, alto + h)
+        pieno.color = Color.argb(225, 15, 20, 30)
+        canvas.drawRoundRect(box, dp(14f), dp(14f), pieno)
+        val lato = dp(48f)
+        val sx = box.left + dp(8f)
+        val dst = RectF(sx, box.centerY() - lato / 2, sx + lato, box.centerY() + lato / 2)
+        val cop = b.copertina
+        if (cop != null) {
+            val salva = canvas.save()
+            val giro = android.graphics.Path().apply { addRoundRect(dst, dp(8f), dp(8f), android.graphics.Path.Direction.CW) }
+            canvas.clipPath(giro)
+            canvas.drawBitmap(cop, null, dst, Paint(Paint.FILTER_BITMAP_FLAG))
+            canvas.restoreToCount(salva)
+        } else {
+            pieno.color = Color.rgb(37, 99, 235)
+            canvas.drawRoundRect(dst, dp(8f), dp(8f), pieno)
+            val nota = Paint(testo).apply { textAlign = Paint.Align.CENTER; textSize = dp(26f) }
+            canvas.drawText("♪", dst.centerX(), dst.centerY() + dp(9f), nota)
+        }
+        val x = dst.right + dp(12f)
+        val spazio = box.right - dp(12f) - x
+        val t1 = Paint(testo).apply { textSize = dp(19f) }
+        val t2 = Paint(testoPiccolo).apply { textSize = dp(15f); color = Color.rgb(189, 193, 198) }
+        val sotto = listOf(b.artista, b.app ?: "").filter { it.isNotEmpty() }.joinToString(" · ")
+        canvas.drawText(taglia(b.titolo.ifEmpty { "In riproduzione" }, t1, spazio), x, box.top + dp(28f), t1)
+        if (sotto.isNotEmpty()) canvas.drawText(taglia(sotto, t2, spazio), x, box.top + dp(50f), t2)
+    }
+
+    /** Taglia [s] coi puntini finché non sta in [spazio]. */
+    private fun taglia(s: String, p: Paint, spazio: Float): String {
+        if (p.measureText(s) <= spazio) return s
+        var t = s
+        while (t.length > 1 && p.measureText("$t…") > spazio) t = t.dropLast(1)
+        return "${t.trimEnd()}…"
+    }
 
     private fun accorcia(s: String, n: Int) = if (s.length <= n) s else s.take(n - 1) + "…"
 

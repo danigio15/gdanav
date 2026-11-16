@@ -27,6 +27,7 @@ class GestoreGuida extends ChangeNotifier {
     ScelteAvvisi? avvisi,
     DateTime Function()? orologio,
     this.stimaInGalleria = true,
+    this.strade,
   }) : _ora = orologio ?? DateTime.now,
        avvisi = avvisi ?? ScelteAvvisi() {
     audio = audioIniziale;
@@ -41,6 +42,11 @@ class GestoreGuida extends ChangeNotifier {
 
   /// Archivio delle preferenze persistenti del navigatore.
   final Archivio? archivio;
+
+  /// Le strade di OpenStreetMap lungo il percorso, per non portare mai
+  /// contromano (vedi «Mai contromano» più sotto): quelle attorno ai punti
+  /// dati (`StradeOsm.attorno`). `null`: non si guarda.
+  final Future<List<TrattoStrada>> Function(List<Punto> punti)? strade;
 
   /// Quali avvisi si vogliono, e come: a voce, solo a schermo o spenti.
   final ScelteAvvisi avvisi;
@@ -725,7 +731,8 @@ class GestoreGuida extends ChangeNotifier {
       _vicinoDetto = true;
       _evento('arrivo_vicino', {'minuti': a.restante.inMinutes});
     }
-    if (a.fuoriPercorso && !ricalcolando) unawaited(_ricalcola());
+    if (!stimata) _guardaAvantiISensi(p0: a);
+    if (a.fuoriPercorso && !ricalcolando) unawaited(_fuoriStrada(qui, a));
     final ultimo = _ultimoTraffico ??= _ora();
     if (!ricalcolando && _ora().difference(ultimo) >= intervalloTraffico) {
       _ultimoTraffico = _ora();
@@ -781,6 +788,120 @@ class GestoreGuida extends ChangeNotifier {
     _guida = Guida(nuovo);
     final qui = _ultimaPosizione;
     avanzamento = qui == null ? null : Guida(nuovo).aggiorna(qui);
+  }
+
+  /* ─── Mai contromano ──────────────────────────────────────────────────────
+   *
+   * «Ancora con questo incrocio»: al bivio di due sensi unici la linea di
+   * TomTom tirava dritto fino al vertice e girava stretta sul ramo vietato.
+   * In guida si guardano le strade vere dei prossimi due chilometri
+   * ([finestraSensiM], tessere di OpenStreetMap, `StradeOsm`) e, se il
+   * percorso fa un pezzo contromano, lo si rifà sul ramo giusto
+   * (`correggiContromano` in gdanav_core): linea, manovra («Al bivio tieni
+   * la destra»), distanza e voce cambiano insieme, sul telefono, in auto e
+   * nella scena 3D, che leggono tutti lo stesso viaggio. Senza ricalcolo: la
+   * meta, le soste e le manovre lontane restano quelle.
+   *
+   * E se il controllo non ha fatto in tempo e l'auto prende il ramo giusto,
+   * prima di ricalcolare si riguarda lì: se rifatto il percorso ci passa,
+   * nessun «Ricalcolo il percorso». */
+
+  /// Quanto avanti si guardano i sensi unici.
+  static const finestraSensiM = 2000.0;
+
+  PercorsoCalcolato? _sensiDi;
+  var _sensiFinoA = -1.0;
+  var _sensiInCorso = false;
+
+  /// Senza strade (niente rete, tessera che non arriva) si riprova dopo.
+  DateTime? _sensiRiprovaDopo;
+
+  void _guardaAvantiISensi({required Avanzamento p0}) {
+    final p = pronto;
+    if (strade == null || p == null || _sensiInCorso) return;
+    final percorso = p.viaggio.percorso;
+    if (!identical(_sensiDi, percorso)) {
+      // Un percorso nuovo (un ricalcolo): si ricomincia da dove si è.
+      _sensiDi = percorso;
+      _sensiFinoA = -1;
+    }
+    final qui = p0.percorsiM;
+    if (qui + finestraSensiM / 2 <= _sensiFinoA) return;
+    if (_sensiRiprovaDopo case final t? when _ora().isBefore(t)) return;
+    final da = math.max(qui, _sensiFinoA - 100);
+    _sensiFinoA = qui + finestraSensiM;
+    unawaited(_correggiISensi(daM: da, aM: _sensiFinoA, protettoM: qui + 30));
+  }
+
+  /// Fuori strada: prima di ricalcolare, si guarda se si è sul ramo giusto
+  /// di un pezzo che il percorso faceva contromano.
+  Future<void> _fuoriStrada(Punto qui, Avanzamento a) async {
+    if (_fuoriInCorso) return;
+    if (strade == null) return _ricalcola();
+    // Si sta già guardando avanti: decide la prossima lettura.
+    if (_sensiInCorso) return;
+    _fuoriInCorso = true;
+    try {
+      final fatti = a.percorsiM;
+      final corretto = await _correggiISensi(
+        daM: math.max(0, fatti - 50),
+        aM: fatti + 400,
+        protettoM: math.max(0, fatti - 250),
+      );
+      if (corretto) {
+        final p = pronto?.viaggio.percorso;
+        if (p != null && Guida(p).aggiorna(qui).lontanoM <= 25) return;
+      }
+    } finally {
+      _fuoriInCorso = false;
+    }
+    if (!ricalcolando && attiva) await _ricalcola();
+  }
+
+  var _fuoriInCorso = false;
+
+  /// Corregge il percorso fra [daM] e [aM] se ci va contromano; `true` se
+  /// l'ha corretto.
+  Future<bool> _correggiISensi({required double daM, required double aM, required double protettoM}) async {
+    final s = strade, p = pronto, g = _guida;
+    if (s == null || p == null || g == null || !attiva || _sensiInCorso) return false;
+    final percorso = p.viaggio.percorso;
+    _sensiInCorso = true;
+    try {
+      final c = g.linea.cumulate, punti = g.linea.punti;
+      final pezzo = [
+        for (var i = 0; i < punti.length; i++)
+          if (c[i] >= daM - 250 && c[i] <= aM + 150) punti[i],
+      ];
+      if (pezzo.isEmpty) return false;
+      final rete = await s(pezzo);
+      if (rete.isEmpty) {
+        // Non si è visto niente: quel pezzo resta da guardare, fra un poco.
+        _sensiRiprovaDopo = _ora().add(const Duration(seconds: 15));
+        if (identical(_sensiDi, percorso)) _sensiFinoA = math.min(_sensiFinoA, daM);
+        return false;
+      }
+      // Nel frattempo è cambiato il percorso, o si è finito.
+      if (!attiva || !identical(pronto?.viaggio.percorso, percorso) || !identical(_guida, g)) return false;
+      final corretto = correggiContromano(percorso, rete, daM: daM, aM: aM, protettoM: protettoM);
+      if (corretto == null) return false;
+      final vecchio = pronto;
+      final nuovo = viaggio.sostituisciPercorso(percorso, corretto.percorso);
+      if (nuovo == null) return false;
+      if (identical(_pianoConsumo, vecchio)) _pianoConsumo = nuovo;
+      _guida = g.conCorrezione(corretto);
+      _sensiDi = corretto.percorso;
+      _sensiFinoA = corretto.metriNuovi(_sensiFinoA);
+      if (_ultimaPosizione case final qui?) avanzamento = Guida(corretto.percorso).aggiorna(qui);
+      debugPrint('contromano evitato: ${corretto.deviazioni}');
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('sensi unici: $e');
+      return false;
+    } finally {
+      _sensiInCorso = false;
+    }
   }
 
   /* ─── Le ricariche: quella di casa e quelle per strada ───────────────────
