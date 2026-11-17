@@ -1,7 +1,11 @@
 // La musica di casa in auto: l'elenco che dà la casa, dove suona ogni voce
 // (in auto col lettore del navigatore, nell'app di Spotify, solo in casa), le
 // ultime suonate per prime, il tocco, «falla partire in casa», e la scheda
-// «Dalla casa». Stazioni e playlist inventate.
+// «Dalla casa»; la radio si comanda dal lettore del navigatore, e mai dal
+// volante (nessuna sessione, nessun servizio in primo piano). Stazioni e
+// playlist inventate.
+
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -311,6 +315,69 @@ void main() {
       expect(find.byKey(const Key('lettore-dalla-casa')), findsOneWidget);
       await con(true);
       expect(find.byKey(const Key('lettore-dalla-casa')), findsNothing);
+    });
+  });
+
+  group('la radio si comanda dal lettore del navigatore', () {
+    testWidgets('suona, e ⏯ ⏭ toccati sul lettore vanno a lei', (tester) async {
+      final casa = _Casa();
+      final l = LettoreFinto();
+      final g = GestoreMusicaDiCasa(chiedi: () => casa.chiedi, lettore: l, android: true);
+      await g.aggiorna();
+      await g.suona(g.radio.firstWhere((v) => v.id == 'r1'), daFermi: false);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: temaGdanav(Brightness.light),
+          home: Scaffold(body: MiniLettore(lettore: l, inMovimento: true)),
+        ),
+      );
+      expect(find.text('Radio Lungomare'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('lettore-successivo')));
+      await tester.pump();
+      expect(find.text('Onda Vesuviana'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('lettore-play')));
+      await tester.pump();
+      expect(l.comandi.skip(1), ['successivo', 'playPausa']);
+      expect(l.suona, isFalse);
+    });
+  });
+
+  // Niente comandi dal volante: la musica di casa non dichiara niente al
+  // sistema che il Play Store (o Apple) chieda di giustificare. Le prove
+  // girano dalla cartella del pacchetto.
+  group('nessuna sessione e nessun servizio per la musica di casa', () {
+    String leggi(String percorso) => File(percorso).readAsStringSync();
+
+    test('Android: nel manifesto solo il servizio in primo piano della posizione', () {
+      final m = leggi('android/src/main/AndroidManifest.xml');
+      expect(m, isNot(contains('FOREGROUND_SERVICE_MEDIA_PLAYBACK')));
+      expect(m, isNot(contains('mediaPlayback')));
+      expect(m, isNot(contains('MediaLibraryService')));
+      expect(m, isNot(contains('ServizioLettoreDiCasa')));
+      expect(RegExp(r'foregroundServiceType="([^"]*)"').allMatches(m).map((x) => x[1]), ['location']);
+      expect(RegExp(r'android\.permission\.FOREGROUND_SERVICE[A-Z_]*').allMatches(m).map((x) => x[0]).toSet(), {
+        'android.permission.FOREGROUND_SERVICE',
+        'android.permission.FOREGROUND_SERVICE_LOCATION',
+      });
+    });
+
+    test('Android: solo ExoPlayer, senza media3-session; nessuna sessione media3 nel codice', () {
+      final g = leggi('android/build.gradle.kts');
+      expect(g, contains('"androidx.media3:media3-exoplayer:'));
+      expect(g, isNot(contains('"androidx.media3:media3-session')));
+      expect(g, isNot(contains('"androidx.media3:media3-ui')));
+      final kotlin = Directory('android/src/main/kotlin').listSync(recursive: true).whereType<File>();
+      for (final f in kotlin) {
+        final t = f.readAsStringSync();
+        expect(t, isNot(contains('androidx.media3.session')), reason: f.path);
+        expect(t, isNot(contains('MediaSessionService')), reason: f.path);
+      }
+    });
+
+    test('iPhone: niente comandi remoti né «In riproduzione» per la radio di casa', () {
+      final s = leggi('ios/gdanav_app/Sources/gdanav_app/LettoreDiCasa.swift');
+      expect(s, isNot(contains('MPRemoteCommandCenter.shared')));
+      expect(s, isNot(contains('MPNowPlayingInfoCenter.default')));
     });
   });
 }

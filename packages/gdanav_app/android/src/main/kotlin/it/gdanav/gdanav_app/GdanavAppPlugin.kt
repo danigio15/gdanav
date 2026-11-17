@@ -15,6 +15,7 @@ import io.flutter.embedding.engine.plugins.lifecycle.HiddenLifecycleReference
 import io.flutter.plugin.common.MethodChannel
 import it.gdanav.gdanav_app.auto.Diagnosi
 import it.gdanav.gdanav_app.auto.PosizioneInAuto
+import it.gdanav.gdanav_app.musica.LettoreDiCasa
 import it.gdanav.gdanav_app.musica.LettoreTelefono
 
 /**
@@ -72,6 +73,12 @@ class GdanavAppPlugin : FlutterPlugin, ActivityAware {
      * Android la lascia partire, e da lì resta accesa fino a fine viaggio.
      */
     private val davanti = object : DefaultLifecycleObserver {
+        // La musica di casa suona senza servizio in primo piano: con l'app
+        // dietro e senza l'auto la si ferma (`LettoreDiCasa.sottofondo`).
+        override fun onStart(owner: LifecycleOwner) = LettoreDiCasa.telefonoDavanti(true)
+
+        override fun onStop(owner: LifecycleOwner) = LettoreDiCasa.telefonoDavanti(false)
+
         override fun onResume(owner: LifecycleOwner) {
             PosizioneInAuto.dalTelefono()
             // Tornando dalla pagina «Accesso alle notifiche»: il permesso
@@ -138,5 +145,7 @@ class GdanavAppPlugin : FlutterPlugin, ActivityAware {
         permessi = null
         ciclo?.removeObserver(davanti)
         ciclo = null
+        // Senza l'attività il telefono non è più davanti.
+        LettoreDiCasa.telefonoDavanti(false)
     }
 }

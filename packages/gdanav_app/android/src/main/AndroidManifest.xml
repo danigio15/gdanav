@@ -21,12 +21,6 @@
          (`auto/PosizioneInAuto.kt`). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-    <!-- La musica di casa che suona nel telefono in auto
-         (`musica/ServizioLettoreDiCasa.kt`): il servizio in primo piano
-         mentre suona, e il telefono sveglio quanto basta a leggere il flusso
-         della radio con lo schermo spento. -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <queries>
         <!-- La voce della guida: la sintesi vocale del telefono. -->
         <intent>
@@ -66,20 +60,6 @@
              compare quando in auto manca). Nell'elenco del sistema si chiama
              «GdANav: musica», anche dentro GdAHome. Nessun android:process:
              sta nel processo dell'app, con lo schermo dell'auto. -->
-        <!-- La musica di casa in auto: ExoPlayer con la sua sessione media3
-             (notifica, focus audio, tasti del volante e delle cuffie). Si
-             sfoglia (le radio di casa nella musica di Android Auto) solo da
-             GdANav, Android Auto e il sistema: lo controlla il servizio. -->
-        <service
-            android:name="it.gdanav.gdanav_app.musica.ServizioLettoreDiCasa"
-            android:exported="true"
-            android:foregroundServiceType="mediaPlayback"
-            android:label="Musica di casa">
-            <intent-filter>
-                <action android:name="androidx.media3.session.MediaLibraryService" />
-                <action android:name="android.media.browse.MediaBrowserService" />
-            </intent-filter>
-        </service>
         <service
             android:name="it.gdanav.gdanav_app.musica.AscoltoNotifiche"
             android:exported="true"
