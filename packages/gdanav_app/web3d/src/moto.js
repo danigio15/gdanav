@@ -245,7 +245,17 @@ export class Moto {
     const l = this.lettura;
     if (this.colFiltro && l) return this.filtro.velocita < 0.05 && Math.abs(this.filtro.velMostrata) < 0.05;
     if (!l || l.v > 0.3) return !l;
-    if (l.metri !== null) return this.s !== null && Math.abs(l.metri - this.s) < 0.05;
+    if (l.metri !== null) {
+      if (this.s === null) return false;
+      if (Math.abs(l.metri - this.s) < 0.05) return true;
+      /* Ferma un poco avanti alla lettura (una frenata detta tardi, il GPS
+       * che da fermi balla indietro): la freccia lì resta apposta, non torna
+       * indietro ([AVANTI_TOLLERATO_M]) — è arrivata anche così. Prima non lo
+       * era mai, e al semaforo la scena continuava a disegnare, tutti i
+       * fotogrammi, una scena immobile. */
+      const avanti = this.s - l.metri;
+      return avanti > 0 && avanti <= AVANTI_TOLLERATO_M + 0.05 && Math.abs(this.vel ?? 0) < 0.05;
+    }
     return this.x !== null && Math.hypot(l.x - this.x, l.y - this.y) < 0.05;
   }
 }

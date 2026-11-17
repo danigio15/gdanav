@@ -46,6 +46,87 @@ const RIPROVA_MAX_MS = 300000;
 /** Più distanti di così due fotogrammi non sono di seguito (una pausa, la mappa ferma). */
 const STACCO_MS = 250;
 
+/*
+ * Sull'auto.
+ *
+ * «Quando è attiva la modalità 3D aumentata si rallenta anche lo smartphone:
+ * se lo utilizzo va lento il telefono e il navigatore.» Sull'auto la scena
+ * doveva andare a trenta fotogrammi al secondo, e ne faceva quasi sessanta
+ * (MapLibre si ridisegna da sé fra un passo e l'altro: vedi
+ * `alPassoDellaScena` in principale.js), alla risoluzione piena dello
+ * schermo dell'auto (2000×1100: 2,2 milioni di pixel, una volta e mezza la
+ * scena del telefono); e ogni fotogramma Android Auto lo codifica anche in
+ * video. La scheda grafica è la stessa dell'app che si sta usando sul
+ * telefono.
+ *
+ * Adesso i fotogrammi seguono la velocità (piano, l'auto sullo schermo si
+ * sposta di poco: bastano meno fotogrammi; ferma e assestata, nessuno), e il
+ * telefono dice quanto può pesare la scena ([carico]: il calore, il telefono
+ * in uso). La risoluzione interna ha un tetto di pixel, e il browser la
+ * porta alla grandezza dello schermo.
+ */
+
+/** I fotogrammi al secondo al più, sull'auto, per livello di carico (0–3). */
+export const FPS_IN_AUTO = [30, 20, 15, 10];
+
+/** I pixel della tela al più, sull'auto, per livello di carico (0–3). */
+export const PIXEL_IN_AUTO = [1.5e6, 1.1e6, 0.8e6, 0.55e6];
+
+const livelloDi = (l) => Math.min(3, Math.max(0, Math.round(Number.isFinite(l) ? l : 0)));
+
+/**
+ * Il livello di carico, da quello che dice il telefono ([carico]:
+ * `{livello, telefono}`): il telefono in uso vale almeno uno.
+ */
+export function livelloDiCarico(carico) {
+  if (!carico) return 0;
+  return livelloDi(Math.max(livelloDi(carico.livello), carico.telefono ? 1 : 0));
+}
+
+/**
+ * I fotogrammi al secondo sull'auto, andando a [velocita] m/s col carico
+ * [livello]: piano (in coda, a passo d'uomo) quindici, sotto i trenta
+ * all'ora venti, più svelti trenta. Tutti divisori di sessanta: su uno
+ * schermo a sessanta giri i fotogrammi cadono sempre allo stesso passo.
+ * [svelto]: la telecamera si sta muovendo da sé (un tasto dello zoom,
+ * l'arrivo sull'auto): fino al tetto del livello.
+ */
+export function fpsInAuto(velocita, livello = 0, svelto = false) {
+  const tetto = FPS_IN_AUTO[livelloDi(livello)];
+  if (svelto) return tetto;
+  const v = Number.isFinite(velocita) ? velocita : 0;
+  const voluti = v < 1.5 ? 15 : v < 8 ? 20 : 30;
+  return Math.min(voluti, tetto);
+}
+
+/**
+ * Un intervallo fra due fotogrammi ([dt] ms) come lo vuole la sonda
+ * ([valutaPrestazioni]), col passo voluto [passo] (ms).
+ *
+ * La sonda dice «lento» sotto i venti fotogrammi al secondo, pensando che
+ * se ne vogliano trenta. Ma sull'auto, piano, se ne vogliono apposta
+ * quindici: senza questo conto la scena si sarebbe spenta da sola («3D
+ * aumentato non è disponibile») proprio quando fa quello che deve. Con un
+ * passo voluto più lungo di un trentesimo l'intervallo si riporta a quel
+ * passo: chi tiene i quindici voluti vale come chi tiene i trenta.
+ */
+export function intervalloPerLaSonda(dt, passo) {
+  return passo > PASSO_30 ? (dt * PASSO_30) / passo : dt;
+}
+
+/**
+ * Quanti pixel della tela per un punto della pagina: sul telefono quelli
+ * dello schermo (al più due); sull'auto anche al più [PIXEL_IN_AUTO] in
+ * tutto, per una tela di [larghezza]×[altezza] punti. A passi di 0,05, per
+ * non rifare la tela per niente.
+ */
+export function rapportoPixel({ dpr = 1, larghezza = 0, altezza = 0, inAuto = false, livello = 0 } = {}) {
+  const pieno = Math.min(dpr > 0 ? dpr : 1, 2);
+  if (!inAuto || !(larghezza > 0 && altezza > 0)) return pieno;
+  const tetto = Math.sqrt(PIXEL_IN_AUTO[livelloDi(livello)] / (larghezza * altezza));
+  return Math.max(0.35, Math.min(pieno, Math.floor(tetto * 20) / 20));
+}
+
 /**
  * Trenta o sessanta fotogrammi al secondo, dall'intervallo vero fra un
  * fotogramma disegnato e il successivo (una media mobile).
@@ -55,11 +136,14 @@ const STACCO_MS = 250;
  * grafica non stava dietro a sessanta, che allora andava a scatti più che a
  * trenta. Adesso si prova: a trenta e al passo, si va a sessanta; se a
  * sessanta i fotogrammi arrivano più radi, si torna a trenta e si riprova
- * più tardi. Con [fisso30] (sull'auto) sempre trenta.
+ * più tardi. Con [fisso30] (sull'auto) mai sessanta: quanti, lo dice
+ * [fpsInAuto] col [livello] di carico.
  */
 export class Ritmo {
   constructor({ fisso30 = false } = {}) {
     this.fisso30 = fisso30;
+    /** Il livello di carico sull'auto (vedi [livelloDiCarico]). */
+    this.livello = 0;
     this.svelto = false;
     /** La media dell'intervallo (ms) al passo [passo], su [campioni] fotogrammi. */
     this.media = null;
@@ -70,9 +154,13 @@ export class Ritmo {
     this.attesa = RIPROVA_MS;
   }
 
-  /** Il passo voluto (ms), andando a [velocita] m/s: da fermi trenta. */
-  intervallo(velocita) {
-    return !this.fisso30 && this.svelto && velocita > 2 ? PASSO_60 : PASSO_30;
+  /**
+   * Il passo voluto (ms), andando a [velocita] m/s: sul telefono da fermi
+   * trenta; sull'auto [fpsInAuto] ([svelto]: la telecamera che si muove da sé).
+   */
+  intervallo(velocita, svelto = false) {
+    if (this.fisso30) return 1000 / fpsInAuto(velocita, this.livello, svelto);
+    return this.svelto && velocita > 2 ? PASSO_60 : PASSO_30;
   }
 
   /**

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { codeOrdinate, decodifica } from '../src/messaggi.js';
-import { PASSO_30, PASSO_60, Ritmo, valutaPrestazioni, valutaWebgl } from '../src/capacita.js';
+import { FPS_IN_AUTO, PASSO_30, PASSO_60, PIXEL_IN_AUTO, Ritmo, fpsInAuto, intervalloPerLaSonda, livelloDiCarico, rapportoPixel, valutaPrestazioni, valutaWebgl } from '../src/capacita.js';
 
 test('i messaggi buoni passano, quelli storti no', () => {
   assert.ok(decodifica({ v: 1, tipo: 'opzioni', notte: false, vista: 'inclinata', auto: '#d62a26' }));
@@ -98,8 +98,71 @@ test('trenta o sessanta: dal passo vero dei fotogrammi, non dal tempo dei comand
   assert.equal(p.campioni, 0);
 });
 
-test("sull'auto sempre trenta", () => {
+test("sull'auto mai sessanta: in autostrada trenta, piano di meno", () => {
   const r = new Ritmo({ fisso30: true });
   for (let i = 1; i < 300; i++) r.disegnato(i * PASSO_30, r.intervallo(20));
   assert.equal(r.intervallo(20), PASSO_30);
+  assert.equal(r.svelto, false);
+  assert.equal(r.intervallo(5), 1000 / 20);
+  assert.equal(r.intervallo(0.5), 1000 / 15);
+  // La telecamera che si muove da sé (il tasto dello zoom): fluida anche da fermi.
+  assert.equal(r.intervallo(0, true), PASSO_30);
+  // Col telefono caldo, o in mano: meno fotogrammi.
+  r.livello = 2;
+  assert.equal(r.intervallo(20), 1000 / 15);
+  assert.equal(r.intervallo(0, true), 1000 / 15);
+});
+
+test('il carico dal telefono: il calore, e il telefono in uso vale almeno uno', () => {
+  assert.equal(livelloDiCarico(null), 0);
+  assert.equal(livelloDiCarico({ livello: 0, telefono: false }), 0);
+  assert.equal(livelloDiCarico({ livello: 0, telefono: true }), 1);
+  assert.equal(livelloDiCarico({ livello: 2, telefono: true }), 2);
+  assert.equal(livelloDiCarico({ livello: 9 }), 3);
+  assert.deepEqual(FPS_IN_AUTO.map((_, l) => fpsInAuto(30, l)), [30, 20, 15, 10]);
+  assert.equal(fpsInAuto(NaN), 15);
+  assert.ok(decodifica({ v: 1, tipo: 'carico', livello: 1, telefono: true }));
+  assert.equal(decodifica({ v: 1, tipo: 'carico', livello: 4 }), null);
+  assert.equal(decodifica({ v: 1, tipo: 'carico', livello: 1.5 }), null);
+  assert.ok(decodifica({ v: 1, tipo: 'nascosta', si: true }));
+  assert.equal(decodifica({ v: 1, tipo: 'nascosta' }), null);
+  // Sul telefono, con un'altra scena sull'auto (`msgLeggera` in ponte_3d.dart).
+  assert.ok(decodifica({ v: 1, tipo: 'leggera', si: true }));
+  assert.equal(decodifica({ v: 1, tipo: 'leggera', si: 1 }), null);
+});
+
+test('i fotogrammi voluti in meno non sono un telefono lento', () => {
+  // Sull'auto a passo d'uomo se ne vogliono quindici: la sonda non deve
+  // dire «lento» (sotto i venti) e spegnere la scena.
+  const passo = 1000 / fpsInAuto(1);
+  const tenuti = Array.from({ length: 200 }, () => intervalloPerLaSonda(passo, passo));
+  assert.equal(valutaPrestazioni(tenuti).lento, false);
+  assert.equal(valutaPrestazioni(tenuti).fps, 30);
+  // Senza quel conto sì: è il guasto che si evita.
+  assert.equal(valutaPrestazioni(Array.from({ length: 200 }, () => passo)).lento, true);
+  // Chi non tiene nemmeno i quindici (un fotogramma ogni 110 ms) resta lento.
+  assert.equal(valutaPrestazioni(Array.from({ length: 200 }, () => intervalloPerLaSonda(110, passo))).lento, true);
+  // A trenta e a sessanta gli intervalli restano quelli veri.
+  assert.equal(intervalloPerLaSonda(40, PASSO_30), 40);
+  assert.equal(intervalloPerLaSonda(18, PASSO_60), 18);
+  // Col telefono caldo (dieci voluti) lo stesso.
+  assert.equal(valutaPrestazioni(Array.from({ length: 200 }, () => intervalloPerLaSonda(100, 1000 / fpsInAuto(30, 3)))).lento, false);
+});
+
+test("la risoluzione: sul telefono quella dello schermo, sull'auto con un tetto di pixel", () => {
+  // Il telefono: come prima (al più due).
+  assert.equal(rapportoPixel({ dpr: 3, larghezza: 390, altezza: 844 }), 2);
+  assert.equal(rapportoPixel({ dpr: 1.5, larghezza: 390, altezza: 844 }), 1.5);
+  // L'auto da 2000×1100 pixel, a densità 1 e 2: la stessa tela, sotto il tetto.
+  for (const dpr of [1, 2]) {
+    const w = 2000 / dpr;
+    const h = 1100 / dpr;
+    const r = rapportoPixel({ dpr, larghezza: w, altezza: h, inAuto: true });
+    assert.ok(w * r * h * r <= PIXEL_IN_AUTO[0], `dpr ${dpr}: ${r}`);
+    assert.ok(w * r * h * r > PIXEL_IN_AUTO[0] * 0.85, `dpr ${dpr}: non troppo poco`);
+    const caldo = rapportoPixel({ dpr, larghezza: w, altezza: h, inAuto: true, livello: 3 });
+    assert.ok(caldo < r && w * caldo * h * caldo <= PIXEL_IN_AUTO[3]);
+  }
+  // Uno schermo piccolo dell'auto resta pieno.
+  assert.equal(rapportoPixel({ dpr: 1, larghezza: 1280, altezza: 720, inAuto: true }), 1);
 });

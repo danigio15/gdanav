@@ -65,6 +65,7 @@ open class SessioneGdanav(private val accendi: (Context) -> Unit) : Session() {
                     NotificaGuida.davantiInAuto = true
                     PonteAuto.notificaDaCapo()
                     PonteAuto.inAuto(true)
+                    RendererMappa.inVista(true)
                     PosizioneInAuto.riprova()
                 }
 
@@ -72,6 +73,8 @@ open class SessioneGdanav(private val accendi: (Context) -> Unit) : Session() {
                     NotificaGuida.davantiInAuto = false
                     PonteAuto.notificaDaCapo()
                     PonteAuto.inAuto(false)
+                    // Sull'auto c'è un'altra app: la scena 3D smette di disegnare.
+                    RendererMappa.inVista(false)
                 }
 
                 override fun onDestroy(owner: LifecycleOwner) {

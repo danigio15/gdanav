@@ -8,7 +8,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import * as THREE from 'three';
 import codiceLavoratore from 'gdanav:lavoratore';
 import { BUDGET, daDisegnare, pianoTessere } from './budget.js';
-import { Ritmo, valutaPrestazioni, valutaWebgl } from './capacita.js';
+import { intervalloPerLaSonda, livelloDiCarico, rapportoPixel, Ritmo, valutaPrestazioni, valutaWebgl } from './capacita.js';
 import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, marginiAiLati } from './geo.js';
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { AggancioStrada, SOGLIA_M } from './aggancio.js';
@@ -35,7 +35,9 @@ const VISTE = { inclinata: { pitch: 70, zoom: 17.9 }, immersiva: { pitch: 74, zo
 const ritmo = new Ritmo();
 
 function intervalloDeiFotogrammi() {
-  return ritmo.intervallo(moto.velocita);
+  // La telecamera che si muove da sé (un tasto dello zoom, l'arrivo sull'auto): fluida.
+  const svelta = !!S.transizione || performance.now() < (S.zoomSubitoFino ?? 0);
+  return ritmo.intervallo(moto.velocita, svelta);
 }
 
 /*
@@ -102,6 +104,14 @@ const S = {
   zoomVoluto: null,
   camera: { modo: 'segui', sopra: 0, sinistra: 0, destra: 0, riquadro: null },
   pausa: false,
+  /** Sull'auto c'è un'altra app (messaggio `nascosta`): non si disegna. */
+  nascosta: false,
+  /** La pagina è quella dello schermo dell'auto (`opzioni.inAuto`). */
+  inAuto: false,
+  /** Quanto può pesare la scena, dal telefono (messaggio `carico`). */
+  carico: null,
+  /** Sul telefono, con un'altra scena sull'auto (messaggio `leggera`): le regole dell'auto. */
+  leggera: false,
   grezze: new Map(),
   /** Gli edifici di Overture dall'app, per tessera: `{dati, quando}` (dati null: non ci sono). */
   edifici: new Map(),
@@ -161,7 +171,7 @@ function ricevi(grezzo) {
     return false;
   }
   // Prima dello stile non c'è la mappa: si tiene da parte.
-  if (!S.mappa && !['stile', 'opzioni', 'pausa'].includes(m.tipo)) {
+  if (!S.mappa && !['stile', 'opzioni', 'pausa', 'carico', 'nascosta', 'leggera'].includes(m.tipo)) {
     S.coda.push(m);
     return true;
   }
@@ -180,8 +190,8 @@ const GESTORI = {
     if (m.vista) S.vista = m.vista;
     if (m.icona) S.icona = m.icona;
     S.edificiDallApp = m.edifici === true;
-    ritmo.fisso30 = m.inAuto === true;
-    if (ritmo.fisso30) ritmo.svelto = false;
+    S.inAuto = m.inAuto === true;
+    aggiornaLeggerezza();
     // La freccia, se è quella scelta; l'auto del suo colore, altrimenti.
     const forma = S.icona === 'freccia' ? 'freccia' : 'auto';
     if ((m.auto && m.auto !== S.colorAuto) || forma !== (scena.formaAuto ?? 'auto')) {
@@ -324,7 +334,69 @@ const GESTORI = {
     if (!m.si) sveglia();
     else S.mappa?.stop();
   },
+  /** Dal telefono, sull'auto: il calore e il telefono in uso (vedi `fpsInAuto` e `rapportoPixel`). */
+  carico(m) {
+    S.carico = { livello: m.livello, telefono: m.telefono === true };
+    ritmo.livello = livelloDiCarico(S.carico);
+    annota('carico', JSON.stringify(S.carico), ritmo.livello);
+    aggiornaPixel();
+    sveglia();
+  },
+  /**
+   * Sul telefono, mentre sull'auto gira un'altra scena: due scene 3D intere
+   * sulla stessa scheda grafica («va lento il telefono e il navigatore»).
+   * Quella del telefono allora segue le regole dell'auto: mai sessanta
+   * fotogrammi, il passo secondo la velocità, il tetto dei pixel.
+   */
+  leggera(m) {
+    S.leggera = m.si;
+    aggiornaLeggerezza();
+    sveglia();
+  },
+  /** Sull'auto c'è un'altra app: niente fotogrammi finché GdANav non torna. */
+  nascosta(m) {
+    S.nascosta = m.si;
+    if (m.si) {
+      S.mappa?.stop();
+      return;
+    }
+    S.mappa?.triggerRepaint();
+    sveglia();
+  },
 };
+
+/** Le regole dell'auto: sull'auto, e sul telefono mentre sull'auto c'è un'altra scena. */
+const comeInAuto = () => S.inAuto || S.leggera;
+
+function aggiornaLeggerezza() {
+  ritmo.fisso30 = comeInAuto();
+  if (ritmo.fisso30) ritmo.svelto = false;
+  aggiornaPixel();
+}
+
+/**
+ * La risoluzione della tela (vedi `rapportoPixel`): sul telefono quella
+ * dello schermo, sull'auto con un tetto di pixel che scende col carico.
+ */
+function aggiornaPixel() {
+  const m = S.mappa;
+  if (!m) return;
+  const c = m.getCanvas();
+  const r = rapportoPixel({
+    dpr: window.devicePixelRatio || 1,
+    larghezza: c.clientWidth || window.innerWidth,
+    altezza: c.clientHeight || window.innerHeight,
+    inAuto: comeInAuto(),
+    livello: ritmo.livello,
+  });
+  if (Math.abs(m.getPixelRatio() - r) < 0.001) return;
+  annota('pixel', r, c.clientWidth, c.clientHeight);
+  m.setPixelRatio(r);
+  // Subito, non al prossimo giro: la tela rifatta è vuota, e per un
+  // fotogramma si vedrebbe il cielo al posto della mappa.
+  if (S.stileCaricato) m.redraw();
+  else m.triggerRepaint();
+}
 
 window.gdanav3d = {
   ricevi,
@@ -410,7 +482,7 @@ function creaMappa(stile) {
       pitch: vista.pitch,
       maxPitch: 80,
       attributionControl: false,
-      pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+      pixelRatio: rapportoPixel({ dpr: window.devicePixelRatio || 1, larghezza: window.innerWidth, altezza: window.innerHeight, inAuto: comeInAuto(), livello: ritmo.livello }),
       canvasContextAttributes: { antialias: true, preserveDrawingBuffer: new URLSearchParams(location.search).has('prova') },
       fadeDuration: 150,
     });
@@ -425,6 +497,7 @@ function creaMappa(stile) {
   // da dentro.
   mappa.setVerticalFieldOfView(OBIETTIVO_GRADI);
   S.mappa = mappa;
+  alPassoDellaScena(mappa);
   window.__mappa = mappa;
   window.__scena = scena;
   // Con gli edifici di Overture (dati ODbL) si dice anche da dove vengono.
@@ -433,6 +506,8 @@ function creaMappa(stile) {
     'top-left',
   );
   mappa.on('style.load', alloStile);
+  // Cambiata la grandezza (lo schermo diviso sull'auto), cambia il tetto dei pixel.
+  mappa.on('resize', aggiornaPixel);
   // L'attribuzione chiusa: si apre toccando la «i».
   mappa.once('load', () => mappa.getContainer().querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'));
   mappa.on('webglcontextlost', () => manda('errore', { motivo: 'contesto' }));
@@ -468,6 +543,45 @@ function creaMappa(stile) {
   setInterval(() => {
     S.sporco.traffico = true;
   }, 30000);
+}
+
+/*
+ * Sull'auto anche i disegni che MapLibre si chiede da sé vanno al passo
+ * della scena.
+ *
+ * Il passo dei fotogrammi ([intervalloDeiFotogrammi]) vale per quelli della
+ * pagina (l'auto e la telecamera che si spostano), ma MapLibre dopo ogni
+ * spostamento si ridisegna anche da solo, a ogni giro dello schermo, finché
+ * le tessere nuove e i nomi non hanno finito di comparire. Misurato su uno
+ * schermo a sessanta giri: con la scena a trenta passi al secondo, MapLibre
+ * disegnava 57 volte al secondo (e ogni disegno è un fotogramma intero,
+ * mappa e scena 3D) — il «fisso a trenta» dell'auto non lo era. Qui quei
+ * disegni aspettano il passo; le sfumature vanno a tempo, finiscono quando
+ * devono, con meno fotogrammi.
+ */
+function alPassoDellaScena(mappa) {
+  const chiedi = mappa.triggerRepaint.bind(mappa);
+  // Quando si è chiesto l'ultimo disegno (non quando è arrivato: i passi
+  // della pagina non devono slittare di un giro dello schermo ciascuno).
+  let chiesto = 0;
+  let attesa = null;
+  const ridisegna = () => {
+    chiesto = performance.now();
+    chiedi();
+  };
+  mappa.triggerRepaint = () => {
+    // Solo mentre la telecamera segue l'auto: un dito sulla mappa (sul
+    // telefono) e la panoramica che vola restano fluidi.
+    if (!comeInAuto() || S.camera.modo !== 'segui' || S.orologioProva !== undefined) return chiedi();
+    // Il passo della pagina stessa: già al suo ritmo.
+    if (nelFotogramma) return ridisegna();
+    const resta = chiesto + intervalloDeiFotogrammi() - 4 - performance.now();
+    if (resta <= 0) return ridisegna();
+    attesa ??= setTimeout(() => {
+      attesa = null;
+      ridisegna();
+    }, resta);
+  };
 }
 
 function caricaStile(stile) {
@@ -684,6 +798,8 @@ function rendererDellaMappa(m, gl) {
     r.autoClear = false;
     r.outputColorSpace = THREE.SRGBColorSpace;
     S.renderer = r;
+    // three.js si ricorda l'altezza della tela di adesso (per i punti luminosi).
+    S.pixelDelRenderer = m.getPixelRatio();
   }
   return S.renderer;
 }
@@ -726,7 +842,10 @@ function strato3d() {
       scena.scena.fog.far = P.nebbiaA * ppm;
       scena.materialeFoschia.uniforms.uNear.value = P.nebbiaDa * 0.8 * ppm;
       scena.materialeFoschia.uniforms.uFar.value = P.nebbiaA * 1.1 * ppm;
-      if (scena.mat.bagliore) scena.mat.bagliore.size = 9 * ppm;
+      // I bagliori dei lampioni sono punti, grandi in pixel secondo l'altezza
+      // della tela che three.js ha visto nascendo: se poi la risoluzione
+      // cambia (il carico sull'auto), restano grandi uguali sullo schermo.
+      if (scena.mat.bagliore) scena.mat.bagliore.size = (9 * ppm * m.getPixelRatio()) / (S.pixelDelRenderer || m.getPixelRatio());
       scena.scalaSegni(Pm.elements[5], m.getCanvas().clientHeight);
       // La camera di three.js con le matrici di questo fotogramma, per sfoltire i nomi.
       const occupati = [];
@@ -759,7 +878,7 @@ function strato3d() {
       // Appena arrivata una tessera la GPU riceve le geometrie: quei
       // fotogrammi lenti non dicono quanto va il telefono.
       if (ultimo !== null && S.anima && !S.sondato && ora - (S.ultimaTessera ?? 0) > 1500) {
-        S.intervalli.push(ora - ultimo);
+        S.intervalli.push(intervalloPerLaSonda(ora - ultimo, intervalloDeiFotogrammi()));
         if (S.intervalli.length >= 240) sonda();
       }
       ultimo = S.anima ? ora : null;
@@ -863,7 +982,7 @@ function pianificaPresto() {
 }
 
 function pianifica() {
-  if (!S.mappa || !S.stileCaricato || S.pausa) return;
+  if (!S.mappa || !S.stileCaricato || S.pausa || S.nascosta) return;
   raccogliGrezze();
   if (!S.origine) {
     const c = S.mappa.getCenter();
@@ -1685,27 +1804,35 @@ function etichetta(testo, cartello) {
 
 let richiesta = null;
 let ultimoFotogramma = 0;
+/** Dentro [fotogramma]: i disegni chiesti lì sono già al passo. */
+let nelFotogramma = false;
 
 /** Riaccende i fotogrammi (se non è in pausa). */
 function sveglia() {
-  if (richiesta || S.pausa || !S.mappa) return;
+  if (richiesta || S.pausa || S.nascosta || !S.mappa) return;
   richiesta = requestAnimationFrame(fotogramma);
 }
 
 function fotogramma(adesso) {
   richiesta = null;
   // Col tempo delle prove (i video) i fotogrammi li chiede il collaudo.
-  if (S.pausa || !S.mappa || !S.stileCaricato || S.orologioProva !== undefined) return;
+  if (S.pausa || S.nascosta || !S.mappa || !S.stileCaricato || S.orologioProva !== undefined) return;
   if (adesso - ultimoFotogramma < intervalloDeiFotogrammi() - 2) {
     richiesta = requestAnimationFrame(fotogramma);
     return;
   }
   const dt = ultimoFotogramma ? adesso - ultimoFotogramma : 0;
   ultimoFotogramma = adesso;
-  aggiornaPercorso(adesso);
-  aggiornaTraffico(adesso);
-  aggiornaSegni(adesso);
-  const ancora = muovi(adesso, dt);
+  nelFotogramma = true;
+  let ancora;
+  try {
+    aggiornaPercorso(adesso);
+    aggiornaTraffico(adesso);
+    aggiornaSegni(adesso);
+    ancora = muovi(adesso, dt);
+  } finally {
+    nelFotogramma = false;
+  }
   S.anima = ancora;
   if (ancora) richiesta = requestAnimationFrame(fotogramma);
 }
@@ -1936,7 +2063,9 @@ function diagnosi() {
     triangoli: scena.triangoli,
     budget: BUDGET.triangoli,
     msDisegno: S.msDisegno,
-    ritmo: { media: ritmo.media, passo: ritmo.passo, svelto: ritmo.svelto, auto: ritmo.fisso30 },
+    ritmo: { media: ritmo.media, passo: ritmo.passo, svelto: ritmo.svelto, auto: ritmo.fisso30, livello: ritmo.livello, leggera: S.leggera },
+    pixel: S.mappa?.getPixelRatio() ?? null,
+    nascosta: S.nascosta,
     rifatti: S.rifatti,
     intervalli: S.intervalli.length,
     auto: S.auto,

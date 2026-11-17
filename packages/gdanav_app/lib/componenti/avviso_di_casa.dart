@@ -137,6 +137,10 @@ class AzioneAvvisoDiCasa {
   final bool principale;
   final String? domanda;
   final bool daFermo;
+
+  /// Un tasto che non fa niente alla casa («Ignora», «Ok»): toccato, la
+  /// scheda si chiude e basta.
+  bool get innocuo => _innocui.contains(id);
 }
 
 /// Un avviso di casa, già ridotto per la guida.
@@ -422,16 +426,27 @@ String? _domanda(String id, CategoriaAvvisoDiCasa c, String p) => switch (id) {
 }
 
 /// La coda degli avvisi: uno in vista (o il gruppo), gli altri dietro.
+///
+/// Un urgente resta finché non lo si tocca, ma non per sempre: dopo
+/// [etaMassimaUrgenti] se ne va da solo (resta fra le notifiche del
+/// telefono), così l'allarme di ieri non ricompare al viaggio di oggi. E
+/// se lo schermo dell'auto lo toglie senza che nessuno l'abbia toccato si
+/// mette da parte ([mettiDaParte]): fa passare quelli dopo, e sul telefono
+/// torna in vista quando non c'è altro.
 class CodaAvvisiDiCasa extends ChangeNotifier {
   CodaAvvisiDiCasa({
     SceltaAvvisiDiCasa scelta = const SceltaAvvisiDiCasa(),
     this.durata = const Duration(seconds: 8),
     this.raggruppaDa = 3,
+    this.etaMassimaUrgenti = const Duration(minutes: 15),
     this.onAzione,
     this.onVoce,
-  }) : _sceltaOra = scelta;
+    DateTime Function()? orologio,
+  }) : _sceltaOra = scelta,
+       _ora = orologio ?? DateTime.now;
 
   SceltaAvvisiDiCasa _sceltaOra;
+  final DateTime Function() _ora;
 
   /// Quali passano. Cambiandola, quelli in attesa che non passano più se ne
   /// vanno.
@@ -441,11 +456,16 @@ class CodaAvvisiDiCasa extends ChangeNotifier {
     final prima = _chiave;
     _urgenti.removeWhere((a) => !s.mostra(a));
     _altre.removeWhere((a) => !s.mostra(a));
+    _daParte.removeWhere((a) => !s.mostra(a));
     _cambiato(prima);
   }
 
   /// Quanto resta in vista un avviso «info» (un importante il doppio).
   final Duration durata;
+
+  /// Quanto può restare un urgente che nessuno tocca, prima di andarsene da
+  /// solo ([scartaVecchi]).
+  final Duration etaMassimaUrgenti;
 
   /// Da quanti avvisi non urgenti insieme si fa il gruppo.
   final int raggruppaDa;
@@ -459,14 +479,29 @@ class CodaAvvisiDiCasa extends ChangeNotifier {
 
   final _urgenti = <AvvisoDiCasa>[];
   final _altre = <AvvisoDiCasa>[];
+
+  /// Gli urgenti messi da parte ([mettiDaParte]): dietro a tutti gli altri.
+  final _daParte = <AvvisoDiCasa>[];
+
+  /// Quando è arrivato ogni urgente, per la sua età ([scartaVecchi]).
+  final _arrivati = <String, DateTime>{};
   AzioneAvvisoDiCasa? _daConfermare;
   bool _aperto = false;
   DateTime? _da;
+
+  /// Come [_da], ma letto dall'orologio della coda (nelle prove, finto).
+  DateTime? _daOrologio;
   Timer? _timer;
 
   /// L'avviso in vista da solo: il primo urgente, o il primo degli altri se
-  /// sono meno di [raggruppaDa].
-  AvvisoDiCasa? get attuale => _urgenti.firstOrNull ?? (_altre.length < raggruppaDa ? _altre.firstOrNull : null);
+  /// sono meno di [raggruppaDa]; quando non c'è altro, un urgente messo da
+  /// parte.
+  AvvisoDiCasa? get attuale =>
+      _urgenti.firstOrNull ?? (_altre.length < raggruppaDa ? _altre.firstOrNull ?? _daParte.firstOrNull : null);
+
+  /// Se [id] è un urgente messo da parte ([mettiDaParte]): sullo schermo
+  /// dell'auto non torna.
+  bool daParte(String id) => _daParte.any((a) => a.id == id);
 
   /// Il gruppo in vista: gli avvisi non urgenti, quando sono tanti.
   List<AvvisoDiCasa>? get gruppo => _urgenti.isEmpty && _altre.length >= raggruppaDa ? List.unmodifiable(_altre) : null;
@@ -480,7 +515,7 @@ class CodaAvvisiDiCasa extends ChangeNotifier {
   /// Quanti aspettano dietro quello in vista.
   int get inCoda {
     if (gruppo != null) return 0;
-    return _urgenti.length + _altre.length - 1;
+    return _urgenti.length + _altre.length + _daParte.length - 1;
   }
 
   /// Da quando è in vista quello attuale (per la barra del tempo).
@@ -498,6 +533,16 @@ class CodaAvvisiDiCasa extends ChangeNotifier {
     };
   }
 
+  /// Quanto resta ancora in vista quello attuale, da adesso; `null`: finché
+  /// non lo si tocca. Per lo schermo dell'auto, che conta per conto suo.
+  Duration? get resta {
+    final t = tempo;
+    final da = _daOrologio;
+    if (t == null || da == null) return t;
+    final r = t - _ora().difference(da);
+    return r < const Duration(seconds: 1) ? const Duration(seconds: 1) : r;
+  }
+
   /// Cosa si vede adesso: quando cambia, il tempo riparte.
   String? get _chiave => switch ((attuale, gruppo)) {
     (final a?, _) => a.id,
@@ -509,11 +554,15 @@ class CodaAvvisiDiCasa extends ChangeNotifier {
   void aggiungi(AvvisoDiCasa avviso) {
     if (!_sceltaOra.mostra(avviso)) return;
     final prima = _chiave;
+    _togliVecchi();
     final primoUrgente = _urgenti.firstOrNull?.id;
     _urgenti.removeWhere((a) => a.id == avviso.id);
     _altre.removeWhere((a) => a.id == avviso.id);
+    // Rimandato dalla casa: non è più «da parte», torna come nuovo.
+    _daParte.removeWhere((a) => a.id == avviso.id);
     if (avviso.urgente) {
       _urgenti.add(avviso);
+      _arrivati[avviso.id] = _ora();
       // Un urgente nuovo chiude la domanda di quello che era in vista.
       if (primoUrgente == null) _daConfermare = null;
     } else {
@@ -586,6 +635,8 @@ class CodaAvvisiDiCasa extends ChangeNotifier {
       _altre.clear();
     } else if (_altre.isNotEmpty) {
       _altre.removeAt(0);
+    } else if (_daParte.isNotEmpty) {
+      _daParte.removeAt(0);
     }
     _daConfermare = null;
     _cambiato(prima, sempre: true);
@@ -594,11 +645,44 @@ class CodaAvvisiDiCasa extends ChangeNotifier {
   /// Via tutti, in silenzio: la guida è finita. Restano fra le notifiche del
   /// telefono.
   void svuota() {
-    if (_urgenti.isEmpty && _altre.isEmpty) return;
+    if (_urgenti.isEmpty && _altre.isEmpty && _daParte.isEmpty) return;
     final prima = _chiave;
     _urgenti.clear();
     _altre.clear();
+    _daParte.clear();
     _cambiato(prima);
+  }
+
+  /// L'urgente [id] non è più sullo schermo dell'auto, e nessuno l'ha
+  /// toccato (l'auto l'ha tolto da sola, o un altro avviso l'ha scalzato):
+  /// non deve tenere fermi quelli dopo. Va dietro a tutti: sul telefono
+  /// torna in vista quando non c'è altro, sull'auto no ([daParte]). Vale
+  /// solo per chi non ha un tempo suo: gli altri se ne vanno da soli.
+  void mettiDaParte(String id) {
+    final i = _urgenti.indexWhere((a) => a.id == id);
+    if (i < 0) return;
+    final prima = _chiave;
+    _daParte.add(_urgenti.removeAt(i));
+    if (i == 0) _daConfermare = null;
+    _cambiato(prima);
+  }
+
+  /// Toglie gli urgenti più vecchi di [etaMassimaUrgenti]: restano fra le
+  /// notifiche del telefono. Si guarda a ogni arrivo, e quando qualcuno
+  /// torna a guardare (lo schermo dell'auto che si accende, la mappa che
+  /// torna davanti).
+  void scartaVecchi() {
+    final prima = _chiave;
+    if (_togliVecchi()) _cambiato(prima);
+  }
+
+  bool _togliVecchi() {
+    final limite = _ora().subtract(etaMassimaUrgenti);
+    bool vecchio(AvvisoDiCasa a) => _arrivati[a.id]?.isBefore(limite) ?? false;
+    final quanti = _urgenti.length + _daParte.length;
+    _urgenti.removeWhere(vecchio);
+    _daParte.removeWhere(vecchio);
+    return _urgenti.length + _daParte.length != quanti;
   }
 
   /// Toglie un avviso solo, dal gruppo aperto.
@@ -611,11 +695,15 @@ class CodaAvvisiDiCasa extends ChangeNotifier {
   void _cambiato(String? prima, {bool sempre = false}) {
     final dopo = _chiave;
     if (gruppo == null) _aperto = false;
+    // Gli orari d'arrivo solo di chi c'è ancora.
+    _arrivati.removeWhere((id, _) => !_urgenti.any((a) => a.id == id) && !_daParte.any((a) => a.id == id));
     if (dopo != prima || sempre) {
       _daConfermare = null;
       _da = dopo == null ? null : DateTime.now();
+      _daOrologio = dopo == null ? null : _ora();
       _avvia();
-      final frase = attuale?.voce;
+      // Uno messo da parte che torna in vista è già stato detto.
+      final frase = dopo != null && daParte(dopo) ? null : attuale?.voce;
       if (dopo != null && dopo != prima && frase != null) onVoce?.call(frase);
     }
     notifyListeners();
@@ -626,6 +714,7 @@ class CodaAvvisiDiCasa extends ChangeNotifier {
     final t = tempo;
     if (t == null || _chiave == null) return;
     _da = DateTime.now();
+    _daOrologio = _ora();
     _timer = Timer(t, chiudi);
   }
 

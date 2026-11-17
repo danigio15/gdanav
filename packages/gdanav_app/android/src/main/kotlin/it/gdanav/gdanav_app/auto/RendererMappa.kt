@@ -133,6 +133,7 @@ class RendererMappa(
             DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY,
         )
         display = d
+        vivi.add(this)
         val cambiata = contenitore.width != larghezza || contenitore.height != altezza
         larghezza = contenitore.width
         altezza = contenitore.height
@@ -213,6 +214,7 @@ class RendererMappa(
     }
 
     override fun onSurfaceDestroyed(contenitore: SurfaceContainer) {
+        vivi.remove(this)
         principale.removeCallbacks(torna)
         principale.removeCallbacks(chiudi)
         principale.removeCallbacks(contaTraffico)
@@ -629,6 +631,8 @@ class RendererMappa(
                 principale.post {
                     stato3dDetto = null
                     diciLoStato3d()
+                    // La pagina c'è: se l'auto mostra un'altra app, lo sa.
+                    if (scena === nuova) diciLaVista()
                 }
             }
             spegniFotogrammi()
@@ -1134,7 +1138,29 @@ class RendererMappa(
         }
     }
 
+    /** Alla pagina 3D: se GdANav si vede sull'auto ([inVista]). */
+    private fun diciLaVista() {
+        val s = scena ?: return
+        s.esegui("window.gdanav3d&&window.gdanav3d.ricevi({v:1,tipo:'nascosta',si:${!vistoSullAuto}})")
+    }
+
     companion object {
+        /*
+         * GdANav si vede sull'auto: la sessione è avviata. Con un'altra app a
+         * tutto schermo sull'auto (la musica, il telefono) la sessione si
+         * ferma, ma la superficie può restare: la scena 3D continuava a
+         * disegnare trenta fotogrammi al secondo che nessuno vedeva.
+         */
+        private var vistoSullAuto = true
+        private val vivi = mutableSetOf<RendererMappa>()
+
+        /** Dalla sessione ([SessioneGdanav]), sul filo principale. */
+        fun inVista(si: Boolean) {
+            if (si == vistoSullAuto) return
+            vistoSullAuto = si
+            for (r in vivi) r.diciLaVista()
+        }
+
         private const val VUOTA = "{\"type\":\"FeatureCollection\",\"features\":[]}"
         private const val SORGENTE_IO = "gdanav-io"
         private const val SORGENTE_PERCORSO = "gdanav-percorso"

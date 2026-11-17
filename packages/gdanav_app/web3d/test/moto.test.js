@@ -70,6 +70,33 @@ test('ferma e arrivata', () => {
   assert.ok(!m.fermo);
 });
 
+test('al semaforo, ferma un poco avanti alla lettura, è arrivata: la scena smette di disegnare', () => {
+  const m = new Moto();
+  // Andando a 15 m/s, poi il GPS dice ferma (e la freccia è già un poco oltre).
+  let t = 0;
+  for (let i = 0; i < 5; i++) {
+    m.posizione({ metri: 100 + 15 * i, v: 15, quando: t });
+    for (let k = 0; k < 30; k++) m.passo((t += 1000 / 30));
+  }
+  assert.ok(!m.fermo, 'andando non è ferma');
+  const dove = 100 + 15 * 4 + 2;
+  // (Da oltre i tre metri la freccia torna piano: qualche secondo.)
+  for (let i = 0; i < 12; i++) {
+    m.posizione({ metri: dove, v: 0, quando: t });
+    for (let k = 0; k < 30; k++) m.passo((t += 1000 / 30));
+  }
+  assert.ok(m.s >= dove && m.s - dove <= 3.05, `ferma entro tre metri: ${(m.s - dove).toFixed(2)}`);
+  assert.ok(m.fermo, 'ferma: niente più fotogrammi');
+  // Il GPS che da ferma balla (sotto la freccia) non la risveglia; una lettura in marcia sì.
+  for (const balla of [2, 0.5, 1.5]) {
+    m.posizione({ metri: dove + balla, v: 0, quando: t });
+    m.passo((t += 33));
+    assert.ok(m.fermo, `il GPS a ${balla} m`);
+  }
+  m.posizione({ metri: dove + 1, v: 4, quando: t });
+  assert.ok(!m.fermo);
+});
+
 test('senza percorso: x, y e la rotta', () => {
   const m = new Moto();
   m.posizione({ metri: null, v: 10, x: 0, y: 0, rotta: 90, quando: 0 });

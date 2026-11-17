@@ -122,8 +122,14 @@ internal class Scena3dLontana(
                 manda(Message.obtain(null, Scena3dServizio.MISURA, w, h))
             }
         }
+        /* Senza BIND_IMPORTANT: con lui il processo della scena saliva alla
+         * priorità dell'app davanti, e col telefono in mano («se lo utilizzo
+         * va lento il telefono e il navigatore») la scena dell'auto si
+         * prendeva il processore come l'app che si stava usando. Legato e
+         * visibile sull'auto il processo resta vivo e non va in fondo alla
+         * fila; quanto disegna lo decide la pagina ([CaricoScena3d]). */
         legata = try {
-            app.bindService(Intent(app, Scena3dServizio::class.java), legame, Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT)
+            app.bindService(Intent(app, Scena3dServizio::class.java), legame, Context.BIND_AUTO_CREATE)
         } catch (e: Exception) {
             Log.w(Scena3dServizio.TAG, "il servizio della scena non si lega", e)
             false

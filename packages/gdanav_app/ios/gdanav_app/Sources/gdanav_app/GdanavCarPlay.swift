@@ -78,7 +78,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         no: String,
         azione: @escaping () -> Void
     ) {
-        guard let t = attuale?.modello else { return }
+        guard let io = attuale, let t = io.modello else { return }
         let alert = CPNavigationAlert(
             titleVariants: [titolo],
             subtitleVariants: [sotto],
@@ -87,11 +87,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
             secondaryAction: CPAlertAction(title: no, style: .cancel) { _ in },
             duration: 15
         )
-        if t.currentNavigationAlert != nil {
-            t.dismissNavigationAlert(animated: false) { _ in t.present(navigationAlert: alert, animated: true) }
-        } else {
-            t.present(navigationAlert: alert, animated: true)
-        }
+        io.metti(alert, in: t)
     }
 
     private var controllore: CPInterfaceController?
@@ -121,11 +117,65 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     private var stradaMostrata: String?
     private weak var avvisoStrada: CPNavigationAlert?
 
-    /// L'avviso di casa mostrato (id e se era la domanda), il suo avviso di
-    /// CarPlay finché si vede, e se è stato chiuso da un suo tasto.
-    private var casaMostrata: String?
-    private weak var avvisoCasa: CPNavigationAlert?
-    private var casaToccata = false
+    /// La scena di CarPlay, per sapere se è davanti (non il Dashboard, non
+    /// un'altra app sullo schermo dell'auto).
+    private weak var scena: CPTemplateApplicationScene?
+
+    /// L'ultimo avviso dato a CarPlay e non ancora confermato (`didShow`), e
+    /// quando: due dati insieme, e il secondo non farebbe niente ([metti]).
+    private weak var inVolo: CPNavigationAlert?
+    private var inVoloDa: TimeInterval = 0
+
+    // L'avviso di casa su CarPlay ([mostraAvvisoCasa]).
+
+    /// Di quale avviso ci si sta occupando (`AvvisoCasaAuto.chiave`), e da
+    /// quando lo si conosce.
+    private var casaVoluta: String?
+    private var casaVistaDa: TimeInterval = 0
+
+    /// Il suo avviso di CarPlay: dato a CarPlay, in vista o in attesa che
+    /// CarPlay lo confermi. Coi dati di quando è stato dato.
+    private var avvisoCasa: CPNavigationAlert?
+    private var casaDati: AvvisoCasaAuto?
+
+    /// CarPlay ha detto che si vede (`didShow`), e quando.
+    private var casaConfermata = false
+    private var casaConfermatoA: TimeInterval = 0
+
+    /// Quando è stato dato a CarPlay, per quanto, e fino a quando CarPlay lo
+    /// tiene.
+    private var casaDatoA: TimeInterval = 0
+    private var casaDurata: TimeInterval = 0
+    private var casaFinoA: TimeInterval = 0
+
+    /// Da quando CarPlay non lo tiene più sullo schermo senza averlo detto.
+    private var casaSparitoDa: TimeInterval?
+
+    /// Il titolo e il testo che mostra.
+    private var casaTitolo = ""
+    private var casaTesto = ""
+
+    /// Se è stato chiuso da un suo tasto (uno per ogni avviso dato).
+    private var casaTocco = Tocco()
+
+    /// Per questo avviso su CarPlay non c'è più niente da fare: toccato,
+    /// scaduto, o ci si è arresi.
+    private var casaFinita = false
+
+    /// Si è visto almeno una volta; quante volte CarPlay non l'ha mostrato
+    /// di fila; quante volte un altro avviso l'ha tolto.
+    private var casaVistoMai = false
+    private var casaTentativi = 0
+    private var casaScalzate = 0
+
+    /// Un nostro avviso di casa che non serve più si sta togliendo, e da quando.
+    private var casaRitiroDa: TimeInterval?
+
+    /// Uno ritirato prima che CarPlay lo mettesse: se arriva, si toglie.
+    private weak var casaRitirato: CPNavigationAlert?
+
+    /// Quando è in programma la prossima occhiata all'avviso di casa (0: mai).
+    private var casaSveglia: TimeInterval = 0
 
     /// La musica (il lettore di sistema): a ogni cambio si rifanno i tasti.
     private var ascoltoMusica: UUID?
@@ -138,6 +188,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         to window: CPWindow
     ) {
         GdanavCarPlay.attuale = self
+        scena = templateApplicationScene
         controllore = interfaceController
         finestra = window
         let m = MappaCarPlay()
@@ -187,9 +238,21 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         modello = nil
         controllore = nil
         finestra = nil
+        scena = nil
+        // L'avviso di casa finisce con la sessione: alla prossima il telefono
+        // rimanda quello di allora, se c'è (`in_auto`).
+        dimenticaAvvisoCasa()
+        PonteAuto.shared.fineSessione()
         if GdanavCarPlay.attuale === self { GdanavCarPlay.attuale = nil }
         PonteAuto.shared.chiedi("in_auto", ["si": false])
         GdanavCarPlay.alCollegamento?(false)
+    }
+
+    /// La mappa di GdANav torna davanti sullo schermo dell'auto (dal
+    /// Dashboard, da un'altra app): un avviso di casa dato mentre era dietro
+    /// si guarda adesso se c'è.
+    public func sceneDidBecomeActive(_ scene: UIScene) {
+        mostraAvvisoCasa()
     }
 
     // MARK: - Le novità dal telefono
@@ -205,6 +268,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
         mostraStrada()
         mostraAvvisoCasa()
         if !GdanavCarPlay.pannelliSullaMappa { avvisaLaSosta() }
+        chiediLaMusica()
         // I tasti si rifanno solo se cambia qualcosa che mostrano.
         if PonteAuto.shared.versioneModello != versione {
             versione = PonteAuto.shared.versioneModello
@@ -254,13 +318,18 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                 tasto(titolo: "C'è ancora") { PonteAuto.shared.ancora(id, si: true) },
                 tasto(titolo: "No") { PonteAuto.shared.ancora(id, si: false) },
             ]
-        } else if ponte.guida != nil, LettoreDiSistema.shared.daMostrare {
-            // In guida con la musica: ⏯ e ⏭, come la barra di Mappe. Apple
-            // non vuole tasti disegnati sulla mappa, e il brano lo mostra la
-            // scheda «In riproduzione» di CarPlay. La lente passa nel Menu.
-            let suona = LettoreDiSistema.shared.brano?.suona == true
+        } else if LettoreDiSistema.shared.daMostrare, let brano = LettoreDiSistema.shared.brano {
+            // Con la Musica di Apple in ascolto, in guida e a mappa libera: ⏯
+            // e ⏭, come la barra di Mappe. Solo se è davvero lei a suonare (o
+            // l'abbiamo messa in pausa da qui): con un'altra app in ascolto
+            // (Spotify), o con la Musica ferma da prima, restano «Cerca» e la
+            // casa — un ▶ farebbe partire un brano vecchio e zittirebbe
+            // l'altra. Apple non vuole tasti disegnati sulla mappa, e il brano
+            // lo mostra la scheda «In riproduzione» di CarPlay. In guida la
+            // lente passa nel Menu; a mappa libera la lente e la casa restano
+            // nei tasti di lato (`mapButtons`).
             sinistra = [
-                tasto(suona ? "pause.fill" : "play.fill") { LettoreDiSistema.shared.comando("playPausa") },
+                tasto(brano.suona ? "pause.fill" : "play.fill") { LettoreDiSistema.shared.comando("playPausa") },
                 tasto("forward.fill") { LettoreDiSistema.shared.comando("successivo") },
             ]
         } else {
@@ -648,6 +717,80 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
                 duration: 8
             )
         }
+        metti(alert, in: t)
+    }
+
+    // MARK: - L'avviso di casa
+
+    /// Dopo quanto, senza un `didShow`, un avviso dato a CarPlay non si è visto.
+    private static let attesaConferma: TimeInterval = 2.5
+
+    /// Quanto si lascia a CarPlay per mettere un avviso prima di dargliene un altro.
+    private static let attesaVolo: TimeInterval = 0.8
+
+    /// Quanto si aspetta che CarPlay tolga un avviso ritirato.
+    private static let attesaRitiro: TimeInterval = 1.5
+
+    /// Un avviso che CarPlay non tiene più, senza averlo detto: lo si crede dopo questo tempo.
+    private static let attesaSparito: TimeInterval = 1
+
+    /// Meno di così CarPlay non tiene un avviso (`CPNavigationAlertMinimumDuration`).
+    private static let durataMinima: TimeInterval = 5
+
+    /// Con meno tempo di così davanti non vale la pena mostrarlo.
+    private static let restoMinimo: TimeInterval = 1.5
+
+    /// Quanto si aspetta CarPlay oltre la durata, prima di darlo per finito.
+    private static let margineFine: TimeInterval = 3
+
+    /// Quante volte di fila si riprova se CarPlay non lo mostra, e quante
+    /// volte si rimette dopo che un altro avviso l'ha tolto.
+    private static let tentativiAlPiu = 3
+    private static let scalzateAlPiu = 3
+
+    /// Quanto CarPlay tiene un avviso che sul telefono non ha un tempo suo:
+    /// l'urgente dieci minuti, la domanda «Sì / No» mezzo minuto, come su
+    /// Android Auto (`SchermoNavigazione.mostraAvvisoCasa`).
+    private static let durataUrgente: TimeInterval = 600
+    private static let durataDomanda: TimeInterval = 30
+
+    /// Ogni quanto si riguarda, mentre si aspetta che la mappa torni in cima
+    /// o che l'avviso di un altro finisca.
+    private static let ogniTanto: TimeInterval = 2
+
+    private static func adesso() -> TimeInterval { ProcessInfo.processInfo.systemUptime }
+
+    /// Se la mappa è lo schermo in cima, senza niente sopra (il Menu, la
+    /// ricerca, la casa, un avviso a tutto schermo): solo lì un avviso di
+    /// navigazione si vede.
+    private var mappaInCima: Bool {
+        guard let c = controllore, let t = modello else { return false }
+        return c.topTemplate === t && c.presentedTemplate == nil
+    }
+
+    /// Se la mappa di GdANav è davanti sullo schermo dell'auto (non il
+    /// Dashboard, non un'altra app).
+    private var scenaDavanti: Bool { scena?.activationState == .foregroundActive }
+
+    /// Dà un avviso a CarPlay. CarPlay ne tiene uno alla volta, e un `present`
+    /// con un altro avviso in vista non fa niente: prima via quello che c'è
+    /// (se è l'avviso di casa, torna quando questo finisce:
+    /// [mostraAvvisoCasa]). Se un altro è stato dato un attimo fa e CarPlay
+    /// non l'ha ancora messo, questo aspetta quell'attimo: dati insieme, il
+    /// secondo si perderebbe.
+    private func metti(_ alert: CPNavigationAlert, in t: CPMapTemplate) {
+        let ora = GdanavCarPlay.adesso()
+        if t.currentNavigationAlert == nil, let altro = inVolo, altro !== alert,
+           ora - inVoloDa < GdanavCarPlay.attesaVolo
+        {
+            DispatchQueue.main.asyncAfter(deadline: .now() + GdanavCarPlay.attesaVolo) { [weak self, weak t] in
+                guard let self, let t, self.modello === t else { return }
+                self.metti(alert, in: t)
+            }
+            return
+        }
+        inVolo = alert
+        inVoloDa = ora
         if t.currentNavigationAlert != nil {
             t.dismissNavigationAlert(animated: false) { _ in t.present(navigationAlert: alert, animated: true) }
         } else {
@@ -656,62 +799,355 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     }
 
     /// Un avviso di casa (dentro GdAHome): un avviso di navigazione, come
-    /// quelli di Mappe, coi tasti scelti dal telefono (al più due). Gli
-    /// urgenti restano finché non li si chiude (durata 0); gli altri se ne
-    /// vanno da soli. Il tasto torna al telefono, che fa la domanda «Sì / No»
-    /// se serve e poi lo passa a GdAHome.
+    /// quelli di Mappe, coi tasti scelti dal telefono (al più due). Il tasto
+    /// torna al telefono, che fa la domanda «Sì / No» se serve e poi lo passa
+    /// a GdAHome.
+    ///
+    /// Qui si confronta quello che il telefono vuole in vista
+    /// (`PonteAuto.avvisoCasa`) con quello che CarPlay ha davvero sullo
+    /// schermo, e si fa quel che manca. Si richiama a ogni novità, quando
+    /// CarPlay mostra o toglie un avviso, e da sé finché aspetta qualcosa.
+    ///
+    /// - **Mostrato solo se CarPlay lo conferma** (`didShow`). Se non lo
+    ///   conferma si riprova, al più tre volte; con un altro schermo sopra la
+    ///   mappa (il Menu, la casa) non si prova nemmeno, e lo si dà quando la
+    ///   mappa torna in cima.
+    /// - **Lo stesso avviso, uguale, non si ripresenta**: il telefono lo
+    ///   rimanda a ogni `in_auto`. Con un altro titolo o testo (il gruppo «3
+    ///   notifiche» che diventa 4) si aggiorna quello in vista.
+    /// - **Uno alla volta.** Un altro avviso (un messaggio, la strada
+    ///   proposta, «Quasi a casa») toglie quello di casa, che **torna** quando
+    ///   l'altro finisce, col tempo che gli resta. Arrivando con un altro
+    ///   avviso in vista, l'urgente gli passa davanti; gli altri aspettano
+    ///   che finisca. Tornando non scalza mai nessuno, e dopo tre volte di
+    ///   fila ci si arrende: niente giri.
+    /// - **Il tempo.** `secondi` è quello che resta sul telefono. L'urgente e
+    ///   la domanda, che sul telefono non scadono, qui durano dieci minuti e
+    ///   mezzo minuto.
+    /// - **Quando se ne va da solo.** Chi ha un tempo suo sparisce e basta:
+    ///   ci pensa il telefono. Per l'urgente e la domanda — scaduti qui, mai
+    ///   mostrati dopo tre prove, tolti troppe volte — lo si dice al telefono
+    ///   (`_scaduto`, [PonteAuto.casaScaduta]), una volta sola: l'urgente va
+    ///   da parte e passano quelli dopo, la domanda torna all'avviso. Da lì
+    ///   in poi per quell'avviso qui non si fa più niente ([casaFinita]),
+    ///   finché il telefono non ne manda un altro.
     private func mostraAvvisoCasa() {
         guard let t = modello else { return }
-        let a = PonteAuto.shared.avvisoCasa
-        let chiave = a.map { "\($0.id)|\($0.conferma)" }
-        guard chiave != casaMostrata else { return }
-        casaMostrata = chiave
-        guard let a else {
-            if let v = avvisoCasa, t.currentNavigationAlert === v {
-                t.dismissNavigationAlert(animated: true) { _ in }
-            }
-            avvisoCasa = nil
+        let ora = GdanavCarPlay.adesso()
+        guard let a = PonteAuto.shared.avvisoCasa else {
+            // Il telefono non ne ha più: via anche da qui.
+            casaVoluta = nil
+            ritiraAvvisoCasa(da: t)
             return
         }
+        if a.chiave != casaVoluta {
+            // Un altro avviso (o lo stesso diventato la domanda): via quello
+            // di prima, e questo da capo.
+            ritiraAvvisoCasa(da: t)
+            casaVoluta = a.chiave
+            casaVistaDa = ora
+            casaFinita = false
+            casaVistoMai = false
+            casaTentativi = 0
+            casaScalzate = 0
+        }
+        guard !casaFinita else { return }
+        if let v = avvisoCasa {
+            // Già dato a CarPlay. Lo stesso con un altro testo si aggiorna.
+            if a.titolo != casaTitolo || a.testo != casaTesto {
+                casaTitolo = a.titolo
+                casaTesto = a.testo
+                v.updateTitleVariants([a.titolo], subtitleVariants: a.testo.isEmpty ? [] : [a.testo])
+            }
+            let sulloSchermo = t.currentNavigationAlert === v
+            if sulloSchermo, !casaConfermata { casaConfermato() }
+            if casaConfermata {
+                if ora > casaFinoA + GdanavCarPlay.margineFine {
+                    // CarPlay doveva averlo già tolto, e non ha detto niente:
+                    // finito, come allo scadere.
+                    finisciCasa(a)
+                    ritiraAvvisoCasa(da: t)
+                    return
+                }
+                if sulloSchermo {
+                    casaSparitoDa = nil
+                    return
+                }
+                // Dietro (il Dashboard, un altro schermo sopra) non si giudica.
+                guard scenaDavanti, mappaInCima else { return }
+                // CarPlay non lo tiene più. Di solito lo sta per dire
+                // (`didDismiss`): gli si lascia un attimo.
+                guard let da = casaSparitoDa else {
+                    casaSparitoDa = ora
+                    rivediCasa(tra: GdanavCarPlay.attesaSparito)
+                    return
+                }
+                let manca = da + GdanavCarPlay.attesaSparito - ora
+                if manca > 0 {
+                    rivediCasa(tra: manca)
+                    return
+                }
+                // Tolto senza dirlo: come scalzato da un altro avviso.
+                casaScalzato()
+            } else {
+                // In attesa che CarPlay dica che si vede.
+                let manca = casaDatoA + GdanavCarPlay.attesaConferma - ora
+                if manca > 0 {
+                    rivediCasa(tra: manca)
+                    return
+                }
+                // Dato mentre la mappa era dietro, magari è uscito come
+                // notifica: si guarda quando torna davanti.
+                guard scenaDavanti else { return }
+                // CarPlay non l'ha mostrato.
+                avvisoCasa = nil
+                casaDati = nil
+                casaRitirato = v
+                casaTentativi += 1
+            }
+        }
+        // Da dare a CarPlay: la prima volta, o di nuovo.
+        if let da = casaRitiroDa {
+            let manca = da + GdanavCarPlay.attesaRitiro - ora
+            if manca > 0 {
+                rivediCasa(tra: manca)
+                return
+            }
+            casaRitiroDa = nil
+        }
+        let scade: TimeInterval
+        if let secondi = a.secondi {
+            scade = a.arrivato + TimeInterval(secondi)
+        } else {
+            scade = casaVistaDa + (a.conferma ? GdanavCarPlay.durataDomanda : GdanavCarPlay.durataUrgente)
+        }
+        let resta = scade - ora
+        guard resta >= GdanavCarPlay.restoMinimo,
+              casaTentativi < GdanavCarPlay.tentativiAlPiu,
+              casaScalzate <= GdanavCarPlay.scalzateAlPiu
+        else {
+            // Il suo tempo è passato, o CarPlay non lo vuole: ci si arrende.
+            finisciCasa(a)
+            return
+        }
+        guard mappaInCima else {
+            rivediCasa(tra: GdanavCarPlay.ogniTanto)
+            return
+        }
+        if t.currentNavigationAlert != nil {
+            // Sullo schermo c'è l'avviso di un altro. L'urgente che non si è
+            // ancora visto gli passa davanti; chi torna, e chi non è urgente,
+            // aspetta che finisca (`didDismiss`).
+            guard a.urgente, !casaVistoMai, casaScalzate == 0 else {
+                rivediCasa(tra: GdanavCarPlay.ogniTanto)
+                return
+            }
+        } else if inVolo != nil, ora - inVoloDa < GdanavCarPlay.attesaVolo {
+            // Un altro è appena stato dato a CarPlay: prima quello.
+            rivediCasa(tra: GdanavCarPlay.attesaVolo)
+            return
+        }
+        daiACarPlay(a, per: resta, in: t)
+    }
+
+    private func daiACarPlay(_ a: AvvisoCasaAuto, per resta: TimeInterval, in t: CPMapTemplate) {
+        let tocco = Tocco()
         func azione(_ x: AvvisoCasaAuto.Tasto) -> CPAlertAction {
             let stile: CPAlertAction.Style = x.principale ? .default : .cancel
-            return CPAlertAction(title: x.etichetta, style: stile) { [weak self] _ in
-                self?.casaToccata = true
+            return CPAlertAction(title: x.etichetta, style: stile) { _ in
+                tocco.fatto = true
                 PonteAuto.shared.tastoCasa(a.id, x.id)
             }
         }
-        let primo = a.tasti.first.map(azione) ?? CPAlertAction(title: "Chiudi", style: .cancel) { [weak self] _ in
-            self?.casaToccata = true
+        let primo = a.tasti.first.map(azione) ?? CPAlertAction(title: "Chiudi", style: .cancel) { _ in
+            tocco.fatto = true
             PonteAuto.shared.tastoCasa(a.id, "_chiudi")
         }
+        let durata = max(resta, GdanavCarPlay.durataMinima)
         let alert = CPNavigationAlert(
             titleVariants: [a.titolo],
             subtitleVariants: a.testo.isEmpty ? [] : [a.testo],
             image: a.icona,
             primaryAction: primo,
             secondaryAction: a.tasti.count > 1 ? azione(a.tasti[1]) : nil,
-            duration: TimeInterval(a.secondi ?? 0)
+            duration: durata
         )
-        casaToccata = false
+        let ora = GdanavCarPlay.adesso()
         avvisoCasa = alert
-        if t.currentNavigationAlert != nil {
-            t.dismissNavigationAlert(animated: false) { _ in t.present(navigationAlert: alert, animated: true) }
-        } else {
-            t.present(navigationAlert: alert, animated: true)
+        casaDati = a
+        casaTocco = tocco
+        casaConfermata = false
+        casaSparitoDa = nil
+        casaDatoA = ora
+        casaDurata = durata
+        casaFinoA = ora + durata
+        casaTitolo = a.titolo
+        casaTesto = a.testo
+        metti(alert, in: t)
+        rivediCasa(tra: GdanavCarPlay.attesaConferma + 0.1)
+    }
+
+    /// CarPlay ha il nostro avviso di casa sullo schermo.
+    private func casaConfermato() {
+        let ora = GdanavCarPlay.adesso()
+        casaConfermata = true
+        casaConfermatoA = ora
+        casaVistoMai = true
+        casaTentativi = 0
+        casaFinoA = ora + casaDurata
+    }
+
+    /// L'avviso di casa non è più sullo schermo e nessuno l'ha chiuso: un
+    /// altro avviso gli ha preso il posto, o CarPlay l'ha tolto. Resta da
+    /// mostrare, e torna quando si può ([mostraAvvisoCasa]). Si contano le
+    /// volte una dietro l'altra: se era rimasto in vista un po', da capo.
+    private func casaScalzato() {
+        let rimasto = casaConfermata && GdanavCarPlay.adesso() - casaConfermatoA >= GdanavCarPlay.durataMinima
+        casaScalzate = rimasto ? 1 : casaScalzate + 1
+        avvisoCasa = nil
+        casaDati = nil
+        casaConfermata = false
+        casaSparitoDa = nil
+    }
+
+    /// Su CarPlay questo avviso è finito senza che nessuno lo toccasse. Chi
+    /// sul telefono non ha un tempo suo (l'urgente, la domanda) lo si dice al
+    /// telefono, che non lo aspetta più; gli altri se ne vanno col loro tempo.
+    private func finisciCasa(_ a: AvvisoCasaAuto) {
+        casaFinita = true
+        if a.secondi == nil { PonteAuto.shared.casaScaduta(a.id, conferma: a.conferma) }
+    }
+
+    /// Toglie dallo schermo il nostro avviso di casa, che non serve più. Da
+    /// qui quello che CarPlay dice di lui non conta.
+    private func ritiraAvvisoCasa(da t: CPMapTemplate) {
+        guard let v = avvisoCasa else { return }
+        avvisoCasa = nil
+        casaDati = nil
+        casaConfermata = false
+        casaSparitoDa = nil
+        guard t.currentNavigationAlert === v else {
+            // Non è (ancora) sullo schermo: se CarPlay lo mette adesso, lo si
+            // toglie (`didShow`).
+            casaRitirato = v
+            return
+        }
+        casaRitiroDa = GdanavCarPlay.adesso()
+        t.dismissNavigationAlert(animated: PonteAuto.shared.avvisoCasa == nil) { [weak self] _ in
+            guard let self else { return }
+            self.casaRitiroDa = nil
+            self.mostraAvvisoCasa()
         }
     }
 
-    /// Un avviso di casa chiuso a mano su CarPlay (non da un suo tasto, non
-    /// scaduto): via anche dal telefono.
+    /// CarPlay si è scollegato: dell'avviso di casa non resta niente.
+    private func dimenticaAvvisoCasa() {
+        casaVoluta = nil
+        avvisoCasa = nil
+        casaDati = nil
+        casaConfermata = false
+        casaFinita = false
+        casaSparitoDa = nil
+        casaRitiroDa = nil
+        casaRitirato = nil
+        casaSveglia = 0
+        inVolo = nil
+    }
+
+    /// Un'altra occhiata all'avviso di casa fra [secondi]; se ce n'è già una
+    /// in programma prima, basta quella.
+    private func rivediCasa(tra secondi: TimeInterval) {
+        let fra = max(secondi, 0.05)
+        let ora = GdanavCarPlay.adesso()
+        if casaSveglia > ora, casaSveglia <= ora + fra { return }
+        casaSveglia = ora + fra
+        DispatchQueue.main.asyncAfter(deadline: .now() + fra) { [weak self] in
+            guard let self else { return }
+            if self.casaSveglia <= GdanavCarPlay.adesso() + 0.02 { self.casaSveglia = 0 }
+            self.mostraAvvisoCasa()
+        }
+    }
+
+    /// CarPlay ha messo un avviso sullo schermo: solo adesso quello di casa è
+    /// «mostrato».
+    public func mapTemplate(_ mapTemplate: CPMapTemplate, didShow navigationAlert: CPNavigationAlert) {
+        if navigationAlert === inVolo { inVolo = nil }
+        if navigationAlert === avvisoCasa {
+            casaConfermato()
+        } else if navigationAlert === casaRitirato {
+            // Ritirato prima che CarPlay lo mettesse: non serve più.
+            casaRitirato = nil
+            casaRitiroDa = GdanavCarPlay.adesso()
+            mapTemplate.dismissNavigationAlert(animated: false) { [weak self] _ in
+                guard let self else { return }
+                self.casaRitiroDa = nil
+                self.mostraAvvisoCasa()
+            }
+        }
+    }
+
+    /// CarPlay ha tolto un avviso. Se era quello di casa: chiuso a mano (non
+    /// da un suo tasto), via anche dal telefono; scaduto, finito; tolto per
+    /// far posto a un altro, torna quando l'altro finisce. In ogni caso lo
+    /// schermo è cambiato: si riguarda se tocca all'avviso di casa.
     public func mapTemplate(
         _ mapTemplate: CPMapTemplate,
         didDismiss navigationAlert: CPNavigationAlert,
         dismissalContext: CPNavigationAlert.DismissalContext
     ) {
-        guard navigationAlert === avvisoCasa, dismissalContext == .userDismissed, !casaToccata,
-            let id = PonteAuto.shared.avvisoCasa?.id
-        else { return }
-        PonteAuto.shared.tastoCasa(id, "_chiudi")
+        if navigationAlert === inVolo { inVolo = nil }
+        if navigationAlert === avvisoCasa {
+            let dati = casaDati
+            let tocco = casaTocco
+            switch dismissalContext {
+            case .userDismissed:
+                casaFinita = true
+                // Il tasto toccato lo dice da sé al telefono, e può dirlo un
+                // attimo dopo: solo se non è stato un tasto, «chiudi».
+                if let id = dati?.id {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        if !tocco.fatto { PonteAuto.shared.tastoCasa(id, "_chiudi") }
+                    }
+                }
+            case .timeout:
+                if let dati {
+                    finisciCasa(dati)
+                } else {
+                    casaFinita = true
+                }
+            default:
+                // Tolto per far posto a un altro avviso (`systemDismissed`):
+                // tornerà.
+                casaScalzato()
+            }
+            avvisoCasa = nil
+            casaDati = nil
+            casaConfermata = false
+            casaSparitoDa = nil
+        }
+        mostraAvvisoCasa()
+    }
+
+    /// Con la mappa di GdANav dietro (il Dashboard, un'altra app sullo
+    /// schermo dell'auto) CarPlay chiede se l'avviso va mostrato come
+    /// notifica: sì per l'avviso di casa e per la strada proposta, che
+    /// altrimenti non si vedrebbero; gli altri (un messaggio, una
+    /// segnalazione) valgono solo sulla mappa.
+    public func mapTemplate(
+        _ mapTemplate: CPMapTemplate,
+        shouldShowNotificationFor navigationAlert: CPNavigationAlert
+    ) -> Bool {
+        navigationAlert === avvisoCasa || navigationAlert === avvisoStrada
+    }
+
+    /// Il permesso della Musica chiesto dall'auto: l'invito del telefono qui
+    /// non si vede. Da fermi, con la musica accesa, e una volta sola in tutto
+    /// (`LettoreDiSistema.chiediDallAuto`): la finestra esce sul telefono. Se
+    /// è già stato negato non si dice niente.
+    private func chiediLaMusica() {
+        let musica = LettoreDiSistema.shared
+        guard musica.daChiedereDallAuto, PonteAuto.shared.daFermi else { return }
+        musica.chiediDallAuto()
     }
 
     /// La strada a risparmio (o più rapida) proposta dal telefono: un avviso di
@@ -743,11 +1179,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
             duration: 20
         )
         avvisoStrada = alert
-        if t.currentNavigationAlert != nil {
-            t.dismissNavigationAlert(animated: false) { _ in t.present(navigationAlert: alert, animated: true) }
-        } else {
-            t.present(navigationAlert: alert, animated: true)
-        }
+        metti(alert, in: t)
     }
 
     /// La prossima sosta di ricarica, avvicinandosi (a 15 km): quello che su
@@ -767,11 +1199,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
             secondaryAction: nil,
             duration: 10
         )
-        if t.currentNavigationAlert != nil {
-            t.dismissNavigationAlert(animated: false) { _ in t.present(navigationAlert: alert, animated: true) }
-        } else {
-            t.present(navigationAlert: alert, animated: true)
-        }
+        metti(alert, in: t)
     }
 
     /// Manca la batteria: l'avviso breve sparirebbe senza lasciare niente da
@@ -843,11 +1271,7 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
             secondaryAction: nil,
             duration: 5
         )
-        if t.currentNavigationAlert != nil {
-            t.dismissNavigationAlert(animated: false) { _ in t.present(navigationAlert: alert, animated: true) }
-        } else {
-            t.present(navigationAlert: alert, animated: true)
-        }
+        metti(alert, in: t)
     }
 
     // MARK: - Spostare la mappa
@@ -880,4 +1304,11 @@ public final class GdanavCarPlay: UIResponder, CPTemplateApplicationSceneDelegat
     public func mapTemplateDidDismissPanningInterface(_ mapTemplate: CPMapTemplate) {
         mappa?.segui()
     }
+}
+
+/// Se un avviso di casa è stato chiuso da un suo tasto: uno per ogni avviso
+/// dato a CarPlay, così quello che arriva in ritardo da un avviso di prima
+/// non si confonde con quello in vista.
+private final class Tocco {
+    var fatto = false
 }

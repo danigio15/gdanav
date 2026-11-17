@@ -72,6 +72,20 @@ la mappa scarica già (OpenFreeMap, schema OpenMapTiles).
   alberi né lampioni, oltre la nebbia niente; al più 900 000 triangoli. Si
   disegna solo quando qualcosa si muove, al più 30 fotogrammi al secondo, e
   niente con l'app in secondo piano.
+- **Sull'auto** (`src/capacita.js`): i fotogrammi seguono la velocità (15
+  a passo d'uomo, 20 sotto i trenta all'ora, 30 più svelti; ferma e
+  assestata nessuno), anche quelli che MapLibre si chiede da sé
+  (`alPassoDellaScena`), e la tela ha al più 1,5 milioni di pixel (su uno
+  schermo da 2000×1100 la scena si fa a 1600×880 e il browser la porta alla
+  grandezza dello schermo). Il telefono dice quanto può pesare (messaggio
+  `carico`, da `CaricoScena3d.kt`: il calore di Android e il telefono in
+  uso) e la scena scende fino a 10 fotogrammi e 0,55 milioni di pixel; con
+  un'altra app sull'auto (messaggio `nascosta`) non disegna. La sonda dei
+  fotogrammi conta rispetto al passo voluto (`intervalloPerLaSonda`):
+  quindici voluti non sono un telefono lento.
+- **Sul telefono con la scena anche sull'auto** (messaggio `leggera`, da
+  `Regia3d.sullAuto`): la scena del telefono segue le regole dell'auto, così
+  le due scene non si contendono la scheda grafica a sessanta fotogrammi.
 - Senza rete resta la scena già fatta (le tessere costruite si tengono).
 
 L'app parla con la pagina coi messaggi di `src/messaggi.js` (lo stesso

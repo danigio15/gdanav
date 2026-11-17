@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import '../componenti/tachimetro.dart';
+import '../componenti/avviso_di_casa.dart' show SchedaAvvisoDiCasa;
 import '../componenti/avvisi_in_guida.dart';
+import '../componenti/mini_lettore.dart' show InvitoMusica, MiniLettore;
 import '../componenti/scheda_auto.dart';
 import '../componenti/vetro.dart';
 import '../mappa/controllo_mappa.dart';
@@ -90,7 +93,14 @@ class SchermataPrincipale extends StatefulWidget {
     this.vociOspite = const [],
     this.soloImpostazioni = false,
     this.chiudiImpostazioni,
+    this.ospitata = false,
   });
+
+  /// GdANav sta dentro un'altra app (GdAHome), come una sua sezione: lo dice
+  /// [GdanavDentro]. Lì il motore può girare senza schermo (acceso dall'auto,
+  /// col telefono in tasca), e allora la mappa non è «in vista» finché l'app
+  /// non è davvero davanti.
+  final bool ospitata;
 
   /// Solo le impostazioni, in una pagina, senza la mappa: chi ospita GdANav
   /// le apre quando il navigatore è sullo schermo dell'auto, e sul telefono
@@ -207,6 +217,9 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
       if (ok) widget.posizione.avvia();
     });
     segnalazioni.avvia();
+    // La mappa davanti: gli avvisi di casa passano anche senza percorso
+    // ([_diciSeInVista], la prima volta da `didChangeDependencies`).
+    _vita = AppLifecycleListener(onStateChange: (_) => _diciSeInVista());
     widget.guida.addListener(_guidaDaFuori);
     widget.apriIlMenu?.addListener(_menuDaFuori);
     widget.apriIlPianificatore?.addListener(_pianificatoreDaFuori);
@@ -252,6 +265,58 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   }
 
   var _inGuida = false;
+  AppLifecycleListener? _vita;
+
+  /// Se questa schermata si vede: chi ospita GdANav tiene le sezioni
+  /// nascoste con gli orologi fermi (`TickerMode`), e così fa il navigatore
+  /// con le pagine sotto quella in cima. Lo si ascolta, senza farsi
+  /// ricostruire a ogni cambio (la mappa non cambia aspetto per questo).
+  ValueListenable<TickerModeData>? _orologi;
+
+  void _seguiGliOrologi() {
+    if (widget.soloImpostazioni) return;
+    final nuovi = TickerMode.getValuesNotifier(context);
+    if (!identical(nuovi, _orologi)) {
+      _orologi?.removeListener(_inVistaFraPoco);
+      _orologi = nuovi..addListener(_inVistaFraPoco);
+    }
+    _inVistaFraPoco();
+  }
+
+  /// Gli orologi cambiano mentre lo schermo si sta ricostruendo: quello che
+  /// ne segue (la coda degli avvisi che si svuota, e chi la mostra che si
+  /// rifà) aspetta che abbia finito.
+  void _inVistaFraPoco() => scheduleMicrotask(() {
+    if (mounted) _diciSeInVista();
+  });
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _seguiGliOrologi();
+  }
+
+  /// Spostata in un altro punto dell'albero: gli orologi possono essere altri.
+  @override
+  void activate() {
+    super.activate();
+    _seguiGliOrologi();
+  }
+
+  /// La mappa del telefono è in vista, per gli avvisi di casa a mappa
+  /// libera: l'app è davanti (`resumed`) e questa sezione si vede davvero.
+  ///
+  /// Senza uno stato del ciclo di vita (`null`) dipende: in GdANav da sola è
+  /// l'app appena aperta, o una prova, e vale; dentro un'altra app è il
+  /// motore acceso dall'auto senza schermo, e non vale. Prima valeva sempre:
+  /// a fine viaggio la coda non si svuotava mai, e l'urgente di ieri tornava
+  /// sullo schermo dell'auto al viaggio di oggi.
+  void _diciSeInVista() {
+    if (widget.soloImpostazioni) return;
+    final stato = WidgetsBinding.instance.lifecycleState;
+    final davanti = stato == AppLifecycleState.resumed || (stato == null && !widget.ospitata);
+    widget.casaInGuida?.mappaInVista(davanti && (_orologi?.value.enabled ?? true));
+  }
 
   Future<void> _avvia() async {
     if (_inGuida) return;
@@ -291,6 +356,9 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   @override
   void dispose() {
     if (!widget.soloImpostazioni) {
+      _vita?.dispose();
+      _orologi?.removeListener(_inVistaFraPoco);
+      widget.casaInGuida?.mappaInVista(false);
       widget.guida.removeListener(_guidaDaFuori);
       widget.apriIlMenu?.removeListener(_menuDaFuori);
       widget.apriIlPianificatore?.removeListener(_pianificatoreDaFuori);
@@ -766,6 +834,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
     }
     final alto = MediaQuery.paddingOf(context).top;
     final schermo = MediaQuery.sizeOf(context).height;
+    final traverso = MediaQuery.sizeOf(context).width > schermo;
     return Scaffold(
       body: Stack(
         children: [
@@ -833,21 +902,43 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
             ),
           ),
           // Senza percorso, in macchina: l'autovelox o la segnalazione che si
-          // ha davanti, come in guida.
+          // ha davanti, come in guida; sotto, l'avviso di casa (dentro
+          // GdAHome), a sinistra dei tasti della mappa.
+          // Di traverso il tachimetro sta in alto a sinistra: gli avvisi
+          // vanno in alto al centro, fra il menu e i tasti della mappa.
           Positioned(
-            left: 4,
-            right: 80,
-            top: alto + 74,
-            child: ListenableBuilder(
-              listenable: _avvisi,
-              builder: (context, _) => switch (_avvisi.davanti) {
-                (final s, final m) => AvvisoSegnalazione(
-                  key: const Key('avviso-senza-percorso'),
-                  segnalazione: s,
-                  metri: m,
+            left: traverso ? 160 : 4,
+            right: traverso ? 160 : 80,
+            top: traverso ? alto + 10 : alto + 74,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: traverso ? 440 : double.infinity),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ListenableBuilder(
+                      listenable: _avvisi,
+                      builder: (context, _) => switch (_avvisi.davanti) {
+                        (final s, final m) => AvvisoSegnalazione(
+                          key: const Key('avviso-senza-percorso'),
+                          segnalazione: s,
+                          metri: m,
+                        ),
+                        null => const SizedBox.shrink(),
+                      },
+                    ),
+                    if (widget.casaInGuida?.coda case final coda?)
+                      ListenableBuilder(
+                        listenable: Listenable.merge([viaggio, widget.posizione]),
+                        builder: (context, _) => viaggio.stato is NessunViaggio
+                            ? SchedaAvvisoDiCasa(coda: coda, inMovimento: widget.posizione.velocitaAdesso() >= 3)
+                            : const SizedBox.shrink(),
+                      ),
+                  ],
                 ),
-                null => const SizedBox.shrink(),
-              },
+              ),
             ),
           ),
           Positioned(
@@ -913,9 +1004,22 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 440),
                   child: ListenableBuilder(
-                    listenable: Listenable.merge([g, viaggio, widget.guida, _avvisi, ?widget.premium]),
+                    listenable: Listenable.merge([
+                      g,
+                      viaggio,
+                      widget.guida,
+                      _avvisi,
+                      ?widget.premium,
+                      ?widget.casaInGuida?.coda,
+                    ]),
                     builder: (context, _) {
-                      final libero = viaggio.stato is NessunViaggio && !widget.guida.attiva && _avvisi.davanti == null;
+                      final coda = widget.casaInGuida?.coda;
+                      final libero =
+                          viaggio.stato is NessunViaggio &&
+                          !widget.guida.attiva &&
+                          _avvisi.davanti == null &&
+                          coda?.attuale == null &&
+                          coda?.gruppo == null;
                       if (!libero) return const SizedBox.shrink();
                       return SchedaPianificaIViaggi(
                         gestore: g,
@@ -967,6 +1071,16 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                             onPreferito: _preferito,
                             onNuovo: () => _imposta(TipoPreferito.altro),
                             onModificaPreferito: _modificaPreferito,
+                            // La musica, come in Waze: in cima al pannello,
+                            // larga quanto lui. Non copre la mappa né i tasti,
+                            // e si sposta col pannello.
+                            musica: switch (widget.casaInGuida) {
+                              final c? when c.lettore != null => _MusicaNelPannello(
+                                casa: c,
+                                posizione: widget.posizione,
+                              ),
+                              _ => null,
+                            },
                             schedaAuto: ListenableBuilder(
                               listenable: widget.posizione,
                               builder: (context, _) => SchedaAuto(
@@ -1006,6 +1120,32 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
       ),
     );
   }
+}
+
+/// A mappa libera, in cima al pannello di partenza: il mini-lettore, o da
+/// fermi l'invito per il permesso (una volta). Con «Musica nel navigatore»
+/// spenta, o senza un lettore aperto, niente.
+class _MusicaNelPannello extends StatelessWidget {
+  const _MusicaNelPannello({required this.casa, required this.posizione});
+
+  final GestoreCasaInGuida casa;
+  final GestorePosizione posizione;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: Listenable.merge([casa, posizione, ?casa.lettore]),
+    builder: (context, _) {
+      final v = posizione.velocitaAdesso();
+      final Widget? musica = switch (casa.lettoreInGuida) {
+        final l? when !l.permesso =>
+          casa.invitoDaMostrare && v < 3 ? InvitoMusica(lettore: l, onVisto: casa.segnaInvitoVisto) : null,
+        final l? => MiniLettore(lettore: l, inMovimento: v >= 3),
+        null => null,
+      };
+      if (musica == null) return const SizedBox.shrink();
+      return Padding(padding: const EdgeInsets.only(bottom: 6), child: musica);
+    },
+  );
 }
 
 class _BottoneMappa extends StatelessWidget {
