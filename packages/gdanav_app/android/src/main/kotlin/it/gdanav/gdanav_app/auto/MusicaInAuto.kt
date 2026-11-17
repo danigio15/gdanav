@@ -70,6 +70,13 @@ object MusicaInAuto {
 }
 
 /**
+ * Quando niente suona, la pillola dice chi partirà: [etichetta] («Spotify»,
+ * o «Avvio Spotify…» mentre parte), l'[icona] dell'app al posto della
+ * copertina, e [inCorso] ▶ diventa tre puntini.
+ */
+internal class PillolaAvvio(val etichetta: String?, val icona: Bitmap?, val inCorso: Boolean)
+
+/**
  * Disegna il lettore musicale disposto da [DisposizioneMusica]: lo sfondo
  * scuro (di notte con un filo chiaro intorno, che lo stacca dalla mappa
  * scura), la copertina tagliata al centro con gli angoli tondi, i testi su
@@ -98,6 +105,10 @@ internal class DisegnoMusica(private val dp: (Float) -> Float) {
     private val titoloSolo = font(20f, true, Color.WHITE)
     private val artista = font(17f, false, CHIARO)
     private val artistaSolo = font(15f, false, CHIARO)
+    private val etichetta = font(18f, true, Color.WHITE)
+
+    /** Quanto è largo, in pixel, il nome nella pillola senza brano. */
+    fun largaEtichetta(testo: String): Float = etichetta.measureText(testo)
 
     private fun RectF.metti(r: Riq): RectF {
         set(r.l, r.t, r.r, r.b)
@@ -121,6 +132,7 @@ internal class DisegnoMusica(private val dp: (Float) -> Float) {
         notte: Boolean,
         premuta: Zona?,
         avanzamento: Float?,
+        avvio: PillolaAvvio? = null,
     ): Int {
         val box = d.box
         val raggio = if (d.forma == Forma.PILLOLA) box.h / 2f else dp(20f)
@@ -131,7 +143,7 @@ internal class DisegnoMusica(private val dp: (Float) -> Float) {
             filo.strokeWidth = dp(1.5f)
             canvas.drawRoundRect(rf.metti(box), raggio, raggio, filo)
         }
-        copertina(canvas, d, b)
+        copertina(canvas, d, b, avvio?.icona.takeIf { b == null })
 
         val brano = b?.titolo?.ifEmpty { null } ?: if (b?.suona == true) "In riproduzione" else "In pausa"
         when (d.forma) {
@@ -153,7 +165,12 @@ internal class DisegnoMusica(private val dp: (Float) -> Float) {
                     canvas.drawText(taglia(sotto, artistaSolo, d.testoLargo), d.testoX, d.lineaArtista ?: 0f, artistaSolo)
                 }
             }
-            Forma.PILLOLA -> {}
+            Forma.PILLOLA -> {
+                val nome = avvio?.etichetta
+                if (b == null && nome != null && d.lineaTitolo != null) {
+                    canvas.drawText(taglia(nome, etichetta, d.testoLargo), d.testoX, d.lineaTitolo, etichetta)
+                }
+            }
         }
 
         var pienaPx = 0
@@ -175,22 +192,26 @@ internal class DisegnoMusica(private val dp: (Float) -> Float) {
         d.playPausa?.let {
             playPausa(
                 canvas,
-                it,
+                d.discoPlay ?: it,
                 suona = b?.suona == true,
                 acceso = b?.puoPlayPausa != false,
                 premuto = premuta == Zona.PLAY_PAUSA,
                 diametro = dp(if (d.forma == Forma.APERTO) 60f else 54f),
+                inCorso = b == null && avvio?.inCorso == true,
             )
         }
         d.freccia?.let { linguetta(canvas, d, it, premuta == Zona.LINGUETTA) }
         return pienaPx
     }
 
-    /** La copertina, tagliata al centro (un'immagine larga non si schiaccia); senza, una nota. */
-    private fun copertina(canvas: Canvas, d: Disposta, b: LettoreTelefono.Brano?) {
+    /**
+     * La copertina, tagliata al centro (un'immagine larga non si schiaccia);
+     * senza brano l'[icona] dell'app che partirà; senza niente, una nota.
+     */
+    private fun copertina(canvas: Canvas, d: Disposta, b: LettoreTelefono.Brano?, icona: Bitmap?) {
         val dove = rf.metti(d.copertina)
         val raggio = if (d.forma == Forma.PILLOLA) dove.width() / 2f else dp(10f)
-        val cop: Bitmap? = b?.copertina
+        val cop: Bitmap? = b?.copertina ?: icona
         if (cop != null && !cop.isRecycled && cop.width > 0 && cop.height > 0) {
             val lato = minOf(cop.width, cop.height)
             val x0 = (cop.width - lato) / 2
@@ -223,20 +244,35 @@ internal class DisegnoMusica(private val dp: (Float) -> Float) {
         canvas.drawRect(cx - 0.6f * u, cy - 4.6f * u, cx + 3.6f * u, cy - 2.2f * u, pieno)
     }
 
-    /** ⏯: un disco bianco col triangolo o le due barre scure. */
-    private fun playPausa(canvas: Canvas, zona: Riq, suona: Boolean, acceso: Boolean, premuto: Boolean, diametro: Float) {
+    /**
+     * ⏯: un disco bianco col triangolo o le due barre scure. [inCorso]: la
+     * musica sta partendo, tre puntini al posto del triangolo (toccarlo di
+     * nuovo non fa niente).
+     */
+    private fun playPausa(
+        canvas: Canvas,
+        zona: Riq,
+        suona: Boolean,
+        acceso: Boolean,
+        premuto: Boolean,
+        diametro: Float,
+        inCorso: Boolean = false,
+    ) {
         val cx = zona.cx
         val cy = zona.cy
         val r = diametro / 2f
         pieno.color = when {
             !acceso -> Color.argb(70, 255, 255, 255)
+            inCorso -> Color.argb(200, 255, 255, 255)
             premuto -> AZZURRO
             else -> Color.WHITE
         }
         canvas.drawCircle(cx, cy, r, pieno)
         pieno.color = if (acceso) SCURO else Color.argb(150, 18, 22, 30)
         val s = r * 0.42f
-        if (suona) {
+        if (inCorso) {
+            for (i in -1..1) canvas.drawCircle(cx + i * s * 0.95f, cy, s * 0.26f, pieno)
+        } else if (suona) {
             rf.set(cx - s, cy - s, cx - s * 0.28f, cy + s)
             canvas.drawRoundRect(rf, s * 0.16f, s * 0.16f, pieno)
             rf.set(cx + s * 0.28f, cy - s, cx + s, cy + s)

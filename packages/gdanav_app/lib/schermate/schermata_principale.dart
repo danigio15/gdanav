@@ -1139,7 +1139,7 @@ class _MusicaNelPannello extends StatelessWidget {
       final Widget? musica = switch (casa.lettoreInGuida) {
         final l? when !l.permesso =>
           casa.invitoDaMostrare && v < 3 ? InvitoMusica(lettore: l, onVisto: casa.segnaInvitoVisto) : null,
-        final l? => MiniLettore(lettore: l, inMovimento: v >= 3),
+        final l? => MiniLettore(lettore: l, inMovimento: v >= 3, dallaCasa: casa.musicaDiCasa),
         null => null,
       };
       if (musica == null) return const SizedBox.shrink();

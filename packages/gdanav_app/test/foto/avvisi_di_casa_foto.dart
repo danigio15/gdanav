@@ -4,7 +4,9 @@
 /// antifurto, la domanda «Sì / No», auto in carica, il gruppo, l'allarme, chi
 /// arriva) e la musica (anche l'invito per il permesso). In verticale e di
 /// traverso, di giorno e di notte; e a mappa libera, senza percorso
-/// (`libera-…`). E la pagina «Casa e musica in guida».
+/// (`libera-…`); con niente che suona, la pillola «▶ Spotify», «Avvio
+/// Spotify…», il messaggio se non parte e la scelta dell'app (`…avvio…`). E
+/// la pagina «Casa e musica in guida», anche con «App della musica».
 ///
 /// Quelle dell'auto (Android Auto, CarPlay) stanno in
 /// `avvisi_di_casa_auto_foto.dart`.
@@ -17,7 +19,9 @@
 /// ```
 ///
 /// Gli sfondi si chiamano `verticale-giorno.png`, `orizzontale-notte.png`…;
-/// senza, la mappa resta grigia. Le copertine `copertina-1.png`….
+/// senza, la mappa resta grigia. Le copertine `copertina-1.png`…, l'icona
+/// (finta) dell'app della musica `icona-app.png`. `CASI=avvio,libera-musica`
+/// fa solo i casi il cui nome comincia così (e le impostazioni).
 library;
 
 import 'dart:io';
@@ -54,6 +58,7 @@ Future<void> _caratteri() async {
 final _dove = Platform.environment['FOTO_CASA'] ?? '../../../../collaudo/foto/avvisi-di-casa';
 final _sfondi = Platform.environment['SFONDI'];
 final _copertine = Platform.environment['COPERTINE'];
+final _soloCasi = Platform.environment['CASI']?.split(',').where((c) => c.isNotEmpty).toList();
 
 ImageProvider? _copertina(int n) {
   final f = _copertine == null ? null : File('$_copertine/copertina-$n.png');
@@ -150,6 +155,18 @@ AvvisoDiCasa _marta() => _da({
   'testo': 'Alle 08:05 · in casa: Marta, nonno Piero',
 });
 
+ImageProvider? _iconaApp() {
+  final f = _copertine == null ? null : File('$_copertine/icona-app.png');
+  return f != null && f.existsSync() ? MemoryImage(f.readAsBytesSync()) : null;
+}
+
+final _spotify = AppDellaMusica(pacchetto: ElencoAppMusica.spotify, nome: 'Spotify', icona: _iconaApp());
+final _installate = [
+  _spotify,
+  const AppDellaMusica(pacchetto: 'it.esempio.radio', nome: 'Radio Lungomare'),
+  const AppDellaMusica(pacchetto: 'com.google.android.apps.youtube.music', nome: 'YouTube Music'),
+];
+
 final _brani = [
   BranoInAscolto(
     titolo: 'Strade di notte',
@@ -179,6 +196,7 @@ typedef _Caso = ({
   bool senzaPermesso,
   bool libera,
   String? tocca,
+  String? avvio,
 });
 
 _Caso _caso(
@@ -193,6 +211,7 @@ _Caso _caso(
   bool senzaPermesso = false,
   bool libera = false,
   String? tocca,
+  String? avvio,
 }) => (
   nome: nome,
   avvisi: avvisi,
@@ -205,6 +224,7 @@ _Caso _caso(
   senzaPermesso: senzaPermesso,
   libera: libera,
   tocca: tocca,
+  avvio: avvio,
 );
 
 final _casi = <_Caso>[
@@ -229,6 +249,14 @@ final _casi = <_Caso>[
   _caso('libera-musica-lavatrice', () => [_lavatrice()], musica: true, libera: true),
   _caso('libera-antifurto-da-fermo', () => [_antifurto()], musica: true, fermo: true, libera: true),
   _caso('libera-invito-da-fermo', () => [], musica: true, fermo: true, senzaPermesso: true, libera: true),
+  // Niente che suona: «▶ Spotify», «Avvio Spotify…», non partito, e senza
+  // un'app da far partire la scelta (da fermi).
+  _caso('libera-avvio-spotify', () => [], musica: true, fermo: true, libera: true, avvio: 'pillola'),
+  _caso('libera-avvio-in-corso', () => [], musica: true, fermo: true, libera: true, avvio: 'in-avvio'),
+  _caso('libera-avvio-non-partito', () => [], musica: true, libera: true, avvio: 'non-partito', soloVerticale: true),
+  _caso('libera-avvio-scegli', () => [], musica: true, fermo: true, libera: true, avvio: 'scegli', soloVerticale: true),
+  _caso('avvio-spotify', () => [], musica: true, avvio: 'pillola'),
+  _caso('avvio-in-corso', () => [], musica: true, avvio: 'in-avvio'),
 ];
 
 void main() {
@@ -241,6 +269,7 @@ void main() {
       for (final caso in _casi) {
         if (caso.soloVerticale && !verticale) continue;
         if (caso.soloGiorno && notte) continue;
+        if (_soloCasi case final solo? when !solo.any(caso.nome.startsWith)) continue;
         testWidgets('${caso.nome}, $verso, $luce', (tester) async {
           preparaPiattaforma(portachiavi: impostazioniComplete);
           final a = await ambiente(
@@ -265,7 +294,14 @@ void main() {
           final fondo = file != null && file.existsSync() ? MemoryImage(file.readAsBytesSync()) : null;
           final coda = CodaAvvisiDiCasa(durata: const Duration(seconds: 9));
           final lettore = caso.musica
-              ? LettoreFinto(brani: _brani, preferite: _preferite, permesso: !caso.senzaPermesso)
+              ? LettoreFinto(
+                  brani: caso.avvio == null ? _brani : const [],
+                  app: caso.avvio == null ? 'Spotify' : null,
+                  preferite: _preferite,
+                  permesso: !caso.senzaPermesso,
+                  prossima: caso.avvio == 'scegli' ? null : _spotify,
+                  appInstallate: _installate,
+                )
               : null;
           addTearDown(() => lettore?.dispose());
           final casa = GestoreCasaInGuida(archivio: a.archivio, coda: coda, lettore: lettore);
@@ -290,6 +326,9 @@ void main() {
             if (b.copertina case final c?) {
               await tester.runAsync(() => precacheImage(c, tester.element(find.byType(Scaffold).first)));
             }
+          }
+          if (_spotify.icona case final i?) {
+            await tester.runAsync(() => precacheImage(i, tester.element(find.byType(Scaffold).first)));
           }
           a.posizione.avvia();
           a.auto.manuale.imposta(90);
@@ -329,6 +368,22 @@ void main() {
             await tester.pump();
             await tester.pump(const Duration(milliseconds: 400));
           }
+          switch (caso.avvio) {
+            case 'in-avvio':
+              lettore!
+                ..inAvvio = true
+                ..nomeInAvvio = 'Spotify'
+                ..notifyListeners();
+            case 'non-partito':
+              lettore!
+                ..esito = 'Spotify non è partito: aprilo quando sei fermo'
+                ..notifyListeners();
+            case 'scegli':
+              await tester.tap(find.byKey(const Key('lettore-avvio')));
+              await tester.pump();
+              await tester.pump(const Duration(milliseconds: 600));
+          }
+          await tester.pump(const Duration(milliseconds: 300));
           if (caso.chiusa) {
             await tester.tap(find.byKey(const Key('lettore-richiudi')));
             await tester.pump();
@@ -346,17 +401,23 @@ void main() {
     }
   }
 
-  // La pagina delle impostazioni, alta quanto serve per vederla tutta.
-  for (final notte in [false, true]) {
+  // La pagina delle impostazioni, alta quanto serve per vederla tutta: senza
+  // il permesso della musica, e col permesso e «App della musica».
+  for (final (notte, conPermesso) in [(false, false), (true, false), (false, true), (true, true)]) {
     final luce = notte ? 'notte' : 'giorno';
-    testWidgets('impostazioni, $luce', (tester) async {
+    final nome = conPermesso ? 'impostazioni-app-della-musica-$luce' : 'impostazioni-$luce';
+    testWidgets('impostazioni${conPermesso ? ' con l\'app della musica' : ''}, $luce', (tester) async {
       tester.view
-        ..physicalSize = const Size(390 * 3, 1840 * 3)
+        ..physicalSize = Size(390 * 3, (conPermesso ? 2200 : 1840) * 3)
         ..devicePixelRatio = 3
         ..padding = const FakeViewPadding(top: 47 * 3, bottom: 34 * 3);
       addTearDown(tester.view.reset);
       preparaPiattaforma();
-      final lettore = LettoreFinto(permesso: false);
+      final lettore = LettoreFinto(
+        permesso: conPermesso,
+        appInstallate: _installate,
+        ultima: 'com.google.android.apps.youtube.music',
+      );
       addTearDown(lettore.dispose);
       final casa = GestoreCasaInGuida(archivio: Archivio(), coda: CodaAvvisiDiCasa(), lettore: lettore);
       addTearDown(casa.dispose);
@@ -374,8 +435,11 @@ void main() {
         home: NotificheNelNavigatoreSchermata(gestore: casa),
       );
       await tester.pumpWidget(_conBarra(pagina, verticale: true, notte: notte));
+      if (_spotify.icona case final i?) {
+        await tester.runAsync(() => precacheImage(i, tester.element(find.byType(Scaffold).first)));
+      }
       await tester.pumpAndSettle();
-      await expectLater(find.byKey(const Key('foto')), matchesGoldenFile('$_dove/telefono-impostazioni-$luce.png'));
+      await expectLater(find.byKey(const Key('foto')), matchesGoldenFile('$_dove/telefono-$nome.png'));
     });
   }
 }

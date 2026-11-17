@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Una playlist, per Android Auto. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M3,6h12v2H3V6zm0,4h12v2H3v-2zm0,4h8v2H3v-2zm14,-8h4v2h-2v8.5c0,1.4 -1.1,2.5 -2.5,2.5S14,17.9 14,16.5s1.1,-2.5 2.5,-2.5c0.2,0 0.3,0 0.5,0.1V6z"/>
+</vector>

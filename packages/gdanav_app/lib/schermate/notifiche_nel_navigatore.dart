@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../componenti/avviso_di_casa.dart';
 import '../componenti/mini_lettore.dart';
+import '../componenti/musica_di_casa.dart';
 import '../stato/gestore_casa_in_guida.dart';
 
 /// «Casa e musica in guida»: gli avvisi di casa sopra la mappa (dentro
@@ -11,7 +12,9 @@ import '../stato/gestore_casa_in_guida.dart';
 ///   categoria. Gli urgenti (fumo, acqua, gas, l'allarme) passano sempre, se
 ///   l'interruttore è acceso.
 /// - «Musica nel navigatore», acceso di serie; senza il permesso del
-///   telefono, la spiegazione e «Consenti».
+///   telefono, la spiegazione e «Consenti». Su Android, col permesso, «App
+///   della musica»: quale app fa partire ▶ quando niente suona (Spotify di
+///   serie, se c'è).
 ///
 /// Quello che non arriva al telefono non arriva nemmeno qui: le notifiche si
 /// scelgono, casa per casa, nella pagina «Notifiche» di GdAHome.
@@ -41,6 +44,11 @@ class NotificheNelNavigatoreSchermata extends StatelessWidget {
           final accesi = gestore.avvisiAccesi;
           final lettore = gestore.lettore;
           final iPhone = lettore?.fonte == FonteMusica.sistema;
+          // Far partire la musica da zero: solo dove si può (Android).
+          final avvio = switch (lettore) {
+            final AvvioDellaMusica a when a.puoAvviare && lettore!.permesso && gestore.musica => a,
+            _ => null,
+          };
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
             children: [
@@ -120,13 +128,52 @@ class NotificheNelNavigatoreSchermata extends StatelessWidget {
                   tasto: 'Consenti',
                   onTap: lettore.chiediPermesso,
                 ),
+              if (gestore.musicaDiCasa case final casa?) ...[
+                titolo('Musica di casa'),
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: ListTile(
+                    key: const Key('musica-di-casa'),
+                    leading: const Icon(Icons.home_rounded),
+                    title: const Text('Dalla casa'),
+                    subtitle: const Text('Le radio preferite e le playlist della plancia, da ascoltare in auto'),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => mostraDallaCasa(context, casa),
+                  ),
+                ),
+                nota(
+                  iPhone
+                      ? 'Le radio suonano qui nel telefono, e in CarPlay si vedono in «In riproduzione». Le playlist '
+                            'di Spotify si aprono nell\'app, da fermo; quelle di Sonos e di Music Assistant si suonano '
+                            'solo sui lettori di casa, e da qui le puoi far partire lì.'
+                      : 'Le radio suonano nel navigatore, anche in Android Auto (Menu › Musica di casa), coi tasti del '
+                            'volante. Le playlist di Spotify partono nell\'app senza aprirla; quelle di Sonos e di Music '
+                            'Assistant si suonano solo sui lettori di casa, e da qui le puoi far partire lì.',
+                ),
+              ],
+              if (avvio != null) ...[
+                titolo('App della musica'),
+                Card(
+                  key: const Key('app-della-musica'),
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: SceltaAppDellaMusica(avvio: avvio, conDettagli: true),
+                  ),
+                ),
+                nota(
+                  'Quando niente suona, il tasto play del navigatore (sul telefono e in Android Auto) fa partire '
+                  'questa app, anche se è chiusa, e di solito riprende da dove eri. Se non parte, sul telefono da '
+                  'fermo si apre l\'app; in auto mai.',
+                ),
+              ],
               nota(
                 iPhone
-                    ? 'Sull\'iPhone un\'app non può comandare le altre: qui si vede la Musica di Apple. Spotify '
-                          'arriverà più avanti. In CarPlay «Play/pausa» e «Avanti» stanno nella barra del '
-                          'navigatore; il brano lo mostra la scheda «In riproduzione» di CarPlay.'
-                    : 'In Android Auto «Play/pausa» e «Avanti» stanno fra i tasti del navigatore, e il brano in '
-                          'alto sulla mappa; i comandi completi restano quelli dell\'auto.',
+                    ? 'Sull\'iPhone un\'app non può comandare le altre né farle partire: qui si vede la Musica '
+                          'di Apple. Spotify arriverà più avanti. In CarPlay «Play/pausa» e «Avanti» stanno nella '
+                          'barra del navigatore; il brano lo mostra la scheda «In riproduzione» di CarPlay.'
+                    : 'In Android Auto il brano e i tasti stanno nel lettore in alto sulla mappa (o fra i tasti del '
+                          'navigatore, sulle auto che non si toccano); i comandi completi restano quelli dell\'auto.',
               ),
             ],
           );

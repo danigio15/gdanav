@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- La musica di casa, per Android Auto: una casa con una nota dentro. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M12,3L2,11.5h3V21h14v-9.5h3L12,3zM15,10.2v5.6c0,1.2 -1,2.2 -2.2,2.2s-2.2,-1 -2.2,-2.2 1,-2.2 2.2,-2.2c0.3,0 0.5,0 0.7,0.1V8.5H15z"/>
+</vector>

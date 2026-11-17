@@ -10,7 +10,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.media.AudioManager
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
@@ -21,7 +20,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
-import android.view.KeyEvent
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -102,22 +100,61 @@ object LettoreTelefono {
     @Volatile var brano: Brano? = null
         private set
 
-    /** Se l'auto deve mostrare il brano: accesa, col permesso, e qualcosa da dire. */
-    val daMostrare: Boolean get() = acceso && permesso && brano != null
+    /**
+     * Se l'auto deve mostrare il brano: accesa, col permesso, e qualcosa da
+     * dire; o la musica di casa che suona qui ([LettoreDiCasa]), che non
+     * chiede né il permesso né l'interruttore: l'ha fatta partire chi guida.
+     */
+    val daMostrare: Boolean get() = (acceso && permesso || mostraCasa) && brano != null
+
+    /**
+     * Il brano è quello della musica di casa ([LettoreDiCasa]): suona, o è in
+     * pausa e nessun'altra app suona al suo posto. Allora i tasti vanno a lei.
+     */
+    @Volatile var mostraCasa = false
+        private set
 
     /**
      * Se l'auto mette i comandi della musica (nel lettore sulla mappa, o ⏯ in
      * alto sulle auto che non mandano i tocchi): accesa e col permesso, anche
-     * se nessuna app ha un lettore aperto. Allora ⏯ fa come il tasto play del
-     * volante ([comando]): il sistema riprende l'ultima app che suonava, e
-     * appena suona arrivano il brano e gli altri tasti.
+     * se nessuna app ha un lettore aperto. Allora ▶ fa partire l'app della
+     * musica ([prossima], «▶ Spotify»: vedi [AvvioMusica]), e appena suona
+     * arrivano il brano e gli altri tasti.
      */
-    val conTasti: Boolean get() = acceso && permesso
+    val conTasti: Boolean get() = acceso && permesso || mostraCasa
+
+    /**
+     * L'app che ▶ fa partire quando niente suona (quella scelta nelle
+     * impostazioni, Spotify di serie, l'ultima che ha suonato), col nome e
+     * l'icona; `null` se non se ne sa nessuna.
+     */
+    val prossima: AvvioMusica.App?
+        get() {
+            val ctx = contesto ?: return null
+            return if (conTasti) AvvioMusica.prossima(ctx) else null
+        }
+
+    /** Si sta facendo partire la musica: «Avvio Spotify…». */
+    val inAvvio: Boolean get() = AvvioMusica.inCorso != null
+
+    /** L'app che si sta facendo partire, se se ne sa quale. */
+    val appInAvvio: AvvioMusica.App? get() = AvvioMusica.inCorso?.app
+
+    /** Il nome dell'app che si sta facendo partire. */
+    val nomeInAvvio: String? get() = appInAvvio?.nome
+
+    /** Un avvio che non è partito: il messaggio da dire una volta. */
+    val esito: AvvioMusica.Esito? get() = AvvioMusica.esito
 
     /** Manca solo il permesso: la musica è accesa, l'«Accesso alle notifiche» no. */
     val senzaPermesso: Boolean get() = acceso && !permesso
 
     private val principale = Handler(Looper.getMainLooper())
+
+    init {
+        // La musica di casa cambia (parte, brano nuovo, pausa): si rilegge.
+        LettoreDiCasa.ascolta { principale.post { programma() } }
+    }
 
     /** La compressione della copertina, fuori dal filo principale. */
     private val lavoro = Executors.newSingleThreadExecutor()
@@ -199,8 +236,86 @@ object LettoreTelefono {
                     risultato.success(null)
                 }
                 "comando" -> {
-                    comando(call.arguments as? String ?: "")
+                    comando(call.arguments as? String ?: "", dallAuto = false)
                     risultato.success(null)
+                }
+                // ▶ con niente che suona, dalla pillola del telefono:
+                // `{da_fermi}` (da fermi, all'ultimo si può aprire l'app).
+                "parti" -> {
+                    val daFermi = (call.arguments as? Map<*, *>)?.get("da_fermi") == true
+                    if (conTasti) AvvioMusica.parti(ctx, dallAuto = false, daFermi = daFermi)
+                    risultato.success(stato())
+                }
+                // L'elenco per «App della musica» nelle impostazioni.
+                "appDellaMusica" -> risultato.success(elencoApp(ctx))
+                "scegliApp" -> {
+                    AvvioMusica.scegli(ctx, call.arguments as? String)
+                    leggiSubito()
+                    risultato.success(elencoApp(ctx))
+                }
+                "esitoDetto" -> {
+                    (call.arguments as? Number)?.let {
+                        AvvioMusica.esitoDetto(it.toInt())
+                        if (it.toInt() == ID_ERRORE_CASA) LettoreDiCasa.erroreDetto()
+                    }
+                    risultato.success(null)
+                }
+                // La musica di casa (`lib/componenti/musica_di_casa.dart`):
+                // l'elenco per lo schermo dell'auto, e da suonare qui.
+                "casa" -> {
+                    MusicaDiCasa.aggiorna(call.arguments)
+                    avvisaLAuto()
+                    risultato.success(null)
+                }
+                "suonaFlussi" -> {
+                    val a = call.arguments as? Map<*, *>
+                    val voci = (a?.get("voci") as? List<*>).orEmpty().mapNotNull { v ->
+                        val m = v as? Map<*, *> ?: return@mapNotNull null
+                        val url = m["url"] as? String ?: return@mapNotNull null
+                        val byte = m["immagine"] as? ByteArray
+                        LettoreDiCasa.Flusso(
+                            id = m["id"] as? String ?: url,
+                            titolo = m["titolo"] as? String ?: "",
+                            sotto = m["sotto"] as? String ?: "",
+                            url = url,
+                            mime = m["mime"] as? String,
+                            immagine = LettoreDiCasa.immagine(byte),
+                            immagineByte = byte,
+                        )
+                    }
+                    val esito = LettoreDiCasa.suona(
+                        ctx,
+                        voci,
+                        (a?.get("da") as? Number)?.toInt() ?: 0,
+                        a?.get("nome") as? String,
+                        a?.get("radio") == true,
+                    )
+                    leggiSubito()
+                    risultato.success(mapOf("esito" to esito, "stato" to stato()))
+                }
+                "suonaNellApp" -> {
+                    val a = call.arguments as? Map<*, *>
+                    val app = a?.get("app") as? String
+                    val esito = if (app == null) {
+                        "Non c'è l'app"
+                    } else {
+                        AvvioMusica.suonaNellApp(
+                            ctx,
+                            app,
+                            a["uri"] as? String,
+                            a["cerca"] as? String,
+                            a["titolo"] as? String ?: "",
+                            dallAuto = false,
+                            daFermi = a["da_fermi"] == true,
+                        )
+                    }
+                    leggiSubito()
+                    risultato.success(mapOf("esito" to esito, "stato" to stato()))
+                }
+                "fermaCasa" -> {
+                    LettoreDiCasa.ferma()
+                    leggiSubito()
+                    risultato.success(stato())
                 }
                 else -> risultato.notImplemented()
             }
@@ -426,6 +541,7 @@ object LettoreTelefono {
         aggiornaPermesso(context)
         val g = context.getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager
         if (!si || !permesso || g == null) {
+            AvvioMusica.annulla()
             stacca()
             programma()
             return
@@ -442,6 +558,9 @@ object LettoreTelefono {
             }
         }
         sessioni(g, context)?.let { scegli(it) }
+        // Le app della musica possono essere cambiate (una installata, la
+        // scelta fatta sul telefono): quella di ▶ si riguarda.
+        AvvioMusica.rileggi(context)
     }
 
     /** Si smette di ascoltare i lettori. */
@@ -456,6 +575,7 @@ object LettoreTelefono {
     /** Il sistema dice che il permesso non c'è: come spento, finché non torna. */
     private fun permessoTolto() {
         permesso = false
+        AvvioMusica.annulla()
         stacca()
         programma()
     }
@@ -468,11 +588,36 @@ object LettoreTelefono {
         null
     }
 
-    /** Fra i lettori aperti, quello che suona; se nessuno suona, il primo. */
-    private fun scegli(elenco: List<MediaController>) {
+    /**
+     * Fra i lettori aperti, quello che suona; se nessuno suona, il primo.
+     * Mentre parte un'app ([AvvioMusica]) si tiene il suo, anche se il
+     * sistema non lo mette ancora fra gli attivi.
+     */
+    private fun scegli(tutte: List<MediaController>) {
+        // La nostra sessione (la musica di casa) la si legge da [LettoreDiCasa].
+        val elenco = tutte.filter { it.packageName != contesto?.packageName }
+        sessioniAttive = elenco
         val suona = elenco.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
-        val scelto = suona ?: elenco.firstOrNull { it.packageName == controllore?.packageName } ?: elenco.firstOrNull()
+        val stessa = elenco.firstOrNull { it.packageName == controllore?.packageName }
+        val dellAvvio = controllore?.takeIf { AvvioMusica.eDellAvvio(it) }
+        val scelto = suona ?: stessa ?: dellAvvio ?: elenco.firstOrNull()
         cambiaControllore(scelto)
+    }
+
+    /**
+     * La sessione dell'app che si sta facendo partire, dal suo
+     * `MediaBrowserService` ([AvvioMusica]): agganciata subito, così il
+     * pannello mostra brano e tasti appena suona. Se un'altra app sta già
+     * suonando, resta quella.
+     */
+    internal fun aggancia(c: MediaController) {
+        if (brano?.suona == true && controllore?.packageName != c.packageName) return
+        cambiaControllore(c)
+    }
+
+    /** L'avvio della musica è cambiato (partito, in corso, non partito): lo si dice a chi guarda. */
+    internal fun avvioCambiato() {
+        principale.post { avvisa() }
     }
 
     private fun cambiaControllore(nuovo: MediaController?) {
@@ -526,7 +671,25 @@ object LettoreTelefono {
 
     private const val OGNI_MS = 250L
 
+    /** L'`esito_id` di un flusso di casa che non si sente (gli avvii hanno id da 1 in su). */
+    private const val ID_ERRORE_CASA = -7
+
     private fun leggi() {
+        // La musica di casa, se suona o se nessun'altra app suona al suo posto.
+        val altraSuona = controllore != null && statoLettore?.state == PlaybackState.STATE_PLAYING
+        mostraCasa = LettoreDiCasa.attivo && (LettoreDiCasa.suona || LettoreDiCasa.carica || !altraSuona)
+        if (mostraCasa) {
+            // Tornando all'altra app la sua copertina si rifà.
+            chiaveBrano = null
+            copertinaGrezza = null
+            copertina = null
+            copertinaPng = null
+            pngDi = null
+            indirizzoCopertina = null
+            brano = LettoreDiCasa.brano()
+            avvisa()
+            return
+        }
         val c = controllore
         if (c == null) {
             chiaveBrano = null
@@ -580,6 +743,9 @@ object LettoreTelefono {
         // accetti: non lo dice. Allora i tasti restano accesi.
         val azioni = stato?.actions ?: 0L
         fun puo(quali: Long) = azioni == 0L || azioni and quali != 0L
+        // Suona: se si stava facendo partire quest'app ci si è riusciti, e
+        // la si ricorda come l'ultima che ha suonato.
+        if (quale == PlaybackState.STATE_PLAYING) contesto?.let { AvvioMusica.suona(it, c.packageName) }
         brano = Brano(
             app = nomeDi(c.packageName),
             titolo = titolo,
@@ -602,6 +768,7 @@ object LettoreTelefono {
      * si sa. Dal filo principale.
      */
     fun posizioneMs(): Long {
+        if (mostraCasa) return LettoreDiCasa.posizioneMs()
         val s = statoLettore ?: return 0L
         var p = s.position
         if (p < 0L) return 0L
@@ -717,6 +884,45 @@ object LettoreTelefono {
         return nome
     }
 
+    /** I lettori delle altre app aperti adesso (col permesso). */
+    private var sessioniAttive: List<MediaController> = emptyList()
+
+    /**
+     * La sessione aperta di [pacchetto], se c'è (col permesso): per far
+     * partire una playlist dentro un'app che è già aperta ([AvvioMusica]).
+     */
+    fun sessioneDi(pacchetto: String): MediaController? =
+        controllore?.takeIf { it.packageName == pacchetto } ?: sessioniAttive.firstOrNull { it.packageName == pacchetto }
+
+    /**
+     * Una voce della musica di casa toccata sull'auto che serve il telefono
+     * (la casa): la si chiede al motore Flutter, e il messaggio torna a
+     * [risposta]. Falso se non c'è un motore a cui chiederlo.
+     */
+    fun chiediAlTelefono(id: String, risposta: (String?) -> Unit): Boolean {
+        val m = vogliono.firstOrNull() ?: canali.keys.firstOrNull() ?: return false
+        val c = canali[m] ?: return false
+        c.invokeMethod(
+            "toccaDallAuto",
+            id,
+            object : MethodChannel.Result {
+                override fun success(result: Any?) = risposta(result as? String)
+
+                override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) =
+                    risposta("Non è partita")
+
+                override fun notImplemented() = risposta("Aggiorna l'app per la musica di casa")
+            },
+        )
+        return true
+    }
+
+    /** L'elenco della musica di casa è cambiato: gli schermi dell'auto si rifanno. */
+    private fun avvisaLAuto() {
+        visto = null
+        avvisa()
+    }
+
     /** Il PNG della copertina per il telefono, su un altro filo: pronto, va al telefono. */
     private fun comprimi(immagine: Bitmap?) {
         pngDi = immagine
@@ -750,13 +956,21 @@ object LettoreTelefono {
         return Bitmap.createScaledBitmap(b, (b.width * f).toInt().coerceAtLeast(1), (b.height * f).toInt().coerceAtLeast(1), true)
     }
 
-    fun comando(quale: String) {
+    /**
+     * Un tasto del lettore. [dallAuto]: dallo schermo dell'auto (lì, se
+     * niente suona, l'app non si apre mai). Senza un lettore aperto ⏯ fa
+     * partire l'app della musica ([AvvioMusica]): il modo pulito, poi il
+     * tasto ▶ all'app, poi quello di sistema.
+     */
+    fun comando(quale: String, dallAuto: Boolean = true) {
+        if (mostraCasa) {
+            LettoreDiCasa.comando(quale)
+            return
+        }
         val t = controllore?.transportControls
         if (t == null) {
-            // Nessun lettore aperto: ⏯ come il tasto play del volante, il
-            // sistema lo dà all'ultima app che suonava (Spotify chiusa da
-            // poco, la radio). Se suona, arriva la sua sessione.
-            if (quale == "playPausa" && conTasti) tastoPlay()
+            val ctx = contesto
+            if (quale == "playPausa" && conTasti && ctx != null) AvvioMusica.parti(ctx, dallAuto, daFermi = false)
             return
         }
         try {
@@ -770,27 +984,50 @@ object LettoreTelefono {
         }
     }
 
-    private fun tastoPlay() {
-        val audio = contesto?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
-        try {
-            audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY))
-            audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PLAY))
-        } catch (_: Exception) {
-            // Nessuno che lo prenda: resta in silenzio.
-        }
+    /**
+     * Le app della musica per le impostazioni: `{app: [{pacchetto, nome,
+     * icona}], scelta, ultima, effettiva, ultimo_avvio}`, come le legge
+     * `LettoreDelTelefono.elencoApp`.
+     */
+    private fun elencoApp(context: Context): Map<String, Any?> {
+        val elenco = AvvioMusica.installate(context).map { AvvioMusica.conIcona(context, it) }
+        return mapOf(
+            "app" to elenco.map { mapOf("pacchetto" to it.pacchetto, "nome" to it.nome, "icona" to it.iconaPng) },
+            "scelta" to AvvioMusica.scelta(context),
+            "ultima" to AvvioMusica.ultima(context),
+            "effettiva" to AvvioMusica.prossima(context)?.pacchetto,
+            // Le strade provate l'ultima volta, per chi prova sul telefono vero.
+            "ultimo_avvio" to AvvioMusica.ultimoAvvio.ifEmpty { null },
+        )
     }
 
     /** Lo stato per il telefono, come lo legge `LettoreDelTelefono.leggi`. */
     private fun stato(): Map<String, Any?> {
         val b = brano
+        // L'app di ▶ serve solo alla pillola, quando niente ha un lettore
+        // aperto: l'icona non viaggia a ogni brano.
+        val p = if (b == null) prossima else null
+        val e = esito
+        val casa = mostraCasa
+        // Un flusso di casa che non si sente: lo si dice come un avvio non partito.
+        val erroreCasa = LettoreDiCasa.errore
         return mapOf(
-            "permesso" to permesso,
+            // Qui la musica si fa partire anche da zero (l'iPhone no).
+            "avviabile" to true,
+            "prossima" to p?.let { mapOf("pacchetto" to it.pacchetto, "nome" to it.nome, "icona" to it.iconaPng) },
+            "in_avvio" to inAvvio,
+            "nome_in_avvio" to nomeInAvvio,
+            "esito" to (e?.testo ?: erroreCasa),
+            "esito_id" to (e?.id ?: if (erroreCasa != null) ID_ERRORE_CASA else null),
+            // La musica di casa si mostra anche senza «Accesso alle notifiche».
+            "permesso" to (permesso || casa),
+            "casa" to casa,
             "app" to b?.app,
             "titolo" to b?.titolo,
             "artista" to b?.artista,
             "suona" to (b?.suona == true),
-            "copertina" to copertinaPng,
-            "durata_ms" to metadati?.getLong(MediaMetadata.METADATA_KEY_DURATION),
+            "copertina" to if (casa) LettoreDiCasa.attuale?.immagineByte else copertinaPng,
+            "durata_ms" to if (casa) LettoreDiCasa.durataMs else metadati?.getLong(MediaMetadata.METADATA_KEY_DURATION),
             // A che punto è adesso (non quando il lettore l'ha detto l'ultima
             // volta): il telefono ci conta sopra da quando lo riceve.
             "posizione_ms" to if (b != null) posizioneMs() else null,
@@ -817,8 +1054,9 @@ object LettoreTelefono {
         // no, e ogni avviso le fa rifare mappa e pannello.
         val b = brano
         val ora = listOf(
-            acceso, permesso, b?.app, b?.titolo, b?.artista, b?.suona, b?.copertina,
+            acceso, permesso, mostraCasa, MusicaDiCasa.versione, LettoreDiCasa.errore, b?.app, b?.titolo, b?.artista, b?.suona, b?.copertina,
             b?.durataMs, b?.puoPrecedente, b?.puoSuccessivo, b?.puoPlayPausa,
+            AvvioMusica.inCorso, AvvioMusica.esito?.id, if (b == null) prossima?.pacchetto else null,
         )
         if (ora == visto) return
         visto = ora

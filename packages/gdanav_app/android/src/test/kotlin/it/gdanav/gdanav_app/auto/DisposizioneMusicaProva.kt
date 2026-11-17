@@ -55,8 +55,13 @@ private fun schermo(
     ostacoli = ostacoli,
 )
 
-private fun disponi(s: Spazio, conBrano: Boolean = true, ridotto: Boolean = false, comandabile: Boolean = true) =
-    DisposizioneMusica.disponi(s, conBrano, ridotto, comandabile)
+private fun disponi(
+    s: Spazio,
+    conBrano: Boolean = true,
+    ridotto: Boolean = false,
+    comandabile: Boolean = true,
+    etichettaDp: Float = 0f,
+) = DisposizioneMusica.disponi(s, conBrano, ridotto, comandabile, etichettaDp)
 
 /** Quello che deve valere per ogni lettore disposto, qualunque forma abbia. */
 private fun regole(nome: String, d: Disposta, s: Spazio) {
@@ -155,9 +160,42 @@ fun main() {
     disponi(largo, conBrano = false)!!.let { d ->
         uguale("senza brano: pillola", d.forma, Forma.PILLOLA)
         uguale("senza brano: solo ▶", d.zone.map { it.first }, listOf(Zona.PLAY_PAUSA))
-        uguale("senza brano: sulla nota niente", DisposizioneMusica.tocco(d, d.copertina.cx, d.copertina.cy), Zona.PANNELLO)
+        // Tutta la pillola fa partire la musica, anche la nota.
+        uguale("senza brano: anche sulla nota ▶", DisposizioneMusica.tocco(d, d.copertina.cx, d.copertina.cy), Zona.PLAY_PAUSA)
+        uguale("senza brano, senza nome: larga 156 punti", d.box.w / largo.k, 156f)
+        uguale("senza brano, senza nome: niente testo", d.lineaTitolo, null)
+        vero("senza brano: ▶ disegnato a destra", d.discoPlay!!.r == d.box.r && d.discoPlay!!.w / largo.k == 76f)
         regole("senza brano", d, largo)
     }
+    // «▶ Spotify»: il nome dell'app allarga la pillola verso sinistra, resta
+    // in alto a destra, e tutta è il tasto.
+    for (k in listOf(1f, 1.5f, 2.625f)) {
+        val s = schermo(1333f, k = k)
+        val d = disponi(s, conBrano = false, etichettaDp = 70f)!!
+        uguale("▶ Spotify, k=$k: pillola", d.forma, Forma.PILLOLA)
+        uguale("▶ Spotify, k=$k: larga 156 + 70 punti", d.box.w / k, 226f)
+        uguale("▶ Spotify, k=$k: in alto a destra", d.box.r to d.box.t, s.destra to s.alto)
+        uguale("▶ Spotify, k=$k: un solo tasto, tutto", d.zone.single().second.let { it.l to it.r }, d.box.l to d.box.r)
+        vero("▶ Spotify, k=$k: il nome fra l'icona e ▶", d.testoX >= d.copertina.r && d.testoX + d.testoLargo <= d.discoPlay!!.l + 0.01f)
+        vero("▶ Spotify, k=$k: il nome a metà altezza", d.lineaTitolo!! > d.box.cy && d.lineaTitolo!! < d.box.b)
+        uguale("▶ Spotify, k=$k: sul nome ▶", DisposizioneMusica.tocco(d, d.testoX + 10f * k, d.box.cy), Zona.PLAY_PAUSA)
+        regole("▶ Spotify, k=$k", d, s)
+    }
+    // Un nome lunghissimo si ferma a 170 punti (poi i puntini, li mette il disegno).
+    uguale(
+        "▶ nome lungo: al più 156 + 170 punti",
+        disponi(largo, conBrano = false, etichettaDp = 400f)!!.box.w / largo.k,
+        326f,
+    )
+    // Dove il nome non ci sta, la pillola col solo ▶.
+    schermo(400f, alto = 300f).let { s ->
+        val d = disponi(s, conBrano = false, etichettaDp = 160f)!!
+        uguale("▶ stretto: resta la pillola", d.forma, Forma.PILLOLA)
+        uguale("▶ stretto: senza nome", d.box.w / s.k to d.lineaTitolo, 156f to null)
+        regole("▶ stretto", d, s)
+    }
+    // Col brano il nome non cambia niente.
+    uguale("col brano l'etichetta non conta", disponi(largo, etichettaDp = 70f)!!.forma, Forma.APERTO)
     disponi(largo, comandabile = false)!!.let { d ->
         uguale("senza tocchi: solo il brano", d.forma, Forma.SOLO_BRANO)
         uguale("senza tocchi: nessun tasto", d.zone.size, 0)

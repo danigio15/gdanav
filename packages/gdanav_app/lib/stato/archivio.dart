@@ -209,6 +209,22 @@ class Archivio {
 
   Future<void> salvaInvitoMusicaVisto() => _p.write(key: 'invito_musica', value: 'sì');
 
+  /// Le radio e le playlist della casa suonate per ultime (gli id della
+  /// casa), la più recente prima: in auto vengono per prime.
+  Future<List<String>> ultimeDallaCasa() async {
+    try {
+      final grezzo = jsonDecode(await _p.read(key: 'musica_di_casa_ultime') ?? '[]');
+      return [
+        for (final v in grezzo is List ? grezzo : const [])
+          if (v is String) v,
+      ];
+    } on FormatException {
+      return const [];
+    }
+  }
+
+  Future<void> salvaUltimeDallaCasa(List<String> id) => _p.write(key: 'musica_di_casa_ultime', value: jsonEncode(id));
+
   /// Come si guarda la mappa: 2D, 3D, immersiva o 3D aumentato
   /// ([VistaMappa]). Si ricorda, e vale anche fuori dalla guida. Di partenza
   /// 3D, come sullo schermo dell'auto. Prima c'erano solo 2D e 3D, e si

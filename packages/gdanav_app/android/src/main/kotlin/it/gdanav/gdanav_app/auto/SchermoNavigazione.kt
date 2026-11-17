@@ -21,6 +21,8 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import it.gdanav.gdanav_app.R
+import it.gdanav.gdanav_app.musica.AvvioMusica
+import it.gdanav.gdanav_app.musica.LettoreDiCasa
 import it.gdanav.gdanav_app.musica.LettoreTelefono
 
 /**
@@ -55,6 +57,8 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         musicaInAlto(),
         musicaInAlto() && LettoreTelefono.daMostrare,
         if (musicaInAlto()) LettoreTelefono.brano?.suona else null,
+        // Senza brano ⏯ dice chi parte («▶ Spotify», «Avvio…»).
+        if (musicaInAlto() && LettoreTelefono.brano == null) LettoreTelefono.prossima?.nome to LettoreTelefono.inAvvio else null,
         // La strada proposta coi tasti in alto, quando il suo avviso non può
         // uscire.
         PonteAuto.stradaNeiTasti,
@@ -342,7 +346,29 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
      */
     private val musica: () -> Unit = {
         renderer.aggiornaPannello()
+        diciEsitoAvvio()
         if (firma() != disegnata || LettoreTelefono.senzaPermesso) PonteAuto.rinfresca()
+    }
+
+    /**
+     * ▶ toccato qui con niente che suona, e dopo qualche secondo non è
+     * partito niente ([AvvioMusica]): lo si dice con un messaggio breve, una
+     * volta. Mai di aprire l'app ora: sul telefono, da fermi.
+     */
+    private fun diciEsitoAvvio() {
+        // Una radio di casa che non si sente: detto una volta, qui.
+        LettoreDiCasa.errore?.let { testo ->
+            LettoreDiCasa.erroreDetto()
+            try {
+                CarToast.makeText(carContext, testo, CarToast.LENGTH_SHORT).show()
+            } catch (_: Exception) {}
+        }
+        val e = LettoreTelefono.esito ?: return
+        if (!e.dallAuto) return
+        AvvioMusica.esitoDetto(e.id)
+        try {
+            CarToast.makeText(carContext, e.testo, CarToast.LENGTH_SHORT).show()
+        } catch (_: Exception) {}
     }
 
     override fun onCreate(owner: LifecycleOwner) {
@@ -450,8 +476,8 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
      * - senza la casa: a mappa libera ⏯, ⏭, «Cerca», «Menu»; in guida ⏯, ⏭,
      *   menu, «Fine»;
      * - in guida la lente sta nel Menu, in alto ([SchermoMenu]);
-     * - ⏭ solo se un'app ha un lettore aperto: senza, ⏯ da solo riprende
-     *   l'ultima.
+     * - ⏭ solo se un'app ha un lettore aperto: senza, ▶ col nome dell'app
+     *   che fa partire («▶ Spotify», [AvvioMusica]; «Avvio…» mentre parte).
      *
      * Con la musica spenta, senza il permesso o coi comandi nel lettore
      * sulla mappa, tutto come prima della musica.
@@ -519,6 +545,11 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         val playPausa = Action.Builder()
             .setIcon(icona(if (suona) R.drawable.auto_pausa else R.drawable.auto_play))
             .setOnClickListener { LettoreTelefono.comando("playPausa") }
+        // Niente che suona: chi parte con ▶.
+        if (LettoreTelefono.brano == null) {
+            val nome = if (LettoreTelefono.inAvvio) "Avvio…" else LettoreTelefono.prossima?.nome
+            if (nome != null) playPausa.setTitle(nome)
+        }
         if (fissi) playPausa.setFlags(Action.FLAG_IS_PERSISTENT)
         striscia.addAction(playPausa.build())
         if (avanti && LettoreTelefono.brano != null) {

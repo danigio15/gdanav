@@ -18,8 +18,10 @@ package it.gdanav.gdanav_app.auto
  *   ⏮ ⏯ ⏭. Solo sugli schermi larghi;
  * - [Forma.COMPATTO]: il titolo su una riga, e sotto copertina, ⏯ e ⏭. Per la
  *   mappa a mezzo schermo;
- * - [Forma.PILLOLA]: copertina e ⏯. Quando lo si richiude, quando lo spazio è
- *   poco, e quando non c'è un brano (allora solo ▶);
+ * - [Forma.PILLOLA]: copertina e ⏯. Quando lo si richiude e quando lo spazio
+ *   è poco. Senza un brano è «▶ Spotify»: l'icona dell'app che partirà, il
+ *   suo nome ([etichettaDp]: «Avvio Spotify…» mentre parte) e ▶, e tutta la
+ *   pillola è il tasto;
  * - [Forma.SOLO_BRANO]: copertina, titolo e artista, senza tasti: sulle auto
  *   che non mandano i tocchi.
  *
@@ -95,6 +97,11 @@ object DisposizioneMusica {
         /** Dove si disegna la freccia della linguetta. */
         val freccia: Riq?,
         val k: Float,
+        /**
+         * Dove si disegna ▶ se non sta al centro della sua zona: nella
+         * pillola senza brano la zona è tutta la pillola, il disco a destra.
+         */
+        val discoPlay: Riq? = null,
     ) {
         /** Le zone di tocco, nell'ordine in cui si guardano. */
         val zone: List<Pair<Zona, Riq>>
@@ -125,6 +132,12 @@ object DisposizioneMusica {
     const val PILLOLA_LARGA_DP = 156f
     const val PILLOLA_ALTA_DP = 68f
 
+    /** Il nome dell'app nella pillola senza brano: al più così largo, poi i puntini. */
+    const val ETICHETTA_MAX_DP = 170f
+
+    /** Dove comincia, nella pillola, il nome dell'app (dopo l'icona). */
+    private const val ETICHETTA_X_DP = 70f
+
     const val SOLO_BRANO_MIN_DP = 200f
     const val SOLO_BRANO_MAX_DP = 330f
     const val SOLO_BRANO_ALTO_DP = 72f
@@ -138,16 +151,28 @@ object DisposizioneMusica {
     /**
      * Il lettore nello spazio [s]. [conBrano]: un'app ha un lettore aperto
      * (se no, solo ▶ nella pillola). [ridotto]: chi guida l'ha richiuso.
-     * [comandabile]: l'auto manda i tocchi. `null`: non ci sta, non si
-     * disegna.
+     * [comandabile]: l'auto manda i tocchi. [etichettaDp]: senza brano,
+     * quanto è largo (in punti) il nome dell'app che ▶ fa partire; se la
+     * pillola col nome non ci sta, resta quella col solo ▶. `null`: non ci
+     * sta, non si disegna.
      */
-    fun disponi(s: Spazio, conBrano: Boolean, ridotto: Boolean, comandabile: Boolean): Disposta? {
+    fun disponi(
+        s: Spazio,
+        conBrano: Boolean,
+        ridotto: Boolean,
+        comandabile: Boolean,
+        etichettaDp: Float = 0f,
+    ): Disposta? {
         val forme = when {
             !comandabile -> if (conBrano) listOf(Forma.SOLO_BRANO) else emptyList()
-            !conBrano || ridotto -> listOf(Forma.PILLOLA)
+            !conBrano -> {
+                val e = etichettaDp.coerceIn(0f, ETICHETTA_MAX_DP)
+                return (if (e > 0f) prova(Forma.PILLOLA, s, false, e) else null) ?: prova(Forma.PILLOLA, s, false, 0f)
+            }
+            ridotto -> listOf(Forma.PILLOLA)
             else -> listOf(Forma.APERTO, Forma.COMPATTO, Forma.PILLOLA)
         }
-        for (f in forme) prova(f, s, conBrano)?.let { return it }
+        for (f in forme) prova(f, s, conBrano, 0f)?.let { return it }
         return null
     }
 
@@ -158,7 +183,7 @@ object DisposizioneMusica {
         return if (d.box.contiene(x, y)) Zona.PANNELLO else Zona.FUORI
     }
 
-    private fun prova(f: Forma, s: Spazio, conBrano: Boolean): Disposta? {
+    private fun prova(f: Forma, s: Spazio, conBrano: Boolean, etichetta: Float): Disposta? {
         val k = s.k
         val aria = ARIA_DP * k
         val alta = when (f) {
@@ -183,7 +208,7 @@ object DisposizioneMusica {
                         .takeIf { it >= APERTO_MIN_DP * k }
                 }
                 Forma.COMPATTO -> minOf(COMPATTO_MAX_DP * k, posto).takeIf { it >= COMPATTO_MIN_DP * k }
-                Forma.PILLOLA -> (PILLOLA_LARGA_DP * k).takeIf { it <= posto }
+                Forma.PILLOLA -> ((PILLOLA_LARGA_DP + etichetta) * k).takeIf { it <= posto }
                 Forma.SOLO_BRANO -> minOf(SOLO_BRANO_MAX_DP * k, posto).takeIf { it >= SOLO_BRANO_MIN_DP * k }
             } ?: return null
             return Riq(destra - larga, alto, destra, alto + alta)
@@ -199,7 +224,7 @@ object DisposizioneMusica {
         return when (f) {
             Forma.APERTO -> aperto(box, k)
             Forma.COMPATTO -> compatto(box, k)
-            Forma.PILLOLA -> pillola(box, k, conBrano)
+            Forma.PILLOLA -> pillola(box, k, conBrano, etichetta)
             Forma.SOLO_BRANO -> soloBrano(box, k)
         }
     }
@@ -258,7 +283,7 @@ object DisposizioneMusica {
         )
     }
 
-    private fun pillola(box: Riq, k: Float, conBrano: Boolean): Disposta {
+    private fun pillola(box: Riq, k: Float, conBrano: Boolean, etichetta: Float): Disposta {
         val l = box.l
         val t = box.t
         // Le zone escono di quattro punti sopra e sotto la pillola: alte 76.
@@ -269,20 +294,25 @@ object DisposizioneMusica {
             forma = Forma.PILLOLA,
             box = box,
             copertina = Riq(l + 6f * k, t + 6f * k, l + 62f * k, t + 62f * k),
-            testoX = 0f,
-            testoLargo = 0f,
+            testoX = if (conBrano) 0f else l + (ETICHETTA_X_DP + 2f) * k,
+            testoLargo = if (conBrano) 0f else etichetta * k,
             appLargo = 0f,
             lineaApp = null,
-            lineaTitolo = null,
+            // Il nome dell'app, a metà altezza (18 punti, la linea di base
+            // un po' sotto il mezzo).
+            lineaTitolo = if (!conBrano && etichetta > 0f) t + 40.5f * k else null,
             lineaArtista = null,
             avanzamento = null,
             precedente = null,
-            playPausa = Riq(meta, su, box.r, giu),
+            // Senza un brano tutta la pillola fa partire la musica: un
+            // bersaglio grande, e la nota non è un tasto morto.
+            playPausa = if (conBrano) Riq(meta, su, box.r, giu) else Riq(l, su, box.r, giu),
             successivo = null,
             // Senza un brano non c'è niente da riaprire.
             linguetta = if (conBrano) Riq(l, su, meta, giu) else null,
             freccia = if (conBrano) Riq(l + 44f * k, t + 44f * k, l + 66f * k, t + 66f * k) else null,
             k = k,
+            discoPlay = if (conBrano) null else Riq(box.r - TOCCO_DP * k, t, box.r, box.b),
         )
     }
 
