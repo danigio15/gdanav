@@ -110,6 +110,12 @@ object ArbitroAvvisi {
     var alCambio: (() -> Unit)? = null
 
     /**
+     * Un avviso di Android Auto è sullo schermo adesso, sopra la mappa: chi
+     * disegna sulla mappa (il lettore musicale) non gli finisce sotto.
+     */
+    val unAvvisoInVista: Boolean get() = inVista != null
+
+    /**
      * Lo schermo della mappa c'è. [mappaInCima]: è lui in cima e si vede
      * (almeno `STARTED`), cioè un avviso adesso si può mostrare.
      */

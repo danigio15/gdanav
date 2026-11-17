@@ -568,6 +568,94 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('mini-lettore')), findsOneWidget);
     });
+
+    testWidgets('i tasti che l\'app che suona non accetta sono spenti', (tester) async {
+      // Una radio in diretta: niente «precedente» né «successivo».
+      final l = LettoreFinto(brani: brani, puoPrecedente: false, puoSuccessivo: false);
+      addTearDown(l.dispose);
+      await tester.pumpWidget(lettore(l));
+      IconButton tasto(String chiave) => tester.widget<IconButton>(find.byKey(Key('lettore-$chiave')));
+      expect(tasto('precedente').onPressed, isNull);
+      expect(tasto('successivo').onPressed, isNull);
+      expect(tasto('play').onPressed, isNotNull);
+      await tester.tap(find.byKey(const Key('lettore-precedente')), warnIfMissed: false);
+      await tester.tap(find.byKey(const Key('lettore-successivo')), warnIfMissed: false);
+      await tester.tap(find.byKey(const Key('lettore-play')));
+      await tester.pump();
+      expect(l.comandi, ['playPausa']);
+      // L'app torna ad accettarli: i tasti si riaccendono.
+      l
+        ..puoPrecedente = true
+        ..puoSuccessivo = true
+        ..playPausa();
+      await tester.pump();
+      expect(tasto('precedente').onPressed, isNotNull);
+      expect(tasto('successivo').onPressed, isNotNull);
+    });
+
+    testWidgets('la barra del brano c\'è solo se il lettore dice quanto dura, e va avanti mentre suona', (
+      tester,
+    ) async {
+      // Senza durata (una radio): niente barra.
+      final radio = LettoreFinto(brani: brani);
+      addTearDown(radio.dispose);
+      await tester.pumpWidget(lettore(radio));
+      expect(find.byKey(const Key('lettore-avanzamento')), findsNothing);
+
+      // In pausa a un quarto del brano: la barra è a un quarto, e sta ferma.
+      final l = LettoreFinto(
+        brani: [
+          BranoInAscolto(
+            titolo: 'Strade di notte',
+            durata: const Duration(seconds: 200),
+            posizione: const Duration(seconds: 50),
+            alle: DateTime.now().subtract(const Duration(minutes: 5)),
+          ),
+        ],
+        suona: false,
+      );
+      addTearDown(l.dispose);
+      await tester.pumpWidget(lettore(l));
+      double barra() => tester.widget<LinearProgressIndicator>(find.byKey(const Key('lettore-avanzamento'))).value!;
+      expect(barra(), 0.25);
+      await tester.pump(const Duration(seconds: 3));
+      expect(barra(), 0.25);
+
+      // Riparte: conta da quando la posizione è stata letta (cinque minuti
+      // fa: il brano è finito), e si ridisegna da sola una volta al secondo.
+      await l.playPausa();
+      await tester.pump();
+      expect(barra(), 1.0);
+      await tester.pump(const Duration(seconds: 2));
+      expect(barra(), 1.0);
+      // Richiuso: il contatore si ferma con lei (nessun timer resta acceso).
+      await tester.tap(find.byKey(const Key('lettore-richiudi')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('lettore-avanzamento')), findsNothing);
+    });
+
+    test('a che punto è il brano: la posizione letta, più il tempo passato se suona', () {
+      final alle = DateTime(2026, 11, 17, 8);
+      final brano = BranoInAscolto(
+        titolo: 'Strade di notte',
+        durata: const Duration(seconds: 200),
+        posizione: const Duration(seconds: 50),
+        alle: alle,
+      );
+      final dopo = alle.add(const Duration(seconds: 10));
+      expect(brano.avanzamento(suona: true, adesso: dopo), closeTo(0.30, 1e-9));
+      // In pausa non va avanti.
+      expect(brano.avanzamento(suona: false, adesso: dopo), closeTo(0.25, 1e-9));
+      // Mai oltre la fine, mai prima dell'inizio (l'orologio tornato indietro).
+      expect(brano.avanzamento(suona: true, adesso: alle.add(const Duration(hours: 1))), 1.0);
+      expect(brano.avanzamento(suona: true, adesso: alle.subtract(const Duration(hours: 1))), closeTo(0.25, 1e-9));
+      // Senza durata non si sa.
+      expect(const BranoInAscolto(titolo: 'Radio').avanzamento(suona: true, adesso: dopo), isNull);
+      expect(
+        const BranoInAscolto(titolo: 'Radio', durata: Duration.zero).avanzamento(suona: true, adesso: dopo),
+        isNull,
+      );
+    });
   });
 
   testWidgets('la pagina «Casa e musica in guida»: i due interruttori e le categorie', (tester) async {
@@ -1153,6 +1241,40 @@ void main() {
       l.leggi({'permesso': true, 'app': 'Lettore Prova'});
       expect(l.brano, isNull);
       expect(l.app, 'Lettore Prova');
+    });
+
+    test('i comandi che l\'app accetta: solo un «no» detto spegne un tasto', () {
+      final l = LettoreDelTelefono(fonte: FonteMusica.telefono);
+      addTearDown(l.dispose);
+      // L'iPhone (e un Android di prima) non lo dice: tutti accesi.
+      l.leggi({'permesso': true, 'app': 'Lettore Prova', 'titolo': 'Strade di notte', 'suona': true});
+      expect([l.puoPrecedente, l.puoPlayPausa, l.puoSuccessivo], [true, true, true]);
+      // Una radio in diretta su Android.
+      l.leggi({
+        'permesso': true,
+        'app': 'Radio Prova',
+        'titolo': 'In diretta',
+        'suona': true,
+        'puo_precedente': false,
+        'puo_successivo': false,
+        'puo_play': true,
+        'durata_ms': 200000,
+        'posizione_ms': 50000,
+      });
+      expect([l.puoPrecedente, l.puoPlayPausa, l.puoSuccessivo], [false, true, false]);
+      // La posizione arriva con l'ora in cui è stata letta: da lì si conta.
+      expect(l.brano?.posizione, const Duration(seconds: 50));
+      expect(l.brano?.alle, isNotNull);
+      expect(l.brano!.avanzamento(suona: false, adesso: DateTime.now()), 0.25);
+      // Torna un brano normale: i tasti si riaccendono.
+      l.leggi({
+        'permesso': true,
+        'app': 'Lettore Prova',
+        'titolo': 'Vento a favore',
+        'suona': true,
+        'puo_precedente': true,
+      });
+      expect([l.puoPrecedente, l.puoPlayPausa, l.puoSuccessivo], [true, true, true]);
     });
 
     test('«Non ora» va al lato nativo; chi non lo conosce non rompe niente', () async {
