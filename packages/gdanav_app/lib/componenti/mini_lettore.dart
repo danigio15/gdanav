@@ -50,6 +50,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'musica_di_casa.dart';
 import 'vetro.dart';
 
 /// Il brano che suona adesso.
@@ -249,7 +250,8 @@ abstract interface class AvvioDellaMusica {
 }
 
 /// Un lettore finto, per le prove e le fotografie.
-class LettoreFinto extends ChangeNotifier implements LettoreMusicale, ComandiDelLettore, AvvioDellaMusica {
+class LettoreFinto extends ChangeNotifier
+    implements LettoreMusicale, ComandiDelLettore, AvvioDellaMusica, SuonaDallaCasa {
   LettoreFinto({
     this.brani = const [],
     this.preferite = const [],
@@ -305,8 +307,67 @@ class LettoreFinto extends ChangeNotifier implements LettoreMusicale, ComandiDel
   int _i = 0;
   final comandi = <String>[];
 
+  /// La musica di casa che suona col lettore «nativo» finto, e da quale.
+  List<VoceDiCasa> casa = const [];
+  int _iCasa = 0;
+  String? nomeCasa;
+
+  /// L'elenco mandato all'«auto».
+  List<Map<String, Object?>> radioPerLAuto = const [];
+  List<Map<String, Object?>> playlistPerLAuto = const [];
+  Future<String?> Function(String id)? toccata;
+
   @override
-  BranoInAscolto? get brano => brani.isEmpty ? null : brani[_i % brani.length];
+  BranoInAscolto? get brano {
+    if (casa.isNotEmpty) {
+      final v = casa[_iCasa % casa.length];
+      return BranoInAscolto(
+        titolo: v.titolo,
+        artista: nomeCasa ?? (v.tipo == TipoDiCasa.radio ? 'In diretta' : v.provenienza),
+        copertina: v.immagine == null ? null : MemoryImage(v.immagine!),
+      );
+    }
+    return brani.isEmpty ? null : brani[_i % brani.length];
+  }
+
+  @override
+  Future<String?> suonaFlussi(List<VoceDiCasa> voci, {int da = 0, String? nome}) async {
+    comandi.add('flussi:${voci.isEmpty ? '' : voci[da.clamp(0, voci.length - 1)].id}');
+    casa = voci;
+    _iCasa = da;
+    nomeCasa = nome;
+    app = voci.isNotEmpty && voci.first.tipo == TipoDiCasa.radio ? 'Radio di casa' : 'Dalla casa';
+    suona = true;
+    puoPrecedente = puoSuccessivo = voci.length > 1;
+    notifyListeners();
+    return null;
+  }
+
+  @override
+  Future<String?> suonaNellApp(VoceDiCasa v, {required String app, required bool daFermi}) async {
+    comandi.add('app:$app:${v.uri ?? v.cerca}${daFermi ? ':fermo' : ''}');
+    return null;
+  }
+
+  @override
+  Future<void> fermaCasa() async {
+    comandi.add('fermaCasa');
+    casa = const [];
+    notifyListeners();
+  }
+
+  @override
+  Future<void> elencoPerLAuto(
+    List<Map<String, Object?>> radio,
+    List<Map<String, Object?>> playlist, {
+    String? ultima,
+  }) async {
+    radioPerLAuto = radio;
+    playlistPerLAuto = playlist;
+  }
+
+  @override
+  set toccataDallAuto(Future<String?> Function(String id)? f) => toccata = f;
 
   @override
   Future<void> accendi(bool si) async {
@@ -330,6 +391,7 @@ class LettoreFinto extends ChangeNotifier implements LettoreMusicale, ComandiDel
   @override
   Future<void> precedente() async {
     comandi.add('precedente');
+    if (casa.isNotEmpty) _iCasa = (_iCasa - 1) % casa.length;
     _i = (_i - 1) % (brani.isEmpty ? 1 : brani.length);
     notifyListeners();
   }
@@ -344,6 +406,7 @@ class LettoreFinto extends ChangeNotifier implements LettoreMusicale, ComandiDel
   @override
   Future<void> successivo() async {
     comandi.add('successivo');
+    if (casa.isNotEmpty) _iCasa++;
     _i++;
     notifyListeners();
   }
@@ -396,12 +459,16 @@ class LettoreFinto extends ChangeNotifier implements LettoreMusicale, ComandiDel
 /// `avviabile`, `prossima` (`{pacchetto, nome, icona}`), `in_avvio`,
 /// `nome_in_avvio`, `esito` ed `esito_id`. Senza il canale (nelle prove, sul
 /// web) resta muto.
-class LettoreDelTelefono extends ChangeNotifier implements LettoreMusicale, ComandiDelLettore, AvvioDellaMusica {
+class LettoreDelTelefono extends ChangeNotifier
+    implements LettoreMusicale, ComandiDelLettore, AvvioDellaMusica, SuonaDallaCasa {
   LettoreDelTelefono({MethodChannel? canale, FonteMusica? fonte})
     : _canale = canale ?? const MethodChannel('gdanav/musica'),
       fonte = fonte ?? (defaultTargetPlatform == TargetPlatform.iOS ? FonteMusica.sistema : FonteMusica.telefono) {
     _canale.setMethodCallHandler((c) async {
       if (c.method == 'stato') leggi(c.arguments);
+      // Una voce della musica di casa toccata sullo schermo dell'auto che il
+      // lato nativo non sa suonare da solo: il messaggio da dire, o niente.
+      if (c.method == 'toccaDallAuto' && c.arguments is String) return _toccata?.call(c.arguments as String);
       return null;
     });
   }
@@ -484,6 +551,9 @@ class LettoreDelTelefono extends ChangeNotifier implements LettoreMusicale, Coma
     // Un avvio non partito: si dice una volta, per qualche secondo.
     final id = grezzo['esito_id'];
     final testo = grezzo['esito'];
+    // Niente da dire: il prossimo messaggio, anche con lo stesso id (quello
+    // della musica di casa è sempre lo stesso), si dirà.
+    if (id == null) _esitoId = null;
     if (id is int && id != _esitoId && testo is String && testo.isNotEmpty) {
       _esitoId = id;
       esito = testo;
@@ -555,6 +625,74 @@ class LettoreDelTelefono extends ChangeNotifier implements LettoreMusicale, Coma
   @override
   Future<void> parti({required bool daFermi}) => _chiama('parti', {'da_fermi': daFermi});
 
+  Future<String?> Function(String id)? _toccata;
+
+  @override
+  set toccataDallAuto(Future<String?> Function(String id)? f) => _toccata = f;
+
+  /// Un comando della musica di casa: `null` se è partita, se no il messaggio.
+  Future<String?> _esito(String metodo, Map<String, Object?> argomenti) async {
+    try {
+      final r = await _canale.invokeMethod<Object?>(metodo, argomenti);
+      if (r is Map) {
+        if (r['stato'] is Map) leggi(r['stato']);
+        final e = r['esito'];
+        return e is String && e.isNotEmpty ? e : null;
+      }
+      return null;
+    } on MissingPluginException {
+      return 'Qui la musica di casa non si può suonare';
+    } on PlatformException catch (e) {
+      return e.message ?? 'Non è partita';
+    }
+  }
+
+  @override
+  Future<String?> suonaFlussi(List<VoceDiCasa> voci, {int da = 0, String? nome}) => _esito('suonaFlussi', {
+    'voci': [
+      for (final v in voci)
+        if (v.flusso != null)
+          {
+            'id': v.id,
+            'titolo': v.titolo,
+            'sotto': v.tipo == TipoDiCasa.radio ? 'In diretta' : v.provenienza,
+            'url': v.flusso,
+            'mime': v.mime,
+            'immagine': v.immagine,
+          },
+    ],
+    'da': da,
+    'nome': nome,
+    'radio': voci.isNotEmpty && voci.first.tipo == TipoDiCasa.radio,
+  });
+
+  @override
+  Future<String?> suonaNellApp(VoceDiCasa v, {required String app, required bool daFermi}) => _esito('suonaNellApp', {
+    'app': app,
+    'uri': v.uri,
+    'cerca': v.cerca ?? v.titolo,
+    'titolo': v.titolo,
+    'da_fermi': daFermi,
+  });
+
+  @override
+  Future<void> fermaCasa() => _chiama('fermaCasa');
+
+  @override
+  Future<void> elencoPerLAuto(
+    List<Map<String, Object?>> radio,
+    List<Map<String, Object?>> playlist, {
+    String? ultima,
+  }) async {
+    try {
+      await _canale.invokeMethod<Object?>('casa', {'radio': radio, 'playlist': playlist, 'ultima': ultima});
+    } on MissingPluginException {
+      // Senza l'auto (il web, le prove): niente.
+    } on PlatformException {
+      // Un lato nativo di prima: niente musica di casa in auto.
+    }
+  }
+
   /// L'elenco come lo manda il lato nativo. Pubblico per le prove.
   @visibleForTesting
   static ElencoAppMusica leggiElenco(Object? grezzo) {
@@ -616,10 +754,15 @@ class MiniLettore extends StatefulWidget {
     this.inMovimento = true,
     this.chiuso = false,
     this.conPreferite = true,
+    this.dallaCasa,
   });
 
   final LettoreMusicale lettore;
   final bool inMovimento;
+
+  /// La musica di casa (dentro GdAHome): da fermi, accanto alla pillola il
+  /// tondo «Dalla casa», e nel riquadro la prima delle scelte.
+  final GestoreMusicaDiCasa? dallaCasa;
 
   /// Le playlist da fermi: di traverso no, non ci stanno senza coprire il
   /// «Poi».
@@ -677,8 +820,24 @@ class _MiniLettoreState extends State<MiniLettore> {
       if (l.brano == null && l.app == null) {
         // Niente che suona: «▶ Spotify», dove si può far partire.
         final a = l is AvvioDellaMusica ? l as AvvioDellaMusica : null;
-        if (a == null || !a.puoAvviare) return const SizedBox.shrink();
-        return _PillolaAvvio(avvio: a, avviso: _avviso, onTap: () => unawaited(_parti(a)));
+        final casa = _tastoCasa(context);
+        if (a == null || !a.puoAvviare) {
+          return casa == null
+              ? const SizedBox.shrink()
+              : Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(padding: const EdgeInsets.fromLTRB(14, 0, 14, 8), child: casa),
+                );
+        }
+        final pillola = _PillolaAvvio(avvio: a, avviso: _avviso, onTap: () => unawaited(_parti(a)));
+        if (casa == null) return pillola;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Flexible(child: pillola),
+            Padding(padding: const EdgeInsets.only(right: 14), child: casa),
+          ],
+        );
       }
       return AnimatedSize(
         duration: const Duration(milliseconds: 220),
@@ -687,6 +846,13 @@ class _MiniLettoreState extends State<MiniLettore> {
       );
     },
   );
+
+  /// Il tondo «Dalla casa», da fermi e dentro GdAHome.
+  Widget? _tastoCasa(BuildContext context) {
+    final g = widget.dallaCasa;
+    if (g == null || widget.inMovimento) return null;
+    return TastoDallaCasa(onTap: () => unawaited(mostraDallaCasa(context, g)));
+  }
 
   Widget _bottone(BuildContext context) {
     final l = widget.lettore;
@@ -724,6 +890,7 @@ class _MiniLettoreState extends State<MiniLettore> {
     final preferite = widget.inMovimento || !widget.conPreferite
         ? const <PlaylistPreferita>[]
         : l.preferite.take(5).toList();
+    final casa = widget.inMovimento || !widget.conPreferite ? null : widget.dallaCasa;
     // I tasti che l'app che suona non accetta restano spenti, come sull'auto.
     final comandi = l is ComandiDelLettore ? l as ComandiDelLettore : null;
     Widget tasto(
@@ -834,14 +1001,24 @@ class _MiniLettoreState extends State<MiniLettore> {
                   padding: const EdgeInsets.fromLTRB(2, 8, 8, 0),
                   child: _Avanzamento(brano: brano, suona: l.suona),
                 ),
-              // Da fermi: le playlist da riprendere, con un tocco.
-              if (preferite.isNotEmpty) ...[
+              // Da fermi: le playlist da riprendere, con un tocco; dentro
+              // GdAHome per prima «Dalla casa».
+              if (preferite.isNotEmpty || casa != null) ...[
                 const SizedBox(height: 8),
                 SizedBox(
                   height: 44,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     children: [
+                      if (casa != null) ...[
+                        ActionChip(
+                          key: const Key('lettore-dalla-casa'),
+                          avatar: const Icon(Icons.home_rounded),
+                          label: const Text('Dalla casa'),
+                          onPressed: () => unawaited(mostraDallaCasa(context, casa)),
+                        ),
+                        if (preferite.isNotEmpty) const SizedBox(width: 8),
+                      ],
                       for (final (i, p) in preferite.indexed) ...[
                         if (i > 0) const SizedBox(width: 8),
                         ActionChip(

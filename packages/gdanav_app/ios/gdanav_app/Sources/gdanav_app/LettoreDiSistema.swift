@@ -47,7 +47,13 @@ final class LettoreDiSistema {
     /// Se c'è un brano da dire, e i tasti per comandarlo (sul telefono e
     /// nella barra di CarPlay): accesa, col permesso, e la Musica di Apple
     /// davvero in ascolto.
-    var daMostrare: Bool { acceso && permesso && brano != nil }
+    var daMostrare: Bool { (acceso && permesso || mostraCasa) && brano != nil }
+
+    /// Il brano è quello della musica di casa ([LettoreDiCasa]): suona, o è
+    /// in pausa e nessun'altra app suona. Allora i tasti vanno a lei, anche
+    /// senza il permesso della libreria (l'ha fatta partire chi guida).
+    private(set) var mostraCasa = false
+    private var ascoltoCasa: UUID?
 
     private let lettore = MPMusicPlayerController.systemMusicPlayer
     private var osservatori: [NSObjectProtocol] = []
@@ -113,9 +119,31 @@ final class LettoreDiSistema {
             case "comando":
                 self.comando(chiamata.arguments as? String ?? "")
                 risposta(nil)
+            // La musica di casa (`lib/componenti/musica_di_casa.dart`).
+            case "suonaFlussi":
+                let esito = LettoreDiCasa.shared.suona(argomenti: chiamata.arguments as? [String: Any] ?? [:])
+                self.leggi()
+                risposta(["esito": esito.map { $0 as Any } ?? NSNull(), "stato": self.stato()])
+            case "suonaNellApp":
+                let esito = self.apriNellApp(chiamata.arguments as? [String: Any] ?? [:])
+                risposta(["esito": esito.map { $0 as Any } ?? NSNull()])
+            case "esitoDetto":
+                if chiamata.arguments as? Int == -7 { LettoreDiCasa.shared.erroreDetto() }
+                risposta(nil)
+            case "fermaCasa":
+                LettoreDiCasa.shared.ferma()
+                self.leggi()
+                risposta(self.stato())
+            // L'elenco per lo schermo dell'auto: CarPlay non ha un elenco
+            // delle radio (un'app di navigazione mostra solo i suoi modelli).
+            case "casa":
+                risposta(nil)
             default:
                 risposta(FlutterMethodNotImplemented)
             }
+        }
+        if ascoltoCasa == nil {
+            ascoltoCasa = LettoreDiCasa.shared.ascolta { [weak self] in self?.leggi() }
         }
         // Tornando dalle Impostazioni il permesso può essere cambiato.
         osservatori.append(
@@ -257,6 +285,10 @@ final class LettoreDiSistema {
     }
 
     func comando(_ quale: String) {
+        if mostraCasa {
+            LettoreDiCasa.shared.comando(quale)
+            return
+        }
         guard permesso else { return }
         // I tasti valgono solo per la Musica di Apple in ascolto: mai un ▶
         // che fa partire un brano vecchio sopra un'altra app che suona.
@@ -280,7 +312,21 @@ final class LettoreDiSistema {
     }
 
     private func leggi() {
-        guard let suona = inAscolto(), let item = lettore.nowPlayingItem else {
+        // La musica di casa, se suona o se la Musica di Apple non suona.
+        let casa = LettoreDiCasa.shared
+        let musicaSuona = permesso && inAscolto() == true
+        mostraCasa = casa.attivo && (casa.suona || !musicaSuona)
+        if mostraCasa, let f = casa.attuale {
+            brano = Brano(
+                titolo: f.titolo,
+                artista: casa.inOnda ?? casa.nome ?? f.sotto,
+                suona: casa.suona,
+                copertina: f.immagine
+            )
+            avvisa()
+            return
+        }
+        guard permesso, let suona = inAscolto(), let item = lettore.nowPlayingItem else {
             brano = nil
             avvisa()
             return
@@ -310,10 +356,22 @@ final class LettoreDiSistema {
             copertinaPng = b?.copertina?.pngData()
         }
         var s: [String: Any] = [
-            "permesso": permesso,
+            "permesso": permesso || mostraCasa,
             "suona": b?.suona == true,
+            "casa": mostraCasa,
         ]
-        if let b {
+        if let errore = LettoreDiCasa.shared.errore {
+            s["esito"] = errore
+            s["esito_id"] = -7
+        }
+        if let b, mostraCasa {
+            s["app"] = LettoreDiCasa.shared.radio ? "Radio di casa" : "Dalla casa"
+            s["titolo"] = b.titolo
+            s["artista"] = b.artista
+            if let png = LettoreDiCasa.shared.attuale?.immagineByte { s["copertina"] = FlutterStandardTypedData(bytes: png) }
+            s["puo_precedente"] = LettoreDiCasa.shared.voci.count > 1
+            s["puo_successivo"] = LettoreDiCasa.shared.voci.count > 1
+        } else if let b {
             s["app"] = "Musica"
             s["titolo"] = b.titolo
             s["artista"] = b.artista
@@ -324,6 +382,20 @@ final class LettoreDiSistema {
             if let ms = LettoreDiSistema.millisecondi(lettore.currentPlaybackTime) { s["posizione_ms"] = ms }
         }
         return s
+    }
+
+    /// Una playlist di Spotify sull'iPhone: un'app non fa partire le altre,
+    /// si apre Spotify sulla playlist (solo sul telefono, da fermi: lo decide
+    /// il telefono, `DoveSuona.apriDaFermo`). Torna il messaggio se non va.
+    private func apriNellApp(_ a: [String: Any]) -> String? {
+        guard a["da_fermi"] as? Bool == true else { return "Si apre sul telefono, da fermo" }
+        guard let testo = a["uri"] as? String, testo.hasPrefix("spotify:"), let url = URL(string: testo) else {
+            return "Sull'iPhone si apre solo Spotify"
+        }
+        UIApplication.shared.open(url, options: [:]) { aperta in
+            if !aperta { NSLog("GdANav: Spotify non si apre") }
+        }
+        return nil
     }
 
     private func avvisa() {

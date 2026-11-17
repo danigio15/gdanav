@@ -22,6 +22,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import it.gdanav.gdanav_app.R
 import it.gdanav.gdanav_app.musica.AvvioMusica
+import it.gdanav.gdanav_app.musica.LettoreDiCasa
 import it.gdanav.gdanav_app.musica.LettoreTelefono
 
 /**
@@ -355,6 +356,13 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
      * volta. Mai di aprire l'app ora: sul telefono, da fermi.
      */
     private fun diciEsitoAvvio() {
+        // Una radio di casa che non si sente: detto una volta, qui.
+        LettoreDiCasa.errore?.let { testo ->
+            LettoreDiCasa.erroreDetto()
+            try {
+                CarToast.makeText(carContext, testo, CarToast.LENGTH_SHORT).show()
+            } catch (_: Exception) {}
+        }
         val e = LettoreTelefono.esito ?: return
         if (!e.dallAuto) return
         AvvioMusica.esitoDetto(e.id)

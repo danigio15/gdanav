@@ -468,7 +468,12 @@ class _SchermataGuidaState extends State<SchermataGuida> {
                 final musica = switch ((ospite, ospite?.lettoreInGuida)) {
                   (final o?, final l?) when !l.permesso =>
                     o.invitoDaMostrare && !inMovimento ? InvitoMusica(lettore: l, onVisto: o.segnaInvitoVisto) : null,
-                  (_, final l?) => MiniLettore(lettore: l, inMovimento: inMovimento, conPreferite: !traverso),
+                  (final o, final l?) => MiniLettore(
+                    lettore: l,
+                    inMovimento: inMovimento,
+                    conPreferite: !traverso,
+                    dallaCasa: o?.musicaDiCasa,
+                  ),
                   _ => null,
                 };
                 if (traverso) {

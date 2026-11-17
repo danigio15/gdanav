@@ -74,5 +74,22 @@ fun main() {
         "Scegli l'app della musica sul telefono, da fermo",
     )
 
+    // --- le playlist della casa ------------------------------------------------
+    uguale(
+        "playlist dall'auto: non si apre niente",
+        SceltaApp.testoPlaylistNonPartita("Viaggio in auto", "Spotify", dallAuto = true, aperta = false),
+        "«Viaggio in auto» non è partita in Spotify: aprila sul telefono quando sei fermo",
+    )
+    uguale(
+        "playlist dal telefono da fermi: l'app aperta su di lei",
+        SceltaApp.testoPlaylistNonPartita("Viaggio in auto", "Spotify", dallAuto = false, aperta = true),
+        "Ho aperto «Viaggio in auto» in Spotify: premi ▶ lì",
+    )
+    uguale(
+        "playlist senza il nome dell'app",
+        SceltaApp.testoPlaylistNonPartita("Viaggio in auto", null, dallAuto = false, aperta = false),
+        "«Viaggio in auto» non è partita nell'app",
+    )
+
     println("SceltaApp: $prove conti, tutti giusti")
 }

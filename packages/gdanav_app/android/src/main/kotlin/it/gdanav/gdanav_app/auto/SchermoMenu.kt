@@ -18,6 +18,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import it.gdanav.gdanav_app.R
 import it.gdanav.gdanav_app.musica.LettoreTelefono
+import it.gdanav.gdanav_app.musica.MusicaDiCasa
 
 /**
  * Uno schermo dell'auto che si rifà quando cambia quello che ha in pagina.
@@ -140,6 +141,11 @@ abstract class SchermoAggiornato(carContext: CarContext) : Screen(carContext), D
  * accanto al titolo, non in una riga in più; e la casa di GdAHome resta
  * sempre fra i tasti sulla mappa. Dove la musica si comanda dal lettore
  * sulla mappa il Menu è quello di sempre.
+ *
+ * Dentro GdAHome la musica di casa (le radio e le playlist della plancia) ha
+ * il suo tasto in alto, accanto al titolo: «Musica di casa». Un elenco ne
+ * concede due, uno solo con la scritta, e l'altro posto è della lente; le
+ * sei righe restano quelle.
  */
 class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) : SchermoAggiornato(carContext) {
     // In pagina: i nomi di Casa e Lavoro, e se l'auto è elettrica (colonnine
@@ -149,6 +155,7 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
         PonteAuto.lavoro()?.nome,
         PonteAuto.cruscotto.elettrica,
         lenteQui(),
+        MusicaDiCasa.conosciuta,
     )
 
     /**
@@ -163,15 +170,26 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
         val casa = PonteAuto.casa()
         val lavoro = PonteAuto.lavoro()
         val blu = CarColor.BLUE
-        val inAlto = if (lenteQui()) {
-            ActionStrip.Builder()
-                .addAction(
+        val inAlto = if (lenteQui() || MusicaDiCasa.conosciuta) {
+            val striscia = ActionStrip.Builder()
+            if (MusicaDiCasa.conosciuta) {
+                striscia.addAction(
+                    Action.Builder()
+                        .setTitle("Musica di casa")
+                        .setIcon(icona(R.drawable.icona_musica_casa))
+                        .setOnClickListener { screenManager.push(SchermoMusicaDiCasa(carContext)) }
+                        .build(),
+                )
+            }
+            if (lenteQui()) {
+                striscia.addAction(
                     Action.Builder()
                         .setIcon(icona(R.drawable.auto_cerca))
                         .setOnClickListener { screenManager.push(SchermoCerca(carContext)) }
                         .build(),
                 )
-                .build()
+            }
+            striscia.build()
         } else {
             null
         }

@@ -60,4 +60,17 @@ object SceltaApp {
         !daFermi -> "$nome non è partito: aprilo quando sei fermo"
         else -> "$nome non è partito"
     }
+
+    /**
+     * Il messaggio quando una playlist della casa ([titolo]) non è partita
+     * nell'app [nome]: dall'auto mai «aprila» se non da fermi sul telefono.
+     */
+    fun testoPlaylistNonPartita(titolo: String, nome: String?, dallAuto: Boolean, aperta: Boolean): String {
+        val dove = nome?.takeIf { it.isNotBlank() }?.let { "in $it" } ?: "nell'app"
+        return when {
+            aperta -> "Ho aperto «$titolo» $dove: premi ▶ lì"
+            dallAuto -> "«$titolo» non è partita $dove: aprila sul telefono quando sei fermo"
+            else -> "«$titolo» non è partita $dove"
+        }
+    }
 }

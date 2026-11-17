@@ -21,6 +21,7 @@ import 'stato/gestore_risparmio.dart';
 import 'stato/gestore_luoghi.dart';
 import 'stato/gestore_meteo.dart';
 import 'componenti/mini_lettore.dart';
+import 'componenti/musica_di_casa.dart';
 import 'stato/gestore_casa_in_guida.dart';
 import 'stato/gestore_persone.dart';
 import 'stato/gestore_posizione.dart';
@@ -47,6 +48,7 @@ export 'schermate/schermata_principale.dart' show VoceOspite;
 export 'sorgenti/sorgente_gdahome.dart';
 export 'componenti/avviso_di_casa.dart';
 export 'componenti/mini_lettore.dart';
+export 'componenti/musica_di_casa.dart';
 export 'schermate/notifiche_nel_navigatore.dart';
 export 'stato/gestore_casa_in_guida.dart' show GestoreCasaInGuida;
 export 'stato/gestore_persone.dart' show GestorePersone, PersonaSullaMappa;
@@ -207,14 +209,31 @@ Future<GdanavApp> preparaGdanav({
   );
   await posizione.carica();
   // Gli avvisi di casa e la musica in guida.
+  final ilLettore = lettore ?? (kIsWeb ? null : LettoreDelTelefono());
   final casaInGuida = GestoreCasaInGuida(
     archivio: archivio,
     notifiche: notificheDiCasa,
     onAzione: tastoDiCasa,
-    lettore: lettore ?? (kIsWeb ? null : LettoreDelTelefono()),
+    lettore: ilLettore,
     inGuida: () => guida.attiva,
     guida: guida,
     voce: guida.annuncia,
+    // Dentro GdAHome: le radio e le playlist della casa, da suonare in auto.
+    musicaDiCasa: gdahome == null
+        ? null
+        : GestoreMusicaDiCasa(
+            chiedi: () => gdahome.chiedi,
+            lettore: ilLettore is SuonaDallaCasa ? ilLettore as SuonaDallaCasa : null,
+            archivio: archivio,
+            // Su Android le app della musica sul telefono (Spotify c'è?);
+            // sull'iPhone non si sa e non serve: Spotify si apre e basta.
+            installate: switch (ilLettore) {
+              final AvvioDellaMusica a when defaultTargetPlatform == TargetPlatform.android => () async => {
+                for (final x in (await a.elencoApp()).app) x.pacchetto,
+              },
+              _ => null,
+            },
+          ),
   );
   await casaInGuida.carica();
   final segnalazioni = GestoreSegnalazioni(posizione: posizione, autovelox: archivioAutovelox());

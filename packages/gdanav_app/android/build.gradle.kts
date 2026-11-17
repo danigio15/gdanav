@@ -55,4 +55,10 @@ dependencies {
     api("androidx.car.app:app-projected:1.4.0")
     // La stessa MapLibre del plugin maplibre_gl, per la mappa sullo schermo dell'auto.
     implementation("org.maplibre.gl:android-sdk-opengl:13.5.0")
+    // La musica di casa in auto (le radio della plancia, nel telefono):
+    // ExoPlayer con la sua sessione, la notifica e i tasti del volante. HLS
+    // perché diverse radio trasmettono così.
+    implementation("androidx.media3:media3-exoplayer:1.11.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.11.1")
+    implementation("androidx.media3:media3-session:1.11.1")
 }

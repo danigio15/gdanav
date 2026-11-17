@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../componenti/avviso_di_casa.dart';
 import '../componenti/mini_lettore.dart';
+import '../componenti/musica_di_casa.dart';
 import 'archivio.dart';
 
 /// La casa e la musica nel navigatore: gli avvisi di casa (le notifiche di
@@ -37,6 +38,7 @@ class GestoreCasaInGuida extends ChangeNotifier {
     this._guida,
     void Function(String frase)? voce,
     CodaAvvisiDiCasa? coda,
+    this.musicaDiCasa,
   }) : coda = notifiche == null && coda == null ? null : (coda ?? CodaAvvisiDiCasa(onVoce: voce)),
        _inGuida = inGuida ?? _sempre {
     final c = this.coda;
@@ -69,6 +71,10 @@ class GestoreCasaInGuida extends ChangeNotifier {
   /// Il lettore della musica; `null` dove non ce n'è (il web, le prove).
   final LettoreMusicale? lettore;
 
+  /// Le radio e le playlist della casa da suonare in auto (dentro GdAHome);
+  /// `null` in GdANav da sola.
+  final GestoreMusicaDiCasa? musicaDiCasa;
+
   final bool Function() _inGuida;
   final Listenable? _guida;
   StreamSubscription<Map<String, Object?>>? _ascolto;
@@ -97,6 +103,8 @@ class GestoreCasaInGuida extends ChangeNotifier {
   void schermoDellAuto(bool acceso) {
     if (acceso == _inAuto) return;
     _inAuto = acceso;
+    // L'elenco della musica di casa all'auto (Menu › Musica di casa).
+    if (acceso) unawaited(musicaDiCasa?.aggiorna());
     _usoCambiato();
   }
 
@@ -225,6 +233,7 @@ class GestoreCasaInGuida extends ChangeNotifier {
     unawaited(_ascolto?.cancel());
     _guida?.removeListener(_usoCambiato);
     coda?.dispose();
+    musicaDiCasa?.dispose();
     super.dispose();
   }
 }

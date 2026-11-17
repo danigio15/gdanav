@@ -8,6 +8,9 @@ import android.graphics.Canvas
 import android.media.AudioManager
 import android.media.browse.MediaBrowser
 import android.media.session.MediaController
+import android.media.session.PlaybackState
+import android.net.Uri
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -58,6 +61,13 @@ object AvvioMusica {
     /** Un avvio in corso: quale app (`null`: il tasto di sistema), chi l'ha chiesto, da quando. */
     class InCorso(val app: App?, val dallAuto: Boolean, val daFermi: Boolean, val dal: Long)
 
+    /**
+     * Una playlist (o una ricerca, per un preferito di Alexa) da far partire
+     * dentro un'app precisa: la musica di casa (`MusicaDiCasa`). [uri]:
+     * `spotify:playlist:…`; [cerca]: il nome, se l'URI l'app non lo prende.
+     */
+    class Richiesta(val pacchetto: String, val uri: String?, val cerca: String?, val titolo: String)
+
     /** Com'è finito un avvio che non è partito: da dire una volta. */
     class Esito(val id: Int, val testo: String, val dallAuto: Boolean)
 
@@ -95,6 +105,10 @@ object AvvioMusica {
     /** L'app che parte con ▶, ricordata: si rifà con [rileggi]. */
     private var prossimaTenuta: App? = null
     private var prossimaLetta = false
+
+    /** La playlist da mettere appena l'app ha una sessione ([suonaNellApp]). */
+    @Volatile var richiesta: Richiesta? = null
+        private set
 
     private var browser: MediaBrowser? = null
     private var tastoAllApp = false
@@ -214,6 +228,11 @@ object AvvioMusica {
     fun suona(context: Context, pacchetto: String) {
         if (pacchetto == context.packageName) return
         val c = inCorso
+        // L'app svegliata col tasto suona (il suo ultimo brano): adesso ha una
+        // sessione, e le si chiede la playlist della casa.
+        richiesta?.takeIf { it.pacchetto == pacchetto }?.let { r ->
+            LettoreTelefono.sessioneDi(pacchetto)?.let { applica(it, r) }
+        }
         if (c != null && (c.app == null || c.app.pacchetto == pacchetto)) riuscito()
         if (ultima(context) != pacchetto) {
             preferenze(context).edit().putString(ULTIMA, pacchetto).apply()
@@ -230,10 +249,87 @@ object AvvioMusica {
     fun parti(context: Context, dallAuto: Boolean, daFermi: Boolean) {
         val ctx = context.applicationContext
         if (inCorso != null) return
+        richiesta = null
+        avvia(ctx, prossima(ctx), dallAuto, daFermi)
+    }
+
+    /**
+     * Una playlist della casa dentro un'app del telefono (Spotify), **senza
+     * aprirla**: se l'app ha già una sessione aperta (si vede col permesso) la
+     * si chiede a lei; se no la si sveglia come con ▶ ([avvia]: il servizio
+     * multimediale, poi il tasto all'app) e appena ha una sessione le si
+     * chiede la playlist ([applica]): l'URI (`playFromUri`, o come id), se
+     * no la si cerca per nome (`playFromSearch`, come fa l'assistente
+     * vocale). Se non parte: dall'auto lo si dice e basta; sul telefono, da
+     * fermi, si apre l'app su quella playlist. Torna il messaggio se non si
+     * può nemmeno provare.
+     */
+    fun suonaNellApp(
+        context: Context,
+        pacchetto: String,
+        uri: String?,
+        cerca: String?,
+        titolo: String,
+        dallAuto: Boolean,
+        daFermi: Boolean,
+    ): String? {
+        val ctx = context.applicationContext
         contesto = ctx
-        val app = prossima(ctx)
+        // La musica di casa che suonava qui lascia il posto.
+        if (LettoreDiCasa.attivo) LettoreDiCasa.ferma()
+        val r = Richiesta(pacchetto, uri, cerca, titolo)
+        LettoreTelefono.sessioneDi(pacchetto)?.let { c ->
+            ultimoAvvio = "«$titolo»${if (dallAuto) " (dall'auto)" else ""}: sessione aperta"
+            if (applica(c, r)) return null
+        }
+        annulla()
+        val app = installate(ctx).firstOrNull { it.pacchetto == pacchetto }?.let { conIcona(ctx, it) }
+            ?: nomeDi(ctx, pacchetto)?.let { App(pacchetto, it, null, null) }
+            ?: return "Sul telefono non c'è l'app"
+        richiesta = r
+        avvia(ctx, app, dallAuto, daFermi)
+        return null
+    }
+
+    /** Chiede la playlist a una sessione dell'app: l'URI, se no la ricerca per nome. */
+    private fun applica(c: MediaController, r: Richiesta): Boolean {
+        val azioni = c.playbackState?.actions ?: 0L
+        // Un lettore che non dichiara niente (0) si prova lo stesso.
+        fun puo(a: Long) = azioni == 0L || azioni and a != 0L
+        val t = c.transportControls
+        return try {
+            when {
+                r.uri != null && puo(PlaybackState.ACTION_PLAY_FROM_URI) -> {
+                    t.playFromUri(Uri.parse(r.uri), Bundle())
+                    passo("playFromUri")
+                }
+                r.uri != null && puo(PlaybackState.ACTION_PLAY_FROM_MEDIA_ID) -> {
+                    t.playFromMediaId(r.uri, Bundle())
+                    passo("playFromMediaId")
+                }
+                !r.cerca.isNullOrBlank() && puo(PlaybackState.ACTION_PLAY_FROM_SEARCH) -> {
+                    // Come «Ok Google, metti la playlist …»: il tipo e il nome.
+                    val extra = Bundle()
+                    extra.putString("android.intent.extra.focus", "vnd.android.cursor.item/playlist")
+                    extra.putString("android.intent.extra.playlist", r.cerca)
+                    t.playFromSearch(r.cerca, extra)
+                    passo("playFromSearch")
+                }
+                else -> return false
+            }
+            richiesta = null
+            true
+        } catch (_: Exception) {
+            passo("playlist rifiutata")
+            false
+        }
+    }
+
+    /** Fa partire [app] (o, senza, il tasto di sistema): le strade una dopo l'altra. */
+    private fun avvia(ctx: Context, app: App?, dallAuto: Boolean, daFermi: Boolean) {
+        contesto = ctx
         inCorso = InCorso(app, dallAuto, daFermi, SystemClock.uptimeMillis())
-        ultimoAvvio = "${app?.nome ?: "nessuna app"}${if (dallAuto) " (dall'auto)" else ""}:"
+        ultimoAvvio = "${richiesta?.let { "«${it.titolo}» su " } ?: ""}${app?.nome ?: "nessuna app"}${if (dallAuto) " (dall'auto)" else ""}:"
         tastoAllApp = false
         esito = null
         LettoreTelefono.avvioCambiato()
@@ -299,8 +395,12 @@ object AvvioMusica {
                     // Agganciata subito: il pannello mostra brano e tasti
                     // anche prima che la sessione compaia fra le attive.
                     LettoreTelefono.aggancia(c)
-                    c.transportControls.play()
-                    passo("play")
+                    // Una playlist della casa: quella; se no ▶.
+                    val r = richiesta?.takeIf { it.pacchetto == app.pacchetto }
+                    if (r == null || !applica(c, r)) {
+                        c.transportControls.play()
+                        passo("play")
+                    }
                 } catch (_: Exception) {
                     passo("play rifiutato")
                     mandaTastoAllApp(context, app.pacchetto)
@@ -418,12 +518,20 @@ object AvvioMusica {
         fermaTempi()
         inCorso = null
         staccaBrowser()
+        val r = richiesta?.takeIf { it.pacchetto == c.app?.pacchetto }
+        richiesta = null
         var aperta = false
         if (ctx != null && c.app != null && !c.dallAuto && c.daFermi && !PonteAuto.inAutoAdesso) {
-            aperta = apri(ctx, c.app.pacchetto)
+            // Una playlist: l'app si apre su di lei (il play lo dà chi guarda).
+            aperta = (r?.uri != null && apriSu(ctx, c.app.pacchetto, r.uri)) || apri(ctx, c.app.pacchetto)
         }
         passo(if (aperta) "niente dopo ${secondi(c)}, app aperta" else "niente dopo ${secondi(c)}")
-        esito = Esito(++ultimoEsito, SceltaApp.testoNonPartita(c.app?.nome, c.dallAuto, aperta, c.daFermi), c.dallAuto)
+        val testo = if (r != null) {
+            SceltaApp.testoPlaylistNonPartita(r.titolo, c.app?.nome, c.dallAuto, aperta)
+        } else {
+            SceltaApp.testoNonPartita(c.app?.nome, c.dallAuto, aperta, c.daFermi)
+        }
+        esito = Esito(++ultimoEsito, testo, c.dallAuto)
         LettoreTelefono.avvioCambiato()
     }
 
@@ -435,6 +543,16 @@ object AvvioMusica {
             context.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             true
         }
+    } catch (_: Exception) {
+        false
+    }
+
+    /** Apre [pacchetto] su un indirizzo suo (`spotify:playlist:…`): solo sul telefono, da fermi. */
+    private fun apriSu(context: Context, pacchetto: String, uri: String): Boolean = try {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(uri)).setPackage(pacchetto).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+        true
     } catch (_: Exception) {
         false
     }
@@ -458,6 +576,7 @@ object AvvioMusica {
 
     /** «Musica nel navigatore» spenta, o il permesso tolto: niente avvio a metà. */
     fun annulla() {
+        richiesta = null
         if (inCorso == null) return
         fermaTempi()
         inCorso = null

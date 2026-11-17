@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../componenti/avviso_di_casa.dart';
 import '../componenti/mini_lettore.dart';
+import '../componenti/musica_di_casa.dart';
 import '../stato/gestore_casa_in_guida.dart';
 
 /// «Casa e musica in guida»: gli avvisi di casa sopra la mappa (dentro
@@ -127,6 +128,29 @@ class NotificheNelNavigatoreSchermata extends StatelessWidget {
                   tasto: 'Consenti',
                   onTap: lettore.chiediPermesso,
                 ),
+              if (gestore.musicaDiCasa case final casa?) ...[
+                titolo('Musica di casa'),
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: ListTile(
+                    key: const Key('musica-di-casa'),
+                    leading: const Icon(Icons.home_rounded),
+                    title: const Text('Dalla casa'),
+                    subtitle: const Text('Le radio preferite e le playlist della plancia, da ascoltare in auto'),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => mostraDallaCasa(context, casa),
+                  ),
+                ),
+                nota(
+                  iPhone
+                      ? 'Le radio suonano qui nel telefono, e in CarPlay si vedono in «In riproduzione». Le playlist '
+                            'di Spotify si aprono nell\'app, da fermo; quelle di Sonos e di Music Assistant si suonano '
+                            'solo sui lettori di casa, e da qui le puoi far partire lì.'
+                      : 'Le radio suonano nel navigatore, anche in Android Auto (Menu › Musica di casa), coi tasti del '
+                            'volante. Le playlist di Spotify partono nell\'app senza aprirla; quelle di Sonos e di Music '
+                            'Assistant si suonano solo sui lettori di casa, e da qui le puoi far partire lì.',
+                ),
+              ],
               if (avvio != null) ...[
                 titolo('App della musica'),
                 Card(
