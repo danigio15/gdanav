@@ -27,8 +27,17 @@
 /// mandano i tocchi ⏯ nell'`ActionStrip` del template col brano da guardare;
 /// su CarPlay ⏯ ⏭ come `CPBarButton`, e niente disegnato sulla mappa (Apple
 /// la vuole solo mappa: il brano lo mostra la scheda «In riproduzione» di
-/// sistema). Col permesso ma senza un lettore aperto resta ⏯, che riprende
-/// l'ultima app che suonava.
+/// sistema). Col permesso ma senza un lettore aperto resta ▶.
+///
+/// **Far partire la musica da zero** (solo Android, [AvvioDellaMusica]): con
+/// niente che suona, sul telefono e sull'auto c'è la pillola «▶ Spotify» con
+/// l'icona e il nome dell'app che partirà (quella scelta in «App della
+/// musica», Spotify di serie, l'ultima che ha suonato). Il lato nativo
+/// (`android/.../musica/AvvioMusica.kt`) prova il `MediaBrowserService`
+/// dell'app, poi il tasto ▶ mandato all'app, e sul telefono da fermi alla fine
+/// la apre; intanto «Avvio Spotify…», e se dopo qualche secondo non suona
+/// niente lo dice. Sull'iPhone un'app non può far partire le altre: lì niente
+/// pillola.
 ///
 /// Qui e sull'auto lo stesso aspetto: la barra sottile del brano sotto i
 /// testi, e i tasti che l'app che suona non accetta ([ComandiDelLettore]:
@@ -152,8 +161,95 @@ abstract interface class ComandiDelLettore {
   bool get puoSuccessivo;
 }
 
+/// Un'app della musica che si può far partire: «Spotify», con la sua icona.
+@immutable
+class AppDellaMusica {
+  const AppDellaMusica({required this.pacchetto, required this.nome, this.icona});
+
+  /// Il pacchetto Android (`com.spotify.music`).
+  final String pacchetto;
+  final String nome;
+  final ImageProvider? icona;
+}
+
+/// Le app della musica per «App della musica» nelle impostazioni.
+@immutable
+class ElencoAppMusica {
+  const ElencoAppMusica({this.app = const [], this.scelta, this.ultima, this.effettiva, this.ultimoAvvio});
+
+  /// Le app installate che offrono un `MediaBrowserService`, Spotify per prima.
+  final List<AppDellaMusica> app;
+
+  /// La scelta salvata: un pacchetto, [ultimaUsata], o `null` (di serie).
+  final String? scelta;
+
+  /// L'ultima app che ha suonato, se se ne sa una.
+  final String? ultima;
+
+  /// Quella che parte davvero con ▶; `null`: nessuna.
+  final String? effettiva;
+
+  /// Le strade provate l'ultima volta e com'è finita (per chi prova).
+  final String? ultimoAvvio;
+
+  /// La scelta «l'ultima che ha suonato».
+  static const ultimaUsata = 'ultima';
+
+  /// Spotify, proposta di serie se c'è.
+  static const spotify = 'com.spotify.music';
+
+  /// Il punto acceso nell'elenco: la scelta, se vale ancora; se no quella di
+  /// serie (Spotify se c'è, se no «l'ultima»).
+  String get selezionata {
+    final s = scelta;
+    if (s != null && (s == ultimaUsata || app.any((a) => a.pacchetto == s))) return s;
+    return app.any((a) => a.pacchetto == spotify) ? spotify : ultimaUsata;
+  }
+
+  /// Il nome di un'app nell'elenco, o il pacchetto.
+  String? nomeDi(String? pacchetto) {
+    if (pacchetto == null) return null;
+    for (final a in app) {
+      if (a.pacchetto == pacchetto) return a.nome;
+    }
+    return null;
+  }
+}
+
+/// Far partire la musica quando nessuna app ha un lettore aperto. Lo sa
+/// fare Android (`android/.../musica/AvvioMusica.kt`); l'iPhone no, e
+/// [puoAvviare] è falso.
+abstract interface class AvvioDellaMusica {
+  /// Se qui la musica si fa partire da zero.
+  bool get puoAvviare;
+
+  /// L'app che ▶ fa partire («Spotify»); `null` se non se ne sa nessuna:
+  /// allora ▶ propone la scelta.
+  AppDellaMusica? get prossima;
+
+  /// Sta partendo: «Avvio Spotify…».
+  bool get inAvvio;
+
+  /// Il nome dell'app che sta partendo.
+  String? get nomeInAvvio;
+
+  /// Non è partita: il messaggio, per qualche secondo; poi `null`.
+  String? get esito;
+
+  /// ▶ con niente che suona. [daFermi]: chi tocca è fermo (alla fine, se
+  /// niente parte, si può aprire l'app).
+  Future<void> parti({required bool daFermi});
+
+  /// Le app della musica sul telefono, per sceglierne una.
+  Future<ElencoAppMusica> elencoApp();
+
+  /// Sceglie l'app di ▶: un pacchetto, [ElencoAppMusica.ultimaUsata], o
+  /// `null` per quella di serie.
+  Future<ElencoAppMusica> scegliApp(String? scelta);
+}
+
 /// Un lettore finto, per le prove e le fotografie.
-class LettoreFinto extends ChangeNotifier implements LettoreMusicale, ComandiDelLettore {
+class LettoreFinto extends ChangeNotifier implements LettoreMusicale, ComandiDelLettore, AvvioDellaMusica {
   LettoreFinto({
     this.brani = const [],
     this.preferite = const [],
@@ -164,7 +260,28 @@ class LettoreFinto extends ChangeNotifier implements LettoreMusicale, ComandiDel
     this.puoPrecedente = true,
     this.puoPlayPausa = true,
     this.puoSuccessivo = true,
-  });
+    bool? puoAvviare,
+    this.prossima,
+    this.appInstallate = const [],
+    this.scelta,
+    this.ultima,
+  }) : puoAvviare = puoAvviare ?? fonte == FonteMusica.telefono;
+
+  @override
+  bool puoAvviare;
+  @override
+  AppDellaMusica? prossima;
+  @override
+  bool inAvvio = false;
+  @override
+  String? nomeInAvvio;
+  @override
+  String? esito;
+
+  /// Le app che offre [elencoApp], e la scelta fatta.
+  List<AppDellaMusica> appInstallate;
+  String? scelta;
+  String? ultima;
 
   @override
   bool puoPrecedente;
@@ -237,6 +354,35 @@ class LettoreFinto extends ChangeNotifier implements LettoreMusicale, ComandiDel
     suona = true;
     notifyListeners();
   }
+
+  @override
+  Future<void> parti({required bool daFermi}) async {
+    comandi.add(daFermi ? 'parti:fermo' : 'parti');
+    inAvvio = true;
+    nomeInAvvio = prossima?.nome;
+    notifyListeners();
+  }
+
+  ElencoAppMusica get _elenco {
+    String? effettiva = scelta == ElencoAppMusica.ultimaUsata ? ultima : scelta;
+    if (effettiva == null || !appInstallate.any((a) => a.pacchetto == effettiva)) {
+      effettiva = appInstallate.any((a) => a.pacchetto == ElencoAppMusica.spotify) ? ElencoAppMusica.spotify : ultima;
+    }
+    return ElencoAppMusica(app: appInstallate, scelta: scelta, ultima: ultima, effettiva: effettiva);
+  }
+
+  @override
+  Future<ElencoAppMusica> elencoApp() async => _elenco;
+
+  @override
+  Future<ElencoAppMusica> scegliApp(String? scelta) async {
+    comandi.add('scegli:$scelta');
+    this.scelta = scelta;
+    final e = _elenco;
+    prossima = appInstallate.where((a) => a.pacchetto == e.effettiva).firstOrNull;
+    notifyListeners();
+    return e;
+  }
 }
 
 /// Il lettore del telefono, dal canale `gdanav/musica`: su Android quello di
@@ -245,9 +391,12 @@ class LettoreFinto extends ChangeNotifier implements LettoreMusicale, ComandiDel
 /// Il lato nativo manda `stato` a ogni cambio (brano, play/pausa, copertina,
 /// permesso): `{permesso, app, titolo, artista, suona, copertina, durata_ms,
 /// posizione_ms, puo_precedente, puo_successivo, puo_play}`. Gli ultimi tre
-/// li manda solo Android; se mancano, i tasti restano accesi. Senza il canale
-/// (nelle prove, sul web) resta muto.
-class LettoreDelTelefono extends ChangeNotifier implements LettoreMusicale, ComandiDelLettore {
+/// li manda solo Android; se mancano, i tasti restano accesi. Solo Android
+/// manda anche come far partire la musica da zero ([AvvioDellaMusica]):
+/// `avviabile`, `prossima` (`{pacchetto, nome, icona}`), `in_avvio`,
+/// `nome_in_avvio`, `esito` ed `esito_id`. Senza il canale (nelle prove, sul
+/// web) resta muto.
+class LettoreDelTelefono extends ChangeNotifier implements LettoreMusicale, ComandiDelLettore, AvvioDellaMusica {
   LettoreDelTelefono({MethodChannel? canale, FonteMusica? fonte})
     : _canale = canale ?? const MethodChannel('gdanav/musica'),
       fonte = fonte ?? (defaultTargetPlatform == TargetPlatform.iOS ? FonteMusica.sistema : FonteMusica.telefono) {
@@ -278,7 +427,25 @@ class LettoreDelTelefono extends ChangeNotifier implements LettoreMusicale, Coma
   @override
   bool puoSuccessivo = true;
 
+  @override
+  bool puoAvviare = false;
+  @override
+  AppDellaMusica? prossima;
+  @override
+  bool inAvvio = false;
+  @override
+  String? nomeInAvvio;
+  @override
+  String? esito;
+
   Uint8List? _copertina;
+  Uint8List? _icona;
+  ImageProvider? _immagineIcona;
+  int? _esitoId;
+  Timer? _finoAllEsito;
+
+  /// Per quanto resta il messaggio di un avvio non partito.
+  static const durataEsito = Duration(seconds: 6);
 
   /// Lo stato come lo manda il lato nativo. Pubblico per le prove.
   @visibleForTesting
@@ -300,6 +467,33 @@ class LettoreDelTelefono extends ChangeNotifier implements LettoreMusicale, Coma
     if (byte is Uint8List && !listEquals(byte, _copertina)) _copertina = byte;
     if (byte == null) _copertina = null;
     Duration? ms(Object? v) => v is num && v > 0 ? Duration(milliseconds: v.toInt()) : null;
+    puoAvviare = grezzo['avviabile'] == true;
+    inAvvio = grezzo['in_avvio'] == true;
+    nomeInAvvio = switch (grezzo['nome_in_avvio']) {
+      final String n when n.isNotEmpty => n,
+      _ => null,
+    };
+    prossima = switch (grezzo['prossima']) {
+      {'pacchetto': final String p, 'nome': final String n} && final Map m => AppDellaMusica(
+        pacchetto: p,
+        nome: n,
+        icona: _iconaDa(m['icona']),
+      ),
+      _ => null,
+    };
+    // Un avvio non partito: si dice una volta, per qualche secondo.
+    final id = grezzo['esito_id'];
+    final testo = grezzo['esito'];
+    if (id is int && id != _esitoId && testo is String && testo.isNotEmpty) {
+      _esitoId = id;
+      esito = testo;
+      _finoAllEsito?.cancel();
+      _finoAllEsito = Timer(durataEsito, () {
+        esito = null;
+        notifyListeners();
+      });
+      unawaited(_chiama('esitoDetto', id));
+    }
     brano = titolo.isEmpty
         ? null
         : BranoInAscolto(
@@ -311,6 +505,16 @@ class LettoreDelTelefono extends ChangeNotifier implements LettoreMusicale, Coma
             alle: DateTime.now(),
           );
     notifyListeners();
+  }
+
+  /// L'icona dell'app: la stessa non si rifà (non lampeggia).
+  ImageProvider? _iconaDa(Object? byte) {
+    if (byte is! Uint8List) return null;
+    if (!listEquals(byte, _icona)) {
+      _icona = byte;
+      _immagineIcona = MemoryImage(byte);
+    }
+    return _immagineIcona;
   }
 
   Future<void> _chiama(String metodo, [Object? argomenti]) async {
@@ -347,12 +551,64 @@ class LettoreDelTelefono extends ChangeNotifier implements LettoreMusicale, Coma
 
   @override
   Future<void> riprendi(PlaylistPreferita playlist) async {}
+
+  @override
+  Future<void> parti({required bool daFermi}) => _chiama('parti', {'da_fermi': daFermi});
+
+  /// L'elenco come lo manda il lato nativo. Pubblico per le prove.
+  @visibleForTesting
+  static ElencoAppMusica leggiElenco(Object? grezzo) {
+    if (grezzo is! Map) return const ElencoAppMusica();
+    String? testo(Object? v) => v is String && v.isNotEmpty ? v : null;
+    return ElencoAppMusica(
+      app: [
+        for (final a in grezzo['app'] is List ? grezzo['app'] as List : const [])
+          if (a case {'pacchetto': final String p, 'nome': final String n})
+            AppDellaMusica(
+              pacchetto: p,
+              nome: n,
+              icona: switch (a['icona']) {
+                final Uint8List b => MemoryImage(b),
+                _ => null,
+              },
+            ),
+      ],
+      scelta: testo(grezzo['scelta']),
+      ultima: testo(grezzo['ultima']),
+      effettiva: testo(grezzo['effettiva']),
+      ultimoAvvio: testo(grezzo['ultimo_avvio']),
+    );
+  }
+
+  Future<ElencoAppMusica> _elenco(String metodo, [Object? argomenti]) async {
+    try {
+      return leggiElenco(await _canale.invokeMethod<Object?>(metodo, argomenti));
+    } on MissingPluginException {
+      return const ElencoAppMusica();
+    } on PlatformException {
+      return const ElencoAppMusica();
+    }
+  }
+
+  @override
+  Future<ElencoAppMusica> elencoApp() => _elenco('appDellaMusica');
+
+  @override
+  Future<ElencoAppMusica> scegliApp(String? scelta) => _elenco('scegliApp', scelta);
+
+  @override
+  void dispose() {
+    _finoAllEsito?.cancel();
+    super.dispose();
+  }
 }
 
 /// Il riquadro in guida. [inMovimento]: niente playlist (si sceglie da
 /// fermi); i tre tasti restano, grandi.
 ///
-/// Senza nessun lettore aperto sul telefono (né brano né app) non c'è.
+/// Senza nessun lettore aperto sul telefono (né brano né app) è la pillola
+/// «▶ Spotify», dove la musica si fa partire da zero ([AvvioDellaMusica]:
+/// Android); dove non si può (l'iPhone) non c'è.
 class MiniLettore extends StatefulWidget {
   const MiniLettore({
     super.key,
@@ -379,12 +635,51 @@ class MiniLettore extends StatefulWidget {
 class _MiniLettoreState extends State<MiniLettore> {
   late bool _chiuso = widget.chiuso;
 
+  /// Un messaggio della pillola detto da qui («Scegli l'app da fermo»).
+  String? _avviso;
+  Timer? _finoAllAvviso;
+
+  @override
+  void dispose() {
+    _finoAllAvviso?.cancel();
+    super.dispose();
+  }
+
+  void _dici(String testo) {
+    _finoAllAvviso?.cancel();
+    setState(() => _avviso = testo);
+    _finoAllAvviso = Timer(LettoreDelTelefono.durataEsito, () {
+      if (mounted) setState(() => _avviso = null);
+    });
+  }
+
+  /// ▶ nella pillola, con niente che suona: parte l'app della musica; se
+  /// non se ne sa nessuna, da fermi la scelta (in marcia lo si dice).
+  Future<void> _parti(AvvioDellaMusica a) async {
+    if (a.inAvvio) return;
+    if (a.prossima == null) {
+      if (widget.inMovimento) {
+        _dici('Scegli l\'app della musica da fermo');
+        return;
+      }
+      final scelta = await mostraSceltaAppMusica(context, a);
+      if (scelta == null || !mounted) return;
+    }
+    await a.parti(daFermi: !widget.inMovimento);
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: widget.lettore,
     builder: (context, _) {
       final l = widget.lettore;
-      if (!l.permesso || (l.brano == null && l.app == null)) return const SizedBox.shrink();
+      if (!l.permesso) return const SizedBox.shrink();
+      if (l.brano == null && l.app == null) {
+        // Niente che suona: «▶ Spotify», dove si può far partire.
+        final a = l is AvvioDellaMusica ? l as AvvioDellaMusica : null;
+        if (a == null || !a.puoAvviare) return const SizedBox.shrink();
+        return _PillolaAvvio(avvio: a, avviso: _avviso, onTap: () => unawaited(_parti(a)));
+      }
       return AnimatedSize(
         duration: const Duration(milliseconds: 220),
         alignment: Alignment.bottomLeft,
@@ -563,6 +858,232 @@ class _MiniLettoreState extends State<MiniLettore> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// La pillola «▶ Spotify», quando nessuna app ha un lettore aperto: l'icona
+/// e il nome dell'app che partirà, e ▶; tutta la pillola è il tasto. Mentre
+/// parte «Avvio Spotify…» coi tre puntini; se non parte, il messaggio per
+/// qualche secondo. Senza un'app da far partire «Scegli la musica».
+class _PillolaAvvio extends StatelessWidget {
+  const _PillolaAvvio({required this.avvio, required this.onTap, this.avviso});
+
+  final AvvioDellaMusica avvio;
+  final VoidCallback onTap;
+  final String? avviso;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final colori = Theme.of(context).colorScheme;
+    final app = avvio.prossima;
+    final messaggio = avvio.esito ?? avviso;
+    final nomeInAvvio = avvio.nomeInAvvio ?? app?.nome;
+    final testo = avvio.inAvvio
+        ? (nomeInAvvio == null ? 'Avvio…' : 'Avvio $nomeInAvvio…')
+        : messaggio ?? app?.nome ?? 'Scegli la musica';
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+        child: Semantics(
+          button: true,
+          label: avvio.inAvvio ? testo : (app == null ? 'Scegli l\'app della musica' : 'Fai partire ${app.nome}'),
+          excludeSemantics: true,
+          child: Vetro(
+            key: const Key('lettore-avvio'),
+            raggio: 28,
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 56),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(width: 6),
+                  ClipOval(
+                    child: SizedBox.square(
+                      dimension: 44,
+                      child: app?.icona != null
+                          ? Image(image: app!.icona!, fit: BoxFit.cover, gaplessPlayback: true)
+                          : ColoredBox(
+                              color: colori.primaryContainer,
+                              child: Icon(Icons.music_note_rounded, color: colori.onPrimaryContainer),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Text(
+                        testo,
+                        key: const Key('lettore-avvio-testo'),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: (messaggio != null && !avvio.inAvvio ? t.bodyMedium : t.titleSmall)?.copyWith(
+                          fontWeight: messaggio != null && !avvio.inAvvio ? FontWeight.w600 : FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox.square(
+                    dimension: 44,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(color: colori.primary, shape: BoxShape.circle),
+                      // Mentre parte tre puntini, come sull'auto: un altro
+                      // tocco non fa niente.
+                      child: Icon(
+                        avvio.inAvvio ? Icons.more_horiz_rounded : Icons.play_arrow_rounded,
+                        key: Key(avvio.inAvvio ? 'lettore-avvio-in-corso' : 'lettore-avvio-play'),
+                        size: 30,
+                        color: colori.onPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// La scelta dell'app della musica, da fermi, quando ▶ non sa chi far
+/// partire: un foglio dal basso con l'elenco ([SceltaAppDellaMusica]). Dà la
+/// scelta fatta, `null` se chiuso senza scegliere.
+Future<String?> mostraSceltaAppMusica(BuildContext context, AvvioDellaMusica avvio) => showModalBottomSheet<String>(
+  context: context,
+  showDragHandle: true,
+  isScrollControlled: true,
+  builder: (context) => SafeArea(
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Quale musica far partire?', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            'Col tasto play del navigatore, quando niente suona, partirà questa app anche se è chiusa. '
+            'La cambi in «Casa e musica in guida».',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          SceltaAppDellaMusica(avvio: avvio, onScelta: (s) => Navigator.of(context).pop(s)),
+        ],
+      ),
+    ),
+  ),
+);
+
+/// «App della musica»: le app installate che si possono far partire, con
+/// la loro icona, e «L'ultima che ha suonato». Di serie Spotify, se c'è. Lo
+/// usano le impostazioni e il foglio di [mostraSceltaAppMusica].
+class SceltaAppDellaMusica extends StatefulWidget {
+  const SceltaAppDellaMusica({super.key, required this.avvio, this.onScelta, this.conDettagli = false});
+
+  final AvvioDellaMusica avvio;
+
+  /// Scelta fatta (e salvata).
+  final ValueChanged<String>? onScelta;
+
+  /// Sotto l'elenco, le strade provate l'ultima volta (le impostazioni).
+  final bool conDettagli;
+
+  @override
+  State<SceltaAppDellaMusica> createState() => _SceltaAppDellaMusicaState();
+}
+
+class _SceltaAppDellaMusicaState extends State<SceltaAppDellaMusica> {
+  ElencoAppMusica? _elenco;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_leggi(widget.avvio.elencoApp()));
+  }
+
+  Future<void> _leggi(Future<ElencoAppMusica> f) async {
+    final e = await f;
+    if (mounted) setState(() => _elenco = e);
+  }
+
+  Future<void> _scegli(String? s) async {
+    if (s == null) return;
+    await _leggi(widget.avvio.scegliApp(s));
+    widget.onScelta?.call(s);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final e = _elenco;
+    final tema = Theme.of(context);
+    if (e == null) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: SizedBox.square(dimension: 28, child: CircularProgressIndicator(strokeWidth: 3))),
+      );
+    }
+    Widget icona(AppDellaMusica a) => ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: SizedBox.square(
+        dimension: 40,
+        child: a.icona != null
+            ? Image(image: a.icona!, fit: BoxFit.cover)
+            : ColoredBox(color: tema.colorScheme.primaryContainer, child: const Icon(Icons.music_note_rounded)),
+      ),
+    );
+    final nomeUltima = e.nomeDi(e.ultima);
+    final dettagli = e.ultimoAvvio;
+    return RadioGroup<String>(
+      groupValue: e.selezionata,
+      onChanged: (s) => unawaited(_scegli(s)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (e.app.isEmpty)
+            Padding(
+              key: const Key('app-musica-nessuna'),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Text(
+                'Sul telefono non c\'è un\'app della musica che GdANav possa far partire. Falla partire tu: '
+                'qui compariranno il brano e i tasti.',
+                style: tema.textTheme.bodyMedium,
+              ),
+            ),
+          for (final a in e.app)
+            RadioListTile<String>(
+              key: Key('app-musica-${a.pacchetto}'),
+              value: a.pacchetto,
+              secondary: icona(a),
+              title: Text(a.nome),
+              subtitle: a.pacchetto == ElencoAppMusica.spotify && e.scelta == null ? const Text('Di serie') : null,
+            ),
+          RadioListTile<String>(
+            key: const Key('app-musica-ultima'),
+            value: ElencoAppMusica.ultimaUsata,
+            secondary: const SizedBox.square(dimension: 40, child: Icon(Icons.history_rounded)),
+            title: const Text('L\'ultima che ha suonato'),
+            subtitle: Text(nomeUltima ?? (e.ultima == null ? 'Nessuna ancora' : 'Quella di prima')),
+          ),
+          if (widget.conDettagli && dettagli != null)
+            Padding(
+              key: const Key('app-musica-ultimo-avvio'),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Text(
+                'L\'ultima volta: $dettagli',
+                style: tema.textTheme.bodySmall?.copyWith(color: tema.colorScheme.onSurfaceVariant),
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -1318,15 +1318,31 @@ void main() {
       expect(visto, 1);
     });
 
-    testWidgets('senza nessun lettore aperto il riquadro non c\'è', (tester) async {
-      final l = LettoreFinto(app: null);
+    testWidgets('senza nessun lettore aperto il riquadro non c\'è; dove la musica non parte da zero, niente', (
+      tester,
+    ) async {
+      // L'iPhone: un'app non fa partire le altre, niente pillola ▶.
+      final l = LettoreFinto(app: null, fonte: FonteMusica.sistema);
       addTearDown(l.dispose);
       await tester.pumpWidget(
         MaterialApp(
+          theme: temaGdanav(Brightness.light),
           home: Scaffold(body: MiniLettore(lettore: l)),
         ),
       );
       expect(find.byKey(const Key('mini-lettore')), findsNothing);
+      expect(find.byKey(const Key('lettore-avvio')), findsNothing);
+      // Android: al posto del riquadro la pillola ▶ (vedi avvio_musica_test).
+      final a = LettoreFinto(app: null);
+      addTearDown(a.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: temaGdanav(Brightness.light),
+          home: Scaffold(body: MiniLettore(lettore: a)),
+        ),
+      );
+      expect(find.byKey(const Key('mini-lettore')), findsNothing);
+      expect(find.byKey(const Key('lettore-avvio')), findsOneWidget);
     });
   });
 }

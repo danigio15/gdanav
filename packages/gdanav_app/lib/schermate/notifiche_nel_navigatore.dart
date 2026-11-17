@@ -11,7 +11,9 @@ import '../stato/gestore_casa_in_guida.dart';
 ///   categoria. Gli urgenti (fumo, acqua, gas, l'allarme) passano sempre, se
 ///   l'interruttore è acceso.
 /// - «Musica nel navigatore», acceso di serie; senza il permesso del
-///   telefono, la spiegazione e «Consenti».
+///   telefono, la spiegazione e «Consenti». Su Android, col permesso, «App
+///   della musica»: quale app fa partire ▶ quando niente suona (Spotify di
+///   serie, se c'è).
 ///
 /// Quello che non arriva al telefono non arriva nemmeno qui: le notifiche si
 /// scelgono, casa per casa, nella pagina «Notifiche» di GdAHome.
@@ -41,6 +43,11 @@ class NotificheNelNavigatoreSchermata extends StatelessWidget {
           final accesi = gestore.avvisiAccesi;
           final lettore = gestore.lettore;
           final iPhone = lettore?.fonte == FonteMusica.sistema;
+          // Far partire la musica da zero: solo dove si può (Android).
+          final avvio = switch (lettore) {
+            final AvvioDellaMusica a when a.puoAvviare && lettore!.permesso && gestore.musica => a,
+            _ => null,
+          };
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
             children: [
@@ -120,13 +127,29 @@ class NotificheNelNavigatoreSchermata extends StatelessWidget {
                   tasto: 'Consenti',
                   onTap: lettore.chiediPermesso,
                 ),
+              if (avvio != null) ...[
+                titolo('App della musica'),
+                Card(
+                  key: const Key('app-della-musica'),
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: SceltaAppDellaMusica(avvio: avvio, conDettagli: true),
+                  ),
+                ),
+                nota(
+                  'Quando niente suona, il tasto play del navigatore (sul telefono e in Android Auto) fa partire '
+                  'questa app, anche se è chiusa, e di solito riprende da dove eri. Se non parte, sul telefono da '
+                  'fermo si apre l\'app; in auto mai.',
+                ),
+              ],
               nota(
                 iPhone
-                    ? 'Sull\'iPhone un\'app non può comandare le altre: qui si vede la Musica di Apple. Spotify '
-                          'arriverà più avanti. In CarPlay «Play/pausa» e «Avanti» stanno nella barra del '
-                          'navigatore; il brano lo mostra la scheda «In riproduzione» di CarPlay.'
-                    : 'In Android Auto «Play/pausa» e «Avanti» stanno fra i tasti del navigatore, e il brano in '
-                          'alto sulla mappa; i comandi completi restano quelli dell\'auto.',
+                    ? 'Sull\'iPhone un\'app non può comandare le altre né farle partire: qui si vede la Musica '
+                          'di Apple. Spotify arriverà più avanti. In CarPlay «Play/pausa» e «Avanti» stanno nella '
+                          'barra del navigatore; il brano lo mostra la scheda «In riproduzione» di CarPlay.'
+                    : 'In Android Auto il brano e i tasti stanno nel lettore in alto sulla mappa (o fra i tasti del '
+                          'navigatore, sulle auto che non si toccano); i comandi completi restano quelli dell\'auto.',
               ),
             ],
           );

@@ -26,6 +26,20 @@
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
+        <!-- Far partire la musica da zero (`musica/AvvioMusica.kt`): da
+             Android 11 si vedono solo le app dichiarate qui. Chi offre un
+             MediaBrowserService (Spotify, YouTube Music…: l'elenco «App
+             della musica» e il collegamento pulito), chi riceve i tasti
+             multimediali (▶ mandato all'app), e Spotify per nome (il nome,
+             l'icona e, solo sul telefono da fermi, aprirla). Si uniscono da
+             sole al manifesto dell'app che porta GdANav dentro. -->
+        <intent>
+            <action android:name="android.media.browse.MediaBrowserService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MEDIA_BUTTON" />
+        </intent>
+        <package android:name="com.spotify.music" />
     </queries>
     <application>
         <service

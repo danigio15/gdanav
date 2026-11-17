@@ -14,6 +14,7 @@ import it.gdanav.gdanav_app.auto.DisposizioneMusica.Forma
 import it.gdanav.gdanav_app.auto.DisposizioneMusica.Riq
 import it.gdanav.gdanav_app.auto.DisposizioneMusica.Zona
 import it.gdanav.gdanav_app.musica.LettoreTelefono
+import it.gdanav.gdanav_app.musica.SceltaApp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -802,18 +803,32 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
             sopra = listOfNotNull(avviso?.riq()),
             ostacoli = ostacoli,
         )
+        // Niente che suona: la pillola dice chi parte con ▶ («▶ Spotify»,
+        // con la sua icona), e mentre parte «Avvio Spotify…».
+        val avvio = if (b == null) {
+            val inCorso = LettoreTelefono.inAvvio
+            val app = if (inCorso) LettoreTelefono.appInAvvio else LettoreTelefono.prossima
+            PillolaAvvio(
+                etichetta = if (inCorso) SceltaApp.testoAvvio(app?.nome) else app?.nome,
+                icona = app?.icona,
+                inCorso = inCorso,
+            )
+        } else {
+            null
+        }
         val d = DisposizioneMusica.disponi(
             spazio,
             conBrano = b != null,
             ridotto = MusicaInAuto.ridotto,
             comandabile = MusicaInAuto.coiTasti,
+            etichettaDp = avvio?.etichetta?.let { disegnoMusica.largaEtichetta(it) / densita } ?: 0f,
         )
         disposta = d
         if (d != null) {
             val durata = b?.durataMs ?: 0L
             val parte = if (d.avanzamento != null && durata > 0L) LettoreTelefono.posizioneMs().toFloat() / durata else null
             val accesa = premuta.takeIf { SystemClock.uptimeMillis() < premutaFino }
-            pienaPx = disegnoMusica.disegna(canvas, d, b, notte, accesa, parte)
+            pienaPx = disegnoMusica.disegna(canvas, d, b, notte, accesa, parte, avvio)
             if (parte != null && b?.suona == true && !battitoInProgramma) {
                 battitoInProgramma = true
                 postDelayed(battito, BATTITO_MS)
@@ -854,7 +869,9 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
                 LettoreTelefono.comando("precedente")
                 accendi(zona)
             }
-            Zona.PLAY_PAUSA -> if (b?.puoPlayPausa != false) {
+            // Senza brano fa partire l'app della musica (una volta: mentre
+            // parte, un altro tocco non fa niente).
+            Zona.PLAY_PAUSA -> if (b?.puoPlayPausa != false && !(b == null && LettoreTelefono.inAvvio)) {
                 LettoreTelefono.comando("playPausa")
                 accendi(zona)
             }
