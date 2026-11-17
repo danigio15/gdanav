@@ -1,19 +1,18 @@
 package it.gdanav.gdanav_app.musica
 
-import android.content.ComponentName
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Handler
 import android.os.Looper
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.session.MediaController
-import androidx.media3.session.SessionToken
-import com.google.common.util.concurrent.ListenableFuture
-import com.google.common.util.concurrent.MoreExecutors
+import androidx.media3.exoplayer.ExoPlayer
+import it.gdanav.gdanav_app.auto.PonteAuto
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -21,18 +20,32 @@ import java.util.concurrent.CopyOnWriteArrayList
  * (e i brani di Home Assistant raggiungibili da fuori) suonano qui, nel
  * telefono, quindi nelle casse dell'auto; non sui lettori di casa.
  *
- * A suonare è ExoPlayer, dentro [ServizioLettoreDiCasa] (un
- * `MediaLibraryService` di media3): la sua sessione dà la notifica, chiede il
- * focus audio (un'altra app che parte la mette in pausa, una telefonata
- * pure), risponde ai tasti del volante e delle cuffie, e compare fra i
- * lettori di Android (e, se l'app dichiara la musica per Android Auto, nella
- * scheda della musica dell'auto). Qui si tiene un `MediaController` collegato
- * a quella sessione: è da lui che si comanda, e da lui si sa cosa suona.
+ * A suonare è ExoPlayer, **dentro il processo dell'app** e senza una
+ * sessione multimediale esposta al sistema: niente servizio in primo piano,
+ * niente notifica della musica, niente tasti del volante o delle cuffie,
+ * niente scheda nella musica di Android Auto. Si comanda solo da GdANav: dal
+ * pannello sulla mappa dell'auto (⏮ ⏯ ⏭ da toccare), dal telefono e dal Menu
+ * «Musica di casa».
  *
- * Le radio si passano tutte insieme ([suona]): ⏮ ⏭ (sul pannello, sul
- * volante) passano alla radio prima o dopo fra le preferite. Una radio in
- * diretta dice spesso cosa sta trasmettendo (i metadati ICY): si mostra al
- * posto di «In diretta» ([inOnda]).
+ * Il focus audio lo chiede ExoPlayer (`setAudioAttributes(…, true)`: un
+ * `AudioFocusRequest` come quello di una sessione): la voce del navigatore,
+ * che chiede il focus per un attimo, la abbassa e poi la rialza; una
+ * telefonata la mette in pausa e alla fine riparte; un'altra app che suona la
+ * ferma. Staccate le cuffie o il Bluetooth dell'auto si ferma da sé.
+ *
+ * Senza servizio in primo piano il processo resta vivo finché qualcosa lo
+ * tiene davanti: con Android Auto collegato lo schermo dell'auto
+ * (`CarAppService` legato da Android Auto, e il servizio della posizione in
+ * auto, `PosizioneInAuto`), sul telefono l'app aperta. Sul solo telefono,
+ * con l'app dietro e l'auto staccata, Android lo congelerebbe o lo
+ * chiuderebbe dopo un po', e la radio morirebbe a caso: allora la si mette in
+ * pausa noi, dopo [ATTESA_SOTTOFONDO_MS], e lo si dice al ritorno
+ * ([sottofondo]).
+ *
+ * Le radio si passano tutte insieme ([suona]): ⏮ ⏭ passano alla radio prima
+ * o dopo fra le preferite. Una radio in diretta dice spesso cosa sta
+ * trasmettendo (i metadati ICY): si mostra al posto di «In diretta»
+ * ([inOnda]).
  *
  * Lo leggono [LettoreTelefono] (che lo mette al posto del lettore delle altre
  * app mentre suona: il pannello sulla mappa dell'auto e il telefono non
@@ -69,7 +82,7 @@ object LettoreDiCasa {
     @Volatile var suona = false
         private set
 
-    /** Si sta collegando o caricando il flusso. */
+    /** Si sta caricando il flusso. */
     @Volatile var carica = false
         private set
 
@@ -93,11 +106,10 @@ object LettoreDiCasa {
     private val principale = Handler(Looper.getMainLooper())
     private val ascoltatori = CopyOnWriteArrayList<() -> Unit>()
     private var contesto: Context? = null
-    private var futuro: ListenableFuture<MediaController>? = null
-    private var controllore: MediaController? = null
+    private var lettore: ExoPlayer? = null
 
-    /** Quello da suonare appena il controllore è collegato. */
-    private var daSuonare: Pair<List<MediaItem>, Int>? = null
+    /** L'app sul telefono è davanti (la dice `GdanavAppPlugin`). */
+    @Volatile private var telefonoDavanti = false
 
     fun ascolta(f: () -> Unit) = ascoltatori.add(f)
 
@@ -140,17 +152,12 @@ object LettoreDiCasa {
         }
     }
 
-    /** Le voci in [ServizioLettoreDiCasa]: l'indirizzo, il titolo, il logo. */
-    internal fun elemento(f: Flusso, radio: Boolean): MediaItem {
-        val m = MediaMetadata.Builder()
-            .setTitle(f.titolo)
-            .setArtist(f.sotto)
-            .setStation(if (radio) f.titolo else null)
-            .setIsBrowsable(false)
-            .setIsPlayable(true)
-            .setMediaType(if (radio) MediaMetadata.MEDIA_TYPE_RADIO_STATION else MediaMetadata.MEDIA_TYPE_MUSIC)
-        f.immagineByte?.let { m.setArtworkData(it, MediaMetadata.PICTURE_TYPE_FRONT_COVER) }
-        val b = MediaItem.Builder().setMediaId(f.id).setUri(f.url).setMediaMetadata(m.build())
+    /** Una voce per ExoPlayer: l'indirizzo e il titolo (per riconoscere i metadati ICY). */
+    private fun elemento(f: Flusso): MediaItem {
+        val b = MediaItem.Builder()
+            .setMediaId(f.id)
+            .setUri(f.url)
+            .setMediaMetadata(MediaMetadata.Builder().setTitle(f.titolo).build())
         f.mime?.let { b.setMimeType(it) }
         return b.build()
     }
@@ -177,58 +184,37 @@ object LettoreDiCasa {
         carica = true
         suona = false
         avvisa()
-        daSuonare = buone.map { elemento(it, radio) } to indice
-        collega(ctx)
+        val l = lettore ?: crea(ctx) ?: run {
+            fallito("Il lettore non parte")
+            return null
+        }
+        try {
+            l.setMediaItems(buone.map(::elemento), indice, 0L)
+            l.prepare()
+            l.play()
+        } catch (_: Exception) {
+            fallito("Il lettore non parte")
+        }
+        // Fatta partire con l'app dietro e senza l'auto: non resterebbe viva.
+        sottofondo()
         return null
     }
 
-    /** Ci si collega alla sessione del servizio (lo fa partire, se serve). */
-    private fun collega(ctx: Context) {
-        controllore?.let {
-            suonaQuelloInAttesa(it)
-            return
-        }
-        if (futuro != null) return
-        val f = try {
-            MediaController.Builder(ctx, SessionToken(ctx, ComponentName(ctx, ServizioLettoreDiCasa::class.java))).buildAsync()
-        } catch (_: Exception) {
-            null
-        }
-        if (f == null) {
-            fallito("Il lettore non parte")
-            return
-        }
-        futuro = f
-        f.addListener(
-            {
-                val c = try {
-                    f.get()
-                } catch (_: Exception) {
-                    null
-                }
-                futuro = null
-                if (c == null) {
-                    fallito("Il lettore non parte")
-                    return@addListener
-                }
-                controllore = c
-                c.addListener(richiamo)
-                suonaQuelloInAttesa(c)
-            },
-            MoreExecutors.directExecutor(),
-        )
-    }
-
-    private fun suonaQuelloInAttesa(c: MediaController) {
-        val (elementi, da) = daSuonare ?: return
-        daSuonare = null
-        try {
-            c.setMediaItems(elementi, da, 0L)
-            c.prepare()
-            c.play()
-        } catch (_: Exception) {
-            fallito("Il lettore non parte")
-        }
+    /** ExoPlayer, nel processo dell'app: il focus audio lo chiede lui, la sessione non c'è. */
+    private fun crea(ctx: Context): ExoPlayer? = try {
+        ExoPlayer.Builder(ctx)
+            .setAudioAttributes(
+                AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
+                true,
+            )
+            .setHandleAudioBecomingNoisy(true)
+            .build()
+            .also {
+                it.addListener(richiamo)
+                lettore = it
+            }
+    } catch (_: Exception) {
+        null
     }
 
     private fun fallito(testo: String) {
@@ -247,12 +233,12 @@ object LettoreDiCasa {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             carica = playbackState == Player.STATE_BUFFERING
-            durataMs = controllore?.duration?.takeIf { it > 0L } ?: 0L
+            durataMs = lettore?.duration?.takeIf { it > 0L } ?: 0L
             avvisa()
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            val i = controllore?.currentMediaItemIndex ?: return
+            val i = lettore?.currentMediaItemIndex ?: return
             if (i in voci.indices) indice = i
             inOnda = null
             avvisa()
@@ -275,41 +261,45 @@ object LettoreDiCasa {
         }
     }
 
-    /** ⏯ ⏮ ⏭ dal pannello dell'auto o dal telefono. */
+    /** ⏯ ⏮ ⏭ dal pannello dell'auto, dal Menu o dal telefono: solo da GdANav. */
     fun comando(quale: String) {
-        val c = controllore
-        if (c == null) {
+        val l = lettore
+        if (l == null) {
             contesto?.let { if (quale == "playPausa" && attivo) riprendi(it) }
             return
         }
         try {
             when (quale) {
-                "playPausa" -> if (c.isPlaying) c.pause() else {
-                    if (c.mediaItemCount == 0) contesto?.let { riprendi(it) } else c.play()
+                "playPausa" -> if (l.isPlaying) l.pause() else {
+                    if (l.mediaItemCount == 0) contesto?.let { riprendi(it) } else l.play()
                 }
-                "successivo" -> if (voci.size > 1) c.seekToNextMediaItem()
-                "precedente" -> if (voci.size > 1) c.seekToPreviousMediaItem()
+                "successivo" -> if (voci.size > 1) l.seekToNextMediaItem()
+                "precedente" -> if (voci.size > 1) l.seekToPreviousMediaItem()
             }
         } catch (_: Exception) {}
     }
 
-    /** Si riprende quello che c'era (il servizio era stato chiuso). */
+    /** Si riprende quello che c'era (il lettore era stato chiuso). */
     private fun riprendi(ctx: Context) {
         suona(ctx, voci, indice, nome, radio)
     }
 
     /** A che punto è il brano (0 per una radio in diretta). Dal filo principale. */
     fun posizioneMs(): Long = try {
-        if (durataMs > 0L) controllore?.currentPosition?.coerceIn(0L, durataMs) ?: 0L else 0L
+        if (durataMs > 0L) lettore?.currentPosition?.coerceIn(0L, durataMs) ?: 0L else 0L
     } catch (_: Exception) {
         0L
     }
 
-    /** La musica di casa si ferma e se ne va dal pannello. */
+    /** La musica di casa si ferma, se ne va dal pannello, e il lettore si chiude. */
     fun ferma() {
+        principale.removeCallbacks(controlloSottofondo)
+        val l = lettore
+        lettore = null
         try {
-            controllore?.stop()
-            controllore?.clearMediaItems()
+            l?.removeListener(richiamo)
+            l?.stop()
+            l?.release()
         } catch (_: Exception) {}
         voci = emptyList()
         indice = 0
@@ -326,7 +316,52 @@ object LettoreDiCasa {
         avvisa()
     }
 
-    /** Solo per le fotografie: lo stato messo a mano, senza il servizio. */
+    // --- In sottofondo, senza l'auto ---------------------------------------
+
+    /**
+     * Se la musica di casa deve fermarsi: senza servizio in primo piano il
+     * processo lo tengono vivo solo l'app aperta sul telefono o lo schermo
+     * dell'auto. Pubblica per le prove.
+     */
+    fun daFermareInSottofondo(telefonoDavanti: Boolean, inAuto: Boolean): Boolean = !telefonoDavanti && !inAuto
+
+    /** Il messaggio al ritorno, quando la si è messa in pausa noi. */
+    const val TESTO_SOTTOFONDO = "La musica di casa si è fermata: senza Android Auto suona solo con l'app aperta"
+
+    /** Quanto si aspetta prima di fermarla: un giro veloce in un'altra app, o una rotazione, non la ferma. */
+    const val ATTESA_SOTTOFONDO_MS = 4_000L
+
+    /** L'app sul telefono è venuta davanti o è andata dietro (`GdanavAppPlugin`). */
+    fun telefonoDavanti(si: Boolean) {
+        telefonoDavanti = si
+        sottofondo()
+    }
+
+    /**
+     * Qualcosa è cambiato (l'app sul telefono, lo schermo dell'auto: lo dice
+     * anche `PonteAuto.inAuto`): se adesso nessuno tiene vivo il processo, fra
+     * [ATTESA_SOTTOFONDO_MS] la si mette in pausa, invece di lasciarla morire
+     * a caso quando Android congela l'app.
+     */
+    fun sottofondo() {
+        principale.removeCallbacks(controlloSottofondo)
+        if (attivo && daFermareInSottofondo(telefonoDavanti, PonteAuto.inAutoAdesso)) {
+            principale.postDelayed(controlloSottofondo, ATTESA_SOTTOFONDO_MS)
+        }
+    }
+
+    private val controlloSottofondo = Runnable {
+        val l = lettore
+        if (!attivo || !daFermareInSottofondo(telefonoDavanti, PonteAuto.inAutoAdesso)) return@Runnable
+        if (l == null || !(l.isPlaying || l.playWhenReady)) return@Runnable
+        try {
+            l.pause()
+        } catch (_: Exception) {}
+        errore = TESTO_SOTTOFONDO
+        avvisa()
+    }
+
+    /** Solo per le fotografie: lo stato messo a mano, senza il lettore. */
     fun perLeFoto(voci: List<Flusso>, indice: Int, radio: Boolean, suona: Boolean, inOnda: String?) {
         this.voci = voci
         this.indice = indice

@@ -4,7 +4,8 @@ package it.gdanav.gdanav_app.musica
  * Le prove di [MusicaDiCasa]: l'elenco della musica di casa come lo manda il
  * telefono allo schermo dell'auto (dove suona ogni voce), quali radio suonano
  * qui (solo quelle in auto, con un flusso https), e il brano che il pannello
- * dell'auto mostra mentre suona una radio di casa ([LettoreDiCasa]).
+ * dell'auto mostra mentre suona una radio di casa ([LettoreDiCasa]), e
+ * quando la si ferma in sottofondo (niente servizio in primo piano).
  * Stazioni e playlist inventate. Come le altre prove, un `main` che si ferma
  * al primo conto sbagliato; ha bisogno delle classi di Android (finte, sul
  * banco) perché legge le immagini.
@@ -79,6 +80,13 @@ object MusicaDiCasaProva {
         uguale("in pausa", LettoreDiCasa.brano()?.suona, false)
         LettoreDiCasa.perLeFoto(emptyList(), 0, radio = true, suona = false, inOnda = null)
         uguale("niente di casa: niente brano", LettoreDiCasa.brano(), null)
+
+        // Senza servizio in primo piano: si ferma solo con l'app dietro e
+        // senza l'auto (lì nessuno tiene vivo il processo).
+        uguale("app aperta, senza auto: suona", LettoreDiCasa.daFermareInSottofondo(telefonoDavanti = true, inAuto = false), false)
+        uguale("app dietro, in auto: suona", LettoreDiCasa.daFermareInSottofondo(telefonoDavanti = false, inAuto = true), false)
+        uguale("app aperta, in auto: suona", LettoreDiCasa.daFermareInSottofondo(telefonoDavanti = true, inAuto = true), false)
+        uguale("app dietro, senza auto: si ferma", LettoreDiCasa.daFermareInSottofondo(telefonoDavanti = false, inAuto = false), true)
 
         println("MusicaDiCasa: $prove conti, tutti giusti")
         System.exit(0)

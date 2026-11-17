@@ -1,6 +1,5 @@
 import AVFoundation
 import Flutter
-import MediaPlayer
 import UIKit
 
 /// La musica di casa **in auto**, sull'iPhone: le radio preferite della casa
@@ -9,17 +8,18 @@ import UIKit
 ///
 /// Suona `AVPlayer` (una coda: ⏮ ⏭ passano alla radio preferita prima o
 /// dopo), con la sessione audio `.playback` (continua a schermo spento:
-/// l'app che porta GdANav dichiara `audio` in `UIBackgroundModes`). Il brano
-/// lo dice `MPNowPlayingInfoCenter` e i tasti li prende
-/// `MPRemoteCommandCenter`: così compare in «In riproduzione» di CarPlay, sul
-/// blocco schermo, e risponde ai tasti del volante e delle cuffie. Una radio
-/// che dice cosa trasmette (i metadati ICY) lo mostra al posto di «In
-/// diretta».
+/// l'app che porta GdANav dichiara `audio` in `UIBackgroundModes` da prima,
+/// per la voce della guida). Una radio che dice cosa trasmette (i metadati
+/// ICY) lo mostra al posto di «In diretta».
 ///
-/// In CarPlay non c'è un elenco delle radio: un'app di navigazione mostra
-/// solo i modelli della navigazione, e le radio si scelgono sul telefono. Il
-/// brano lo mostra «In riproduzione»; ⏯ e ⏭ stanno nella barra del
-/// navigatore (`GdanavCarPlay`, da [LettoreDiSistema]).
+/// Come su Android, **niente comandi dal volante**: nessun
+/// `MPRemoteCommandCenter` (volante, cuffie, blocco schermo) e nessun
+/// `MPNowPlayingInfoCenter` («In riproduzione» di CarPlay avrebbe i suoi
+/// tasti, che arrivano come comandi remoti). Si comanda solo da GdANav: dal
+/// telefono e, in CarPlay, coi tasti ⏯ ⏭ della barra del navigatore
+/// (`GdanavCarPlay`, da [LettoreDiSistema]). In CarPlay non c'è un elenco
+/// delle radio: un'app di navigazione mostra solo i modelli della
+/// navigazione, e le radio si scelgono sul telefono.
 ///
 /// Solo indirizzi `https` (la regola di iOS, App Transport Security): la casa
 /// manda solo quelli. Si tocca dal filo principale.
@@ -51,7 +51,6 @@ final class LettoreDiCasa: NSObject {
     private var osservaFine: NSObjectProtocol?
     private var metadati: AVPlayerItemMetadataOutput?
     private var ascoltatori: [UUID: () -> Void] = [:]
-    private var comandiPronti = false
 
     @discardableResult
     func ascolta(_ f: @escaping () -> Void) -> UUID {
@@ -65,7 +64,6 @@ final class LettoreDiCasa: NSObject {
     }
 
     private func avvisa() {
-        aggiornaInRiproduzione()
         for f in ascoltatori.values { f() }
     }
 
@@ -91,7 +89,6 @@ final class LettoreDiCasa: NSObject {
         indice = min(max(argomenti["da"] as? Int ?? 0, 0), flussi.count - 1)
         nome = argomenti["nome"] as? String
         radio = argomenti["radio"] as? Bool ?? false
-        preparaComandi()
         do {
             let sessione = AVAudioSession.sharedInstance()
             try sessione.setCategory(.playback, mode: .default)
@@ -168,62 +165,11 @@ final class LettoreDiCasa: NSObject {
         indice = 0
         suona = false
         inOnda = nil
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         avvisa()
     }
 
     func erroreDetto() {
         errore = nil
-    }
-
-    /// I tasti del sistema: il volante, le cuffie, «In riproduzione».
-    private func preparaComandi() {
-        guard !comandiPronti else { return }
-        comandiPronti = true
-        let c = MPRemoteCommandCenter.shared()
-        c.playCommand.addTarget { [weak self] _ in
-            guard let self, self.attivo else { return .noActionableNowPlayingItem }
-            if !self.suona { self.comando("playPausa") }
-            return .success
-        }
-        c.pauseCommand.addTarget { [weak self] _ in
-            guard let self, self.attivo else { return .noActionableNowPlayingItem }
-            if self.suona { self.comando("playPausa") }
-            return .success
-        }
-        c.togglePlayPauseCommand.addTarget { [weak self] _ in
-            guard let self, self.attivo else { return .noActionableNowPlayingItem }
-            self.comando("playPausa")
-            return .success
-        }
-        c.nextTrackCommand.addTarget { [weak self] _ in
-            guard let self, self.voci.count > 1 else { return .noActionableNowPlayingItem }
-            self.comando("successivo")
-            return .success
-        }
-        c.previousTrackCommand.addTarget { [weak self] _ in
-            guard let self, self.voci.count > 1 else { return .noActionableNowPlayingItem }
-            self.comando("precedente")
-            return .success
-        }
-    }
-
-    /// Quello che mostrano «In riproduzione» di CarPlay e il blocco schermo.
-    private func aggiornaInRiproduzione() {
-        guard let f = attuale else { return }
-        MPRemoteCommandCenter.shared().nextTrackCommand.isEnabled = voci.count > 1
-        MPRemoteCommandCenter.shared().previousTrackCommand.isEnabled = voci.count > 1
-        var info: [String: Any] = [
-            MPMediaItemPropertyTitle: f.titolo,
-            MPMediaItemPropertyArtist: inOnda ?? nome ?? f.sotto,
-            MPNowPlayingInfoPropertyIsLiveStream: radio,
-            MPNowPlayingInfoPropertyPlaybackRate: suona ? 1.0 : 0.0,
-        ]
-        if radio { info[MPMediaItemPropertyAlbumTitle] = "Radio di casa" }
-        if let img = f.immagine {
-            info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: img.size) { _ in img }
-        }
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 }
 

@@ -12,6 +12,7 @@ import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import it.gdanav.gdanav_app.musica.LettoreDiCasa
 import it.gdanav.gdanav_app.musica.LettoreTelefono
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -908,6 +909,9 @@ object PonteAuto {
         inAutoAdesso = si
         principale.post {
             if (si) contesto?.let { LettoreTelefono.ricontrolla(it) }
+            // Staccata l'auto, la musica di casa resta viva solo con l'app
+            // aperta sul telefono (`LettoreDiCasa.sottofondo`).
+            LettoreDiCasa.sottofondo()
             inAutoTentativi = IN_AUTO_TENTATIVI
             if (!inAutoInViaggio) {
                 inAutoInViaggio = true

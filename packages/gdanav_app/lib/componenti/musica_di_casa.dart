@@ -10,9 +10,12 @@
 ///
 /// - una radio (un flusso internet già risolto da Home Assistant) e un file
 ///   di Home Assistant raggiungibile da fuori: col lettore **nativo** del
-///   navigatore ([SuonaDallaCasa]: su Android ExoPlayer con la sua sessione,
-///   sull'iPhone AVPlayer), che compare nel lettore sulla mappa, nella scheda
-///   della musica dell'auto e risponde ai tasti del volante;
+///   navigatore ([SuonaDallaCasa]: su Android ExoPlayer, sull'iPhone
+///   AVPlayer), che compare nel lettore sulla mappa e si comanda da lì, dal
+///   telefono e dal Menu dell'auto. Nessuna sessione per il sistema: niente
+///   tasti del volante, niente scheda della musica dell'auto, niente
+///   servizio in primo piano (su Android suona finché l'app è aperta o
+///   l'auto è collegata);
 /// - una playlist di Spotify (o un preferito di Alexa con un servizio che sul
 ///   telefono ha la sua app): nell'app del telefono, **senza aprirla** in auto
 ///   (solo Android; sull'iPhone un'app non fa partire le altre, e Spotify si

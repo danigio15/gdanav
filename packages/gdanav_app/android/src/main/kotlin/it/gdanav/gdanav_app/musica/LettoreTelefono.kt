@@ -594,7 +594,8 @@ object LettoreTelefono {
      * sistema non lo mette ancora fra gli attivi.
      */
     private fun scegli(tutte: List<MediaController>) {
-        // La nostra sessione (la musica di casa) la si legge da [LettoreDiCasa].
+        // Mai una nostra: la musica di casa non ha sessione, la si legge da
+        // [LettoreDiCasa].
         val elenco = tutte.filter { it.packageName != contesto?.packageName }
         sessioniAttive = elenco
         val suona = elenco.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }

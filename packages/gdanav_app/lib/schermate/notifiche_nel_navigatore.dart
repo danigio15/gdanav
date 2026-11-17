@@ -143,12 +143,13 @@ class NotificheNelNavigatoreSchermata extends StatelessWidget {
                 ),
                 nota(
                   iPhone
-                      ? 'Le radio suonano qui nel telefono, e in CarPlay si vedono in «In riproduzione». Le playlist '
-                            'di Spotify si aprono nell\'app, da fermo; quelle di Sonos e di Music Assistant si suonano '
-                            'solo sui lettori di casa, e da qui le puoi far partire lì.'
-                      : 'Le radio suonano nel navigatore, anche in Android Auto (Menu › Musica di casa), coi tasti del '
-                            'volante. Le playlist di Spotify partono nell\'app senza aprirla; quelle di Sonos e di Music '
-                            'Assistant si suonano solo sui lettori di casa, e da qui le puoi far partire lì.',
+                      ? 'Le radio suonano qui nel telefono, e in CarPlay si comandano coi tasti della barra del '
+                            'navigatore. Le playlist di Spotify si aprono nell\'app, da fermo; quelle di Sonos e di Music '
+                            'Assistant si suonano solo sui lettori di casa, e da qui le puoi far partire lì.'
+                      : 'Le radio suonano nel navigatore, anche in Android Auto (Menu › Musica di casa), e si comandano '
+                            'dal lettore sulla mappa; senza l\'auto, solo con l\'app aperta. Le playlist di Spotify partono '
+                            'nell\'app senza aprirla; quelle di Sonos e di Music Assistant si suonano solo sui lettori di '
+                            'casa, e da qui le puoi far partire lì.',
                 ),
               ],
               if (avvio != null) ...[
