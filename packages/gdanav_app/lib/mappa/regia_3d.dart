@@ -125,6 +125,27 @@ class Regia3d {
   /// La pagina è quella dello schermo dell'auto (vedi `msgOpzioni`).
   final bool inAuto;
 
+  /// Quante scene 3D girano adesso sullo schermo dell'auto (le regie con
+  /// [inAuto], da [avvia] a [ferma]).
+  ///
+  /// «Quando è attiva la modalità 3D aumentata si rallenta anche lo
+  /// smartphone: se lo utilizzo va lento il telefono e il navigatore.» Con la
+  /// guida sull'auto e il navigatore aperto anche sul telefono le scene 3D
+  /// sono due, intere, sulla stessa scheda grafica: quella del telefono fino
+  /// a sessanta fotogrammi al secondo. Finché ce n'è una sull'auto, quella
+  /// del telefono si fa leggera ([msgLeggera]).
+  static final sullAuto = ValueNotifier<int>(0);
+  var _contata = false;
+  bool? _leggeraMandata;
+
+  void _leggera() {
+    if (inAuto || !_caricata || _finita) return;
+    final si = sullAuto.value > 0;
+    if (si == (_leggeraMandata ?? false)) return;
+    _leggeraMandata = si;
+    _manda(msgLeggera(si));
+  }
+
   var _caricata = false;
   var _pronta = false;
   var _finita = false;
@@ -167,6 +188,12 @@ class Regia3d {
     persone?.addListener(_persone);
     guida.risparmio?.addListener(_risparmio);
     guida.auto.addListener(_dalCruscotto);
+    if (inAuto) {
+      _contata = true;
+      sullAuto.value++;
+    } else {
+      sullAuto.addListener(_leggera);
+    }
     _attesa = Timer(attesa, () {
       if (!_pronta) nonVa('tempo', ricorda: false);
     });
@@ -185,6 +212,11 @@ class Regia3d {
     persone?.removeListener(_persone);
     guida.risparmio?.removeListener(_risparmio);
     guida.auto.removeListener(_dalCruscotto);
+    sullAuto.removeListener(_leggera);
+    if (_contata) {
+      _contata = false;
+      sullAuto.value--;
+    }
     _attesa?.cancel();
     _guardia?.cancel();
   }
@@ -256,6 +288,8 @@ class Regia3d {
     _sopraMandato = null;
     // La pausa prima di tutto: la mappa non deve partire a disegnare.
     if (_pausa) _manda(msgPausa(true));
+    _leggeraMandata = null;
+    _leggera();
     opzioni(forza: true);
     _stile();
     // Le persone sono un cerchio e due scritte, senza immagini: subito.

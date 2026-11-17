@@ -44,6 +44,11 @@ const CONTROLLI = {
     (m.pitch === undefined || (numero(m.pitch) && m.pitch >= 0 && m.pitch <= 85)) &&
     (m.riquadro === undefined || (Array.isArray(m.riquadro) && m.riquadro.length === 4 && m.riquadro.every(numero))),
   pausa: (m) => typeof m.si === 'boolean',
+  // Dal telefono, sull'auto (`CaricoScena3d.kt`, `RendererMappa.kt`).
+  carico: (m) => Number.isInteger(m.livello) && m.livello >= 0 && m.livello <= 3 && (m.telefono === undefined || typeof m.telefono === 'boolean'),
+  nascosta: (m) => typeof m.si === 'boolean',
+  // Dall'app, sul telefono: sull'auto gira un'altra scena (`Regia3d.sullAuto`).
+  leggera: (m) => typeof m.si === 'boolean',
   velocita: (m) => numero(m.ms) && m.ms >= 0 && numero(m.alle),
   edifici: (m) =>
     [m.z, m.x, m.y].every((n) => Number.isInteger(n) && n >= 0) && (m.dati === null || m.dati === undefined || typeof m.dati === 'string'),

@@ -42,7 +42,8 @@ double _sei(double x) => (x * 1e6).roundToDouble() / 1e6;
 /// pagina li chiede per ogni tessera che costruisce.
 ///
 /// [inAuto]: la pagina è quella dello schermo dell'auto (Android Auto): lì
-/// disegna sempre a trenta fotogrammi al secondo.
+/// i fotogrammi seguono la velocità (al più trenta al secondo) e la tela ha
+/// un tetto di pixel (`web3d/src/capacita.js`).
 Map<String, Object?> msgOpzioni({
   required bool notte,
   required VistaMappa vista,
@@ -185,6 +186,12 @@ Map<String, Object?> msgCamera(
 
 /// L'app va in secondo piano (o torna): la mappa smette di disegnare.
 Map<String, Object?> msgPausa(bool si) => _m('pausa', {'si': si});
+
+/// Sull'auto gira un'altra scena 3D ([si]): quella del telefono segue le
+/// regole dell'auto (mai sessanta fotogrammi al secondo, il passo secondo la
+/// velocità, il tetto dei pixel). Due scene intere sulla stessa scheda
+/// grafica: «va lento il telefono e il navigatore».
+Map<String, Object?> msgLeggera(bool si) => _m('leggera', {'si': si});
 
 /// Il colore dell'auto 3D. La freccia (la scelta di partenza) è l'auto rossa:
 /// «crea un colore che vada in contrasto con la linea del percorso». Le

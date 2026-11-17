@@ -57,6 +57,7 @@ internal class Scena3dAuto(
 
             override fun onPageFinished(view: WebView, url: String?) {
                 misura()
+                carico.ridici()
             }
 
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
@@ -70,6 +71,9 @@ internal class Scena3dAuto(
     }
 
     private var finita = false
+
+    /** Il calore del telefono e il telefono in uso: la pagina pesa di meno ([CaricoScena3d]). */
+    private val carico = CaricoScena3d(context) { js -> esegui(js) }
 
     /**
      * Quanti pixel dello schermo dell'auto fa un punto della pagina, misurato
@@ -116,6 +120,7 @@ internal class Scena3dAuto(
     override fun distruggi() {
         if (finita) return
         finita = true
+        carico.ferma()
         vista.stopLoading()
         vista.removeJavascriptInterface(CANALE)
         vista.destroy()
