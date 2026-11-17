@@ -112,8 +112,11 @@ struct AvvisoAuto {
 
 /// Un avviso di casa (dentro GdAHome: la lavatrice, l'antifurto, il fumo),
 /// come lo manda `lib/auto/avvisi_di_casa_in_auto.dart`: al più due tasti,
-/// già scelti dal telefono. `secondi` nil: resta finché non lo si chiude.
-/// `conferma`: è la domanda «Sì / No» di un tasto che fa qualcosa da lontano.
+/// già scelti dal telefono (un urgente ha sempre «Chiudi»). `secondi` è il
+/// tempo che gli **resta** sul telefono, contato da quando è arrivato qui
+/// (`arrivato`); nil: sul telefono resta finché non lo si chiude (gli
+/// urgenti, la domanda). `conferma`: è la domanda «Sì / No» di un tasto che
+/// fa qualcosa da lontano.
 struct AvvisoCasaAuto {
     struct Tasto {
         let id: String
@@ -130,19 +133,31 @@ struct AvvisoCasaAuto {
     let icona: UIImage?
     let tasti: [Tasto]
 
+    /// Quando è arrivato dal telefono (il tempo di sistema, in secondi).
+    let arrivato: TimeInterval
+
+    /// Di quale avviso si tratta, per CarPlay: l'id, se è la domanda, e i
+    /// suoi tasti (che su un avviso già mostrato non si cambiano). Titolo e
+    /// testo no: quelli si aggiornano senza rimostrarlo.
+    let chiave: String
+
     init?(_ a: [String: Any], scala: CGFloat) {
         guard let id = a["id"] as? String else { return nil }
         self.id = id
         titolo = a["titolo"] as? String ?? ""
         testo = a["testo"] as? String ?? ""
         urgente = (a["urgente"] as? Bool) == true
-        secondi = numero(a["secondi"]).map { Int($0) }
-        conferma = (a["conferma"] as? Bool) == true
+        secondi = numeroIntero(a["secondi"]).map { max($0, 0) }
+        let domanda = (a["conferma"] as? Bool) == true
+        conferma = domanda
+        arrivato = ProcessInfo.processInfo.systemUptime
         icona = (a["icona"] as? FlutterStandardTypedData).flatMap { UIImage(data: $0.data, scale: scala) }
-        tasti = (a["tasti"] as? [[String: Any]] ?? []).compactMap { t in
+        let scelti: [Tasto] = (a["tasti"] as? [[String: Any]] ?? []).compactMap { t in
             guard let tid = t["id"] as? String else { return nil }
             return Tasto(id: tid, etichetta: t["etichetta"] as? String ?? tid, principale: (t["principale"] as? Bool) == true)
         }.prefix(2).map { $0 }
+        tasti = scelti
+        chiave = "\(id)|\(domanda)|" + scelti.map { "\($0.id)=\($0.etichetta)" }.joined(separator: "|")
     }
 }
 
@@ -216,6 +231,14 @@ struct TermicaAuto {
 }
 
 func numero(_ v: Any?) -> Double? { (v as? NSNumber)?.doubleValue }
+
+/// Un numero intero arrivato dal telefono; `nil` se non c'è o non è un
+/// numero vero. `Int(Double.nan)` e `Int(.infinity)` in Swift chiudono l'app:
+/// qui non ci si arriva.
+func numeroIntero(_ v: Any?) -> Int? {
+    guard let d = numero(v), d.isFinite, abs(d) < 1e15 else { return nil }
+    return Int(d)
+}
 
 /// Quello che il telefono sa e CarPlay mostra: la copia di `PonteAuto.kt`.
 /// L'app Flutter lo aggiorna sul canale `gdanav/schermo_auto`, e dall'auto
@@ -317,6 +340,13 @@ final class PonteAuto {
     func collega(registrar: FlutterPluginRegistrar) {
         let c = FlutterMethodChannel(name: "gdanav/schermo_auto", binaryMessenger: registrar.messenger())
         c.setMethodCallHandler { [weak self] call, risultato in
+            // Il telefono, partendo, chiede se lo schermo dell'auto è acceso
+            // adesso (`_chiediInAuto` in `lib/auto/ponte_auto.dart`):
+            // l'`in_auto` mandato prima che ascoltasse può essersi perso.
+            if call.method == "chiedi_in_auto" {
+                risultato(GdanavCarPlay.collegato)
+                return
+            }
             self?.gestisci(call)
             risultato(nil)
         }
@@ -381,7 +411,7 @@ final class PonteAuto {
                 autonomiaKm: numero(a["autonomia_km"]),
                 autonomiaAuto: (a["autonomia_auto"] as? Bool) == true,
                 velocita: numero(a["velocita"]),
-                limite: numero(a["limite"]).map { Int($0) },
+                limite: numeroIntero(a["limite"]),
                 arrivoBatteria: numero(a["arrivo_batteria"]),
                 sostaNome: a["sosta_nome"] as? String,
                 sostaKm: numero(a["sosta_km"]),
@@ -397,7 +427,7 @@ final class PonteAuto {
                 tipo: a["tipo"] as? String,
                 testo: a["testo"] as? String,
                 metri: numero(a["metri"]),
-                limite: numero(a["limite"]).map { Int($0) },
+                limite: numeroIntero(a["limite"]),
                 ancoraId: a["ancora_id"] as? String,
                 ancoraTesto: a["ancora_testo"] as? String
             )
@@ -426,7 +456,7 @@ final class PonteAuto {
         case "opzioni":
             opzioni = a
         case "svincolo":
-            if let id = numero(a["id"]).map({ Int($0) }),
+            if let id = numeroIntero(a["id"]),
                let png = (a["png"] as? FlutterStandardTypedData)?.data,
                let immagine = UIImage(data: png, scale: 2)
             {
@@ -463,7 +493,7 @@ final class PonteAuto {
     private func guidaDa(_ a: [String: Any]) -> GuidaAuto {
         let arrivoMs = numero(a["arrivo"]) ?? Date().timeIntervalSince1970 * 1000
         var g = GuidaAuto(
-            tipo: numero(a["tipo"]).map { Int($0) } ?? 8,
+            tipo: numeroIntero(a["tipo"]) ?? 8,
             distanzaM: numero(a["distanza"]) ?? 0,
             strada: a["strada"] as? String ?? "",
             istruzione: a["istruzione"] as? String ?? "",
@@ -478,7 +508,7 @@ final class PonteAuto {
             stradaKmh: numero(a["strada_kmh"]),
             uscita: a["uscita"] as? String ?? "",
             verso: a["verso"] as? String ?? "",
-            rotonda: numero(a["rotonda"]).map { Int($0) },
+            rotonda: numeroIntero(a["rotonda"]),
             corsie: (a["corsie"] as? [[String: Any]] ?? []).map { c in
                 CorsiaAuto(
                     direzioni: (c["direzioni"] as? [Any] ?? []).map { "\($0)" },
@@ -486,14 +516,14 @@ final class PonteAuto {
                     consigliata: c["consigliata"] as? String
                 )
             },
-            dopoTipo: numero(a["dopo_tipo"]).map { Int($0) },
+            dopoTipo: numeroIntero(a["dopo_tipo"]),
             dopoStrada: a["dopo_strada"] as? String ?? "",
-            dopoRotonda: numero(a["dopo_rotonda"]).map { Int($0) },
+            dopoRotonda: numeroIntero(a["dopo_rotonda"]),
             frasi: (a["frasi"] as? [Any] ?? []).compactMap { $0 as? String }.filter { !$0.isEmpty },
             dopoFrasi: (a["dopo_frasi"] as? [Any] ?? []).compactMap { $0 as? String }.filter { !$0.isEmpty },
-            svincolo: numero(a["svincolo"]).map { Int($0) }
+            svincolo: numeroIntero(a["svincolo"])
         )
-        g.trafficoMinuti = numero(a["traffico_minuti"]).map { Int($0) } ?? 0
+        g.trafficoMinuti = numeroIntero(a["traffico_minuti"]) ?? 0
         return g
     }
 
@@ -607,6 +637,36 @@ final class PonteAuto {
     func tastoCasa(_ id: String, _ tasto: String) {
         chiedi("avviso_casa_tasto", ["id": id, "tasto": tasto])
     }
+
+    /// Un avviso di casa senza un tempo suo (un urgente, la domanda «Sì /
+    /// No») se n'è andato da CarPlay senza che nessuno lo toccasse, o CarPlay
+    /// non è riuscito a mostrarlo: lo si dice al telefono col tasto finto
+    /// `_scaduto` (`AvvisiDiCasaInAuto.scaduto`). Il telefono allora non lo
+    /// tiene più «in vista sull'auto»: l'urgente lo mette da parte e fa
+    /// passare quelli dopo, la domanda torna all'avviso. [conferma]: era la
+    /// domanda.
+    func casaScaduta(_ id: String, conferma: Bool) {
+        let dati: [String: Any] = ["id": id, "tasto": "_scaduto", "conferma": conferma]
+        chiedi("avviso_casa_tasto", dati)
+    }
+
+    /// CarPlay si è scollegato: l'avviso di casa tenuto qui non vale più
+    /// (alla prossima il telefono rimanda quello di allora, se c'è).
+    func fineSessione() {
+        avvisoCasa = nil
+    }
+
+    /// Se si è fermi, per quello che sull'auto si chiede solo da fermi (il
+    /// permesso della musica, che apre una finestra sul telefono). Come
+    /// `PonteAuto.daFermi` su Android: senza una posizione non si sa, e
+    /// allora no.
+    var daFermi: Bool {
+        guard qui != nil, let kmh = cruscotto.velocita else { return false }
+        return kmh < PonteAuto.fermiKmh && velocita * 3.6 < PonteAuto.fermiKmh
+    }
+
+    /// Sotto questa velocità si è fermi (il GPS da fermi non dice mai zero giusto).
+    private static let fermiKmh = 3.0
 
     /// Le colonnine vicine, come luoghi da raggiungere.
     func colonnine(risultati: @escaping ([LuogoAuto]) -> Void) {
