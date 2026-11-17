@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -92,7 +93,14 @@ class SchermataPrincipale extends StatefulWidget {
     this.vociOspite = const [],
     this.soloImpostazioni = false,
     this.chiudiImpostazioni,
+    this.ospitata = false,
   });
+
+  /// GdANav sta dentro un'altra app (GdAHome), come una sua sezione: lo dice
+  /// [GdanavDentro]. Lì il motore può girare senza schermo (acceso dall'auto,
+  /// col telefono in tasca), e allora la mappa non è «in vista» finché l'app
+  /// non è davvero davanti.
+  final bool ospitata;
 
   /// Solo le impostazioni, in una pagina, senza la mappa: chi ospita GdANav
   /// le apre quando il navigatore è sullo schermo dell'auto, e sul telefono
@@ -209,12 +217,9 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
       if (ok) widget.posizione.avvia();
     });
     segnalazioni.avvia();
-    // La mappa davanti: gli avvisi di casa passano anche senza percorso.
-    final stato = WidgetsBinding.instance.lifecycleState;
-    widget.casaInGuida?.mappaInVista(stato == null || stato == AppLifecycleState.resumed);
-    _vita = AppLifecycleListener(
-      onStateChange: (s) => widget.casaInGuida?.mappaInVista(s == AppLifecycleState.resumed),
-    );
+    // La mappa davanti: gli avvisi di casa passano anche senza percorso
+    // ([_diciSeInVista], la prima volta da `didChangeDependencies`).
+    _vita = AppLifecycleListener(onStateChange: (_) => _diciSeInVista());
     widget.guida.addListener(_guidaDaFuori);
     widget.apriIlMenu?.addListener(_menuDaFuori);
     widget.apriIlPianificatore?.addListener(_pianificatoreDaFuori);
@@ -262,6 +267,57 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   var _inGuida = false;
   AppLifecycleListener? _vita;
 
+  /// Se questa schermata si vede: chi ospita GdANav tiene le sezioni
+  /// nascoste con gli orologi fermi (`TickerMode`), e così fa il navigatore
+  /// con le pagine sotto quella in cima. Lo si ascolta, senza farsi
+  /// ricostruire a ogni cambio (la mappa non cambia aspetto per questo).
+  ValueListenable<TickerModeData>? _orologi;
+
+  void _seguiGliOrologi() {
+    if (widget.soloImpostazioni) return;
+    final nuovi = TickerMode.getValuesNotifier(context);
+    if (!identical(nuovi, _orologi)) {
+      _orologi?.removeListener(_inVistaFraPoco);
+      _orologi = nuovi..addListener(_inVistaFraPoco);
+    }
+    _inVistaFraPoco();
+  }
+
+  /// Gli orologi cambiano mentre lo schermo si sta ricostruendo: quello che
+  /// ne segue (la coda degli avvisi che si svuota, e chi la mostra che si
+  /// rifà) aspetta che abbia finito.
+  void _inVistaFraPoco() => scheduleMicrotask(() {
+    if (mounted) _diciSeInVista();
+  });
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _seguiGliOrologi();
+  }
+
+  /// Spostata in un altro punto dell'albero: gli orologi possono essere altri.
+  @override
+  void activate() {
+    super.activate();
+    _seguiGliOrologi();
+  }
+
+  /// La mappa del telefono è in vista, per gli avvisi di casa a mappa
+  /// libera: l'app è davanti (`resumed`) e questa sezione si vede davvero.
+  ///
+  /// Senza uno stato del ciclo di vita (`null`) dipende: in GdANav da sola è
+  /// l'app appena aperta, o una prova, e vale; dentro un'altra app è il
+  /// motore acceso dall'auto senza schermo, e non vale. Prima valeva sempre:
+  /// a fine viaggio la coda non si svuotava mai, e l'urgente di ieri tornava
+  /// sullo schermo dell'auto al viaggio di oggi.
+  void _diciSeInVista() {
+    if (widget.soloImpostazioni) return;
+    final stato = WidgetsBinding.instance.lifecycleState;
+    final davanti = stato == AppLifecycleState.resumed || (stato == null && !widget.ospitata);
+    widget.casaInGuida?.mappaInVista(davanti && (_orologi?.value.enabled ?? true));
+  }
+
   Future<void> _avvia() async {
     if (_inGuida) return;
     _inGuida = true;
@@ -301,6 +357,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
   void dispose() {
     if (!widget.soloImpostazioni) {
       _vita?.dispose();
+      _orologi?.removeListener(_inVistaFraPoco);
       widget.casaInGuida?.mappaInVista(false);
       widget.guida.removeListener(_guidaDaFuori);
       widget.apriIlMenu?.removeListener(_menuDaFuori);

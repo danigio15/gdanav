@@ -172,6 +172,7 @@ class PonteAuto {
     if (casaInGuida?.coda case final coda?) {
       _casa = AvvisiDiCasaInAuto(coda, _manda)..avvia();
     }
+    unawaited(_chiediInAuto());
     if (persone case final g?) {
       _persone = PersoneInAuto(
         g,
@@ -179,6 +180,35 @@ class PonteAuto {
           'dati': {sorgentePersone: dati},
         }),
       )..avvia();
+    }
+  }
+
+  /// Lo schermo dell'auto si è acceso o spento (`in_auto`, o la risposta a
+  /// [_chiediInAuto]).
+  void _inAuto(bool acceso) {
+    auto?.schermoDellAuto(acceso);
+    // E gli avvisi di casa passano anche a mappa libera, senza percorso.
+    casaInGuida?.schermoDellAuto(acceso);
+    // L'auto, spenta, ha dimenticato l'avviso che teneva: riaccesa lo
+    // riceve da capo.
+    _casa?.schermo(acceso);
+    // E i viaggi pianificati, letti freschi: quello pianificato poco fa
+    // sul telefono deve esserci in «Dove andiamo?».
+    if (acceso && pianificati != null) unawaited(pianificati!.carica());
+  }
+
+  /// Partendo si chiede all'auto se il suo schermo è acceso
+  /// (`chiedi_in_auto`, risponde `true` o `false`): l'`in_auto` mandato
+  /// prima che qui si ascoltasse può essersi perso, o essere arrivato fuori
+  /// ordine. Un lato nativo che non lo sa (uno di prima, CarPlay finché non
+  /// lo aggiunge, le prove) non risponde con un sì o un no, e allora vale
+  /// quello che dirà `in_auto`.
+  Future<void> _chiediInAuto() async {
+    try {
+      final r = await _canale.invokeMethod<Object?>('chiedi_in_auto');
+      if (r is bool && _attivo) _inAuto(r);
+    } catch (_) {
+      // Nessuno risponde: lo dirà `in_auto`.
     }
   }
 
@@ -215,12 +245,7 @@ class PonteAuto {
       // Lo schermo dell'auto si è acceso o spento: qualcuno sta guardando, e
       // i dati dell'auto si chiedono freschi anche senza un percorso.
       case 'in_auto':
-        auto?.schermoDellAuto(a['si'] == true);
-        // E gli avvisi di casa passano anche a mappa libera, senza percorso.
-        casaInGuida?.schermoDellAuto(a['si'] == true);
-        // E i viaggi pianificati, letti freschi: quello pianificato poco fa
-        // sul telefono deve esserci in «Dove andiamo?».
-        if (a['si'] == true && pianificati != null) unawaited(pianificati!.carica());
+        _inAuto(a['si'] == true);
       // Android Auto accende la prova di guida: da qui ogni guida si percorre
       // da sola, e se non c'è ancora una meta se ne sceglie una.
       case 'prova_guida':
@@ -259,8 +284,10 @@ class PonteAuto {
       case 'naviga':
         await naviga(a['uri'] as String? ?? '');
       // Un tasto di un avviso di casa, toccato sull'auto.
+      // Anche quello finto, `_scaduto`: l'auto l'ha tolto da sola (con
+      // `conferma` se era la domanda «Sì / No»).
       case 'avviso_casa_tasto':
-        _casa?.tasto(a['id'] as String?, a['tasto'] as String?);
+        _casa?.tasto(a['id'] as String?, a['tasto'] as String?, conferma: a['conferma'] as bool?);
       // «Fine» premuto sullo schermo dell'auto.
       case 'ferma':
         // Anche dal riepilogo dell'arrivo: si chiude, come «Fine» sul telefono.

@@ -98,6 +98,11 @@ abstract class LettoreMusicale implements Listenable {
   /// Apre la pagina del permesso (Android) o lo chiede (iPhone).
   Future<void> chiediPermesso();
 
+  /// L'invito al permesso è stato visto o chiuso («Non ora») sul telefono:
+  /// chi lo ripeteva altrove (il messaggio sullo schermo dell'auto, la
+  /// notifica) smette.
+  Future<void> invitoVisto();
+
   Future<void> precedente();
   Future<void> playPausa();
   Future<void> successivo();
@@ -145,6 +150,12 @@ class LettoreFinto extends ChangeNotifier implements LettoreMusicale {
     permesso = true;
     notifyListeners();
   }
+
+  /// Quante volte gli è stato detto che l'invito è stato visto.
+  int invitiVisti = 0;
+
+  @override
+  Future<void> invitoVisto() async => invitiVisti++;
 
   @override
   Future<void> precedente() async {
@@ -252,6 +263,12 @@ class LettoreDelTelefono extends ChangeNotifier implements LettoreMusicale {
 
   @override
   Future<void> chiediPermesso() => _chiama('chiediPermesso');
+
+  /// Al lato nativo (`invitoVisto`, senza argomenti): su Android l'auto non
+  /// ripete più l'invito. Un lato nativo che non lo conosce risponde «non
+  /// c'è», e va bene così.
+  @override
+  Future<void> invitoVisto() => _chiama('invitoVisto');
 
   @override
   Future<void> precedente() => _chiama('comando', 'precedente');

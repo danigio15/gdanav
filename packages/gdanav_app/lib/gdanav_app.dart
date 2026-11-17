@@ -448,9 +448,11 @@ class GdanavApp extends StatelessWidget {
     List<VoceOspite> vociOspite = const [],
     bool soloImpostazioni = false,
     VoidCallback? chiudiImpostazioni,
+    bool ospitata = false,
   }) => SchermataPrincipale(
     soloImpostazioni: soloImpostazioni,
     chiudiImpostazioni: chiudiImpostazioni,
+    ospitata: ospitata,
     menuOspite: menuOspite,
     iconaOspite: iconaOspite,
     apriIlMenu: apriIlMenu,
@@ -538,6 +540,9 @@ class GdanavDentro extends StatelessWidget {
               vociOspite: vociOspite,
               soloImpostazioni: soloImpostazioni,
               chiudiImpostazioni: chiudiImpostazioni,
+              // Dentro un'altra app la mappa è «in vista» solo se lo è
+              // davvero (vedi `SchermataPrincipale.ospitata`).
+              ospitata: true,
             ),
           ),
         ),

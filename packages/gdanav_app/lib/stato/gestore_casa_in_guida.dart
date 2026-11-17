@@ -89,14 +89,21 @@ class GestoreCasaInGuida extends ChangeNotifier {
 
   /// Lo schermo di Android Auto o di CarPlay si è acceso o spento (`in_auto`
   /// dal ponte): acceso, gli avvisi passano anche senza un percorso.
+  ///
+  /// Spento, se il navigatore non è più in uso (né guida, né mappa del
+  /// telefono davanti) la coda si svuota: quello che era lì solo per l'auto
+  /// non aspetta il viaggio dopo. Acceso, gli urgenti rimasti da troppo se
+  /// ne vanno ([CodaAvvisiDiCasa.scartaVecchi]).
   void schermoDellAuto(bool acceso) {
     if (acceso == _inAuto) return;
     _inAuto = acceso;
     _usoCambiato();
   }
 
-  /// La mappa del telefono è davanti (la schermata principale montata, con
-  /// l'app in primo piano) o no.
+  /// La mappa del telefono è **davvero** davanti o no: l'app in primo piano
+  /// e la sezione del navigatore in vista. Lo dice la schermata principale;
+  /// dentro un'altra app (GdAHome) la mappa resta montata anche quando si
+  /// guarda un'altra sezione, e lì non è in vista.
   void mappaInVista(bool si) {
     if (si == _mappaInVista) return;
     _mappaInVista = si;
@@ -134,6 +141,8 @@ class GestoreCasaInGuida extends ChangeNotifier {
     _caricato = true;
     coda?.scelta = _scelta;
     await lettore?.accendi(_musica);
+    // L'invito già visto sul telefono («Non ora»): nemmeno l'auto insiste.
+    if (_invitoVisto) unawaited(lettore?.invitoVisto());
     notifyListeners();
   }
 
@@ -160,6 +169,10 @@ class GestoreCasaInGuida extends ChangeNotifier {
     if (!inUso) {
       coda?.svuota();
       _buste.clear();
+    } else {
+      // Qualcuno torna a guardare: un urgente rimasto lì da troppo (l'allarme
+      // del viaggio di prima) non si ripresenta.
+      coda?.scartaVecchi();
     }
   }
 
@@ -199,6 +212,8 @@ class GestoreCasaInGuida extends ChangeNotifier {
     _invitoVisto = true;
     notifyListeners();
     unawaited(archivio.salvaInvitoMusicaVisto().catchError((Object _) {}));
+    // Anche al lato nativo: l'auto non ripete un invito già rifiutato.
+    unawaited(lettore?.invitoVisto());
   }
 
   /// Se le scelte sono già state lette (per le prove).

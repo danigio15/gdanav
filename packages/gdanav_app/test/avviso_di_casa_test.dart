@@ -60,6 +60,20 @@ AvvisoDiCasa _fumo() => AvvisoDiCasa(
   urgenza: UrgenzaAvvisoDiCasa.urgente,
 );
 
+/// L'antifurto che suona: urgente, a voce, con due tasti che fanno qualcosa.
+AvvisoDiCasa _allarme() => AvvisoDiCasa(
+  id: 'allarme',
+  categoria: CategoriaAvvisoDiCasa.antifurto,
+  sotto: 'allarme',
+  titolo: 'Allarme scattato',
+  urgenza: UrgenzaAvvisoDiCasa.urgente,
+  voce: 'Allarme scattato',
+  azioni: const [
+    AzioneAvvisoDiCasa('disinserisci', 'Disinserisci', principale: true, domanda: 'Disinserire l\'antifurto?'),
+    AzioneAvvisoDiCasa('sirena', 'Spegni la sirena'),
+  ],
+);
+
 Widget _scheda(CodaAvvisiDiCasa coda, {bool inMovimento = true}) => MaterialApp(
   theme: temaGdanav(Brightness.light),
   home: Scaffold(
@@ -327,6 +341,69 @@ void main() {
       addTearDown(coda.dispose);
       coda.aggiungi(_campanello());
       expect(frasi, ['Campanello di casa']);
+    });
+
+    test('un urgente messo da parte fa passare gli altri, e torna quando non c\'è altro', () {
+      final frasi = <String>[];
+      final coda = CodaAvvisiDiCasa(onVoce: frasi.add);
+      addTearDown(coda.dispose);
+      coda
+        ..aggiungi(_allarme())
+        ..aggiungi(_campanello());
+      expect(coda.attuale?.id, 'allarme');
+      expect(frasi, ['Allarme scattato']);
+      coda.mettiDaParte('allarme');
+      // Tocca al campanello; l'allarme aspetta dietro a tutti.
+      expect(coda.attuale?.id, 'campanello');
+      expect(coda.daParte('allarme'), isTrue);
+      expect(coda.inCoda, 1);
+      expect(coda.tempo, isNotNull, reason: 'il campanello ha il suo tempo: la coda cammina');
+      coda.chiudi();
+      // Non c'è altro: torna in vista (sul telefono), senza ridirlo a voce.
+      expect(coda.attuale?.id, 'allarme');
+      expect(coda.tempo, isNull);
+      expect(frasi, ['Allarme scattato', 'Campanello di casa']);
+      // Uno che arriva dopo gli passa davanti.
+      coda.aggiungi(_lavatrice());
+      expect(coda.attuale?.id, 'lavatrice');
+      coda.chiudi();
+      expect(coda.attuale?.id, 'allarme');
+      // Rimandato dalla casa (scatta di nuovo): torna come nuovo.
+      coda.aggiungi(_allarme());
+      expect(coda.daParte('allarme'), isFalse);
+      expect(coda.attuale?.id, 'allarme');
+      coda.chiudi();
+      expect(coda.attuale, isNull);
+      // Chi non è un urgente in coda non si mette da parte.
+      coda.aggiungi(_lavatrice());
+      coda.mettiDaParte('lavatrice');
+      expect(coda.daParte('lavatrice'), isFalse);
+      expect(coda.attuale?.id, 'lavatrice');
+    });
+
+    test('un urgente che nessuno tocca non resta per sempre', () {
+      var ora = DateTime(2026, 11, 17, 18);
+      final coda = CodaAvvisiDiCasa(orologio: () => ora);
+      addTearDown(coda.dispose);
+      coda
+        ..aggiungi(_fumo())
+        ..aggiungi(_allarme());
+      coda.mettiDaParte('fumo');
+      ora = ora.add(const Duration(minutes: 14));
+      coda.scartaVecchi();
+      expect(coda.attuale?.id, 'allarme');
+      expect(coda.daParte('fumo'), isTrue);
+      // Passato il quarto d'ora se ne vanno, anche quello messo da parte.
+      ora = ora.add(const Duration(minutes: 2));
+      coda.scartaVecchi();
+      expect(coda.attuale, isNull);
+      expect(coda.daParte('fumo'), isFalse);
+      // E all'arrivo di un altro, quello vecchio non gli resta davanti.
+      coda.aggiungi(_fumo());
+      ora = ora.add(const Duration(minutes: 20));
+      coda.aggiungi(_allarme());
+      expect(coda.attuale?.id, 'allarme');
+      expect(coda.inCoda, 0);
     });
 
     testWidgets('tante insieme diventano un gruppo, che si apre solo da fermi', (tester) async {
@@ -679,6 +756,35 @@ void main() {
       expect(premuti.single.$1['_casa_id'], 'casa-1');
     });
 
+    test('riacceso lo schermo dell\'auto, l\'urgente del viaggio di prima non torna', () async {
+      var ora = DateTime(2026, 11, 17, 18);
+      final g = GestoreCasaInGuida(
+        archivio: Archivio(),
+        coda: CodaAvvisiDiCasa(orologio: () => ora),
+        inGuida: () => false,
+      );
+      addTearDown(g.dispose);
+      await g.carica();
+      // In auto, con la mappa del telefono davanti: scatta l'allarme.
+      g.mappaInVista(true);
+      g.schermoDellAuto(true);
+      g.arrivata(_busta('antifurto', 'Allarme in casa', urg: 'urgente'));
+      expect(g.coda!.attuale?.urgente, isTrue);
+      // Scesi dall'auto col telefono ancora sulla mappa: lì resta.
+      g.schermoDellAuto(false);
+      expect(g.coda!.attuale, isNotNull);
+      // Il viaggio dopo: quello vecchio non si ripresenta sull'auto.
+      ora = ora.add(const Duration(minutes: 40));
+      g.schermoDellAuto(true);
+      expect(g.coda!.attuale, isNull);
+      // E quello arrivato solo per l'auto se ne va con lei.
+      g.mappaInVista(false);
+      g.arrivata(_busta('antifurto', 'Allarme in casa', urg: 'urgente'));
+      expect(g.coda!.attuale, isNotNull);
+      g.schermoDellAuto(false);
+      expect(g.coda!.attuale, isNull);
+    });
+
     test('la musica: spenta non si accende, l\'invito una volta sola', () async {
       final l = LettoreFinto(permesso: false);
       addTearDown(l.dispose);
@@ -688,8 +794,11 @@ void main() {
       expect(l.acceso, isTrue);
       expect(g.coda, isNull, reason: 'GdANav da sola: niente avvisi di casa');
       expect(g.invitoDaMostrare, isTrue);
+      expect(l.invitiVisti, 0);
       g.segnaInvitoVisto();
       expect(g.invitoDaMostrare, isFalse);
+      // «Non ora» arriva anche al lato nativo: l'auto non insiste.
+      expect(l.invitiVisti, 1);
       await g.cambiaMusica(false);
       expect(l.acceso, isFalse);
       expect(g.lettoreInGuida, isNull);
@@ -697,6 +806,7 @@ void main() {
       final dopo = GestoreCasaInGuida(archivio: Archivio(), lettore: l);
       addTearDown(dopo.dispose);
       await dopo.carica();
+      expect(l.invitiVisti, 2, reason: 'riaperta l\'app lo si ridice: il lato nativo può averlo perso');
       expect(dopo.musica, isFalse);
       await dopo.cambiaMusica(true);
       expect(dopo.invitoDaMostrare, isFalse);
@@ -704,14 +814,198 @@ void main() {
   });
 
   group('sullo schermo dell\'auto', () {
-    (AvvisiDiCasaInAuto, List<Map<String, Object?>>) auto(CodaAvvisiDiCasa coda) {
+    (AvvisiDiCasaInAuto, List<Map<String, Object?>>) auto(
+      CodaAvvisiDiCasa coda, {
+      Future<Uint8List> Function(Color, IconData)? disegna,
+    }) {
       final mandati = <Map<String, Object?>>[];
       final a = AvvisiDiCasaInAuto(coda, (metodo, dati) {
-        expect(metodo, 'avviso_casa');
-        mandati.add(dati);
-      });
+        // Solo `avviso_casa` (un `expect` qui, mentre il tempo finto gira,
+        // la prova non lo regge: si guarda dopo).
+        if (metodo == 'avviso_casa') mandati.add(dati);
+      }, disegna: disegna);
       return (a, mandati);
     }
+
+    test('l\'urgente che l\'auto toglie da sola non tiene fermi quelli dopo', () {
+      final coda = CodaAvvisiDiCasa();
+      addTearDown(coda.dispose);
+      final (a, _) = auto(coda);
+      coda
+        ..aggiungi(_fumo())
+        ..aggiungi(_campanello());
+      expect(a.adesso()['id'], 'fumo');
+      // Il tasto finto di un avviso che non è quello in vista non vale.
+      a.tasto('lavatrice', AvvisiDiCasaInAuto.scaduto);
+      expect(a.adesso()['id'], 'fumo');
+      // Dieci minuti senza un tocco: l'auto lo toglie e lo dice.
+      a.tasto('fumo', AvvisiDiCasaInAuto.scaduto, conferma: false);
+      expect(a.adesso()['id'], 'campanello', reason: 'sull\'auto passa quello dopo');
+      expect(coda.daParte('fumo'), isTrue, reason: 'sul telefono resta');
+      a.tasto('campanello', 'ignora');
+      // Non c'è altro: sul telefono torna il fumo, sull'auto no.
+      expect(coda.attuale?.id, 'fumo');
+      expect(a.adesso(), isEmpty);
+      // Detto due volte non cambia niente.
+      a.tasto('fumo', AvvisiDiCasaInAuto.scaduto);
+      expect(coda.attuale?.id, 'fumo');
+    });
+
+    test('la domanda lasciata lì torna all\'avviso; chi ha un tempo suo resta com\'è', () {
+      final coda = CodaAvvisiDiCasa();
+      addTearDown(coda.dispose);
+      final (a, _) = auto(coda);
+      coda.aggiungi(_campanello());
+      a.tasto('campanello', 'apri');
+      expect(a.adesso()['conferma'], isTrue);
+      // L'auto parla dell'avviso di prima, non della domanda: niente.
+      a.tasto('campanello', AvvisiDiCasaInAuto.scaduto, conferma: false);
+      expect(coda.daConfermare, isNotNull);
+      // La domanda senza risposta: è un «No».
+      a.tasto('campanello', AvvisiDiCasaInAuto.scaduto, conferma: true);
+      expect(coda.daConfermare, isNull);
+      expect(a.adesso()['conferma'], isFalse);
+      expect(a.adesso()['secondi'], 16);
+      // Il campanello ha il suo tempo: tolto dall'auto, dal telefono no.
+      a.tasto('campanello', AvvisiDiCasaInAuto.scaduto);
+      expect(coda.attuale?.id, 'campanello');
+      expect(coda.daParte('campanello'), isFalse);
+      expect(a.adesso()['id'], 'campanello');
+    });
+
+    test('un urgente ha sempre un modo di chiuderlo: il primo tasto, e «Chiudi»', () {
+      final coda = CodaAvvisiDiCasa();
+      addTearDown(coda.dispose);
+      final (a, _) = auto(coda);
+      coda.aggiungi(_allarme());
+      List<Object?> tasti() => [for (final t in a.adesso()['tasti'] as List) (t as Map)['id']];
+      expect(tasti(), ['disinserisci', AvvisiDiCasaInAuto.chiudi]);
+      a.tasto('allarme', AvvisiDiCasaInAuto.chiudi);
+      expect(coda.attuale, isNull);
+      // Con «Ignora» fra i due restano tutti e due: chiude lui.
+      coda.aggiungi(
+        AvvisoDiCasa(
+          id: 'fumo-2',
+          categoria: CategoriaAvvisoDiCasa.sicurezza,
+          urgenza: UrgenzaAvvisoDiCasa.urgente,
+          titolo: 'Fumo in cucina',
+          azioni: const [
+            AzioneAvvisoDiCasa('chiama', 'Chiama casa', principale: true),
+            AzioneAvvisoDiCasa('ignora', 'Ignora'),
+          ],
+        ),
+      );
+      expect(tasti(), ['chiama', 'ignora']);
+      // E chi se ne va da solo tiene i suoi due tasti.
+      coda
+        ..chiudi()
+        ..aggiungi(
+          AvvisoDiCasa(
+            id: 'auto',
+            categoria: CategoriaAvvisoDiCasa.energia,
+            titolo: 'Auto carica',
+            azioni: const [
+              AzioneAvvisoDiCasa('stacca', 'Ferma la ricarica'),
+              AzioneAvvisoDiCasa('clima', 'Accendi il clima'),
+            ],
+          ),
+        );
+      expect(tasti(), ['stacca', 'clima']);
+    });
+
+    testWidgets('il gruppo che cresce si rimanda; riacceso lo schermo, anche lo stesso', (tester) async {
+      var ora = DateTime(2026, 11, 17, 18);
+      final coda = CodaAvvisiDiCasa(orologio: () => ora);
+      final (a, mandati) = auto(coda, disegna: (_, _) async => Uint8List.fromList([1, 2, 3]));
+      a.avvia();
+      coda
+        ..aggiungi(_lavatrice())
+        ..aggiungi(_lavatrice(id: 'forno', titolo: 'Forno pronto'))
+        ..aggiungi(_lavatrice(id: 'auto', titolo: 'Auto carica'));
+      await tester.pump();
+      expect(mandati.last['titolo'], '3 notifiche di casa');
+      expect(mandati.last['secondi'], 16);
+      await tester.pump(const Duration(seconds: 5));
+      ora = ora.add(const Duration(seconds: 5));
+      // Ne arriva una quarta: stesso id («gruppo»), titolo e testo nuovi.
+      coda.aggiungi(_lavatrice(id: 'lavastoviglie', titolo: 'Lavastoviglie finita'));
+      await tester.pump();
+      expect(mandati.last['id'], 'gruppo');
+      expect(mandati.last['titolo'], '4 notifiche di casa');
+      expect(mandati.last['testo'], contains('Lavastoviglie finita'));
+      expect(mandati.last['secondi'], 11, reason: 'il tempo che resta, non quello intero');
+      // Fine sessione e auto riaccesa: l'auto l'ha dimenticato, lo si rimanda.
+      final prima = mandati.length;
+      a.schermo(false);
+      expect(mandati.length, prima);
+      a.schermo(true);
+      await tester.pump();
+      expect(mandati.length, prima + 1);
+      expect(mandati.last['titolo'], '4 notifiche di casa');
+      a.ferma();
+      coda.dispose();
+    });
+
+    testWidgets('l\'avviso non aspetta l\'icona più di 400 ms, e parte senza', (tester) async {
+      final coda = CodaAvvisiDiCasa();
+      // Il telefono è bloccato: il disegno resta in attesa.
+      final disegni = <Completer<Uint8List>>[];
+      final (a, mandati) = auto(
+        coda,
+        disegna: (_, _) {
+          disegni.add(Completer<Uint8List>());
+          return disegni.last.future;
+        },
+      );
+      a.avvia();
+      await tester.pump();
+      expect(disegni, hasLength(1), reason: 'all\'avvio si preparano le icone, una alla volta');
+      coda.aggiungi(_lavatrice());
+      await tester.pump(const Duration(milliseconds: 390));
+      expect(mandati.single, isEmpty, reason: 'fin qui aspetta l\'icona');
+      await tester.pump(const Duration(milliseconds: 20));
+      expect(mandati.last['titolo'], 'Lavatrice finita');
+      expect(mandati.last.containsKey('icona'), isFalse);
+      // Sbloccato il telefono l'icona arriva: resta per la volta dopo.
+      for (final d in disegni) {
+        d.complete(Uint8List.fromList([7]));
+      }
+      await tester.pump();
+      coda
+        ..chiudi()
+        ..aggiungi(_lavatrice(id: 'lavatrice-2'));
+      await tester.pump();
+      expect(mandati.last['id'], 'lavatrice-2');
+      expect(mandati.last['icona'], [7]);
+      a.ferma();
+      coda.dispose();
+    });
+
+    testWidgets('le icone delle categorie sono pronte prima dell\'avviso', (tester) async {
+      final coda = CodaAvvisiDiCasa();
+      var disegnate = 0;
+      final (a, mandati) = auto(
+        coda,
+        disegna: (_, _) async {
+          disegnate++;
+          return Uint8List.fromList([9]);
+        },
+      );
+      a.avvia();
+      await tester.pump();
+      expect(disegnate, greaterThan(CategoriaAvvisoDiCasa.values.length));
+      final prima = disegnate;
+      for (final avviso in [_lavatrice(), _campanello(), _fumo(), _allarme()]) {
+        coda.aggiungi(avviso);
+        await tester.pump();
+        expect(mandati.last['id'], avviso.id);
+        expect(mandati.last['icona'], [9]);
+        coda.chiudi();
+      }
+      expect(disegnate, prima, reason: 'niente da disegnare quando arriva l\'avviso');
+      a.ferma();
+      coda.dispose();
+    });
 
     test('al più due tasti, mai quelli da fermo; con uno solo, «Chiudi»', () {
       final coda = CodaAvvisiDiCasa();
@@ -859,6 +1153,17 @@ void main() {
       l.leggi({'permesso': true, 'app': 'Lettore Prova'});
       expect(l.brano, isNull);
       expect(l.app, 'Lettore Prova');
+    });
+
+    test('«Non ora» va al lato nativo; chi non lo conosce non rompe niente', () async {
+      final l = LettoreDelTelefono(fonte: FonteMusica.telefono);
+      addTearDown(l.dispose);
+      await l.invitoVisto();
+      expect(chiamate.single.method, 'invitoVisto');
+      expect(chiamate.single.arguments, isNull);
+      // CarPlay finché non lo aggiunge: «non c'è».
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(canale, null);
+      await l.invitoVisto();
     });
 
     testWidgets('senza permesso il riquadro non c\'è; l\'invito si vede una volta', (tester) async {

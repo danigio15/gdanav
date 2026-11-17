@@ -12,7 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/auto/ponte_auto.dart';
 import 'package:gdanav_app/componenti/avviso_di_casa.dart';
 import 'package:gdanav_app/componenti/mini_lettore.dart';
-import 'package:gdanav_app/gdanav_app.dart' show GdanavApp;
+import 'package:gdanav_app/gdanav_app.dart' show GdanavApp, GdanavDentro;
 import 'package:gdanav_app/stato/archivio.dart';
 import 'package:gdanav_app/stato/gestore_casa_in_guida.dart';
 
@@ -163,6 +163,185 @@ void main() {
     await dallAuto('in_auto', {'si': false});
     expect((await mandati()).last, isEmpty);
     casa.coda?.chiudi();
+  });
+
+  group('lo schermo dell\'auto e il telefono si capiscono', () {
+    const canale = MethodChannel('gdanav/schermo_auto');
+
+    /// Il ponte acceso su un'auto finta: [acceso] è quello che risponde a
+    /// `chiedi_in_auto` (`null`: un lato nativo che non lo conosce).
+    Future<
+      ({
+        GestoreCasaInGuida casa,
+        List<MethodCall> chiamate,
+        Future<void> Function(String, Map<String, Object?>) dallAuto,
+      })
+    >
+    accendi(WidgetTester tester, {required bool? acceso}) async {
+      preparaPiattaforma(portachiavi: impostazioniComplete);
+      final chiamate = <MethodCall>[];
+      final messaggero = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messaggero.setMockMethodCallHandler(canale, (c) async {
+        chiamate.add(c);
+        return c.method == 'chiedi_in_auto' ? acceso : null;
+      });
+      addTearDown(() => messaggero.setMockMethodCallHandler(canale, null));
+      final a = await ambiente(tester, km: 20);
+      final casa = GestoreCasaInGuida(
+        archivio: a.archivio,
+        coda: CodaAvvisiDiCasa(),
+        inGuida: () => a.guida.attiva,
+        guida: a.guida,
+      );
+      addTearDown(casa.dispose);
+      await tester.runAsync(casa.carica);
+      final ponte = PonteAuto(
+        viaggio: a.viaggio,
+        guida: a.guida,
+        posizione: a.posizione,
+        casaInGuida: casa,
+        canale: canale,
+      )..avvia();
+      addTearDown(ponte.ferma);
+      // La risposta dell'auto arriva fuori dal tempo finto.
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump();
+      Future<void> dallAuto(String metodo, Map<String, Object?> dati) async {
+        await tester.runAsync(
+          () => messaggero.handlePlatformMessage(
+            'gdanav/schermo_auto',
+            const StandardMethodCodec().encodeMethodCall(MethodCall(metodo, dati)),
+            (_) {},
+          ),
+        );
+        await tester.pump();
+      }
+
+      return (casa: casa, chiamate: chiamate, dallAuto: dallAuto);
+    }
+
+    testWidgets('partendo il telefono chiede se lo schermo dell\'auto è acceso', (tester) async {
+      // L'`in_auto` dell'auto è partito prima che il telefono ascoltasse, e
+      // si è perso: senza chiederlo, a mappa libera gli avvisi si scartano.
+      final x = await accendi(tester, acceso: true);
+      expect(x.chiamate.where((c) => c.method == 'chiedi_in_auto'), hasLength(1));
+      expect(x.casa.inUso, isTrue);
+      x.casa.arrivata(_lavatrice());
+      expect(x.casa.coda!.attuale?.titolo, 'Lavatrice finita');
+      // (l'icona dell'avviso si disegna fuori dal tempo finto)
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+      await tester.pump();
+      // Poi vale quello che l'auto dice da sé.
+      await x.dallAuto('in_auto', {'si': false});
+      expect(x.casa.inUso, isFalse);
+      expect(x.casa.coda!.attuale, isNull);
+    });
+
+    testWidgets('un lato nativo che non sa rispondere non accende niente', (tester) async {
+      final x = await accendi(tester, acceso: null);
+      expect(x.casa.inUso, isFalse);
+      await x.dallAuto('in_auto', {'si': true});
+      expect(x.casa.inUso, isTrue);
+      await x.dallAuto('in_auto', {'si': false});
+    });
+
+    testWidgets('l\'urgente che l\'auto toglie da sola: lo dice, e passa quello dopo', (tester) async {
+      final x = await accendi(tester, acceso: true);
+      final coda = x.casa.coda!;
+      List<Map<Object?, Object?>> mandati() => [
+        for (final c in x.chiamate)
+          if (c.method == 'avviso_casa') c.arguments as Map<Object?, Object?>,
+      ];
+      Future<void> aspetta() async {
+        // L'icona si disegna fuori dal tempo finto.
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+        await tester.pump();
+      }
+
+      x.casa.arrivata({..._campanello(id: 'allarme-1'), 'tipo': 'antifurto', 'titolo': 'Allarme scattato'});
+      x.casa.arrivata(_lavatrice());
+      await aspetta();
+      expect(coda.attuale?.urgente, isTrue);
+      expect(mandati().last['id'], 'allarme-1');
+      expect(mandati().last['secondi'], isNull, reason: 'sul telefono resta finché non lo si tocca');
+      // L'auto lo tiene dieci minuti, poi lo toglie e lo dice col tasto finto.
+      await x.dallAuto('avviso_casa_tasto', {'id': 'allarme-1', 'tasto': '_scaduto', 'conferma': false});
+      await aspetta();
+      expect(coda.daParte('allarme-1'), isTrue);
+      expect(mandati().last['titolo'], 'Lavatrice finita', reason: 'la coda dell\'auto non resta ferma');
+      coda.svuota();
+    });
+  });
+
+  testWidgets('dentro un\'altra app la mappa è in vista solo quando lo è davvero', (tester) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    addTearDown(tester.binding.resetInternalState);
+    final a = await ambiente(tester, km: 20);
+    final casa = GestoreCasaInGuida(
+      archivio: a.archivio,
+      coda: CodaAvvisiDiCasa(),
+      inGuida: () => a.guida.attiva,
+      guida: a.guida,
+    );
+    addTearDown(casa.dispose);
+    await tester.runAsync(casa.carica);
+    // Come GdAHome: la sezione del navigatore resta montata anche quando se
+    // ne guarda un'altra, con gli orologi fermi.
+    final mostrata = ValueNotifier(true);
+    addTearDown(mostrata.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ValueListenableBuilder<bool>(
+            valueListenable: mostrata,
+            builder: (context, si, figlio) => TickerMode(enabled: si, child: figlio!),
+            child: GdanavDentro(
+              app: GdanavApp(
+                posizione: a.posizione,
+                archivio: a.archivio,
+                auto: a.auto,
+                viaggio: a.viaggio,
+                guida: a.guida,
+                segnalazioni: a.segnalazioni,
+                casaInGuida: casa,
+                mappa: (context, c) => const ColoredBox(color: Colors.grey),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // Il motore acceso dall'auto, col telefono in tasca: nessuno schermo, e
+    // quindi nessuno stato. La mappa non la guarda nessuno.
+    expect(tester.binding.lifecycleState, isNull);
+    expect(casa.inUso, isFalse);
+    casa.arrivata(_lavatrice());
+    expect(casa.coda!.attuale, isNull, reason: 'resta sul telefono, non in una coda che non si svuota mai');
+    // L'app davanti, sulla sezione del navigatore.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(casa.inUso, isTrue);
+    casa.arrivata(_lavatrice());
+    expect(casa.coda!.attuale?.titolo, 'Lavatrice finita');
+    // Si passa alla plancia: la mappa resta montata, ma non si vede.
+    mostrata.value = false;
+    await tester.pump();
+    expect(casa.inUso, isFalse);
+    expect(casa.coda!.attuale, isNull);
+    mostrata.value = true;
+    await tester.pump();
+    expect(casa.inUso, isTrue);
+    // L'app dietro.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    expect(casa.inUso, isFalse);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpWidget(const SizedBox());
   });
 
   group('sul telefono, a mappa libera', () {

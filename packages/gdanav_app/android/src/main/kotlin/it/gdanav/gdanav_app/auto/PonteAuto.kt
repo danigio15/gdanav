@@ -12,6 +12,7 @@ import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import it.gdanav.gdanav_app.musica.LettoreTelefono
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -176,6 +177,14 @@ object PonteAuto {
     @Volatile var conAvvisi = false
 
     /**
+     * La strada proposta sta coi tasti in alto e il testo nel pannello sulla
+     * mappa: sulle auto senza avvisi, e quando sullo schermo c'è un avviso
+     * che conta di più (un urgente di casa) e il suo non può uscire. Lo dice
+     * [SchermoNavigazione] a ogni novità.
+     */
+    @Volatile var stradaNeiTasti = false
+
+    /**
      * L'auto scrive un testo accanto ai km che restano (API 5,
      * `TravelEstimate.setTripText`): in guida batteria, km, batteria
      * all'arrivo, meteo e pedaggio vanno lì, e non nella barra sulla mappa.
@@ -320,6 +329,13 @@ object PonteAuto {
         preferenze = context.applicationContext.getSharedPreferences("gdanav", Context.MODE_PRIVATE)
         canale = MethodChannel(messenger, "gdanav/schermo_auto").also { c ->
             c.setMethodCallHandler { call, risultato ->
+                // Il telefono, partendo, chiede se lo schermo dell'auto è
+                // acceso: l'`in_auto` mandato prima che ascoltasse può essersi
+                // perso.
+                if (call.method == "chiedi_in_auto") {
+                    risultato.success(inAutoAdesso)
+                    return@setMethodCallHandler
+                }
                 gestisci(call)
                 risultato.success(null)
             }
@@ -659,6 +675,38 @@ object PonteAuto {
     /** Un tasto di un avviso di casa, toccato sull'auto. */
     fun tastoCasa(id: String, tasto: String) = chiedi("avviso_casa_tasto", mapOf("id" to id, "tasto" to tasto))
 
+    /**
+     * Un avviso di casa se n'è andato dall'auto senza che nessuno lo
+     * toccasse (il tempo dell'auto, o l'auto non lo mostra). Il telefono, se
+     * era uno senza tempo (un urgente, la domanda «Sì / No»), non lo tiene
+     * più «in vista sull'auto»: i successivi passano. [conferma]: era la
+     * domanda.
+     */
+    fun casaScaduta(id: String, conferma: Boolean) =
+        chiedi("avviso_casa_tasto", mapOf("id" to id, "tasto" to "_scaduto", "conferma" to conferma))
+
+    /** La sessione in auto è finita: l'avviso di casa tenuto qui non vale più. */
+    fun fineSessione() {
+        avvisoCasa = null
+        stradaNeiTasti = false
+    }
+
+    /**
+     * Se si è fermi, per quello che si può dire sull'auto solo da fermi
+     * (l'invito a guardare il telefono). Vale la velocità del cruscotto
+     * dell'auto, se la dà; se no quella del GPS del telefono. Senza una
+     * posizione non si sa, e allora no.
+     */
+    fun daFermi(): Boolean {
+        val auto = ultimaVelocita
+        if (auto != null) return auto < FERMI_KMH
+        val telefono = cruscotto.velocita ?: return false
+        return qui != null && telefono < FERMI_KMH && velocita * 3.6 < FERMI_KMH
+    }
+
+    /** Sotto questa velocità si è fermi (il GPS da fermi non dice mai zero giusto). */
+    private const val FERMI_KMH = 3.0
+
     /** È cambiato qualcosa fuori dal telefono (la musica): gli schermi si rifanno. */
     fun rinfresca() = avvisa()
 
@@ -846,11 +894,73 @@ object PonteAuto {
      * percorso impostato. Prima li chiedeva solo la guida, e fermi in garage
      * la batteria restava quella di mezz'ora prima.
      *
-     * Si manda anche se il Dart non c'è ancora: il motore Flutter si accende
-     * insieme alla sessione, e il filo si apre qualche istante dopo. Con la
-     * riprova arriva lo stesso, invece di perdersi.
+     * Lo stato si tiene qui ([inAutoAdesso]) e al telefono va con **una sola
+     * catena** di riprove, che manda sempre l'ultimo valore: prima ogni
+     * chiamata aveva la sua, e acceso / spento / acceso nei secondi in cui il
+     * Dart si accende potevano arrivare fuori ordine, lasciandolo su
+     * «spento» con lo schermo acceso. Il Dart, partendo, lo chiede anche da
+     * sé (`chiedi_in_auto`).
+     *
+     * Acceso lo schermo si riguarda anche il permesso della musica: può
+     * essere stato dato mentre GdANav dormiva.
      */
-    fun inAuto(si: Boolean) = mandaConRiprova("in_auto", mapOf("si" to si), 40)
+    fun inAuto(si: Boolean) {
+        inAutoAdesso = si
+        principale.post {
+            if (si) contesto?.let { LettoreTelefono.ricontrolla(it) }
+            inAutoTentativi = IN_AUTO_TENTATIVI
+            if (!inAutoInViaggio) {
+                inAutoInViaggio = true
+                mandaInAuto()
+            }
+        }
+    }
+
+    /** Se lo schermo dell'auto è acceso adesso. */
+    @Volatile var inAutoAdesso = false
+        private set
+
+    /** Un `in_auto` è partito e non ha ancora risposta (si tocca dal filo principale). */
+    private var inAutoInViaggio = false
+    private var inAutoTentativi = 0
+    private const val IN_AUTO_TENTATIVI = 40
+
+    private fun mandaInAuto() {
+        val c = canale
+        if (c == null) {
+            riprovaInAuto()
+            return
+        }
+        val valore = inAutoAdesso
+        c.invokeMethod("in_auto", mapOf("si" to valore), object : MethodChannel.Result {
+            override fun success(r: Any?) {
+                inAutoArrivato(valore)
+            }
+
+            override fun error(codice: String, messaggio: String?, dettagli: Any?) {
+                inAutoArrivato(valore)
+            }
+
+            override fun notImplemented() {
+                riprovaInAuto()
+            }
+        })
+    }
+
+    /** Il Dart non ascolta ancora: fra mezzo secondo, col valore di allora. */
+    private fun riprovaInAuto() {
+        if (inAutoTentativi > 1) {
+            inAutoTentativi--
+            principale.postDelayed({ mandaInAuto() }, 500)
+        } else {
+            inAutoInViaggio = false
+        }
+    }
+
+    /** Arrivato: se nel frattempo è cambiato, parte quello nuovo. */
+    private fun inAutoArrivato(valore: Boolean) {
+        if (inAutoAdesso != valore) mandaInAuto() else inAutoInViaggio = false
+    }
 
     /** La sessione dell'auto è finita: la prova di guida smette con lei. */
     fun fineProva() = principale.post { canale?.invokeMethod("prova_fine", null) }

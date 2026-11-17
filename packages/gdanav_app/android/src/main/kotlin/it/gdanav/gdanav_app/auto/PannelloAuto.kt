@@ -55,6 +55,31 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
 
     fun aggiorna() = postInvalidate()
 
+    /**
+     * Da dove parte, in alto, il brano che suona: il punto più basso a cui è
+     * arrivato il bordo alto dell'area libera su questa superficie.
+     *
+     * L'area libera sale e scende coi tasti in alto, che Android Auto
+     * nasconde dopo qualche secondo senza tocchi e rimette al primo tocco: il
+     * brano, legato a lei, saltava su e giù. L'area che i tasti non coprono
+     * mai (quella «stabile») sta sempre dentro quella libera, e il suo bordo
+     * alto è proprio il più basso che quella libera raggiunge: tenendo quello
+     * il brano resta fermo, sotto i tasti quando ci sono. Si ricomincia se
+     * cambia la superficie (lo schermo diviso).
+     */
+    private var altoFermo = 0
+    private var altoFermoPer = 0L
+
+    private fun bordoFermo(a: Rect): Int {
+        val per = (width.toLong() shl 32) or height.toLong()
+        if (per != altoFermoPer) {
+            altoFermoPer = per
+            altoFermo = a.top
+        }
+        if (a.top > altoFermo) altoFermo = a.top
+        return altoFermo
+    }
+
     override fun onDraw(canvas: Canvas) {
         val tutta = Rect(0, 0, width, height)
         val a = area?.let { Rect(it) }?.takeIf { it.intersect(tutta) && !it.isEmpty } ?: tutta
@@ -72,11 +97,17 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
 
         // La musica, come in Waze: il brano in alto a destra, solo da
         // guardare (i comandi sono i tasti del template), in guida e a mappa
-        // libera. Sotto l'avviso, se c'è: non si coprono.
+        // libera. Sotto l'avviso, se c'è: non si coprono. Fermo dove i tasti
+        // in alto non arrivano mai ([bordoFermo]), e a sinistra della striscia
+        // del traffico quando c'è.
+        val fermo = bordoFermo(a)
         if (LettoreTelefono.daMostrare) {
             val av = PonteAuto.avviso
-            val conAvviso = av.titolo != null || av.ancoraTesto != null || (PonteAuto.strada.id != null && !PonteAuto.conAvvisi)
-            musica(canvas, a, margine, if (conAvviso) alto + dp(72f) else alto)
+            val conAvviso = av.titolo != null || av.ancoraTesto != null ||
+                (PonteAuto.strada.id != null && PonteAuto.stradaNeiTasti)
+            val altoMusica = max(alto, fermo + margine) + if (conAvviso) dp(72f) else 0f
+            val conStriscia = PonteAuto.guida?.striscia?.isNotEmpty() == true
+            musica(canvas, a, margine, altoMusica, if (conStriscia) dp(48f) else 0f)
         }
 
         // In basso a sinistra, dal lato di chi guida: velocità e limite, e
@@ -424,7 +455,7 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         // La strada a risparmio, sulle auto senza gli avvisi di Android Auto:
         // qui il testo, i due tasti in alto. Viene prima: ha venti secondi.
         val strada = PonteAuto.strada
-        val perStrada = strada.id != null && !PonteAuto.conAvvisi
+        val perStrada = strada.id != null && PonteAuto.stradaNeiTasti
         val (riga1, riga2, colore) = when {
             perStrada -> Triple(
                 strada.titolo ?: "Strada a risparmio",
@@ -640,16 +671,19 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
     /**
      * Il brano che suona: copertina, titolo, e «artista · app». Largo al più
      * 330 punti, a destra nell'area libera; il testo lungo si taglia.
+     * [aDestra]: lo spazio da lasciare sul bordo destro, dove sta la striscia
+     * del traffico (che si disegna dopo, e gli finiva sopra).
      */
-    private fun musica(canvas: Canvas, a: Rect, margine: Float, alto: Float) {
+    private fun musica(canvas: Canvas, a: Rect, margine: Float, alto: Float, aDestra: Float) {
         val b = LettoreTelefono.brano ?: return
-        val w = minOf(dp(330f), a.width() - margine * 2)
+        val destra = a.right - margine - aDestra
+        val w = minOf(dp(330f), destra - a.left - margine)
         if (w < dp(180f)) return
         val h = dp(64f)
         // Un'area bassa (a mezzo schermo, di traverso): il brano non scende
         // sulla barra dei dati dell'auto e sul tachimetro, in basso.
         if (alto + h > a.bottom - dp(150f)) return
-        val box = RectF(a.right - margine - w, alto, a.right - margine, alto + h)
+        val box = RectF(destra - w, alto, destra, alto + h)
         pieno.color = Color.argb(225, 15, 20, 30)
         canvas.drawRoundRect(box, dp(14f), dp(14f), pieno)
         val lato = dp(48f)

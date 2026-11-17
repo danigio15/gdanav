@@ -4,6 +4,7 @@ import androidx.car.app.CarContext
 import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
+import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.CarColor
 import androidx.car.app.model.CarIcon
 import androidx.car.app.model.ItemList
@@ -70,9 +71,18 @@ abstract class SchermoAggiornato(carContext: CarContext) : Screen(carContext), D
             .build()
     }
 
-    /** Un menu diviso in sezioni, ognuna col suo titolo. */
-    protected fun sezioni(titolo: String, gruppi: List<Pair<String, List<Row>>>): Template {
+    /**
+     * Un menu diviso in sezioni, ognuna col suo titolo. [inAlto]: i tasti
+     * accanto al titolo (al più due, e uno solo con la scritta: è quanto un
+     * elenco di Android Auto concede).
+     */
+    protected fun sezioni(
+        titolo: String,
+        gruppi: List<Pair<String, List<Row>>>,
+        inAlto: ActionStrip? = null,
+    ): Template {
         val t = ListTemplate.Builder().setTitle(titolo).setHeaderAction(Action.BACK)
+        inAlto?.let { t.setActionStrip(it) }
         for ((nome, righe) in gruppi) {
             if (righe.isEmpty()) continue
             val lista = ItemList.Builder()
@@ -123,7 +133,11 @@ abstract class SchermoAggiornato(carContext: CarContext) : Screen(carContext), D
 /**
  * Il menu dell'auto, come Waze: Casa e Lavoro (un tocco e si parte),
  * preferiti e recenti, colonnine vicine, segnala, impostazioni. Sei righe:
- * è il minimo che ogni auto mostra.
+ * è il minimo che ogni auto mostra, e le righe oltre il limite dell'auto
+ * spariscono dal fondo («Impostazioni», «Segnala»). Perciò qui non se ne
+ * aggiungono mai: in guida con la musica la lente, che lascia il posto a ⏯
+ * fra i tasti sulla mappa, sta accanto al titolo, non in una riga in più; e
+ * la casa di GdAHome resta sempre fra i tasti sulla mappa.
  */
 class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) : SchermoAggiornato(carContext) {
     // In pagina: i nomi di Casa e Lavoro, e se l'auto è elettrica (colonnine
@@ -132,45 +146,34 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
         PonteAuto.casa()?.nome,
         PonteAuto.lavoro()?.nome,
         PonteAuto.cruscotto.elettrica,
-        conMusica(),
-        lenteSpostata(),
+        lenteQui(),
     )
 
     /**
-     * Con la musica la casa di GdAHome (e in guida anche la lente) lascia i
-     * tasti in alto a ⏯ e ⏭ (`SchermoNavigazione.azioni`): sta qui, per prima.
+     * In guida con la musica la lente non sta fra i tasti sulla mappa (c'è
+     * ⏯, `SchermoNavigazione.azioni`): sta qui, in alto.
      */
-    private fun conMusica() = LettoreTelefono.conTasti
-
-    /** La lente sta in alto solo a mappa libera. */
-    private fun lenteSpostata() = conMusica() && PonteAuto.guida != null
+    private fun lenteQui() = LettoreTelefono.conTasti && PonteAuto.guida != null
 
     override fun schermata(): Template {
         val casa = PonteAuto.casa()
         val lavoro = PonteAuto.lavoro()
         val blu = CarColor.BLUE
-        val spostati = if (conMusica()) {
-            listOfNotNull(
-                if (lenteSpostata()) {
-                    riga("Cerca", sfoglia = true, icona = icona(R.drawable.auto_cerca)) {
-                        screenManager.push(SchermoCerca(carContext))
-                    }
-                } else {
-                    null
-                },
-                GdanavInAuto.casa?.let { schermo ->
-                    riga("GdAHome", "La tua casa", sfoglia = true, icona = icona(R.drawable.auto_casa)) {
-                        screenManager.push(schermo(carContext))
-                    }
-                },
-            )
+        val inAlto = if (lenteQui()) {
+            ActionStrip.Builder()
+                .addAction(
+                    Action.Builder()
+                        .setIcon(icona(R.drawable.auto_cerca))
+                        .setOnClickListener { screenManager.push(SchermoCerca(carContext)) }
+                        .build(),
+                )
+                .build()
         } else {
-            emptyList()
+            null
         }
         return sezioni(
             "Menu",
             listOf(
-                (if (lenteSpostata()) "Cerca e casa" else "La casa") to spostati,
                 "Vai a" to listOf(
                     if (casa != null) {
                         riga("Casa", casa.nome, icona = icona(R.drawable.icona_casa, blu)) { vai(casa) }
@@ -223,6 +226,7 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
                     ) { screenManager.push(SchermoImpostazioni(carContext, renderer)) },
                 ),
             ),
+            inAlto,
         )
     }
 

@@ -11,12 +11,20 @@ import android.service.notification.StatusBarNotification
  * lettore musicale ([LettoreTelefono]).
  */
 class AscoltoNotifiche : NotificationListenerService() {
+    // Collegato dal sistema: il permesso è appena stato dato (o l'app è
+    // appena partita con il permesso). Lo si dice al lettore, che parte
+    // subito: vedi [LettoreTelefono.servizio].
     override fun onListenerConnected() {
-        LettoreTelefono.ricontrolla(applicationContext)
+        LettoreTelefono.servizio(applicationContext, true)
     }
 
     override fun onListenerDisconnected() {
-        LettoreTelefono.ricontrolla(applicationContext)
+        LettoreTelefono.servizio(applicationContext, false)
+    }
+
+    override fun onDestroy() {
+        LettoreTelefono.servizio(applicationContext, false)
+        super.onDestroy()
     }
 
     // Le notifiche non interessano: niente si legge, niente si conserva.
