@@ -76,4 +76,94 @@ void main() {
     expect(senza.righeAuto.last.$1, 'Costo');
     expect(senza.righeAuto.length, lessThanOrEqualTo(4));
   });
+
+  // Dal campo: «Costo ~2,10 €: ~1,05 € energia · ~1,05 € pedaggio. Verifica i
+  // costi perché non mi trovo: 1 € di energia per 3,5 kWh».
+  group('il riepilogo che non tornava', () {
+    RiepilogoViaggio arrivo({CostoDellEnergia? energia, SenzaPrezzoVero? manca, double kwh = 3.5, double? largo}) =>
+        RiepilogoViaggio(
+          destinazione: 'Via dei Limoni',
+          durata: const Duration(minutes: 47),
+          metri: 13600,
+          elettrica: true,
+          kwh: kwh,
+          consumoStimato: false,
+          kwhPiuOMeno: largo,
+          euroAlKwh: 0.30,
+          // La Tangenziale: un prezzo di listino, non una stima.
+          pedaggio: const CostoPedaggio(euro: 1.05, stimato: false),
+          energia: energia,
+          senzaPrezzoVero: manca,
+        );
+
+    test('col prezzo delle opzioni non dice «Casa»: è una stima, quanto vale, e cosa manca', () {
+      final r = arrivo(
+        energia: costoDellEnergia(consumatiKwh: 3.5, partenzaKwh: 57, euroAlKwhDiRiserva: 0.30),
+        manca: SenzaPrezzoVero.senzaTariffa,
+      );
+      expect(r.righe, contains(('Batteria', '3,5 kWh · ~1,05 € · stima a 0,30 €/kWh')));
+      expect(r.righe.map((x) => x.$1), isNot(contains('Da casa')));
+      expect(r.righeAuto[2], (
+        'Ricarica',
+        'Batteria 3,5 kWh · ~1,05 € · stima a 0,30 €/kWh · in GdAHome manca il prezzo dell\'energia',
+      ));
+      // Il pedaggio di listino non ha la tilde: non è lo stesso numero dell'energia.
+      expect(r.righeAuto.last, ('Costo ~2,10 €', '~1,05 € energia · 1,05 € pedaggio'));
+      expect(r.note.single, startsWith('Il costo dell\'energia è una stima (0,30 €/kWh)'));
+      expect(r.note.single, contains('opzioni del percorso'));
+      expect(r.note.single, contains('plancia, sezione Energia'));
+    });
+
+    test('in GdANav da sola la stima si dice, senza parlare di una casa che non c\'è', () {
+      final r = arrivo(energia: costoDellEnergia(consumatiKwh: 3.5, euroAlKwhDiRiserva: 0.30));
+      expect(
+        r.note,
+        ['Il costo dell\'energia è una stima (0,30 €/kWh): il prezzo si cambia nelle opzioni del percorso.'],
+      );
+      expect(r.righeAuto[2], ('Ricarica', 'Batteria 3,5 kWh · ~1,05 € · stima a 0,30 €/kWh'));
+    });
+
+    test('con la tariffa di casa dice «prezzo di casa», e che il sole non lo sa', () {
+      final r = arrivo(
+        energia: costoDellEnergia(consumatiKwh: 3.5, euroAlKwhDiCasa: 0.22, euroAlKwhDiRiserva: 0.30),
+        manca: SenzaPrezzoVero.ricaricaNonVale,
+      );
+      expect(r.righe, contains(('Da casa', '3,5 kWh · ~0,77 € · prezzo di casa 0,22 €/kWh')));
+      expect(r.righeAuto[2], ('Ricarica', 'Casa 3,5 kWh · ~0,77 € · prezzo di casa 0,22 €/kWh'));
+      expect(
+          r.note.single, startsWith('Energia al prezzo della rete di casa (0,22 €/kWh): la parte dal sole non si sa'));
+      expect(r.note.single, contains('è di più di due settimane fa'));
+    });
+
+    test('con la ricarica di casa: il suo prezzo e la quota dal sole, e niente da spiegare', () {
+      final casa =
+          RicaricaDiCasa(finitaIl: DateTime(2026, 11, 14, 15), kwh: 20, socA: 100, kwhSole: 13, euroRete: 1.75);
+      expect(casa.valePer(partenza: DateTime(2026, 11, 16, 8, 13), batteriaPartenza: 82), isTrue);
+      final r =
+          arrivo(energia: costoDellEnergia(consumatiKwh: 3.5, partenzaKwh: 57, casa: casa, euroAlKwhDiRiserva: 0.3));
+      expect(r.righe, contains(('Da casa', '3,5 kWh · ~0,31 € · 65% dal sole')));
+      expect(r.note, isEmpty);
+    });
+
+    test('quattro punti di batteria su 13 km sono una misura larga: «circa», e quanto', () {
+      // Dall'82% al 78% di una batteria da 70 kWh: 2,8 kWh, più o meno 0,7.
+      final r = arrivo(kwh: 2.8, largo: 0.7);
+      expect(r.consumoCirca, isTrue);
+      expect(r.consumoTesto, 'circa 2,8 kWh · circa 21 kWh/100 km');
+      expect(r.note, contains(startsWith('Energia misurata dai punti della batteria (±0,7 kWh)')));
+      expect(r.perAuto, contains('circa 2,8 kWh'));
+      // Su un viaggio lungo lo stesso punto non pesa.
+      const lungo = RiepilogoViaggio(
+        destinazione: 'Poggio Sereno',
+        durata: Duration(hours: 2),
+        metri: 180000,
+        elettrica: true,
+        kwh: 31.5,
+        consumoStimato: false,
+        kwhPiuOMeno: 0.7,
+      );
+      expect(lungo.consumoCirca, isFalse);
+      expect(lungo.consumoTesto, '31,5 kWh · 17,5 kWh/100 km');
+    });
+  });
 }
