@@ -21,11 +21,18 @@
 ///   l'auto non cambiano.
 ///
 /// In auto lo stesso lettore nativo dà, con o senza percorso: su Android Auto
-/// ⏯ ⏭ nell'`ActionStrip` del template e il brano disegnato in alto sulla
-/// mappa (solo da guardare); su CarPlay ⏯ ⏭ come `CPBarButton`, e niente
-/// disegnato sulla mappa (Apple la vuole solo mappa: il brano lo mostra la
-/// scheda «In riproduzione» di sistema). Col permesso ma senza un lettore
-/// aperto resta ⏯, che riprende l'ultima app che suonava.
+/// un lettore disegnato in alto a destra sulla mappa, che si comanda col dito
+/// (copertina, titolo, artista, la barra del brano e ⏮ ⏯ ⏭; si richiude in
+/// una pillola: `android/.../auto/PannelloAuto.kt`), e solo sulle auto che non
+/// mandano i tocchi ⏯ nell'`ActionStrip` del template col brano da guardare;
+/// su CarPlay ⏯ ⏭ come `CPBarButton`, e niente disegnato sulla mappa (Apple
+/// la vuole solo mappa: il brano lo mostra la scheda «In riproduzione» di
+/// sistema). Col permesso ma senza un lettore aperto resta ⏯, che riprende
+/// l'ultima app che suonava.
+///
+/// Qui e sull'auto lo stesso aspetto: la barra sottile del brano sotto i
+/// testi, e i tasti che l'app che suona non accetta ([ComandiDelLettore]:
+/// una radio in diretta non ha ⏮ e ⏭) spenti.
 library;
 
 import 'dart:async';
@@ -39,13 +46,40 @@ import 'vetro.dart';
 /// Il brano che suona adesso.
 @immutable
 class BranoInAscolto {
-  const BranoInAscolto({required this.titolo, this.artista = '', this.copertina, this.durata, this.posizione});
+  const BranoInAscolto({
+    required this.titolo,
+    this.artista = '',
+    this.copertina,
+    this.durata,
+    this.posizione,
+    this.alle,
+  });
 
   final String titolo;
   final String artista;
   final ImageProvider? copertina;
   final Duration? durata;
+
+  /// A che punto era il brano [alle]: se suona, da allora è andato avanti.
   final Duration? posizione;
+
+  /// Quando è stata letta la [posizione].
+  final DateTime? alle;
+
+  /// Quanta parte del brano è passata [adesso], da 0 a 1: la [posizione],
+  /// più il tempo trascorso da quando è stata letta se [suona]. `null` se il
+  /// lettore non dice quanto dura (una radio in diretta).
+  double? avanzamento({required bool suona, required DateTime adesso}) {
+    final durata = this.durata;
+    if (durata == null || durata.inMilliseconds <= 0) return null;
+    var ms = (posizione ?? Duration.zero).inMilliseconds;
+    final alle = this.alle;
+    if (suona && alle != null) {
+      final passati = adesso.difference(alle).inMilliseconds;
+      if (passati > 0) ms += passati;
+    }
+    return (ms / durata.inMilliseconds).clamp(0.0, 1.0);
+  }
 }
 
 /// Una playlist da riprendere con un tocco (solo da fermi): «Riprendi».
@@ -109,8 +143,17 @@ abstract class LettoreMusicale implements Listenable {
   Future<void> riprendi(PlaylistPreferita playlist);
 }
 
+/// I comandi che il lettore accetta adesso. Su Android lo dichiara l'app che
+/// suona (`PlaybackState.actions`): una radio in diretta non ha «precedente»
+/// né «successivo». Un [LettoreMusicale] che non lo sa dire li accetta tutti.
+abstract interface class ComandiDelLettore {
+  bool get puoPrecedente;
+  bool get puoPlayPausa;
+  bool get puoSuccessivo;
+}
+
 /// Un lettore finto, per le prove e le fotografie.
-class LettoreFinto extends ChangeNotifier implements LettoreMusicale {
+class LettoreFinto extends ChangeNotifier implements LettoreMusicale, ComandiDelLettore {
   LettoreFinto({
     this.brani = const [],
     this.preferite = const [],
@@ -118,7 +161,17 @@ class LettoreFinto extends ChangeNotifier implements LettoreMusicale {
     this.fonte = FonteMusica.telefono,
     this.suona = true,
     this.permesso = true,
+    this.puoPrecedente = true,
+    this.puoPlayPausa = true,
+    this.puoSuccessivo = true,
   });
+
+  @override
+  bool puoPrecedente;
+  @override
+  bool puoPlayPausa;
+  @override
+  bool puoSuccessivo;
 
   final List<BranoInAscolto> brani;
   @override
@@ -191,8 +244,10 @@ class LettoreFinto extends ChangeNotifier implements LettoreMusicale {
 ///
 /// Il lato nativo manda `stato` a ogni cambio (brano, play/pausa, copertina,
 /// permesso): `{permesso, app, titolo, artista, suona, copertina, durata_ms,
-/// posizione_ms}`. Senza il canale (nelle prove, sul web) resta muto.
-class LettoreDelTelefono extends ChangeNotifier implements LettoreMusicale {
+/// posizione_ms, puo_precedente, puo_successivo, puo_play}`. Gli ultimi tre
+/// li manda solo Android; se mancano, i tasti restano accesi. Senza il canale
+/// (nelle prove, sul web) resta muto.
+class LettoreDelTelefono extends ChangeNotifier implements LettoreMusicale, ComandiDelLettore {
   LettoreDelTelefono({MethodChannel? canale, FonteMusica? fonte})
     : _canale = canale ?? const MethodChannel('gdanav/musica'),
       fonte = fonte ?? (defaultTargetPlatform == TargetPlatform.iOS ? FonteMusica.sistema : FonteMusica.telefono) {
@@ -216,6 +271,12 @@ class LettoreDelTelefono extends ChangeNotifier implements LettoreMusicale {
   bool permesso = false;
   @override
   List<PlaylistPreferita> get preferite => const [];
+  @override
+  bool puoPrecedente = true;
+  @override
+  bool puoPlayPausa = true;
+  @override
+  bool puoSuccessivo = true;
 
   Uint8List? _copertina;
 
@@ -229,6 +290,10 @@ class LettoreDelTelefono extends ChangeNotifier implements LettoreMusicale {
       _ => null,
     };
     suona = grezzo['suona'] == true;
+    // Solo un «no» detto spegne un tasto: chi non lo dice (l'iPhone) li ha tutti.
+    puoPrecedente = grezzo['puo_precedente'] != false;
+    puoPlayPausa = grezzo['puo_play'] != false;
+    puoSuccessivo = grezzo['puo_successivo'] != false;
     final titolo = '${grezzo['titolo'] ?? ''}'.trim();
     final byte = grezzo['copertina'];
     // La stessa copertina non si rifà: l'immagine non lampeggia.
@@ -243,6 +308,7 @@ class LettoreDelTelefono extends ChangeNotifier implements LettoreMusicale {
             copertina: _copertina == null ? null : MemoryImage(_copertina!),
             durata: ms(grezzo['durata_ms']),
             posizione: ms(grezzo['posizione_ms']),
+            alle: DateTime.now(),
           );
     notifyListeners();
   }
@@ -363,24 +429,32 @@ class _MiniLettoreState extends State<MiniLettore> {
     final preferite = widget.inMovimento || !widget.conPreferite
         ? const <PlaylistPreferita>[]
         : l.preferite.take(5).toList();
-    Widget tasto(IconData icona, String chiave, String nome, Future<void> Function() fai, {bool grande = false}) =>
-        SizedBox(
-          width: grande ? 52 : 44,
-          height: 56,
-          child: IconButton(
-            key: Key('lettore-$chiave'),
-            tooltip: nome,
-            onPressed: fai,
-            iconSize: grande ? 34 : 30,
-            style: grande
-                ? IconButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                  )
-                : null,
-            icon: Icon(icona),
-          ),
-        );
+    // I tasti che l'app che suona non accetta restano spenti, come sull'auto.
+    final comandi = l is ComandiDelLettore ? l as ComandiDelLettore : null;
+    Widget tasto(
+      IconData icona,
+      String chiave,
+      String nome,
+      Future<void> Function() fai, {
+      bool grande = false,
+      bool acceso = true,
+    }) => SizedBox(
+      width: grande ? 52 : 44,
+      height: 56,
+      child: IconButton(
+        key: Key('lettore-$chiave'),
+        tooltip: nome,
+        onPressed: acceso ? fai : null,
+        iconSize: grande ? 34 : 30,
+        style: grande
+            ? IconButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              )
+            : null,
+        icon: Icon(icona),
+      ),
+    );
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       child: Vetro(
@@ -423,15 +497,28 @@ class _MiniLettoreState extends State<MiniLettore> {
                       ],
                     ),
                   ),
-                  tasto(Icons.skip_previous_rounded, 'precedente', 'Precedente', l.precedente),
+                  tasto(
+                    Icons.skip_previous_rounded,
+                    'precedente',
+                    'Precedente',
+                    l.precedente,
+                    acceso: comandi?.puoPrecedente ?? true,
+                  ),
                   tasto(
                     l.suona ? Icons.pause_rounded : Icons.play_arrow_rounded,
                     'play',
                     l.suona ? 'Pausa' : 'Riproduci',
                     l.playPausa,
                     grande: true,
+                    acceso: comandi?.puoPlayPausa ?? true,
                   ),
-                  tasto(Icons.skip_next_rounded, 'successivo', 'Successivo', l.successivo),
+                  tasto(
+                    Icons.skip_next_rounded,
+                    'successivo',
+                    'Successivo',
+                    l.successivo,
+                    acceso: comandi?.puoSuccessivo ?? true,
+                  ),
                   SizedBox(
                     width: 28,
                     height: 56,
@@ -445,6 +532,13 @@ class _MiniLettoreState extends State<MiniLettore> {
                   ),
                 ],
               ),
+              // La barra sottile del brano, come sull'auto: solo se il
+              // lettore dice quanto dura.
+              if (brano != null && brano.durata != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(2, 8, 8, 0),
+                  child: _Avanzamento(brano: brano, suona: l.suona),
+                ),
               // Da fermi: le playlist da riprendere, con un tocco.
               if (preferite.isNotEmpty) ...[
                 const SizedBox(height: 8),
@@ -587,6 +681,64 @@ class _InvitoMusicaState extends State<InvitoMusica> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// La barra del brano: va avanti da sola, una volta al secondo, solo mentre
+/// suona. Ferma (in pausa, o chiuso il riquadro) non fa lavorare niente.
+class _Avanzamento extends StatefulWidget {
+  const _Avanzamento({required this.brano, required this.suona});
+
+  final BranoInAscolto brano;
+  final bool suona;
+
+  @override
+  State<_Avanzamento> createState() => _AvanzamentoState();
+}
+
+class _AvanzamentoState extends State<_Avanzamento> {
+  Timer? _battito;
+
+  @override
+  void initState() {
+    super.initState();
+    _regola();
+  }
+
+  @override
+  void didUpdateWidget(_Avanzamento prima) {
+    super.didUpdateWidget(prima);
+    _regola();
+  }
+
+  void _regola() {
+    if (widget.suona) {
+      _battito ??= Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+    } else {
+      _battito?.cancel();
+      _battito = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _battito?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colori = Theme.of(context).colorScheme;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(2),
+      child: LinearProgressIndicator(
+        key: const Key('lettore-avanzamento'),
+        value: widget.brano.avanzamento(suona: widget.suona, adesso: DateTime.now()) ?? 0,
+        minHeight: 4,
+        backgroundColor: colori.onSurface.withValues(alpha: 0.14),
+        color: colori.primary,
       ),
     );
   }

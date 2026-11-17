@@ -24,11 +24,11 @@ import it.gdanav.gdanav_app.R
 import it.gdanav.gdanav_app.musica.LettoreTelefono
 
 /**
- * Lo schermo dell'auto: la mappa di GdANav sotto (con velocità, limite e dati
- * dell'auto), sopra la prossima manovra con corsie, svincolo e arrivo nelle
- * schede di Android Auto. In alto Cerca, Menu e Fine; a lato sposta, + e −,
- * 2D/3D e Centra. In guida il viaggio va anche al cruscotto dell'auto e
- * nella notifica di navigazione.
+ * Lo schermo dell'auto: la mappa di GdANav sotto (con velocità, limite, dati
+ * dell'auto e il lettore musicale), sopra la prossima manovra con corsie,
+ * svincolo e arrivo nelle schede di Android Auto. In alto Cerca, Menu e
+ * Fine; a lato sposta, + e −, 2D/3D e Centra. In guida il viaggio va anche
+ * al cruscotto dell'auto e nella notifica di navigazione.
  */
 class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLifecycleObserver {
     private val renderer = RendererMappa(carContext)
@@ -49,11 +49,12 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         PonteAuto.termica.id,
         PonteAuto.arrivo,
         PonteAuto.strade?.id,
-        // La musica cambia i tasti in alto (⏯ ⏭) solo quando c'è o no, e
-        // quando passa da play a pausa: non a ogni brano.
-        LettoreTelefono.conTasti,
-        LettoreTelefono.daMostrare,
-        LettoreTelefono.brano?.suona,
+        // La musica cambia i tasti in alto (⏯ ⏭) solo dove sta lì e non nel
+        // lettore sulla mappa, solo quando c'è o no, e quando passa da play
+        // a pausa: non a ogni brano.
+        musicaInAlto(),
+        musicaInAlto() && LettoreTelefono.daMostrare,
+        if (musicaInAlto()) LettoreTelefono.brano?.suona else null,
         // La strada proposta coi tasti in alto, quando il suo avviso non può
         // uscire.
         PonteAuto.stradaNeiTasti,
@@ -303,6 +304,8 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         lifecycle.addObserver(this)
         PonteAuto.conAvvisi = carContext.carAppApiLevel >= 5
         PonteAuto.pedaggioNellaStima = carContext.carAppApiLevel >= 5
+        // I tocchi sulla mappa (e sul lettore musicale) arrivano dall'API 5.
+        MusicaInAuto.api5 = carContext.carAppApiLevel >= 5
         carContext.getCarService(AppManager::class.java).setSurfaceCallback(renderer)
         renderer.alCambio = { invalidate() }
         // Tocco su un distributore, una colonnina o un ristorante: la scheda.
@@ -329,8 +332,18 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         })
     }
 
-    /** La musica cambia sul telefono (un brano, play/pausa): si rifà come una novità. */
-    private val musica: () -> Unit = { PonteAuto.rinfresca() }
+    /**
+     * La musica cambia sul telefono (un brano, la copertina, play/pausa): si
+     * ridisegna il lettore sulla mappa, lui solo. Il resto (la mappa, i
+     * tasti in alto) si rifà come per una novità solo se cambia quello che
+     * questo schermo ha in pagina (dove i comandi stanno nel lettore, mai), o
+     * se manca il permesso: l'invito a darlo si guarda lì
+     * ([avvisaPermessoMusica]).
+     */
+    private val musica: () -> Unit = {
+        renderer.aggiornaPannello()
+        if (firma() != disegnata || LettoreTelefono.senzaPermesso) PonteAuto.rinfresca()
+    }
 
     override fun onCreate(owner: LifecycleOwner) {
         // Gli avvisi di Android Auto esistono solo sopra la mappa: l'arbitro
@@ -366,6 +379,8 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         // più (alla prossima il telefono rimanda quello di allora).
         ArbitroAvvisi.scollega(carContext)
         PonteAuto.fineSessione()
+        // Il lettore richiuso a pillola vale per questa sessione.
+        MusicaInAuto.fineSessione()
         // Finita la sessione in auto finisce anche la prova di guida.
         PonteAuto.fineProva()
         if (navigando) navigazione.navigationEnded()
@@ -408,13 +423,27 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
         Action.Builder().setIcon(icona(id)).setOnClickListener { azione() }.build()
 
     /**
+     * La musica si comanda coi tasti in alto: accesa e col permesso, e i
+     * comandi non stanno già nel lettore sulla mappa
+     * ([MusicaInAuto.nelLettore]: le auto che mandano i tocchi, dall'API 5).
+     */
+    private fun musicaInAlto() = LettoreTelefono.conTasti && !MusicaInAuto.nelLettore
+
+    /**
      * In alto, al più quattro tasti: Cerca, la casa (dentro GdAHome) e Menu
-     * (in guida anche Fine); con la musica ⏯ per primo; appena passata una
+     * (in guida la lente, la casa, il menu e Fine); appena passata una
      * segnalazione, «C'è ancora?» Sì / No.
+     *
+     * La musica si comanda dal lettore sulla mappa, e qui non c'è: i tasti
+     * sono quelli di prima della musica. Solo sulle auto che non mandano i
+     * tocchi (prima dell'API 5, o con la sola manopola), e finché su
+     * quest'auto non se n'è visto uno, ⏯ sta qui per primo
+     * ([musicaInAlto]).
      *
      * La casa di GdAHome resta **sempre** qui, mai nel Menu: lì il percorso
      * dei suoi schermi si allunga di un passo e passa il limite dei cinque
-     * che Android Auto concede (l'app verrebbe chiusa). Con la musica:
+     * che Android Auto concede (l'app verrebbe chiusa). Con la musica in
+     * alto:
      *
      * - con la casa: a mappa libera ⏯, «Cerca», casa, «Menu»; in guida ⏯,
      *   casa, menu, «Fine». Per ⏭ non c'è posto;
@@ -424,7 +453,8 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
      * - ⏭ solo se un'app ha un lettore aperto: senza, ⏯ da solo riprende
      *   l'ultima.
      *
-     * Con la musica spenta o senza il permesso, tutto come prima della musica.
+     * Con la musica spenta, senza il permesso o coi comandi nel lettore
+     * sulla mappa, tutto come prima della musica.
      */
     private fun azioni(): ActionStrip {
         val striscia = ActionStrip.Builder()
@@ -447,7 +477,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             return striscia.build()
         }
         val guida = PonteAuto.guida != null
-        val conMusica = LettoreTelefono.conTasti
+        val conMusica = musicaInAlto()
         if (conMusica) tastiMusica(striscia, avanti = GdanavInAuto.casa == null)
         if (guida) {
             // In guida c'è poco spazio: solo la lente, e con la musica
@@ -543,7 +573,7 @@ class SchermoNavigazione(carContext: CarContext) : Screen(carContext), DefaultLi
             .setActionStrip(azioni())
             .setMapActionStrip(azioniMappa())
         if (carContext.carAppApiLevel >= 2) {
-            modello.setPanModeListener { inPan -> if (!inPan) renderer.segui() }
+            modello.setPanModeListener { inPan -> renderer.sposta(inPan) }
         }
         if (guida != null) {
             // La manovra (freccia, distanza, corsie, svincolo col cartello)

@@ -9,11 +9,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.AudioManager
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -28,13 +30,16 @@ import it.gdanav.gdanav_app.R
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.URI
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 
 /**
  * Il lettore musicale del telefono, qualunque app suoni (Spotify, YouTube
- * Music, Amazon Music…): il brano, la copertina, play/pausa, e i comandi
- * precedente / play-pausa / successivo.
+ * Music, Amazon Music…): il brano, la copertina, play/pausa, a che punto è, e
+ * i comandi precedente / play-pausa / successivo, con quali l'app accetta.
  *
  * Android lo lascia fare con `MediaSessionManager.getActiveSessions`, a
  * patto che l'utente abbia dato «Accesso alle notifiche» a GdANav
@@ -58,6 +63,14 @@ import java.util.concurrent.Executors
  * app ne mandano uno al secondo) si accorpano, uno ogni [OGNI_MS]; e lo
  * schermo dell'auto si avvisa solo se cambia qualcosa che si vede. Tutto il
  * resto si tocca dal filo principale.
+ *
+ * La copertina è quella che l'app dichiara: l'immagine dell'album, o quella
+ * del brano, o l'icona; e se l'app dà solo un indirizzo (o un'immagine
+ * minuscola), la si legge da lì, fuori dal filo principale
+ * ([caricaCopertina]). Resta in memoria finché non cambia il brano.
+ *
+ * A che punto è il brano ([posizioneMs]) non fa notizia: chi lo mostra (la
+ * barra del lettore sull'auto) lo chiede quando disegna, una volta al secondo.
  */
 object LettoreTelefono {
     /** Il brano come lo vede l'auto. */
@@ -67,6 +80,16 @@ object LettoreTelefono {
         val artista: String,
         val suona: Boolean,
         val copertina: Bitmap?,
+        /** Quanto dura, in millisecondi; 0 se l'app non lo dice (una radio). */
+        val durataMs: Long = 0L,
+        /**
+         * I comandi che il lettore dell'app dichiara di accettare adesso
+         * (`PlaybackState.actions`): un tasto che non farebbe niente si
+         * disegna spento.
+         */
+        val puoPrecedente: Boolean = true,
+        val puoSuccessivo: Boolean = true,
+        val puoPlayPausa: Boolean = true,
     )
 
     @Volatile var acceso = false
@@ -83,10 +106,11 @@ object LettoreTelefono {
     val daMostrare: Boolean get() = acceso && permesso && brano != null
 
     /**
-     * Se l'auto mette ⏯ in alto: accesa e col permesso, anche se nessuna app
-     * ha un lettore aperto. Allora ⏯ fa come il tasto play del volante
-     * ([comando]): il sistema riprende l'ultima app che suonava, e appena
-     * suona arrivano il brano e ⏭.
+     * Se l'auto mette i comandi della musica (nel lettore sulla mappa, o ⏯ in
+     * alto sulle auto che non mandano i tocchi): accesa e col permesso, anche
+     * se nessuna app ha un lettore aperto. Allora ⏯ fa come il tasto play del
+     * volante ([comando]): il sistema riprende l'ultima app che suonava, e
+     * appena suona arrivano il brano e gli altri tasti.
      */
     val conTasti: Boolean get() = acceso && permesso
 
@@ -116,6 +140,9 @@ object LettoreTelefono {
 
     /** La copertina che il PNG (fatto o in arrivo) rappresenta. */
     private var pngDi: Bitmap? = null
+
+    /** L'indirizzo da cui si è letta (o si sta leggendo) la copertina di questo brano. */
+    private var indirizzoCopertina: String? = null
 
     /** Il nome dell'ultima app, per non richiederlo al sistema a ogni giro. */
     private var nomeApp: Pair<String, String?>? = null
@@ -507,6 +534,7 @@ object LettoreTelefono {
             copertina = null
             copertinaPng = null
             pngDi = null
+            indirizzoCopertina = null
             brano = null
             avvisa()
             return
@@ -522,12 +550,20 @@ object LettoreTelefono {
         val grezza = m?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
             ?: m?.getBitmap(MediaMetadata.METADATA_KEY_ART)
             ?: m?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
+        // Senza immagine, o con una minuscola (certe app danno solo
+        // un'iconcina e l'indirizzo di quella vera): la si legge da lì.
+        val indirizzo = if (grezza == null || maxOf(grezza.width, grezza.height) < COPERTINA_MINUSCOLA) {
+            INDIRIZZI_COPERTINA.firstNotNullOfOrNull { k -> m?.getString(k)?.takeIf { it.isNotBlank() } }
+        } else {
+            null
+        }
         // La copertina (e il suo PNG) si rifà solo se è cambiato il brano o
         // l'immagine: a ogni «play» e «pausa» resta quella.
         val chiave = "${c.packageName}|$titolo|$artista|${m?.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: ""}"
-        if (chiave != chiaveBrano || !stessaImmagine(grezza, copertinaGrezza)) {
+        if (chiave != chiaveBrano || !stessaImmagine(grezza, copertinaGrezza) || indirizzo != indirizzoCopertina) {
             chiaveBrano = chiave
             copertinaGrezza = grezza
+            indirizzoCopertina = indirizzo
             val ridotta = try {
                 grezza?.let(::piccola)
             } catch (_: Exception) {
@@ -535,11 +571,126 @@ object LettoreTelefono {
             }
             copertina = ridotta
             comprimi(ridotta)
+            if (indirizzo != null) caricaCopertina(indirizzo, chiave)
         }
-        val quale = statoLettore?.state
+        val stato = statoLettore
+        val quale = stato?.state
         val suona = quale == PlaybackState.STATE_PLAYING || quale == PlaybackState.STATE_BUFFERING
-        brano = Brano(nomeDi(c.packageName), titolo, artista, suona, copertina)
+        // Un lettore che non dichiara nessun comando (0) non è che non ne
+        // accetti: non lo dice. Allora i tasti restano accesi.
+        val azioni = stato?.actions ?: 0L
+        fun puo(quali: Long) = azioni == 0L || azioni and quali != 0L
+        brano = Brano(
+            app = nomeDi(c.packageName),
+            titolo = titolo,
+            artista = artista,
+            suona = suona,
+            copertina = copertina,
+            durataMs = (m?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L).coerceAtLeast(0L),
+            puoPrecedente = puo(PlaybackState.ACTION_SKIP_TO_PREVIOUS),
+            puoSuccessivo = puo(PlaybackState.ACTION_SKIP_TO_NEXT),
+            puoPlayPausa = puo(
+                PlaybackState.ACTION_PLAY_PAUSE or if (suona) PlaybackState.ACTION_PAUSE else PlaybackState.ACTION_PLAY,
+            ),
+        )
         avvisa()
+    }
+
+    /**
+     * A che punto è il brano adesso, in millisecondi: l'ultima posizione detta
+     * dal lettore, più il tempo passato da allora se sta suonando. 0 se non
+     * si sa. Dal filo principale.
+     */
+    fun posizioneMs(): Long {
+        val s = statoLettore ?: return 0L
+        var p = s.position
+        if (p < 0L) return 0L
+        val detta = s.lastPositionUpdateTime
+        if (s.state == PlaybackState.STATE_PLAYING && detta > 0L) {
+            p += ((SystemClock.elapsedRealtime() - detta) * s.playbackSpeed).toLong()
+        }
+        val durata = brano?.durataMs ?: 0L
+        return if (durata > 0L) p.coerceIn(0L, durata) else p.coerceAtLeast(0L)
+    }
+
+    /** Sotto questo lato, in pixel, la copertina dell'app è un'iconcina: si cerca quella vera. */
+    private const val COPERTINA_MINUSCOLA = 160
+
+    /** Dove l'app può dire l'indirizzo della copertina, dal più preciso. */
+    private val INDIRIZZI_COPERTINA = listOf(
+        MediaMetadata.METADATA_KEY_ALBUM_ART_URI,
+        MediaMetadata.METADATA_KEY_ART_URI,
+        MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI,
+    )
+
+    /** Al più tanti byte per una copertina letta da un indirizzo. */
+    private const val COPERTINA_AL_PIU = 6 * 1024 * 1024
+
+    /**
+     * La copertina da un [indirizzo], su un altro filo: quando arriva prende
+     * il posto di quella che c'era (niente, o l'iconcina), se il brano è
+     * ancora quello ([chiave]). Se non si riesce a leggere resta com'è, e non
+     * si riprova finché il brano non cambia.
+     */
+    private fun caricaCopertina(indirizzo: String, chiave: String) {
+        val ctx = contesto ?: return
+        lavoro.execute {
+            val letta = try {
+                leggiImmagine(ctx, indirizzo)?.let(::piccola)
+            } catch (_: Exception) {
+                null
+            } catch (_: OutOfMemoryError) {
+                null
+            }
+            if (letta != null) {
+                principale.post {
+                    if (chiaveBrano == chiave && indirizzoCopertina == indirizzo && controllore != null) {
+                        copertina = letta
+                        comprimi(letta)
+                        brano = brano?.copy(copertina = letta)
+                        avvisa()
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * L'immagine a quell'indirizzo, già ridotta nel leggerla. Solo indirizzi
+     * del telefono (`content:`, `android.resource:`) e `https:`: niente file
+     * di altre app e niente rete in chiaro.
+     */
+    private fun leggiImmagine(context: Context, indirizzo: String): Bitmap? {
+        val uri = Uri.parse(indirizzo)
+        val flusso: InputStream = when (uri.scheme?.lowercase()) {
+            "content", "android.resource" -> context.contentResolver.openInputStream(uri)
+            "https" -> {
+                val rete = URI(indirizzo).toURL().openConnection() as HttpURLConnection
+                rete.connectTimeout = 4_000
+                rete.readTimeout = 6_000
+                rete.instanceFollowRedirects = true
+                rete.inputStream
+            }
+            else -> null
+        } ?: return null
+        val byte = flusso.use { f ->
+            val out = ByteArrayOutputStream()
+            val pezzo = ByteArray(16 * 1024)
+            while (true) {
+                val n = f.read(pezzo)
+                if (n < 0) break
+                out.write(pezzo, 0, n)
+                if (out.size() > COPERTINA_AL_PIU) return null
+            }
+            out.toByteArray()
+        }
+        val misura = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(byte, 0, byte.size, misura)
+        val lato = maxOf(misura.outWidth, misura.outHeight)
+        if (lato <= 0) return null
+        var passo = 1
+        while (lato / (passo * 2) >= 256) passo *= 2
+        return BitmapFactory.decodeByteArray(byte, 0, byte.size, BitmapFactory.Options().apply { inSampleSize = passo })
     }
 
     /** Se due copertine sono la stessa immagine (l'app la rimanda uguale a ogni richiamo). */
@@ -640,7 +791,12 @@ object LettoreTelefono {
             "suona" to (b?.suona == true),
             "copertina" to copertinaPng,
             "durata_ms" to metadati?.getLong(MediaMetadata.METADATA_KEY_DURATION),
-            "posizione_ms" to statoLettore?.position,
+            // A che punto è adesso (non quando il lettore l'ha detto l'ultima
+            // volta): il telefono ci conta sopra da quando lo riceve.
+            "posizione_ms" to if (b != null) posizioneMs() else null,
+            "puo_precedente" to (b?.puoPrecedente != false),
+            "puo_successivo" to (b?.puoSuccessivo != false),
+            "puo_play" to (b?.puoPlayPausa != false),
         )
     }
 
@@ -660,7 +816,10 @@ object LettoreTelefono {
         // L'auto solo se cambia qualcosa che si vede: la posizione nel brano
         // no, e ogni avviso le fa rifare mappa e pannello.
         val b = brano
-        val ora = listOf(acceso, permesso, b?.app, b?.titolo, b?.artista, b?.suona, b?.copertina)
+        val ora = listOf(
+            acceso, permesso, b?.app, b?.titolo, b?.artista, b?.suona, b?.copertina,
+            b?.durataMs, b?.puoPrecedente, b?.puoSuccessivo, b?.puoPlayPausa,
+        )
         if (ora == visto) return
         visto = ora
         for (f in ascoltatori) f()

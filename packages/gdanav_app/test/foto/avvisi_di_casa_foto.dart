@@ -151,7 +151,13 @@ AvvisoDiCasa _marta() => _da({
 });
 
 final _brani = [
-  BranoInAscolto(titolo: 'Strade di notte', artista: 'Le Lucciole', copertina: _copertina(1)),
+  BranoInAscolto(
+    titolo: 'Strade di notte',
+    artista: 'Le Lucciole',
+    copertina: _copertina(1),
+    durata: const Duration(minutes: 3, seconds: 21),
+    posizione: const Duration(minutes: 1, seconds: 23),
+  ),
   BranoInAscolto(titolo: 'Vento a favore', artista: 'Orsa Minore', copertina: _copertina(2)),
 ];
 final _preferite = [

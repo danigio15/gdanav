@@ -121,6 +121,51 @@ class RendererMappa(
 
     private val torna = Runnable { segui() }
 
+    init {
+        // Se su quest'auto si è già visto un tocco sulla mappa: allora i
+        // comandi della musica stanno nel lettore, non fra i tasti in alto.
+        if (!soloMappa) MusicaInAuto.tocchi = preferenze.getBoolean(TOCCHI_VISTI, false)
+    }
+
+    /** Nel modo «sposta» di Android Auto (la manopola, il touchpad). */
+    private var inSposta = false
+
+    /**
+     * L'auto ha mandato un gesto del dito (un tocco, uno scorrimento, due
+     * dita): i tocchi arrivano, e il lettore musicale si comanda da lì
+     * ([MusicaInAuto]). Nel modo «sposta» no: lì i gesti li fabbrica Android
+     * Auto dalla manopola.
+     */
+    private fun toccoVisto() {
+        if (soloMappa || inSposta) return
+        MusicaInAuto.tocchiOra = true
+        if (MusicaInAuto.tocchi && !MusicaInAuto.senzaTocchi) return
+        MusicaInAuto.tocchi = true
+        MusicaInAuto.senzaTocchi = false
+        preferenze.edit().putBoolean(TOCCHI_VISTI, true).apply()
+        // I tasti in alto cambiano: lo schermo si rifà.
+        PonteAuto.rinfresca()
+    }
+
+    /**
+     * Android Auto entra ([si]) o esce dal modo «sposta». Uscendo si torna
+     * sull'auto. Entrandoci senza aver mai visto un tocco in questa sessione
+     * è un'auto con la manopola: il lettore musicale non si può toccare, e i
+     * comandi tornano fra i tasti in alto.
+     */
+    fun sposta(si: Boolean) {
+        inSposta = si
+        if (!si) {
+            segui()
+            return
+        }
+        if (soloMappa || MusicaInAuto.tocchiOra || MusicaInAuto.senzaTocchi) return
+        MusicaInAuto.senzaTocchi = true
+        MusicaInAuto.tocchi = false
+        preferenze.edit().putBoolean(TOCCHI_VISTI, false).apply()
+        PonteAuto.rinfresca()
+    }
+
     override fun onSurfaceAvailable(contenitore: SurfaceContainer) {
         val superficie = contenitore.surface ?: return
         val gestore = carContext.getSystemService(DisplayManager::class.java)
@@ -167,6 +212,8 @@ class RendererMappa(
         val segnaposto = FrecciaAuto(p.context)
         val sopra = if (soloMappa) null else PannelloAuto(p.context, contenitore.dpi / 160f)
         sopra?.area = areaVisibile
+        sopra?.areaStabile = areaStabile
+        sopra?.notte = carContext.isDarkMode
         val tutto = FrameLayout.LayoutParams.MATCH_PARENT
         contenuto.addView(vista, FrameLayout.LayoutParams(tutto, tutto))
         contenuto.addView(segnaposto, FrameLayout.LayoutParams(tutto, tutto))
@@ -300,6 +347,7 @@ class RendererMappa(
 
     override fun onStableAreaChanged(area: Rect) {
         areaStabile = Rect(area)
+        pannello?.areaStabile = areaStabile
         if (areaVisibile == null) {
             areaVisibile = Rect(area)
             pannello?.area = areaVisibile
@@ -332,13 +380,32 @@ class RendererMappa(
     var alPunto: (Map<String, Any?>, Double, Double) -> Unit = { _, _, _ -> }
 
     /**
-     * Un tocco sulla mappa (Android Auto dalla versione 5 dell'auto): se sotto
-     * il dito c'è un distributore, una colonnina, un punto di interesse o una
-     * persona di casa (da GdAHome), la sua scheda, con «Vai» (per una persona
-     * «Naviga verso …»). Toccare non serve a niente altro: i segnaposto
-     * restano fermi, come vuole Android Auto per chi guida.
+     * Un tocco sulla mappa (Android Auto dalla versione 5 dell'auto), in
+     * pixel della superficie. Se cade sul lettore musicale è suo (un tasto fa
+     * il suo comando, il resto niente) e la mappa non lo vede
+     * ([PannelloAuto.tocco]). Se no, se sotto il dito c'è un distributore,
+     * una colonnina, un punto di interesse o una persona di casa (da
+     * GdAHome), la sua scheda, con «Vai» (per una persona «Naviga verso …»).
+     * Toccare non serve a niente altro: i segnaposto restano fermi, come
+     * vuole Android Auto per chi guida.
      */
     override fun onClick(x: Float, y: Float) {
+        // La libreria dell'auto chiama sul filo principale; se un'auto lo
+        // facesse da un altro, ci si torna: il lettore e la mappa si toccano
+        // solo da lì.
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            principale.post { onClick(x, y) }
+            return
+        }
+        toccoVisto()
+        // Il lettore sta sopra la mappa, e sopra la scena 3D: prima lui.
+        try {
+            if (pannello?.tocco(x, y, larghezza, altezza) == true) return
+        } catch (_: Exception) {
+            // Un comando che il lettore dell'altra app rifiuta male non
+            // chiude la sessione dell'auto.
+            return
+        }
         // Con la scena 3D sotto il dito non c'è la mappa di MapLibre.
         if (scena != null) return
         // Il tap sulla mappa arriva dal thread dell'host Android Auto: un
@@ -381,6 +448,7 @@ class RendererMappa(
     // --- col dito o con la manopola -------------------------------------
 
     override fun onScroll(distanceX: Float, distanceY: Float) {
+        toccoVisto()
         // Con la scena 3D la mappa sotto non si sposta: la scena segue l'auto.
         if (scena != null) return
         val m = mappa ?: return
@@ -389,6 +457,7 @@ class RendererMappa(
     }
 
     override fun onFling(velocityX: Float, velocityY: Float) {
+        toccoVisto()
         // Con la scena 3D la mappa sotto non si sposta: la scena segue l'auto.
         if (scena != null) return
         val m = mappa ?: return
@@ -397,6 +466,23 @@ class RendererMappa(
     }
 
     override fun onScale(focusX: Float, focusY: Float, scaleFactor: Float) {
+        // Col dito c'è il punto fra le dita; dalla manopola no (negativo).
+        if (focusX >= 0 && focusY >= 0) {
+            toccoVisto()
+            // Sul lettore musicale la mappa non si ingrandisce. Due tocchi
+            // svelti su un tasto (⏭ ⏭) Android Auto li dà come un tocco e poi
+            // un «ingrandisci» secco (fattore negativo, o 2): il secondo è un
+            // altro tocco sul tasto. Le due dita allargate no.
+            val p = pannello
+            if (p != null && p.sulLettore(focusX, focusY, larghezza, altezza) != DisposizioneMusica.Zona.FUORI) {
+                if (scaleFactor <= 0f || scaleFactor == 2f) {
+                    try {
+                        p.tocco(focusX, focusY, larghezza, altezza)
+                    } catch (_: Exception) {}
+                }
+                return
+            }
+        }
         // Il doppio tocco arriva con un fattore negativo: si ingrandisce di uno.
         val passo = if (scaleFactor <= 0f) 1.0 else ln(scaleFactor.toDouble()) / ln(2.0)
         if (passo == 0.0) return
@@ -557,8 +643,19 @@ class RendererMappa(
 
     // --- i dati dal telefono --------------------------------------------
 
+    /**
+     * È cambiato solo quello che sta sopra la mappa (il brano del lettore
+     * musicale): si ridisegna quello, e la mappa — o la scena 3D — non se ne
+     * accorge.
+     */
+    fun aggiornaPannello() {
+        pannello?.notte = carContext.isDarkMode
+        pannello?.aggiorna()
+    }
+
     /** Chiamata a ogni novità dal telefono. */
     fun aggiorna() {
+        pannello?.notte = carContext.isDarkMode
         pannello?.aggiorna()
         aggiornaScena()
         val m = mappa ?: return
@@ -1160,6 +1257,9 @@ class RendererMappa(
             vistoSullAuto = si
             for (r in vivi) r.diciLaVista()
         }
+
+        /** Dove si ricorda che su quest'auto i tocchi sulla mappa arrivano. */
+        private const val TOCCHI_VISTI = "auto_tocchi"
 
         private const val VUOTA = "{\"type\":\"FeatureCollection\",\"features\":[]}"
         private const val SORGENTE_IO = "gdanav-io"

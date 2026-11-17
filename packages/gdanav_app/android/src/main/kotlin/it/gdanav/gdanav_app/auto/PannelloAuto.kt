@@ -8,9 +8,14 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.os.SystemClock
 import android.view.View
+import it.gdanav.gdanav_app.auto.DisposizioneMusica.Forma
+import it.gdanav.gdanav_app.auto.DisposizioneMusica.Riq
+import it.gdanav.gdanav_app.auto.DisposizioneMusica.Zona
 import it.gdanav.gdanav_app.musica.LettoreTelefono
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
@@ -18,7 +23,8 @@ import kotlin.math.roundToInt
  * Auto lasciano libera, perché la mappa si veda: in basso a sinistra, dal
  * lato di chi guida, velocità e limite, e sopra una barra sottile coi dati
  * dell'auto (batteria, km, alla meta), il meteo e la prossima sosta; in alto
- * solo l'avviso della segnalazione che si avvicina, finché serve. Manovra,
+ * solo l'avviso della segnalazione che si avvicina, finché serve, e a destra
+ * il lettore musicale, che si comanda col dito ([musica], [tocco]). Manovra,
  * corsie, svincolo e arrivo no: stanno nelle schede di Android Auto, come
  * vuole Google per i navigatori (NF-2). Qui si compone solo l'immagine dello
  * svincolo col cartello, che va nella scheda ([svincoloConCartello]).
@@ -27,6 +33,24 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
     /** L'area non coperta dalle schede di Android Auto. */
     var area: Rect? = null
         set(v) {
+            field = v
+            invalidate()
+        }
+
+    /**
+     * L'area che le schede fisse di Android Auto non coprono mai: lì sotto
+     * sta fermo il lettore musicale. `null` finché l'auto non la dice.
+     */
+    var areaStabile: Rect? = null
+        set(v) {
+            field = v
+            invalidate()
+        }
+
+    /** La mappa è quella della notte: il lettore prende un filo chiaro intorno. */
+    var notte = false
+        set(v) {
+            if (field == v) return
             field = v
             invalidate()
         }
@@ -56,7 +80,7 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
     fun aggiorna() = postInvalidate()
 
     /**
-     * Da dove parte, in alto, il brano che suona: il punto più basso a cui è
+     * Da dove parte, in alto, il lettore musicale: il punto più basso a cui è
      * arrivato il bordo alto dell'area libera su questa superficie.
      *
      * L'area libera sale e scende coi tasti in alto, che Android Auto
@@ -64,8 +88,10 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
      * brano, legato a lei, saltava su e giù. L'area che i tasti non coprono
      * mai (quella «stabile») sta sempre dentro quella libera, e il suo bordo
      * alto è proprio il più basso che quella libera raggiunge: tenendo quello
-     * il brano resta fermo, sotto i tasti quando ci sono. Si ricomincia se
-     * cambia la superficie (lo schermo diviso).
+     * il lettore resta fermo, sotto i tasti quando ci sono. Si ricomincia se
+     * cambia la superficie (lo schermo diviso). Quando l'auto dice l'area
+     * stabile ([areaStabile]) vale il più basso dei due: il lettore è al suo
+     * posto dal primo disegno, senza aspettare che i tasti siano comparsi.
      */
     private var altoFermo = 0
     private var altoFermoPer = 0L
@@ -93,22 +119,7 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         // In alto niente, per vedere la strada davanti: solo l'avviso che si
         // avvicina (autovelox, polizia, incidente…), finché serve.
         val alto = (sottoIlCartello ?: a.top.toFloat()) + margine
-        avviso(canvas, a.left + margine, a.right - margine, alto)
-
-        // La musica, come in Waze: il brano in alto a destra, solo da
-        // guardare (i comandi sono i tasti del template), in guida e a mappa
-        // libera. Sotto l'avviso, se c'è: non si coprono. Fermo dove i tasti
-        // in alto non arrivano mai ([bordoFermo]), e a sinistra della striscia
-        // del traffico quando c'è.
-        val fermo = bordoFermo(a)
-        if (LettoreTelefono.daMostrare) {
-            val av = PonteAuto.avviso
-            val conAvviso = av.titolo != null || av.ancoraTesto != null ||
-                (PonteAuto.strada.id != null && PonteAuto.stradaNeiTasti)
-            val altoMusica = max(alto, fermo + margine) + if (conAvviso) dp(72f) else 0f
-            val conStriscia = PonteAuto.guida?.striscia?.isNotEmpty() == true
-            musica(canvas, a, margine, altoMusica, if (conStriscia) dp(48f) else 0f)
-        }
+        val riquadroAvviso = avviso(canvas, a.left + margine, a.right - margine, alto)
 
         // In basso a sinistra, dal lato di chi guida: velocità e limite, e
         // sopra una barra sottile coi dati dell'auto e il meteo.
@@ -120,13 +131,27 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         // vecchie anche in guida.
         // A destra la striscia del traffico, come sul telefono, se davanti
         // c'è qualche coda.
-        PonteAuto.guida?.let { g -> if (g.striscia.isNotEmpty()) striscia(canvas, a, margine, g) }
+        val occupaStriscia = PonteAuto.guida?.takeIf { it.striscia.isNotEmpty() }?.let { striscia(canvas, a, margine, it) }
         val nellaScheda = PonteAuto.pedaggioNellaStima && PonteAuto.guida != null
-        barra(
+        val riquadroBarra = barra(
             canvas,
             a,
             tachimetro,
             if (nellaScheda) c.copy(batteria = null, meteoTemperatura = null, pedaggio = null) else c,
+        )
+
+        // La musica, come in Waze: il lettore in alto a destra, in guida e a
+        // mappa libera. Per ultimo: sa dove sta tutto il resto, e non lo
+        // copre ([musica]).
+        musica(
+            canvas,
+            a,
+            tutta,
+            margine,
+            sottoIlCartello,
+            riquadroAvviso,
+            occupaStriscia.orEmpty(),
+            listOfNotNull(tachimetro, riquadroBarra),
         )
     }
 
@@ -314,12 +339,13 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
     /**
      * La barra dei dati, sottile, in basso a sinistra sopra il tachimetro:
      * batteria (icona e %), km che restano, batteria alla meta, meteo; sopra,
-     * piccola, la prossima sosta. Con la termica solo il meteo.
+     * piccola, la prossima sosta. Con la termica solo il meteo. Restituisce
+     * dove sta, se c'è.
      */
-    private fun barra(canvas: Canvas, a: Rect, tachimetro: RectF?, c: PonteAuto.Cruscotto) {
+    private fun barra(canvas: Canvas, a: Rect, tachimetro: RectF?, c: PonteAuto.Cruscotto): RectF? {
         val b = c.batteria
         val meteo = c.meteoTemperatura
-        if (b == null && meteo == null && c.sostaNome == null && c.pedaggio == null) return
+        if (b == null && meteo == null && c.sostaNome == null && c.pedaggio == null) return null
         val margine = dp(10f)
         val forte = font(20f)
         val piccolo = font(13f, grassetto = false, colore = muto)
@@ -443,13 +469,14 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
             pezzo.second(cx, linea)
             cx += pezzo.first
         }
+        return box
     }
 
     /**
-     * L'avviso al centro fra [sinistra] e [destra], da [alto]. Con [prova] non
-     * disegna: dice solo se non ci sta (o se non c'è niente da dire).
+     * L'avviso al centro fra [sinistra] e [destra], da [alto]. Restituisce
+     * dove sta, o `null` se non c'è niente da dire.
      */
-    private fun avviso(canvas: Canvas, sinistra: Float, destra: Float, alto: Float, prova: Boolean = false): Boolean {
+    private fun avviso(canvas: Canvas, sinistra: Float, destra: Float, alto: Float): RectF? {
         val av = PonteAuto.avviso
         val titoloAvviso = av.titolo
         // La strada a risparmio, sulle auto senza gli avvisi di Android Auto:
@@ -477,14 +504,13 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
             av.ancoraTesto != null -> Triple(av.ancoraTesto, "Rispondi coi tasti in alto", Color.argb(235, 32, 38, 51))
             else -> Triple(null, null, 0)
         }
-        if (riga1 == null) return false
+        if (riga1 == null) return null
         val icona = if (perStrada) null else av.tipo?.let { PonteAuto.immagini["segnala-$it"] }
         val limite = if (perStrada) null else av.limite
         val spazioIcona = if (icona != null) dp(48f) else 0f
         val spazioLimite = if (limite != null) dp(52f) else 0f
         val larghezza = max(testo.measureText(riga1), riga2?.let { testoPiccolo.measureText(it) } ?: 0f) +
             dp(30f) + spazioIcona + spazioLimite
-        if (prova) return larghezza > destra - sinistra
         val cx = (sinistra + destra) / 2f
         val box = RectF(cx - larghezza / 2, alto, cx + larghezza / 2, alto + dp(62f))
         pieno.color = colore
@@ -498,7 +524,7 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         canvas.drawText(riga1, x, box.top + dp(28f), testo)
         riga2?.let { canvas.drawText(it, x, box.top + dp(50f), testoPiccolo) }
         limite?.let { l -> cartello(canvas, box.right - dp(32f), box.centerY(), dp(23f), l) }
-        return false
+        return box
     }
 
     /**
@@ -543,19 +569,23 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
      * non esce la linea ai lati del traffico con i minuti in più». In basso
      * l'auto, in cima la meta (o i puntini, se il viaggio va oltre); le code
      * colorate al loro posto e, a sinistra di ognuna, «+7 min» e quanto manca.
+     * Restituisce quello che occupa (la striscia e le etichette): il lettore
+     * musicale gli sta a sinistra.
      */
-    private fun striscia(canvas: Canvas, a: Rect, margine: Float, g: PonteAuto.Guida) {
+    private fun striscia(canvas: Canvas, a: Rect, margine: Float, g: PonteAuto.Guida): List<RectF> {
         val sopra = dp(46f)
         val sotto = dp(30f)
         val alto = a.top + margine + sopra
         val basso = a.bottom - margine - sotto
         val barra = basso - alto
-        if (barra < dp(90f)) return
+        if (barra < dp(90f)) return emptyList()
         /* «La linea del traffico è troppo sottile»: a dieci dp, sullo schermo
          * dell'auto, era un filo azzurro sopra una mappa chiara. Più larga, e
          * con un bordo scuro dietro che la stacca dalla mappa. */
         val w = dp(18f)
         val cx = a.right - margine - dp(20f)
+        // La striscia con la bandiera in cima e l'auto in fondo.
+        val occupa = mutableListOf(RectF(cx - dp(16f), alto - sopra, cx + dp(16f), basso + sotto))
         fun y(f: Float) = alto + barra * (1f - f)
         fun colore(livello: Int) = when {
             livello >= 4 -> Color.rgb(156, 163, 175)
@@ -642,8 +672,10 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
             piccolo.textAlign = Paint.Align.RIGHT
             canvas.drawText(riga1, box.right - dp(9f), box.top + dp(18f), forte)
             if (c.sotto.isNotEmpty()) canvas.drawText(c.sotto, box.right - dp(9f), box.top + dp(34f), piccolo)
+            occupa += box
             libero = cima
         }
+        return occupa
     }
 
     /** Da che parte va la manovra: 1 destra, -1 sinistra, 0 dritto. */
@@ -668,55 +700,184 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
     /** Come sul telefono: vedi [GuidaAuto.distanzaTesto]. */
     private fun distanza(m: Double): String = GuidaAuto.distanzaTesto(m)
 
-    /**
-     * Il brano che suona: copertina, titolo, e «artista · app». Largo al più
-     * 330 punti, a destra nell'area libera; il testo lungo si taglia.
-     * [aDestra]: lo spazio da lasciare sul bordo destro, dove sta la striscia
-     * del traffico (che si disegna dopo, e gli finiva sopra).
+    // --- il lettore musicale -----------------------------------------------
+
+    /*
+     * Dal campo, con la foto: «è uscito ma non mi piace, devi vederlo meglio,
+     * deve essere comandabile». Il brano era un riquadro piccolo da guardare,
+     * e i comandi stavano fra i tasti in alto. Adesso è un lettore: copertina
+     * grande, titolo e artista che si leggono a colpo d'occhio, la barra del
+     * brano, e ⏮ ⏯ ⏭ dentro, da toccare. Dove sta e quanto è grande lo decide
+     * [DisposizioneMusica] (coi suoi conti provati a parte); qui si mette
+     * insieme lo spazio, si disegna ([DisegnoMusica]) e si risponde al dito
+     * ([tocco]).
      */
-    private fun musica(canvas: Canvas, a: Rect, margine: Float, alto: Float, aDestra: Float) {
-        val b = LettoreTelefono.brano ?: return
-        val destra = a.right - margine - aDestra
-        val w = minOf(dp(330f), destra - a.left - margine)
-        if (w < dp(180f)) return
-        val h = dp(64f)
-        // Un'area bassa (a mezzo schermo, di traverso): il brano non scende
-        // sulla barra dei dati dell'auto e sul tachimetro, in basso.
-        if (alto + h > a.bottom - dp(150f)) return
-        val box = RectF(destra - w, alto, destra, alto + h)
-        pieno.color = Color.argb(225, 15, 20, 30)
-        canvas.drawRoundRect(box, dp(14f), dp(14f), pieno)
-        val lato = dp(48f)
-        val sx = box.left + dp(8f)
-        val dst = RectF(sx, box.centerY() - lato / 2, sx + lato, box.centerY() + lato / 2)
-        val cop = b.copertina
-        if (cop != null) {
-            val salva = canvas.save()
-            val giro = android.graphics.Path().apply { addRoundRect(dst, dp(8f), dp(8f), android.graphics.Path.Direction.CW) }
-            canvas.clipPath(giro)
-            canvas.drawBitmap(cop, null, dst, Paint(Paint.FILTER_BITMAP_FLAG))
-            canvas.restoreToCount(salva)
-        } else {
-            pieno.color = Color.rgb(37, 99, 235)
-            canvas.drawRoundRect(dst, dp(8f), dp(8f), pieno)
-            val nota = Paint(testo).apply { textAlign = Paint.Align.CENTER; textSize = dp(26f) }
-            canvas.drawText("♪", dst.centerX(), dst.centerY() + dp(9f), nota)
+
+    private val disegnoMusica = DisegnoMusica { it * densita }
+
+    /** Il lettore com'è disegnato adesso: il tocco guarda qui. `null`: non c'è. */
+    private var disposta: DisposizioneMusica.Disposta? = null
+
+    /** Il tasto appena toccato, acceso fino a [premutaFino] (`uptimeMillis`). */
+    private var premuta: Zona? = null
+    private var premutaFino = 0L
+    private val spegni = Runnable { invalidate() }
+
+    /** Quanti pixel è lunga, com'è disegnata, la parte piena della barra del brano. */
+    private var pienaPx = 0
+    private var battitoInProgramma = false
+
+    /**
+     * La barra del brano va avanti da sola: una volta al secondo, solo col
+     * lettore aperto e la musica che suona, e si ridisegna (questa vista,
+     * non la mappa) solo se la barra si è allungata di almeno un pixel.
+     */
+    private val battito: Runnable = object : Runnable {
+        override fun run() {
+            battitoInProgramma = false
+            val barra = disposta?.avanzamento ?: return
+            val b = LettoreTelefono.brano ?: return
+            if (!b.suona || b.durataMs <= 0L) return
+            val px = (barra.w * (LettoreTelefono.posizioneMs().toFloat() / b.durataMs).coerceIn(0f, 1f)).roundToInt()
+            if (px != pienaPx) {
+                invalidate()
+            } else {
+                battitoInProgramma = true
+                postDelayed(this, BATTITO_MS)
+            }
         }
-        val x = dst.right + dp(12f)
-        val spazio = box.right - dp(12f) - x
-        val t1 = Paint(testo).apply { textSize = dp(19f) }
-        val t2 = Paint(testoPiccolo).apply { textSize = dp(15f); color = Color.rgb(189, 193, 198) }
-        val sotto = listOf(b.artista, b.app ?: "").filter { it.isNotEmpty() }.joinToString(" · ")
-        canvas.drawText(taglia(b.titolo.ifEmpty { "In riproduzione" }, t1, spazio), x, box.top + dp(28f), t1)
-        if (sotto.isNotEmpty()) canvas.drawText(taglia(sotto, t2, spazio), x, box.top + dp(50f), t2)
     }
 
-    /** Taglia [s] coi puntini finché non sta in [spazio]. */
-    private fun taglia(s: String, p: Paint, spazio: Float): String {
-        if (p.measureText(s) <= spazio) return s
-        var t = s
-        while (t.length > 1 && p.measureText("$t…") > spazio) t = t.dropLast(1)
-        return "${t.trimEnd()}…"
+    override fun onDetachedFromWindow() {
+        removeCallbacks(battito)
+        removeCallbacks(spegni)
+        battitoInProgramma = false
+        super.onDetachedFromWindow()
+    }
+
+    private fun RectF.riq() = Riq(left, top, right, bottom)
+
+    /**
+     * Il lettore musicale, in alto a destra sotto i tasti: fermo dove i tasti
+     * in alto non arrivano mai ([bordoFermo]), a sinistra della [striscia] del
+     * traffico, sotto il cartello dello svincolo e sotto l'[avviso] se lo
+     * toccherebbe, mai sopra tachimetro e barra dei dati ([inBasso]) né nella
+     * colonna dove Android Auto mette l'avviso di casa. Se aperto non ci sta
+     * si fa compatto, poi pillola, poi niente.
+     */
+    private fun musica(
+        canvas: Canvas,
+        a: Rect,
+        tutta: Rect,
+        margine: Float,
+        sottoIlCartello: Float?,
+        avviso: RectF?,
+        striscia: List<RectF>,
+        inBasso: List<RectF>,
+    ) {
+        if (!LettoreTelefono.conTasti) {
+            disposta = null
+            // Senza musica non c'è niente da dire ai tasti in alto.
+            MusicaInAuto.inVista = true
+            return
+        }
+        val b = LettoreTelefono.brano
+        val stabile = areaStabile?.let { Rect(it) }?.takeIf { it.intersect(tutta) && !it.isEmpty } ?: tutta
+        val fermo = max(bordoFermo(a), stabile.top)
+        val ostacoli = inBasso.mapTo(mutableListOf<Riq>()) { it.riq() }
+        // L'avviso di casa lo disegna Android Auto, sopra la mappa, nella
+        // colonna di sinistra: finché c'è, lì il lettore non entra.
+        if (ArbitroAvvisi.unAvvisoInVista) {
+            ostacoli += Riq(stabile.left.toFloat(), 0f, stabile.left + dp(COLONNA_AVVISO_DP), height.toFloat())
+        }
+        val spazio = DisposizioneMusica.Spazio(
+            sinistra = a.left + margine,
+            alto = max(sottoIlCartello ?: 0f, fermo.toFloat()) + margine,
+            destra = min(a.right, stabile.right) - margine,
+            basso = a.bottom - margine,
+            centroX = (stabile.left + stabile.right) / 2f,
+            larghezza = stabile.width().toFloat(),
+            k = densita,
+            aDestra = striscia.map { it.riq() },
+            sopra = listOfNotNull(avviso?.riq()),
+            ostacoli = ostacoli,
+        )
+        val d = DisposizioneMusica.disponi(
+            spazio,
+            conBrano = b != null,
+            ridotto = MusicaInAuto.ridotto,
+            comandabile = MusicaInAuto.coiTasti,
+        )
+        disposta = d
+        if (d != null) {
+            val durata = b?.durataMs ?: 0L
+            val parte = if (d.avanzamento != null && durata > 0L) LettoreTelefono.posizioneMs().toFloat() / durata else null
+            val accesa = premuta.takeIf { SystemClock.uptimeMillis() < premutaFino }
+            pienaPx = disegnoMusica.disegna(canvas, d, b, notte, accesa, parte)
+            if (parte != null && b?.suona == true && !battitoInProgramma) {
+                battitoInProgramma = true
+                postDelayed(battito, BATTITO_MS)
+            }
+        }
+        // Se il lettore coi tasti non ha posto, i tasti tornano in alto (e
+        // viceversa): lo schermo si rifà.
+        val coiTasti = d?.coiTasti == true
+        if (MusicaInAuto.inVista != coiTasti) {
+            MusicaInAuto.inVista = coiTasti
+            PonteAuto.rinfresca()
+        }
+    }
+
+    /** Dove cade, sul lettore, un punto della superficie larga [larghezza] e alta [altezza]. */
+    fun sulLettore(x: Float, y: Float, larghezza: Int, altezza: Int): Zona {
+        val d = disposta?.takeIf { it.coiTasti } ?: return Zona.FUORI
+        // La vista riempie la superficie: se non fosse così, il punto si
+        // riporta alle misure con cui si è disegnato.
+        val vx = if (larghezza > 0 && width > 0 && larghezza != width) x * width / larghezza else x
+        val vy = if (altezza > 0 && height > 0 && altezza != height) y * height / altezza else y
+        return DisposizioneMusica.tocco(d, vx, vy)
+    }
+
+    /**
+     * Un tocco sulla superficie ([x], [y] in pixel, come li dà
+     * `SurfaceCallback.onClick`). `true`: è caduto sul lettore, e la mappa non
+     * lo deve vedere. Su un tasto fa il suo comando, e il tasto si accende per
+     * un attimo; su un tasto spento (l'app che suona non accetta quel comando)
+     * e sul resto del lettore non fa niente. Dal filo principale.
+     */
+    fun tocco(x: Float, y: Float, larghezza: Int, altezza: Int): Boolean {
+        val zona = sulLettore(x, y, larghezza, altezza)
+        if (zona == Zona.FUORI) return false
+        val b = LettoreTelefono.brano
+        when (zona) {
+            Zona.PRECEDENTE -> if (b?.puoPrecedente != false) {
+                LettoreTelefono.comando("precedente")
+                accendi(zona)
+            }
+            Zona.PLAY_PAUSA -> if (b?.puoPlayPausa != false) {
+                LettoreTelefono.comando("playPausa")
+                accendi(zona)
+            }
+            Zona.SUCCESSIVO -> if (b?.puoSuccessivo != false) {
+                LettoreTelefono.comando("successivo")
+                accendi(zona)
+            }
+            // Richiuso a pillola, o riaperto: si ricorda per la sessione.
+            Zona.LINGUETTA -> {
+                MusicaInAuto.ridotto = disposta?.forma != Forma.PILLOLA
+                invalidate()
+            }
+            else -> {}
+        }
+        return true
+    }
+
+    private fun accendi(zona: Zona) {
+        premuta = zona
+        premutaFino = SystemClock.uptimeMillis() + PREMUTO_MS
+        invalidate()
+        removeCallbacks(spegni)
+        postDelayed(spegni, PREMUTO_MS + 20L)
     }
 
     private fun accorcia(s: String, n: Int) = if (s.length <= n) s else s.take(n - 1) + "…"
@@ -727,5 +888,18 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
 
         /** Da quanti metri prima il cartello si vede sulla mappa. */
         const val CARTELLO_DA_M = 2000.0
+
+        /** Ogni quanto la barra del brano guarda se deve allungarsi. */
+        const val BATTITO_MS = 1_000L
+
+        /** Per quanto resta acceso un tasto del lettore appena toccato. */
+        const val PREMUTO_MS = 180L
+
+        /**
+         * Quanto è larga, dal bordo sinistro, la colonna dove Android Auto
+         * mette l'avviso di casa (la scheda è larga come quella della
+         * manovra, più i margini): il lettore le sta a destra.
+         */
+        const val COLONNA_AVVISO_DP = 400f
     }
 }

@@ -104,26 +104,28 @@ class SorgenteGdahome extends ChangeNotifier implements SorgenteDatiAuto {
     notifyListeners();
   }
 
-  /// L'ultima ricarica a casa dell'auto della plancia (`ponte/auto/
-  /// ricariche-di-casa`): quanti kWh, quanti col sole, gli euro di rete,
-  /// fino a che percentuale. Per il costo vero del viaggio. `null` fuori da
-  /// GdAHome, senza casa, o se la casa non ne ha ancora vista una.
-  Future<RicaricaDiCasa?> ricaricaDiCasa() async {
+  /// Quello che la casa sa dell'energia con cui l'auto della plancia parte
+  /// (`ponte/auto/ricariche-di-casa`): l'ultima ricarica a casa (quanti kWh,
+  /// quanti col sole, gli euro di rete, fino a che percentuale), il prezzo
+  /// della rete di casa, e se la casa segue quest'auto. Per il costo vero del
+  /// viaggio. `null` fuori da GdAHome, senza casa, o se la casa non risponde
+  /// (e allora si richiede: [GestoreGuida]).
+  Future<EnergiaDiCasa?> energiaDiCasa() async {
     final c = _chiedi;
     if (c == null) return null;
     try {
       final r = await c({'type': 'ponte/auto/ricariche-di-casa'}).timeout(const Duration(seconds: 8));
-      final elenco = r is Map ? r['ricariche'] : null;
-      if (elenco is! List || elenco.isEmpty) return null;
-      final voci = elenco.whereType<Map>().toList();
-      final nomi = {_auto?.nome, _auto?.etichetta}..removeWhere((n) => n == null || n.isEmpty);
-      final sua = voci.where((v) => nomi.contains(v['nome'])).firstOrNull ?? (voci.length == 1 ? voci.single : null);
-      return RicaricaDiCasa.daJson(sua);
+      if (r is! Map) return null;
+      return EnergiaDiCasa.daRisposta(r, nomi: [_auto?.nome, _auto?.etichetta]);
     } catch (e) {
-      debugPrint('GdAHome, la ricarica di casa: $e');
+      debugPrint('GdAHome, l\'energia di casa: $e');
       return null;
     }
   }
+
+  /// L'ultima ricarica a casa dell'auto della plancia: quella di
+  /// [energiaDiCasa]. `null` anche se la casa non ne ha ancora vista una.
+  Future<RicaricaDiCasa?> ricaricaDiCasa() async => (await energiaDiCasa())?.ricarica;
 
   /// In viaggio, all'avvio e quando si torna nell'app: dati freschi, se chi
   /// ospita sa chiederli. Un errore non si propaga: i dati di prima restano.

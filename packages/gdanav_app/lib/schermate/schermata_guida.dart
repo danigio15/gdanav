@@ -704,13 +704,13 @@ class RiepilogoArrivo extends StatelessWidget {
                         }
                         return righe;
                       }(),
-                      if (riepilogo.consumoStimato && riepilogo.consumoTesto != null)
+                      // Da dove viene un numero che non è quello vero, e dove
+                      // si rimedia: il consumo stimato, la misura larga, il
+                      // prezzo dell'energia che non è quello della ricarica.
+                      for (final nota in riepilogo.note)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            'Consumo stimato dal percorso; i prezzi si cambiano nelle opzioni del percorso.',
-                            style: t.bodySmall?.copyWith(color: colori.onSurfaceVariant),
-                          ),
+                          child: Text(nota, style: t.bodySmall?.copyWith(color: colori.onSurfaceVariant)),
                         ),
                       const SizedBox(height: 14),
                       FilledButton(key: const Key('fine-arrivo'), onPressed: onFine, child: const Text('Fine')),

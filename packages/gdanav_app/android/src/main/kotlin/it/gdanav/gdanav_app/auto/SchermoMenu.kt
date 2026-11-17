@@ -135,9 +135,11 @@ abstract class SchermoAggiornato(carContext: CarContext) : Screen(carContext), D
  * preferiti e recenti, colonnine vicine, segnala, impostazioni. Sei righe:
  * è il minimo che ogni auto mostra, e le righe oltre il limite dell'auto
  * spariscono dal fondo («Impostazioni», «Segnala»). Perciò qui non se ne
- * aggiungono mai: in guida con la musica la lente, che lascia il posto a ⏯
- * fra i tasti sulla mappa, sta accanto al titolo, non in una riga in più; e
- * la casa di GdAHome resta sempre fra i tasti sulla mappa.
+ * aggiungono mai: sulle auto dove la musica si comanda coi tasti in alto, in
+ * guida la lente, che lascia il posto a ⏯ fra i tasti sulla mappa, sta
+ * accanto al titolo, non in una riga in più; e la casa di GdAHome resta
+ * sempre fra i tasti sulla mappa. Dove la musica si comanda dal lettore
+ * sulla mappa il Menu è quello di sempre.
  */
 class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) : SchermoAggiornato(carContext) {
     // In pagina: i nomi di Casa e Lavoro, e se l'auto è elettrica (colonnine
@@ -150,10 +152,12 @@ class SchermoMenu(carContext: CarContext, private val renderer: RendererMappa) :
     )
 
     /**
-     * In guida con la musica la lente non sta fra i tasti sulla mappa (c'è
-     * ⏯, `SchermoNavigazione.azioni`): sta qui, in alto.
+     * In guida, con la musica fra i tasti in alto, la lente non sta fra i
+     * tasti sulla mappa (c'è ⏯, `SchermoNavigazione.azioni`): sta qui, in alto.
+     * Coi comandi nel lettore sulla mappa ([MusicaInAuto.nelLettore]) no: la
+     * lente è al suo posto.
      */
-    private fun lenteQui() = LettoreTelefono.conTasti && PonteAuto.guida != null
+    private fun lenteQui() = LettoreTelefono.conTasti && !MusicaInAuto.nelLettore && PonteAuto.guida != null
 
     override fun schermata(): Template {
         val casa = PonteAuto.casa()
