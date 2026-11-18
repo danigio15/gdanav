@@ -25,6 +25,7 @@ export const PRIVACY = `<!doctype html>
   <li><b>Traffico e colonnine libere/occupate</b>: la zona della mappa e le colonnine delle soste a TomTom.</li>
   <li><b>Meteo</b>: alcuni punti del percorso e la zona in cui sei, arrotondati a circa un chilometro, a MET Norway (api.met.no) per le previsioni.</li>
   <li><b>Colonnine fuori dall'archivio dell'app</b>: la zona del percorso al relay di GdANav, che le chiede a OpenStreetMap.</li>
+  <li><b>Corsie della mappa 3D</b>: il numero del riquadro di mappa che stai guardando (poco meno di due chilometri di lato) al relay di GdANav, che chiede corsie, strisce, semafori e alberi a OpenStreetMap.</li>
   <li><b>Distributori e prezzi dei carburanti</b> (auto termica): la zona in cui sei, entro 5 km, all'Osservaprezzi carburanti del Ministero delle Imprese (in Italia) o ai server Overpass di OpenStreetMap (altrove).</li>
 </ul>
 
@@ -46,7 +47,7 @@ export const PRIVACY = `<!doctype html>
 
 <h2>Contatti</h2>
 <p>Per domande: <a href="https://github.com/danigio15/gdanav/issues">github.com/danigio15/gdanav/issues</a>.</p>
-<p><small>Ultimo aggiornamento: settembre 2026.</small></p>
+<p><small>Ultimo aggiornamento: novembre 2026.</small></p>
 </body>
 </html>
 `;
