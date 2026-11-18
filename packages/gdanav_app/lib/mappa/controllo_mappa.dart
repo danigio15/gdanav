@@ -12,11 +12,18 @@ import 'package:flutter/foundation.dart';
 /// ([Mappa3d]: viadotti in quota coi piloni, alberi, edifici con le
 /// finestre, l'auto rossa); fuori dalla guida, o dove la scena non c'è, la
 /// mappa di sempre la disegna come il 3D ([nativa]).
+///
+/// [corsie] («Corsie»): la stessa pagina del 3D aumentato, con la vista a
+/// corsie (l'asfalto largo quanto le corsie vere, le righe bianche, le
+/// frecce dipinte, i semafori, il percorso come una fascia verde sulla
+/// corsia da tenere). Per tutto il resto è come il 3D aumentato: dove la
+/// WebView non c'è, o il telefono non ce la fa, non si può scegliere.
 enum VistaMappa {
   piatta('2D', 'Dall\'alto', '2D'),
   inclinata('3D', '3D', '3D'),
   immersiva('Immersiva', 'Immersiva', 'immersiva'),
-  aumentata('3D+', '3D aumentato', '3D aumentato');
+  aumentata('3D+', '3D aumentato', '3D aumentato'),
+  corsie('Corsie', 'Corsie', 'Corsie');
 
   const VistaMappa(this.sigla, this.nome, this.inFrase);
 
@@ -30,19 +37,23 @@ enum VistaMappa {
   final String inFrase;
 
   /// Come la disegna la mappa di sempre (MapLibre Native): il 3D aumentato
-  /// come il 3D, le altre come sono.
-  VistaMappa get nativa => this == aumentata ? inclinata : this;
+  /// e le corsie come il 3D, le altre come sono.
+  VistaMappa get nativa => scena3d ? inclinata : this;
+
+  /// La disegna la pagina 3D (nella WebView): il 3D aumentato e le corsie.
+  bool get scena3d => this == aumentata || this == corsie;
 
   /// La vista salvata, da una parola; quella di partenza se non si capisce.
   static VistaMappa daNome(String? nome) =>
       VistaMappa.values.firstWhere((v) => v.name == nome, orElse: () => VistaMappa.inclinata);
 }
 
-/// Cosa si dice quando il 3D aumentato si ferma e si torna a [vista]: per
-/// sempre su questo telefono ([ricorda]), o solo questa volta.
-String avvisoAumentatoNonVa(VistaMappa vista, {required bool ricorda}) => ricorda
-    ? '3D aumentato non è disponibile su questo telefono: torno alla vista ${vista.inFrase}'
-    : '3D aumentato non è partito: torno alla vista ${vista.inFrase}';
+/// Cosa si dice quando il 3D aumentato (o le corsie: [di]) si ferma e si
+/// torna a [vista]: per sempre su questo telefono ([ricorda]), o solo questa
+/// volta.
+String avvisoAumentatoNonVa(VistaMappa vista, {required bool ricorda, VistaMappa di = VistaMappa.aumentata}) => ricorda
+    ? '${di.nome} non è disponibile su questo telefono: torno alla vista ${vista.inFrase}'
+    : '${di.nome} non è partito: torno alla vista ${vista.inFrase}';
 
 /// Perché il 3D aumentato non va su questo telefono, in una riga (sotto la
 /// voce della scelta, e nella spiegazione).
@@ -64,15 +75,15 @@ class ControlloMappa extends ChangeNotifier {
     this.salvaAumentataNonVa,
     this.dimenticaAumentataNonVa,
   }) : vista = vista ?? (inclinata ? VistaMappa.inclinata : VistaMappa.piatta) {
-    if (this.vista != VistaMappa.aumentata) vistaPrima = this.vista;
+    if (!this.vista.scena3d) vistaPrima = this.vista;
   }
 
   /// Di partenza 3D, come sullo schermo dell'auto; la scelta si ricorda
   /// ([salvaVista], [carica]).
   VistaMappa vista;
 
-  /// L'ultima vista scelta che non è il 3D aumentato: ci si torna se il
-  /// telefono non ce la fa.
+  /// L'ultima vista scelta che non è il 3D aumentato (né le corsie): ci si
+  /// torna se il telefono non ce la fa.
   VistaMappa vistaPrima = VistaMappa.inclinata;
 
   /// Inclinata (3D, immersiva o 3D aumentato): girata come si va, e (fuori
@@ -104,8 +115,9 @@ class ControlloMappa extends ChangeNotifier {
   /// Si può scegliere il 3D aumentato, adesso.
   bool get aumentataDisponibile => aumentataPossibile && aumentataNonVa == null;
 
-  /// La scena 3D aumentata è da disegnare (in guida): scelta e disponibile.
-  bool get scenaAumentata => vista == VistaMappa.aumentata && aumentataDisponibile;
+  /// La scena 3D è da disegnare (in guida): il 3D aumentato o le corsie,
+  /// scelti e disponibili.
+  bool get scenaAumentata => vista.scena3d && aumentataDisponibile;
 
   var _sceltaQui = false;
   int _centra = 0;
@@ -125,13 +137,13 @@ class ControlloMappa extends ChangeNotifier {
   Future<void> carica(Future<VistaMappa> ricordata, {Future<String?>? nonVa, Future<VistaMappa?>? prima}) async {
     var v = await ricordata;
     if (nonVa != null) aumentataNonVa = await nonVa;
-    if (await prima case final p? when p != VistaMappa.aumentata) vistaPrima = p;
-    // Ricordato il 3D aumentato, ma il telefono non ce la fa: il 3D.
-    if (v == VistaMappa.aumentata && aumentataNonVa != null) v = VistaMappa.inclinata;
+    if (await prima case final p? when !p.scena3d) vistaPrima = p;
+    // Ricordato il 3D aumentato (o le corsie), ma il telefono non ce la fa: il 3D.
+    if (v.scena3d && aumentataNonVa != null) v = VistaMappa.inclinata;
     _letta = true;
     if (!_sceltaQui && v != vista) {
       vista = v;
-      if (v != VistaMappa.aumentata) vistaPrima = v;
+      if (!v.scena3d) vistaPrima = v;
     }
     notifyListeners();
   }
@@ -155,7 +167,7 @@ class ControlloMappa extends ChangeNotifier {
     libera = false;
     if (v != vista) {
       vista = v;
-      if (v != VistaMappa.aumentata) vistaPrima = v;
+      if (!v.scena3d) vistaPrima = v;
       unawaited(salvaVista?.call(v));
     }
     notifyListeners();
@@ -170,7 +182,7 @@ class ControlloMappa extends ChangeNotifier {
       aumentataNonVa = motivo;
       unawaited(salvaAumentataNonVa?.call(motivo));
     }
-    if (vista == VistaMappa.aumentata) {
+    if (vista.scena3d) {
       vista = vistaPrima;
       if (ricorda) unawaited(salvaVista?.call(vista));
     }
@@ -178,11 +190,12 @@ class ControlloMappa extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// «Riprova»: si dimentica che non andava e si sceglie il 3D aumentato.
-  void riprovaAumentata() {
+  /// «Riprova»: si dimentica che non andava e si sceglie il 3D aumentato (o
+  /// le corsie: [v]).
+  void riprovaAumentata([VistaMappa v = VistaMappa.aumentata]) {
     aumentataNonVa = null;
     unawaited(dimenticaAumentataNonVa?.call());
-    scegliVista(VistaMappa.aumentata);
+    scegliVista(v.scena3d ? v : VistaMappa.aumentata);
   }
 
   /// «Dove sono»: la mappa torna su di te, e (in 3D) ti segue di nuovo.

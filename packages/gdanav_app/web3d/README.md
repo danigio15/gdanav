@@ -87,6 +87,33 @@ la mappa scarica già (OpenFreeMap, schema OpenMapTiles).
   `Regia3d.sullAuto`): la scena del telefono segue le regole dell'auto, così
   le due scene non si contendono la scheda grafica a sessanta fotogrammi.
 - Senza rete resta la scena già fatta (le tessere costruite si tengono).
+- La vista **«Corsie»** (prototipo, `opzioni.corsie: true`; spenta, tutto è
+  come prima): le corsie vere di OpenStreetMap, che le tessere non hanno,
+  arrivano col messaggio `corsie` (il formato è in `src/corsie.js`; domani
+  dal relay, `/v1/corsie/<x>/<y>`, oggi da `collaudo/corsie-osm.mjs`).
+  L'asfalto blu notte largo quanto le corsie, le righe bianche (tratteggi,
+  bordi, mezzeria, la riga larga della corsia di decelerazione, la
+  zebratura dove la carreggiata si divide), le frecce di `turn:lanes`, le
+  strisce, le linee d'arresto e i semafori (`src/segnaletica.js`, tre
+  geometrie per tessera); il percorso è una fascia verde sulla corsia da
+  tenere (le frecce dipinte, o le corsie giuste della manovra se l'app le
+  manda), e l'auto ci sta dentro; la telecamera più bassa e vicina, gli
+  edifici bianchi col bordo del tetto più scuro, il suolo chiaro a toni per
+  zona. Niente di inventato: gli
+  edifici sono quelli delle tessere (in prova, quelli di Overture al posto
+  di quelli di OpenStreetMap: `collaudo/_overture-prova.mjs`), gli alberi
+  quelli veri (`natural=tree`, `natural=tree_row` nel messaggio `corsie`, e
+  i parchi, i boschi e i giardini delle tessere); i marciapiedi col cordolo.
+  I semafori all'italiana (il palo tondo grigio, la lanterna scura col
+  pannello nero bordato di bianco, le visiere; a sbraccio agli incroci
+  larghi) sono spenti (nessuno pubblica di che colore sono), con un fumetto
+  neutro sopra. Nell'app è una vista del tasto della vista
+  (`VistaMappa.corsie`, accanto al 3D aumentato e con le sue stesse regole);
+  le corsie le chiede la regia al relay, una tessera z14 alla volta lungo i
+  prossimi tre chilometri (`lib/stato/corsie_relay.dart`); le corsie giuste
+  di TomTom vanno nel messaggio `manovra`, e dove c'è coda la fascia prende
+  il colore del traffico. Su Android Auto c'è l'interruttore «Corsie» come
+  quello del 3D aumentato; su CarPlay, come il 3D aumentato, non c'è.
 
 L'app parla con la pagina coi messaggi di `src/messaggi.js` (lo stesso
 formato di `lib/mappa/ponte_3d.dart`); la WebView è in

@@ -568,6 +568,8 @@ class PonteAuto {
       ],
       if (ztl case final z?) 'ztl_mappa': z.scelte.sullaMappa,
       if (guida.archivio != null) 'aumentato': Archivio.vistaScelta.value == VistaMappa.aumentata,
+      // Le corsie: la stessa pagina del 3D aumentato, con la vista a corsie.
+      if (guida.archivio != null) 'corsie': Archivio.vistaScelta.value == VistaMappa.corsie,
     });
     _segnapostoNelMenu = posizione.segnaposto;
   }
@@ -615,14 +617,18 @@ class PonteAuto {
       }
     }
     if (a['ztl_mappa'] case final bool si) await ztl?.mostra(si);
-    if (a['aumentato'] case final bool si) {
-      final archivio = guida.archivio;
-      if (archivio != null) {
-        await archivio.salvaVistaMappa(
-          si ? VistaMappa.aumentata : (await archivio.vistaPrimaDellAumentata() ?? VistaMappa.inclinata),
-        );
-        // Riaccesa a mano si riprova, come sul telefono.
-        if (si) _treDNonVa = false;
+    // Il 3D aumentato e le corsie: due interruttori, uno esclude l'altro
+    // (sono due viste del telefono).
+    for (final (chiave, vista) in [('aumentato', VistaMappa.aumentata), ('corsie', VistaMappa.corsie)]) {
+      if (a[chiave] case final bool si) {
+        final archivio = guida.archivio;
+        if (archivio != null) {
+          await archivio.salvaVistaMappa(
+            si ? vista : (await archivio.vistaPrimaDellAumentata() ?? VistaMappa.inclinata),
+          );
+          // Riaccesa a mano si riprova, come sul telefono.
+          if (si) _treDNonVa = false;
+        }
       }
     }
     _opzioni();
@@ -700,8 +706,18 @@ class PonteAuto {
   /// segue il telefono.
   var _aspetto3d = false;
 
+  /// Sul telefono la vista è quella a corsie: la scena dell'auto pure.
+  var _corsieInAuto = false;
+
   void _dallaVista() {
-    final a = Archivio.vistaScelta.value == VistaMappa.aumentata;
+    final a = Archivio.vistaScelta.value?.scena3d ?? false;
+    final corsie = Archivio.vistaScelta.value == VistaMappa.corsie;
+    // Dal 3D aumentato alle corsie (o al contrario) la scena resta: cambia
+    // solo la vista della pagina.
+    if (_attivo && a && corsie != _corsieInAuto) {
+      _corsieInAuto = corsie;
+      _regia3d?.comandi();
+    }
     if (!_attivo || a == _aspetto3d) return;
     _aspetto3d = a;
     _stili();
@@ -745,7 +761,9 @@ class PonteAuto {
     guida: guida,
     manda: (m) => _manda('web3d', {'js': chiamata3d(m)}),
     notte: () => _stato3d.notte,
-    vista: () => _stato3d.vista,
+    // Le viste 3D e immersiva dell'auto; con le corsie scelte sul telefono,
+    // la vista a corsie.
+    vista: () => Archivio.vistaScelta.value == VistaMappa.corsie ? VistaMappa.corsie : _stato3d.vista,
     inquadratura: () => (libera: false, sopra: _stato3d.sopra, sinistra: _stato3d.sinistra, destra: _stato3d.destra),
     onNonVa: (motivo, {required ricorda}) {
       _treDNonVa = true;

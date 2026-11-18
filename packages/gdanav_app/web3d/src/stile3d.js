@@ -8,7 +8,7 @@
 // sopra il 3D, e non quelli dei ponti (che cadrebbero a terra, sotto il
 // viadotto); i numeri delle strade («A4», «SS33») in un cartello.
 
-import { GIORNO, NOTTE } from './tavolozza.js';
+import { tavolozza } from './tavolozza.js';
 
 export const ZOOM_3D = 14.5;
 export const STRATO_3D = 'gdanav-3d';
@@ -61,8 +61,11 @@ const LARGO_OLTRE = 0.32;
 /** Il suolo con i colori del 3D. */
 const SUOLO = { sfondo: 'sfondo', abitato: 'abitato', industria: 'industria', prato: 'prato', bosco: 'bosco', parco: 'prato', acqua: 'acqua' };
 
-export function adattaStile(stile, { notte = false } = {}) {
-  const t = notte ? NOTTE : GIORNO;
+/** Gli strati coi nomi della mappa (non quelli di GdANav): tenui nella vista «Corsie». */
+const NOMI_MAPPA = ['nomi-strade', 'luoghi'];
+
+export function adattaStile(stile, { notte = false, corsie = false } = {}) {
+  const t = tavolozza(notte, corsie);
   const s = JSON.parse(JSON.stringify(stile));
   const layers = [];
   for (const l of s.layers) {
@@ -82,10 +85,15 @@ export function adattaStile(stile, { notte = false } = {}) {
       else if (l.type === 'fill') l.paint['fill-color'] = colore;
     }
     if (l.id === 'corsi-acqua' && l.paint) l.paint['line-color'] = t.acqua;
+    // Nella vista «Corsie» i nomi non tirano l'occhio: grigi, col bordo del suolo.
+    if (corsie && NOMI_MAPPA.includes(l.id) && l.paint) {
+      l.paint['text-color'] = t.nomi;
+      l.paint['text-halo-color'] = notte ? t.sfondo : '#FFFFFF';
+    }
     if (l.id === 'nomi-strade') {
       // Né i ponti (i loro nomi li scrive il 3D sull'impalcato) né le
       // gallerie (il nome finirebbe sopra quello che le copre).
-      l.filter = FILTRO_NOMI;
+      l.filter = filtroNomi([], corsie);
       l.layout = {
         ...l.layout,
         'text-pitch-alignment': 'viewport',
@@ -95,8 +103,13 @@ export function adattaStile(stile, { notte = false } = {}) {
         'symbol-spacing': 320,
       };
       if (l.paint) l.paint['text-halo-width'] = 2.4;
+      // Nella vista «Corsie» la telecamera è bassa e l'obiettivo largo: un
+      // nome scritto lungo una strada che corre verso l'orizzonte si
+      // piegava lettera per lettera e si scriveva a rovescio. Un nome per
+      // strada, dritto sullo schermo, nel mezzo del pezzo.
+      if (corsie) l.layout = { ...l.layout, 'symbol-placement': 'line-center', 'text-rotation-alignment': 'viewport', 'text-pitch-alignment': 'viewport', 'text-keep-upright': true };
       layers.push(l);
-      layers.push(scudi());
+      layers.push(scudi(corsie));
       continue;
     }
     if (l.id === 'luoghi' && l.layout) l.layout['text-pitch-alignment'] = 'viewport';
@@ -150,13 +163,17 @@ export const FILTRO_NOMI = ['match', ['coalesce', ['get', 'brunnel'], ''], ['bri
  * con un pezzo in galleria o in quota (rampe, viadotti) che le tessere
  * uniscono al resto, e MapLibre scriverebbe a terra o sopra la galleria.
  */
-export function filtroNomi(nascosti) {
-  if (!nascosti.length) return FILTRO_NOMI;
-  return ['all', FILTRO_NOMI, ['!', ['in', ['coalesce', ['get', 'name'], ''], ['literal', nascosti]]]];
+export function filtroNomi(nascosti, corsie = false) {
+  const parti = [FILTRO_NOMI];
+  if (nascosti.length) parti.push(['!', ['in', ['coalesce', ['get', 'name'], ''], ['literal', nascosti]]]);
+  // Nella vista «Corsie» niente nomi lungo le autostrade: da così vicino si
+  // scrivevano a pezzi sullo spartitraffico; bastano i cartelli coi numeri.
+  if (corsie) parti.push(['!', ['match', ['get', 'class'], ['motorway', 'trunk'], true, false]]);
+  return parti.length === 1 ? FILTRO_NOMI : ['all', ...parti];
 }
 
-export function scudi() {
-  return {
+export function scudi(corsie = false) {
+  const s = {
     id: 'scudi',
     type: 'symbol',
     source: 'openmaptiles',
@@ -187,4 +204,8 @@ export function scudi() {
     },
     paint: { 'text-color': '#FFFFFF' },
   };
+  // Nella vista «Corsie» da vicino il cartello si ripeteva ogni pochi
+  // metri: uno per pezzo di strada, nel mezzo.
+  if (corsie) s.layout['symbol-placement'] = 'line-center';
+  return s;
 }

@@ -241,7 +241,13 @@ void main() {
 
   group('la vista «3D aumentato»', () {
     test('è una vista come le altre: si ricorda per nome, e la mappa di sempre la disegna come il 3D', () {
-      expect(VistaMappa.values, [VistaMappa.piatta, VistaMappa.inclinata, VistaMappa.immersiva, VistaMappa.aumentata]);
+      expect(VistaMappa.values, [
+        VistaMappa.piatta,
+        VistaMappa.inclinata,
+        VistaMappa.immersiva,
+        VistaMappa.aumentata,
+        VistaMappa.corsie,
+      ]);
       expect(VistaMappa.daNome('aumentata'), VistaMappa.aumentata);
       expect(VistaMappa.aumentata.nome, '3D aumentato');
       expect(VistaMappa.aumentata.sigla, '3D+');
@@ -368,7 +374,8 @@ void main() {
 
     testWidgets('spento perché il telefono non ce la fa: si spiega, e «Riprova» lo riaccende', (tester) async {
       final c = await scelta(tester, ControlloMappa(aumentataPossibile: true)..aumentataNonVa = 'lento');
-      expect(find.text('Su questo telefono va a scatti'), findsOneWidget);
+      // Sotto il 3D aumentato e sotto le corsie (la stessa pagina).
+      expect(find.text('Su questo telefono va a scatti'), findsNWidgets(2));
       await tester.tap(find.byKey(const Key('vista-aumentata')));
       await tester.pumpAndSettle();
       expect(c.vista, VistaMappa.inclinata, reason: 'non si sceglie da solo');
@@ -382,7 +389,7 @@ void main() {
 
     testWidgets('senza WebView (qui nelle prove) si vede spento, e non c’è «Riprova»', (tester) async {
       final c = await scelta(tester, ControlloMappa());
-      expect(find.text('Non c\'è su questo dispositivo'), findsOneWidget);
+      expect(find.text('Non c\'è su questo dispositivo'), findsNWidgets(2), reason: '3D aumentato e corsie');
       await tester.tap(find.byKey(const Key('vista-aumentata')));
       await tester.pumpAndSettle();
       expect(c.vista, VistaMappa.inclinata);

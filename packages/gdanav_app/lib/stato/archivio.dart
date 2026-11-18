@@ -225,7 +225,7 @@ class Archivio {
 
   Future<void> salvaUltimeDallaCasa(List<String> id) => _p.write(key: 'musica_di_casa_ultime', value: jsonEncode(id));
 
-  /// Come si guarda la mappa: 2D, 3D, immersiva o 3D aumentato
+  /// Come si guarda la mappa: 2D, 3D, immersiva, 3D aumentato o corsie
   /// ([VistaMappa]). Si ricorda, e vale anche fuori dalla guida. Di partenza
   /// 3D, come sullo schermo dell'auto. Prima c'erano solo 2D e 3D, e si
   /// scriveva solo chi l'aveva voluta piatta: quella scelta vale ancora.
@@ -243,7 +243,7 @@ class Archivio {
   Future<void> salvaVistaMappa(VistaMappa v) async {
     await _p.write(key: _vista, value: v.name);
     await _p.delete(key: _vistaPiatta);
-    if (v != VistaMappa.aumentata) await _p.write(key: _vistaPrima, value: v.name);
+    if (!v.scena3d) await _p.write(key: _vistaPrima, value: v.name);
     vistaScelta.value = v;
   }
 

@@ -16,7 +16,8 @@ const CONTROLLI = {
     typeof m.notte === 'boolean' &&
     (m.vista === undefined || ['inclinata', 'immersiva'].includes(m.vista)) &&
     (m.auto === undefined || /^#[0-9a-fA-F]{6}$/.test(m.auto)) &&
-    (m.inAuto === undefined || typeof m.inAuto === 'boolean'),
+    (m.inAuto === undefined || typeof m.inAuto === 'boolean') &&
+    (m.corsie === undefined || typeof m.corsie === 'boolean'),
   stile: (m) => m.stile && typeof m.stile === 'object' && Array.isArray(m.stile.layers),
   immagine: (m) => typeof m.nome === 'string' && typeof m.png === 'string' && (m.ratio === undefined || numero(m.ratio)),
   sorgente: (m) => typeof m.id === 'string' && m.dati && typeof m.dati === 'object',
@@ -24,7 +25,20 @@ const CONTROLLI = {
     (m.punti === null || coppie(m.punti)) &&
     (m.metri === undefined || (Array.isArray(m.metri) && m.punti && m.metri.length === m.punti.length / 2 && m.metri.every(numero))) &&
     (m.code === undefined || (Array.isArray(m.code) && m.code.every((c) => Array.isArray(c) && c.length === 3 && c.every(numero)))),
-  manovra: (m) => (m.da === null && m.a === null) || (numero(m.da) && numero(m.a) && m.a >= m.da),
+  manovra: (m) =>
+    ((m.da === null && m.a === null) || (numero(m.da) && numero(m.a) && m.a >= m.da)) &&
+    (m.corsie === undefined || (Array.isArray(m.corsie) && m.corsie.length <= 16)) &&
+    (m.dove === undefined || numero(m.dove)),
+  // La vista «Corsie»: le vie con le corsie e i nodi (il formato è in `corsie.js`).
+  corsie: (m) =>
+    m.dati &&
+    typeof m.dati === 'object' &&
+    (m.dati.v === undefined || m.dati.v === 1) &&
+    Array.isArray(m.dati.strade) &&
+    m.dati.strade.every((st) => st && typeof st.hw === 'string' && coppie(st.g)) &&
+    (m.dati.nodi === undefined || (Array.isArray(m.dati.nodi) && m.dati.nodi.every((n) => n && Array.isArray(n.g) && n.g.length === 2 && n.g.every(numero)))) &&
+    (m.dati.alberi === undefined || (Array.isArray(m.dati.alberi) && m.dati.alberi.every((a) => Array.isArray(a) && a.length >= 2 && a.every(numero)))) &&
+    (m.dati.filari === undefined || (Array.isArray(m.dati.filari) && m.dati.filari.every((f) => f && coppie(f.g)))),
   risparmio: (m) => m.punti === null || coppie(m.punti),
   posizione: (m) =>
     numero(m.lat) &&

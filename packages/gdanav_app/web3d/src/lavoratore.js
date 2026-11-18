@@ -24,7 +24,7 @@ function decodifica(chiave, dati) {
 }
 
 self.onmessage = (e) => {
-  const { id, z, x, y, tessere, dettaglio, edifici } = e.data;
+  const { id, z, x, y, tessere, dettaglio, edifici, corsie, vistaCorsie } = e.data;
   try {
     const livelli = {};
     for (const [off, { chiave, dati }] of Object.entries(tessere)) livelli[off] = decodifica(chiave, dati);
@@ -34,7 +34,8 @@ self.onmessage = (e) => {
       const veri = new VectorTile(new Pbf(new Uint8Array(edifici))).layers.building;
       if (veri) livelli['0,0'] = { ...livelli['0,0'], building: veri };
     }
-    const t = costruisciTessera({ z, x, y, livelli, dettaglio });
+    // Le vie con le corsie, nella vista «Corsie» (vedi `segnaletica.js`).
+    const t = costruisciTessera({ z, x, y, livelli, dettaglio, datiCorsie: corsie, vistaCorsie: vistaCorsie === true });
     self.postMessage({ id, tessera: t }, bufferDellaTessera(t));
   } catch (err) {
     self.postMessage({ id, errore: String(err?.stack ?? err) });

@@ -53,6 +53,8 @@ Map<String, Object?> msgOpzioni({
 }) => _m('opzioni', {
   'notte': notte,
   'vista': vista == VistaMappa.immersiva ? 'immersiva' : 'inclinata',
+  // La vista a corsie: la stessa pagina, con le corsie (`web3d/src/corsie.js`).
+  if (vista == VistaMappa.corsie) 'corsie': true,
   'auto': coloreAuto3d(segnaposto),
   'icona': segnaposto.immagine,
   if (edifici) 'edifici': true,
@@ -103,10 +105,30 @@ Map<String, Object?> msgPercorso(Viaggio? v) {
 
 /// La freccia della prossima manovra: da dove a dove (metri lungo il
 /// percorso), come `datiManovra`; o niente.
+///
+/// E le corsie della manovra, se chi fa il percorso le sa (TomTom: da
+/// sinistra, quali vanno bene) con [dove] la manovra sta lungo il percorso:
+/// nella vista a corsie la fascia verde prende la corsia che dice TomTom.
 Map<String, Object?> msgManovra(Viaggio? v, Manovra? m) {
   final t = trattoManovraM(v, m);
-  return _m('manovra', {'da': t?.$1, 'a': t?.$2});
+  final corsie = t == null || m == null ? const <Corsia>[] : m.corsie;
+  final punti = v?.percorso.punti ?? const <Punto>[];
+  final dove = corsie.isEmpty || punti.length < 2
+      ? null
+      : (Linea(punti).cumulate[m!.inizio.clamp(0, punti.length - 1)] * 10).roundToDouble() / 10;
+  return _m('manovra', {
+    'da': t?.$1,
+    'a': t?.$2,
+    if (dove != null && corsie.any((c) => c.giusta)) ...{
+      'corsie': [for (final c in corsie) c.giusta],
+      'dove': dove,
+    },
+  });
 }
+
+/// Le corsie di una tessera z14 (il JSON del relay, `/v1/corsie/14/x/y`,
+/// com'è: il formato è in `web3d/src/corsie.js`).
+Map<String, Object?> msgCorsie(Map<String, Object?> dati) => _m('corsie', {'dati': dati});
 
 /// La strada proposta in guida (verde), o niente.
 Map<String, Object?> msgRisparmio(PropostaStrada? p) {

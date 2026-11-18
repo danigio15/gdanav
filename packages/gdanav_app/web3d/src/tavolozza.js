@@ -58,6 +58,74 @@ export const NOTTE = {
   ombraPonte: 0.16,
 };
 
+/**
+ * La vista «Corsie»: chiara e pulita, perché le corsie si leggano. Il suolo
+ * quasi bianco, gli edifici bianchi e grigio chiaro (la forma resta, i
+ * colori no), l'asfalto blu notte su cui il bianco delle righe e il verde
+ * del percorso stanno bene; i nomi tenui. Si aggiunge ai colori del giorno
+ * (o della notte), che restano per tutto il resto.
+ */
+export const CORSIE = {
+  // Il suolo a toni appena diversi: le case un grigio caldo chiarissimo, le
+  // fabbriche un grigio freddo, i campi e i prati verde pallido, i boschi e
+  // i parchi più verdi. Tutto chiaro: le strade restano le protagoniste.
+  sfondo: '#EDF0E9',
+  abitato: '#F2EFEA',
+  industria: '#E5E8EC',
+  prato: '#DDEACC',
+  bosco: '#C9DFB6',
+  acqua: '#BDDCF3',
+  marciapiede: '#D7DBE1',
+  nebbia: '#EEF1F5',
+  asfalto: '#2E394C',
+  asfaltoGrande: '#2B3648',
+  asfaltoPonte: '#3A465B',
+  asfaltoPonteGrande: '#374359',
+  righe: '#F7F9FC',
+  facciata: '#ECEEF1',
+  tetto: '#FBFCFD',
+  ombra: 0.1,
+  ombraPonte: 0.14,
+  nomi: '#6B7380',
+  percorso: '#22C55E',
+  percorsoBordo: '#15803D',
+};
+
+/** E di notte: l'asfalto quasi nero, gli edifici grigio fumo. */
+export const CORSIE_NOTTE = {
+  marciapiede: '#3A4253',
+  asfalto: '#1A2130',
+  asfaltoGrande: '#182030',
+  asfaltoPonte: '#252E40',
+  asfaltoPonteGrande: '#232C3E',
+  righe: '#E8EDF5',
+  facciata: '#5A6274',
+  tetto: '#6A7286',
+  nomi: '#A5ADBA',
+  percorso: '#34D399',
+  percorsoBordo: '#047857',
+};
+
+/** I colori di una vista: il giorno o la notte, e sopra quelli delle corsie. */
+export const tavolozza = (notte, corsie = false) => (corsie ? { ...(notte ? NOTTE : GIORNO), ...(notte ? CORSIE_NOTTE : CORSIE) } : notte ? NOTTE : GIORNO);
+
+/**
+ * I colori delle code (livello 1 rallenta, 2 lento, 3 fermo, 4 chiuso):
+ * quelli della linea del traffico sulla mappa (lo strato `code` di
+ * `stile.dart`). Nella vista «Corsie» la fascia verde li prende dove c'è coda.
+ */
+export const COLORI_CODA = ['#F9A825', '#EF6C00', '#D32F2F', '#7B1F1F'];
+
+/** Il colore della coda di livello [nome] (una variabile GLSL), in GLSL. */
+export function glslColoreCoda(nome = 'livello') {
+  const v = (h) => {
+    const [r, g, b] = rgb(h).map((c) => (c / 255).toFixed(3));
+    return `vec3(${r}, ${g}, ${b})`;
+  };
+  const [a, b, c, d] = COLORI_CODA;
+  return `(${nome} < 1.5 ? ${v(a)} : ${nome} < 2.5 ? ${v(b)} : ${nome} < 3.5 ? ${v(c)} : ${v(d)})`;
+}
+
 /** I colori delle facciate e dei tetti, per stile di edificio. */
 export const FACCIATE = {
   residenziale: {
