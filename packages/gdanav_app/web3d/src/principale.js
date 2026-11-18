@@ -758,6 +758,8 @@ function motiviSuolo(m) {
   const usa = (strato, proprieta, img) => {
     if (m.getLayer(strato)) m.setPaintProperty(strato, proprieta, img);
   };
+  // Nella vista «Corsie» il suolo è liscio: i suoi colori, senza puntini.
+  if (S.corsie) return;
   usa('sfondo', 'background-pattern', 'p-sfondo');
   usa('abitato', 'fill-pattern', 'p-abitato');
   usa('industria', 'fill-pattern', 'p-industria');
@@ -1174,7 +1176,7 @@ function chiedi(k, dettaglio) {
   const edifici = e ? e.slice(0) : null;
   const trasferiti = Object.values(tessere).map((t) => t.dati);
   if (edifici) trasferiti.push(edifici);
-  lavoratore.postMessage({ id, z, x, y, tessere, dettaglio, edifici, corsie: S.corsie ? corsiePerTessera(z, x, y) : null }, trasferiti);
+  lavoratore.postMessage({ id, z, x, y, tessere, dettaglio, edifici, corsie: S.corsie ? corsiePerTessera(z, x, y) : null, vistaCorsie: S.corsie }, trasferiti);
 }
 
 /** Le vie con le corsie (e i nodi) attorno alla tessera z/x/y, per il lavoratore. */

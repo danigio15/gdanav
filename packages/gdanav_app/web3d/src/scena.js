@@ -907,11 +907,11 @@ export class Scena {
     });
     m.tetti = new THREE.MeshLambertMaterial({ vertexColors: true });
     this.vetroVicino(m.tetti, 'tetti');
-    // Nella vista «Corsie» gli edifici tengono la forma e perdono i colori:
-    // bianchi i tetti, grigio chiarissimo le facciate.
+    // Nella vista «Corsie» gli edifici hanno i colori della vista (bianchi,
+    // grigi chiari, il bordo del tetto più scuro): li mette il lavoratore.
     if (this.corsie) {
-      for (const s of STILI_FACCIATA) Object.assign(m['facciata-' + s], { vertexColors: false, color: new THREE.Color(P.facciata) });
-      Object.assign(m.tetti, { vertexColors: false, color: new THREE.Color(P.tetto) });
+      // I marciapiedi: grigio chiaro, un poco sopra la strada.
+      m['corsie-marciapiedi'] = new THREE.MeshLambertMaterial({ color: P.marciapiede, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -2 });
       // L'asfalto delle corsie, la vernice bianca (righe, frecce, strisce) e
       // i semafori: una geometria l'uno per tessera (vedi `segnaletica.js`).
       m['corsie-asfalto'] = new THREE.MeshLambertMaterial({ color: P.asfalto, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -2 });
@@ -1152,6 +1152,7 @@ export class Scena {
     if (t.corsie?.asfalto) aggiungi('corsie-asfalto', new THREE.Mesh(geometria(t.corsie.asfalto, notte)), 1);
     if (t.corsie?.vernice) aggiungi('corsie-vernice', new THREE.Mesh(geometria(t.corsie.vernice, notte)), 1);
     if (t.corsie?.segnali) aggiungi('corsie-segnali', new THREE.Mesh(geometria(t.corsie.segnali, notte)), 3);
+    if (t.corsie?.marciapiedi) aggiungi('corsie-marciapiedi', new THREE.Mesh(geometria(t.corsie.marciapiedi, notte)), 1);
     const g = this.geo;
     if (t.fusti.length) aggiungi('fusto', istanze(g.fusto, null, t.fusti), 3);
     if (t.capitelli.length) aggiungi('capitello', istanze(g.capitello, null, t.capitelli), 3);

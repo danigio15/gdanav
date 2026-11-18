@@ -12,6 +12,14 @@ import { Costruttore } from './costruttore.js';
 import { bordiCorsie, centroCorsia, larghezzaCorsie, normali, progressive } from './corsie.js';
 import { ritagliaLinea } from './ritaglio.js';
 
+/**
+ * I marciapiedi delle strade di città (m): larghi secondo la strada, alti
+ * [ALTO_MARCIAPIEDE] sopra l'asfalto, col cordolo. Non in autostrada, sulle
+ * superstrade e sulle rampe.
+ */
+export const MARCIAPIEDI = { primary: 2.5, secondary: 2.5, tertiary: 2.2, unclassified: 1.8, residential: 1.8, living_street: 1.5 };
+export const ALTO_MARCIAPIEDE = 0.14;
+
 /** Larghezze delle righe (m): un poco più larghe del codice, che da lontano non spariscano. */
 export const RIGHE = { corsia: 0.18, corsiaGrande: 0.2, bordo: 0.2, bordoGrande: 0.25, mezzeria: 0.2, doppia: 0.16, decelerazione: 0.5, arresto: 0.5 };
 
@@ -172,6 +180,27 @@ export function striscia(c, r, oa, ob, dz, meta) {
   }
 }
 
+/**
+ * Una parete lungo la linea ricca [r], allo spostamento [o], da [dz0] a
+ * [dz1] sopra la quota, girata verso [lato] (1 a sinistra, -1 a destra): il
+ * cordolo del marciapiede.
+ */
+export function parete(c, r, o, dz0, dz1, lato, meta) {
+  for (const pezzo of ritagliaLinea(r, -meta, -meta, meta, meta)) {
+    if (pezzo.length < 2) continue;
+    for (let k = 1; k < pezzo.length; k++) {
+      const P = (p, dz) => {
+        const nl = Math.hypot(p[3], p[4]) || 1;
+        return [p[0] + (p[3] / nl) * o, p[1] + (p[4] / nl) * o, p[2] + dz];
+      };
+      const a = pezzo[k - 1];
+      const b = pezzo[k];
+      const nl = Math.hypot(a[3], a[4]) || 1;
+      c.quad(P(a, dz0), P(b, dz0), P(b, dz1), P(a, dz1), [(a[3] / nl) * lato, (a[4] / nl) * lato, 0]);
+    }
+  }
+}
+
 /** Il punto della linea ricca a [s] metri, spostato di [o] a sinistra: `[x, y, h, tx, ty]`. */
 export function puntoA(r, s, o = 0) {
   const p = pezzoFra(r, s, s)[0];
@@ -231,6 +260,7 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
   const asfalto = new Costruttore();
   const vernice = new Costruttore();
   const segnali = new Costruttore({ colori: true });
+  const marciapiedi = new Costruttore();
   const dentro = (x, y) => x >= -meta && x <= meta && y >= -meta && y <= meta;
   const righe = new Map();
 
@@ -353,6 +383,24 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       }
     }
     if (v.galleria) return;
+
+    // ── I marciapiedi, col cordolo verso la strada ─────────────────────
+    // Aperti dove arriva un'altra strada (col suo marciapiede: un poco di più).
+    const largoM = MARCIAPIEDI[v.hw];
+    if (largoM) {
+      const piu = (bb) => bb.map(([a, b]) => [a - 2.5, b + 2.5]);
+      for (const [lato, bordo, buchi] of [
+        [1, B.sinistra + mS, [...buchiTutte, ...piu(buchiLato.sinistra)]],
+        [-1, B.destra - mD, [...buchiTutte, ...piu(buchiLato.destra)]],
+      ]) {
+        for (const [a, b] of togli([[0, L]], buchi)) {
+          if (b - a < 1.5) continue;
+          const pz = pezzoFra(r, a, b);
+          striscia(marciapiedi, pz, lato > 0 ? bordo + largoM : bordo, lato > 0 ? bordo : bordo - largoM, z0 + ALTO_MARCIAPIEDE, meta);
+          parete(marciapiedi, pz, bordo, z0 - 0.05, z0 + ALTO_MARCIAPIEDE, -lato, meta);
+        }
+      }
+    }
 
     // ── Le righe ───────────────────────────────────────────────────────
     const dz = z0 + 0.02;
@@ -592,5 +640,5 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       }
     }
   }
-  return { asfalto, vernice, segnali, righe, semafori };
+  return { asfalto, vernice, segnali, marciapiedi, righe, semafori };
 }

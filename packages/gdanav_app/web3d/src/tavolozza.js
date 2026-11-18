@@ -66,12 +66,16 @@ export const NOTTE = {
  * (o della notte), che restano per tutto il resto.
  */
 export const CORSIE = {
-  sfondo: '#F3F4F6',
-  abitato: '#EEF0F3',
-  industria: '#E9EBEF',
-  prato: '#DDEBD3',
-  bosco: '#D0E4C4',
-  acqua: '#C4DFF4',
+  // Il suolo a toni appena diversi: le case un grigio caldo chiarissimo, le
+  // fabbriche un grigio freddo, i campi e i prati verde pallido, i boschi e
+  // i parchi più verdi. Tutto chiaro: le strade restano le protagoniste.
+  sfondo: '#EDF0E9',
+  abitato: '#F2EFEA',
+  industria: '#E5E8EC',
+  prato: '#DDEACC',
+  bosco: '#C9DFB6',
+  acqua: '#BDDCF3',
+  marciapiede: '#D7DBE1',
   nebbia: '#EEF1F5',
   asfalto: '#2E394C',
   asfaltoGrande: '#2B3648',
@@ -89,6 +93,7 @@ export const CORSIE = {
 
 /** E di notte: l'asfalto quasi nero, gli edifici grigio fumo. */
 export const CORSIE_NOTTE = {
+  marciapiede: '#3A4253',
   asfalto: '#1A2130',
   asfaltoGrande: '#182030',
   asfaltoPonte: '#252E40',

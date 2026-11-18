@@ -98,7 +98,13 @@ la mappa scarica già (OpenFreeMap, schema OpenMapTiles).
   geometrie per tessera); il percorso è una fascia verde sulla corsia da
   tenere (le frecce dipinte, o le corsie giuste della manovra se l'app le
   manda), e l'auto ci sta dentro; la telecamera più bassa e vicina, gli
-  edifici bianchi, il suolo chiaro.
+  edifici bianchi col bordo del tetto più scuro, il suolo chiaro a toni per
+  zona. La città piena (`src/riempitivo.js`): dove OpenStreetMap non ha
+  edifici, nelle zone abitate (o nelle tessere di città, fuori da campi,
+  parchi e acqua) nascono blocchi plausibili lungo le strade, sempre gli
+  stessi; i marciapiedi col cordolo, i filari lungo le strade di città, gli
+  alberi nei giardini. I semafori sono spenti (nessuno pubblica di che
+  colore sono), con un fumetto neutro sopra.
 
 L'app parla con la pagina coi messaggi di `src/messaggi.js` (lo stesso
 formato di `lib/mappa/ponte_3d.dart`); la WebView è in
