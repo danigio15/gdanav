@@ -18,7 +18,7 @@ import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
 import { dallaScorta, nellaScorta } from './scorte.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
 import { tavolozza } from './tavolozza.js';
-import { corsieLungoIlPercorso, IndiceCorsie, preparaCorsie } from './corsie.js';
+import { corsieLungoIlPercorso, IndiceCorsie, preparaCorsie, tessereConCorsieVere } from './corsie.js';
 import './gdanav3d.css';
 
 /** Gli strati da toccare (come `stratiToccabili` in stile.dart). */
@@ -157,6 +157,12 @@ const S = {
   /** Le stesse, pronte (vedi `preparaCorsie`), e nei metri della scena. */
   corsiePronte: null,
   indiceCorsie: null,
+  /** Le tessere che hanno le corsie vere (un messaggio `corsie` con delle vie): le altre le stimano. */
+  corsieTessere: new Set(),
+  /** Le corsie stimate dal lavoratore, per tessera (vedi `stima.js`): per il percorso sulla corsia. */
+  stimeCorsie: new Map(),
+  /** Le stesse, pronte (vedi `preparaCorsie`); `null` da rifare. */
+  stimePronte: null,
   /** Le corsie giuste della manovra secondo chi fa il percorso (TomTom): `[{s, giuste}]`. */
   suggerimenti: [],
 };
@@ -239,6 +245,10 @@ const GESTORI = {
       S.sporco.traffico = true;
     }
     if (cambiaCorsie) {
+      // Le corsie stimate le rifanno le tessere, se la vista si riaccende.
+      S.stimeCorsie.clear();
+      S.stimePronte = null;
+      S.indiceCorsie = null;
       scena.impostaCorsie(corsie);
       S.mappa?.setVerticalFieldOfView(corsie ? OBIETTIVO_CORSIE_GRADI : OBIETTIVO_GRADI);
       // Lo stile di sotto (i colori chiari), e le tessere con o senza corsie.
@@ -259,6 +269,11 @@ const GESTORI = {
     for (const n of m.dati.nodi ?? []) G.nodi.set(n.id, n);
     for (const a of m.dati.alberi ?? []) G.alberi.set(`${a[0]},${a[1]}`, a);
     for (const f of m.dati.filari ?? []) G.filari.set(f.id ?? f.g.join(), f);
+    // La tessera ha le corsie vere: non le stima più (una arrivata vuota sì).
+    for (const k of tessereConCorsieVere(m.dati)) {
+      S.corsieTessere.add(k);
+      if (S.stimeCorsie.delete(k)) S.stimePronte = null;
+    }
     S.corsiePronte = preparaCorsie({ strade: [...G.strade.values()], nodi: [...G.nodi.values()], alberi: [...G.alberi.values()], filari: [...G.filari.values()] });
     for (const v of S.corsiePronte.strade) {
       let [a, b, c, d] = [Infinity, Infinity, -Infinity, -Infinity];
@@ -1074,6 +1089,7 @@ function pianifica() {
     scena.togliTessera(k);
     indice.togli(k);
     S.costruite.delete(k);
+    if (S.stimeCorsie.delete(k)) S.stimePronte = null;
     S.sporco.profilo = true;
   }
   const disegno = daDisegnare(S.costruite, qui[0], qui[1], BUDGET, S.disegnate);
@@ -1178,7 +1194,9 @@ function chiedi(k, dettaglio) {
   const edifici = e ? e.slice(0) : null;
   const trasferiti = Object.values(tessere).map((t) => t.dati);
   if (edifici) trasferiti.push(edifici);
-  lavoratore.postMessage({ id, z, x, y, tessere, dettaglio, edifici, corsie: S.corsie ? corsiePerTessera(z, x, y) : null, vistaCorsie: S.corsie }, trasferiti);
+  // Nella vista «Corsie», senza le corsie vere della tessera le stima il lavoratore (vedi `stima.js`).
+  const stima = S.corsie && !S.corsieTessere.has(k);
+  lavoratore.postMessage({ id, z, x, y, tessere, dettaglio, edifici, corsie: S.corsie && !stima ? corsiePerTessera(z, x, y) : null, vistaCorsie: S.corsie, stimaCorsie: stima }, trasferiti);
 }
 
 /** Le vie con le corsie (e i nodi) attorno alla tessera z/x/y, per il lavoratore. */
@@ -1202,18 +1220,35 @@ function corsiePerTessera(z, x, y) {
   return { strade, nodi, alberi, filari };
 }
 
-/** Le vie con le corsie nei metri della scena, per il percorso (vedi `corsieLungoIlPercorso`). */
+/**
+ * Le vie con le corsie nei metri della scena, per il percorso (vedi
+ * `corsieLungoIlPercorso`): le vere, e nella vista «Corsie» quelle stimate
+ * delle tessere che non le hanno vere.
+ */
 function indicizzaCorsie() {
   const c = S.corsiePronte;
-  if (!c || !S.origine) {
+  const stimate = S.corsie ? corsieStimatePronte() : null;
+  if ((!c && !stimate) || !S.origine) {
     S.indiceCorsie = null;
     return;
   }
-  for (const v of c.strade) {
+  const strade = [...(c?.strade ?? []), ...(stimate?.strade ?? [])];
+  for (const v of strade) {
     v.xy = [];
     for (let i = 0; i < v.llVia.length; i += 2) v.xy.push(S.origine.daLonLat(v.llVia[i], v.llVia[i + 1]));
   }
-  S.indiceCorsie = new IndiceCorsie(c.strade);
+  S.indiceCorsie = new IndiceCorsie(strade);
+}
+
+/** Le corsie stimate delle tessere senza quelle vere, pronte; `null` se non ce ne sono. */
+function corsieStimatePronte() {
+  if (!S.stimePronte) {
+    const strade = [];
+    for (const [k, ss] of S.stimeCorsie) if (!S.corsieTessere.has(k)) strade.push(...ss);
+    if (!strade.length) return null;
+    S.stimePronte = preparaCorsie({ v: 1, strade });
+  }
+  return S.stimePronte;
 }
 
 /** Tutte le tessere da rifare (la vista «Corsie» accesa o spenta, le corsie arrivate). */
@@ -1227,7 +1262,7 @@ function rifaiTessere() {
   pianificaPresto();
 }
 
-function allaTessera({ id, tessera, errore }) {
+function allaTessera({ id, tessera, errore, stimate }) {
   const lavoro = S.lavoro;
   S.lavoro = null;
   if (!lavoro || lavoro.id !== id) return pianificaPresto();
@@ -1238,6 +1273,13 @@ function allaTessera({ id, tessera, errore }) {
     return pianificaPresto();
   }
   const posto = postoTessera(tessera.chiave);
+  // Le corsie stimate della tessera (o niente, con quelle vere): il percorso le usa.
+  const cambiate = S.stimeCorsie.delete(tessera.chiave) || stimate?.length > 0;
+  if (stimate?.length) S.stimeCorsie.set(tessera.chiave, stimate);
+  if (cambiate) {
+    S.stimePronte = null;
+    S.indiceCorsie = null;
+  }
   scena.aggiungiTessera(tessera, posto.cx, posto.cy, posto.scala);
   indice.aggiungi(tessera.chiave, tessera.segmenti, posto.cx, posto.cy, posto.scala);
   S.costruite.set(tessera.chiave, {
@@ -1343,7 +1385,7 @@ function aggiornaPercorso(adesso) {
     const qui = s !== null && p.profilo ? p.profilo.quotaVera(s) : null;
     p.profilo = profiloDi(p.linea, da, a, indice, 4, qui === null ? null : { s, h: qui }, p.suStrada);
     S.sporco.segni = true;
-    if (S.corsie && S.corsiePronte) {
+    if (S.corsie && (S.corsiePronte || S.stimeCorsie.size)) {
       // La vista «Corsie»: il percorso (e l'auto con lui) sulla corsia da
       // tenere, una fascia verde trasparente invece della linea blu.
       sullaCorsia(p);

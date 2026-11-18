@@ -40,6 +40,13 @@
 // si toccano dove hanno un nodo con le stesse coordinate (i 6 decimali).
 // Le strade `service` il relay le manda, ma qui non hanno corsie (restano
 // fuori da [CLASSI_CORSIE]).
+//
+// Una tessera senza i dati veri (mai arrivati, arrivati vuoti, il relay in
+// errore) le corsie le stima dalla tessera vettoriale, nello stesso formato
+// (`stima.js`: le vie con la classe e il senso unico, id negativi, niente
+// nodi né alberi); quando arrivano quelli veri la tessera si rifà con loro.
+
+import { mercX, mercY } from './geo.js';
 
 /** Le classi di strada che hanno le corsie disegnate. */
 export const CLASSI_CORSIE = new Set([
@@ -528,6 +535,23 @@ export function preparaCorsie(dati) {
   const alberi = (dati?.alberi ?? []).filter((a) => Array.isArray(a) && a.length >= 2);
   const filari = (dati?.filari ?? []).filter((f) => Array.isArray(f?.g) && f.g.length >= 4);
   return { strade, nodi, alberi, filari };
+}
+
+/**
+ * Le tessere z14 (`"14/x/y"`) di cui il messaggio `corsie` [dati] porta le
+ * corsie vere: quella che dice il relay (`z`, `x`, `y`), o senza, quelle dove
+ * stanno le sue vie. Nessuna se non ha vie: una tessera arrivata vuota (o
+ * mai arrivata) si stima (vedi `stima.js`).
+ */
+export function tessereConCorsieVere(dati) {
+  const strade = dati?.strade ?? [];
+  if (!strade.length) return [];
+  if (Number.isInteger(dati.x) && Number.isInteger(dati.y) && (dati.z ?? 14) === 14) return [`14/${dati.x}/${dati.y}`];
+  const out = new Set();
+  for (const st of strade) {
+    for (let i = 0; i + 1 < (st.g?.length ?? 0); i += 2) out.add(`14/${Math.floor(mercX(st.g[i]) * 2 ** 14)}/${Math.floor(mercY(st.g[i + 1]) * 2 ** 14)}`);
+  }
+  return [...out];
 }
 
 // ── La corsia del percorso ──────────────────────────────────────────────
