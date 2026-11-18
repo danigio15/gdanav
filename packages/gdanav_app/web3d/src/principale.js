@@ -315,7 +315,7 @@ const GESTORI = {
       const quale = `${m.punti.length}:${m.punti[0]}:${m.punti[1]}:${m.punti[m.punti.length - 2]}`;
       if (quale !== S.qualePercorso) moto.nuovoPercorso();
       S.qualePercorso = quale;
-      S.percorso = { lonlat: m.punti, metri: m.metri ?? null, linea: lineaDi(m.punti, m.metri), code: codeOrdinate(m.code), profilo: null, da: null, a: 0 };
+      S.percorso = { lonlat: m.punti, metri: m.metri ?? null, linea: lineaDi(m.punti, m.metri), code: codeOrdinate(m.code), suStrada: m.suStrada ?? [], profilo: null, da: null, a: 0 };
       moto.svolte = svolteDi(S.percorso.linea);
     }
     S.sporco.profilo = true;
@@ -1341,7 +1341,7 @@ function aggiornaPercorso(adesso) {
     // Dove sta l'auto la quota si sa già (dal profilo di prima): chi è sul
     // viadotto ci resta, anche con una strada più vicina sotto.
     const qui = s !== null && p.profilo ? p.profilo.quotaVera(s) : null;
-    p.profilo = profiloDi(p.linea, da, a, indice, 4, qui === null ? null : { s, h: qui });
+    p.profilo = profiloDi(p.linea, da, a, indice, 4, qui === null ? null : { s, h: qui }, p.suStrada);
     S.sporco.segni = true;
     if (S.corsie && S.corsiePronte) {
       // La vista «Corsie»: il percorso (e l'auto con lui) sulla corsia da

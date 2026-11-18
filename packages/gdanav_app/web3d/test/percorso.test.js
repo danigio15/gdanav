@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { IndiceSegmenti, Linea, Origine, Profilo, alzataDeiNastri, direzioneDisegnata, lungoLaLinea, nastro, pezziDelNastro, profiloDi, quote, riempiQuote, sensiDiMarcia } from '../src/percorso.js';
+import { IndiceSegmenti, Linea, Origine, Profilo, alzataDeiNastri, direzioneDisegnata, fermiSuStrada, lungoLaLinea, nastro, pezziDelNastro, profiloDi, quote, riempiQuote, sensiDiMarcia } from '../src/percorso.js';
 
 /** Segmenti finti: [x0,y0,z0,x1,y1,z1,w,codice]. */
 function indice(segmenti) {
@@ -584,4 +584,26 @@ test('la punta della freccia guarda come il nastro che chiude, non come la linea
   assert.ok(Math.abs(direzioneDisegnata(l, p, 90)) < 1e-6);
   // Senza spostamenti è il verso della linea.
   assert.ok(Math.abs(direzioneDisegnata(l, new Profilo(0, 4, new Float64Array(26)), 50)) < 1e-6);
+});
+
+test('il pezzo rifatto sulle strade vere non si sposta, e ai capi si raccorda senza ganci', () => {
+  // TomTom sta otto metri di lato: prima e dopo lo spostamento lo riporta
+  // sulla strada. Il pezzo da 40 a 120 m è già sulla strada, con 20 m di
+  // raccordo per parte.
+  const passo = 4;
+  const n = 41;
+  const dx = new Float64Array(n);
+  const dy = new Float64Array(n).fill(-8);
+  fermiSuStrada(dx, dy, 0, passo, [[40, 120, 20]]);
+  const a = (s) => dy[Math.round(s / passo)];
+  assert.equal(a(20), -8, 'prima del pezzo resta lo spostamento di TomTom');
+  assert.equal(a(40), -8, 'dove si stacca, ancora quello');
+  assert.ok(Math.abs(a(48) + 4.8) < 1e-9, 'nel raccordo scende piano');
+  for (let s = 60; s <= 100; s += passo) assert.ok(Math.abs(a(s)) < 1e-12, `a ${s} m è già sulla strada`);
+  assert.ok(Math.abs(a(112) + 4.8) < 1e-9, 'e risale piano verso la fine');
+  assert.equal(a(140), -8, 'dopo, di nuovo TomTom');
+  // Senza pezzi non cambia niente.
+  const x = Float64Array.from([1, 2, 3]);
+  fermiSuStrada(x, Float64Array.from([1, 2, 3]), 0, 4, []);
+  assert.deepEqual([...x], [1, 2, 3]);
 });

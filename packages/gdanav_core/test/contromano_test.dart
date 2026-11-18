@@ -131,6 +131,28 @@ void main() {
       expect(d.lunghezzaM, lessThanOrEqualTo((d.aM - d.daM) * 1.5));
     });
 
+    test('il pezzo rifatto è segnato «sulla strada», col suo raccordo: la scena 3D non lo sposta', () {
+      final prima = dalVertice();
+      expect(prima.suStrada, isEmpty);
+      final c = correggiContromano(prima, triangolo)!;
+      final dopo = c.percorso;
+      expect(dopo.suStrada, hasLength(1));
+      final (da, fine, raccordo) = dopo.suStrada.single;
+      final d = c.deviazioni.single;
+      expect(da, closeTo(d.daM, 3), reason: 'parte dove si stacca dalla linea di prima');
+      expect(fine - da, closeTo(d.lunghezzaM, 3));
+      expect(raccordo, inInclusiveRange(1, 25));
+      // In mezzo al pezzo, fuori dai raccordi, la linea è proprio sul ramo giusto.
+      final cum = Linea(dopo.punti).cumulate;
+      for (var i = 0; i < dopo.punti.length; i++) {
+        if (cum[i] < da + raccordo || cum[i] > fine - raccordo) continue;
+        final ramo = [a(w.$1, w.$2), a(n.$1, n.$2), a(1, -60)];
+        expect(passaA(ramo, dove(dopo.punti[i])), lessThan(0.5), reason: 'a ${cum[i].round()} m');
+      }
+      // Anche sotto il traffico, che si rifà dal percorso senza.
+      if (dopo.senzaTraffico case final s?) expect(s.suStrada, hasLength(1));
+    });
+
     test('la manovra diventa «al bivio tieni la destra», nel punto dove si stacca il ramo giusto', () {
       final dopo = correggiContromano(dalVertice(), triangolo)!.percorso;
       expect(dopo.manovre.map((m) => m.tipo), [1, 23, 4]);

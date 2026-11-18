@@ -636,11 +636,15 @@ class _ManovraNuova {
 }
 
 class _Sostituzione {
-  _Sostituzione(this.deviazione, this.inseriti, this.manovre);
+  _Sostituzione(this.deviazione, this.inseriti, this.manovre, this.raccordo);
 
   final Deviazione deviazione;
   final List<Punto> inseriti;
   final List<_ManovraNuova> manovre;
+
+  /// I metri, all'inizio e alla fine, in cui il pezzo nuovo si raccorda alla
+  /// linea di prima (vedi [_costruisci]).
+  final double raccordo;
 
   PercorsoCalcolato applica(PercorsoCalcolato p) {
     final d = deviazione;
@@ -720,6 +724,13 @@ class _Sostituzione {
       senzaTraffico: p.senzaTraffico == null || p.senzaTraffico!.punti.length != p.punti.length
           ? p.senzaTraffico
           : applica(p.senzaTraffico!),
+      // Il pezzo nuovo, dal primo all'ultimo punto inserito, è sulle strade
+      // vere: la scena non lo sposta.
+      suStrada: [
+        for (final (a, b, r) in p.suStrada)
+          if (b <= d.daM || a >= d.aM) (metri(a), metri(b), r),
+        if (inseriti.length >= 2) (cum[iA + 1], cum[iA + inseriti.length], raccordo),
+      ]..sort((x, y) => x.$1.compareTo(y.$1)),
     );
   }
 }
@@ -965,7 +976,7 @@ _Sostituzione _costruisci(
   // Niente da dire dove la strada nuova si stacca appena (una carreggiata
   // accanto) e non c'era nessuna manovra: si resta come prima.
   nuove.removeWhere((n) => n.manovra.tipo == 8 && tolte.isEmpty);
-  return _Sostituzione(deviazione, inseriti, nuove);
+  return _Sostituzione(deviazione, inseriti, nuove, raccordo);
 }
 
 int _tipoDaAngolo(double giro) {

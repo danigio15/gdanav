@@ -493,7 +493,7 @@ export class Profilo {
  * Il profilo di [linea] fra [s0] e [s1], con le strade di [indice].
  * [ancora] `{s, h}`: la quota che si sa già a [s] metri (vedi [quote]).
  */
-export function profiloDi(linea, s0, s1, indice, passo = 4, ancora = null) {
+export function profiloDi(linea, s0, s1, indice, passo = 4, ancora = null, suStrada = []) {
   const n = Math.max(2, Math.ceil((s1 - s0) / passo) + 1);
   const punti = [];
   for (let k = 0; k < n; k++) {
@@ -503,9 +503,50 @@ export function profiloDi(linea, s0, s1, indice, passo = 4, ancora = null) {
   const ia = ancora ? Math.round((ancora.s - s0) / passo) : -1;
   const grezze = quote(punti, indice, ia >= 0 && ia < n ? { i: ia, h: ancora.h } : null);
   const [dx, dy] = spostamenti(grezze.dx, grezze.dy, punti, passo, grezze.galleria);
+  fermiSuStrada(dx, dy, s0, passo, suStrada);
   const profilo = new Profilo(s0, passo, riempiQuote(grezze), grezze.galleria, dx, dy);
   profilo.trovata = Uint8Array.from(grezze, (v) => (Number.isNaN(v) ? 0 : 1));
   return profilo;
+}
+
+/**
+ * I pezzi del percorso già sulle strade della mappa non si spostano.
+ *
+ * «Il tratto verde è al centro, non strettamente a destra»: al triangolo di
+ * due sensi unici l'app rifà il pezzo contromano sulle strade vere
+ * (`correggiContromano`), sul ramo giusto. Qui però lo si spostava come la
+ * linea di TomTom, che prima e dopo sta otto metri di lato: la media e lo
+ * spigolo di [spostamenti] portavano anche il pezzo rifatto di qualche metro
+ * verso il mezzo del triangolo, fuori dal ramo.
+ *
+ * [suStrada] `[[da, a, raccordo], …]` in metri sul percorso. Nei primi e
+ * negli ultimi [raccordo] metri il pezzo rifatto va dalla linea di TomTom
+ * alla strada (e ritorno), piano: lì lo spostamento scende da quello di
+ * TomTom a zero, come il raccordo dell'app. In mezzo è zero.
+ */
+export function fermiSuStrada(dx, dy, s0, passo, suStrada) {
+  const n = dx.length;
+  if (!suStrada?.length || !n) return;
+  const x0 = Float64Array.from(dx);
+  const y0 = Float64Array.from(dy);
+  const indice = (s) => Math.min(n - 1, Math.max(0, Math.round((s - s0) / passo)));
+  for (const [a, b, r] of suStrada) {
+    if (b < s0 || a > s0 + (n - 1) * passo) continue;
+    const ra = Math.max(0, Math.min(r, (b - a) / 2));
+    // Lo spostamento di TomTom dove il pezzo si stacca e dove ritorna.
+    const ka = indice(a);
+    const kb = indice(b);
+    const [ax, ay] = a >= s0 ? [x0[ka], y0[ka]] : [0, 0];
+    const [bx, by] = b <= s0 + (n - 1) * passo ? [x0[kb], y0[kb]] : [0, 0];
+    for (let k = 0; k < n; k++) {
+      const s = s0 + k * passo;
+      if (s <= a || s >= b) continue;
+      const wa = ra > 0 ? Math.max(0, 1 - (s - a) / ra) : 0;
+      const wb = ra > 0 ? Math.max(0, 1 - (b - s) / ra) : 0;
+      dx[k] = ax * wa + bx * wb;
+      dy[k] = ay * wa + by * wb;
+    }
+  }
 }
 
 /** Più di così non si sposta: oltre, la strada giusta è un'altra.
