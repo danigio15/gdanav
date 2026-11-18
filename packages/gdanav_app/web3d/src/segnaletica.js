@@ -205,13 +205,20 @@ function scatola(c, x, y, z0, z1, tx, ty, lu, lv, cg, cn) {
   c.quad(P(-1, -1, z1), P(1, -1, z1), P(1, 1, z1), P(-1, 1, z1), [0, 0, 1], cg, cn);
 }
 
-const PALO = [[70, 76, 86], [40, 44, 52]];
-const LANTERNA = [[38, 42, 50], [22, 25, 30]];
-const LUCI = [
-  [[230, 48, 40], [255, 70, 60]],
-  [[120, 100, 40], [90, 75, 30]],
-  [[40, 90, 60], [30, 70, 45]],
-];
+/*
+ * I semafori: spenti. In Italia non si sa di che colore è un semaforo né
+ * quando cambia (nessuno lo pubblica): una luce rossa o verde disegnata
+ * direbbe una cosa falsa. Il palo scuro, la lanterna quasi nera col bordo
+ * chiaro (il pannello di contrasto: si stacca dall'asfalto e dagli edifici
+ * bianchi) e le tre lenti grigie, tutte uguali. Più grandi del vero di metà,
+ * che sul telefono a settanta metri si vedano.
+ */
+const PALO = [[48, 52, 60], [30, 33, 40]];
+const LANTERNA = [[26, 29, 35], [16, 18, 22]];
+const PANNELLO = [[236, 239, 243], [150, 156, 166]];
+const LENTE = [[78, 84, 95], [58, 63, 72]];
+/** Il semaforo, in metri: l'altezza del palo fin sotto la lanterna, e la lanterna. */
+export const SEMAFORO = { palo: 3.2, lanterna: 1.6, largo: 0.62, mezzoPalo: 0.12 };
 
 /**
  * La segnaletica di una tessera. [strade]: le vie (vedi `normalizza` in
@@ -471,7 +478,11 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
 
   // ── Strisce, linee d'arresto, semafori ─────────────────────────────
   const fatti = new Set();
+  // Dove sta ogni semaforo (la cima del primo palo dell'incrocio): sopra la
+  // pagina ci mette il suo segno (vedi `aggiornaSegni` in principale.js).
+  const semafori = [];
   for (const n of nodi) {
+    let semaforoMesso = false;
     const kk = chiave(n.xy);
     const rami = ramiDi(kk);
     if (!rami.length) continue;
@@ -493,22 +504,27 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       if (versoDetto === 'backward' && arrivaAvanti) continue;
       const B = bordiCorsie(v);
       const dz = sopra(v.hw) + 0.022;
-      // All'incrocio la linea si ferma prima delle altre strade; su una via
-      // sola (una striscia a metà strada) sul nodo.
+      // Per chi arriva, in fila: la linea d'arresto, le strisce, l'incrocio.
+      // All'incrocio le strisce stanno prima delle altre strade (mai sopra);
+      // su una via sola (le strisce a metà strada) sul nodo, e la linea
+      // d'arresto un metro prima.
       const altri = rami.filter((x) => x.i !== ramo.i);
-      const R = incrocio && altri.length ? Math.max(...altri.map((x) => x.mezza)) + 1.2 : 0;
+      const bordo = incrocio && altri.length ? Math.max(...altri.map((x) => x.mezza)) : null;
       const verso = arrivaAvanti ? -1 : 1;
-      const sz = s + verso * R;
-      if (sz < 0.5 || sz > L - 0.5) continue;
-      const chiaveFatta = `${ramo.i}:${Math.round(sz)}:${tipo}`;
+      const lungoZ = 3;
+      const dZebra = bordo === null ? 0 : bordo + 0.8 + lungoZ / 2;
+      const dArresto = tipo === 'traffic_signals' ? dZebra + lungoZ / 2 + 1.2 : bordo === null ? 0.5 : bordo + 1.2;
+      const sZebra = s + verso * dZebra;
+      const sA = s + verso * dArresto;
+      if (sA < 0.5 || sA > L - 0.5) continue;
+      const chiaveFatta = `${ramo.i}:${Math.round(sA)}:${tipo}`;
       if (fatti.has(chiaveFatta)) continue;
       fatti.add(chiaveFatta);
       // Le strisce pedonali: su tutta la carreggiata, a strisce lungo la strada.
       const zebra = tipo === 'crossing' || tipo === 'traffic_signals';
-      const lungoZ = 3;
-      const sZebra = tipo === 'crossing' ? s : sz + verso * (lungoZ / 2 + 0.5);
-      if (zebra && sZebra > lungoZ / 2 && sZebra < L - lungoZ / 2 && (tipo !== 'crossing' || !fatti.has(`${ramo.i}:${Math.round(s)}:zebra`))) {
-        fatti.add(`${ramo.i}:${Math.round(s)}:zebra`);
+      const chiaveZebra = `${ramo.i}:${Math.round(sZebra)}:zebra`;
+      if (zebra && sZebra > lungoZ / 2 && sZebra < L - lungoZ / 2 && !fatti.has(chiaveZebra)) {
+        fatti.add(chiaveZebra);
         const pz = pezzoFra(r, sZebra - lungoZ / 2, sZebra + lungoZ / 2);
         const m = pz[Math.floor(pz.length / 2)];
         if (dentro(m[0], m[1])) {
@@ -517,7 +533,6 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       }
       if (tipo === 'crossing') continue;
       // La linea d'arresto: sulle corsie di chi arriva, prima delle strisce.
-      const sA = tipo === 'traffic_signals' ? sz - verso * 0.6 : sz;
       const [oa, ob] = arrivaAvanti ? [v.indietro ? B.mezzeria : B.sinistra, B.destra] : [B.sinistra, B.mezzeria];
       const pa = pezzoFra(r, sA - RIGHE.arresto / 2, sA + RIGHE.arresto / 2);
       const m = pa[0];
@@ -545,22 +560,37 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       }
       // Il semaforo: un palo a destra di chi arriva, con le tre luci verso di lui.
       if (tipo === 'traffic_signals') {
-        const lato = arrivaAvanti ? B.destra - 0.9 : B.sinistra + 0.9;
+        const lato = arrivaAvanti ? B.destra - 1.0 : B.sinistra + 1.0;
         const [px, py, ph, tx, ty] = puntoA(r, sA, lato);
+        // La lanterna guarda chi arriva.
         const fx = tx * verso;
         const fy = ty * verso;
-        scatola(segnali, px, py, ph, ph + 3.4, fx, fy, 0.08, 0.08, ...PALO);
-        scatola(segnali, px + fx * 0.05, py + fy * 0.05, ph + 2.3, ph + 3.5, fx, fy, 0.2, 0.22, ...LANTERNA);
-        LUCI.forEach(([cg, cn], j) => {
-          const z = ph + 3.25 - j * 0.38;
-          const qx = px + fx * 0.26;
-          const qy = py + fy * 0.26;
-          const lx = -fy * 0.13;
-          const ly = fx * 0.13;
-          segnali.quad([qx + lx, qy + ly, z - 0.13], [qx - lx, qy - ly, z - 0.13], [qx - lx, qy - ly, z + 0.13], [qx + lx, qy + ly, z + 0.13], [fx, fy, 0], cg, cn);
-        });
+        const { palo, lanterna, largo, mezzoPalo } = SEMAFORO;
+        const z0 = ph + palo;
+        const z1 = z0 + lanterna;
+        scatola(segnali, px, py, ph, z0 + 0.1, fx, fy, mezzoPalo, mezzoPalo, ...PALO);
+        // Il pannello chiaro dietro, poi la lanterna davanti.
+        const pannello = (q) => [px + fx * 0.02 - fy * q[0], py + fy * 0.02 + fx * q[0], q[1]];
+        const w = largo / 2 + 0.1;
+        segnali.quad(pannello([w, z0 - 0.1]), pannello([-w, z0 - 0.1]), pannello([-w, z1 + 0.1]), pannello([w, z1 + 0.1]), [fx, fy, 0], ...PANNELLO);
+        scatola(segnali, px + fx * 0.2, py + fy * 0.2, z0, z1, fx, fy, 0.17, largo / 2, ...LANTERNA);
+        // Le tre lenti spente, ognuna con la sua visiera.
+        for (let j = 0; j < 3; j++) {
+          const zc = z1 - lanterna * (0.2 + 0.3 * j);
+          const r2 = largo * 0.3;
+          const qx = px + fx * 0.38;
+          const qy = py + fy * 0.38;
+          const lx = -fy * r2;
+          const ly = fx * r2;
+          segnali.quad([qx + lx, qy + ly, zc - r2], [qx - lx, qy - ly, zc - r2], [qx - lx, qy - ly, zc + r2], [qx + lx, qy + ly, zc + r2], [fx, fy, 0], ...LENTE);
+          segnali.quad([qx + lx, qy + ly, zc + r2], [qx - lx, qy - ly, zc + r2], [qx - lx + fx * 0.16, qy - ly + fy * 0.16, zc + r2 + 0.02], [qx + lx + fx * 0.16, qy + ly + fy * 0.16, zc + r2 + 0.02], [0, 0, 1], ...LANTERNA);
+        }
+        if (!semaforoMesso && dentro(px, py)) {
+          semafori.push(px, py, z1 + 0.3);
+          semaforoMesso = true;
+        }
       }
     }
   }
-  return { asfalto, vernice, segnali, righe };
+  return { asfalto, vernice, segnali, righe, semafori };
 }

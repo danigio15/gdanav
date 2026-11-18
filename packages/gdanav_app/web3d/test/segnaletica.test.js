@@ -130,6 +130,21 @@ test('un semaforo: la linea d’arresto, le strisce e il palo con le luci', () =
   const p = sg.vernice.p;
   for (let i = 0; i < p.length; i += 3) if (p[i + 1] > 3.3 && p[i + 1] < 3.5) bordo.push(p[i]);
   assert.ok(!bordo.some((x) => Math.abs(x) < 2), 'niente bordo davanti alla strada che arriva');
+  // Chi arriva da ovest (sulla sua corsia, y fra 0 e -3,25): prima la linea
+  // d'arresto, poi le strisce, e niente vernice sulla strada che incrocia.
+  const corsia = [];
+  for (let i = 0; i < p.length; i += 3) if (p[i + 1] < -0.3 && p[i + 1] > -3) corsia.push(p[i]);
+  const qui = (a, b) => corsia.some((x) => x > a && x < b);
+  // La strada da nord è larga 3,35 per parte, quella di là 3,6: le strisce da -7,4 a -4,4.
+  // La linea d'arresto va da un bordo all'altro delle corsie di chi arriva:
+  // il suo angolo a destra sta a 3,15 m (le righe del bordo a 3,05 e 3,25).
+  const arresto = [];
+  for (let i = 0; i < p.length; i += 3) if (Math.abs(p[i + 1] + 3.15) < 0.01) arresto.push(p[i]);
+  assert.ok(arresto.length && arresto.every((x) => x > -9 && x < -8.3), `la linea d’arresto ${arresto}`);
+  assert.ok(qui(-7.4, -4.4), 'le strisce');
+  assert.ok(!qui(-4.2, -0.5), 'niente strisce dentro l’incrocio');
+  assert.ok(!qui(-8.2, -7.5), 'fra la linea e le strisce un metro di asfalto');
+  assert.equal(sg.semafori.length, 3, 'un segno per incrocio');
 });
 
 /** Da metri della tessera z/x/y a `[lon, lat]`. */

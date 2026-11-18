@@ -103,8 +103,13 @@ export function adattaStile(stile, { notte = false, corsie = false } = {}) {
         'symbol-spacing': 320,
       };
       if (l.paint) l.paint['text-halo-width'] = 2.4;
+      // Nella vista «Corsie» la telecamera è bassa e l'obiettivo largo: un
+      // nome scritto lungo una strada che corre verso l'orizzonte si
+      // piegava lettera per lettera e si scriveva a rovescio. Un nome per
+      // strada, dritto sullo schermo, nel mezzo del pezzo.
+      if (corsie) l.layout = { ...l.layout, 'symbol-placement': 'line-center', 'text-rotation-alignment': 'viewport', 'text-pitch-alignment': 'viewport', 'text-keep-upright': true };
       layers.push(l);
-      layers.push(scudi());
+      layers.push(scudi(corsie));
       continue;
     }
     if (l.id === 'luoghi' && l.layout) l.layout['text-pitch-alignment'] = 'viewport';
@@ -167,8 +172,8 @@ export function filtroNomi(nascosti, corsie = false) {
   return parti.length === 1 ? FILTRO_NOMI : ['all', ...parti];
 }
 
-export function scudi() {
-  return {
+export function scudi(corsie = false) {
+  const s = {
     id: 'scudi',
     type: 'symbol',
     source: 'openmaptiles',
@@ -199,4 +204,8 @@ export function scudi() {
     },
     paint: { 'text-color': '#FFFFFF' },
   };
+  // Nella vista «Corsie» da vicino il cartello si ripeteva ogni pochi
+  // metri: uno per pezzo di strada, nel mezzo.
+  if (corsie) s.layout['symbol-placement'] = 'line-center';
+  return s;
 }

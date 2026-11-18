@@ -1151,6 +1151,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
 
   // La segnaletica delle corsie: asfalto, vernice, semafori.
   let segnaletica = null;
+  let semafori = [];
   if (conCorsie) {
     const sg = costruisciSegnaletica({ strade: conCorsie.strade, nodi: conCorsie.nodi, sopra: sopraCorsie, meta });
     segnaletica = {
@@ -1158,6 +1159,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
       vernice: sg.vernice.triangoli ? sg.vernice.fatto() : null,
       segnali: sg.segnali.triangoli ? sg.segnali.fatto() : null,
     };
+    semafori = sg.semafori;
   }
 
   const fatti = Object.fromEntries(NASTRI.filter((t) => nastri[t].triangoli).map((t) => [t, nastri[t].fatto()]));
@@ -1182,6 +1184,8 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     etichette,
     nascosti: [...nascosti],
     corsie: segnaletica,
+    // Dove stanno i semafori (x, y, la cima): il loro segno sulla pagina.
+    semafori: new Float32Array(semafori),
   };
   const triStrade = Object.values(nastri).reduce((s, g) => s + g.triangoli, 0);
   out.conti = {
@@ -1782,6 +1786,7 @@ export function bufferDellaTessera(t) {
   geo(t.tetti);
   for (const g of Object.values(t.facciate)) geo(g);
   if (t.corsie) for (const g of Object.values(t.corsie)) geo(g);
+  if (t.semafori) lista.push(t.semafori.buffer);
   for (const a of [t.fusti, t.capitelli, t.pali, t.teste, t.luci, t.segmenti, ...Object.values(t.alberi)]) lista.push(a.buffer);
   return lista;
 }

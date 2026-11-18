@@ -1873,7 +1873,65 @@ function aggiornaSegni(adesso) {
     // colori (lo stesso segno, riusato, restava scuro sull'alone bianco).
     segni.push({ chiave: `nome:${testo}:${Math.round(e.x)}:${Math.round(e.y)}:${S.notte ? 'notte' : 'giorno'}`, x: e.x, y: e.y, z: e.h + 1.2, immagine: tela, w: tela.width / 2, h: tela.height / 2, centro: 0.5 });
   }
+  // Nella vista «Corsie», sopra i semafori vicini un fumetto col semaforo
+  // (spento: di che colore è non lo sa nessuno), che si veda anche da lontano.
+  if (S.corsie) {
+    const semafori = [];
+    for (const c of S.costruite.values()) {
+      const t = scena.tessere.get(c.chiave)?.dati.semafori;
+      for (let i = 0; t && i < t.length; i += 3) {
+        const x = c.cx + t[i] * c.scala;
+        const y = c.cy + t[i + 1] * c.scala;
+        const d = Math.hypot(x - qui[0], y - qui[1]);
+        if (d < SEMAFORI_VICINI_M) semafori.push({ x, y, z: t[i + 2], d });
+      }
+    }
+    semafori.sort((a, b) => a.d - b.d);
+    const tela = iconaSemaforo();
+    for (const q of semafori.slice(0, 6)) {
+      segni.push({ chiave: `semaforo:${Math.round(q.x)}:${Math.round(q.y)}:${S.notte ? 'notte' : 'giorno'}`, x: q.x, y: q.y, z: q.z, immagine: tela, w: tela.width / 2, h: tela.height / 2 });
+    }
+  }
   scena.impostaSegni(segni);
+}
+
+/** Fin dove si mette il fumetto sopra i semafori (vista «Corsie»). */
+const SEMAFORI_VICINI_M = 350;
+
+/** Il fumetto del semaforo: bianco, la lanterna scura con le tre lenti grigie, la punta in basso. */
+let telaSemaforo = null;
+function iconaSemaforo() {
+  const notte = S.notte;
+  if (telaSemaforo?.notte === notte) return telaSemaforo.tela;
+  const c = document.createElement('canvas');
+  c.width = 60;
+  c.height = 80;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgba(15,23,42,0.25)';
+  g.beginPath();
+  g.roundRect(4, 5, 52, 60, 14);
+  g.fill();
+  g.fillStyle = notte ? '#E5E9F0' : '#FFFFFF';
+  g.beginPath();
+  g.roundRect(4, 2, 52, 60, 14);
+  g.fill();
+  g.beginPath();
+  g.moveTo(22, 60);
+  g.lineTo(30, 76);
+  g.lineTo(38, 60);
+  g.fill();
+  g.fillStyle = '#1F2430';
+  g.beginPath();
+  g.roundRect(20, 9, 20, 46, 6);
+  g.fill();
+  g.fillStyle = '#8A93A3';
+  for (const y of [18, 32, 46]) {
+    g.beginPath();
+    g.arc(30, y, 5, 0, Math.PI * 2);
+    g.fill();
+  }
+  telaSemaforo = { notte, tela: c };
+  return c;
 }
 
 /**
