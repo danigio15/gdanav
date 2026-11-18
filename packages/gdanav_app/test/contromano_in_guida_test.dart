@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/stato/gestore_guida.dart';
 import 'package:gdanav_app/stato/gestore_viaggio.dart';
+import 'package:gdanav_app/stato/strade_osm.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
 import 'aiuti.dart';
@@ -136,6 +137,18 @@ void main() {
     expect(voce.frasi, isNot(contains('Ricalcolo il percorso.')));
     expect(voce.frasi.where((f) => f.contains('Via Sud')), isNotEmpty);
     expect(voce.frasi.where((f) => f.contains('Gira a destra in Via Sud') && f.contains('Tra')), isEmpty);
+  });
+
+  testWidgets('appena partiti, prima ancora del GPS, la linea è già sul ramo giusto', (tester) async {
+    final (a, g, _) = await prepara(tester, (_) async => _strade);
+    final prima = (a.viaggio.stato as ViaggioPronto).viaggio.percorso;
+    g.avvia();
+    // Nessuna posizione: si lascia solo il tempo alle strade di arrivare.
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+    final dopo = (a.viaggio.stato as ViaggioPronto).viaggio.percorso;
+    expect(identical(dopo, prima), isFalse, reason: 'corretto senza aspettare la prima posizione');
+    expect(dopo.manovre.where((m) => distanzaM(dopo.punti[m.inizio], _a(0, 0)) < 15), isEmpty);
+    expect(diarioSensi.voci.first, contains('contromano evitato'));
   });
 
   testWidgets('se le strade non sono arrivate in tempo e si prende il ramo giusto, niente ricalcolo', (tester) async {

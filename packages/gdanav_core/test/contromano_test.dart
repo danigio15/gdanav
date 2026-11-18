@@ -198,7 +198,9 @@ void main() {
       final p = dalVertice();
       final l = Linea(p.punti);
       final oltreW = l.proietta(a(-3, 32)).lungoM;
-      expect(correggiContromano(p, triangolo, protettoM: oltreW), isNull);
+      final diario = <String>[];
+      expect(correggiContromano(p, triangolo, protettoM: oltreW, diario: diario.add), isNull);
+      expect(diario, [contains('già passato')]);
     });
   });
 
@@ -285,7 +287,11 @@ void main() {
         strada([(0, 0), (500, 0), (500, 300), (0, 300)]),
       ];
       final (p, _) = linea([(0, -300), (0, 0), (0, 300), (0, 600)]);
-      expect(correggiContromano(percorso(p, [(0, 1, '', ''), (p.length - 1, 4, '', '')]), strade), isNull);
+      final diario = <String>[];
+      expect(correggiContromano(percorso(p, [(0, 1, '', ''), (p.length - 1, 4, '', '')]), strade, diario: diario.add),
+          isNull);
+      // E nella diagnosi si legge perché.
+      expect(diario, [contains('nessuna strada corta')]);
     });
 
     test('contromano proprio sulla meta: la meta non si sposta', () {

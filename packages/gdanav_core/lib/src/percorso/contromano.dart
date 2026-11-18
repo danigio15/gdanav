@@ -176,6 +176,7 @@ PercorsoCorretto? correggiContromano(
   double? aM,
   double protettoM = 0,
   RegoleContromano regole = const RegoleContromano(),
+  void Function(String)? diario,
 }) {
   final punti = p.punti;
   if (punti.length < 2) return null;
@@ -217,10 +218,21 @@ PercorsoCorretto? correggiContromano(
   // 2. La strada giusta per ognuno.
   final sostituzioni = <_Sostituzione>[];
   var liberoDa = math.max(protettoM, 0.0);
+  String m(double v) => '${v.round()} m';
   for (final (c0, c1) in sospetti) {
-    if (c0 < liberoDa) continue;
+    if (c0 < liberoDa) {
+      diario?.call('contromano a ${m(c0)}–${m(c1)}, ma lì è già passata l\'auto: si lascia');
+      continue;
+    }
     final s = _sostituisci(p, linea, v, rete, regole, c0, c1, liberoDa, totale);
-    if (s == null) continue;
+    if (s == null) {
+      diario?.call(
+        c0 - liberoDa < indietroMax
+            ? 'contromano a ${m(c0)}–${m(c1)}, ma il ramo giusto è già passato o è troppo vicino all\'auto'
+            : 'contromano a ${m(c0)}–${m(c1)}, ma nessuna strada corta per evitarlo',
+      );
+      continue;
+    }
     sostituzioni.add(s);
     liberoDa = s.deviazione.aM + 1;
   }
