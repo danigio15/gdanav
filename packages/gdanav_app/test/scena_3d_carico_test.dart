@@ -22,7 +22,7 @@ void main() {
     expect(renderer, contains("tipo:'nascosta',si:"));
     // Prima che la mappa ci sia, i due messaggi non aspettano in coda.
     final principale = File('web3d/src/principale.js').readAsStringSync();
-    expect(principale, contains("['stile', 'opzioni', 'pausa', 'carico', 'nascosta', 'leggera']"));
+    expect(principale, contains("['stile', 'opzioni', 'pausa', 'carico', 'nascosta', 'leggera', 'corsie']"));
     // E quello del telefono (`msgLeggera`): con la scena anche sull'auto.
     expect(messaggi, contains('leggera: (m) =>'));
     expect(msgLeggera(true), {'v': 1, 'tipo': 'leggera', 'si': true});

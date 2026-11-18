@@ -2174,8 +2174,10 @@ function muovi(adesso, dt) {
     const W = m.getCanvas().clientWidth;
     // Lo spazio delle schede, mai più di metà schermo: con misure sbagliate
     // (l'auto le dà in punti suoi) l'auto finiva in un angolo, lontana.
-    // Nella vista «Corsie» l'auto sta nel terzo basso: si spinge giù il mezzo.
-    const sopra = S.corsie ? Math.min(H * 0.4 + S.camera.sopra * 0.5, H * 0.62) : Math.min(H * 0.12 + S.camera.sopra * 0.8, H * 0.5);
+    // Nella vista «Corsie» l'auto sta più in basso, poco sotto i sei decimi
+    // dello schermo: davanti c'è la strada da fare, e sotto restano il
+    // contachilometri e il limite del cruscotto, che più giù la coprivano.
+    const sopra = S.corsie ? Math.min(H * 0.24 + S.camera.sopra * 0.5, H * 0.5) : Math.min(H * 0.12 + S.camera.sopra * 0.8, H * 0.5);
     // In larghezza l'auto sta in mezzo alla parte libera: a sinistra il
     // cruscotto di traverso sul telefono, a destra l'altra app dello schermo
     // diviso sull'auto («la navigazione si nasconde sotto l'altro pezzo di

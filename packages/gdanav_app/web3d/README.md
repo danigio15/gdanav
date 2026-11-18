@@ -107,7 +107,13 @@ la mappa scarica già (OpenFreeMap, schema OpenMapTiles).
   I semafori all'italiana (il palo tondo grigio, la lanterna scura col
   pannello nero bordato di bianco, le visiere; a sbraccio agli incroci
   larghi) sono spenti (nessuno pubblica di che colore sono), con un fumetto
-  neutro sopra.
+  neutro sopra. Nell'app è una vista del tasto della vista
+  (`VistaMappa.corsie`, accanto al 3D aumentato e con le sue stesse regole);
+  le corsie le chiede la regia al relay, una tessera z14 alla volta lungo i
+  prossimi tre chilometri (`lib/stato/corsie_relay.dart`); le corsie giuste
+  di TomTom vanno nel messaggio `manovra`, e dove c'è coda la fascia prende
+  il colore del traffico. Su Android Auto c'è l'interruttore «Corsie» come
+  quello del 3D aumentato; su CarPlay, come il 3D aumentato, non c'è.
 
 L'app parla con la pagina coi messaggi di `src/messaggi.js` (lo stesso
 formato di `lib/mappa/ponte_3d.dart`); la WebView è in

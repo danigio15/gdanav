@@ -185,3 +185,34 @@ test('i messaggi della vista «Corsie»', () => {
   assert.ok(decodifica({ v: 1, tipo: 'manovra', da: 10, a: 100, corsie: [false, true], dove: 55 }));
   assert.equal(decodifica({ v: 1, tipo: 'manovra', da: 10, a: 100, corsie: 'destra' }), null);
 });
+
+test('il traffico sulla fascia della corsia: i colori delle code, solo sul tratto in coda', async () => {
+  const { COLORI_CODA, glslColoreCoda } = await import('../src/tavolozza.js');
+  const { Linea, Profilo, nastro } = await import('../src/percorso.js');
+  // Gli stessi colori della linea del traffico sulla mappa (lo strato `code`).
+  assert.deepEqual(COLORI_CODA, ['#F9A825', '#EF6C00', '#D32F2F', '#7B1F1F']);
+  // Il GLSL generato, valutato in JavaScript: livello → colore.
+  const colore = (livello) => {
+    const vec3 = (r, g, b) => [r, g, b];
+    // eslint-disable-next-line no-new-func
+    return new Function('livello', 'vec3', `return ${glslColoreCoda()};`)(livello, vec3);
+  };
+  const daEsa = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+  for (const [livello, esa] of [
+    [1, '#F9A825'],
+    [2, '#EF6C00'],
+    [3, '#D32F2F'],
+    [4, '#7B1F1F'],
+  ]) {
+    colore(livello).forEach((c, k) => assert.ok(Math.abs(c - daEsa(esa)[k]) < 0.002, `livello ${livello}`));
+  }
+  // La fascia: il livello della coda solo fra 100 e 300 metri.
+  const linea = new Linea([0, 0, 500, 0]);
+  const profilo = new Profilo(0, 4, new Array(126).fill(0));
+  const n = nastro(linea, profilo, 0, 500, 2.7, 0.3, { code: [[100, 300, 2]] });
+  for (let i = 0; i < n.livelli.length; i++) {
+    const s = n.uv[2 * i + 1];
+    if (s > 101 && s < 299) assert.equal(n.livelli[i], 2, `in coda a ${s}`);
+    if (s < 99 || s > 301) assert.equal(n.livelli[i], 0, `libera a ${s}`);
+  }
+});

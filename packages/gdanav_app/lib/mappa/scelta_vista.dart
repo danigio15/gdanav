@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'controllo_mappa.dart';
 
 /// Il tasto della vista: dice quella di adesso, e al tocco apre la scelta fra
-/// 2D, 3D, immersiva e 3D aumentato. Prima era un interruttore 2D/3D; con più
+/// 2D, 3D, immersiva, 3D aumentato e corsie. Prima era un interruttore 2D/3D; con più
 /// viste un interruttore che gira in tondo obbliga a passare da quella che
 /// non si vuole, e non dice dove si arriva.
 ///
@@ -22,6 +22,7 @@ class SceltaVista extends StatelessWidget {
     VistaMappa.inclinata => 'Inclinata, con gli edifici',
     VistaMappa.immersiva => 'Da vicino, con le corsie sulla strada',
     VistaMappa.aumentata => 'In guida: viadotti, alberi ed edifici in 3D',
+    VistaMappa.corsie => 'In guida: le corsie, le righe e la corsia da tenere',
   };
 
   /// Perché il 3D aumentato non si può scegliere, sotto la voce.
@@ -29,20 +30,24 @@ class SceltaVista extends StatelessWidget {
       controllo.aumentataPossibile ? spiegaAumentatoNonVa(controllo.aumentataNonVa) : 'Non c\'è su questo dispositivo';
 
   void _scegli(BuildContext context, VistaMappa v) {
-    if (v == VistaMappa.aumentata && !controllo.aumentataDisponibile) {
-      _nonDisponibile(context);
+    // Le corsie stanno nella stessa pagina del 3D aumentato: le stesse regole.
+    if (v.scena3d && !controllo.aumentataDisponibile) {
+      _nonDisponibile(context, v);
       return;
     }
     controllo.scegliVista(v);
   }
 
-  /// Il 3D aumentato spento: perché, e «Riprova» (se qui si può provare).
-  Future<void> _nonDisponibile(BuildContext context) => showDialog<void>(
+  /// Il 3D aumentato (o le corsie: [v]) spento: perché, e «Riprova» (se qui
+  /// si può provare).
+  Future<void> _nonDisponibile(BuildContext context, VistaMappa v) => showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
       key: const Key('vista-aumentata-spiegazione'),
-      icon: const IconaAumentata(dimensione: 30),
-      title: const Text('3D aumentato non disponibile'),
+      icon: v == VistaMappa.corsie
+          ? const Icon(Icons.add_road_rounded, size: 30)
+          : const IconaAumentata(dimensione: 30),
+      title: Text('${v.nome} non disponibile'),
       content: Text(
         controllo.aumentataPossibile
             ? '$_perche, così la mappa è tornata alla vista ${controllo.vistaPrima.inFrase}. '
@@ -56,7 +61,7 @@ class SceltaVista extends StatelessWidget {
             key: const Key('vista-aumentata-riprova'),
             onPressed: () {
               Navigator.of(context).pop();
-              controllo.riprovaAumentata();
+              controllo.riprovaAumentata(v);
             },
             child: const Text('Riprova'),
           ),
@@ -67,6 +72,8 @@ class SceltaVista extends StatelessWidget {
   Widget _segno(VistaMappa v, TextStyle testo, double icona, {bool spenta = false}) => switch (v) {
     VistaMappa.immersiva => Icon(Icons.view_in_ar_rounded, size: icona),
     VistaMappa.aumentata => IconaAumentata(dimensione: icona, stile: testo, spenta: spenta),
+    // Le corsie: una strada con le righe.
+    VistaMappa.corsie => Icon(Icons.add_road_rounded, size: icona, semanticLabel: 'Corsie'),
     _ => Text(v.sigla, style: testo),
   };
 
@@ -84,7 +91,7 @@ class SceltaVista extends StatelessWidget {
       itemBuilder: (context) => [
         for (final scelta in VistaMappa.values)
           () {
-            final spenta = scelta == VistaMappa.aumentata && !controllo.aumentataDisponibile;
+            final spenta = scelta.scena3d && !controllo.aumentataDisponibile;
             return PopupMenuItem(
               key: Key('vista-${scelta.name}'),
               value: scelta,
@@ -117,10 +124,11 @@ class SceltaVista extends StatelessWidget {
   }
 }
 
-/// Il 3D aumentato si è fermato: si torna alla vista di prima
+/// Il 3D aumentato (o le corsie) si è fermato: si torna alla vista di prima
 /// ([ControlloMappa.lasciaAumentata]) e lo si dice, una volta, in fondo.
 void lasciaAumentataConAvviso(BuildContext context, ControlloMappa controllo, String motivo, {required bool ricorda}) {
-  if (controllo.vista != VistaMappa.aumentata) return;
+  final di = controllo.vista;
+  if (!di.scena3d) return;
   controllo.lasciaAumentata(motivo, ricorda: ricorda);
   ScaffoldMessenger.maybeOf(context)
     ?..hideCurrentSnackBar()
@@ -134,7 +142,9 @@ void lasciaAumentataConAvviso(BuildContext context, ControlloMappa controllo, St
               stile: TextStyle(color: Theme.of(context).colorScheme.onInverseSurface, fontWeight: FontWeight.w800),
             ),
             const SizedBox(width: 14),
-            Expanded(child: Text(avvisoAumentatoNonVa(controllo.vista, ricorda: ricorda))),
+            Expanded(
+              child: Text(avvisoAumentatoNonVa(controllo.vista, ricorda: ricorda, di: di)),
+            ),
           ],
         ),
         behavior: SnackBarBehavior.floating,

@@ -12,16 +12,17 @@
 //
 // ── Il formato dei dati (messaggio `corsie`, versione 1) ─────────────────
 //
-// Lo stesso JSON che domani darà il relay per tessera z14,
-// `GET /v1/corsie/<x>/<y>` (da Overpass, con `out geom`); oggi lo fa
-// `collaudo/corsie-osm.mjs` dalle risposte dell'API di OpenStreetMap.
+// Lo stesso JSON che dà il relay di GdANav per tessera z14,
+// `GET /v1/corsie/14/<x>/<y>` (da Overpass; le strade intere, non tagliate
+// sul bordo, i nodi e gli alberi fino a trenta metri fuori); nelle prove lo
+// fa `collaudo/corsie-osm.mjs` dalle risposte dell'API di OpenStreetMap.
 //
 //   {
 //     "v": 1,
-//     "z": 14, "x": 8817, "y": 6123,      // la tessera, se viene dal relay
+//     "z": 14, "x": 8817, "y": 6123,      // la tessera (dal relay)
 //     "strade": [                          // le vie guidabili ([CLASSI_CORSIE])
 //       { "id": 123, "hw": "motorway",     // l'id della via e `highway`
-//         "g": [lon, lat, lon, lat, …],    // i nodi in fila, 7 decimali
+//         "g": [lon, lat, lon, lat, …],    // i nodi in fila, 6 decimali
 //         "lanes": "4", "turn:lanes": "|||slight_right", "oneway": "yes",
 //         "placement": "middle_of:2", …    // i tag di [TAG_STRADE] che ci sono,
 //       }, …                               // così come sono in OpenStreetMap
@@ -36,7 +37,9 @@
 //
 // I tag restano stringhe di OpenStreetMap (il relay non deve capire niente):
 // una via che manca di un tag prende quello che dice la sua classe. Due vie
-// si toccano dove hanno un nodo con le stesse coordinate (i 7 decimali).
+// si toccano dove hanno un nodo con le stesse coordinate (i 6 decimali).
+// Le strade `service` il relay le manda, ma qui non hanno corsie (restano
+// fuori da [CLASSI_CORSIE]).
 
 /** Le classi di strada che hanno le corsie disegnate. */
 export const CLASSI_CORSIE = new Set([

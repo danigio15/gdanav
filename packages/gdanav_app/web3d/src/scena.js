@@ -8,7 +8,7 @@ import { generatore } from './caso.js';
 import { pezziDelNastro } from './percorso.js';
 import { Condivise } from './scorte.js';
 import { CAMPATA, NASTRI, PERIODO_STRADA, PIANO, STILI_FACCIATA } from './tessera.js';
-import { GIORNO, SOLE, tavolozza } from './tavolozza.js';
+import { GIORNO, SOLE, glslColoreCoda, tavolozza } from './tavolozza.js';
 
 
 /**
@@ -577,8 +577,18 @@ varying vec2 vUv;
 varying float vLivello;
 void main() {
   float e = abs(vUv.x - 0.5) * 2.0;
-  vec3 c = mix(mix(uCore, vec3(1.0), 0.35), uCore, smoothstep(0.0, 0.75, e));
-  c = mix(c, uBordo, smoothstep(0.82, 1.0, e) * 0.6);
+  // Il traffico sulla corsia, come le mappe delle corsie: dove c'è coda la
+  // fascia prende il colore della coda (1 rallenta, 2 lento, 3 fermo, 4
+  // chiuso), coi colori della linea del traffico; +10 in galleria.
+  float livello = vLivello > 9.5 ? vLivello - 10.0 : vLivello;
+  vec3 core = uCore;
+  vec3 bordo = uBordo;
+  if (livello > 0.5) {
+    core = ${glslColoreCoda()};
+    bordo = core * 0.7;
+  }
+  vec3 c = mix(mix(core, vec3(1.0), 0.35), core, smoothstep(0.0, 0.75, e));
+  c = mix(c, bordo, smoothstep(0.82, 1.0, e) * 0.6);
   // Trasparente in mezzo: sotto si leggono le frecce dipinte sulla corsia.
   float a = mix(0.42, 0.62, smoothstep(0.2, 0.85, e)) * (1.0 - smoothstep(0.9, 1.0, e));
   // Le punte in avanti: in mezzo più avanti, ai lati più indietro.

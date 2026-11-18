@@ -461,6 +461,14 @@ class SchermoMappa(carContext: CarContext, private val renderer: RendererMappa) 
                         "Viadotti, alberi ed edifici in 3D, nelle viste 3D e immersiva",
                     ) { PonteAuto.scegli(mapOf("aumentato" to it)) }
                 },
+                // Le corsie: la stessa scena, con la vista a corsie (come sul telefono).
+                (o["corsie"] as? Boolean)?.let { acceso ->
+                    interruttore(
+                        "Corsie",
+                        acceso,
+                        "Le corsie vere, le righe e la corsia da tenere, nelle viste 3D e immersiva",
+                    ) { PonteAuto.scegli(mapOf("corsie" to it)) }
+                },
                 riga(
                     "Simbolo dell'auto",
                     nomeDelSimbolo(o) ?: "Freccia",

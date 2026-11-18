@@ -8,6 +8,7 @@ import '../componenti/icona_manovra.dart' show bandieraArrivoPng, puntaManovraPn
 import '../componenti/icone_punti.dart';
 import '../componenti/icone_segnalazioni.dart';
 import '../servizi.dart';
+import '../stato/corsie_relay.dart';
 import '../stato/gestore_edifici.dart';
 import '../stato/gestore_guida.dart';
 import '../stato/gestore_persone.dart';
@@ -60,8 +61,13 @@ class Regia3d {
     this.zoomScelto,
     this.inclinazione,
     this.inAuto = false,
+    this.corsieRelay,
     Future<Uint8List?> Function(int z, int x, int y)? edifici,
   }) : edifici = edifici ?? GestoreEdifici.attuale?.tessera;
+
+  /// Da dove vengono le corsie, nella vista a corsie (`null`: il relay
+  /// dell'app, [CorsieRelay.attuale]).
+  final CorsieRelay? corsieRelay;
 
   /// Gli edifici di Overture di una tessera ([GestoreEdifici]), se l'app li
   /// ha; `null`: la pagina usa quelli di sempre.
@@ -278,6 +284,8 @@ class Regia3d {
 
   /// La pagina c'è: tutto da capo (le opzioni prima dello stile).
   Future<void> _tutto() async {
+    _corsieMandate.clear();
+    _corsieGuardateAlle = null;
     _viaggioMandato = null;
     _frecciaMandata = (-1, -1);
     _tracciaMandata = -1;
@@ -377,6 +385,7 @@ class Regia3d {
   void dallaGuida() {
     if (!_caricata || _finita) return;
     final g = guida;
+    _corsie();
     // La strada già fatta, piatta a terra sotto il percorso: al più ogni tre secondi.
     if (g.versioneTraccia != _tracciaMandata) {
       final ora = _ora();
@@ -440,6 +449,49 @@ class Regia3d {
       ),
     );
     _zoomSubito = false;
+  }
+
+  /* ── Le corsie, nella vista a corsie ──────────────────────────────────
+   *
+   * Le tessere delle corsie lungo i prossimi tre chilometri del percorso, e
+   * quella dove si è ([CorsieRelay]): ognuna va alla pagina appena arriva
+   * (messaggio `corsie`), una volta. Si guarda al più ogni tre secondi. */
+  final _corsieMandate = <({int x, int y})>{};
+  final _corsieInArrivo = <({int x, int y})>{};
+  DateTime? _corsieGuardateAlle;
+
+  void _corsie() {
+    if (vista() != VistaMappa.corsie) return;
+    final ora = _ora();
+    final prima = _corsieGuardateAlle;
+    if (prima != null && ora.difference(prima) < const Duration(seconds: 3)) return;
+    _corsieGuardateAlle = ora;
+    final relay = corsieRelay ?? CorsieRelay.attuale;
+    // In guida il percorso della guida da dove si è; col viaggio pronto ma
+    // non ancora partito, dall'inizio.
+    final stato = gestore.stato;
+    final inGuida = guida.pronto?.viaggio;
+    final percorso = inGuida ?? (stato is ViaggioPronto ? stato.viaggio : null);
+    final tessere = CorsieRelay.tessereDavanti(
+      percorso: percorso?.percorso.punti ?? const [],
+      daM: guida.metriStimati() ?? guida.avanzamento?.percorsiM ?? (percorso != null ? 0 : null),
+      qui: guida.posizioneStimata()?.punto ?? posizione.qui,
+    );
+    var nuove = 0;
+    for (final t in tessere) {
+      if (_corsieMandate.contains(t) || _corsieInArrivo.contains(t)) continue;
+      // Non troppe insieme: le altre al prossimo giro.
+      if (++nuove > 12) break;
+      _corsieInArrivo.add(t);
+      unawaited(
+        relay.tessera(t.x, t.y).then((dati) {
+          _corsieInArrivo.remove(t);
+          if (dati == null || _finita || !_caricata) return;
+          _corsieMandate.add(t);
+          _manda(msgCorsie(dati));
+        }),
+      );
+    }
   }
 
   /* La velocità dell'auto dal cruscotto, alla pagina ogni volta che cambia:

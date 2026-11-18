@@ -95,4 +95,57 @@ void main() {
     await tester.pump();
     expect(chiamate.where((c) => c.method == 'web3d_vuoi' && (c.arguments as Map)['si'] == true), isEmpty);
   });
+
+  testWidgets("con le corsie sul telefono l'auto vuole la scena, a corsie; l'interruttore dell'auto le sceglie", (
+    tester,
+  ) async {
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final chiamate = <MethodCall>[];
+    final messaggero = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messaggero.setMockMethodCallHandler(canale, (c) async {
+      chiamate.add(c);
+      return null;
+    });
+    addTearDown(() => messaggero.setMockMethodCallHandler(canale, null));
+    Future<void> dallAuto(String metodo, [Object? argomenti]) => messaggero.handlePlatformMessage(
+      canale.name,
+      const StandardMethodCodec().encodeMethodCall(MethodCall(metodo, argomenti)),
+      (_) {},
+    );
+    Future<void> aspetta() async {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 60)));
+      await tester.pump();
+    }
+
+    final a = await ambiente(tester, km: 20);
+    await tester.runAsync(() => a.archivio.salvaVistaMappa(VistaMappa.corsie));
+    final ponte = PonteAuto(viaggio: a.viaggio, guida: a.guida, posizione: a.posizione, canale: canale)..avvia();
+    addTearDown(ponte.ferma);
+    await aspetta();
+    expect((chiamate.lastWhere((c) => c.method == 'web3d_vuoi').arguments as Map)['si'], isTrue);
+    Map<Object?, Object?> opzioni() => chiamate.lastWhere((c) => c.method == 'opzioni').arguments as Map;
+    expect(opzioni()['corsie'], isTrue);
+    expect(opzioni()['aumentato'], isFalse);
+
+    // La pagina dell'auto: le opzioni dicono le corsie, anche nella vista immersiva dell'auto.
+    await dallAuto('stato3d', {'notte': false, 'vista': 'immersiva', 'sopra': 0.0, 'sinistra': 320.0});
+    await dallAuto('dalla3d', {'testo': '{"tipo":"caricata"}'});
+    await aspetta();
+    final js = [for (final c in chiamate.where((c) => c.method == 'web3d')) (c.arguments as Map)['js'] as String];
+    final uno = js.firstWhere((j) => j.contains('"tipo":"opzioni"'));
+    final opz = jsonDecode(uno.substring(uno.indexOf('ricevi(') + 7, uno.lastIndexOf(');'))) as Map;
+    expect(opz['corsie'], isTrue);
+
+    // Il 3D aumentato acceso dall'auto spegne le corsie (sono due viste del telefono), e al contrario.
+    await dallAuto('scelta', {'aumentato': true});
+    await aspetta();
+    expect(opzioni()['aumentato'], isTrue);
+    expect(opzioni()['corsie'], isFalse);
+    await dallAuto('scelta', {'corsie': true});
+    await aspetta();
+    expect(opzioni()['corsie'], isTrue);
+    expect(opzioni()['aumentato'], isFalse);
+    await dallAuto('chiusa3d');
+    await aspetta();
+  });
 }
