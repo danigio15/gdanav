@@ -10,6 +10,7 @@ import 'gestore_consumo.dart';
 import 'gestore_risparmio.dart';
 import 'gestore_viaggio.dart';
 import 'scelte_avvisi.dart';
+import 'strade_osm.dart';
 import 'voce.dart';
 
 /// La guida passo-passo: segue la posizione, dice le manovre, ricalcola se
@@ -406,6 +407,15 @@ class GestoreGuida extends ChangeNotifier {
     // Un errore del GPS non deve finire nel vuoto né chiudere la guida: la
     // posizione dopo arriva lo stesso.
     _iscrizione = posizioni().listen(_posizione, onError: (Object e) => debugPrint('posizioni in guida: $e'));
+    // I sensi unici dei primi chilometri si guardano subito, senza aspettare
+    // la prima posizione: si parte spesso a due passi dall'incrocio, e
+    // guardandoli dopo la linea giusta arrivava quando l'auto era già lì.
+    if (strade != null && !_sensiInCorso) {
+      _sensiDi = p.viaggio.percorso;
+      _sensiFinoA = finestraSensiM;
+      _sensiRiprovaDopo = null;
+      unawaited(_correggiISensi(daM: 0, aM: finestraSensiM, protettoM: 0));
+    }
     _ultimaRichiestaDati = DateTime(0);
     _forseChiediDati();
     _evento('partenza');
@@ -887,6 +897,7 @@ class GestoreGuida extends ChangeNotifier {
       if (pezzo.isEmpty) return false;
       final rete = await s(pezzo);
       if (rete.isEmpty) {
+        diarioSensi.scrivi('nessuna strada vera attorno al percorso: si riprova fra 15 s');
         // Non si è visto niente: quel pezzo resta da guardare, fra un poco.
         _sensiRiprovaDopo = _ora().add(const Duration(seconds: 15));
         if (identical(_sensiDi, percorso)) _sensiFinoA = math.min(_sensiFinoA, daM);
@@ -894,8 +905,19 @@ class GestoreGuida extends ChangeNotifier {
       }
       // Nel frattempo è cambiato il percorso, o si è finito.
       if (!attiva || !identical(pronto?.viaggio.percorso, percorso) || !identical(_guida, g)) return false;
-      final corretto = correggiContromano(percorso, rete, daM: daM, aM: aM, protettoM: protettoM);
-      if (corretto == null) return false;
+      final corretto = correggiContromano(
+        percorso,
+        rete,
+        daM: daM,
+        aM: aM,
+        protettoM: protettoM,
+        diario: diarioSensi.scrivi,
+      );
+      String km(double m) => (m / 1000).toStringAsFixed(1).replaceAll('.', ',');
+      if (corretto == null) {
+        diarioSensi.scrivi('guardato da ${km(daM)} a ${km(aM)} km (${rete.length} strade): niente da correggere');
+        return false;
+      }
       final vecchio = pronto;
       final nuovo = viaggio.sostituisciPercorso(percorso, corretto.percorso);
       if (nuovo == null) return false;
@@ -905,6 +927,9 @@ class GestoreGuida extends ChangeNotifier {
       _sensiFinoA = corretto.metriNuovi(_sensiFinoA);
       if (_ultimaPosizione case final qui?) avanzamento = Guida(corretto.percorso).aggiorna(qui);
       debugPrint('contromano evitato: ${corretto.deviazioni}');
+      for (final d in corretto.deviazioni) {
+        diarioSensi.scrivi('contromano evitato a ${km(d.daM)} km: rifatto sul ramo giusto (${d.lunghezzaM.round()} m)');
+      }
       notifyListeners();
       return true;
     } catch (e) {

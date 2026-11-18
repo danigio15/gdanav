@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../stato/strade_osm.dart';
 import '../tema.dart';
 
 const _canale = MethodChannel('gdanav/diagnosi');
@@ -87,6 +88,7 @@ class DiagnosiAuto extends StatelessWidget {
             ),
             for (final (titolo, ok, dettaglio) in vociTraffico(d['traffico'])) voce(titolo, ok, dettaglio),
           ],
+          const DiarioDeiSensi(),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Text('Se GdANav non compare sull\'auto', style: t.titleMedium),
@@ -228,6 +230,37 @@ class AiutoCarPlay extends StatelessWidget {
               '4. Impostazioni → GdANav → Posizione: «Sempre», così la guida continua con lo schermo del telefono spento.\n'
               '5. Scollega e ricollega l\'iPhone all\'auto.',
             ),
+          ),
+          const DiarioDeiSensi(),
+        ],
+      ),
+    );
+  }
+}
+
+/// Gli ultimi controlli dei sensi unici («mai contromano»): se le strade vere
+/// sono arrivate, cosa si è guardato e cosa si è corretto.
+class DiarioDeiSensi extends StatelessWidget {
+  const DiarioDeiSensi({super.key, this.voci});
+
+  /// Di solito il diario di questo telefono; le prove ne passano uno.
+  final List<String>? voci;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final righe = voci ?? diarioSensi.voci;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('I sensi unici', style: t.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            righe.isEmpty ? 'Ancora nessun controllo: si fanno in guida.' : righe.join('\n'),
+            key: const Key('diario-sensi'),
+            style: t.bodySmall,
           ),
         ],
       ),
