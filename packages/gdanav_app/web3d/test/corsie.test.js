@@ -178,6 +178,8 @@ test('i messaggi della vista «Corsie»', () => {
   assert.equal(decodifica({ v: 1, tipo: 'opzioni', notte: false, corsie: 'sì' }), null);
   const dati = { v: 1, strade: [{ id: 1, hw: 'primary', g: [10, 40, 10.001, 40], lanes: '2' }], nodi: [{ id: 2, g: [10, 40], highway: 'crossing' }] };
   assert.ok(decodifica({ v: 1, tipo: 'corsie', dati }));
+  assert.ok(decodifica({ v: 1, tipo: 'corsie', dati: { ...dati, alberi: [[10, 40]], filari: [{ id: 3, g: [10, 40, 10.001, 40] }] } }));
+  assert.equal(decodifica({ v: 1, tipo: 'corsie', dati: { ...dati, alberi: [[10]] } }), null, 'un albero senza latitudine');
   assert.equal(decodifica({ v: 1, tipo: 'corsie', dati: { strade: [{ hw: 'primary', g: [10, 40, 10.1] }] } }), null, 'coppie dispari');
   assert.equal(decodifica({ v: 1, tipo: 'corsie', dati: { v: 2, strade: [] } }), null, 'altra versione del formato');
   assert.ok(decodifica({ v: 1, tipo: 'manovra', da: 10, a: 100, corsie: [false, true], dove: 55 }));

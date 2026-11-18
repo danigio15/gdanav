@@ -153,6 +153,55 @@ function geo(z, x, y) {
   return (mx, my) => [lonDaMerc(sys.mx + mx * sys.s), latDaMerc(sys.my - my * sys.s)];
 }
 
+test('a un incrocio largo il semaforo è a sbraccio, con la lanterna sopra le corsie', () => {
+  // Due corsie per chi arriva da ovest, e una strada larga da attraversare.
+  const a = via({ id: 1, hw: 'primary', lanes: '4' }, [
+    [-150, 0],
+    [0, 0],
+  ]);
+  const b = via({ id: 2, hw: 'primary', lanes: '4' }, [
+    [0, 0],
+    [150, 0],
+  ]);
+  const c = via({ id: 3, hw: 'primary', lanes: '4' }, [
+    [0, -150],
+    [0, 0],
+  ]);
+  const d = via({ id: 4, hw: 'primary', lanes: '4' }, [
+    [0, 0],
+    [0, 150],
+  ]);
+  const largo = costruisciSegnaletica({ strade: [a, b, c, d], nodi: [{ highway: 'traffic_signals', xy: [0, 0] }], meta: 1000 });
+  const p = largo.segnali.p;
+  let alto = 0;
+  let sopraCorsie = false;
+  for (let i = 0; i < p.length; i += 3) {
+    alto = Math.max(alto, p[i + 2]);
+    // Sopra le due corsie di chi arriva da ovest (y fra -6,5 e 0), prima dell'incrocio, in alto.
+    if (p[i] < -5 && p[i] > -30 && p[i + 1] < -1 && p[i + 1] > -6 && p[i + 2] > 5) sopraCorsie = true;
+  }
+  assert.ok(alto > 6, `il palo a sbraccio è alto (${alto})`);
+  assert.ok(sopraCorsie, 'la lanterna appesa sopra le corsie');
+  // Una via stretta: il palo da tre metri, la lanterna in cima.
+  const s1 = via({ id: 5, hw: 'residential' }, [
+    [-100, 0],
+    [0, 0],
+    [100, 0],
+  ]);
+  const s2 = via({ id: 6, hw: 'residential' }, [
+    [0, 0],
+    [0, 100],
+  ]);
+  const stretto = costruisciSegnaletica({ strade: [s1, s2], nodi: [{ highway: 'traffic_signals', xy: [0, 0] }], meta: 1000 });
+  const zs = stretto.segnali.p.filter((_, i) => i % 3 === 2);
+  assert.ok(Math.max(...zs) < 4.5 && Math.max(...zs) > 3, `palo normale (${Math.max(...zs)})`);
+  // Le lenti spente: nessun colore acceso nei colori del semaforo.
+  for (let i = 0; i < stretto.segnali.c.length; i += 3) {
+    const [r, g, bb] = stretto.segnali.c.slice(i, i + 3);
+    assert.ok(!(r > 150 && g < 100) && !(g > 150 && r < 100), 'niente rosso né verde acceso');
+  }
+});
+
 test('la tessera con le corsie: le geometrie in più, i nastri coperti spenti; senza, com’era', () => {
   const X = 8605;
   const Y = 5860;
@@ -173,4 +222,25 @@ test('la tessera con le corsie: le geometrie in più, i nastri coperti spenti; s
   assert.ok(con.strade.motorway.indici.length < senza.strade.motorway.indici.length / 4, 'il nastro dell’autostrada sotto le corsie non c’è più');
   assert.deepEqual(Object.keys(con.strade).sort(), Object.keys(senza.strade).sort());
   assert.ok(con.conti.triangoli > senza.conti.triangoli);
+});
+
+test('gli alberi della vista «Corsie»: solo quelli veri, mai sull’asfalto', () => {
+  const X = 8605;
+  const Y = 5860;
+  const ll = geo(14, X, Y);
+  const strade = [{ id: 1, hw: 'motorway', lanes: '3', g: [...ll(-800, 0), ...ll(800, 0)] }];
+  const base = preparaCorsie({ v: 1, strade });
+  const con = preparaCorsie({
+    v: 1,
+    strade,
+    // Un albero nel prato, uno in mezzo all'autostrada (un nodo messo male), e un filare di 80 m.
+    alberi: [ll(300, 300), ll(100, 0)],
+    filari: [{ id: 9, g: [...ll(-400, 200), ...ll(-320, 200)] }],
+  });
+  assert.equal(con.alberi.length, 2);
+  assert.equal(con.filari.length, 1);
+  const prima = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': cavalcavia() }, datiCorsie: base, vistaCorsie: true });
+  const dopo = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': cavalcavia() }, datiCorsie: con, vistaCorsie: true });
+  // L'albero nel prato e gli 11 del filare (uno ogni otto metri, i due capi compresi); quello sull'autostrada no.
+  assert.equal(dopo.conti.alberi - prima.conti.alberi, 12);
 });

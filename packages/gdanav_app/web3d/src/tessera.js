@@ -22,7 +22,6 @@ import {
 } from './ritaglio.js';
 import { CHIOME, FACCIATE, TETTI, rgb, spostamentoOmbra } from './tavolozza.js';
 import { costruisciSegnaletica } from './segnaletica.js';
-import { alberiLungoLeStrade, blocchiLungoLeStrade, semeDi } from './riempitivo.js';
 import earcut from 'earcut';
 
 /** I tipi di nastro d'asfalto (ognuno con la sua trama di righe). */
@@ -725,11 +724,6 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   }
   // I più grandi per primi: se non ci stanno tutti, restano fuori i piccoli.
   edificiOut.sort((a, b) => b.area - a.area);
-  // Nella vista «Corsie» la città piena: i blocchi dove la mappa non ha
-  // edifici (vedi `riempitivo.js`), dopo i veri (se il budget finisce,
-  // restano fuori loro). E gli alberi lungo le strade, più sotto.
-  const citta = vistaCorsie ? cittaDellaTessera({ centro, sys, x, y, linee, visibili, edifici: edificiOut, conCorsie, meta, dettaglio }) : null;
-  if (citta) for (const b of citta.blocchi) edificiOut.push(b);
   // Un edificio sotto un viadotto (le mappe a volte li sovrappongono) non
   // buca l'impalcato: si ferma un poco sotto il ventre, o non si fa.
   const GQ = 20;
@@ -1032,17 +1026,16 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   }
 
   // ── Gli alberi ────────────────────────────────────────────────────────
-  // Nella vista «Corsie» prima i filari lungo le strade di città (si vedono
-  // guidando), poi i parchi e i giardini; ogni albero sono due triangoli,
-  // e ce ne stanno di più.
-  const limiteAlberi = citta ? lim.alberi * 3 : lim.alberi;
-  const filari = [];
-  if (citta && lim.alberi > 0) {
-    for (const [ax, ay, sc] of citta.alberi(edificiOut, Math.round(limiteAlberi * 0.7))) {
-      filari.push([ax, ay, sc, 0, Math.floor(mescola(Math.round(ax * 10), Math.round(ay * 10)) * 100000)]);
+  const alberi = lim.alberi > 0 ? piantaAlberi({ centro, sys, x, y, linee, visibili, edifici: edificiOut, limite: lim.alberi, seme, verdi: vistaCorsie }) : [];
+  // Nella vista «Corsie» anche gli alberi veri di OpenStreetMap, uno per uno
+  // (`natural=tree`) e i filari (`natural=tree_row`): dove la mappa non ne ha,
+  // niente alberi.
+  if (conCorsie && lim.alberi > 0) {
+    for (const [ax, ay, sc] of conCorsie.alberi) {
+      if (alberi.length >= lim.alberi * 2) break;
+      alberi.push([ax, ay, sc, 0, Math.floor(mescola(Math.round(ax * 10), Math.round(ay * 10)) * 100000)]);
     }
   }
-  const alberi = lim.alberi > 0 ? [...filari, ...piantaAlberi({ centro, sys, x, y, linee, visibili, edifici: edificiOut, limite: limiteAlberi - filari.length, seme, verdi: vistaCorsie })] : [];
   // Le ombre degli alberi: macchie tonde e sfumate (una trama), non esagoni.
   const ombreAlberi = new Costruttore({ uv: true });
   const istanzeAlberi = istanzeDiAlberi(alberi, ombreAlberi);
@@ -1661,144 +1654,6 @@ function distanzaLinea(px, py, l) {
 /** I colori dei blocchi nella vista «Corsie»: bianchi, grigi chiari, appena caldi o freddi. */
 const CORSIE_FACCIATE = ['#f6f7f8', '#f1f3f5', '#eceff2', '#f6f4f1', '#eff1f4', '#f3f3f1'];
 
-/** Le zone dove si costruisce (OpenMapTiles, `landuse`), e quelle dove mai. */
-const ZONE_CASE = { residential: 'residenziale', suburb: 'residenziale', quarter: 'residenziale', neighbourhood: 'residenziale', commercial: 'residenziale', retail: 'residenziale', industrial: 'industriale', garages: 'industriale' };
-const ZONE_VIETATE = new Set(['cemetery', 'pitch', 'playground', 'stadium', 'track', 'school', 'university', 'college', 'kindergarten', 'hospital', 'military', 'railway', 'grass', 'park', 'theme_park', 'zoo', 'farmland', 'wood', 'forest', 'sand', 'wetland', 'ice', 'rock']);
-/** Una tessera con tanti edifici veri è di città: lì anche fuori dalle zone segnate si costruisce. */
-const EDIFICI_DI_CITTA = 150;
-
-/**
- * La città della tessera, nella vista «Corsie»: i blocchi lungo le strade
- * dove mancano gli edifici veri, e la funzione che pianta i filari (dopo,
- * quando ci sono tutti gli edifici). Vedi `riempitivo.js`.
- */
-function cittaDellaTessera({ centro, sys, x, y, linee, visibili, edifici, conCorsie, meta, dettaglio }) {
-  const metriDi = (px, py) => sys.metri(x * ESTENSIONE + px, y * ESTENSIONE + py);
-  // I poligoni delle zone, in una griglia di cento metri.
-  const C = 100;
-  const griglia = new Map();
-  const aggiungi = (anelli, cosa) => {
-    const [x0, y0, x1, y1] = anelli[0].reduce((q, [px, py]) => [Math.min(q[0], px), Math.min(q[1], py), Math.max(q[2], px), Math.max(q[3], py)], [Infinity, Infinity, -Infinity, -Infinity]);
-    const z = { anelli, cosa, box: [x0, y0, x1, y1] };
-    for (let cx = Math.floor(x0 / C); cx <= Math.floor(x1 / C); cx++) {
-      for (let cy = Math.floor(y0 / C); cy <= Math.floor(y1 / C); cy++) {
-        const k = cx + ',' + cy;
-        if (!griglia.has(k)) griglia.set(k, []);
-        griglia.get(k).push(z);
-      }
-    }
-  };
-  for (const [strato, cosa] of [
-    ['landuse', (p) => ZONE_CASE[p.class] ?? (ZONE_VIETATE.has(p.class) ? 'no' : null)],
-    ['landcover', (p) => (ZONE_VIETATE.has(p.class) ? 'no' : null)],
-    ['park', () => 'no'],
-    ['water', () => 'no'],
-  ]) {
-    const L = centro[strato];
-    for (let i = 0; L && i < L.length; i++) {
-      const f = L.feature(i);
-      if (f.type !== 3) continue;
-      const c = cosa(f.properties);
-      if (!c) continue;
-      for (const poli of anelliPoligoni(f.loadGeometry())) {
-        const anelli = [];
-        for (const r of poli) {
-          const q = ritagliaAnello(r, 0, 0, ESTENSIONE, ESTENSIONE);
-          if (q) anelli.push(q.map(([px, py]) => metriDi(px, py)));
-        }
-        if (anelli.length) aggiungi(anelli, c);
-      }
-    }
-  }
-  const diCitta = edifici.length >= EDIFICI_DI_CITTA;
-  const dentro = (px, py) => px >= -meta && px <= meta && py >= -meta && py <= meta;
-  const zona = (px, py) => {
-    let tipo = null;
-    for (const z of griglia.get(Math.floor(px / C) + ',' + Math.floor(py / C)) ?? []) {
-      const [x0, y0, x1, y1] = z.box;
-      if (px < x0 || px > x1 || py < y0 || py > y1 || !puntoDentroPoligono(px, py, z.anelli)) continue;
-      if (z.cosa === 'no') return null;
-      tipo = tipo === 'industriale' ? tipo : z.cosa;
-    }
-    return tipo ?? (diCitta ? 'residenziale' : null);
-  };
-  // Il seme di una strada: dove comincia e dove finisce, nel mondo (non
-  // nella tessera), così le tessere vicine la vedono uguale.
-  const nelMondo = (q) => [Math.round((sys.mx + q[0] * sys.s) * 2 ** 24), Math.round((sys.my - q[1] * sys.s) * 2 ** 24)];
-  const ostacoli = [];
-  const strade = [];
-  visibili.forEach((f, i) => {
-    const pts = linee[i];
-    if (pts.length < 2) return;
-    ostacoli.push({ pts, mezza: f.w / 2 + (f.cls === 'rail' ? 1 : 0) });
-    if (!['minor', 'tertiary', 'secondary', 'primary'].includes(f.cls) || f.rampa || f.ponte || f.galleria || f.cucita) return;
-    const a = nelMondo(pts[0]);
-    const b = nelMondo(pts[pts.length - 1]);
-    strade.push({ pts, mezza: f.w / 2, seme: semeDi(a[0] ^ b[1], a[1] ^ b[0]), cls: f.cls });
-  });
-  const mezzaQui = conCorsie ? conCorsie.mezzaQui : null;
-  // Prima le strade grandi (si guidano, si vedono), poi le vie di quartiere:
-  // se i blocchi finiscono, restano senza le ultime.
-  const RANGO = { primary: 0, secondary: 1, tertiary: 2, minor: 3 };
-  strade.sort((a, b) => RANGO[a.cls] - RANGO[b.cls]);
-  const blocchi = blocchiLungoLeStrade({
-    strade,
-    ostacoli,
-    edifici: edifici.map((b) => b.anelli[0].pts),
-    zona,
-    mezzaQui,
-    dentro,
-    limite: dettaglio === 'pieno' ? 2500 : 800,
-  }).map((b) => ({
-    seme: semeDi(...nelMondo(b.pts[0])),
-    h: b.h,
-    mh: 0,
-    area: Math.abs(area(b.pts)),
-    anelli: [{ pts: b.pts, muro: b.pts.map(() => true) }],
-    riempitivo: true,
-  }));
-  // Gli incroci: dove si toccano tre rami o più (lì niente alberi).
-  const capi = new Map();
-  linee.forEach((pts, i) => {
-    if (visibili[i].cls === 'rail') return;
-    pts.forEach((q, k) => {
-      const key = Math.round(q[0]) + ',' + Math.round(q[1]);
-      const e = capi.get(key) ?? { q, n: 0 };
-      e.n += k === 0 || k === pts.length - 1 ? 1 : 2;
-      capi.set(key, e);
-    });
-  });
-  const incroci = [...capi.values()].filter((e) => e.n >= 3).map((e) => e.q);
-  const alberi = (tutti, limite) => {
-    const G = 40;
-    const g = new Map();
-    for (const b of tutti) {
-      const p = b.anelli[0].pts;
-      let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
-      for (const [px, py] of p) [x0, y0, x1, y1] = [Math.min(x0, px), Math.min(y0, py), Math.max(x1, px), Math.max(y1, py)];
-      for (let cx = Math.floor(x0 / G); cx <= Math.floor(x1 / G); cx++) {
-        for (let cy = Math.floor(y0 / G); cy <= Math.floor(y1 / G); cy++) {
-          const k = cx + ',' + cy;
-          if (!g.has(k)) g.set(k, []);
-          g.get(k).push(p);
-        }
-      }
-    }
-    const occupato = (px, py) => (g.get(Math.floor(px / G) + ',' + Math.floor(py / G)) ?? []).some((p) => puntoDentroPoligono(px, py, [p]));
-    // I filari nelle zone di case (non fra i capannoni né in campagna).
-    return alberiLungoLeStrade({
-      strade: strade.filter((st) => st.cls !== 'minor' || st.seme % 3 === 0),
-      ostacoli,
-      incroci,
-      occupato: (px, py) => occupato(px, py) || conCorsie?.sullAsfalto(px, py),
-      mezzaQui,
-      dentro: (px, py) => dentro(px, py) && zona(px, py) === 'residenziale',
-      limite,
-    });
-  };
-  return { blocchi, alberi };
-}
-
 /** Quanto sopra la quota sta l'asfalto delle corsie: come il nastro della sua classe, un poco sopra. */
 function sopraCorsie(hw) {
   const b = String(hw ?? '').replace(/_link$/, '');
@@ -1897,6 +1752,18 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
     strade.push({ ...v0, xy, xyVia: inMetri(v0.llVia ?? v0.ll), h });
   }
   const nodi = (corsie.nodi ?? []).map((n) => ({ ...n, xy: sys.daLonLat(n.g[0], n.g[1]) })).filter((n) => vicina(n.xy));
+  // Gli alberi veri di questa tessera (quelli sul bordo li fa una sola), e
+  // lungo i filari uno ogni otto metri circa.
+  const nellaTessera = (q) => q[0] >= -meta && q[0] <= meta && q[1] >= -meta && q[1] <= meta;
+  const puntiAlberi = (corsie.alberi ?? []).map((a) => sys.daLonLat(a[0], a[1]));
+  for (const f of corsie.filari ?? []) {
+    const p = inMetri(f.g);
+    for (let k = 1; k < p.length; k++) {
+      const l = Math.hypot(p[k][0] - p[k - 1][0], p[k][1] - p[k - 1][1]);
+      const n = Math.max(1, Math.round(l / 8));
+      for (let j = k === 1 ? 0 : 1; j <= n; j++) puntiAlberi.push([p[k - 1][0] + ((p[k][0] - p[k - 1][0]) * j) / n, p[k - 1][1] + ((p[k][1] - p[k - 1][1]) * j) / n]);
+    }
+  }
   // Le vie con le corsie in una griglia: per sapere quali nastri coprono.
   const coperte = new Map();
   for (const v of strade) {
@@ -1937,19 +1804,9 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
     }
     return false;
   };
-  /** La mezza larghezza (asfalto e banchine) della via con le corsie sotto [px, py], o 0. */
-  const mezzaQui = (px, py) => {
-    let m = 0;
-    for (const [a, b, mezza] of coperte.get(Math.floor(px / G) + ',' + Math.floor(py / G)) ?? []) {
-      const dx = b[0] - a[0];
-      const dy = b[1] - a[1];
-      const l2 = dx * dx + dy * dy || 1e-9;
-      const u = Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / l2));
-      if (Math.hypot(a[0] + dx * u - px, a[1] + dy * u - py) < mezza + 6) m = Math.max(m, mezza);
-    }
-    return m;
-  };
-  return { strade, nodi, copre, sullAsfalto, mezzaQui };
+  // Mai sull'asfalto (un nodo messo male, o la strada disegnata più larga).
+  const alberi = puntiAlberi.filter((q) => nellaTessera(q) && !sullAsfalto(q[0], q[1])).map((q) => [q[0], q[1], 0.6 + mescola(Math.round(q[0] * 7), Math.round(q[1] * 7)) * 0.25]);
+  return { strade, nodi, copre, sullAsfalto, alberi };
 }
 
 /** Tutti i buffer di una tessera fatta, da trasferire. */

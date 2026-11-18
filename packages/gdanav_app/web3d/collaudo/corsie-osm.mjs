@@ -35,6 +35,15 @@ export function daElementiOsm(elementi) {
     strade.push(s);
   }
   const segni = [];
+  // Gli alberi veri: i nodi `natural=tree` e le vie `natural=tree_row`.
+  const alberi = [];
+  for (const n of nodi.values()) if (n.tags?.natural === 'tree') alberi.push([sette(n.lon), sette(n.lat)]);
+  const filari = [];
+  for (const w of vie.values()) {
+    if (w.tags?.natural !== 'tree_row') continue;
+    const punti = w.geometry ? w.geometry.map((p) => [p.lon, p.lat]) : (w.nodes ?? []).map((i) => nodi.get(i)).filter(Boolean).map((q) => [q.lon, q.lat]);
+    if (punti.length >= 2) filari.push({ id: w.id, g: punti.flatMap(([lon, lat]) => [sette(lon), sette(lat)]) });
+  }
   for (const n of nodi.values()) {
     const t = n.tags ?? {};
     if (!TIPI_NODI.has(t.highway)) continue;
@@ -44,7 +53,7 @@ export function daElementiOsm(elementi) {
   }
   strade.sort((a, b) => a.id - b.id);
   segni.sort((a, b) => a.id - b.id);
-  return { v: 1, strade, nodi: segni };
+  return { v: 1, strade, nodi: segni, alberi, filari };
 }
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop())) {
@@ -52,5 +61,5 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
   const elementi = ingressi.flatMap((f) => JSON.parse(fs.readFileSync(f, 'utf8')).elements ?? []);
   const dati = daElementiOsm(elementi);
   fs.writeFileSync(uscita, JSON.stringify(dati));
-  console.log(uscita, dati.strade.length, 'strade', dati.nodi.length, 'nodi');
+  console.log(uscita, dati.strade.length, 'strade', dati.nodi.length, 'nodi', dati.alberi.length, 'alberi', dati.filari.length, 'filari');
 }

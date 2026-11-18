@@ -36,7 +36,9 @@ const CONTROLLI = {
     (m.dati.v === undefined || m.dati.v === 1) &&
     Array.isArray(m.dati.strade) &&
     m.dati.strade.every((st) => st && typeof st.hw === 'string' && coppie(st.g)) &&
-    (m.dati.nodi === undefined || (Array.isArray(m.dati.nodi) && m.dati.nodi.every((n) => n && Array.isArray(n.g) && n.g.length === 2 && n.g.every(numero)))),
+    (m.dati.nodi === undefined || (Array.isArray(m.dati.nodi) && m.dati.nodi.every((n) => n && Array.isArray(n.g) && n.g.length === 2 && n.g.every(numero)))) &&
+    (m.dati.alberi === undefined || (Array.isArray(m.dati.alberi) && m.dati.alberi.every((a) => Array.isArray(a) && a.length >= 2 && a.every(numero)))) &&
+    (m.dati.filari === undefined || (Array.isArray(m.dati.filari) && m.dati.filari.every((f) => f && coppie(f.g)))),
   risparmio: (m) => m.punti === null || coppie(m.punti),
   posizione: (m) =>
     numero(m.lat) &&

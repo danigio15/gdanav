@@ -235,19 +235,90 @@ function scatola(c, x, y, z0, z1, tx, ty, lu, lv, cg, cn) {
 }
 
 /*
- * I semafori: spenti. In Italia non si sa di che colore è un semaforo né
- * quando cambia (nessuno lo pubblica): una luce rossa o verde disegnata
- * direbbe una cosa falsa. Il palo scuro, la lanterna quasi nera col bordo
- * chiaro (il pannello di contrasto: si stacca dall'asfalto e dagli edifici
- * bianchi) e le tre lenti grigie, tutte uguali. Più grandi del vero di metà,
- * che sul telefono a settanta metri si vedano.
+ * I semafori, come in Italia: il palo tondo d'acciaio grigio, alto tre
+ * metri, con la lanterna in cima; la lanterna verde scurissimo con tre
+ * lenti tonde, ognuna con la sua visiera, e dietro il pannello nero col
+ * bordino bianco. Agli incroci larghi (due corsie per chi arriva, o più di
+ * quindici metri da attraversare) il palo a sbraccio: alto, col braccio che
+ * passa sopra le corsie e la lanterna appesa sopra di loro, e una seconda
+ * lanterna sul palo, all'altezza di sempre.
+ *
+ * Spenti: in Italia non si sa di che colore è un semaforo né quando cambia
+ * (nessuno lo pubblica), e una luce rossa o verde disegnata direbbe una
+ * cosa falsa. Le lenti sono vetro scuro, tutte uguali. Un poco più grandi del
+ * vero, che sul telefono a sessanta metri si leggano.
  */
-const PALO = [[48, 52, 60], [30, 33, 40]];
-const LANTERNA = [[26, 29, 35], [16, 18, 22]];
-const PANNELLO = [[236, 239, 243], [150, 156, 166]];
-const LENTE = [[78, 84, 95], [58, 63, 72]];
-/** Il semaforo, in metri: l'altezza del palo fin sotto la lanterna, e la lanterna. */
-export const SEMAFORO = { palo: 3.2, lanterna: 1.6, largo: 0.62, mezzoPalo: 0.12 };
+const PALO = [[132, 138, 146], [66, 70, 78]];
+// Più scuri del vero: la luce chiara della vista «Corsie» li schiarisce.
+const LANTERNA = [[14, 22, 18], [10, 14, 12]];
+const PANNELLO = [[6, 6, 8], [4, 4, 6]];
+const BORDINO = [[238, 240, 243], [150, 156, 166]];
+const LENTE = [[70, 76, 86], [50, 54, 62]];
+/** Le misure (m): il palo, la lanterna (alta, larga, profonda), le lenti, lo sbraccio. */
+export const SEMAFORO = { palo: 2.6, raggioPalo: 0.09, alta: 1.3, larga: 0.44, fonda: 0.3, lente: 0.15, sbraccio: 6.2, sopraCorsie: 5.4 };
+
+/** Un cilindro a [lati] facce fra i punti [a] e [b] (`[x, y, z]`), di raggio [r]. */
+export function cilindro(c, a, b, r, lati, cg, cn) {
+  const ax = b[0] - a[0];
+  const ay = b[1] - a[1];
+  const az = b[2] - a[2];
+  const l = Math.hypot(ax, ay, az) || 1;
+  const u = [ax / l, ay / l, az / l];
+  // Due direzioni di traverso all'asse.
+  const q = Math.abs(u[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+  let p1 = [u[1] * q[2] - u[2] * q[1], u[2] * q[0] - u[0] * q[2], u[0] * q[1] - u[1] * q[0]];
+  const l1 = Math.hypot(...p1);
+  p1 = p1.map((v) => v / l1);
+  const p2 = [u[1] * p1[2] - u[2] * p1[1], u[2] * p1[0] - u[0] * p1[2], u[0] * p1[1] - u[1] * p1[0]];
+  const giro = (k) => {
+    const t = (2 * Math.PI * k) / lati;
+    return [Math.cos(t) * p1[0] + Math.sin(t) * p2[0], Math.cos(t) * p1[1] + Math.sin(t) * p2[1], Math.cos(t) * p1[2] + Math.sin(t) * p2[2]];
+  };
+  for (let k = 0; k < lati; k++) {
+    const d0 = giro(k);
+    const d1 = giro(k + 1);
+    const n = giro(k + 0.5);
+    const P = (o, d) => [o[0] + d[0] * r, o[1] + d[1] * r, o[2] + d[2] * r];
+    c.quad(P(a, d0), P(a, d1), P(b, d1), P(b, d0), n, cg, cn);
+  }
+}
+
+/**
+ * Una lanterna in [c]: il centro [x, y, z] (z il mezzo della lanterna), che
+ * guarda verso [fx, fy]; il pannello nero col bordino, la scatola, le tre
+ * lenti con le visiere.
+ */
+export function lanterna(c, x, y, z, fx, fy) {
+  const { alta, larga, fonda, lente } = SEMAFORO;
+  // A destra di chi guarda la lanterna da davanti: (fy, -fx).
+  const P = (dx, dz, avanti) => [x + fy * dx + fx * avanti, y - fx * dx + fy * avanti, z + dz];
+  const piano = (w, h, avanti, cg, cn) => c.quad(P(-w, -h, avanti), P(w, -h, avanti), P(w, h, avanti), P(-w, h, avanti), [fx, fy, 0], cg, cn);
+  // Il pannello: prima il bordino bianco, un poco più grande e dietro; poi il nero.
+  piano(larga / 2 + 0.2, alta / 2 + 0.16, -0.02, ...BORDINO);
+  piano(larga / 2 + 0.17, alta / 2 + 0.13, 0.0, ...PANNELLO);
+  scatola(c, x + fx * (fonda / 2), y + fy * (fonda / 2), z - alta / 2, z + alta / 2, fx, fy, fonda / 2, larga / 2, ...LANTERNA);
+  for (let j = 0; j < 3; j++) {
+    const zc = alta / 3 - (j * alta) / 3;
+    const davanti = fonda + 0.005;
+    // La lente: un disco di otto spicchi, vetro scuro.
+    const N = 10;
+    for (let k = 0; k < N; k++) {
+      const a0 = (2 * Math.PI * k) / N;
+      const a1 = (2 * Math.PI * (k + 1)) / N;
+      c.triPunti(P(0, zc, davanti), P(Math.cos(a0) * lente, zc + Math.sin(a0) * lente, davanti), P(Math.cos(a1) * lente, zc + Math.sin(a1) * lente, davanti), [fx, fy, 0], ...LENTE);
+    }
+    // La visiera: mezzo tubo sopra la lente, che sporge in avanti.
+    for (let k = 0; k < 5; k++) {
+      const a0 = (Math.PI * k) / 5;
+      const a1 = (Math.PI * (k + 1)) / 5;
+      const r = lente + 0.03;
+      const q0 = [Math.cos(a0) * r, zc + Math.sin(a0) * r];
+      const q1 = [Math.cos(a1) * r, zc + Math.sin(a1) * r];
+      const m = (a0 + a1) / 2;
+      c.quad(P(q0[0], q0[1], davanti), P(q1[0], q1[1], davanti), P(q1[0], q1[1], davanti + 0.22), P(q0[0], q0[1], davanti + 0.22), [fy * Math.cos(m), -fx * Math.cos(m), Math.sin(m)], ...LANTERNA);
+    }
+  }
+}
 
 /**
  * La segnaletica di una tessera. [strade]: le vie (vedi `normalizza` in
@@ -606,33 +677,39 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       } else {
         striscia(vernice, pa, oa - 0.1, ob + 0.1, dz, meta * 1.5);
       }
-      // Il semaforo: un palo a destra di chi arriva, con le tre luci verso di lui.
+      // Il semaforo: un palo a destra di chi arriva, con la lanterna verso di lui.
       if (tipo === 'traffic_signals') {
         const lato = arrivaAvanti ? B.destra - 1.0 : B.sinistra + 1.0;
         const [px, py, ph, tx, ty] = puntoA(r, sA, lato);
         // La lanterna guarda chi arriva.
         const fx = tx * verso;
         const fy = ty * verso;
-        const { palo, lanterna, largo, mezzoPalo } = SEMAFORO;
-        const z0 = ph + palo;
-        const z1 = z0 + lanterna;
-        scatola(segnali, px, py, ph, z0 + 0.1, fx, fy, mezzoPalo, mezzoPalo, ...PALO);
-        // Il pannello chiaro dietro, poi la lanterna davanti.
-        const pannello = (q) => [px + fx * 0.02 - fy * q[0], py + fy * 0.02 + fx * q[0], q[1]];
-        const w = largo / 2 + 0.1;
-        segnali.quad(pannello([w, z0 - 0.1]), pannello([-w, z0 - 0.1]), pannello([-w, z1 + 0.1]), pannello([w, z1 + 0.1]), [fx, fy, 0], ...PANNELLO);
-        scatola(segnali, px + fx * 0.2, py + fy * 0.2, z0, z1, fx, fy, 0.17, largo / 2, ...LANTERNA);
-        // Le tre lenti spente, ognuna con la sua visiera.
-        for (let j = 0; j < 3; j++) {
-          const zc = z1 - lanterna * (0.2 + 0.3 * j);
-          const r2 = largo * 0.3;
-          const qx = px + fx * 0.38;
-          const qy = py + fy * 0.38;
-          const lx = -fy * r2;
-          const ly = fx * r2;
-          segnali.quad([qx + lx, qy + ly, zc - r2], [qx - lx, qy - ly, zc - r2], [qx - lx, qy - ly, zc + r2], [qx + lx, qy + ly, zc + r2], [fx, fy, 0], ...LENTE);
-          segnali.quad([qx + lx, qy + ly, zc + r2], [qx - lx, qy - ly, zc + r2], [qx - lx + fx * 0.16, qy - ly + fy * 0.16, zc + r2 + 0.02], [qx + lx + fx * 0.16, qy + ly + fy * 0.16, zc + r2 + 0.02], [0, 0, 1], ...LANTERNA);
+        const { palo, raggioPalo, alta, fonda, sbraccio, sopraCorsie } = SEMAFORO;
+        // Le corsie di chi arriva: quante, e dov'è il loro mezzo (dal palo, verso la strada).
+        const corsieQui = arrivaAvanti ? v.avanti : v.indietro;
+        const mezzoCorsie = (oa + ob) / 2;
+        const largo = corsieQui >= 2 || (bordo ?? 0) * 2 > 15;
+        // Verso la strada dal palo: la normale della via, dalla parte delle corsie.
+        const nx = -ty * Math.sign(mezzoCorsie - lato);
+        const ny = tx * Math.sign(mezzoCorsie - lato);
+        const braccio = Math.abs(mezzoCorsie - lato);
+        let cima = ph + palo + alta;
+        if (largo) {
+          // Il palo a sbraccio: alto, col braccio sopra le corsie e la lanterna appesa.
+          cilindro(segnali, [px, py, ph], [px, py, ph + sbraccio], raggioPalo * 1.6, 8, ...PALO);
+          const zb = ph + sbraccio - 0.25;
+          cilindro(segnali, [px, py, zb], [px + nx * (braccio + 0.4), py + ny * (braccio + 0.4), zb], raggioPalo * 1.1, 6, ...PALO);
+          const hx = px + nx * braccio;
+          const hy = py + ny * braccio;
+          lanterna(segnali, hx - fx * 0.15, hy - fy * 0.15, ph + sopraCorsie + alta / 2, fx, fy);
+          // E la lanterna di ripetizione sul palo, all'altezza di sempre.
+          lanterna(segnali, px + fx * (raggioPalo * 1.6), py + fy * (raggioPalo * 1.6), ph + palo + alta / 2, fx, fy);
+          cima = ph + sbraccio + 0.3;
+        } else {
+          cilindro(segnali, [px, py, ph], [px, py, ph + palo + 0.2], raggioPalo, 8, ...PALO);
+          lanterna(segnali, px - fx * (fonda / 2), py - fy * (fonda / 2), ph + palo + alta / 2, fx, fy);
         }
+        const z1 = cima;
         if (!semaforoMesso && dentro(px, py)) {
           semafori.push(px, py, z1 + 0.3);
           semaforoMesso = true;

@@ -29,7 +29,9 @@
 //     "nodi": [                            // i nodi che si disegnano ([TIPI_NODI])
 //       { "id": 456, "g": [lon, lat],
 //         "highway": "crossing", "crossing:markings": "zebra", … }  // [TAG_NODI]
-//     ]
+//     ],
+//     "alberi": [[lon, lat], …],           // `natural=tree`, uno per uno
+//     "filari": [{ "id": 789, "g": [lon, lat, …] }]   // `natural=tree_row`
 //   }
 //
 // I tag restano stringhe di OpenStreetMap (il relay non deve capire niente):
@@ -519,7 +521,10 @@ export function preparaCorsie(dati) {
     delete v.xy;
   });
   const nodi = (dati?.nodi ?? []).filter((n) => TIPI_NODI.has(n.highway) && Array.isArray(n.g));
-  return { strade, nodi };
+  // Gli alberi veri: solo quelli che la mappa ha.
+  const alberi = (dati?.alberi ?? []).filter((a) => Array.isArray(a) && a.length >= 2);
+  const filari = (dati?.filari ?? []).filter((f) => Array.isArray(f?.g) && f.g.length >= 4);
+  return { strade, nodi, alberi, filari };
 }
 
 // ── La corsia del percorso ──────────────────────────────────────────────

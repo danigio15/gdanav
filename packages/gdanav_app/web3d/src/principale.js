@@ -153,7 +153,7 @@ const S = {
   /** La vista «Corsie» accesa (`opzioni.corsie`). */
   corsie: false,
   /** Le vie e i nodi del messaggio `corsie`, per id (si sommano: un messaggio per tessera). */
-  corsieGrezze: { strade: new Map(), nodi: new Map() },
+  corsieGrezze: { strade: new Map(), nodi: new Map(), alberi: new Map(), filari: new Map() },
   /** Le stesse, pronte (vedi `preparaCorsie`), e nei metri della scena. */
   corsiePronte: null,
   indiceCorsie: null,
@@ -257,7 +257,9 @@ const GESTORI = {
     const G = S.corsieGrezze;
     for (const st of m.dati.strade ?? []) G.strade.set(st.id, st);
     for (const n of m.dati.nodi ?? []) G.nodi.set(n.id, n);
-    S.corsiePronte = preparaCorsie({ strade: [...G.strade.values()], nodi: [...G.nodi.values()] });
+    for (const a of m.dati.alberi ?? []) G.alberi.set(`${a[0]},${a[1]}`, a);
+    for (const f of m.dati.filari ?? []) G.filari.set(f.id ?? f.g.join(), f);
+    S.corsiePronte = preparaCorsie({ strade: [...G.strade.values()], nodi: [...G.nodi.values()], alberi: [...G.alberi.values()], filari: [...G.filari.values()] });
     for (const v of S.corsiePronte.strade) {
       let [a, b, c, d] = [Infinity, Infinity, -Infinity, -Infinity];
       for (let i = 0; i < v.ll.length; i += 2) {
@@ -1189,9 +1191,15 @@ function corsiePerTessera(z, x, y) {
   const nord = latDaMerc(y / n) + MARGINE_CORSIE;
   const sud = latDaMerc((y + 1) / n) - MARGINE_CORSIE;
   const strade = c.strade.filter((v) => v.riquadro[2] >= o && v.riquadro[0] <= e && v.riquadro[3] >= sud && v.riquadro[1] <= nord).map(({ xy, sxy, riquadro, ...v }) => v);
-  if (!strade.length) return null;
-  const nodi = c.nodi.filter((q) => q.g[0] >= o && q.g[0] <= e && q.g[1] >= sud && q.g[1] <= nord);
-  return { strade, nodi };
+  if (!strade.length && !c.alberi.length) return null;
+  const dentro = (lon, lat) => lon >= o && lon <= e && lat >= sud && lat <= nord;
+  const nodi = c.nodi.filter((q) => dentro(q.g[0], q.g[1]));
+  const alberi = c.alberi.filter((a) => dentro(a[0], a[1]));
+  const filari = c.filari.filter((f) => {
+    for (let i = 0; i < f.g.length; i += 2) if (dentro(f.g[i], f.g[i + 1])) return true;
+    return false;
+  });
+  return { strade, nodi, alberi, filari };
 }
 
 /** Le vie con le corsie nei metri della scena, per il percorso (vedi `corsieLungoIlPercorso`). */
