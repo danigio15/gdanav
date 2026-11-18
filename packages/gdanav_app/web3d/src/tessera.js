@@ -21,6 +21,7 @@ import {
   ritagliaLinea,
 } from './ritaglio.js';
 import { CHIOME, FACCIATE, TETTI, rgb, spostamentoOmbra } from './tavolozza.js';
+import { costruisciSegnaletica } from './segnaletica.js';
 import earcut from 'earcut';
 
 /** I tipi di nastro d'asfalto (ognuno con la sua trama di righe). */
@@ -105,7 +106,7 @@ export const CODICI_CLASSE = { motorway: 1, trunk: 2, primary: 3, secondary: 4, 
  * `"dx,dy"` (da -1 a 1; quella di mezzo è "0,0"); [dettaglio]: «pieno» o
  * «ridotto» (lontano: niente alberi né lampioni, meno edifici).
  */
-export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limiti }) {
+export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limiti, datiCorsie = null }) {
   const lim = { ...LIMITI[dettaglio], ...limiti };
   const sys = sistemaTessera(z, x, y);
   const meta = sys.lato / 2;
@@ -164,6 +165,10 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   const ek = (p) => Math.round(p[0] * 10) + ',' + Math.round(p[1] * 10);
   const linee = visibili.map((f) => f.nodi.map((i) => [nodi[i].x, nodi[i].y, nodi[i].h]));
   const sottopassi = iSottopassi(nodi, feats);
+  // La vista «Corsie»: le vie di OpenStreetMap con le corsie (vedi
+  // `corsie.js`), alle quote delle strade della tessera; i nastri di sempre
+  // che quelle vie coprono non si disegnano.
+  const conCorsie = datiCorsie?.strade?.length ? corsieDellaTessera(datiCorsie, sys, linee, visibili, meta) : null;
   const estremi = new Map();
   linee.forEach((pts, i) => {
     if (pts.length < 2) return;
@@ -404,6 +409,8 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         L.push([pezzo[k][0] + nx * hw * m, pezzo[k][1] + ny * hw * m, zz, 0, v]);
         R.push([pezzo[k][0] - nx * hw * m, pezzo[k][1] - ny * hw * m, zz, 1, v]);
       }
+      // Dove c'è la via con le corsie, il nastro di sempre non c'è.
+      const coperto = conCorsie ? pezzo.map((q) => conCorsie.copre(q[0], q[1], q[3], q[4], q[2])) : null;
       // Il nastro: due vertici per punto, a indici.
       const base = gb.vertici;
       for (let k = 0; k < n; k++) {
@@ -416,6 +423,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         const r0 = l0 + 1;
         const l1 = base + 2 * k;
         const r1 = l1 + 1;
+        if (coperto && coperto[k - 1] && coperto[k]) continue;
         const ux = R[k - 1][0] - L[k - 1][0];
         const uy = R[k - 1][1] - L[k - 1][1];
         const vx = R[k][0] - L[k - 1][0];
@@ -1014,7 +1022,9 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   const istanzeAlberi = istanzeDiAlberi(alberi, ombreAlberi);
 
   // ── I lampioni ────────────────────────────────────────────────────────
-  const lamp = lampioni.filter((l) => dentro(l.x, l.y)).slice(0, lim.lampioni);
+  // Con le corsie la strada è larga quanto è davvero: un lampione messo al
+  // bordo del nastro di sempre può finire in mezzo all'asfalto.
+  const lamp = lampioni.filter((l) => dentro(l.x, l.y) && !conCorsie?.sullAsfalto(l.x, l.y)).slice(0, lim.lampioni);
   const pali = new Float32Array(lamp.length * 16);
   const teste = new Float32Array(lamp.length * 16);
   const luci = new Float32Array(lamp.length * 3);
@@ -1139,6 +1149,17 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     }
   }
 
+  // La segnaletica delle corsie: asfalto, vernice, semafori.
+  let segnaletica = null;
+  if (conCorsie) {
+    const sg = costruisciSegnaletica({ strade: conCorsie.strade, nodi: conCorsie.nodi, sopra: sopraCorsie, meta });
+    segnaletica = {
+      asfalto: sg.asfalto.triangoli ? sg.asfalto.fatto() : null,
+      vernice: sg.vernice.triangoli ? sg.vernice.fatto() : null,
+      segnali: sg.segnali.triangoli ? sg.segnali.fatto() : null,
+    };
+  }
+
   const fatti = Object.fromEntries(NASTRI.filter((t) => nastri[t].triangoli).map((t) => [t, nastri[t].fatto()]));
   const out = {
     chiave: `${z}/${x}/${y}`,
@@ -1160,6 +1181,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     segmenti: new Float32Array(segmenti),
     etichette,
     nascosti: [...nascosti],
+    corsie: segnaletica,
   };
   const triStrade = Object.values(nastri).reduce((s, g) => s + g.triangoli, 0);
   out.conti = {
@@ -1190,6 +1212,7 @@ export function stimaTriangoli(t) {
   for (const g of Object.values(t.strade)) n += tri(g);
   n += tri(t.opere) + tri(t.ombre) + tri(t.ombrePonti) + tri(t.ombreAlberi) + tri(t.tetti);
   for (const g of Object.values(t.facciate)) n += tri(g);
+  if (t.corsie) n += tri(t.corsie.asfalto) + tri(t.corsie.vernice) + tri(t.corsie.segnali);
   n += (t.fusti.length / 16) * TRIANGOLI_ISTANZA.fusto + (t.capitelli.length / 16) * TRIANGOLI_ISTANZA.capitello;
   // Gli alberi sono immagini: due triangoli l'uno.
   const a = t.alberi;
@@ -1603,6 +1626,147 @@ function distanzaLinea(px, py, l) {
   return d;
 }
 
+/** Quanto sopra la quota sta l'asfalto delle corsie: come il nastro della sua classe, un poco sopra. */
+function sopraCorsie(hw) {
+  const b = String(hw ?? '').replace(/_link$/, '');
+  const cls = b === 'motorway' || b === 'trunk' || b === 'primary' || b === 'secondary' || b === 'tertiary' ? b : 'minor';
+  return (SOPRA[cls] ?? 0.16) + 0.012;
+}
+
+/**
+ * Le vie con le corsie che toccano la tessera, nei suoi metri, con la quota
+ * di ogni punto presa dalle strade della tessera ([linee], già con i ponti e
+ * le rampe in salita): sotto un viadotto ci sono due quote, e una via
+ * segnata come ponte prende la più alta, le altre quella più vicina alla
+ * quota di prima (chi è a terra resta a terra). E [copre]: se un punto di un
+ * nastro di sempre sta sotto una di queste vie (allora non si disegna).
+ */
+function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
+  const G = 20;
+  const griglia = new Map();
+  linee.forEach((pts, i) => {
+    if (visibili[i].cls === 'rail') return;
+    for (let k = 1; k < pts.length; k++) {
+      const a = pts[k - 1];
+      const b = pts[k];
+      for (let cx = Math.floor(Math.min(a[0], b[0]) / G); cx <= Math.floor(Math.max(a[0], b[0]) / G); cx++) {
+        for (let cy = Math.floor(Math.min(a[1], b[1]) / G); cy <= Math.floor(Math.max(a[1], b[1]) / G); cy++) {
+          const key = cx + ',' + cy;
+          if (!griglia.has(key)) griglia.set(key, []);
+          griglia.get(key).push([a, b]);
+        }
+      }
+    }
+  });
+  /** Le quote possibili in [px, py] lungo (tx, ty): `[h, distanza]`. */
+  const quoteQui = (px, py, tx, ty) => {
+    const out = [];
+    const visti = new Set();
+    const vicini = [];
+    for (let ax = -1; ax <= 1; ax++) {
+      for (let ay = -1; ay <= 1; ay++) {
+        for (const t of griglia.get(Math.floor(px / G) + ax + ',' + (Math.floor(py / G) + ay)) ?? []) {
+          if (visti.has(t)) continue;
+          visti.add(t);
+          vicini.push(t);
+        }
+      }
+    }
+    for (const [a, b] of vicini) {
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const l2 = dx * dx + dy * dy || 1e-9;
+      const u = Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / l2));
+      const d = Math.hypot(a[0] + dx * u - px, a[1] + dy * u - py);
+      if (d > 8) continue;
+      if (Math.abs((dx * tx + dy * ty) / Math.sqrt(l2)) < 0.55) continue;
+      out.push([a[2] + (b[2] - a[2]) * u, d]);
+    }
+    return out;
+  };
+  const vicina = (q) => q[0] >= -meta - 60 && q[0] <= meta + 60 && q[1] >= -meta - 60 && q[1] <= meta + 60;
+  const inMetri = (ll) => {
+    const out = [];
+    for (let i = 0; i < ll.length; i += 2) out.push(sys.daLonLat(ll[i], ll[i + 1]));
+    return out;
+  };
+  const strade = [];
+  for (const v0 of corsie.strade) {
+    const xy = inMetri(v0.ll);
+    if (!xy.some(vicina)) continue;
+    const h = new Array(xy.length).fill(NaN);
+    let prima = null;
+    for (let k = 0; k < xy.length; k++) {
+      const a = xy[Math.max(0, k - 1)];
+      const b = xy[Math.min(xy.length - 1, k + 1)];
+      const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const qq = quoteQui(xy[k][0], xy[k][1], (b[0] - a[0]) / l, (b[1] - a[1]) / l);
+      if (!qq.length) continue;
+      let meglio = qq[0];
+      let bv = Infinity;
+      for (const q of qq) {
+        const voto = q[1] + (prima !== null ? 2 * Math.abs(q[0] - prima) : v0.ponte ? -0.5 * q[0] : 0.5 * q[0]);
+        if (voto < bv) {
+          bv = voto;
+          meglio = q;
+        }
+      }
+      h[k] = meglio[0];
+      prima = meglio[0];
+    }
+    // Dove non c'è una strada sotto: fra le quote attorno, o a terra.
+    let ultimo = -1;
+    for (let k = 0; k <= h.length; k++) {
+      if (k < h.length && Number.isNaN(h[k])) continue;
+      for (let j = ultimo + 1; j < k; j++) h[j] = ultimo < 0 ? (k < h.length ? h[k] : 0) : k >= h.length ? h[ultimo] : h[ultimo] + ((h[k] - h[ultimo]) * (j - ultimo)) / (k - ultimo);
+      ultimo = k;
+    }
+    strade.push({ ...v0, xy, xyVia: inMetri(v0.llVia ?? v0.ll), h });
+  }
+  const nodi = (corsie.nodi ?? []).map((n) => ({ ...n, xy: sys.daLonLat(n.g[0], n.g[1]) })).filter((n) => vicina(n.xy));
+  // Le vie con le corsie in una griglia: per sapere quali nastri coprono.
+  const coperte = new Map();
+  for (const v of strade) {
+    const mezza = ((v.avanti + v.indietro) * v.lw + v.margini[0] + v.margini[1]) / 2;
+    for (let k = 1; k < v.xy.length; k++) {
+      const a = [...v.xy[k - 1], v.h[k - 1]];
+      const b = [...v.xy[k], v.h[k]];
+      for (let cx = Math.floor((Math.min(a[0], b[0]) - mezza) / G); cx <= Math.floor((Math.max(a[0], b[0]) + mezza) / G); cx++) {
+        for (let cy = Math.floor((Math.min(a[1], b[1]) - mezza) / G); cy <= Math.floor((Math.max(a[1], b[1]) + mezza) / G); cy++) {
+          const key = cx + ',' + cy;
+          if (!coperte.has(key)) coperte.set(key, []);
+          coperte.get(key).push([a, b, mezza + Math.abs(v.posa)]);
+        }
+      }
+    }
+  }
+  const copre = (px, py, tx, ty, h) => {
+    for (const [a, b, mezza] of coperte.get(Math.floor(px / G) + ',' + Math.floor(py / G)) ?? []) {
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const l2 = dx * dx + dy * dy || 1e-9;
+      const u = Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / l2));
+      if (Math.hypot(a[0] + dx * u - px, a[1] + dy * u - py) > mezza + 1.5) continue;
+      if (Math.abs(a[2] + (b[2] - a[2]) * u - h) > 2) continue;
+      const tl = Math.hypot(tx, ty) || 1;
+      if (Math.abs((dx * tx + dy * ty) / (Math.sqrt(l2) * tl)) < 0.5) continue;
+      return true;
+    }
+    return false;
+  };
+  const sullAsfalto = (px, py) => {
+    for (const [a, b, mezza] of coperte.get(Math.floor(px / G) + ',' + Math.floor(py / G)) ?? []) {
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const l2 = dx * dx + dy * dy || 1e-9;
+      const u = Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / l2));
+      if (Math.hypot(a[0] + dx * u - px, a[1] + dy * u - py) < mezza + 0.6) return true;
+    }
+    return false;
+  };
+  return { strade, nodi, copre, sullAsfalto };
+}
+
 /** Tutti i buffer di una tessera fatta, da trasferire. */
 export function bufferDellaTessera(t) {
   const lista = [];
@@ -1617,6 +1781,7 @@ export function bufferDellaTessera(t) {
   geo(t.ombreAlberi);
   geo(t.tetti);
   for (const g of Object.values(t.facciate)) geo(g);
+  if (t.corsie) for (const g of Object.values(t.corsie)) geo(g);
   for (const a of [t.fusti, t.capitelli, t.pali, t.teste, t.luci, t.segmenti, ...Object.values(t.alberi)]) lista.push(a.buffer);
   return lista;
 }

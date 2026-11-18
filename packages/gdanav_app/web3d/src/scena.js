@@ -8,7 +8,7 @@ import { generatore } from './caso.js';
 import { pezziDelNastro } from './percorso.js';
 import { Condivise } from './scorte.js';
 import { CAMPATA, NASTRI, PERIODO_STRADA, PIANO, STILI_FACCIATA } from './tessera.js';
-import { GIORNO, NOTTE, SOLE } from './tavolozza.js';
+import { GIORNO, SOLE, tavolozza } from './tavolozza.js';
 
 
 /**
@@ -561,6 +561,37 @@ void main() {
   #include <colorspace_fragment>
 }`;
 
+/**
+ * La vista «Corsie»: il percorso è una fascia verde sulla corsia da tenere,
+ * trasparente perché sotto si vedano le righe e le frecce dipinte, più
+ * chiara nel mezzo, con delle punte tenui che dicono il verso.
+ */
+const FRAMMENTO_CORSIA = `
+uniform vec3 uCore;
+uniform vec3 uBordo;
+uniform float uNotte;
+uniform float uInizio;
+uniform float uFine;
+uniform float uOpacita;
+varying vec2 vUv;
+varying float vLivello;
+void main() {
+  float e = abs(vUv.x - 0.5) * 2.0;
+  vec3 c = mix(mix(uCore, vec3(1.0), 0.35), uCore, smoothstep(0.0, 0.75, e));
+  c = mix(c, uBordo, smoothstep(0.82, 1.0, e) * 0.6);
+  // Trasparente in mezzo: sotto si leggono le frecce dipinte sulla corsia.
+  float a = mix(0.42, 0.62, smoothstep(0.2, 0.85, e)) * (1.0 - smoothstep(0.9, 1.0, e));
+  // Le punte in avanti: in mezzo più avanti, ai lati più indietro.
+  float t = fract((vUv.y + abs(vUv.x - 0.5) * 2.4) / 13.0);
+  float chev = (1.0 - smoothstep(0.0, 0.03, abs(t - 0.06) - 0.022)) * (1.0 - smoothstep(0.55, 0.72, e));
+  c = mix(c, vec3(1.0), chev * 0.6);
+  a = mix(a, 0.9, chev * 0.5);
+  a *= smoothstep(uInizio, uInizio + 5.0, vUv.y);
+  a *= 1.0 - smoothstep(uFine - 3.0, uFine, vUv.y);
+  gl_FragColor = vec4(c * (1.0 + 0.25 * uNotte), a * uOpacita);
+  #include <colorspace_fragment>
+}`;
+
 const FRAMMENTO_ALONE = `
 uniform vec3 uCore;
 uniform float uNotte;
@@ -610,6 +641,8 @@ export class Scena {
     this.scena.add(this.mondo);
     this.tessere = new Map();
     this.notte = null;
+    /** La vista «Corsie» (vedi [impostaCorsie]). */
+    this.corsie = false;
     this.emisferica = new THREE.HemisphereLight(0xdbe8ff, 0x8d917f, 1.35);
     this.sole = new THREE.DirectionalLight(0xfff0d8, 2.3);
     const az = (SOLE.azimut * Math.PI) / 180;
@@ -743,16 +776,35 @@ export class Scena {
   impostaNotte(notte) {
     if (this.notte === notte) return;
     this.notte = notte;
-    const P = notte ? NOTTE : GIORNO;
+    this.aggiornaAspetto();
+  }
+
+  /**
+   * La vista «Corsie» (sì o no): i colori chiari, gli edifici bianchi,
+   * l'asfalto blu notte, la fascia verde del percorso. Spenta, tutto torna
+   * com'era nel 3D aumentato.
+   */
+  impostaCorsie(si) {
+    if (this.corsie === si) return;
+    this.corsie = si;
+    if (this.notte !== null) this.aggiornaAspetto();
+  }
+
+  /** Luci, nebbia, materiali e colori, per la notte e la vista di adesso. */
+  aggiornaAspetto() {
+    const notte = this.notte;
+    const corsie = this.corsie;
+    const P = tavolozza(notte, corsie);
     this.P = P;
-    // Di notte le finestre accese restano tutte.
-    this.uniformiEdifici.uFinestreTenui.value = notte ? 0 : 0.45;
-    this.uniformiEdifici.uLuceTetti.value = notte ? 0 : 0.12;
+    // Di notte le finestre accese restano tutte; nella vista «Corsie» di
+    // giorno quasi niente finestre (gli edifici sono forme bianche).
+    this.uniformiEdifici.uFinestreTenui.value = notte ? 0 : corsie ? 0.9 : 0.45;
+    this.uniformiEdifici.uLuceTetti.value = notte ? 0 : corsie ? 0.3 : 0.12;
     this.emisferica.color.set(notte ? 0x4a5d8c : 0xdbe8ff);
-    this.emisferica.groundColor.set(notte ? 0x141a26 : 0xc4bcae);
-    this.emisferica.intensity = notte ? 0.75 : 1.35;
-    this.sole.color.set(notte ? 0x9db2ff : 0xfff0d8);
-    this.sole.intensity = notte ? 0.5 : 2.3;
+    this.emisferica.groundColor.set(notte ? 0x141a26 : corsie ? 0xd6d9de : 0xc4bcae);
+    this.emisferica.intensity = notte ? 0.75 : corsie ? 1.7 : 1.35;
+    this.sole.color.set(notte ? 0x9db2ff : corsie ? 0xffffff : 0xfff0d8);
+    this.sole.intensity = notte ? 0.5 : corsie ? 1.7 : 2.3;
     this.scena.fog.color.set(P.nebbia);
     this.materialeFoschia.uniforms.uColor.value.set(P.nebbia);
     for (const u of [this.uniformiPercorso, this.uniformiRisparmio]) u.uNotte.value = notte ? 1 : 0;
@@ -855,6 +907,17 @@ export class Scena {
     });
     m.tetti = new THREE.MeshLambertMaterial({ vertexColors: true });
     this.vetroVicino(m.tetti, 'tetti');
+    // Nella vista «Corsie» gli edifici tengono la forma e perdono i colori:
+    // bianchi i tetti, grigio chiarissimo le facciate.
+    if (this.corsie) {
+      for (const s of STILI_FACCIATA) Object.assign(m['facciata-' + s], { vertexColors: false, color: new THREE.Color(P.facciata) });
+      Object.assign(m.tetti, { vertexColors: false, color: new THREE.Color(P.tetto) });
+      // L'asfalto delle corsie, la vernice bianca (righe, frecce, strisce) e
+      // i semafori: una geometria l'uno per tessera (vedi `segnaletica.js`).
+      m['corsie-asfalto'] = new THREE.MeshLambertMaterial({ color: P.asfalto, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -2 });
+      m['corsie-vernice'] = new THREE.MeshLambertMaterial({ color: P.righe, emissive: P.righe, emissiveIntensity: notte ? 0.55 : 0.35, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -3 });
+      m['corsie-segnali'] = new THREE.MeshLambertMaterial({ vertexColors: true });
+    }
     m.fusto = new THREE.MeshLambertMaterial({ color: P.pilone });
     m.capitello = new THREE.MeshLambertMaterial({ color: P.trave });
     m.tronco = new THREE.MeshLambertMaterial({ color: notte ? '#2e2823' : '#4f4238' });
@@ -933,6 +996,13 @@ export class Scena {
     m.alone = nastro(FRAMMENTO_ALONE, this.uniformiPercorso, { blending: notte ? THREE.AdditiveBlending : THREE.NormalBlending });
     m.freccia = nastro(FRAMMENTO_FRECCIA, {}, { polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
     m.punta = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false });
+    // La fascia della corsia: gli stessi tempi del percorso (dove comincia,
+    // dove finisce), il suo verde.
+    m.percorsoCorsia = nastro(
+      FRAMMENTO_CORSIA,
+      { uCore: this.uniformiPercorso.uCore, uBordo: this.uniformiPercorso.uBordo, uNotte: this.uniformiPercorso.uNotte, uInizio: this.uniformiPercorso.uInizio, uFine: this.uniformiPercorso.uFine, uOpacita: { value: 1 } },
+      { polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -5 },
+    );
     m.risparmio = nastro(FRAMMENTO_NASTRO, this.uniformiRisparmio, { polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -3 });
     // La strada già fatta: un blu più tenue e stretto, senza frecce, sotto il
     // percorso (come `percorso-fatto` sulla mappa piatta).
@@ -1078,6 +1148,10 @@ export class Scena {
     if (t.opere) aggiungi('opere', new THREE.Mesh(geometria(t.opere, notte)), 3);
     for (const [s, d] of Object.entries(t.facciate)) aggiungi('facciata-' + s, new THREE.Mesh(geometria(d, notte)), 3);
     if (t.tetti) aggiungi('tetti', new THREE.Mesh(geometria(t.tetti, notte)), 3);
+    // La vista «Corsie»: sopra l'asfalto la vernice, nello stesso giro delle strade.
+    if (t.corsie?.asfalto) aggiungi('corsie-asfalto', new THREE.Mesh(geometria(t.corsie.asfalto, notte)), 1);
+    if (t.corsie?.vernice) aggiungi('corsie-vernice', new THREE.Mesh(geometria(t.corsie.vernice, notte)), 1);
+    if (t.corsie?.segnali) aggiungi('corsie-segnali', new THREE.Mesh(geometria(t.corsie.segnali, notte)), 3);
     const g = this.geo;
     if (t.fusti.length) aggiungi('fusto', istanze(g.fusto, null, t.fusti), 3);
     if (t.capitelli.length) aggiungi('capitello', istanze(g.capitello, null, t.capitelli), 3);
@@ -1216,8 +1290,9 @@ export class Scena {
     metti(nome, materiale, ordine);
     if (nome === 'percorso') {
       metti('fantasma', 'percorsoFantasma', 40);
-      // E la strada fatta fino all'auto (vedi `uniformiFattoVicino`).
-      metti('fattoVicino', 'fattoVicino', 3);
+      // E la strada fatta fino all'auto (vedi `uniformiFattoVicino`); non
+      // nella vista «Corsie».
+      if (!this.corsie) metti('fattoVicino', 'fattoVicino', 3);
     }
   }
 
@@ -1341,7 +1416,9 @@ export class Scena {
       pozza.renderOrder = 9;
       g.add(pozza);
     }
-    g.scale.setScalar(2.0);
+    // Grande il doppio, che da lontano si veda; nella vista «Corsie» grande
+    // com'è, dentro la sua corsia.
+    g.scale.setScalar(this.corsie ? 1.0 : 2.0);
     this.sostituisciAuto(g, vecchia);
   }
 
@@ -1407,7 +1484,7 @@ export class Scena {
     }
     g.add(sagoma);
     g.add(this.ombraAuto(6.2, 4.6));
-    g.scale.setScalar(2.4);
+    g.scale.setScalar(this.corsie ? 1.2 : 2.4);
     this.sostituisciAuto(g, vecchia);
   }
 

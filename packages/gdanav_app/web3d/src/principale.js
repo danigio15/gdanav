@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import codiceLavoratore from 'gdanav:lavoratore';
 import { BUDGET, daDisegnare, pianoTessere } from './budget.js';
 import { intervalloPerLaSonda, livelloDiCarico, rapportoPixel, Ritmo, valutaPrestazioni, valutaWebgl } from './capacita.js';
-import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, marginiAiLati } from './geo.js';
+import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, lonDaMerc, marginiAiLati } from './geo.js';
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { AggancioStrada, SOGLIA_M } from './aggancio.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
@@ -17,7 +17,8 @@ import { alzataDeiNastri, direzioneDisegnata, IndiceSegmenti, Linea, lungoLaLine
 import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
 import { dallaScorta, nellaScorta } from './scorte.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
-import { GIORNO, NOTTE } from './tavolozza.js';
+import { tavolozza } from './tavolozza.js';
+import { corsieLungoIlPercorso, IndiceCorsie, preparaCorsie } from './corsie.js';
 import './gdanav3d.css';
 
 /** Gli strati da toccare (come `stratiToccabili` in stile.dart). */
@@ -25,6 +26,26 @@ const TOCCABILI = ['persone', 'alternative-etichetta', 'alternative', 'gdanav-so
 
 /** Le viste: inclinazione e zoom di partenza (il prototipo approvato). */
 const VISTE = { inclinata: { pitch: 70, zoom: 17.9 }, immersiva: { pitch: 74, zoom: 18.3 } };
+
+/*
+ * La vista «Corsie» (`opzioni.corsie`): una vista in più, sopra le altre.
+ * La telecamera più bassa e più vicina dietro l'auto, con l'obiettivo più
+ * largo (le corsie che corrono verso l'orizzonte, come chi guida le vede), e
+ * l'auto nel terzo basso dello schermo: davanti c'è la strada da fare.
+ */
+const VISTA_CORSIE = { pitch: 62, zoom: 18.6 };
+const OBIETTIVO_CORSIE_GRADI = 44;
+/**
+ * Quanto lo zoom chiesto dall'app (secondo la velocità) si avvicina nella
+ * vista «Corsie», e fin dove: le corsie si devono contare, una corsia di
+ * città resta larga una quarantina di punti accanto all'auto.
+ */
+const PIU_VICINO_CORSIE = 2.5;
+const ZOOM_MASSIMO_CORSIE = 20.6;
+/** La fascia della corsia: quanto è larga (m) e quanto sta sopra l'asfalto. */
+const FASCIA_CORSIA = { largo: 2.7, sopra: 0.3 };
+/** Fin dove attorno a una tessera si mandano le vie con le corsie (gradi, ~200 m). */
+const MARGINE_CORSIE = 0.002;
 
 /** Al più un fotogramma ogni tanto: trenta al secondo da fermi, o col
  * telefono che fatica; sessanta andando, se il telefono ci sta dietro (lo
@@ -129,6 +150,15 @@ const S = {
   intervalli: [],
   sondato: false,
   log: [],
+  /** La vista «Corsie» accesa (`opzioni.corsie`). */
+  corsie: false,
+  /** Le vie e i nodi del messaggio `corsie`, per id (si sommano: un messaggio per tessera). */
+  corsieGrezze: { strade: new Map(), nodi: new Map() },
+  /** Le stesse, pronte (vedi `preparaCorsie`), e nei metri della scena. */
+  corsiePronte: null,
+  indiceCorsie: null,
+  /** Le corsie giuste della manovra secondo chi fa il percorso (TomTom): `[{s, giuste}]`. */
+  suggerimenti: [],
 };
 
 const scena = new Scena();
@@ -171,7 +201,7 @@ function ricevi(grezzo) {
     return false;
   }
   // Prima dello stile non c'è la mappa: si tiene da parte.
-  if (!S.mappa && !['stile', 'opzioni', 'pausa', 'carico', 'nascosta', 'leggera'].includes(m.tipo)) {
+  if (!S.mappa && !['stile', 'opzioni', 'pausa', 'carico', 'nascosta', 'leggera', 'corsie'].includes(m.tipo)) {
     S.coda.push(m);
     return true;
   }
@@ -192,6 +222,10 @@ const GESTORI = {
     S.edificiDallApp = m.edifici === true;
     S.inAuto = m.inAuto === true;
     aggiornaLeggerezza();
+    // La vista «Corsie»: si accende e si spegne senza rifare la pagina.
+    const corsie = m.corsie === true;
+    const cambiaCorsie = corsie !== S.corsie;
+    S.corsie = corsie;
     // La freccia, se è quella scelta; l'auto del suo colore, altrimenti.
     const forma = S.icona === 'freccia' ? 'freccia' : 'auto';
     if ((m.auto && m.auto !== S.colorAuto) || forma !== (scena.formaAuto ?? 'auto')) {
@@ -204,6 +238,39 @@ const GESTORI = {
       S.sporco.profilo = true;
       S.sporco.traffico = true;
     }
+    if (cambiaCorsie) {
+      scena.impostaCorsie(corsie);
+      S.mappa?.setVerticalFieldOfView(corsie ? OBIETTIVO_CORSIE_GRADI : OBIETTIVO_GRADI);
+      // Lo stile di sotto (i colori chiari), e le tessere con o senza corsie.
+      if (S.mappa && S.stileGrezzo && !cambiaNotte) caricaStile(S.stileGrezzo);
+      rifaiTessere();
+      S.sporco.profilo = true;
+    }
+    sveglia();
+  },
+  /**
+   * Le vie con le corsie e i nodi da disegnare (il formato è in `corsie.js`).
+   * Si sommano a quelli arrivati prima (una tessera alla volta, dal relay):
+   * i raccordi fra le vie si rifanno su tutti.
+   */
+  corsie(m) {
+    const G = S.corsieGrezze;
+    for (const st of m.dati.strade ?? []) G.strade.set(st.id, st);
+    for (const n of m.dati.nodi ?? []) G.nodi.set(n.id, n);
+    S.corsiePronte = preparaCorsie({ strade: [...G.strade.values()], nodi: [...G.nodi.values()] });
+    for (const v of S.corsiePronte.strade) {
+      let [a, b, c, d] = [Infinity, Infinity, -Infinity, -Infinity];
+      for (let i = 0; i < v.ll.length; i += 2) {
+        a = Math.min(a, v.ll[i]);
+        b = Math.min(b, v.ll[i + 1]);
+        c = Math.max(c, v.ll[i]);
+        d = Math.max(d, v.ll[i + 1]);
+      }
+      v.riquadro = [a, b, c, d];
+    }
+    indicizzaCorsie();
+    if (S.corsie) rifaiTessere();
+    S.sporco.profilo = true;
     sveglia();
   },
   stile(m) {
@@ -254,6 +321,13 @@ const GESTORI = {
   },
   manovra(m) {
     S.manovra = m.da === null ? null : [m.da, m.a];
+    // Le corsie giuste per la manovra, se chi fa il percorso le sa (da
+    // sinistra, come le corsie di TomTom): nella vista «Corsie» vincono
+    // sulle frecce dipinte. [dove]: i metri della manovra (se no, la fine del
+    // tratto della freccia, meno i suoi 45 metri dopo).
+    const prima = JSON.stringify(S.suggerimenti);
+    S.suggerimenti = m.da !== null && Array.isArray(m.corsie) && m.corsie.length ? [{ s: m.dove ?? m.a - 45, giuste: m.corsie.map((c) => c === true || c?.giusta === true) }] : [];
+    if (S.corsie && JSON.stringify(S.suggerimenti) !== prima) S.sporco.profilo = true;
     // Solo la freccia: il profilo del percorso è quello di prima.
     S.sporco.freccia = true;
     sveglia();
@@ -476,7 +550,7 @@ function creaMappa(stile) {
   try {
     mappa = new maplibregl.Map({
       container: 'mappa',
-      style: adattaStile(stile, { notte: S.notte }),
+      style: adattaStile(stile, { notte: S.notte, corsie: S.corsie }),
       center: [12.5, 41.9],
       zoom: vista.zoom,
       pitch: vista.pitch,
@@ -495,7 +569,7 @@ function creaMappa(stile) {
   // metri arrivavano quasi all'altezza della telecamera: il tetto enorme, le
   // pareti che si stringevano verso terra, il palazzo «vuoto», come visto
   // da dentro.
-  mappa.setVerticalFieldOfView(OBIETTIVO_GRADI);
+  mappa.setVerticalFieldOfView(S.corsie ? OBIETTIVO_CORSIE_GRADI : OBIETTIVO_GRADI);
   S.mappa = mappa;
   alPassoDellaScena(mappa);
   window.__mappa = mappa;
@@ -589,7 +663,7 @@ function caricaStile(stile) {
   // Lo stile nuovo ha il filtro dei nomi di partenza: si rimette.
   S.nomiNascosti = null;
   S.sporco.segni = true;
-  S.mappa.setStyle(adattaStile(stile, { notte: S.notte }), { diff: false });
+  S.mappa.setStyle(adattaStile(stile, { notte: S.notte, corsie: S.corsie }), { diff: false });
 }
 
 /** Lo stile è pronto: motivi del suolo, cartelli, immagini, sorgenti, lo strato 3D. */
@@ -646,7 +720,7 @@ async function aggiungiImmagine({ nome, png, ratio }) {
 
 /** Le trame del suolo: puntini leggeri, che il prato non sembri carta. */
 function motiviSuolo(m) {
-  const P = S.notte ? NOTTE : GIORNO;
+  const P = tavolozza(S.notte, S.corsie);
   const fai = (nome, base, macchie, n, seme) => {
     const c = document.createElement('canvas');
     c.width = c.height = 128;
@@ -1100,7 +1174,47 @@ function chiedi(k, dettaglio) {
   const edifici = e ? e.slice(0) : null;
   const trasferiti = Object.values(tessere).map((t) => t.dati);
   if (edifici) trasferiti.push(edifici);
-  lavoratore.postMessage({ id, z, x, y, tessere, dettaglio, edifici }, trasferiti);
+  lavoratore.postMessage({ id, z, x, y, tessere, dettaglio, edifici, corsie: S.corsie ? corsiePerTessera(z, x, y) : null }, trasferiti);
+}
+
+/** Le vie con le corsie (e i nodi) attorno alla tessera z/x/y, per il lavoratore. */
+function corsiePerTessera(z, x, y) {
+  const c = S.corsiePronte;
+  if (!c?.strade.length) return null;
+  const n = 2 ** z;
+  const o = lonDaMerc(x / n) - MARGINE_CORSIE;
+  const e = lonDaMerc((x + 1) / n) + MARGINE_CORSIE;
+  const nord = latDaMerc(y / n) + MARGINE_CORSIE;
+  const sud = latDaMerc((y + 1) / n) - MARGINE_CORSIE;
+  const strade = c.strade.filter((v) => v.riquadro[2] >= o && v.riquadro[0] <= e && v.riquadro[3] >= sud && v.riquadro[1] <= nord).map(({ xy, sxy, riquadro, ...v }) => v);
+  if (!strade.length) return null;
+  const nodi = c.nodi.filter((q) => q.g[0] >= o && q.g[0] <= e && q.g[1] >= sud && q.g[1] <= nord);
+  return { strade, nodi };
+}
+
+/** Le vie con le corsie nei metri della scena, per il percorso (vedi `corsieLungoIlPercorso`). */
+function indicizzaCorsie() {
+  const c = S.corsiePronte;
+  if (!c || !S.origine) {
+    S.indiceCorsie = null;
+    return;
+  }
+  for (const v of c.strade) {
+    v.xy = [];
+    for (let i = 0; i < v.llVia.length; i += 2) v.xy.push(S.origine.daLonLat(v.llVia[i], v.llVia[i + 1]));
+  }
+  S.indiceCorsie = new IndiceCorsie(c.strade);
+}
+
+/** Tutte le tessere da rifare (la vista «Corsie» accesa o spenta, le corsie arrivate). */
+function rifaiTessere() {
+  for (const k of S.costruite.keys()) {
+    const c = S.costruite.get(k);
+    // Si tengono finché le nuove non arrivano: rifatte, prendono il loro posto.
+    c.rifare = true;
+  }
+  S.lavoro = null;
+  pianificaPresto();
 }
 
 function allaTessera({ id, tessera, errore }) {
@@ -1157,6 +1271,7 @@ function riorigina(lon, lat) {
   }
   if (S.percorso) S.percorso.linea = lineaDi(S.percorso.lonlat, S.percorso.metri);
   if (S.risparmio) S.risparmio.linea = lineaDi(S.risparmio.lonlat);
+  S.indiceCorsie = null;
   if (S.fatto) S.fatto.linea = lineaDi(S.fatto.lonlat);
   moto.s = null;
   moto.x = null;
@@ -1218,8 +1333,16 @@ function aggiornaPercorso(adesso) {
     const qui = s !== null && p.profilo ? p.profilo.quotaVera(s) : null;
     p.profilo = profiloDi(p.linea, da, a, indice, 4, qui === null ? null : { s, h: qui });
     S.sporco.segni = true;
-    scena.impostaNastro('alone', nastro(p.linea, p.profilo, da, a, 15, 0.55), 'alone', 4);
-    scena.impostaNastro('percorso', nastro(p.linea, p.profilo, da, a, 4.6, 0.62, { code: p.code }), 'percorso', 5);
+    if (S.corsie && S.corsiePronte) {
+      // La vista «Corsie»: il percorso (e l'auto con lui) sulla corsia da
+      // tenere, una fascia verde trasparente invece della linea blu.
+      sullaCorsia(p);
+      scena.impostaNastro('alone', null);
+      scena.impostaNastro('percorso', nastro(p.linea, p.profilo, da, a, FASCIA_CORSIA.largo, FASCIA_CORSIA.sopra, { code: p.code }), 'percorsoCorsia', 5);
+    } else {
+      scena.impostaNastro('alone', nastro(p.linea, p.profilo, da, a, 15, 0.55), 'alone', 4);
+      scena.impostaNastro('percorso', nastro(p.linea, p.profilo, da, a, 4.6, 0.62, { code: p.code }), 'percorso', 5);
+    }
     aggiornaFreccia();
   }
   // Con le tessere cambiate cambiano le quote anche della strada fatta.
@@ -1235,12 +1358,39 @@ function aggiornaPercorso(adesso) {
   } else scena.impostaNastro('risparmio', null);
 }
 
+/**
+ * Il percorso [p] sulla corsia giusta: allo spostamento che lo mette sulla
+ * strada (il profilo) si aggiunge quello di lato fino al mezzo della corsia
+ * (vedi `corsieLungoIlPercorso`). Lo seguono la fascia e l'auto.
+ */
+function sullaCorsia(p) {
+  if (!S.indiceCorsie) indicizzaCorsie();
+  const pr = p.profilo;
+  if (!S.indiceCorsie || !pr?.dx) return;
+  const n = pr.dx.length;
+  const punti = [];
+  for (let k = 0; k < n; k++) {
+    const [x, y] = p.linea.a(pr.s0 + k * pr.passo);
+    punti.push([x + pr.dx[k], y + pr.dy[k]]);
+  }
+  const r = corsieLungoIlPercorso(punti, S.indiceCorsie, { passo: pr.passo, s0: pr.s0, suggerimenti: S.suggerimenti });
+  for (let k = 0; k < n; k++) {
+    const a = punti[Math.max(0, k - 1)];
+    const b = punti[Math.min(n - 1, k + 1)];
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    pr.dx[k] += (-(b[1] - a[1]) / l) * r.sposta[k];
+    pr.dy[k] += ((b[0] - a[0]) / l) * r.sposta[k];
+  }
+  p.manovreCorsie = r.manovre.map((m) => ({ s: m.s, dir: m.dir }));
+}
+
 /** La strada già fatta: gli ultimi [FATTO_M] metri, all'altezza giusta. */
 function aggiornaFatto() {
   S.sporco.fatto = false;
   S.rifatti.fatto++;
   const f = S.fatto;
-  if (f && f.linea.lunghezza > 2) {
+  // Nella vista «Corsie» la strada fatta non si disegna: conta quella da fare.
+  if (f && f.linea.lunghezza > 2 && !S.corsie) {
     const a = f.linea.lunghezza;
     const da = Math.max(0, a - FATTO_M);
     scena.impostaNastro('fatto', nastro(f.linea, profiloDi(f.linea, da, a, indice), da, a, 3.6, 0.5), 'fatto', 3);
@@ -1315,7 +1465,8 @@ function aggiornaFreccia() {
   S.sporco.freccia = false;
   S.rifatti.freccia++;
   const p = S.percorso;
-  if (!p?.profilo || !S.manovra) {
+  // Nella vista «Corsie» la manovra la dice la fascia verde sulla corsia.
+  if (!p?.profilo || !S.manovra || S.corsie) {
     scena.impostaNastro('freccia', null);
     scena.impostaPunta(null);
     return;
@@ -1695,7 +1846,7 @@ function aggiornaSegni(adesso) {
   const firma = elenco.join('|');
   if (firma !== S.nomiNascosti && S.mappa?.getLayer('nomi-strade')) {
     S.nomiNascosti = firma;
-    S.mappa.setFilter('nomi-strade', filtroNomi(elenco));
+    S.mappa.setFilter('nomi-strade', filtroNomi(elenco, S.corsie));
   }
   // I nomi dei ponti e delle rampe vicine, scritti sull'impalcato; delle
   // strade con una galleria, fuori dalla galleria.
@@ -1928,13 +2079,15 @@ function muovi(adesso, dt) {
   copertaDaUnPonte(x, y, z, dir);
   aggiornaIo();
   const [lon, lat] = S.origine.lonLat(x, y);
-  const vista = VISTE[S.vista] ?? VISTE.inclinata;
+  const vista = S.corsie ? VISTA_CORSIE : (VISTE[S.vista] ?? VISTE.inclinata);
   let assestata = true;
   if (S.camera.modo === 'segui') {
-    const zoomVoluto = S.zoomVoluto ?? vista.zoom;
+    // Nella vista «Corsie» più vicini di quanto chiede l'app, sempre con la
+    // sua inclinazione (anche sull'auto).
+    const zoomVoluto = S.corsie ? Math.min(ZOOM_MASSIMO_CORSIE, (S.zoomVoluto ?? 17.9) + PIU_VICINO_CORSIE) : (S.zoomVoluto ?? vista.zoom);
     // L'inclinazione: quella della vista, o quella chiesta (sull'auto più
     // dall'alto: «voglio vederla un po' più dall'alto»).
-    const pitchVoluto = S.camera.pitch ?? vista.pitch;
+    const pitchVoluto = S.corsie ? vista.pitch : (S.camera.pitch ?? vista.pitch);
     const c = (S.cam ??= { rotta: rottaCamera, zoom: zoomVoluto, quota: z, pitch: pitchVoluto });
     c.rotta = angoloVerso(c.rotta, rottaCamera, 1 - Math.exp(-dt / 400));
     /* Lo zoom cambia da sé (in autostrada si allontana, vicino a una manovra
@@ -1953,7 +2106,8 @@ function muovi(adesso, dt) {
     const W = m.getCanvas().clientWidth;
     // Lo spazio delle schede, mai più di metà schermo: con misure sbagliate
     // (l'auto le dà in punti suoi) l'auto finiva in un angolo, lontana.
-    const sopra = Math.min(H * 0.12 + S.camera.sopra * 0.8, H * 0.5);
+    // Nella vista «Corsie» l'auto sta nel terzo basso: si spinge giù il mezzo.
+    const sopra = S.corsie ? Math.min(H * 0.4 + S.camera.sopra * 0.5, H * 0.62) : Math.min(H * 0.12 + S.camera.sopra * 0.8, H * 0.5);
     // In larghezza l'auto sta in mezzo alla parte libera: a sinistra il
     // cruscotto di traverso sul telefono, a destra l'altra app dello schermo
     // diviso sull'auto («la navigazione si nasconde sotto l'altro pezzo di
@@ -2041,7 +2195,12 @@ function aggiornaCielo(forza = false) {
   hy = Math.round(hy);
   if (!forza && ultimoOrizzonte !== null && Math.abs(hy - ultimoOrizzonte) < 3) return;
   ultimoOrizzonte = hy;
-  const P = S.notte ? NOTTE : GIORNO;
+  const P = tavolozza(S.notte, S.corsie);
+  // Nella vista «Corsie» un cielo chiaro e pulito, senza nuvole.
+  if (S.corsie && !S.notte) {
+    document.getElementById('mappa').style.background = `linear-gradient(180deg, #a9c8ea 0px, #d6e5f3 ${hy * 0.6}px, ${P.nebbia} ${hy + 4}px, ${P.nebbia} 100%)`;
+    return;
+  }
   document.getElementById('mappa').style.background = S.notte
     ? `linear-gradient(180deg, #040915 0px, #0b1633 ${hy * 0.55}px, #283456 ${hy - 14}px, #4a4660 ${hy - 3}px, ${P.nebbia} ${hy + 4}px, ${P.nebbia} 100%)`
     : `radial-gradient(ellipse 60% 18% at 22% ${hy * 0.35}px, rgba(255,255,255,.55), rgba(255,255,255,0) 70%), radial-gradient(ellipse 45% 12% at 78% ${hy * 0.55}px, rgba(255,255,255,.45), rgba(255,255,255,0) 70%), linear-gradient(180deg, #3f86d6 0px, #79b0e6 ${hy * 0.5}px, #cfe2f2 ${hy - 8}px, ${P.nebbia} ${hy + 4}px, ${P.nebbia} 100%)`;

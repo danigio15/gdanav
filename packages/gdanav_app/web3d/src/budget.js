@@ -42,7 +42,8 @@ export function pianoTessere(disponibili, costruite, x, y, budget = BUDGET) {
     .filter((t) => {
       const c = costruite.get(t.chiave);
       // Una tessera piena va bene anche se ne basterebbe una ridotta.
-      return !c || (c.dettaglio === 'ridotto' && t.dettaglio === 'pieno');
+      // E una da rifare (la vista «Corsie» accesa o spenta) si rifà.
+      return !c || c.rifare || (c.dettaglio === 'ridotto' && t.dettaglio === 'pieno');
     })
     .sort((a, b) => a.d - b.d);
   // Le costruite: lontane, o oltre il numero e i triangoli, si buttano

@@ -58,6 +58,52 @@ export const NOTTE = {
   ombraPonte: 0.16,
 };
 
+/**
+ * La vista «Corsie»: chiara e pulita, perché le corsie si leggano. Il suolo
+ * quasi bianco, gli edifici bianchi e grigio chiaro (la forma resta, i
+ * colori no), l'asfalto blu notte su cui il bianco delle righe e il verde
+ * del percorso stanno bene; i nomi tenui. Si aggiunge ai colori del giorno
+ * (o della notte), che restano per tutto il resto.
+ */
+export const CORSIE = {
+  sfondo: '#F3F4F6',
+  abitato: '#EEF0F3',
+  industria: '#E9EBEF',
+  prato: '#DDEBD3',
+  bosco: '#D0E4C4',
+  acqua: '#C4DFF4',
+  nebbia: '#EEF1F5',
+  asfalto: '#2E394C',
+  asfaltoGrande: '#2B3648',
+  asfaltoPonte: '#3A465B',
+  asfaltoPonteGrande: '#374359',
+  righe: '#F7F9FC',
+  facciata: '#ECEEF1',
+  tetto: '#FBFCFD',
+  ombra: 0.1,
+  ombraPonte: 0.14,
+  nomi: '#6B7380',
+  percorso: '#22C55E',
+  percorsoBordo: '#15803D',
+};
+
+/** E di notte: l'asfalto quasi nero, gli edifici grigio fumo. */
+export const CORSIE_NOTTE = {
+  asfalto: '#1A2130',
+  asfaltoGrande: '#182030',
+  asfaltoPonte: '#252E40',
+  asfaltoPonteGrande: '#232C3E',
+  righe: '#E8EDF5',
+  facciata: '#5A6274',
+  tetto: '#6A7286',
+  nomi: '#A5ADBA',
+  percorso: '#34D399',
+  percorsoBordo: '#047857',
+};
+
+/** I colori di una vista: il giorno o la notte, e sopra quelli delle corsie. */
+export const tavolozza = (notte, corsie = false) => (corsie ? { ...(notte ? NOTTE : GIORNO), ...(notte ? CORSIE_NOTTE : CORSIE) } : notte ? NOTTE : GIORNO);
+
 /** I colori delle facciate e dei tetti, per stile di edificio. */
 export const FACCIATE = {
   residenziale: {

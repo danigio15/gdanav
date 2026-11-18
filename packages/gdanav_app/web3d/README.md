@@ -87,6 +87,18 @@ la mappa scarica già (OpenFreeMap, schema OpenMapTiles).
   `Regia3d.sullAuto`): la scena del telefono segue le regole dell'auto, così
   le due scene non si contendono la scheda grafica a sessanta fotogrammi.
 - Senza rete resta la scena già fatta (le tessere costruite si tengono).
+- La vista **«Corsie»** (prototipo, `opzioni.corsie: true`; spenta, tutto è
+  come prima): le corsie vere di OpenStreetMap, che le tessere non hanno,
+  arrivano col messaggio `corsie` (il formato è in `src/corsie.js`; domani
+  dal relay, `/v1/corsie/<x>/<y>`, oggi da `collaudo/corsie-osm.mjs`).
+  L'asfalto blu notte largo quanto le corsie, le righe bianche (tratteggi,
+  bordi, mezzeria, la riga larga della corsia di decelerazione, la
+  zebratura dove la carreggiata si divide), le frecce di `turn:lanes`, le
+  strisce, le linee d'arresto e i semafori (`src/segnaletica.js`, tre
+  geometrie per tessera); il percorso è una fascia verde sulla corsia da
+  tenere (le frecce dipinte, o le corsie giuste della manovra se l'app le
+  manda), e l'auto ci sta dentro; la telecamera più bassa e vicina, gli
+  edifici bianchi, il suolo chiaro.
 
 L'app parla con la pagina coi messaggi di `src/messaggi.js` (lo stesso
 formato di `lib/mappa/ponte_3d.dart`); la WebView è in
