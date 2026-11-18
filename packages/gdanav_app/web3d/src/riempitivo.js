@@ -1,7 +1,7 @@
 // La città piena, nella vista «Corsie»: le case che OpenStreetMap non ha.
 //
 // «Però devi comunque mettere case ecc., così sembra morto.» In tanti paesi
-// (Aversa, i dintorni di Caserta) gli edifici veri nella mappa sono pochi:
+// del Sud gli edifici veri nella mappa sono pochi:
 // lungo una strada di città restava un piano bianco, come una campagna
 // innevata. Dove la mappa dice che è abitato (o in una tessera di città,
 // fuori dai campi, dai parchi e dall'acqua), lungo le strade nascono dei
