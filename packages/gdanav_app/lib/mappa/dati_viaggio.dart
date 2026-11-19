@@ -343,18 +343,43 @@ Map<String, Object?> datiManovra(
    * la freccia parte da lì, dove la linea è, e in [uscitaCorsiaM] metri dopo
    * la manovra torna sul percorso. */
   final c = corsie ? _corsieDi(v, m, sullaMappa: sullaMappa) : null;
-  final tratto = _trattoSpostato(g, math.max(0, centro - primaM), fine, c?.latoA);
+  // Con le corsie disegnate la freccia parte poco prima della manovra: prima
+  // la corsia giusta la dice la linea blu, e una freccia bianca sopra la
+  // nascondeva tutta («la linea bianca è troppo lunga»).
+  final da = math.max(0.0, centro - (c == null ? primaM : _primaConCorsieM));
+  final tratto = _trattoSpostato(g, da, fine, c?.latoA);
   if (tratto.length < 2 || fine - centro < 5) return _collezione([]);
   // La punta guarda come l'ultimo pezzo del tratto.
   final rotta = rottaGradi(_trattoSpostato(g, fine - 4, fine, c?.latoA).first, tratto.last);
+  Map<String, Object?> pezzo(double a, double b) => {
+    'type': 'LineString',
+    'coordinates': [for (final p in _trattoSpostato(g, a, b, c?.latoA)) _xy(p)],
+  };
+  final passo = uscitaCorsiaM / 8;
   return _collezione([
-    _elemento({
-      'type': 'LineString',
-      'coordinates': [for (final p in tratto) _xy(p)],
-    }, const {}),
+    if (c == null)
+      _elemento({
+        'type': 'LineString',
+        'coordinates': [for (final p in tratto) _xy(p)],
+      }, const {})
+    else ...[
+      // Larga come la linea blu sotto: nella corsia quanto lei, poi via via
+      // quanto il percorso (`f` e `largo`, come in [datiCorsie]).
+      if (centro > da) _elemento(pezzo(da, centro + 0.3), {'f': 1.0, 'largo': c.largo}),
+      for (var k = 0; k < 8; k++)
+        if (centro + k * passo < fine)
+          _elemento(pezzo(centro + k * passo, math.min(fine, centro + (k + 1) * passo + 0.3)), {
+            'f': 1 - _liscio((k + 0.5) / 8),
+            'largo': c.largo,
+          }),
+      if (fine > centro + uscitaCorsiaM) _elemento(pezzo(centro + uscitaCorsiaM, fine), {'f': 0.0, 'largo': c.largo}),
+    ],
     _elemento({'type': 'Point', 'coordinates': _xy(tratto.last)}, {'rotta': rotta}),
   ]);
 }
+
+/// Con le corsie, quanto prima della manovra parte la freccia.
+const _primaConCorsieM = 20.0;
 
 /// Dove finisce la freccia: poco dopo la manovra, mai fin sulla manovra dopo
 /// (la punta ci arriverebbe sopra, e sembrerebbe di dover girare lì).
@@ -363,7 +388,9 @@ Map<String, Object?> datiManovra(
 /// alla strada per un bel pezzo, e la freccia, finita [dopoM] metri dopo,
 /// puntava dritta: sembrava di dover tirare dritto. Se la strada gira più in
 /// là (entro [_allungoMaxM]), la freccia arriva fin dove ha girato di
-/// [_giratoGradi]: la punta guarda dove si va.
+/// [_giratoGradi]: la punta guarda dove si va. Se gira ancora più in là, la
+/// freccia arriva a [_uscitaLungaM] metri: si vede la rampa che si stacca.
+/// Mai più lunga di così: «la linea bianca è troppo lunga».
 double _fineFreccia(Viaggio v, Manovra m, Linea l, double centro, double dopoM) {
   final manovre = v.percorso.manovre;
   final k = manovre.indexWhere((x) => x.inizio > m.inizio);
@@ -374,6 +401,7 @@ double _fineFreccia(Viaggio v, Manovra m, Linea l, double centro, double dopoM) 
     final verso = rottaGradi(prima, qui);
     // Girata già entro [dopoM] (una svolta a un incrocio): resta com'era.
     if (_girata(l, verso, centro + dopoM) == null) {
+      voluta = centro + _uscitaLungaM;
       for (var s = centro + dopoM + 5; s <= math.min(centro + _allungoMaxM, l.lunghezzaM); s += 5) {
         if (_girata(l, verso, s) != null) {
           voluta = s;
@@ -386,10 +414,13 @@ double _fineFreccia(Viaggio v, Manovra m, Linea l, double centro, double dopoM) 
 }
 
 /// Fin dove si allunga la freccia di un'uscita, al più.
-const _allungoMaxM = 250.0;
+const _allungoMaxM = 100.0;
+
+/// Fin dove va la freccia di un'uscita che gira più in là di [_allungoMaxM].
+const _uscitaLungaM = 80.0;
 
 /// Di quanto deve aver girato la strada perché la freccia lo mostri.
-const _giratoGradi = 20.0;
+const _giratoGradi = 15.0;
 
 /// [s] se a [s] metri la strada va a più di [_giratoGradi] da [verso].
 double? _girata(Linea l, double verso, double s) {

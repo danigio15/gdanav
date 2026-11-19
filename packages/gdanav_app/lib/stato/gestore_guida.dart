@@ -445,6 +445,10 @@ class GestoreGuida extends ChangeNotifier {
     // dell'arrivo, e la mappa 3D lo prendeva per la velocità di adesso).
     _velocitaMs = null;
     _velocitaGps = null;
+    // E il punto sul percorso: chi lo vede (la scena 3D, la mappa del
+    // telefono) finché c'è non ascolta il GPS, e l'auto restava ferma
+    // dov'era finita la guida («solo la visuale 2D funziona senza percorso»).
+    avanzamento = null;
     if (zittisci) await voce.zitta();
     _racconta(inViaggio: false);
     notifyListeners();
@@ -590,6 +594,10 @@ class GestoreGuida extends ChangeNotifier {
   /// Dove disegnare l'auto adesso e la direzione della strada lì; `null`
   /// se non si è agganciati alla strada (si disegna il punto del GPS).
   ({Punto punto, double rotta})? posizioneStimata() {
+    // Finita la guida non c'è un punto sul percorso: l'avanzamento resta
+    // quello dell'ultima lettura, e la scena 3D teneva l'auto lì, ferma
+    // («senza navigazione di nuovo fermo, non cammina»; solo il 2D andava).
+    if (!attiva) return null;
     final a = avanzamento, g = _guida, sulla = a?.posizioneSulPercorso, rotta = a?.rotta;
     final metri = metriStimati();
     if (a == null || g == null || sulla == null || rotta == null || metri == null) return null;
@@ -600,6 +608,7 @@ class GestoreGuida extends ChangeNotifier {
   /// Come [posizioneStimata], in metri lungo il percorso ([strada]); `null`
   /// se non si è agganciati alla strada.
   double? metriStimati() {
+    if (!attiva) return null;
     final a = avanzamento;
     if (a == null || _guida == null || a.posizioneSulPercorso == null || a.rotta == null) return null;
     final v = _velocitaMs, alle = _lettaAlle;

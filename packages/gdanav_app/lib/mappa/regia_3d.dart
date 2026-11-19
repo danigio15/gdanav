@@ -399,7 +399,8 @@ class Regia3d {
         _manda(msgSorgente(sorgenteFatto, datiTraccia(g.traccia)));
       }
     }
-    final v = g.pronto?.viaggio, a = g.avanzamento;
+    // Fuori guida niente avanzamento: quello rimasto è dell'ultima lettura in guida.
+    final v = g.pronto?.viaggio, a = g.attiva ? g.avanzamento : null;
     // La freccia della prossima manovra, avvicinandosi.
     final chiave = chiaveFreccia(v, a?.prossima, a?.allaProssimaM, ricalcolo: g.ricalcolando);
     if (chiave != _frecciaMandata) {

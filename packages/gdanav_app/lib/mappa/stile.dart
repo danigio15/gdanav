@@ -644,7 +644,10 @@ List<Object> _filtroFrecciaManovra(bool immersiva) => [
 /// La larghezza della linea che dal percorso entra nella corsia giusta (vedi
 /// `datiCorsie`): a ogni zoom, fra quella del percorso (pixel) e `largo`
 /// metri, secondo `f`.
-List<Object> _daPercorsoACorsia() {
+///
+/// Anche per la freccia della manovra ([scala]: quanto della linea), che
+/// senza `f` e `largo` è larga come il percorso.
+List<Object> _daPercorsoACorsia({double scala = 1}) {
   double percorso(double z) {
     if (z <= 12) return larghezzaPercorso.$1;
     if (z >= 18) return larghezzaPercorso.$2;
@@ -652,6 +655,16 @@ List<Object> _daPercorsoACorsia() {
     return larghezzaPercorso.$1 + (larghezzaPercorso.$2 - larghezzaPercorso.$1) * t;
   }
 
+  final f = [
+    'coalesce',
+    ['get', 'f'],
+    0,
+  ];
+  final largo = [
+    'coalesce',
+    ['get', 'largo'],
+    larghezzaCorsia,
+  ];
   return [
     'interpolate',
     ['linear'],
@@ -659,23 +672,19 @@ List<Object> _daPercorsoACorsia() {
     for (final z in [12.0, 14.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0]) ...[
       z,
       [
-        '+',
+        '*',
+        scala,
         [
-          '*',
-          [
-            '-',
-            1,
-            ['get', 'f'],
-          ],
-          percorso(z),
-        ],
-        [
-          '*',
-          ['get', 'f'],
+          '+',
           [
             '*',
-            ['get', 'largo'],
-            pixelPerMetro(z),
+            ['-', 1, f],
+            percorso(z),
+          ],
+          [
+            '*',
+            f,
+            ['*', largo, pixelPerMetro(z)],
           ],
         ],
       ],
@@ -1421,7 +1430,10 @@ Map<String, Object> stileMappa({
         // strade: in pixel, da vicino, sbordava dalla corsia giusta.
         'paint': {
           'line-color': '#0B3C78',
-          'line-width': immersiva ? _metri(larghezzaCorsia * 0.94) : _largo(larghezzaBordo.$1, larghezzaBordo.$2),
+          // Nell'immersiva larga quanto la linea blu lì sotto: nella corsia
+          // giusta quanto la corsia, fuori quanto il percorso («la linea
+          // bianca non ha la stessa dimensione della blu»).
+          'line-width': immersiva ? _daPercorsoACorsia() : _largo(larghezzaBordo.$1, larghezzaBordo.$2),
         },
       },
       {
@@ -1434,7 +1446,7 @@ Map<String, Object> stileMappa({
         'paint': {
           'line-color': '#FFFFFF',
           'line-width': immersiva
-              ? _metri(larghezzaCorsia * 0.6)
+              ? _daPercorsoACorsia(scala: 0.72)
               : _largo(larghezzaPercorso.$1 * 0.75, larghezzaPercorso.$2 * 0.75),
         },
       },

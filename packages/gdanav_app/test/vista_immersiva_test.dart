@@ -71,12 +71,15 @@ void main() {
       corsie: [dritta, dritta, giusta],
     );
     final v = viaggioCon(uscita);
-    final c =
-        ((datiManovra(v, uscita, corsie: true)['features']! as List).cast<Map>().first['geometry']
-                as Map)['coordinates']
-            as List;
+    // A pezzi, ognuno largo quanto la linea blu lì sotto.
+    final pezzi = [
+      for (final e in (datiManovra(v, uscita, corsie: true)['features']! as List).cast<Map>())
+        if ((e['geometry'] as Map)['type'] == 'LineString') ((e['geometry'] as Map)['coordinates'] as List),
+    ];
+    expect(pezzi.length, greaterThan(2));
+    final c = [for (final p in pezzi) ...p];
     const est = 3.5 / (111195.08 * 0.70711);
-    // Sessanta metri prima della manovra: nella corsia giusta, a destra.
+    // Venti metri prima della manovra: nella corsia giusta, a destra.
     expect(((c.first as List)[0] as double), closeTo(9 + est, 2e-7));
     // In fondo, passata la manovra, di nuovo sul percorso (verso est, lat 45,003).
     expect(((c.last as List)[1] as double), closeTo(45.003, 1e-7));
@@ -177,11 +180,11 @@ void main() {
 
   test("a un'uscita la freccia arriva fin dove la rampa gira, e la punta guarda lì", () {
     // «Deve esserci la freccia che esce»: la rampa corre dritta accanto alla
-    // strada per 150 m, poi gira a destra. Prima la freccia finiva 45 m dopo
+    // strada per 90 m, poi gira a destra. Prima la freccia finiva 45 m dopo
     // e puntava dritta.
     final rampa = [
-      for (var i = 0; i <= 36; i++) Punto(45 + i * 0.0001, 9),
-      for (var i = 1; i <= 20; i++) Punto(45.0036, 9 + i * 0.00014),
+      for (var i = 0; i <= 28; i++) Punto(45 + i * 0.0001, 9),
+      for (var i = 1; i <= 20; i++) Punto(45.0028, 9 + i * 0.00014),
     ];
     const esci = Manovra(istruzione: 'Esci a destra', lunghezzaM: 300, secondi: 20, inizio: 20, tipo: 20);
     final v = Viaggio(
@@ -195,9 +198,9 @@ void main() {
     expect(((punta['properties'] as Map)['rotta'] as num).toDouble(), greaterThan(20));
     // E sta oltre l'inizio della curva, non 45 m dopo la manovra.
     final dove = ((punta['geometry'] as Map)['coordinates'] as List).cast<double>();
-    expect(dove[1], greaterThan(45.0035));
+    expect(dove[1], greaterThan(45.0027));
     // A una svolta vera (girata subito) la freccia resta corta.
-    const gira = Manovra(istruzione: 'Gira a destra', lunghezzaM: 300, secondi: 20, inizio: 36, tipo: 10);
+    const gira = Manovra(istruzione: 'Gira a destra', lunghezzaM: 300, secondi: 20, inizio: 28, tipo: 10);
     final v2 = Viaggio(
       percorso: PercorsoCalcolato(punti: rampa, tratti: const [], manovre: [gira]),
       colonnine: const [],
