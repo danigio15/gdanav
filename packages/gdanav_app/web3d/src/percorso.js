@@ -549,6 +549,58 @@ export function fermiSuStrada(dx, dy, s0, passo, suStrada) {
   }
 }
 
+/** Da quanti gradi in su, fra otto metri prima e otto dopo, la fascia arrotonda la svolta. */
+const SMUSSO_GRADI = 18;
+/** E quanto prima (e dopo) dello spigolo comincia la curva, al più (m). */
+const SMUSSO_M = 14;
+
+/**
+ * Le svolte della fascia della vista «Corsie», arrotondate.
+ *
+ * «Non gira bene nella corsia, va più avanti»: il percorso gira dove si
+ * incontrano le linee di mezzo delle due strade, e la fascia, spostata
+ * sulla corsia di destra prima e nel mezzo del ramo dopo, tirava dritto
+ * oltre il punto in cui il ramo si stacca e poi girava ad angolo. Qui ogni
+ * spigolo diventa una curva (una Bézier con lo spigolo per controllo) che
+ * comincia fino a [SMUSSO_M] metri prima: la fascia entra nel ramo da dove
+ * il ramo comincia, come la strada vera.
+ *
+ * [punti] `[x, y]` già spostati sulla strada e sulla corsia, uno ogni
+ * [passo] metri; si cambiano al loro posto.
+ */
+export function smussaLeSvolte(punti, passo = 4) {
+  const n = punti.length;
+  const w = Math.max(1, Math.round(8 / passo));
+  if (n < 2 * w + 3) return punti;
+  const verso = (a, b) => Math.atan2(b[1] - a[1], b[0] - a[0]);
+  const giro = new Float64Array(n);
+  for (let k = w; k < n - w; k++) {
+    let d = verso(punti[k], punti[k + w]) - verso(punti[k - w], punti[k]);
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    giro[k] = Math.abs(d) * (180 / Math.PI);
+  }
+  const m0 = Math.max(1, Math.round(SMUSSO_M / passo));
+  let libero = 0;
+  for (let k = w; k < n - w; k++) {
+    if (giro[k] < SMUSSO_GRADI || giro[k] < giro[k - 1] || giro[k] < giro[k + 1]) continue;
+    const m = Math.min(m0, k - libero, n - 1 - k);
+    if (m < 1) continue;
+    const p0 = punti[k - m];
+    const p1 = [...punti[k]];
+    const p2 = punti[k + m];
+    for (let j = -m + 1; j < m; j++) {
+      const t = (j + m) / (2 * m);
+      const a = (1 - t) * (1 - t);
+      const b = 2 * t * (1 - t);
+      const c = t * t;
+      punti[k + j] = [a * p0[0] + b * p1[0] + c * p2[0], a * p0[1] + b * p1[1] + c * p2[1]];
+    }
+    libero = k + m;
+    k = k + m;
+  }
+  return punti;
+}
+
 /** Più di così non si sposta: oltre, la strada giusta è un'altra.
  *
  * Il percorso arriva da TomTom (`ClienteTomTom`, per il traffico nei tempi),

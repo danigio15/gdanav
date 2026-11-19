@@ -13,7 +13,7 @@ import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, lon
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { AggancioStrada, SOGLIA_M } from './aggancio.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
-import { alzataDeiNastri, direzioneDisegnata, IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti } from './percorso.js';
+import { alzataDeiNastri, direzioneDisegnata, IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti, smussaLeSvolte } from './percorso.js';
 import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
 import { dallaScorta, nellaScorta } from './scorte.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
@@ -1527,6 +1527,17 @@ function sullaCorsia(p) {
     const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
     pr.dx[k] += (-(b[1] - a[1]) / l) * r.sposta[k];
     pr.dy[k] += ((b[0] - a[0]) / l) * r.sposta[k];
+  }
+  // E le svolte arrotondate: la fascia entra nel ramo da dove comincia.
+  const sulla = [];
+  for (let k = 0; k < n; k++) {
+    const [x, y] = p.linea.a(pr.s0 + k * pr.passo);
+    sulla.push([x + pr.dx[k], y + pr.dy[k], x, y]);
+  }
+  const tonde = smussaLeSvolte(sulla.map(([x, y]) => [x, y]), pr.passo);
+  for (let k = 0; k < n; k++) {
+    pr.dx[k] = tonde[k][0] - sulla[k][2];
+    pr.dy[k] = tonde[k][1] - sulla[k][3];
   }
   p.manovreCorsie = r.manovre.map((m) => ({ s: m.s, dir: m.dir }));
 }

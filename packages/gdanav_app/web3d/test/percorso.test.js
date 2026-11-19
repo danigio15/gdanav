@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { IndiceSegmenti, Linea, Origine, Profilo, alzataDeiNastri, direzioneDisegnata, fermiSuStrada, lungoLaLinea, nastro, pezziDelNastro, profiloDi, quote, riempiQuote, sensiDiMarcia } from '../src/percorso.js';
+import { IndiceSegmenti, Linea, Origine, Profilo, alzataDeiNastri, direzioneDisegnata, fermiSuStrada, lungoLaLinea, smussaLeSvolte, nastro, pezziDelNastro, profiloDi, quote, riempiQuote, sensiDiMarcia } from '../src/percorso.js';
 
 /** Segmenti finti: [x0,y0,z0,x1,y1,z1,w,codice]. */
 function indice(segmenti) {
@@ -606,4 +606,26 @@ test('il pezzo rifatto sulle strade vere non si sposta, e ai capi si raccorda se
   const x = Float64Array.from([1, 2, 3]);
   fermiSuStrada(x, Float64Array.from([1, 2, 3]), 0, 4, []);
   assert.deepEqual([...x], [1, 2, 3]);
+});
+
+test('la fascia arrotonda lo spigolo: comincia a girare prima, e finisce sulla strada di dopo', () => {
+  // Dritti verso nord per 60 m, poi a destra (est) di 90°.
+  const passo = 4;
+  const punti = [];
+  for (let y = 0; y <= 60; y += passo) punti.push([0, y]);
+  for (let x = passo; x <= 60; x += passo) punti.push([x, 60]);
+  const prima = punti.map((p) => [...p]);
+  smussaLeSvolte(punti, passo);
+  const k = prima.findIndex(([x, y]) => x === 0 && y === 60);
+  // Lo spigolo non c'è più: lì la fascia passa dentro la curva.
+  assert.ok(punti[k][0] > 2 && punti[k][1] < 58, `allo spigolo ${punti[k]}`);
+  // Qualche metro prima già gira a destra…
+  assert.ok(punti[k - 2][0] > 0.2, `prima dello spigolo ${punti[k - 2]}`);
+  // …ma lontano dalla svolta niente cambia.
+  assert.deepEqual(punti[0], prima[0]);
+  assert.deepEqual(punti.at(-1), prima.at(-1));
+  assert.deepEqual(punti[k - 6], prima[k - 6]);
+  // E una strada dritta resta dritta.
+  const dritta = Array.from({ length: 20 }, (_, i) => [0, i * passo]);
+  assert.deepEqual(smussaLeSvolte(dritta.map((p) => [...p]), passo), dritta);
 });
