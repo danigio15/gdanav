@@ -919,7 +919,9 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
       await m.setGeoJsonSource(sorgenteManovra, dati.cast<String, dynamic>());
       // Le corsie sulla strada: solo la vista immersiva le ha nello stile.
       if (_immersiva) {
-        final corsie = chiave == null ? datiCorsie(null, null) : datiCorsie(v, a?.prossima, sullaMappa: sulla);
+        final corsie = chiave == null
+            ? datiCorsie(null, null)
+            : datiCorsie(v, a?.prossima, sullaMappa: sulla, classe: (m) => g?.classeSullaMappa(v?.percorso, m) ?? '');
         await m.setGeoJsonSource(sorgenteCorsie, corsie.cast<String, dynamic>());
       }
     } catch (_) {

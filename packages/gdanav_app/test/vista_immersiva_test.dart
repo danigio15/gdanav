@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/mappa/dati_viaggio.dart';
 import 'package:gdanav_app/mappa/stile.dart';
@@ -73,6 +75,18 @@ void main() {
         if ((xy[1] as double) < 45.0029) expect(xy[0] as double, closeTo(9 - ovest, 1e-7));
       }
     }
+    // Le corsie prendono la classe della strada su cui stanno: lo stile le
+    // colora come lei, e non sono più una lastra chiara sopra l'autostrada.
+    final classi = {
+      for (final e
+          in (datiCorsie(v, uscita, sullaMappa: spostata, classe: (_) => 'motorway')['features']! as List).cast<Map>())
+        if ((e['properties'] as Map)['tipo'] == 'corsia') (e['properties'] as Map)['classe'],
+    };
+    expect(classi, {'motorway'});
+    final strato = (stileMappa(scuro: false, immersiva: true)['layers']! as List).cast<Map>().firstWhere(
+      (l) => l['id'] == 'corsie',
+    );
+    expect(jsonEncode((strato['paint'] as Map)['line-color']), contains('motorway'));
     final percorso = datiViaggio(v, sullaMappa: spostata)[sorgentePercorso]!;
     expect((linee(percorso).single.first as List)[0], closeTo(9 - ovest, 1e-9));
     // Di un altro percorso (un'altra lunghezza) non si usa.

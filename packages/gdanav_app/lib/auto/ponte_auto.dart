@@ -1350,6 +1350,7 @@ class PonteAuto {
               chiave == null ? null : p.viaggio,
               a?.prossima,
               sullaMappa: guida.sullaMappaDi(p.viaggio.percorso),
+              classe: (m) => guida.classeSullaMappa(p.viaggio.percorso, m) ?? '',
             ),
           ),
         },

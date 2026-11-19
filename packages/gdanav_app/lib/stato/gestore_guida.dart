@@ -637,6 +637,14 @@ class GestoreGuida extends ChangeNotifier {
     return s.linea;
   }
 
+  /// La classe della strada della mappa sotto il percorso [p] a [metri]
+  /// («motorway», «primary»…), se si sa: le corsie ne prendono il colore.
+  String? classeSullaMappa(PercorsoCalcolato? p, double metri) {
+    final s = _sullaMappa;
+    if (p == null || s == null || !identical(s.percorso, p.punti)) return null;
+    return s.classeA(metri);
+  }
+
   /// La linea su cui la freccia scorre nella mappa di sempre: [strada], ma
   /// sulle strade della mappa se si sa.
   Linea? get stradaSullaMappa => sullaMappaDi(pronto?.viaggio.percorso) ?? strada;

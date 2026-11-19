@@ -382,7 +382,18 @@ double _fineFreccia(Viaggio v, Manovra m, Linea l, double centro, double dopoM) 
 /// carreggiata: la corsia `i` di `n` sta a `(i - (n-1)/2)` corsie dal centro
 /// (a destra il segno è più, come per `line-offset`). Solo quando servono
 /// ([Manovra.corsieUtili]): se vanno bene tutte non c'è niente da dire.
-Map<String, Object?> datiCorsie(Viaggio? v, Manovra? m, {double primaM = 160, Linea? sullaMappa}) {
+///
+/// [classe]: la strada su cui si sta («motorway», «primary»…), dalle strade
+/// della mappa ([GestoreGuida.classeSullaMappa]): le corsie che non sono
+/// quella giusta hanno il suo colore, e sulla strada si vedono le righe e la
+/// corsia giusta, non una lastra più chiara appoggiata sopra.
+Map<String, Object?> datiCorsie(
+  Viaggio? v,
+  Manovra? m, {
+  double primaM = 160,
+  Linea? sullaMappa,
+  String Function(double metri)? classe,
+}) {
   if (v == null || m == null || !m.corsieUtili || v.percorso.punti.length < 2) return _collezione([]);
   final l = Linea(v.percorso.punti);
   final centro = l.cumulate[m.inizio.clamp(0, l.punti.length - 1)];
@@ -402,11 +413,13 @@ Map<String, Object?> datiCorsie(Viaggio? v, Manovra? m, {double primaM = 160, Li
     'coordinates': [for (final p in tratto) _xy(p)],
   };
   final n = m.corsie.length;
+  final classeCorsie = classe?.call(math.max(da, centro - 40)) ?? '';
   return _collezione([
     for (var i = 0; i < n; i++)
       _elemento(linea, {
         'tipo': 'corsia',
         'giusta': m.corsie[i].giusta,
+        'classe': classeCorsie,
         'spostamento': (i - (n - 1) / 2) * larghezzaCorsia,
       }),
     for (var i = 0; i <= n; i++)
