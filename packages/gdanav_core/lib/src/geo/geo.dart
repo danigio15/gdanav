@@ -167,6 +167,11 @@ class Proiezione {
 class Linea {
   Linea(this.punti) : cumulate = _cumulate(punti);
 
+  /// Una linea coi metri già detti, uno per punto e in salita: quelli di
+  /// un'altra linea di cui questa è una copia spostata (vedi `SullaMappa`),
+  /// così «a tanti metri» è lo stesso posto sulle due.
+  Linea.conMetri(this.punti, this.cumulate) : assert(punti.length == cumulate.length);
+
   final List<Punto> punti;
   final List<double> cumulate;
 

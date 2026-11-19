@@ -212,3 +212,35 @@ test('il profilo che si rifà non fa saltare la freccia: ci arriva piano', async
   r2.passo(vecchio, 10, (p) => (p === vecchio ? [0, 0, 0] : [20, 0, 0]), 33);
   assert.deepEqual(r2.passo(lontano, 10, (p) => (p === vecchio ? [0, 0, 0] : [20, 0, 0]), 33), [0, 0, 0]);
 });
+
+test('senza percorso e senza velocità dall\'app, la freccia va con le letture e non resta indietro', () => {
+  // «Senza navigazione di nuovo fermo, non cammina»: l'app mandava zero
+  // (la velocità rimasta dalla guida finita), e la freccia restava indietro.
+  const m = new Moto();
+  let t = 0;
+  let y = 0;
+  for (let k = 0; k < 10; k++) {
+    m.posizione({ metri: null, v: 0, x: 0, y: 10 * k, rotta: 0, quando: t, adesso: t });
+    for (let f = 0; f < 30; f++) {
+      t += 1000 / 30;
+      y = m.passo(t).y;
+    }
+  }
+  // Dopo dieci secondi a 10 m/s: sulla lettura portata avanti, non trenta metri dietro.
+  assert.ok(y > 95, `la freccia è a ${y.toFixed(1)} m`);
+});
+
+test('da fermi il GPS che balla non fa partire la freccia', () => {
+  const m = new Moto();
+  let t = 0;
+  let y = 0;
+  const balli = [0, 2.5, -1, 3, 0.5, -2, 2, 1, -1.5, 2.5];
+  for (const b of balli) {
+    m.posizione({ metri: null, v: 0, x: b * 0.5, y: b, rotta: 0, quando: t, adesso: t });
+    for (let f = 0; f < 30; f++) {
+      t += 1000 / 30;
+      y = m.passo(t).y;
+    }
+  }
+  assert.ok(y < 4, `la freccia è andata a ${y.toFixed(1)} m`);
+});

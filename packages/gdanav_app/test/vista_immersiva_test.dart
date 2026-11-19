@@ -45,6 +45,41 @@ void main() {
     expect((linea.first as List)[1], lessThan(45.0016));
   });
 
+  test('con la linea sulle strade della mappa, corsie, freccia e percorso stanno lì e non dove dice il fornitore', () {
+    // «Linee fuori strada»: la strada della mappa sta otto metri a ovest
+    // della linea del fornitore. La linea da disegnare è spostata lì, coi
+    // metri del percorso: corsie, freccia e percorso la seguono.
+    final uscita = Manovra(
+      istruzione: 'Esci a destra',
+      lunghezzaM: 300,
+      secondi: 20,
+      inizio: 30,
+      tipo: 20,
+      corsie: [dritta, giusta],
+    );
+    final v = viaggioCon(uscita);
+    final l = Linea(punti);
+    const ovest = 8 / (111195.08 * 0.7071);
+    final spostata = Linea.conMetri([for (final p in punti) Punto(p.lat, p.lon - ovest)], l.cumulate);
+    List<List> linee(Map<String, Object?> dati) => [
+      for (final e in (dati['features']! as List).cast<Map>())
+        if ((e['geometry'] as Map)['type'] == 'LineString') ((e['geometry'] as Map)['coordinates'] as List),
+    ];
+    for (final c in [
+      ...linee(datiCorsie(v, uscita, sullaMappa: spostata)),
+      ...linee(datiManovra(v, uscita, sullaMappa: spostata)),
+    ]) {
+      for (final xy in c.cast<List>()) {
+        if ((xy[1] as double) < 45.0029) expect(xy[0] as double, closeTo(9 - ovest, 1e-7));
+      }
+    }
+    final percorso = datiViaggio(v, sullaMappa: spostata)[sorgentePercorso]!;
+    expect((linee(percorso).single.first as List)[0], closeTo(9 - ovest, 1e-9));
+    // Di un altro percorso (un'altra lunghezza) non si usa.
+    final altra = Linea.conMetri(spostata.punti, [for (final c in l.cumulate) c * 2]);
+    expect((linee(datiViaggio(v, sullaMappa: altra)[sorgentePercorso]!).single.first as List)[0], 9);
+  });
+
   test("la freccia della manovra sta sulla linea blu, anche nell'immersiva e anche con le corsie", () {
     // «La linea bianca non combacia con quella blu, e sul continuo del
     // percorso»: «mantieni la sinistra» a un bivio, la corsia giusta tutta a
