@@ -81,30 +81,34 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
     fun aggiorna() = postInvalidate()
 
     /**
-     * Da dove parte, in alto, il lettore musicale: il punto più basso a cui è
-     * arrivato il bordo alto dell'area libera su questa superficie.
+     * Da dove parte, in alto, il lettore musicale: il bordo alto dell'area
+     * libera, che sale e scende coi tasti in alto (Android Auto li nasconde
+     * dopo qualche secondo senza tocchi e li rimette al primo tocco).
      *
-     * L'area libera sale e scende coi tasti in alto, che Android Auto
-     * nasconde dopo qualche secondo senza tocchi e rimette al primo tocco: il
-     * brano, legato a lei, saltava su e giù. L'area che i tasti non coprono
-     * mai (quella «stabile») sta sempre dentro quella libera, e il suo bordo
-     * alto è proprio il più basso che quella libera raggiunge: tenendo quello
-     * il lettore resta fermo, sotto i tasti quando ci sono. Si ricomincia se
-     * cambia la superficie (lo schermo diviso). Quando l'auto dice l'area
-     * stabile ([areaStabile]) vale il più basso dei due: il lettore è al suo
-     * posto dal primo disegno, senza aspettare che i tasti siano comparsi.
+     * Prima stava fermo al punto più basso, per non saltare su e giù coi
+     * tasti; ma «quando scompaiono i tasti cerca eccetera, le info della
+     * musica devono andare sopra, non devono stare lì». Adesso sale, piano
+     * ([DisposizioneMusica.altoVerso]), e quando i tasti tornano scende
+     * subito sotto di loro. Si ricomincia se cambia la superficie (lo schermo
+     * diviso).
      */
-    private var altoFermo = 0
-    private var altoFermoPer = 0L
+    private var altoMostrato = Float.NaN
+    private var altoMostratoPer = 0L
+    private var altoMostratoIl = 0L
 
-    private fun bordoFermo(a: Rect): Int {
+    private fun altoDelLettore(a: Rect): Float {
         val per = (width.toLong() shl 32) or height.toLong()
-        if (per != altoFermoPer) {
-            altoFermoPer = per
-            altoFermo = a.top
+        val ora = SystemClock.uptimeMillis()
+        if (per != altoMostratoPer) {
+            altoMostratoPer = per
+            altoMostrato = Float.NaN
         }
-        if (a.top > altoFermo) altoFermo = a.top
-        return altoFermo
+        val meta = a.top.toFloat()
+        altoMostrato = DisposizioneMusica.altoVerso(altoMostrato, meta, ora - altoMostratoIl)
+        altoMostratoIl = ora
+        // Ancora in salita: il prossimo fotogramma lo porta un po' più su.
+        if (altoMostrato != meta) postInvalidateOnAnimation()
+        return altoMostrato
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -759,8 +763,8 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
     private fun RectF.riq() = Riq(left, top, right, bottom)
 
     /**
-     * Il lettore musicale, in alto a destra sotto i tasti: fermo dove i tasti
-     * in alto non arrivano mai ([bordoFermo]), a sinistra della [striscia] del
+     * Il lettore musicale, in alto a destra sotto i tasti, e più su quando i
+     * tasti spariscono ([altoDelLettore]), a sinistra della [striscia] del
      * traffico, sotto il cartello dello svincolo e sotto l'[avviso] se lo
      * toccherebbe, mai sopra tachimetro e barra dei dati ([inBasso]) né nella
      * colonna dove Android Auto mette l'avviso di casa. Se aperto non ci sta
@@ -784,7 +788,7 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         }
         val b = LettoreTelefono.brano
         val stabile = areaStabile?.let { Rect(it) }?.takeIf { it.intersect(tutta) && !it.isEmpty } ?: tutta
-        val fermo = max(bordoFermo(a), stabile.top)
+        val fermo = altoDelLettore(a)
         val ostacoli = inBasso.mapTo(mutableListOf<Riq>()) { it.riq() }
         // L'avviso di casa lo disegna Android Auto, sopra la mappa, nella
         // colonna di sinistra: finché c'è, lì il lettore non entra.
@@ -793,7 +797,7 @@ class PannelloAuto(context: Context, private val densita: Float) : View(context)
         }
         val spazio = DisposizioneMusica.Spazio(
             sinistra = a.left + margine,
-            alto = max(sottoIlCartello ?: 0f, fermo.toFloat()) + margine,
+            alto = max(sottoIlCartello ?: 0f, fermo) + margine,
             destra = min(a.right, stabile.right) - margine,
             basso = a.bottom - margine,
             centroX = (stabile.left + stabile.right) / 2f,

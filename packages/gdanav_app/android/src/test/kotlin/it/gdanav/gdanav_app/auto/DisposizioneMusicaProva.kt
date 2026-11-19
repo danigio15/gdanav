@@ -251,5 +251,16 @@ fun main() {
     uguale("avviso di casa, 830: resta compatto", disponi(schermo(830f, schede = true, ostacoli = listOf(colonna(653f))))?.forma, Forma.COMPATTO)
     uguale("avviso di casa, 640: non c'è posto", disponi(schermo(640f, schede = true, ostacoli = listOf(colonna(653f)))), null)
 
+    // I tasti in alto spariscono e tornano: il lettore sale piano, scende subito.
+    val altoVerso = DisposizioneMusica::altoVerso
+    uguale("al primo disegno: dov'è l'area", altoVerso(Float.NaN, 138f, 0L), 138f)
+    uguale("i tasti tornano: subito sotto di loro", altoVerso(20f, 138f, 16L), 138f)
+    val dopo70 = altoVerso(138f, 20f, 70L)
+    vero("i tasti spariti: a metà strada in un mezzo passo ($dopo70)", dopo70 > 78f && dopo70 < 80f)
+    var su = 138f
+    repeat(60) { su = altoVerso(su, 20f, 16L) }
+    uguale("in un secondo è arrivato in cima", su, 20f)
+    uguale("un fotogramma lunghissimo non fa saltare oltre", altoVerso(138f, 20f, 10_000L) >= 20f, true)
+
     println("DisposizioneMusica: $prove conti, tutti giusti")
 }
