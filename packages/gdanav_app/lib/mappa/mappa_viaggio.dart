@@ -914,18 +914,9 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     // Segnata prima, perché chi arriva nel frattempo non la riscriva.
     _frecciaDisegnata = chiave;
     final sulla = g?.sullaMappaDi(v?.percorso);
-    final dati = chiave == null
-        ? datiManovra(null, null)
-        : datiManovra(v, a?.prossima, sullaMappa: sulla, corsie: _immersiva);
+    final dati = chiave == null ? datiManovra(null, null) : datiManovra(v, a?.prossima, sullaMappa: sulla);
     try {
       await m.setGeoJsonSource(sorgenteManovra, dati.cast<String, dynamic>());
-      // Le corsie sulla strada: solo la vista immersiva le ha nello stile.
-      if (_immersiva) {
-        final corsie = chiave == null
-            ? datiCorsie(null, null)
-            : datiCorsie(v, a?.prossima, sullaMappa: sulla, classe: (m) => g?.classeSullaMappa(v?.percorso, m) ?? '');
-        await m.setGeoJsonSource(sorgenteCorsie, corsie.cast<String, dynamic>());
-      }
     } catch (_) {
       if (_frecciaDisegnata == chiave) _frecciaDisegnata = _frecciaIgnota;
       rethrow;
