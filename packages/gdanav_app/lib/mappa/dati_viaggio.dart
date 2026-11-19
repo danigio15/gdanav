@@ -315,7 +315,14 @@ const _senzaFreccia = {0, 1, 2, 3, 4, 5, 6, 7, 8};
 /// Adesso la larghezza è quella della linea (vedi lo stile), la punta è
 /// un'icona in pixel posata sulla fine del tratto (un punto con la sua
 /// [rotta]), e il tratto si ferma dieci metri prima della manovra dopo.
-Map<String, Object?> datiManovra(Viaggio? v, Manovra? m, {double primaM = 60, double dopoM = 45, Linea? sullaMappa}) {
+Map<String, Object?> datiManovra(
+  Viaggio? v,
+  Manovra? m, {
+  double primaM = 60,
+  double dopoM = 45,
+  Linea? sullaMappa,
+  bool corsie = false,
+}) {
   if (v == null || m == null || _senzaFreccia.contains(m.tipo) || v.percorso.punti.length < 2) {
     return _collezione([]);
   }
@@ -324,15 +331,6 @@ Map<String, Object?> datiManovra(Viaggio? v, Manovra? m, {double primaM = 60, do
   final fine = _fineFreccia(v, m, l, centro, dopoM);
   // I metri dal percorso, i punti dalla linea che si disegna.
   final g = _mostrata(v.percorso, sullaMappa) ?? l;
-  final tratto = [
-    _aMetri(g, math.max(0, centro - primaM)),
-    for (var i = 0; i < g.punti.length; i++)
-      if (g.cumulate[i] > centro - primaM && g.cumulate[i] < fine) g.punti[i],
-    _aMetri(g, fine),
-  ];
-  if (tratto.length < 2 || fine - centro < 5) return _collezione([]);
-  // La punta guarda come l'ultimo pezzo del tratto.
-  final rotta = rottaGradi(_aMetri(g, fine - 4), tratto.last);
   /* La freccia sta sulla linea blu del percorso, in tutte le viste.
    *
    * «La linea bianca non combacia con quella blu, e sul continuo del
@@ -340,24 +338,95 @@ Map<String, Object?> datiManovra(Viaggio? v, Manovra? m, {double primaM = 60, do
    * spostata di lato, e la teneva finché il percorso non la raggiungeva. A
    * un bivio dove si tiene la sinistra (l'uscita di corso Malta venendo da
    * Pomigliano) il percorso non la raggiungeva mai: correva parallela a
-   * quella blu, a qualche metro. La corsia giusta la dicono le corsie
-   * disegnate sulla strada e la scheda della manovra. */
+   * quella blu, a qualche metro. Con le corsie disegnate ([corsie], vista
+   * immersiva) la linea blu stessa entra nella corsia giusta ([datiCorsie]):
+   * la freccia parte da lì, dove la linea è, e in [uscitaCorsiaM] metri dopo
+   * la manovra torna sul percorso. */
+  final c = corsie ? _corsieDi(v, m, sullaMappa: sullaMappa) : null;
+  // Con le corsie disegnate la freccia parte poco prima della manovra: prima
+  // la corsia giusta la dice la linea blu, e una freccia bianca sopra la
+  // nascondeva tutta («la linea bianca è troppo lunga»).
+  final da = math.max(0.0, centro - (c == null ? primaM : _primaConCorsieM));
+  final tratto = _trattoSpostato(g, da, fine, c?.latoA);
+  if (tratto.length < 2 || fine - centro < 5) return _collezione([]);
+  // La punta guarda come l'ultimo pezzo del tratto.
+  final rotta = rottaGradi(_trattoSpostato(g, fine - 4, fine, c?.latoA).first, tratto.last);
+  Map<String, Object?> pezzo(double a, double b) => {
+    'type': 'LineString',
+    'coordinates': [for (final p in _trattoSpostato(g, a, b, c?.latoA)) _xy(p)],
+  };
+  final passo = uscitaCorsiaM / 8;
   return _collezione([
-    _elemento({
-      'type': 'LineString',
-      'coordinates': [for (final p in tratto) _xy(p)],
-    }, const {}),
+    if (c == null)
+      _elemento({
+        'type': 'LineString',
+        'coordinates': [for (final p in tratto) _xy(p)],
+      }, const {})
+    else ...[
+      // Larga come la linea blu sotto: nella corsia quanto lei, poi via via
+      // quanto il percorso (`f` e `largo`, come in [datiCorsie]).
+      if (centro > da) _elemento(pezzo(da, centro + 0.3), {'f': 1.0, 'largo': c.largo}),
+      for (var k = 0; k < 8; k++)
+        if (centro + k * passo < fine)
+          _elemento(pezzo(centro + k * passo, math.min(fine, centro + (k + 1) * passo + 0.3)), {
+            'f': 1 - _liscio((k + 0.5) / 8),
+            'largo': c.largo,
+          }),
+      if (fine > centro + uscitaCorsiaM) _elemento(pezzo(centro + uscitaCorsiaM, fine), {'f': 0.0, 'largo': c.largo}),
+    ],
     _elemento({'type': 'Point', 'coordinates': _xy(tratto.last)}, {'rotta': rotta}),
   ]);
 }
 
+/// Con le corsie, quanto prima della manovra parte la freccia.
+const _primaConCorsieM = 20.0;
+
 /// Dove finisce la freccia: poco dopo la manovra, mai fin sulla manovra dopo
 /// (la punta ci arriverebbe sopra, e sembrerebbe di dover girare lì).
+///
+/// «Deve esserci la freccia che esce»: a un'uscita la rampa corre accanto
+/// alla strada per un bel pezzo, e la freccia, finita [dopoM] metri dopo,
+/// puntava dritta: sembrava di dover tirare dritto. Se la strada gira più in
+/// là (entro [_allungoMaxM]), la freccia arriva fin dove ha girato di
+/// [_giratoGradi]: la punta guarda dove si va. Se gira ancora più in là, la
+/// freccia arriva a [_uscitaLungaM] metri: si vede la rampa che si stacca.
+/// Mai più lunga di così: «la linea bianca è troppo lunga».
 double _fineFreccia(Viaggio v, Manovra m, Linea l, double centro, double dopoM) {
   final manovre = v.percorso.manovre;
   final k = manovre.indexWhere((x) => x.inizio > m.inizio);
   final dopo = k < 0 ? l.lunghezzaM : l.cumulate[manovre[k].inizio.clamp(0, l.punti.length - 1)];
-  return math.min(math.max(centro + 10, math.min(centro + dopoM, dopo - _primaDellaDopoM)), l.lunghezzaM);
+  var voluta = centro + dopoM;
+  final prima = _aMetri(l, math.max(0, centro - 30)), qui = _aMetri(l, centro);
+  if (distanzaM(prima, qui) > 5) {
+    final verso = rottaGradi(prima, qui);
+    // Girata già entro [dopoM] (una svolta a un incrocio): resta com'era.
+    if (_girata(l, verso, centro + dopoM) == null) {
+      voluta = centro + _uscitaLungaM;
+      for (var s = centro + dopoM + 5; s <= math.min(centro + _allungoMaxM, l.lunghezzaM); s += 5) {
+        if (_girata(l, verso, s) != null) {
+          voluta = s;
+          break;
+        }
+      }
+    }
+  }
+  return math.min(math.max(centro + 10, math.min(voluta, dopo - _primaDellaDopoM)), l.lunghezzaM);
+}
+
+/// Fin dove si allunga la freccia di un'uscita, al più.
+const _allungoMaxM = 100.0;
+
+/// Fin dove va la freccia di un'uscita che gira più in là di [_allungoMaxM].
+const _uscitaLungaM = 80.0;
+
+/// Di quanto deve aver girato la strada perché la freccia lo mostri.
+const _giratoGradi = 15.0;
+
+/// [s] se a [s] metri la strada va a più di [_giratoGradi] da [verso].
+double? _girata(Linea l, double verso, double s) {
+  final a = _aMetri(l, math.max(0, s - 15)), b = _aMetri(l, s);
+  if (distanzaM(a, b) < 5) return null;
+  return diQuantoSiGira(verso, rottaGradi(a, b)).abs() >= _giratoGradi ? s : null;
 }
 
 /// Il tratto della freccia della manovra [m] in metri lungo il percorso (da,
@@ -373,20 +442,25 @@ double _fineFreccia(Viaggio v, Manovra m, Linea l, double centro, double dopoM) 
 }
 
 /// Le corsie della prossima manovra disegnate sulla strada, nella vista
-/// immersiva: negli ultimi [primaM] metri prima della manovra la strada si
-/// divide in tante strisce quante sono le corsie, larghe [larghezzaCorsia],
-/// quella giusta del colore del percorso e le altre grigie, con le righe
-/// bianche tratteggiate fra l'una e l'altra e continue ai bordi.
+/// immersiva: negli ultimi [primaM] metri prima della manovra la linea del
+/// percorso si stringe ed entra nella corsia giusta (larga quanto lei), con
+/// le righe bianche tratteggiate fra una corsia e l'altra; alla manovra
+/// prosegue con la freccia ([datiManovra] con `corsie`).
 ///
-/// Le corsie vanno da sinistra a destra e il percorso corre nel mezzo della
+/// «Secondo te è corretto?»: prima le corsie erano un riquadro a parte
+/// appoggiato sulla strada — tre strisce grigie bordate di bianco, la giusta
+/// blu e stretta, di lato alla linea larga del percorso che finiva lì sotto e
+/// ricominciava dopo. Adesso c'è una linea sola: quella del percorso.
+///
+/// Le corsie vanno da sinistra a destra e la linea corre nel mezzo della
 /// carreggiata: la corsia `i` di `n` sta a `(i - (n-1)/2)` corsie dal centro
 /// (a destra il segno è più, come per `line-offset`). Solo quando servono
 /// ([Manovra.corsieUtili]): se vanno bene tutte non c'è niente da dire.
 ///
-/// [classe]: la strada su cui si sta («motorway», «primary»…), dalle strade
-/// della mappa ([GestoreGuida.classeSullaMappa]): le corsie che non sono
-/// quella giusta hanno il suo colore, e sulla strada si vedono le righe e la
-/// corsia giusta, non una lastra più chiara appoggiata sopra.
+/// Gli elementi: `copertura` (lungo la linea, larga quanto il percorso, del
+/// colore della strada [classe]: sotto il percorso largo non si vede più),
+/// `raccordo` (la linea del percorso che si stringe e si sposta: `f` da 0 a
+/// 1, `largo` le corsie giuste in metri) e `riga` (le righe, `spostamento`).
 Map<String, Object?> datiCorsie(
   Viaggio? v,
   Manovra? m, {
@@ -394,37 +468,138 @@ Map<String, Object?> datiCorsie(
   Linea? sullaMappa,
   String Function(double metri)? classe,
 }) {
-  if (v == null || m == null || !m.corsieUtili || v.percorso.punti.length < 2) return _collezione([]);
+  final c = _corsieDi(v, m, primaM: primaM, sullaMappa: sullaMappa);
+  if (c == null) return _collezione([]);
+  final g = c.linea;
+  final inizio = math.max(0.0, c.da - entrataCorsiaM);
+  Map<String, Object?> linea(double da, double a, [double Function(double)? lato]) => {
+    'type': 'LineString',
+    'coordinates': [for (final p in _trattoSpostato(g, da, a, lato)) _xy(p)],
+  };
+  final classeCorsie = classe?.call(math.max(c.da, c.centro - 40)) ?? '';
+  // La linea che entra nella corsia: a pezzi, ognuno col suo `f`.
+  const pezzi = 8;
+  final passo = (c.da - inizio) / pezzi;
+  final fine = math.min(g.lunghezzaM, c.centro + uscitaCorsiaM);
+  final uscita = (fine - c.centro) / pezzi;
+  return _collezione([
+    _elemento(linea(inizio, fine), {'tipo': 'copertura', 'classe': classeCorsie}),
+    if (passo > 0.5)
+      for (var k = 0; k < pezzi; k++)
+        _elemento(linea(inizio + k * passo, inizio + (k + 1) * passo + 0.5, c.latoA), {
+          'tipo': 'raccordo',
+          'f': _liscio((k + 0.5) / pezzi),
+          'largo': c.largo,
+        }),
+    _elemento(linea(c.da, c.centro, c.latoA), {'tipo': 'raccordo', 'f': 1.0, 'largo': c.largo}),
+    // E dopo la manovra torna larga, nel mezzo: senza scalino.
+    for (var k = 0; k < pezzi; k++)
+      _elemento(linea(c.centro + k * uscita - 0.5, c.centro + (k + 1) * uscita, c.latoA), {
+        'tipo': 'raccordo',
+        'f': 1 - _liscio((k + 0.5) / pezzi),
+        'largo': c.largo,
+      }),
+    for (var i = 1; i < c.n; i++)
+      _elemento(linea(c.da, c.centro), {'tipo': 'riga', 'spostamento': (i - c.n / 2) * larghezzaCorsia}),
+  ]);
+}
+
+/// In quanti metri, prima delle corsie, la linea del percorso entra nella corsia giusta.
+const entrataCorsiaM = 40.0;
+
+/// In quanti metri, dopo la manovra, la freccia torna dalla corsia al mezzo.
+const uscitaCorsiaM = 25.0;
+
+typedef _Corsie = ({
+  Linea linea,
+  double da,
+  double centro,
+  int n,
+  double lato,
+  double largo,
+  double Function(double metri) latoA,
+});
+
+/// Il tratto delle corsie di [m]: da dove a dove (metri del percorso), quante
+/// sono, di quanto sta a destra la corsia giusta ([lato], la media se sono
+/// più di una) e quanto è larga ([largo]); [latoA]: di quanto è spostata la
+/// linea a tanti metri (zero prima, [lato] dentro, morbido fra i due).
+_Corsie? _corsieDi(Viaggio? v, Manovra? m, {double primaM = 160, Linea? sullaMappa}) {
+  if (v == null || m == null || !m.corsieUtili || v.percorso.punti.length < 2) return null;
   final l = Linea(v.percorso.punti);
   final centro = l.cumulate[m.inizio.clamp(0, l.punti.length - 1)];
   final da = math.max(0.0, centro - primaM);
-  // Le corsie sulla strada della mappa, non accanto: attorno alla linea che
-  // si disegna («la lastra è sbagliata»: stavano di lato, fuori strada).
-  final g = _mostrata(v.percorso, sullaMappa) ?? l;
-  final tratto = [
-    _aMetri(g, da),
-    for (var i = 0; i < g.punti.length; i++)
-      if (g.cumulate[i] > da && g.cumulate[i] < centro) g.punti[i],
-    _aMetri(g, centro),
-  ];
-  if (tratto.length < 2 || centro - da < 20) return _collezione([]);
-  final linea = {
-    'type': 'LineString',
-    'coordinates': [for (final p in tratto) _xy(p)],
-  };
+  if (centro - da < 20) return null;
   final n = m.corsie.length;
-  final classeCorsie = classe?.call(math.max(da, centro - 40)) ?? '';
-  return _collezione([
+  final giuste = [
     for (var i = 0; i < n; i++)
-      _elemento(linea, {
-        'tipo': 'corsia',
-        'giusta': m.corsie[i].giusta,
-        'classe': classeCorsie,
-        'spostamento': (i - (n - 1) / 2) * larghezzaCorsia,
-      }),
-    for (var i = 0; i <= n; i++)
-      _elemento(linea, {'tipo': i == 0 || i == n ? 'bordo' : 'riga', 'spostamento': (i - n / 2) * larghezzaCorsia}),
-  ]);
+      if (m.corsie[i].giusta) (i - (n - 1) / 2) * larghezzaCorsia,
+  ];
+  final lato = giuste.reduce((a, b) => a + b) / giuste.length;
+  final largo = (giuste.reduce(math.max) - giuste.reduce(math.min)) + larghezzaCorsia;
+  final inizio = math.max(0.0, da - entrataCorsiaM);
+  double latoA(double s) {
+    if (s <= inizio) return 0;
+    if (s < da) return lato * _liscio((s - inizio) / (da - inizio));
+    if (s <= centro) return lato;
+    if (s < centro + uscitaCorsiaM) return lato * (1 - _liscio((s - centro) / uscitaCorsiaM));
+    return 0;
+  }
+
+  return (
+    linea: _mostrata(v.percorso, sullaMappa) ?? l,
+    da: da,
+    centro: centro,
+    n: n,
+    lato: lato,
+    largo: largo,
+    latoA: latoA,
+  );
+}
+
+/// Da 0 a 1 senza scalini ai capi.
+double _liscio(double t) {
+  final x = t.clamp(0.0, 1.0);
+  return x * x * (3 - 2 * x);
+}
+
+/// Il pezzo di [g] da [da] ad [a] metri, ogni tre metri, spostato a destra di
+/// [lato] metri (se c'è).
+List<Punto> _trattoSpostato(Linea g, double da, double a, double Function(double)? lato) {
+  if (a <= da) return const [];
+  final metri = <double>[da];
+  for (var i = 0; i < g.punti.length; i++) {
+    if (g.cumulate[i] > da && g.cumulate[i] < a) metri.add(g.cumulate[i]);
+  }
+  if (lato != null) {
+    for (var s = da + 3; s < a; s += 3) {
+      metri.add(s);
+    }
+  }
+  metri
+    ..add(a)
+    ..sort();
+  final out = <Punto>[];
+  for (final s in metri) {
+    final p = _aMetri(g, s);
+    final o = lato?.call(s) ?? 0;
+    if (o.abs() < 0.01) {
+      out.add(p);
+      continue;
+    }
+    // A destra del verso di marcia, misurato fra un poco prima e un poco dopo.
+    final p0 = _aMetri(g, math.max(0, s - 3)), p1 = _aMetri(g, math.min(g.lunghezzaM, s + 3));
+    final kx = 111195.08 * math.cos(p.lat * math.pi / 180);
+    final ex = (p1.lon - p0.lon) * kx, ny = (p1.lat - p0.lat) * 111195.08;
+    final lungo = math.sqrt(ex * ex + ny * ny);
+    if (lungo < 0.01) {
+      out.add(p);
+      continue;
+    }
+    // La destra di (ex, ny) è (ny, -ex).
+    out.add(Punto(p.lat + (-ex / lungo) * o / 111195.08, p.lon + (ny / lungo) * o / kx));
+  }
+  return out;
 }
 
 /// La linea [sullaMappa] se è di questo percorso (coi suoi metri: la stessa

@@ -255,6 +255,11 @@ void main() {
     // Finita, quella velocità non vale più: senza navigazione la mappa 3D
     // non deve credere che l'auto sia ancora ferma.
     expect(a.guida.velocitaMs, isNull);
+    // E niente punto sul percorso: la mappa 3D e quella del telefono
+    // ascoltano di nuovo il GPS.
+    expect(a.guida.avanzamento, isNull);
+    expect(a.guida.posizioneStimata(), isNull);
+    expect(a.guida.metriStimati(), isNull);
   });
 
   testWidgets('la voce si silenzia', (tester) async {
