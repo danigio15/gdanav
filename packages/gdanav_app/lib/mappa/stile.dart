@@ -641,6 +641,48 @@ List<Object> _filtroFrecciaManovra(bool immersiva) => [
     ],
 ];
 
+/// La larghezza della linea che dal percorso entra nella corsia giusta (vedi
+/// `datiCorsie`): a ogni zoom, fra quella del percorso (pixel) e `largo`
+/// metri, secondo `f`.
+List<Object> _daPercorsoACorsia() {
+  double percorso(double z) {
+    if (z <= 12) return larghezzaPercorso.$1;
+    if (z >= 18) return larghezzaPercorso.$2;
+    final t = (math.pow(1.6, z - 12) - 1) / (math.pow(1.6, 6) - 1);
+    return larghezzaPercorso.$1 + (larghezzaPercorso.$2 - larghezzaPercorso.$1) * t;
+  }
+
+  return [
+    'interpolate',
+    ['linear'],
+    ['zoom'],
+    for (final z in [12.0, 14.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0]) ...[
+      z,
+      [
+        '+',
+        [
+          '*',
+          [
+            '-',
+            1,
+            ['get', 'f'],
+          ],
+          percorso(z),
+        ],
+        [
+          '*',
+          ['get', 'f'],
+          [
+            '*',
+            ['get', 'largo'],
+            pixelPerMetro(z),
+          ],
+        ],
+      ],
+    ],
+  ];
+}
+
 /// Quanti pixel fa un metro allo zoom [z].
 double pixelPerMetro(double z) => 512 * math.pow(2, z) / (40075016.686 * _cosenoItalia);
 
@@ -1300,6 +1342,69 @@ Map<String, Object> stileMappa({
         },
         'paint': {'text-color': '#FFFFFF', 'text-opacity': 0.9},
       },
+      /* La vista immersiva: le corsie della prossima manovra sulla strada. La
+       * linea del percorso si stringe ed entra nella corsia giusta, con le
+       * righe bianche fra una corsia e l'altra (vedi `datiCorsie`); la freccia
+       * della manovra sta sopra, sulla corsia, e ne esce alla manovra. */
+      if (immersiva) ...[
+        // Sotto il percorso largo, del colore della strada: nel tratto delle
+        // corsie la linea del percorso è quella stretta, nella corsia giusta.
+        {
+          'id': 'corsie',
+          'type': 'line',
+          'source': sorgenteCorsie,
+          'filter': [
+            '==',
+            ['get', 'tipo'],
+            'copertura',
+          ],
+          'layout': {'line-cap': 'butt', 'line-join': 'round'},
+          'paint': {
+            'line-color': [
+              'match',
+              ['get', 'classe'],
+              ['motorway', 'trunk'],
+              t.autostrada,
+              ['primary', 'secondary'],
+              t.principale,
+              t.strada,
+            ],
+            'line-width': _largo(larghezzaBordo.$1 + 1, larghezzaBordo.$2 + 2),
+          },
+        },
+        // La linea del percorso che si stringe ed entra nella corsia giusta:
+        // larga come il percorso a `f` = 0, come le corsie giuste a `f` = 1.
+        {
+          'id': 'corsie-percorso',
+          'type': 'line',
+          'source': sorgenteCorsie,
+          'filter': [
+            '==',
+            ['get', 'tipo'],
+            'raccordo',
+          ],
+          'layout': {'line-cap': 'round', 'line-join': 'round'},
+          'paint': {'line-color': t.percorso, 'line-width': _daPercorsoACorsia()},
+        },
+        {
+          'id': 'corsie-righe',
+          'type': 'line',
+          'source': sorgenteCorsie,
+          'filter': [
+            '==',
+            ['get', 'tipo'],
+            'riga',
+          ],
+          'layout': {'line-cap': 'butt', 'line-join': 'round'},
+          'paint': {
+            'line-color': '#FFFFFF',
+            'line-opacity': 0.9,
+            'line-width': _metri(0.2),
+            'line-dasharray': [3, 3],
+            'line-offset': _metriDa('spostamento'),
+          },
+        },
+      ],
       // La freccia della prossima manovra, sopra il percorso: bianca col
       // bordo blu scuro, larga quanto la linea del percorso (in pixel, come
       // lei: in metri a zoom alto era il doppio e sbordava), così allo
@@ -1360,84 +1465,9 @@ Map<String, Object> stileMappa({
           'icon-ignore-placement': true,
         },
       },
-      /* La vista immersiva: le corsie della prossima manovra sulla strada
-       * (quella giusta del colore del percorso, le altre grigie, le righe
-       * bianche), sopra la freccia della manovra: prima dello svincolo la
-       * strada la dicono le corsie, dopo la freccia. Poi gli edifici, sopra
-       * il percorso e un po' trasparenti; i segnaposto restano sopra tutto. */
+      // La vista immersiva: gli edifici sopra il percorso, un po' trasparenti;
+      // i segnaposto restano sopra tutto.
       if (immersiva) ...[
-        {
-          'id': 'corsie',
-          'type': 'line',
-          'source': sorgenteCorsie,
-          'filter': [
-            '==',
-            ['get', 'tipo'],
-            'corsia',
-          ],
-          'layout': {'line-cap': 'butt', 'line-join': 'round'},
-          'paint': {
-            // Piene: sotto ci sono la linea del percorso e il grigio della
-            // strada, e una corsia trasparente li lascerebbe vedere.
-            // Le altre del colore della strada su cui stanno («la lastra è
-            // sbagliata»: grigio chiaro sopra l'autostrada più scura, sembrava
-            // un blocco appoggiato sopra la strada).
-            'line-color': [
-              'case',
-              ['get', 'giusta'],
-              t.percorso,
-              [
-                'match',
-                ['get', 'classe'],
-                ['motorway', 'trunk'],
-                t.autostrada,
-                ['primary', 'secondary'],
-                t.principale,
-                t.strada,
-              ],
-            ],
-            // Larghe una corsia intera: fra una e l'altra non si vede la
-            // linea del percorso sotto (prima un filo, a tratti, del colore
-            // del traffico).
-            'line-width': _metri(larghezzaCorsia),
-            'line-offset': _metriDa('spostamento'),
-          },
-        },
-        {
-          'id': 'corsie-righe',
-          'type': 'line',
-          'source': sorgenteCorsie,
-          'filter': [
-            '==',
-            ['get', 'tipo'],
-            'riga',
-          ],
-          'layout': {'line-cap': 'butt', 'line-join': 'round'},
-          'paint': {
-            'line-color': '#FFFFFF',
-            'line-opacity': 0.9,
-            'line-width': _metri(0.2),
-            'line-dasharray': [3, 3],
-            'line-offset': _metriDa('spostamento'),
-          },
-        },
-        {
-          'id': 'corsie-bordi',
-          'type': 'line',
-          'source': sorgenteCorsie,
-          'filter': [
-            '==',
-            ['get', 'tipo'],
-            'bordo',
-          ],
-          'layout': {'line-cap': 'butt', 'line-join': 'round'},
-          'paint': {
-            'line-color': '#FFFFFF',
-            'line-opacity': 0.9,
-            'line-width': _metri(0.25),
-            'line-offset': _metriDa('spostamento'),
-          },
-        },
         {
           'id': stratoEdificiImmersivi,
           'type': 'fill-extrusion',

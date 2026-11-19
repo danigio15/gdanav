@@ -1341,6 +1341,8 @@ class PonteAuto {
               chiave == null ? null : p.viaggio,
               a?.prossima,
               sullaMappa: guida.sullaMappaDi(p.viaggio.percorso),
+              // La vista immersiva disegna le corsie, e la freccia ne esce.
+              corsie: true,
             ),
           ),
           // Le corsie sulla strada: le disegna solo la vista immersiva, che

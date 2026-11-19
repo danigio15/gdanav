@@ -21,7 +21,10 @@ void main() {
     piano: null,
   );
 
-  test('le corsie sulla strada: una striscia per corsia, la giusta segnata, le righe fra l\'una e l\'altra', () {
+  test('le corsie sulla strada: la linea del percorso entra nella corsia giusta, le righe fra l\'una e l\'altra', () {
+    // «Secondo te è corretto?»: prima un riquadro a parte, tre strisce grigie
+    // bordate di bianco e la giusta stretta, di lato alla linea larga. Adesso
+    // la linea stessa si stringe ed entra nella corsia giusta.
     final uscita = Manovra(
       istruzione: 'Esci a destra',
       lunghezzaM: 300,
@@ -31,20 +34,55 @@ void main() {
       corsie: [dritta, dritta, dritta, giusta],
     );
     final elementi = (datiCorsie(viaggioCon(uscita), uscita)['features']! as List).cast<Map>();
-    final corsie = [
-      for (final e in elementi)
-        if ((e['properties'] as Map)['tipo'] == 'corsia') e['properties'] as Map,
-    ];
-    expect(corsie, hasLength(4));
-    // Da sinistra a destra, centrate sul percorso; la giusta è l'ultima.
-    expect([for (final c in corsie) c['spostamento']], [-5.25, -1.75, 1.75, 5.25]);
-    expect([for (final c in corsie) c['giusta']], [false, false, false, true]);
-    final righe = [for (final e in elementi) (e['properties'] as Map)['tipo']].where((t) => t != 'corsia').toList();
-    expect(righe, ['bordo', 'riga', 'riga', 'riga', 'bordo']);
-    // Il tratto finisce sulla manovra e comincia prima, sulla strada verso nord.
-    final linea = ((elementi.first['geometry'] as Map)['coordinates'] as List);
-    expect((linea.last as List)[1], closeTo(45.003, 1e-9));
+    Iterable<Map> di(String tipo) => elementi.where((e) => (e['properties'] as Map)['tipo'] == tipo);
+    // Niente strisce delle corsie né bordi: la copertura sotto, la linea, le righe.
+    expect({for (final e in elementi) (e['properties'] as Map)['tipo']}, {'copertura', 'raccordo', 'riga'});
+    expect([for (final e in di('riga')) (e['properties'] as Map)['spostamento']], [-3.5, 0.0, 3.5]);
+    // La linea: da larga come il percorso (f 0) a larga una corsia (f 1), e ritorno.
+    final f = [for (final e in di('raccordo')) (e['properties'] as Map)['f'] as double];
+    expect(f.first, lessThan(0.05));
+    expect(f.last, lessThan(0.05));
+    expect(f, contains(1.0));
+    for (var i = 1; i < f.indexOf(1.0); i++) {
+      expect(f[i], greaterThan(f[i - 1]));
+    }
+    expect({for (final e in di('raccordo')) (e['properties'] as Map)['largo']}, {3.5});
+    // Nel tratto delle corsie la linea sta nella corsia giusta (l'ultima, a
+    // 5,25 m a destra del mezzo); verso nord la destra è a est.
+    final dentro = di('raccordo').firstWhere((e) => (e['properties'] as Map)['f'] == 1.0);
+    const est = 5.25 / (111195.08 * 0.70711);
+    for (final xy in ((dentro['geometry'] as Map)['coordinates'] as List).cast<List>()) {
+      if ((xy[1] as double) < 45.0029) expect(xy[0] as double, closeTo(9 + est, 2e-7));
+    }
+    // E finisce sulla manovra (lat 45,003: lì la corsia è spostata di lato
+    // anche verso sud, perché lì il percorso gira), comincia prima, verso nord.
+    final linea = ((dentro['geometry'] as Map)['coordinates'] as List);
+    expect((linea.last as List)[1], closeTo(45.003, 6e-5));
     expect((linea.first as List)[1], lessThan(45.0016));
+  });
+
+  test('con le corsie la freccia della manovra parte dalla corsia giusta e torna sul percorso', () {
+    final uscita = Manovra(
+      istruzione: 'Esci a destra',
+      lunghezzaM: 300,
+      secondi: 20,
+      inizio: 30,
+      tipo: 20,
+      corsie: [dritta, dritta, giusta],
+    );
+    final v = viaggioCon(uscita);
+    final c =
+        ((datiManovra(v, uscita, corsie: true)['features']! as List).cast<Map>().first['geometry']
+                as Map)['coordinates']
+            as List;
+    const est = 3.5 / (111195.08 * 0.70711);
+    // Sessanta metri prima della manovra: nella corsia giusta, a destra.
+    expect(((c.first as List)[0] as double), closeTo(9 + est, 2e-7));
+    // In fondo, passata la manovra, di nuovo sul percorso (verso est, lat 45,003).
+    expect(((c.last as List)[1] as double), closeTo(45.003, 1e-7));
+    // Senza corsie (le altre viste) sulla linea, come sempre.
+    final senza = ((datiManovra(v, uscita)['features']! as List).cast<Map>().first['geometry'] as Map)['coordinates'];
+    expect((((senza as List).first as List)[0] as double), closeTo(9, 1e-9));
   });
 
   test('con la linea sulle strade della mappa, corsie, freccia e percorso stanno lì e non dove dice il fornitore', () {
@@ -67,8 +105,12 @@ void main() {
       for (final e in (dati['features']! as List).cast<Map>())
         if ((e['geometry'] as Map)['type'] == 'LineString') ((e['geometry'] as Map)['coordinates'] as List),
     ];
+    List<List> senzaRaccordo(Map<String, Object?> dati) => [
+      for (final e in (dati['features']! as List).cast<Map>())
+        if ((e['properties'] as Map)['tipo'] != 'raccordo') ((e['geometry'] as Map)['coordinates'] as List),
+    ];
     for (final c in [
-      ...linee(datiCorsie(v, uscita, sullaMappa: spostata)),
+      ...senzaRaccordo(datiCorsie(v, uscita, sullaMappa: spostata)),
       ...linee(datiManovra(v, uscita, sullaMappa: spostata)),
     ]) {
       for (final xy in c.cast<List>()) {
@@ -80,7 +122,7 @@ void main() {
     final classi = {
       for (final e
           in (datiCorsie(v, uscita, sullaMappa: spostata, classe: (_) => 'motorway')['features']! as List).cast<Map>())
-        if ((e['properties'] as Map)['tipo'] == 'corsia') (e['properties'] as Map)['classe'],
+        if ((e['properties'] as Map)['tipo'] == 'copertura') (e['properties'] as Map)['classe'],
     };
     expect(classi, {'motorway'});
     final strato = (stileMappa(scuro: false, immersiva: true)['layers']! as List).cast<Map>().firstWhere(
@@ -154,11 +196,14 @@ void main() {
     final immersivo = stileMappa(scuro: false, immersiva: true);
     expect(idDi(normale), isNot(contains(stratoEdificiImmersivi)));
     final strati = idDi(immersivo);
-    // Le corsie sopra il percorso e sopra la freccia della manovra, gli
-    // edifici sopra le corsie, il segnaposto sopra tutto.
+    // Le corsie sopra il percorso (lo coprono e lo stringono nella corsia
+    // giusta), la freccia della manovra sopra le corsie, gli edifici sopra,
+    // il segnaposto sopra tutto.
     expect(strati.indexOf('corsie'), greaterThan(strati.indexOf('percorso')));
-    expect(strati.indexOf('corsie'), greaterThan(strati.indexOf('manovra')));
-    expect(strati.indexOf(stratoEdificiImmersivi), greaterThan(strati.indexOf('corsie')));
+    expect(strati.indexOf('corsie-percorso'), greaterThan(strati.indexOf('corsie')));
+    expect(strati.indexOf('manovra'), greaterThan(strati.indexOf('corsie-righe')));
+    expect(strati, isNot(contains('corsie-bordi')));
+    expect(strati.indexOf(stratoEdificiImmersivi), greaterThan(strati.indexOf('manovra')));
     expect(strati.indexOf('io'), greaterThan(strati.indexOf(stratoEdificiImmersivi)));
     expect((immersivo['sources']! as Map).containsKey(sorgenteCorsie), isTrue);
     // L'autostrada larga 14 metri: a zoom 18 sono 14 × pixel per metro.
