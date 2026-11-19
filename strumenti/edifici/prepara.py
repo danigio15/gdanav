@@ -166,8 +166,9 @@ def _fonte(fonti, proprieta: str) -> str | None:
         return None
     tutto = None
     for f in fonti:
-        p = f.get("property") or ""
-        if p == f"/properties/{proprieta}":
+        # «/properties/height» nei parquet, «properties/height» altrove.
+        p = (f.get("property") or "").lstrip("/")
+        if p == f"properties/{proprieta}":
             return f.get("dataset")
         if p == "":
             tutto = f.get("dataset")

@@ -85,6 +85,29 @@ void main() {
       expect(contati, 12);
     });
 
+    test('un server che ignora i pezzi: si chiude subito, senza scaricare il pacchetto', () async {
+      // 200 col pacchetto intero, a pezzi da 64 KB: se lo si svuotasse,
+      // sui dati a consumo arriverebbe tutto, fuori dal conto.
+      var mandati = 0;
+      final client = MockClient.streaming((r, _) async {
+        Stream<List<int>> corpo() async* {
+          for (var i = 0; i < 320; i++) {
+            mandati += 65536;
+            yield Uint8List(65536);
+            await Future<void>.delayed(Duration.zero);
+          }
+        }
+
+        return http.StreamedResponse(corpo(), 200);
+      });
+      var contati = 0;
+      final h = SorgenteHttp(client, Uri.parse('https://pezzi.example/p.pmtiles'), letti: (n) => contati += n);
+      await expectLater(h.leggi(0, 7), throwsA(isA<HttpException>()));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(mandati, lessThan(320 * 65536 ~/ 4), reason: 'la risposta intera non si scarica');
+      expect(contati, 0);
+    });
+
     test('scaduta la firma, si richiede il rinvio', () async {
       final s = server();
       final h = SorgenteHttp(s.client, Uri.parse('https://github.com/x/y/releases/download/edifici/p.pmtiles'));

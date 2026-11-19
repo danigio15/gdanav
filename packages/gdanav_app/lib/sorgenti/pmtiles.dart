@@ -188,8 +188,10 @@ class SorgenteHttp {
       throw const _RinvioScaduto();
     }
     if (risposta.statusCode != 206) {
-      // Niente pezzi (200: il pacchetto intero): non lo si legge.
-      unawaited(risposta.stream.drain<void>().catchError((Object _) {}));
+      // Niente pezzi (200: il pacchetto intero): non lo si legge, e la
+      // connessione si chiude subito — svuotarla vorrebbe dire scaricare
+      // tutto il pacchetto sui dati a consumo, fuori dal conto.
+      unawaited(risposta.stream.listen(null, onError: (Object _) {}).cancel());
       throw HttpException('pacchetto in rete: risposta ${risposta.statusCode}');
     }
     final b = await risposta.stream.toBytes().timeout(attesa);
