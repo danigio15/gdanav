@@ -334,6 +334,130 @@ export function lanterna(c, x, y, z, fx, fy) {
   }
 }
 
+/*
+ * Dove non va il marciapiede.
+ *
+ * «Guarda questo incrocio, i marciapiedi in mezzo alla strada.» Ogni via di
+ * città aveva il suo marciapiede da tutti e due i lati, aperto solo dove
+ * un'altra via la tocca in un nodo: ma agli incroci le vie si incrociano e
+ * si sovrappongono anche senza nodi in comune (le carreggiate divise, i
+ * rami di svolta), e il marciapiede passava sull'asfalto delle altre; fra due
+ * carreggiate vicine (lo spartitraffico) i due marciapiedi interni si
+ * accavallavano, e nei pezzi corti a senso unico dentro l'incrocio
+ * attraversavano tutto. Adesso il marciapiede non c'è:
+ *  - sull'asfalto di un'altra via (alla stessa quota), come il cordolo vero
+ *    che si interrompe all'incrocio;
+ *  - dal lato dove, entro [SPARTITRAFFICO_M] dal cordolo, corre un'altra via
+ *    quasi parallela (l'altra carreggiata, una complanare): lì c'è al più
+ *    lo spartitraffico;
+ *  - sui pezzi a senso unico più corti di [PEZZO_INCROCIO_M] attaccati ad
+ *    altre vie ai due capi (le svolte e i rami dentro l'incrocio), come
+ *    sulle rampe (`_link`, che non lo hanno mai).
+ */
+export const SPARTITRAFFICO_M = 8;
+export const PEZZO_INCROCIO_M = 45;
+const PASSO_MARCIAPIEDE_M = 1.5;
+
+/**
+ * L'asfalto di tutte le vie [strade] (con [ricche]: le loro linee ricche, e
+ * [bordi]: `[sinistra, destra]` dell'asfalto a sinistra della linea), in una
+ * griglia: `sotto(x, y, h, salvo)` dice l'asfalto di quale via (non [salvo])
+ * copre il punto, `{i, tx, ty}` (il verso di quel pezzo), o null.
+ */
+export function asfaltoDelleVie(strade, ricche, bordi, cella = 16) {
+  const griglia = new Map();
+  const pezzi = [];
+  strade.forEach((v, i) => {
+    if (v.galleria) return;
+    const r = ricche[i];
+    const [sx, dx] = bordi[i];
+    const oc = (sx + dx) / 2;
+    const mezza = (sx - dx) / 2;
+    for (let k = 1; k < r.length; k++) {
+      const a = r[k - 1];
+      const b = r[k];
+      const na = Math.hypot(a[3], a[4]) || 1;
+      const nb = Math.hypot(b[3], b[4]) || 1;
+      const ax = a[0] + (a[3] / na) * oc;
+      const ay = a[1] + (a[4] / na) * oc;
+      const bx = b[0] + (b[3] / nb) * oc;
+      const by = b[1] + (b[4] / nb) * oc;
+      const l = Math.hypot(bx - ax, by - ay);
+      if (l < 1e-6) continue;
+      const q = { i, ax, ay, bx, by, l, tx: (bx - ax) / l, ty: (by - ay) / l, mezza, h: (a[2] + b[2]) / 2 };
+      const n = pezzi.push(q) - 1;
+      const m = mezza + 1;
+      for (let cx = Math.floor((Math.min(ax, bx) - m) / cella); cx <= Math.floor((Math.max(ax, bx) + m) / cella); cx++) {
+        for (let cy = Math.floor((Math.min(ay, by) - m) / cella); cy <= Math.floor((Math.max(ay, by) + m) / cella); cy++) {
+          const kk = cx * 100003 + cy;
+          let lista = griglia.get(kk);
+          if (!lista) griglia.set(kk, (lista = []));
+          lista.push(n);
+        }
+      }
+    }
+  });
+  return {
+    sotto(x, y, h, salvo, margine = 0.3) {
+      for (const n of griglia.get(Math.floor(x / cella) * 100003 + Math.floor(y / cella)) ?? []) {
+        const q = pezzi[n];
+        if (q.i === salvo || Math.abs(q.h - h) > 2.5) continue;
+        const u = Math.max(0, Math.min(q.l, (x - q.ax) * q.tx + (y - q.ay) * q.ty));
+        if (Math.hypot(x - q.ax - q.tx * u, y - q.ay - q.ty * u) < q.mezza + margine) return q;
+      }
+      return null;
+    },
+  };
+}
+
+/**
+ * I tratti `[da, a]` (metri lungo la linea ricca [r] della via [i]) dove il
+ * marciapiede dal [lato] (1 sinistra, -1 destra), largo [largo] dal [bordo],
+ * non va (vedi sopra): sull'asfalto di un'altra via, o con un'altra via quasi
+ * parallela a meno di [SPARTITRAFFICO_M] dal cordolo. Solo dove [utile]
+ * (`(x, y) => bool`: dentro la tessera).
+ */
+export function senzaMarciapiede(r, i, lato, bordo, largo, asfalto, utile = () => true) {
+  const L = r[r.length - 1][5];
+  const out = [];
+  const passo = PASSO_MARCIAPIEDE_M;
+  let k = 1;
+  for (let s = passo / 2; s < L; s += passo) {
+    // Il punto a [s] (la linea si percorre una volta sola).
+    while (k < r.length - 1 && r[k][5] < s) k++;
+    const a0 = r[k - 1];
+    const b0 = r[k];
+    const f = Math.max(0, Math.min(1, (s - a0[5]) / Math.max(1e-9, b0[5] - a0[5])));
+    const p = a0.map((v, j) => v + (b0[j] - v) * f);
+    const nl = Math.hypot(p[3], p[4]) || 1;
+    const nx = p[3] / nl;
+    const ny = p[4] / nl;
+    if (!utile(p[0] + nx * bordo, p[1] + ny * bordo)) continue;
+    // Il verso della via qui: a destra della normale a sinistra.
+    const tx = ny;
+    const ty = -nx;
+    let no = false;
+    for (const d of [0.25, largo / 2, largo - 0.25]) {
+      const o = bordo + lato * d;
+      if (asfalto.sotto(p[0] + nx * o, p[1] + ny * o, p[2], i)) {
+        no = true;
+        break;
+      }
+    }
+    for (let d = 0.5; !no && d <= SPARTITRAFFICO_M; d += 1.5) {
+      const o = bordo + lato * d;
+      const q = asfalto.sotto(p[0] + nx * o, p[1] + ny * o, p[2], i, 0);
+      if (q && Math.abs(q.tx * tx + q.ty * ty) > 0.8) no = true;
+    }
+    if (!no) continue;
+    const a = Math.max(0, s - passo / 2 - 0.3);
+    const b = Math.min(L, s + passo / 2 + 0.3);
+    if (out.length && out[out.length - 1][1] >= a) out[out.length - 1][1] = b;
+    else out.push([a, b]);
+  }
+  return out;
+}
+
 /**
  * La segnaletica di una tessera. [strade]: le vie (vedi `normalizza` in
  * corsie.js) con `xy` (la geometria da disegnare, metri della tessera),
@@ -384,8 +508,22 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
     return out;
   };
 
+  // Le linee da disegnare e l'asfalto di tutte (per dove il marciapiede non va).
+  const ricche = strade.map((v) => lineaRicca(v.xy, v.h));
+  const bordiAsfalto = strade.map((v) => {
+    const B = bordiCorsie(v);
+    return [B.sinistra + v.margini[0], B.destra - v.margini[1]];
+  });
+  let copertura = null;
+  // I pezzi a senso unico corti attaccati ad altre vie ai due capi: dentro l'incrocio.
+  const dentroLIncrocio = (v, i) => {
+    if (!v.senso || v.sVia[v.sVia.length - 1] > PEZZO_INCROCIO_M) return false;
+    const attaccato = (q) => (tocchi.get(chiave(q)) ?? []).some((t) => t.i !== i);
+    return attaccato(v.xyVia[0]) && attaccato(v.xyVia[v.xyVia.length - 1]);
+  };
+
   strade.forEach((v, i) => {
-    const r = lineaRicca(v.xy, v.h);
+    const r = ricche[i];
     const L = r[r.length - 1][5];
     const Lvia = v.sVia[v.sVia.length - 1] || L;
     const daVia = (s) => (s * L) / Lvia;
@@ -472,13 +610,15 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
     // ── I marciapiedi, col cordolo verso la strada ─────────────────────
     // Aperti dove arriva un'altra strada (col suo marciapiede: un poco di più).
     const largoM = MARCIAPIEDI[v.hw];
-    if (largoM) {
+    if (largoM && !dentroLIncrocio(v, i)) {
+      copertura ??= asfaltoDelleVie(strade, ricche, bordiAsfalto);
       const piu = (bb) => bb.map(([a, b]) => [a - 2.5, b + 2.5]);
       for (const [lato, bordo, buchi] of [
         [1, B.sinistra + mS, [...buchiTutte, ...piu(buchiLato.sinistra)]],
         [-1, B.destra - mD, [...buchiTutte, ...piu(buchiLato.destra)]],
       ]) {
-        for (const [a, b] of togli([[0, L]], buchi)) {
+        const no = senzaMarciapiede(r, i, lato, bordo, largoM, copertura, (x, y) => Math.abs(x) <= meta + largoM + 2 && Math.abs(y) <= meta + largoM + 2);
+        for (const [a, b] of togli([[0, L]], [...buchi, ...no])) {
           if (b - a < 1.5) continue;
           const pz = pezzoFra(r, a, b);
           striscia(marciapiedi, pz, lato > 0 ? bordo + largoM : bordo, lato > 0 ? bordo : bordo - largoM, z0 + ALTO_MARCIAPIEDE, meta);

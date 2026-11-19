@@ -1,14 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gdanav_app/mappa/controllo_mappa.dart';
 import 'package:gdanav_app/mappa/regia_3d.dart';
+import 'package:gdanav_app/stato/gestore_posizione.dart';
+import 'package:gdanav_core/gdanav_core.dart';
 
 import 'aiuti.dart';
 
 /// La regia della scena 3D, con una pagina finta: i messaggi che le manda.
 void main() {
-  Future<(Regia3d, List<Map<String, Object?>>)> regia(WidgetTester tester, {bool inAuto = false}) async {
+  Future<(Regia3d, List<Map<String, Object?>>)> regia(WidgetTester tester, {bool inAuto = false, Ambiente? amb}) async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
-    final a = await ambiente(tester, km: 20);
+    final a = amb ?? await ambiente(tester, km: 20);
     final mandati = <Map<String, Object?>>[];
     final r = Regia3d(
       gestore: a.viaggio,
@@ -106,5 +108,26 @@ void main() {
     expect(leggere(mandati), [false]);
     altra.ferma();
     expect(Regia3d.sullAuto.value, 0);
+  });
+
+  testWidgets('senza percorso, fermi prima di essersi mossi, la rotta è incerta; andando non più', (tester) async {
+    // «Va al contrario»: la rotta che l'app non sa ancora (il nord di
+    // partenza) sceglieva per la pagina il verso della strada.
+    preparaPiattaforma(portachiavi: impostazioniComplete);
+    final a = await ambiente(tester, km: 20);
+    final (r, mandati) = await regia(tester, amb: a);
+    r.dallaMappa('{"tipo":"caricata"}');
+    a.posizione.avvia();
+    a.gps.add(const Lettura(Punto(41.9, 12.5)));
+    await tester.pump(const Duration(milliseconds: 50));
+    final ferma = mandati.lastWhere((m) => m['tipo'] == 'posizione');
+    expect(ferma['rottaIncerta'], isTrue);
+    for (var i = 1; i <= 3; i++) {
+      a.gps.add(Lettura(Punto(41.9 + i * 0.0001, 12.5), velocitaMs: 11, rotta: 2));
+      await tester.pump(const Duration(seconds: 1));
+    }
+    final andando = mandati.lastWhere((m) => m['tipo'] == 'posizione');
+    expect(andando.containsKey('rottaIncerta'), isFalse);
+    r.ferma();
   });
 }

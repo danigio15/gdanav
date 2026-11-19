@@ -199,15 +199,38 @@ export class Moto {
       this.s = Math.min(this.s, this.primaDellaSvolta(this.s));
       return { s: this.s };
     }
+    const lv = this.lettura.v;
     if (this.x === null || Math.hypot(v.x - this.x, v.y - this.y) > 150) {
       this.x = v.x;
       this.y = v.y;
       this.rotta = v.rotta;
-    } else {
-      this.x = smorza(this.x, v.x, dt, this.tau);
-      this.y = smorza(this.y, v.y, dt, this.tau);
-      this.rotta = angoloVerso(this.rotta, v.rotta, 1 - Math.exp(-dt / 250));
+      this.vel = lv;
+      return { x: this.x, y: this.y, rotta: this.rotta };
     }
+    /* Senza percorso. «Va a scatti, non è fluido»: la freccia inseguiva il
+     * punto voluto (la lettura portata avanti) con un ritardo fisso, e a ogni
+     * lettura nuova — il GPS che balla di un paio di metri, una frenata —
+     * tornava indietro lungo la strada, o correva e si fermava. Adesso, come
+     * sul percorso: lungo la strada ha una velocità sua (quella della lettura
+     * più la correzione, che si recupera in [RECUPERO_S]) e non va mai
+     * indietro; di lato si porta piano sul punto. Indietro solo da ferma,
+     * piano, oltre [AVANTI_TOLLERATO_M]. */
+    const ar = ((90 - v.rotta) * Math.PI) / 180;
+    const hx = Math.cos(ar);
+    const hy = Math.sin(ar);
+    const ex = v.x - this.x;
+    const ey = v.y - this.y;
+    const lungo = ex * hx + ey * hy;
+    const voluta = Math.min(Math.max(0, lv + lungo / RECUPERO_S), lv + VELOCITA_IN_PIU);
+    this.vel = smorza(this.vel ?? lv, voluta, dt, TAU_VELOCITA);
+    let passo = Math.max(0, this.vel) * (dt / 1000);
+    if (lv < 1.5 && lungo < -AVANTI_TOLLERATO_M) passo = (lungo + AVANTI_TOLLERATO_M) * (1 - Math.exp(-dt / 1200));
+    // Da ferma mai oltre il punto voluto (il GPS che balla in avanti).
+    else if (lv < 1.5) passo = Math.min(passo, Math.max(0, lungo));
+    const k = 1 - Math.exp(-dt / this.tau);
+    this.x += hx * passo + (ex - lungo * hx) * k;
+    this.y += hy * passo + (ey - lungo * hy) * k;
+    this.rotta = angoloVerso(this.rotta, v.rotta, 1 - Math.exp(-dt / 250));
     return { x: this.x, y: this.y, rotta: this.rotta };
   }
 
@@ -256,7 +279,14 @@ export class Moto {
       const avanti = this.s - l.metri;
       return avanti > 0 && avanti <= AVANTI_TOLLERATO_M + 0.05 && Math.abs(this.vel ?? 0) < 0.05;
     }
-    return this.x !== null && Math.hypot(l.x - this.x, l.y - this.y) < 0.05;
+    if (this.x === null) return false;
+    // Ferma sul punto, o un poco avanti (non torna indietro apposta, vedi [passo]).
+    const ar = ((90 - l.rotta) * Math.PI) / 180;
+    const ex = l.x - this.x;
+    const ey = l.y - this.y;
+    const lungo = ex * Math.cos(ar) + ey * Math.sin(ar);
+    const lato = Math.hypot(ex - lungo * Math.cos(ar), ey - lungo * Math.sin(ar));
+    return lato < 0.05 && lungo < 0.05 && lungo >= -AVANTI_TOLLERATO_M - 0.05 && Math.abs(this.vel ?? 0) < 0.05;
   }
 }
 

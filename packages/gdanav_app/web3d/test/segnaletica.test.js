@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { normalizza, preparaCorsie } from '../src/corsie.js';
 import { latDaMerc, lonDaMerc, sistemaTessera } from '../src/geo.js';
-import { RIGHE, costruisciSegnaletica, formaFreccia, togli, trattini } from '../src/segnaletica.js';
+import { ALTO_MARCIAPIEDE, RIGHE, costruisciSegnaletica, formaFreccia, togli, trattini } from '../src/segnaletica.js';
 import { costruisciTessera } from '../src/tessera.js';
 import { cavalcavia } from './finte.js';
 
@@ -243,4 +243,86 @@ test('gli alberi della vista «Corsie»: solo quelli veri, mai sull’asfalto', 
   const dopo = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': cavalcavia() }, datiCorsie: con, vistaCorsie: true });
   // L'albero nel prato e gli 11 del filare (uno ogni otto metri, i due capi compresi); quello sull'autostrada no.
   assert.equal(dopo.conti.alberi - prima.conti.alberi, 12);
+});
+
+// ── Dove non va il marciapiede ─────────────────────────────────────────
+// «Guarda questo incrocio, i marciapiedi in mezzo alla strada.»
+
+/** La linea da [a] a [b] con un punto ogni [passo] metri (così il marciapiede ha i vertici anche in mezzo). */
+const fitta = (a, b, passo = 2) => {
+  const n = Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / passo);
+  return Array.from({ length: n + 1 }, (_, k) => [a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
+};
+
+/** I punti `[x, y]` del marciapiede (il piano in cima, senza il cordolo). */
+function marciapiede(sg) {
+  const p = sg.marciapiedi.p;
+  const out = [];
+  for (let i = 0; i < p.length; i += 3) if (p[i + 2] > ALTO_MARCIAPIEDE + 0.1) out.push([p[i], p[i + 1]]);
+  return out;
+}
+
+test('una via di città ha il marciapiede dai due lati, per tutta la via', () => {
+  const v = via({ id: 1, hw: 'residential' }, [
+    [-100, 0],
+    [100, 0],
+  ]);
+  const m = marciapiede(costruisciSegnaletica({ strade: [v], meta: 1000 }));
+  assert.ok(m.some(([, y]) => y > 3) && m.some(([, y]) => y < -3), 'dai due lati');
+  assert.ok(Math.min(...m.map(([x]) => x)) < -99 && Math.max(...m.map(([x]) => x)) > 99, 'da un capo all’altro');
+});
+
+test('due carreggiate divise: il marciapiede solo fuori, niente nello spartitraffico', () => {
+  // Due sensi unici a due corsie (3,25 m e mezzo metro di banchina: 3,6 m
+  // per parte), coi bordi interni a tre metri: lo spartitraffico.
+  const nord = via({ id: 1, hw: 'primary', lanes: '2', oneway: 'yes' }, fitta([-200, 5.1], [200, 5.1], 10));
+  const sud = via({ id: 2, hw: 'primary', lanes: '2', oneway: 'yes' }, fitta([200, -5.1], [-200, -5.1], 10));
+  const m = marciapiede(costruisciSegnaletica({ strade: [nord, sud], meta: 1000 }));
+  assert.ok(m.length > 0);
+  assert.ok(!m.some(([, y]) => Math.abs(y) < 8.7 - 0.01), 'niente fra le due carreggiate');
+  assert.ok(m.some(([, y]) => y > 8.7) && m.some(([, y]) => y < -8.7), 'fuori sì, dai due lati');
+});
+
+test('due vie che si incrociano senza un nodo in comune: nessun marciapiede sull’asfalto dell’altra', () => {
+  const a = via({ id: 1, hw: 'secondary', lanes: '2' }, fitta([-150, 0], [150, 0]));
+  const b = via({ id: 2, hw: 'residential' }, fitta([0, -150], [0, 150]).map(([x, y]) => [x, y + 1]));
+  const sg = costruisciSegnaletica({ strade: [a, b], meta: 1000 });
+  const m = marciapiede(sg);
+  // L'asfalto di [a]: |y| < 3,6; quello di [b]: |x| < 3,35.
+  assert.ok(!m.some(([x, y]) => Math.abs(y) < 3.6 - 0.05 && Math.abs(x) < 120), 'niente sull’asfalto di a');
+  assert.ok(!m.some(([x, y]) => Math.abs(x) < 3.35 - 0.05 && Math.abs(y) < 120), 'niente sull’asfalto di b');
+  // Ma lontano dall'incrocio c'è, per tutte e due.
+  assert.ok(m.some(([x, y]) => x > 50 && y > 3.6));
+  assert.ok(m.some(([x, y]) => y > 50 && x > 3.35));
+});
+
+test('niente marciapiede sulle rampe, né sui pezzi corti a senso unico dentro l’incrocio', () => {
+  const rampa = via({ id: 1, hw: 'primary_link', oneway: 'yes' }, [
+    [-100, 0],
+    [100, 0],
+  ]);
+  assert.equal(costruisciSegnaletica({ strade: [rampa], meta: 1000 }).marciapiedi.triangoli, 0);
+  // Una svolta a destra di trentacinque metri, a senso unico, fra due vie: dentro l'incrocio.
+  const a = via({ id: 2, hw: 'secondary', lanes: '2' }, [
+    [-200, 0],
+    [0, 0],
+  ]);
+  const b = via({ id: 3, hw: 'secondary', lanes: '2' }, [
+    [25, -25],
+    [25, -200],
+  ]);
+  const svolta = via({ id: 4, hw: 'secondary', lanes: '1', oneway: 'yes' }, [
+    [0, 0],
+    [15, -8],
+    [25, -25],
+  ]);
+  const sg = costruisciSegnaletica({ strade: [a, b, svolta], meta: 1000 });
+  const m = marciapiede(sg);
+  assert.ok(!m.some(([x, y]) => x > 2 && x < 18 && y < -2 && y > -24), 'niente marciapiede lungo la svolta');
+  // Lo stesso senso unico lungo, una via vera: il marciapiede ce l'ha.
+  const lungo = via({ id: 5, hw: 'secondary', lanes: '1', oneway: 'yes' }, [
+    [0, 0],
+    [0, -300],
+  ]);
+  assert.ok(costruisciSegnaletica({ strade: [a, lungo], meta: 1000 }).marciapiedi.triangoli > 0);
 });

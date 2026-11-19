@@ -104,6 +104,54 @@ test('senza percorso: x, y e la rotta', () => {
   assert.ok(Math.abs(p.x - 10) < 1e-6 && Math.abs(p.y) < 1e-6);
 });
 
+test('senza percorso non torna mai indietro: il GPS che balla e le letture a 1 Hz', () => {
+  // «Va a scatti»: verso nord a 10 m/s, una lettura al secondo, che balla
+  // di due metri avanti e indietro. Prima la freccia inseguiva il punto e a
+  // ogni lettura un poco indietro tornava indietro lungo la strada.
+  const m = new Moto();
+  const balla = [0, 2, -2, 1.5, -1.8, 2, -2, 0.5, -1, 2, -2];
+  let y = null;
+  let peggio = 0;
+  let vMin = Infinity;
+  let vMax = 0;
+  for (let t = 0; t <= 10000; t += 33) {
+    if (t % 1000 < 33) {
+      const k = Math.round(t / 1000);
+      m.posizione({ metri: null, v: 10, x: 0, y: 10 * k + balla[k], rotta: 0, quando: t });
+    }
+    const p = m.passo(t);
+    if (y !== null && t > 1500) {
+      peggio = Math.min(peggio, p.y - y);
+      vMin = Math.min(vMin, (p.y - y) / 0.033);
+      vMax = Math.max(vMax, (p.y - y) / 0.033);
+    }
+    y = p.y;
+  }
+  assert.ok(peggio >= 0, `mai indietro (${peggio.toFixed(3)} m in un fotogramma)`);
+  assert.ok(vMin > 4 && vMax < 18, `la velocità mostrata resta vicina a quella vera (${vMin.toFixed(1)}–${vMax.toFixed(1)} m/s)`);
+  assert.ok(Math.abs(y - 100) < 4, `a 10 s sta vicino ai 100 m (${y.toFixed(1)})`);
+});
+
+test('senza percorso, ferma un poco avanti alla lettura: resta lì, ed è arrivata', () => {
+  const m = new Moto();
+  m.posizione({ metri: null, v: 0, x: 0, y: 2, rotta: 0, quando: 0 });
+  for (let t = 0; t <= 3000; t += 33) m.passo(t);
+  // Il GPS balla indietro di due metri: la freccia non torna indietro.
+  m.posizione({ metri: null, v: 0, x: 0, y: 0, rotta: 0, quando: 3000 });
+  let p = null;
+  for (let t = 3000; t <= 6000; t += 33) p = m.passo(t);
+  assert.ok(Math.abs(p.y - 2) < 0.01, `resta a 2 m (${p.y.toFixed(2)})`);
+  assert.equal(m.fermo, true);
+  // Di lato invece ci va: la strada è lì.
+  m.posizione({ metri: null, v: 0, x: 1, y: 0, rotta: 0, quando: 6000 });
+  for (let t = 6000; t <= 9000; t += 33) p = m.passo(t);
+  assert.ok(Math.abs(p.x - 1) < 0.05, `di lato sì (${p.x.toFixed(2)})`);
+  // Oltre i tre metri torna, piano.
+  m.posizione({ metri: null, v: 0, x: 1, y: -6, rotta: 0, quando: 9000 });
+  for (let t = 9000; t <= 15000; t += 33) p = m.passo(t);
+  assert.ok(p.y < -2.5 && p.y > -3.2, `torna fino a tre metri dalla lettura (${p.y.toFixed(2)})`);
+});
+
 test('alle svolte, fermi o quasi, la freccia non gira prima dell\'auto', async () => {
   const { svolteDi } = await import('../src/moto.js');
   // Una L: 100 m verso est, poi 100 m verso nord. La svolta a 100 m.

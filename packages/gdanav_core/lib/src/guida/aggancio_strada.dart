@@ -116,6 +116,10 @@ class AggancioStrada {
           if (diQuantoSiGira(c.rotta, prima.rotta).abs() > 90) verso = (c.rotta + 180) % 360;
         } else if (s.senso < 0) {
           verso = (c.rotta + 180) % 360;
+        } else if (s.senso == 0 && rotta != null && rotta.isFinite && diQuantoSiGira(c.rotta, rotta).abs() > 90) {
+          // Fermi, la prima volta (l'auto parcheggiata): il verso in cui
+          // guarda, se si sa. Il verso dei punti della via non vuol dire niente.
+          verso = (c.rotta + 180) % 360;
         }
         // Un poco di più per la strada che gira rispetto all'auto: a pari
         // distanza vince quella dritta.

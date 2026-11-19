@@ -71,3 +71,14 @@ test('oltre il tratto del 3D il percorso continua, piatto e più stretto, con le
   assert.deepEqual(oltre[1].filter, ['has', 'livello']);
   assert.deepEqual(oltre[0].filter, ['!', ['has', 'livello']]);
 });
+
+test('nella vista «Corsie» il traffico di TomTom non oltre lo zoom 18; nel 3D aumentato come prima', () => {
+  const base = { version: 8, sources: { traffico: { type: 'vector', maxzoom: 22 }, eventi: { type: 'vector', maxzoom: 22 } }, layers: [] };
+  const corsie = adattaStile(base, { corsie: true });
+  assert.equal(corsie.sources.traffico.maxzoom, 18);
+  assert.equal(corsie.sources.eventi.maxzoom, 18);
+  const aumentato = adattaStile(base);
+  assert.equal(aumentato.sources.traffico.maxzoom, 22);
+  assert.equal(aumentato.sources.eventi.maxzoom, 22);
+  assert.equal(base.sources.traffico.maxzoom, 22, 'lo stile dell’app resta com’è');
+});

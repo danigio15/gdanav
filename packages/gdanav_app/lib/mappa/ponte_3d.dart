@@ -164,10 +164,14 @@ Map<String, Object?> msgPosizione({
   required DateTime quando,
   ({double metri, DateTime alle, double? velocitaMs, double? precisioneM})? lettura,
   bool zoomSubito = false,
+  bool rottaIncerta = false,
 }) => _m('posizione', {
   'lat': _sei(qui.lat),
   'lon': _sei(qui.lon),
   'rotta': ((rotta % 360) * 10).roundToDouble() / 10,
+  // La rotta non si sa ancora (il nord di partenza, fermi): la pagina non la
+  // usa per scegliere in che verso della strada sta l'auto.
+  if (rottaIncerta) 'rottaIncerta': true,
   'metri': metri == null || !metri.isFinite ? null : (metri * 10).roundToDouble() / 10,
   'velocita': velocitaMs.isFinite ? math.max(0.0, (velocitaMs * 10).roundToDouble() / 10) : 0.0,
   'zoom': (zoom * 100).roundToDouble() / 100,

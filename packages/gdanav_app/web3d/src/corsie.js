@@ -554,6 +554,76 @@ export function tessereConCorsieVere(dati) {
   return [...out];
 }
 
+/** Il riquadro `[ovest, sud, est, nord]` dei punti `[lon, lat, …]`. */
+export function riquadroLonLat(ll) {
+  let [a, b, c, d] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (let i = 0; i + 1 < ll.length; i += 2) {
+    a = Math.min(a, ll[i]);
+    b = Math.min(b, ll[i + 1]);
+    c = Math.max(c, ll[i]);
+    d = Math.max(d, ll[i + 1]);
+  }
+  return [a, b, c, d];
+}
+
+/**
+ * Fin dove arriva quello che il messaggio `corsie` [dati] disegna (le vie, i
+ * nodi, gli alberi): `[ovest, sud, est, nord]`, o `null` se non ha niente.
+ * Le tessere costruite che lo toccano si rifanno; le altre restano.
+ */
+export function riquadroCorsie(dati) {
+  const ll = [];
+  for (const s of dati?.strade ?? []) if (Array.isArray(s.g)) ll.push(...s.g);
+  for (const n of dati?.nodi ?? []) if (Array.isArray(n.g)) ll.push(n.g[0], n.g[1]);
+  for (const a of dati?.alberi ?? []) if (Array.isArray(a)) ll.push(a[0], a[1]);
+  for (const f of dati?.filari ?? []) if (Array.isArray(f?.g)) ll.push(...f.g);
+  const r = riquadroLonLat(ll);
+  return Number.isFinite(r[0]) ? r : null;
+}
+
+// ── La corsia dell'auto, senza percorso ─────────────────────────────────
+
+/**
+ * Di quanto spostare di lato (a sinistra positivo, rispetto a [rotta],
+ * gradi da nord) l'auto in [x, y] perché stia nella sua corsia: la più a
+ * destra del suo senso di marcia, come si guida in Italia (senza percorso
+ * non si sa dove girerà). `null` se sotto non c'è una via con le corsie
+ * che vada come l'auto. [indice]: un [IndiceCorsie] nei metri della scena.
+ *
+ * «Va al contrario»: senza percorso l'auto stava sulla riga di mezzo, a
+ * cavallo dei due sensi, e nella vista «Corsie» pareva sulla corsia di chi
+ * viene incontro.
+ */
+export function corsiaDellAuto(indice, x, y, rotta) {
+  if (!indice || !Number.isFinite(rotta)) return null;
+  const r = (rotta * Math.PI) / 180;
+  const dx = Math.sin(r);
+  const dy = Math.cos(r);
+  let meglio = null;
+  let bv = Infinity;
+  for (const [i, k] of indice.vicini(x, y)) {
+    const v = indice.strade[i];
+    const t = sulTratto(v, k, x, y);
+    if (t.d > 9) continue;
+    const cos = t.tx * dx + t.ty * dy;
+    if (Math.abs(cos) < 0.7 || (v.senso && cos < 0)) continue;
+    const voto = t.d + 15 * (1 - Math.abs(cos));
+    if (voto < bv) {
+      bv = voto;
+      meglio = { v, t, av: cos > 0 };
+    }
+  }
+  if (!meglio) return null;
+  const { v, t, av } = meglio;
+  const nc = av ? v.avanti : v.indietro;
+  if (!nc) return null;
+  const o = centroCorsia(v, v.condivisa ? 0 : nc - 1, av) + (v.raccordo && v.sxy ? spostamentoRaccordo(v.raccordo, t.s, v.sxy.at(-1)) : 0) * (av ? 1 : -1);
+  // Il mezzo della corsia, e quanto sta a sinistra dell'auto.
+  const cx = t.qx + (av ? -t.ty : t.ty) * o - x;
+  const cy = t.qy + (av ? t.tx : -t.tx) * o - y;
+  return cx * -dy + cy * dx;
+}
+
 // ── La corsia del percorso ──────────────────────────────────────────────
 
 /** Le frecce buone per una manovra (le famiglie di frecce). */

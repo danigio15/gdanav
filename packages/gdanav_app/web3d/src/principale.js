@@ -18,7 +18,7 @@ import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
 import { dallaScorta, nellaScorta } from './scorte.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
 import { tavolozza } from './tavolozza.js';
-import { corsieLungoIlPercorso, IndiceCorsie, preparaCorsie, tessereConCorsieVere } from './corsie.js';
+import { corsiaDellAuto, corsieLungoIlPercorso, IndiceCorsie, preparaCorsie, riquadroCorsie, riquadroLonLat, tessereConCorsieVere } from './corsie.js';
 import './gdanav3d.css';
 
 /** Gli strati da toccare (come `stratiToccabili` in stile.dart). */
@@ -152,8 +152,11 @@ const S = {
   log: [],
   /** La vista «Corsie» accesa (`opzioni.corsie`). */
   corsie: false,
-  /** Le vie e i nodi del messaggio `corsie`, per id (si sommano: un messaggio per tessera). */
-  corsieGrezze: { strade: new Map(), nodi: new Map(), alberi: new Map(), filari: new Map() },
+  /** I messaggi `corsie` arrivati, per tessera (si sommano: un messaggio per tessera; vedi [prendiCorsie]). */
+  corsieDati: new Map(),
+  /** Quelli arrivati e non ancora presi (vedi [CORSIE_INSIEME_MS]). */
+  corsieInArrivo: [],
+  corsieAttesa: null,
   /** Le stesse, pronte (vedi `preparaCorsie`), e nei metri della scena. */
   corsiePronte: null,
   indiceCorsie: null,
@@ -253,7 +256,7 @@ const GESTORI = {
       S.mappa?.setVerticalFieldOfView(corsie ? OBIETTIVO_CORSIE_GRADI : OBIETTIVO_GRADI);
       // Lo stile di sotto (i colori chiari), e le tessere con o senza corsie.
       if (S.mappa && S.stileGrezzo && !cambiaNotte) caricaStile(S.stileGrezzo);
-      rifaiTessere();
+      rifaiTessere(null, { scarta: true });
       S.sporco.profilo = true;
     }
     sveglia();
@@ -261,34 +264,14 @@ const GESTORI = {
   /**
    * Le vie con le corsie e i nodi da disegnare (il formato è in `corsie.js`).
    * Si sommano a quelli arrivati prima (una tessera alla volta, dal relay):
-   * i raccordi fra le vie si rifanno su tutti.
+   * i raccordi fra le vie si rifanno su tutti (vedi [prendiCorsie]).
    */
   corsie(m) {
-    const G = S.corsieGrezze;
-    for (const st of m.dati.strade ?? []) G.strade.set(st.id, st);
-    for (const n of m.dati.nodi ?? []) G.nodi.set(n.id, n);
-    for (const a of m.dati.alberi ?? []) G.alberi.set(`${a[0]},${a[1]}`, a);
-    for (const f of m.dati.filari ?? []) G.filari.set(f.id ?? f.g.join(), f);
-    // La tessera ha le corsie vere: non le stima più (una arrivata vuota sì).
-    for (const k of tessereConCorsieVere(m.dati)) {
-      S.corsieTessere.add(k);
-      if (S.stimeCorsie.delete(k)) S.stimePronte = null;
-    }
-    S.corsiePronte = preparaCorsie({ strade: [...G.strade.values()], nodi: [...G.nodi.values()], alberi: [...G.alberi.values()], filari: [...G.filari.values()] });
-    for (const v of S.corsiePronte.strade) {
-      let [a, b, c, d] = [Infinity, Infinity, -Infinity, -Infinity];
-      for (let i = 0; i < v.ll.length; i += 2) {
-        a = Math.min(a, v.ll[i]);
-        b = Math.min(b, v.ll[i + 1]);
-        c = Math.max(c, v.ll[i]);
-        d = Math.max(d, v.ll[i + 1]);
-      }
-      v.riquadro = [a, b, c, d];
-    }
-    indicizzaCorsie();
-    if (S.corsie) rifaiTessere();
-    S.sporco.profilo = true;
-    sveglia();
+    if (!m.dati || typeof m.dati !== 'object') return;
+    // Arrivano a mazzi (l'app ne chiede fino a dodici insieme): si prendono
+    // tutti insieme, una volta sola (vedi [prendiCorsie]).
+    S.corsieInArrivo.push(m.dati);
+    if (!S.corsieAttesa) S.corsieAttesa = setTimeout(prendiCorsie, CORSIE_INSIEME_MS);
   },
   stile(m) {
     S.stileGrezzo = m.stile;
@@ -362,7 +345,16 @@ const GESTORI = {
     // Fuori dal percorso (o senza): sulla strada più vicina, se è vicina e va
     // come l'auto (`aggancio.js`), non accanto dove dice il GPS.
     if (!(S.percorso && m.metri !== null && m.metri !== undefined)) {
-      const su = aggancio.aggancia(x, y, m.rotta, m.velocita ?? 0, indice.vicini(x, y, SOGLIA_M));
+      // La rotta che l'app non sa ancora (`rottaIncerta`: il nord di
+      // partenza, prima di essersi mossi) non sceglie il verso della strada.
+      // Col percorso sotto (il viaggio pronto, non ancora partito) quel verso
+      // lo dice il percorso: si parte come va lui, non all'indietro.
+      let rottaNota = m.rottaIncerta === true ? null : m.rotta;
+      if (rottaNota === null && S.percorso?.linea) {
+        const q = S.percorso.linea.proietta(x, y);
+        if (q.d < SOGLIA_M) rottaNota = (((90 - (S.percorso.linea.direzione(q.s, 8) * 180) / Math.PI) % 360) + 360) % 360;
+      }
+      const su = aggancio.aggancia(x, y, rottaNota, m.velocita ?? 0, indice.vicini(x, y, SOGLIA_M));
       if (su) {
         x = su.x;
         y = su.y;
@@ -1199,6 +1191,94 @@ function chiedi(k, dettaglio) {
   lavoratore.postMessage({ id, z, x, y, tessere, dettaglio, edifici, corsie: S.corsie && !stima ? corsiePerTessera(z, x, y) : null, vistaCorsie: S.corsie, stimaCorsie: stima }, trasferiti);
 }
 
+/*
+ * Le corsie vere, dal relay: un messaggio per tessera, che l'app manda
+ * appena arriva (fino a dodici insieme, e una nuova ogni tanto, andando).
+ *
+ * «Va a scatti, non è fluido.» A ogni messaggio la pagina rifaceva tutto:
+ * le vie pronte di tutte le tessere arrivate dall'inizio del viaggio (mai
+ * buttate), e tutte le tessere costruite, togliendo al lavoratore quella che
+ * stava facendo. Peggio: la risposta del lavoro tolto, arrivando, toglieva a
+ * sua volta quello nuovo e ne chiedeva un altro, e così via per sempre — il
+ * lavoratore sempre al lavoro sulla stessa tessera, che non arrivava mai
+ * (né le corsie vere). Adesso i messaggi arrivati insieme si prendono una
+ * volta, si tengono solo le tessere vicine ([CORSIE_TENUTE]), si rifanno solo
+ * le tessere costruite che le nuove vie toccano, e il lavoro in corso finisce.
+ */
+const CORSIE_INSIEME_MS = 150;
+const CORSIE_TENUTE = 36;
+
+function prendiCorsie() {
+  S.corsieAttesa = null;
+  const nuovi = S.corsieInArrivo.splice(0);
+  if (!nuovi.length) return;
+  let senzaTessera = 0;
+  for (const d of nuovi) {
+    const k = Number.isInteger(d.x) && Number.isInteger(d.y) ? chiaveTessera(d.z ?? 14, d.x, d.y) : `altro/${S.corsieDati.size}/${senzaTessera++}`;
+    S.corsieDati.delete(k);
+    S.corsieDati.set(k, d);
+    // La tessera ha le corsie vere: non le stima più (una arrivata vuota sì).
+    for (const t of tessereConCorsieVere(d)) {
+      S.corsieTessere.add(t);
+      if (S.stimeCorsie.delete(t)) S.stimePronte = null;
+    }
+  }
+  // Le più lontane dall'auto si lasciano (le tessere arrivate prima, se non si sa dove si è).
+  if (S.corsieDati.size > CORSIE_TENUTE) {
+    const qui = S.posizione ? [S.posizione.lon, S.posizione.lat] : null;
+    const lontane = [...S.corsieDati.keys()]
+      .map((k, i) => ({ k, d: qui && /^\d+\/\d+\/\d+$/.test(k) ? distanzaDaTessera(qui, k) : -i }))
+      .sort((a, b) => b.d - a.d);
+    // Le loro tessere, se ci si torna, le stimano (l'app non le rimanda).
+    for (const { k } of lontane.slice(0, S.corsieDati.size - CORSIE_TENUTE)) {
+      for (const t of tessereConCorsieVere(S.corsieDati.get(k))) S.corsieTessere.delete(t);
+      S.corsieDati.delete(k);
+    }
+  }
+  const strade = new Map();
+  const nodi = new Map();
+  const alberi = new Map();
+  const filari = new Map();
+  for (const d of S.corsieDati.values()) {
+    for (const st of d.strade ?? []) strade.set(st.id, st);
+    for (const n of d.nodi ?? []) nodi.set(n.id, n);
+    for (const a of d.alberi ?? []) alberi.set(`${a[0]},${a[1]}`, a);
+    for (const f of d.filari ?? []) filari.set(f.id ?? f.g.join(), f);
+  }
+  S.corsiePronte = preparaCorsie({ strade: [...strade.values()], nodi: [...nodi.values()], alberi: [...alberi.values()], filari: [...filari.values()] });
+  for (const v of S.corsiePronte.strade) v.riquadro = riquadroLonLat(v.ll);
+  indicizzaCorsie();
+  if (S.corsie) {
+    // Le tessere costruite che le vie nuove toccano (coi raccordi delle
+    // vicine), e quella che il lavoratore sta facendo, se le tocca.
+    const r = nuovi.map(riquadroCorsie).filter(Boolean);
+    const chiavi = new Set(S.costruite.keys());
+    if (S.lavoro?.chiave) chiavi.add(S.lavoro.chiave);
+    rifaiTessere([...chiavi].filter((k) => r.some((q) => toccaTessera(q, k, MARGINE_CORSIE))));
+  }
+  S.sporco.profilo = true;
+  sveglia();
+}
+
+/** Quanto è lontano [lonlat] dal mezzo della tessera [k] (gradi, alla buona: per ordinare). */
+function distanzaDaTessera([lon, lat], k) {
+  const { z, x, y } = daChiave(k);
+  const n = 2 ** z;
+  const c = [lonDaMerc((x + 0.5) / n), latDaMerc((y + 0.5) / n)];
+  return Math.hypot((c[0] - lon) * Math.cos((lat * Math.PI) / 180), c[1] - lat);
+}
+
+/** Se la tessera [k] (coi [margine] gradi attorno) tocca il riquadro [q] `[o, s, e, n]`. */
+function toccaTessera(q, k, margine) {
+  const { z, x, y } = daChiave(k);
+  const n = 2 ** z;
+  const o = lonDaMerc(x / n) - margine;
+  const e = lonDaMerc((x + 1) / n) + margine;
+  const nord = latDaMerc(y / n) + margine;
+  const sud = latDaMerc((y + 1) / n) - margine;
+  return q[2] >= o && q[0] <= e && q[3] >= sud && q[1] <= nord;
+}
+
 /** Le vie con le corsie (e i nodi) attorno alla tessera z/x/y, per il lavoratore. */
 function corsiePerTessera(z, x, y) {
   const c = S.corsiePronte;
@@ -1251,21 +1331,31 @@ function corsieStimatePronte() {
   return S.stimePronte;
 }
 
-/** Tutte le tessere da rifare (la vista «Corsie» accesa o spenta, le corsie arrivate). */
-function rifaiTessere() {
-  for (const k of S.costruite.keys()) {
+/**
+ * Le tessere [chiavi] da rifare (tutte, senza: la vista «Corsie» accesa o
+ * spenta; quelle che toccano le corsie arrivate): si tengono finché le nuove
+ * non arrivano, e rifatte prendono il loro posto. Quella che il lavoratore
+ * sta facendo finisce lo stesso (vedi [prendiCorsie]): arrivata si rifà
+ * ancora, o con [scarta] (la vista cambiata: è fatta per l'altra) si butta.
+ */
+function rifaiTessere(chiavi = null, { scarta = false } = {}) {
+  const quali = chiavi ?? [...S.costruite.keys()];
+  for (const k of quali) {
     const c = S.costruite.get(k);
-    // Si tengono finché le nuove non arrivano: rifatte, prendono il loro posto.
-    c.rifare = true;
+    if (c) c.rifare = true;
   }
-  S.lavoro = null;
+  const l = S.lavoro;
+  if (l && (chiavi === null || quali.includes(l.chiave))) l.stantio = scarta ? 'scarta' : 'rifai';
   pianificaPresto();
 }
 
 function allaTessera({ id, tessera, errore, stimate }) {
   const lavoro = S.lavoro;
+  // La risposta di un lavoro che non è quello in corso (non dovrebbe più
+  // capitare): quello in corso resta, e la sua risposta arriverà.
+  if (lavoro && lavoro.id !== id) return;
   S.lavoro = null;
-  if (!lavoro || lavoro.id !== id) return pianificaPresto();
+  if (!lavoro || lavoro.stantio === 'scarta') return pianificaPresto();
   if (errore) {
     annota('tessera', lavoro.chiave, errore);
     // Non si riprova subito: si segna come fatta, vuota, ridotta.
@@ -1289,6 +1379,8 @@ function allaTessera({ id, tessera, errore, stimate }) {
     triangoli: tessera.conti.triangoli,
     vicine: lavoro.vicine,
     conti: tessera.conti,
+    // Arrivata mentre cambiava quello che le serve (le corsie): si rifà.
+    rifare: lavoro.stantio === 'rifai',
   });
   annota('tessera', tessera.chiave, tessera.dettaglio, JSON.stringify(tessera.conti), Math.round(performance.now() - lavoro.da) + 'ms');
   S.sporco.profilo = true;
@@ -2122,6 +2214,7 @@ function muovi(adesso, dt) {
   const m = S.mappa;
   const pos = moto.passo(S.orologioProva ?? Date.now());
   const p = S.percorso;
+  let latoInMoto = false;
   if (!pos || !S.origine || (pos.s !== undefined && !p)) {
     aggiornaCielo();
     return false;
@@ -2132,6 +2225,7 @@ function muovi(adesso, dt) {
   let dir;
   let rottaCamera;
   if (pos.s !== undefined && p) {
+    S.latoCorsia = 0;
     const s = Math.min(pos.s, p.linea.lunghezza);
     [x, y] = p.linea.a(s);
     const prof = p.profilo;
@@ -2176,6 +2270,14 @@ function muovi(adesso, dt) {
     x = pos.x;
     y = pos.y;
     dir = ((90 - pos.rotta) * Math.PI) / 180;
+    // Nella vista «Corsie» l'auto sta nella sua corsia (vedi `corsiaDellAuto`),
+    // e non a cavallo della riga di mezzo; ci va piano, cambiando strada.
+    if (S.corsie && !S.indiceCorsie) indicizzaCorsie();
+    const lato = S.corsie ? corsiaDellAuto(S.indiceCorsie, x, y, pos.rotta) : null;
+    S.latoCorsia = smorza(S.latoCorsia ?? 0, lato ?? 0, dt, 500);
+    if (Math.abs(S.latoCorsia - (lato ?? 0)) > 0.03) latoInMoto = true;
+    x += -Math.sin(dir) * S.latoCorsia;
+    y += Math.cos(dir) * S.latoCorsia;
     // Senza percorso: la quota della strada sotto, la più vicina a quella di prima.
     const cand = indice.candidati(x, y, Math.cos(dir), Math.sin(dir), 7);
     const prima = S.auto?.z ?? 0;
@@ -2249,7 +2351,7 @@ function muovi(adesso, dt) {
     m.triggerRepaint();
   }
   aggiornaCielo();
-  return !(moto.fermo && assestata);
+  return !(moto.fermo && assestata && !latoInMoto);
 }
 
 /**

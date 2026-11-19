@@ -50,7 +50,8 @@ const CONTROLLI = {
     (m.metri === null || numero(m.metri)) &&
     numero(m.velocita) &&
     numero(m.quando) &&
-    (m.zoom === undefined || numero(m.zoom)),
+    (m.zoom === undefined || numero(m.zoom)) &&
+    (m.rottaIncerta === undefined || typeof m.rottaIncerta === 'boolean'),
   camera: (m) =>
     ['segui', 'libera', 'panoramica'].includes(m.modo) &&
     (m.sopra === undefined || numero(m.sopra)) &&
