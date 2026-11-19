@@ -23,6 +23,23 @@ test('troppo lontano, di traverso o contromano su un senso unico: niente', () =>
   assert.equal(Math.round(giu.rotta), 180);
 });
 
+test('fermi, la prima volta, la freccia guarda dove guarda l\'auto, non dove vanno i punti della via', () => {
+  // «Va al contrario»: la pagina appena aperta, l'auto parcheggiata verso sud
+  // su una via disegnata da sud a nord. La freccia e la mappa guardavano a
+  // nord, all'indietro, finché non si partiva.
+  assert.equal(Math.round(new AggancioStrada().aggancia(3, 0, 178, 0, [nordSud]).rotta), 180);
+  assert.equal(Math.round(new AggancioStrada().aggancia(3, 0, 10, 0, [nordSud]).rotta), 0);
+  // La rotta che l'app non sa (null): il verso della via, come prima.
+  assert.equal(Math.round(new AggancioStrada().aggancia(3, 0, null, 0, [nordSud]).rotta), 0);
+  // Su un senso unico si guarda come va lui.
+  assert.equal(Math.round(new AggancioStrada().aggancia(3, 0, 180, 0, [{ ...nordSud, senso: 1 }]).rotta), 0);
+  assert.equal(Math.round(new AggancioStrada().aggancia(3, 0, 0, 0, [{ ...nordSud, senso: -1 }]).rotta), 180);
+  // E poi, ancora fermi, si resta in quel verso anche se il GPS balla.
+  const a = new AggancioStrada();
+  a.aggancia(3, 0, 178, 0, [nordSud]);
+  assert.equal(Math.round(a.aggancia(2, 1, 20, 0.5, [nordSud]).rotta), 180);
+});
+
 test('fra due parallele a 20 m non salta, e passa quando si è davvero sull\'altra', () => {
   const prima = { x0: 0, y0: -500, x1: 0, y1: 1000, senso: 0 };
   const seconda = { x0: 20, y0: -500, x1: 20, y1: 1000, senso: 0 };

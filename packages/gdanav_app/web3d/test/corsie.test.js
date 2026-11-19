@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
   IndiceCorsie,
   centroCorsia,
+  corsiaDellAuto,
   corsieAdatte,
   corsieDi,
   corsieLungoIlPercorso,
@@ -15,6 +16,7 @@ import {
   normalizza,
   raccordi,
   riempi,
+  riquadroCorsie,
   scegliCorsia,
   scostamentoPosa,
   sensoUnico,
@@ -215,4 +217,41 @@ test('il traffico sulla fascia della corsia: i colori delle code, solo sul tratt
     if (s > 101 && s < 299) assert.equal(n.livelli[i], 2, `in coda a ${s}`);
     if (s < 99 || s > 301) assert.equal(n.livelli[i], 0, `libera a ${s}`);
   }
+});
+
+/** Delle vie inventate in metri (`g` già in metri), pronte per [IndiceCorsie]. */
+function inMetri(vie) {
+  const strade = vie.map(normalizza);
+  for (const v of strade) {
+    v.xy = [];
+    for (let i = 0; i < v.ll.length; i += 2) v.xy.push([v.ll[i], v.ll[i + 1]]);
+    v.llVia = v.ll;
+  }
+  return new IndiceCorsie(strade);
+}
+
+test('senza percorso l\'auto sta nella sua corsia, a destra, non sulla riga di mezzo', () => {
+  // Una via a doppio senso verso nord (una corsia per senso, 3 m), disegnata da sud a nord.
+  const indice = inMetri([{ id: 1, hw: 'residential', g: [0, -300, 0, 300] }]);
+  // Verso nord: la corsia di destra, 1,5 m a est (a destra = spostamento negativo).
+  assert.ok(vicino(corsiaDellAuto(indice, 0, 0, 0), -1.5), `nord ${corsiaDellAuto(indice, 0, 0, 0)}`);
+  // Verso sud, sulla stessa via: 1,5 m a ovest, che per chi va a sud è ancora la destra.
+  assert.ok(vicino(corsiaDellAuto(indice, 0, 0, 180), -1.5));
+  // Col GPS mezzo metro a est, verso nord: un metro in più a destra, sempre al mezzo della corsia.
+  assert.ok(vicino(corsiaDellAuto(indice, 0.5, 0, 0), -1));
+  // Di traverso, o lontano: niente.
+  assert.equal(corsiaDellAuto(indice, 0, 0, 90), null);
+  assert.equal(corsiaDellAuto(indice, 30, 0, 0), null);
+  // Un senso unico a tre corsie: la più a destra; contromano niente.
+  const uno = inMetri([{ id: 2, hw: 'primary', lanes: '3', oneway: 'yes', g: [0, -300, 0, 300] }]);
+  assert.ok(vicino(corsiaDellAuto(uno, 0, 0, 0), -3.25));
+  assert.equal(corsiaDellAuto(uno, 0, 0, 180), null);
+  // Una corsia sola per i due sensi: nel mezzo.
+  const stretta = inMetri([{ id: 3, hw: 'residential', lanes: '1', g: [0, -300, 0, 300] }]);
+  assert.ok(vicino(corsiaDellAuto(stretta, 0, 0, 0), 0));
+});
+
+test('il riquadro di un messaggio corsie: vie, nodi, alberi; niente se è vuoto', () => {
+  assert.deepEqual(riquadroCorsie({ strade: [{ g: [1, 2, 3, 4] }], nodi: [{ g: [0, 5] }], alberi: [[4, 1]] }), [0, 1, 4, 5]);
+  assert.equal(riquadroCorsie({ strade: [] }), null);
 });

@@ -12,6 +12,8 @@ import { tavolozza } from './tavolozza.js';
 
 export const ZOOM_3D = 14.5;
 export const STRATO_3D = 'gdanav-3d';
+/** Nella vista «Corsie» le tessere del traffico non oltre questo zoom (vedi [adattaStile]). */
+export const ZOOM_TRAFFICO_CORSIE = 18;
 
 /** Gli strati che il 3D disegna da sé, da vicino. */
 export const STRATI_SOSTITUITI = [
@@ -132,6 +134,17 @@ export function adattaStile(stile, { notte = false, corsie = false } = {}) {
   }
   if (s.sources?.['gdanav-percorso']) {
     s.sources[SORGENTE_OLTRE] = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } };
+  }
+  // Nella vista «Corsie» la telecamera è bassa e vicina (zoom fino a 20,6,
+  // inclinata): MapLibre chiedeva a TomTom le tessere del traffico fino allo
+  // zoom 21, cinque volte quelle del «3D aumentato», e nuove a ogni pochi
+  // metri (un minuto di guida in città: quasi cinquecento). Il traffico del
+  // 3D le stesse strade le ha già alla 18: oltre, MapLibre ingrandisce quelle.
+  if (corsie) {
+    for (const id of ['traffico', 'eventi']) {
+      const src = s.sources?.[id];
+      if (src && (src.maxzoom ?? 22) > ZOOM_TRAFFICO_CORSIE) src.maxzoom = ZOOM_TRAFFICO_CORSIE;
+    }
   }
   // Il traffico da vicino lo disegna il 3D, ma le tessere di TomTom le
   // scarica MapLibre solo se uno strato le usa: uno invisibile.

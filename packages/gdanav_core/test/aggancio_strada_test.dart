@@ -52,6 +52,20 @@ void main() {
     expect(AggancioStrada().aggancia(a(6, 0), rotta: 180, velocitaMs: 10, strade: [alContrario]), isNotNull);
   });
 
+  test('fermi, la prima volta, si guarda dove guarda l\'auto, non dove vanno i punti della via', () {
+    // «Va al contrario»: l'auto parcheggiata verso sud su una via disegnata
+    // da sud a nord girava la freccia (e la mappa) verso nord.
+    final sud = AggancioStrada().aggancia(a(3, 0), rotta: 178, velocitaMs: 0, strade: [nordSud]);
+    expect(diQuantoSiGira(sud!.rotta, 180).abs(), lessThan(0.1));
+    // La rotta che non si sa: il verso della via, come prima.
+    final senza = AggancioStrada().aggancia(a(3, 0), velocitaMs: 0, strade: [nordSud]);
+    expect(diQuantoSiGira(senza!.rotta, 0).abs(), lessThan(0.1));
+    // Su un senso unico, fermi, si guarda come va lui anche se il GPS dice l'altro verso.
+    final sensoUnico = TrattoStrada([a(0, -500), a(0, 500)], senso: 1);
+    final su = AggancioStrada().aggancia(a(3, 0), rotta: 180, velocitaMs: 0, strade: [sensoUnico]);
+    expect(diQuantoSiGira(su!.rotta, 0).abs(), lessThan(0.1));
+  });
+
   test('fra due strade parallele non salta a ogni lettura', () {
     // Due strade a 20 m l'una dall'altra; si va sulla prima (x = 0) e il GPS
     // balla fra 3 e 12 metri verso la seconda, a volte più vicino a lei.

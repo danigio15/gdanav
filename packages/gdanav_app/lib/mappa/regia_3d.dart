@@ -431,6 +431,7 @@ class Regia3d {
       msgPosizione(
         qui: qui,
         rotta: stimata?.rotta ?? a?.rotta ?? posizione.rotta,
+        rottaIncerta: stimata == null && a == null && !posizione.rottaConosciuta,
         metri: metri,
         velocitaMs: (g.velocitaMs ?? posizione.velocitaAdesso() / 3.6),
         zoom:

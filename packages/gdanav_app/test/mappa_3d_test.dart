@@ -158,6 +158,19 @@ void main() {
       expect(fuori['metri'], isNull);
       expect(fuori['velocita'], 0.0);
       expect(fuori.containsKey('lettura'), isFalse);
+      expect(fuori.containsKey('rottaIncerta'), isFalse);
+      // Fermi, prima di essersi mossi, la rotta è il nord di partenza: la
+      // pagina non deve scegliere con lei il verso della strada («va al contrario»).
+      final ferma = msgPosizione(
+        qui: const Punto(45, 9),
+        rotta: 0,
+        metri: null,
+        velocitaMs: 0,
+        zoom: 18,
+        quando: DateTime(2026),
+        rottaIncerta: true,
+      );
+      expect(ferma['rottaIncerta'], isTrue);
     });
 
     test('la lettura del GPS com\'era, per il filtro della pagina, e la velocità del cruscotto', () {

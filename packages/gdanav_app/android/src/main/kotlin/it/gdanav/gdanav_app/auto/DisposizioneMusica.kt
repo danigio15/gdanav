@@ -1,5 +1,7 @@
 package it.gdanav.gdanav_app.auto
 
+import kotlin.math.pow
+
 /**
  * Dove sta il lettore musicale sulla mappa dell'auto, e su quale tasto è
  * caduto un tocco. Solo conti: niente di Android qui dentro, così si provano
@@ -177,6 +179,24 @@ object DisposizioneMusica {
     }
 
     /** Su cosa è caduto il tocco in ([x], [y]), pixel della superficie. */
+    /**
+     * Il bordo alto del lettore mentre l'area libera cambia: [mostrato] quello
+     * dell'ultimo disegno ([Float.NaN] al primo), [meta] quello dell'area di
+     * adesso, [dtMs] il tempo passato. Salendo — i tasti in alto spariti — ci
+     * va piano: metà della strada ogni [SALITA_MEZZA_MS], e a mezzo pixel è
+     * arrivato. Scendendo — i tasti tornati — subito: sotto di loro, mai
+     * coperto neanche per un fotogramma.
+     */
+    fun altoVerso(mostrato: Float, meta: Float, dtMs: Long): Float {
+        if (mostrato.isNaN() || meta >= mostrato) return meta
+        val resta = 0.5.pow(dtMs.coerceIn(0L, 200L) / SALITA_MEZZA_MS.toDouble()).toFloat()
+        val nuovo = meta + (mostrato - meta) * resta
+        return if (nuovo - meta < 0.5f) meta else nuovo
+    }
+
+    /** In quanti millisecondi il lettore fa metà della salita. */
+    const val SALITA_MEZZA_MS = 70f
+
     fun tocco(d: Disposta?, x: Float, y: Float): Zona {
         d ?: return Zona.FUORI
         for ((zona, dove) in d.zone) if (dove.contiene(x, y)) return zona

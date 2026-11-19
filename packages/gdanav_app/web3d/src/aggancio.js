@@ -75,6 +75,13 @@ export class AggancioStrada {
       } else if (prima) {
         if (Math.abs(giro(suo, prima.rotta)) > 90) verso = (suo + 180) % 360;
       } else if (s.senso < 0) verso = (suo + 180) % 360;
+      else if (s.senso === 0 && Number.isFinite(rotta) && Math.abs(giro(suo, rotta)) > 90) {
+        // Fermi, la prima volta (la pagina appena aperta, l'auto parcheggiata):
+        // il verso in cui guarda l'auto, se si sa. Prima il verso dei punti
+        // della via, che non vuol dire niente: «va al contrario», la freccia
+        // e la mappa girate all'indietro finché non si partiva.
+        verso = (suo + 180) % 360;
+      }
       const c = { x: px, y: py, rotta: verso, lontano: d, costo: d + scarto * 0.08 };
       if (!meglio || c.costo < meglio.costo) meglio = c;
       if (prima && proseguimento(prima, s, suo)) {
