@@ -2,9 +2,9 @@
 // le corsie, su strade inventate: nessun posto vero.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizza, preparaCorsie } from '../src/corsie.js';
+import { bordiCorsie, normalizza, preparaCorsie } from '../src/corsie.js';
 import { latDaMerc, lonDaMerc, sistemaTessera } from '../src/geo.js';
-import { ALTO_MARCIAPIEDE, RIGHE, costruisciSegnaletica, formaFreccia, togli, trattini } from '../src/segnaletica.js';
+import { ALTO_MARCIAPIEDE, ANGOLO, CORDOLO_M, angoloMarciapiede, lineaRicca, MARCIAPIEDI, RIGHE, SCIVOLO, costruisciSegnaletica, formaFreccia, semplificaPezzo, togli, trattini } from '../src/segnaletica.js';
 import { costruisciTessera } from '../src/tessera.js';
 import { cavalcavia } from './finte.js';
 
@@ -325,4 +325,189 @@ test('niente marciapiede sulle rampe, né sui pezzi corti a senso unico dentro l
     [0, -300],
   ]);
   assert.ok(costruisciSegnaletica({ strade: [a, lungo], meta: 1000 }).marciapiedi.triangoli > 0);
+});
+
+// ── Come si vede il marciapiede ────────────────────────────────────────
+// «Non si capisce che sono marciapiedi.»
+
+/** I triangoli del piano in cima ai marciapiedi (non le facce del cordolo): `[[x, y, z] × 3]`. */
+function pianiMarciapiede(sg) {
+  const { p, n, i } = sg.marciapiedi;
+  const out = [];
+  for (let t = 0; t < i.length; t += 3) {
+    const v = [i[t], i[t + 1], i[t + 2]];
+    if (v.some((k) => n[3 * k + 2] < 0.9)) continue;
+    out.push(v.map((k) => [p[3 * k], p[3 * k + 1], p[3 * k + 2]]));
+  }
+  return out;
+}
+
+/** Se il punto (x, y) sta sotto uno dei triangoli [tri] (visti dall'alto). */
+function sotto(tri, x, y) {
+  return tri.some(([a, b, c]) => {
+    const s1 = (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]);
+    const s2 = (c[0] - b[0]) * (y - b[1]) - (c[1] - b[1]) * (x - b[0]);
+    const s3 = (a[0] - c[0]) * (y - c[1]) - (a[1] - c[1]) * (x - c[0]);
+    return (s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0);
+  });
+}
+
+/** L'incrocio di due vie di quartiere in un nodo, e mezza larghezza dell'asfalto. */
+function incrocio() {
+  const a = via({ id: 1, hw: 'residential' }, fitta([-120, 0], [120, 0], 4));
+  const b = via({ id: 2, hw: 'residential' }, fitta([0, -120], [0, 120], 4));
+  return { a, b, m: bordiCorsie(a).sinistra + a.margini[0] };
+}
+
+test('all’incrocio gli angoli sono tondi: il marciapiede gira da una via all’altra, senza buchi', () => {
+  const { a, b, m } = incrocio();
+  const sg = costruisciSegnaletica({ strade: [a, b], meta: 1000 });
+  const piani = pianiMarciapiede(sg);
+  const w = MARCIAPIEDI.residential;
+  const R = w + ANGOLO.raggio;
+  for (const [sx, sy] of [
+    [1, 1],
+    [-1, 1],
+    [-1, -1],
+    [1, -1],
+  ]) {
+    // Lungo le due vie, fin dove comincia la curva, e intorno alla curva.
+    for (let d = m + R + 0.2; d < 60; d += 2) {
+      assert.ok(sotto(piani, sx * d, sy * (m + w / 2)), `lungo a, ${sx},${sy} a ${d}`);
+      assert.ok(sotto(piani, sx * (m + w / 2), sy * d), `lungo b, ${sx},${sy} a ${d}`);
+    }
+    // Il centro della curva è a (m + R, m + R): il mezzo del marciapiede a R - w/2 da lì.
+    for (const ang of [0.15, 0.5, 0.85]) {
+      const t = (Math.PI / 2) * ang;
+      const x = m + R - Math.cos(t) * (R - w / 2);
+      const y = m + R - Math.sin(t) * (R - w / 2);
+      assert.ok(sotto(piani, sx * x, sy * y), `sulla curva ${sx},${sy} ${ang}`);
+    }
+    // Lo spigolo vero, fra la curva e l'asfalto: asfalto, non marciapiede.
+    const spigolo = m + 0.4;
+    assert.ok(!sotto(piani, sx * spigolo, sy * spigolo), `niente marciapiede nello spigolo ${sx},${sy}`);
+    assert.ok(sotto(triangoliDi(sg.asfalto), sx * spigolo, sy * spigolo), `l’asfalto riempie lo spigolo ${sx},${sy}`);
+  }
+  // Mai sull'asfalto delle due vie.
+  for (const tri of piani) {
+    const cx = (tri[0][0] + tri[1][0] + tri[2][0]) / 3;
+    const cy = (tri[0][1] + tri[1][1] + tri[2][1]) / 3;
+    assert.ok(Math.abs(cx) > m - 0.01 && Math.abs(cy) > m - 0.01, `sull’asfalto: ${cx},${cy}`);
+  }
+});
+
+/** I triangoli di un costruttore, visti dall'alto. */
+function triangoliDi(c) {
+  const out = [];
+  for (let t = 0; t < c.i.length; t += 3) out.push([c.i[t], c.i[t + 1], c.i[t + 2]].map((k) => [c.p[3 * k], c.p[3 * k + 1], c.p[3 * k + 2]]));
+  return out;
+}
+
+test('l’angolo tondo non si fa dove passa un’altra via (la svolta a destra che taglia l’angolo)', () => {
+  const { a, b, m } = incrocio();
+  // La svolta da a (verso est) a b (verso sud), corta e a senso unico: dentro l'incrocio.
+  const svolta = via({ id: 3, hw: 'residential', oneway: 'yes' }, fitta([14, 0], [0, -14], 2));
+  a.xy = a.xyVia = [...fitta([-120, 0], [0, 0], 4), ...fitta([0, 0], [14, 0], 2).slice(1), ...fitta([14, 0], [120, 0], 4).slice(1)];
+  a.h = a.xy.map(() => 0);
+  b.xy = b.xyVia = [...fitta([0, -120], [0, -14], 4), ...fitta([0, -14], [0, 0], 2).slice(1), ...fitta([0, 0], [0, 120], 4).slice(1)];
+  b.h = b.xy.map(() => 0);
+  const sg = costruisciSegnaletica({ strade: [a, b, svolta], meta: 1000 });
+  const piani = pianiMarciapiede(sg);
+  const mezza = bordiCorsie(svolta).sinistra + svolta.margini[0];
+  const sv = svolta.xy;
+  for (const tri of piani) {
+    const cx = (tri[0][0] + tri[1][0] + tri[2][0]) / 3;
+    const cy = (tri[0][1] + tri[1][1] + tri[2][1]) / 3;
+    for (let k = 1; k < sv.length; k++) {
+      const [p, q] = [sv[k - 1], sv[k]];
+      const dx = q[0] - p[0];
+      const dy = q[1] - p[1];
+      const t = Math.max(0, Math.min(1, ((cx - p[0]) * dx + (cy - p[1]) * dy) / (dx * dx + dy * dy)));
+      assert.ok(Math.hypot(cx - p[0] - dx * t, cy - p[1] - dy * t) > mezza - 0.05, `marciapiede sulla svolta: ${cx},${cy}`);
+    }
+  }
+  // Quell'angolo non c'è; gli altri tre restano tondi.
+  const R = MARCIAPIEDI.residential + ANGOLO.raggio;
+  const x = m + R - Math.cos(Math.PI / 4) * (R - 0.9);
+  assert.ok(!sotto(piani, x, -x), 'niente curva sulla svolta');
+  assert.ok(sotto(piani, x, x) && sotto(piani, -x, x) && sotto(piani, -x, -x));
+});
+
+test('l’arco dell’angolo: tangente ai due cordoli, e niente se sotto passa un’altra via', () => {
+  const { a, b, m } = incrocio();
+  const strade = [a, b];
+  for (const v of strade) v.sVia = v.xyVia.map((_, k) => k * 4);
+  const ricche = strade.map((v) => lineaRicca(v.xy, v.h));
+  const bordi = strade.map((v) => [bordiCorsie(v).sinistra + v.margini[0], bordiCorsie(v).destra - v.margini[1]]);
+  const k = a.xy.findIndex(([x, y]) => x === 0 && y === 0);
+  // Da a verso est a b verso nord: l'angolo a nord-est.
+  const A = { i: 0, k, passo: 1 };
+  const B = { i: 1, k, passo: 1 };
+  const ang = angoloMarciapiede(A, B, strade, ricche, bordi, () => 0.2, null);
+  assert.ok(ang);
+  const R = MARCIAPIEDI.residential + ANGOLO.raggio;
+  assert.ok(Math.abs(ang.a.sT - (120 + m + R)) < 1e-6 && Math.abs(ang.b.sT - (120 + m + R)) < 1e-6, 'i dritti finiscono dove comincia la curva');
+  const [p0, pN] = [ang.punti[0], ang.punti[ang.punti.length - 1]];
+  assert.ok(Math.hypot(p0.x - (m + R), p0.y - m) < 1e-6 && Math.hypot(pN.x - m, pN.y - (m + R)) < 1e-6);
+  // Il marciapiede verso l'isolato (nord-est), e ai capi proprio come i dritti.
+  assert.ok(Math.abs(p0.nx) < 1e-9 && Math.abs(p0.ny - 1) < 1e-9 && Math.abs(pN.nx - 1) < 1e-9 && Math.abs(pN.ny) < 1e-9);
+  // Il cordolo sull'arco: a R dal centro (m + R, m + R).
+  for (const q of ang.punti) assert.ok(Math.abs(Math.hypot(q.x - m - R, q.y - m - R) - R) < 0.02, `fuori dal cerchio: ${q.x},${q.y}`);
+  // Un'altra via sotto l'arco: niente angolo.
+  assert.equal(angoloMarciapiede(A, B, strade, ricche, bordi, () => 0.2, { sotto: () => ({ i: 9 }) }), null);
+  // Due vie quasi dritte: niente angolo.
+  assert.equal(angoloMarciapiede(A, { i: 0, k, passo: -1 }, strade, ricche, bordi, () => 0.2, null), null);
+});
+
+test('alle strisce pedonali il marciapiede scende: lo scivolo, senza il cordolo', () => {
+  const v = via({ id: 1, hw: 'residential' }, fitta([-100, 0], [100, 0], 4));
+  const sg = costruisciSegnaletica({ strade: [v], nodi: [{ highway: 'crossing', xy: [0, 0] }], meta: 1000 });
+  const { p, n, t } = sg.marciapiedi;
+  const z0 = 0.2;
+  let bassi = 0;
+  for (let k = 0; k < p.length / 3; k++) {
+    if (n[3 * k + 2] < 0.9) continue;
+    const x = p[3 * k];
+    const z = p[3 * k + 2] - z0;
+    if (Math.abs(x) <= SCIVOLO.mezzo + 1e-6) {
+      assert.ok(Math.abs(z - SCIVOLO.alto) < 1e-6, `sulle strisce il marciapiede è basso: ${x} ${z}`);
+      bassi++;
+      // Il cordolo non c'è: la sua fascia (u < CORDOLO_M) comincia più in là.
+      assert.ok(t[2 * k] >= CORDOLO_M);
+    } else if (Math.abs(x) >= SCIVOLO.mezzo + SCIVOLO.rampa - 1e-6) assert.ok(Math.abs(z - ALTO_MARCIAPIEDE) < 1e-6, `fuori dalle strisce è alto: ${x} ${z}`);
+  }
+  assert.ok(bassi >= 4, 'lo scivolo dai due lati');
+  // Lontano dalle strisce il cordolo comincia dal bordo della strada.
+  assert.ok([...Array(p.length / 3).keys()].some((k) => n[3 * k + 2] > 0.9 && Math.abs(p[3 * k]) > 50 && t[2 * k] === 0));
+});
+
+test('il marciapiede di una via dritta: quattro vertici, con le uv e i colori di giorno e di notte', () => {
+  const v = via({ id: 1, hw: 'residential' }, fitta([-100, 0], [100, 0], 2));
+  const sg = costruisciSegnaletica({ strade: [v], meta: 1000 });
+  // Due lati, ognuno il piano (2 triangoli) e la faccia del cordolo (2).
+  assert.equal(sg.marciapiedi.triangoli, 8);
+  const g = sg.marciapiedi.fatto();
+  assert.equal(g.uv.length, (g.posizioni.length / 3) * 2);
+  assert.equal(g.colori.length, g.posizioni.length);
+  assert.equal(g.coloriNotte.length, g.posizioni.length);
+  // La faccia del cordolo è più scura del piano.
+  const c = sg.marciapiedi.c;
+  const nn = sg.marciapiedi.n;
+  const faccia = [...Array(nn.length / 3).keys()].find((k) => Math.abs(nn[3 * k + 2]) < 0.1);
+  const piano = [...Array(nn.length / 3).keys()].find((k) => nn[3 * k + 2] > 0.9);
+  assert.ok(c[3 * faccia] < c[3 * piano]);
+});
+
+test('semplificare un pezzo: sulle vie dritte restano i capi, in curva no, i fissi sempre', () => {
+  const dritta = fitta([0, 0], [100, 0], 4).map(([x, y], k) => [x, y, 0, 0, 1, k * 4]);
+  assert.equal(semplificaPezzo(dritta, 3, 5).length, 2);
+  const fissi = new Set([dritta[10]]);
+  assert.deepEqual(semplificaPezzo(dritta, 3, 5, 0.04, fissi), [dritta[0], dritta[10], dritta[dritta.length - 1]]);
+  // Un arco di raggio 30: il cordolo a 3 m e il filo a 5 m restano entro 4 cm.
+  const arco = Array.from({ length: 40 }, (_, k) => {
+    const a = (k / 39) * (Math.PI / 2);
+    return [30 * Math.cos(a), 30 * Math.sin(a), 0, -Math.cos(a), -Math.sin(a), 30 * a];
+  });
+  const pochi = semplificaPezzo(arco, 3, 5);
+  assert.ok(pochi.length > 4 && pochi.length < arco.length);
 });

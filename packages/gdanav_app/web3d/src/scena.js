@@ -7,6 +7,7 @@ import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { generatore } from './caso.js';
 import { pezziDelNastro } from './percorso.js';
 import { Condivise } from './scorte.js';
+import { CORDOLO_M } from './segnaletica.js';
 import { CAMPATA, NASTRI, PERIODO_STRADA, PIANO, STILI_FACCIATA } from './tessera.js';
 import { GIORNO, SOLE, glslColoreCoda, tavolozza } from './tavolozza.js';
 
@@ -492,6 +493,64 @@ function geometria(d, notte) {
   return g;
 }
 
+/**
+ * Le lastre dei marciapiedi, disegnate dalla scheda grafica con le uv (`u`
+ * i metri dal bordo della strada, `v` quelli lungo la via): la fascia chiara
+ * del cordolo con lo spigolo scuro verso l'asfalto, poi le lastre di
+ * [LASTRA_M] con le fughe sottili e il tono che cambia appena dall'una
+ * all'altra. Da lontano le fughe e i toni sfumano (sotto qualche pixel per
+ * lastra farebbero solo sfarfallio). Poi i colori dei vertici: la faccia
+ * in ombra, gli scivoli.
+ */
+const LASTRA_M = 1.0;
+const FRAMMENTO_LASTRE = `
+{
+  vec2 q = vLastre;
+  float fx = max(fwidth(q.x), 1e-4);
+  float cordolo = 1.0 - smoothstep(${CORDOLO_M.toFixed(2)} - fx, ${CORDOLO_M.toFixed(2)} + fx, q.x);
+  diffuseColor.rgb = mix(diffuseColor.rgb, uCordolo, cordolo);
+  vec2 l = vec2((q.x - ${CORDOLO_M.toFixed(2)}) / ${LASTRA_M.toFixed(2)}, q.y / ${LASTRA_M.toFixed(2)});
+  vec2 fl = max(fwidth(l), vec2(1e-4));
+  vec2 d = abs(fract(l + 0.5) - 0.5);
+  vec2 sp = vec2(0.03 / ${LASTRA_M.toFixed(2)});
+  vec2 vicino = clamp(1.0 - (fl - 0.1) * 5.0, 0.0, 1.0);
+  vec2 linee = (1.0 - smoothstep(sp, sp + fl, d)) * vicino;
+  // Le fughe lungo la via solo fra le lastre (dal cordolo in là).
+  float fuga = max(linee.y, linee.x * step(${CORDOLO_M.toFixed(2)} - fx, q.x));
+  vec2 h2 = fract(floor(l) * vec2(0.1031, 0.1030));
+  h2 += dot(h2, h2.yx + 33.33);
+  float tono = 1.0 + (fract((h2.x + h2.y) * h2.x) - 0.5) * 0.08 * vicino.x * vicino.y * (1.0 - cordolo);
+  // Lo spigolo del cordolo, verso la strada.
+  float spigolo = 1.0 - smoothstep(0.0, 0.05 + fx, q.x);
+  diffuseColor.rgb *= tono * (1.0 - 0.13 * fuga) * (1.0 - 0.4 * spigolo);
+}
+#include <color_fragment>`;
+
+function materialeMarciapiedi(P, notte) {
+  // Un poco di luce propria: di notte (le luci sono basse) il marciapiede
+  // resterebbe del colore del suolo, e la sera non si vedrebbe.
+  const luce = notte ? 0.55 : 0.12;
+  const m = new THREE.MeshLambertMaterial({ color: P.marciapiede, vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -2 });
+  const cordolo = colore(P.cordolo);
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uCordolo = { value: cordolo };
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', `#include <common>
+        varying vec2 vLastre;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        vLastre = uv;`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        uniform vec3 uCordolo;
+        varying vec2 vLastre;`)
+      .replace('#include <color_fragment>', FRAMMENTO_LASTRE)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        totalEmissiveRadiance += diffuseColor.rgb * ${luce.toFixed(2)};`);
+  };
+  m.customProgramCacheKey = () => 'marciapiedi-lastre-' + luce;
+  return m;
+}
+
 function istanze(geo, materiale, matrici, colori) {
   const n = matrici.length / 16;
   const m = new THREE.InstancedMesh(geo, materiale, n);
@@ -920,8 +979,9 @@ export class Scena {
     // Nella vista «Corsie» gli edifici hanno i colori della vista (bianchi,
     // grigi chiari, il bordo del tetto più scuro): li mette il lavoratore.
     if (this.corsie) {
-      // I marciapiedi: grigio chiaro, un poco sopra la strada.
-      m['corsie-marciapiedi'] = new THREE.MeshLambertMaterial({ color: P.marciapiede, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -2 });
+      // I marciapiedi: le lastre, il cordolo chiaro, la faccia in ombra (vedi
+      // [FRAMMENTO_LASTRE] e `segnaletica.js`).
+      m['corsie-marciapiedi'] = materialeMarciapiedi(P, notte);
       // L'asfalto delle corsie, la vernice bianca (righe, frecce, strisce) e
       // i semafori: una geometria l'uno per tessera (vedi `segnaletica.js`).
       m['corsie-asfalto'] = new THREE.MeshLambertMaterial({ color: P.asfalto, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -2 });
