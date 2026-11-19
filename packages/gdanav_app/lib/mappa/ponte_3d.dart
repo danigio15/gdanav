@@ -100,6 +100,13 @@ Map<String, Object?> msgPercorso(Viaggio? v) {
       for (final c in v!.percorso.code)
         if (c.daM.isFinite && c.aM.isFinite && c.aM > c.daM) [c.daM.roundToDouble(), c.aM.roundToDouble(), c.livello],
     ],
+    // I pezzi già sulle strade della mappa (rifatti contro il contromano): la
+    // scena non li sposta.
+    'suStrada': [
+      for (final (a, b, r) in v.percorso.suStrada)
+        if (a.isFinite && b.isFinite && r.isFinite && b > a)
+          [(a * 10).roundToDouble() / 10, (b * 10).roundToDouble() / 10, (r * 10).roundToDouble() / 10],
+    ],
   });
 }
 

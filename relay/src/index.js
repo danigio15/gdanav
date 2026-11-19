@@ -40,7 +40,7 @@ export default {
     if (percorso.startsWith('/v1/segnalazioni')) return segnalazioni(richiesta, env);
     if (percorso.startsWith('/v1/codici/')) return codici(richiesta, env);
     if (percorso.startsWith('/v1/colonnine/')) return colonnine(richiesta, ctx);
-    if (percorso.startsWith('/v1/corsie/')) return corsie(richiesta, ctx);
+    if (percorso.startsWith('/v1/corsie/')) return corsie(richiesta, ctx, { archivio: env.ARCHIVIO_CORSIE ?? null });
     if (richiesta.headers.get('Upgrade') !== 'websocket') {
       return new Response('gdanav relay\n', { status: 426 });
     }

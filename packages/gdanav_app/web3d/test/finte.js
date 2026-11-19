@@ -93,3 +93,65 @@ export function sottopasso() {
     ]),
   };
 }
+
+/**
+ * I byte di una tessera vettoriale (Mapbox Vector Tile 2) con gli strati
+ * [strati] (`{nome: [{tipo, p, g}, …]}`, come [strato]): per provare il
+ * lavoratore, che le tessere le riceve così.
+ */
+export async function byteTessera(strati) {
+  const { default: Pbf } = await import('pbf');
+  const pbf = new Pbf();
+  const zz = (n) => (n << 1) ^ (n >> 31);
+  for (const [nome, elementi] of Object.entries(strati)) {
+    const chiavi = [];
+    const valori = [];
+    const indice = (arr, v) => {
+      const k = arr.findIndex((x) => x === v);
+      if (k >= 0) return k;
+      arr.push(v);
+      return arr.length - 1;
+    };
+    pbf.writeMessage(3, (_, p) => {
+      p.writeVarintField(15, 2);
+      p.writeStringField(1, nome);
+      for (const e of elementi) {
+        const tipo = e.tipo ?? 2;
+        p.writeMessage(2, (__, q) => {
+          const tag = [];
+          for (const [k, v] of Object.entries(e.p ?? {})) tag.push(indice(chiavi, k), indice(valori, v));
+          q.writePackedVarint(2, tag);
+          q.writeVarintField(3, tipo);
+          const geo = [];
+          let cx = 0;
+          let cy = 0;
+          for (const linea0 of e.g) {
+            const chiusa = tipo === 3 && linea0.length > 1 && linea0[0][0] === linea0.at(-1)[0] && linea0[0][1] === linea0.at(-1)[1];
+            const linea = chiusa ? linea0.slice(0, -1) : linea0;
+            linea.forEach(([x, y], i) => {
+              if (i === 0) geo.push(1 | (1 << 3));
+              else if (i === 1) geo.push(2 | ((linea.length - 1) << 3));
+              geo.push(zz(x - cx), zz(y - cy));
+              cx = x;
+              cy = y;
+            });
+            if (tipo === 3) geo.push(7 | (1 << 3));
+          }
+          q.writePackedVarint(4, geo);
+        });
+      }
+      for (const k of chiavi) p.writeStringField(3, k);
+      for (const v of valori) {
+        p.writeMessage(4, (___, q) => {
+          if (typeof v === 'string') q.writeStringField(1, v);
+          else if (typeof v === 'boolean') q.writeBooleanField(7, v);
+          else if (Number.isInteger(v)) q.writeSVarintField(6, v);
+          else q.writeDoubleField(3, v);
+        });
+      }
+      p.writeVarintField(5, 4096);
+    });
+  }
+  const b = pbf.finish();
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+}

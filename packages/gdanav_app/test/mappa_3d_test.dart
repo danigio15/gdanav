@@ -79,6 +79,21 @@ void main() {
       expect(m['code'], [
         [100.0, 220.0, 3],
       ]);
+      expect(m['suStrada'], isEmpty, reason: 'niente rifatto: la scena sposta tutto come sempre');
+      // Un pezzo rifatto sulle strade vere (contro il contromano) arriva alla scena.
+      final rifatto = Viaggio(
+        percorso: PercorsoCalcolato(
+          punti: punti,
+          tratti: const [],
+          manovre: const [],
+          suStrada: const [(40.04, 120.0, 19.15)],
+        ),
+        colonnine: const [],
+        piano: null,
+      );
+      expect(msgPercorso(rifatto)['suStrada'], [
+        [40.0, 120.0, 19.2],
+      ]);
       expect(msgPercorso(null)['punti'], isNull);
       // Un punto che non è un numero non arriva alla pagina (il JSON non sa cosa sia NaN).
       final storto = Viaggio(

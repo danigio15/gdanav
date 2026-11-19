@@ -43,6 +43,20 @@ export function trattini(L, pieno, vuoto, buchi = [], fase = 0) {
   return togli(out, buchi);
 }
 
+/**
+ * Il tratteggio di una via stimata (`stimata`, vedi stima.js): un numero
+ * intero di trattini, appena allungati o accorciati, con mezzo vuoto ai due
+ * capi. I pezzi stimati nascono e finiscono sul bordo della tessera, e
+ * contati dall'inizio di ognuno (come [trattini]) lì due trattini
+ * finirebbero attaccati: così sul bordo c'è un vuoto intero.
+ */
+export function trattiniAdattati(L, pieno, vuoto, buchi = []) {
+  const periodo = pieno + vuoto;
+  const n = Math.max(1, Math.round(L / periodo));
+  const k = L / (n * periodo);
+  return trattini(L, pieno * k, vuoto * k, buchi, (vuoto * k) / 2);
+}
+
 /** Gli intervalli [pezzi] senza le parti dentro [buchi] (tutti `[da, a]`). */
 export function togli(pezzi, buchi) {
   let out = pezzi;
@@ -476,7 +490,7 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
     // ── Le righe ───────────────────────────────────────────────────────
     const dz = z0 + 0.02;
     const riga = (o, w, buchi, tipo = 'continua', pieno = 3, vuoto = 3) => {
-      const pezzi = tipo === 'continua' ? togli([[0, L]], buchi) : trattini(L, pieno, vuoto, buchi);
+      const pezzi = tipo === 'continua' ? togli([[0, L]], buchi) : v.stimata ? trattiniAdattati(L, pieno, vuoto, buchi) : trattini(L, pieno, vuoto, buchi);
       for (const [a, b] of pezzi) {
         if (b - a < 0.2) continue;
         striscia(vernice, pezzoFra(r, a, b), o + w / 2, o - w / 2, dz, meta);

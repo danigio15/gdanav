@@ -119,6 +119,14 @@ jobs:
           fi
           # In cima al file: dopo le tabelle [[...]] finirebbe dentro l'ultima.
           sed -i "/^compatibility_date/a routes = [{ pattern = \"$HOST\", custom_domain = true }]" wrangler.toml
+          # L'archivio delle corsie (corsie.yml): senza il bucket (o senza il
+          # permesso R2 nel gettone) wrangler rifiuterebbe di pubblicare, e
+          # allora il relay va senza, come prima, chiedendo a Overpass.
+          BUCKET=$(sed -n 's/^bucket_name = "\(.*\)"/\1/p' wrangler.toml)
+          if ! npx wrangler r2 bucket info "$BUCKET" > /dev/null 2>&1; then
+            echo "::warning::Il bucket R2 $BUCKET non c'è (o il gettone non ha il permesso R2): relay pubblicato senza l'archivio delle corsie."
+            sed -i '/^# >>> archivio corsie/,/^# <<< archivio corsie/d' wrangler.toml
+          fi
           npx wrangler deploy
       - name: Il relay risponde
         env:

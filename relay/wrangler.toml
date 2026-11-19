@@ -38,3 +38,13 @@ class_name = "Codice"
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = ["Codice"]
+
+# >>> archivio corsie
+# Le corsie d'Italia già pronte, una tessera z14 per oggetto, rifatte ogni
+# mese da .github/workflows/corsie.yml (strumenti/corsie): il relay le legge
+# prima di chiedere a Overpass. Se il bucket non c'è ancora, la CI toglie
+# queste righe prima di pubblicare (fino a «<<<») e il relay va come prima.
+[[r2_buckets]]
+binding = "ARCHIVIO_CORSIE"
+bucket_name = "gdanav-corsie"
+# <<< archivio corsie

@@ -211,6 +211,7 @@ class PercorsoCalcolato {
     this.pedaggi = const [],
     this.prezzoPedaggio,
     this.pagamentiPedaggio,
+    this.suStrada = const [],
   });
 
   final List<Punto> punti;
@@ -269,6 +270,15 @@ class PercorsoCalcolato {
   /// pagare. `null`: non si sanno, si stima.
   final List<PagamentoPedaggio>? pagamentiPedaggio;
 
+  /// I pezzi della geometria rifatti sulle strade di OpenStreetMap che la
+  /// mappa disegna (`correggiContromano`), `(da, a, raccordo)` in metri sui
+  /// [punti]: nei primi e negli ultimi [raccordo] metri il pezzo si stacca
+  /// dalla linea del fornitore per arrivare sulla strada, in mezzo è già
+  /// sulla strada. La scena 3D appoggia la linea del fornitore sulle strade
+  /// spostandola di qualche metro; questi pezzi sono già al loro posto e non
+  /// si spostano («il tratto verde è al centro, non strettamente a destra»).
+  final List<(double, double, double)> suStrada;
+
   /// Coi pedaggi veri: anche sotto il traffico, che si rifà da
   /// [senzaTraffico] e non deve perderli.
   PercorsoCalcolato conPagamenti(List<PagamentoPedaggio>? pagamenti) =>
@@ -314,6 +324,7 @@ class PercorsoCalcolato {
         pedaggi: pedaggi,
         prezzoPedaggio: prezzoPedaggio,
         pagamentiPedaggio: pagamentiPedaggio ?? this.pagamentiPedaggio,
+        suStrada: suStrada,
       );
 
   PercorsoCalcolato conLimiti(List<int?> limiti) => _copia(limiti: limiti);
@@ -329,6 +340,7 @@ class PercorsoCalcolato {
     required List<TrattoPedaggio> pedaggi,
     required List<PagamentoPedaggio>? pagamentiPedaggio,
     required PercorsoCalcolato? senzaTraffico,
+    List<(double, double, double)> suStrada = const [],
   }) =>
       PercorsoCalcolato(
         punti: punti,
@@ -348,6 +360,7 @@ class PercorsoCalcolato {
         pedaggi: pedaggi,
         prezzoPedaggio: prezzoPedaggio,
         pagamentiPedaggio: pagamentiPedaggio,
+        suStrada: suStrada,
       );
 
   /// Con le corsie di ogni manovra (dalla risposta OSRM dello stesso

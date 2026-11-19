@@ -1,0 +1,162 @@
+# Le corsie d'Italia per la vista «Corsie», in un archivio nostro.
+#
+# Il relay serve `GET /v1/corsie/14/<x>/<y>`: prima le chiedeva a Overpass a
+# ogni tessera nuova, e quando Overpass non risponde la vista resta vuota.
+# Qui, una volta al mese (o a mano), si prende l'estratto d'Italia di
+# Geofabrik, si fanno TUTTE le tessere z14 con le stesse regole del relay
+# (strumenti/corsie: osmium per filtrare, poi le funzioni del relay) e si
+# caricano sul bucket R2 che il relay legge prima di Overpass:
+#   corsie/v1/14/<x>/<y>.json.gz   una tessera, il JSON compresso con gzip
+#   corsie/v1/manifesto.json       la data dell'estratto e le tessere coperte
+# Il manifesto si carica per ultimo: finché non c'è, il relay non usa
+# l'archivio.
+#
+# Il runner (ubuntu-latest: 2-4 CPU, 7-16 GB di memoria, 14 GB di disco
+# garantiti) basta, coi conti fatti su estratti veri piccoli e su uno finto
+# grande un quinto d'Italia (31 s, 560 MB di memoria, 210 MB di appoggio):
+#   disco   l'estratto ~2 GB, cancellato appena filtrato (il filtrato ~0,3
+#           GB); i file di appoggio ~1-2 GB, cancellati alla fine;
+#           l'archivio ~150-300 MB compressi (0,7-1,2 GB di JSON), ~100 000
+#           file. Al più ~4-5 GB insieme.
+#   memoria osmium add-locations-to-ways ~1-1,5 GB (i luoghi dei nodi delle
+#           vie) e node (tetto a 4 GB, ne usa ~1,5-2,5) insieme.
+#   tempo   scaricare 1-3 min, filtrare 3-5, convertire 3-6, caricare la
+#           prima volta 10-20 (100 000 PUT, 48 alla volta); i mesi dopo
+#           rclone carica solo le tessere cambiate. In tutto ~20-40 minuti.
+#
+# Segreti (Settings → Secrets and variables → Actions):
+#   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY  un gettone R2 «Object Read & Write»
+#                                           sul solo bucket dell'archivio
+#   R2_ENDPOINT                             https://<id account>.r2.cloudflarestorage.com
+#                                           (se manca, si fa da CLOUDFLARE_ACCOUNT_ID)
+# Variabile facoltativa: R2_BUCKET_CORSIE (di norma gdanav-corsie, lo stesso
+# nome di relay/wrangler.toml). Senza segreti l'archivio si fa lo stesso (le
+# prove) ma non si carica.
+#
+# Dati © i contributori di OpenStreetMap, licenza ODbL.
+name: corsie
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Il 3 del mese: l'estratto di Geofabrik è della notte prima.
+    - cron: "41 4 3 * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: corsie
+  cancel-in-progress: false
+
+jobs:
+  archivio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      BUCKET: ${{ vars.R2_BUCKET_CORSIE || 'gdanav-corsie' }}
+      # Meno di così vuol dire che qualcosa si è rotto: non si carica (rclone
+      # sync cancellerebbe le tessere buone che mancano).
+      MINIMO_TESSERE: "40000"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Gli strumenti
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q osmium-tool rclone
+          osmium --version | head -1
+          rclone version | head -1
+          df -h / "$RUNNER_TEMP"; free -m; nproc
+
+      - name: L'estratto d'Italia (Geofabrik)
+        working-directory: ${{ runner.temp }}
+        run: |
+          base=https://download.geofabrik.de/europe
+          curl -fsSL --retry 5 --retry-delay 30 -o italy-latest.osm.pbf.md5 "$base/italy-latest.osm.pbf.md5"
+          curl -fsSL --retry 5 --retry-delay 30 -o italy-latest.osm.pbf "$base/italy-latest.osm.pbf"
+          md5sum -c italy-latest.osm.pbf.md5
+          curl -fsSL --retry 5 --retry-delay 30 -o italy.poly "$base/italy.poly"
+          ls -l italy-latest.osm.pbf italy.poly
+          osmium fileinfo italy-latest.osm.pbf
+
+      - name: Le tessere
+        id: tessere
+        env:
+          TOGLI_INGRESSO: "1"
+          MEMORIA_NODE_MB: "4096"
+        run: |
+          set -o pipefail
+          export LAVORO="$RUNNER_TEMP/lavoro"
+          strumenti/corsie/prepara.sh "$RUNNER_TEMP/italy-latest.osm.pbf" "$RUNNER_TEMP/uscita" "$RUNNER_TEMP/italy.poly" \
+            "Geofabrik italy-latest.osm.pbf, © i contributori di OpenStreetMap (ODbL)" | tee "$RUNNER_TEMP/riassunto.txt"
+          rm -rf "$LAVORO"
+          m="$RUNNER_TEMP/uscita/corsie/v1/manifesto.json"
+          n=$(node -e 'const m=JSON.parse(require("fs").readFileSync(process.argv[1]));process.stdout.write(String(m.tessere))' "$m")
+          file=$(find "$RUNNER_TEMP/uscita/corsie/v1/14" -name '*.json.gz' | wc -l)
+          echo "tessere nel manifesto: $n, file: $file"
+          du -sh "$RUNNER_TEMP/uscita"
+          df -h "$RUNNER_TEMP"
+          if [ "$n" != "$file" ] || [ "$n" -lt "$MINIMO_TESSERE" ]; then
+            echo "::error::Archivio strano ($n tessere, $file file): non si carica."
+            exit 1
+          fi
+          {
+            echo "### Corsie d'Italia"
+            echo
+            echo "- estratto: $(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1])).estratto)' "$m")"
+            echo "- tessere: $n ($(du -sh "$RUNNER_TEMP/uscita" | cut -f1))"
+            echo "- riassunto: \`$(tail -1 "$RUNNER_TEMP/riassunto.txt")\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # rclone con l'API S3 di R2: tante tessere in parallelo, coi tentativi
+      # ripetuti, e `sync --checksum` carica solo quelle cambiate (l'MD5 del
+      # file contro l'ETag di R2; il gzip di node non ci mette la data, quindi
+      # una tessera uguale dà lo stesso file) e cancella quelle sparite. Il
+      # manifesto per ultimo.
+      - name: Su R2
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$R2_ACCESS_KEY_ID" ] || [ -z "$R2_SECRET_ACCESS_KEY" ]; then
+            echo "::notice::Archivio delle corsie fatto ma non caricato: mancano i segreti R2_ACCESS_KEY_ID e R2_SECRET_ACCESS_KEY."
+            exit 0
+          fi
+          endpoint="${R2_ENDPOINT:-https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com}"
+          if [ "$endpoint" = "https://.r2.cloudflarestorage.com" ]; then
+            echo "::error::Manca R2_ENDPOINT (o CLOUDFLARE_ACCOUNT_ID)."; exit 1
+          fi
+          export RCLONE_CONFIG_R2_TYPE=s3
+          export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
+          export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
+          export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+          export RCLONE_CONFIG_R2_ENDPOINT="$endpoint"
+          export RCLONE_CONFIG_R2_REGION=auto
+          export RCLONE_CONFIG_R2_ACL=private
+          # Il gettone vale per il solo bucket: niente controlli o creazioni di bucket.
+          export RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true
+          uscita="$RUNNER_TEMP/uscita/corsie/v1"
+          rclone sync "$uscita/14" "r2:$BUCKET/corsie/v1/14" \
+            --checksum --fast-list --transfers 48 --checkers 48 \
+            --retries 5 --low-level-retries 20 --max-delete 20000 \
+            --stats 60s --stats-one-line --stats-log-level NOTICE
+          rclone copyto "$uscita/manifesto.json" "r2:$BUCKET/corsie/v1/manifesto.json" \
+            --header-upload "Cache-Control: no-cache" --retries 5
+          rclone size "r2:$BUCKET/corsie/v1" --fast-list
+
+      - name: Il relay le serve
+        continue-on-error: true
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        run: |
+          [ -z "$R2_ACCESS_KEY_ID" ] && exit 0
+          # Una tessera dell'archivio a caso: le intestazioni e quanto pesa.
+          f=$(find "$RUNNER_TEMP/uscita/corsie/v1/14" -name '*.json.gz' | shuf -n 1)
+          t=${f#"$RUNNER_TEMP/uscita/corsie/v1/14/"}; t=${t%.json.gz}
+          curl -sS -o /dev/null -D - -m 30 "https://gdanav.gdahome.org/v1/corsie/14/$t" | grep -iE '^(HTTP|x-gdanav|content-type)'

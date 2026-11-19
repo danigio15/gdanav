@@ -24,7 +24,8 @@ const CONTROLLI = {
   percorso: (m) =>
     (m.punti === null || coppie(m.punti)) &&
     (m.metri === undefined || (Array.isArray(m.metri) && m.punti && m.metri.length === m.punti.length / 2 && m.metri.every(numero))) &&
-    (m.code === undefined || (Array.isArray(m.code) && m.code.every((c) => Array.isArray(c) && c.length === 3 && c.every(numero)))),
+    (m.code === undefined || (Array.isArray(m.code) && m.code.every((c) => Array.isArray(c) && c.length === 3 && c.every(numero)))) &&
+    (m.suStrada === undefined || (Array.isArray(m.suStrada) && m.suStrada.every((c) => Array.isArray(c) && c.length === 3 && c.every(numero)))),
   manovra: (m) =>
     ((m.da === null && m.a === null) || (numero(m.da) && numero(m.a) && m.a >= m.da)) &&
     (m.corsie === undefined || (Array.isArray(m.corsie) && m.corsie.length <= 16)) &&

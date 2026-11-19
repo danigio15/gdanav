@@ -166,3 +166,9 @@ test("la risoluzione: sul telefono quella dello schermo, sull'auto con un tetto 
   // Uno schermo piccolo dell'auto resta pieno.
   assert.equal(rapportoPixel({ dpr: 1, larghezza: 1280, altezza: 720, inAuto: true }), 1);
 });
+
+test('il percorso coi pezzi già sulle strade: da, a, raccordo', () => {
+  assert.ok(decodifica({ v: 1, tipo: 'percorso', punti: [9, 45, 9.1, 45.1], suStrada: [[10, 80, 20]] }));
+  assert.equal(decodifica({ v: 1, tipo: 'percorso', punti: [9, 45, 9.1, 45.1], suStrada: [[10, 80]] }), null);
+  assert.equal(decodifica({ v: 1, tipo: 'percorso', punti: [9, 45, 9.1, 45.1], suStrada: 'tutto' }), null);
+});

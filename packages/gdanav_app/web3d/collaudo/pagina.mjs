@@ -103,7 +103,7 @@ export async function apri(browser, { porta, cartella, rotta, caso, notte, largh
   // punto, prima di quello vero): lontano dall'origine i numeri della scheda
   // grafica perdono precisione, e il percorso non deve risentirne.
   if (caso.origine) await manda({ tipo: 'percorso', punti: [caso.origine[0], caso.origine[1], caso.origine[0] + 0.001, caso.origine[1]], code: [] });
-  await manda({ tipo: 'percorso', punti, code: caso.code ?? [] });
+  await manda({ tipo: 'percorso', punti, code: caso.code ?? [], ...(caso.suStrada ? { suStrada: caso.suStrada } : {}) });
   if (caso.manovra) await manda({ tipo: 'manovra', da: caso.manovra[0], a: caso.manovra[1] });
   await manda({ tipo: 'sorgente', id: 'gdanav-arrivo', dati: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [punti.at(-2), punti.at(-1)] }, properties: { arrivo: true } }] } });
   // Un autovelox davanti all'auto, sul percorso.

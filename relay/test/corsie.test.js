@@ -268,3 +268,186 @@ test('gli indirizzi sbagliati non arrivano a Overpass', async () => {
   assert.equal((await chiedi('/v1/corsie/14')).status, 404);
   assert.equal(chiamate.length, 0);
 });
+
+// ── L'archivio nostro (R2 finto) ───────────────────────────────────────
+
+import { gzipSync } from 'node:zlib';
+
+import { CHIAVE_MANIFESTO, TEMPO_OVERPASS_MS, chiaveArchivio, dentroCopertura, manifestoBuono } from '../src/corsie.js';
+
+// Un estratto di ieri: le tessere che ne vengono sono fresche.
+const ESTRATTO = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+const COPERTURA = { [Y]: [[X - 5, X - 1], [X, X + 2]], [Y + 1]: [[X, X]] };
+const manifesto = (altro = {}) => ({ v: 1, z: 14, estratto: ESTRATTO, tessere: 1, copertura: COPERTURA, ...altro });
+
+/** Un bucket R2 finto: get(chiave) come il binding, con i byte dati. */
+function r2Finto(oggetti, { rotto = false } = {}) {
+  const letti = [];
+  return {
+    letti,
+    get: async (chiave) => {
+      letti.push(chiave);
+      if (rotto) throw new Error('R2 giù');
+      if (!(chiave in oggetti)) return null;
+      const v = oggetti[chiave];
+      const byte = typeof v === 'string' ? new TextEncoder().encode(v) : new Uint8Array(v);
+      return { arrayBuffer: async () => byte.slice().buffer, text: async () => new TextDecoder().decode(byte) };
+    },
+  };
+}
+
+const TESSERA_ARCHIVIO = JSON.stringify(daElementiOsm(RISPOSTA_INVENTATA.elements, { x: X, y: Y }));
+const chiediConArchivio = (archivio, percorso = `/v1/corsie/14/${X}/${Y}`) =>
+  corsie(new Request(`https://r.dev${percorso}`), ctx, { attesaMs: 0, archivio });
+
+test('la copertura dell\'archivio: per riga, intervalli con gli estremi compresi', () => {
+  assert.ok(dentroCopertura(COPERTURA, X - 5, Y));
+  assert.ok(dentroCopertura(COPERTURA, X - 1, Y));
+  assert.ok(dentroCopertura(COPERTURA, X + 2, Y));
+  assert.ok(!dentroCopertura(COPERTURA, X + 3, Y));
+  assert.ok(!dentroCopertura(COPERTURA, X - 6, Y));
+  assert.ok(dentroCopertura(COPERTURA, X, Y + 1));
+  assert.ok(!dentroCopertura(COPERTURA, X + 1, Y + 1));
+  assert.ok(!dentroCopertura(COPERTURA, X, Y + 2));
+  assert.ok(!dentroCopertura(null, X, Y));
+  assert.ok(manifestoBuono(manifesto()));
+  assert.ok(!manifestoBuono(manifesto({ v: 2 })));
+  assert.ok(!manifestoBuono(manifesto({ z: 13 })));
+  assert.ok(!manifestoBuono(manifesto({ estratto: 'ieri' })));
+  assert.equal(chiaveArchivio(X, Y), `corsie/v1/14/${X}/${Y}.json.gz`);
+});
+
+test('dall\'archivio: la tessera compressa, con la data dell\'estratto, senza Overpass', async () => {
+  rispondi = buona;
+  const archivio = r2Finto({
+    [CHIAVE_MANIFESTO]: JSON.stringify(manifesto()),
+    [chiaveArchivio(X, Y)]: gzipSync(TESSERA_ARCHIVIO),
+  });
+  const r = await chiediConArchivio(archivio);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('content-type'), 'application/json');
+  assert.equal(r.headers.get('cache-control'), `public, max-age=${DURATA_CACHE_S}`);
+  assert.equal(r.headers.get('x-gdanav-salvata'), String(Date.parse(ESTRATTO)));
+  assert.equal(r.headers.get('x-gdanav-vecchia'), null);
+  // Lo stesso testo che il relay fa da Overpass.
+  assert.equal(await r.text(), TESSERA_ARCHIVIO);
+  assert.equal(chiamate.length, 0);
+  await Promise.all(attese);
+  assert.ok(cache.has(CHIAVE));
+});
+
+test('una tessera coperta ma senza oggetto è vuota, non si chiede a Overpass', async () => {
+  rispondi = buona;
+  const archivio = r2Finto({ [CHIAVE_MANIFESTO]: JSON.stringify(manifesto()) });
+  const r = await chiediConArchivio(archivio);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('x-gdanav-salvata'), String(Date.parse(ESTRATTO)));
+  assert.deepEqual(await r.json(), { v: 1, z: 14, x: X, y: Y, strade: [], nodi: [], alberi: [], filari: [] });
+  assert.equal(chiamate.length, 0);
+});
+
+test('fuori dalla copertura, senza manifesto o con R2 rotto: Overpass come prima', async () => {
+  rispondi = buona;
+  // Fuori dalla copertura e senza oggetto.
+  const fuori = r2Finto({ [CHIAVE_MANIFESTO]: JSON.stringify(manifesto({ copertura: {} })) });
+  let r = await chiediConArchivio(fuori);
+  assert.equal((await r.json()).strade.length, 3);
+  assert.equal(chiamate.length, 1);
+  assert.deepEqual(fuori.letti, [CHIAVE_MANIFESTO, chiaveArchivio(X, Y)]);
+
+  // Senza manifesto l'archivio non si usa, nemmeno l'oggetto che c'è.
+  cache.clear();
+  const senza = r2Finto({ [chiaveArchivio(X, Y)]: gzipSync('{"v":1,"strade":"sbagliata"}') });
+  r = await chiediConArchivio(senza);
+  assert.equal((await r.json()).strade.length, 3);
+  assert.equal(chiamate.length, 2);
+  assert.deepEqual(senza.letti, [CHIAVE_MANIFESTO]);
+
+  // Un manifesto rotto vale come nessuno.
+  cache.clear();
+  r = await chiediConArchivio(r2Finto({ [CHIAVE_MANIFESTO]: '{non è json', [chiaveArchivio(X, Y)]: gzipSync(TESSERA_ARCHIVIO) }));
+  assert.equal(r.status, 200);
+  assert.equal(chiamate.length, 3);
+
+  // R2 che non risponde.
+  cache.clear();
+  r = await chiediConArchivio(r2Finto({}, { rotto: true }));
+  assert.equal(r.status, 200);
+  assert.equal(chiamate.length, 4);
+
+  // Un oggetto di un'altra tessera (o rovinato) non si serve.
+  cache.clear();
+  const altra = JSON.stringify(daElementiOsm([], { x: X + 1, y: Y }));
+  r = await chiediConArchivio(r2Finto({ [CHIAVE_MANIFESTO]: JSON.stringify(manifesto()), [chiaveArchivio(X, Y)]: gzipSync(altra) }));
+  assert.equal((await r.json()).x, X);
+  assert.equal(chiamate.length, 5);
+
+  // Senza bucket (il binding non c'è): come prima.
+  cache.clear();
+  r = await chiediConArchivio(null);
+  assert.equal(r.status, 200);
+  assert.equal(chiamate.length, 6);
+});
+
+test('anche un oggetto non compresso, e la cache fresca passa davanti all\'archivio', async () => {
+  rispondi = buona;
+  const archivio = r2Finto({ [CHIAVE_MANIFESTO]: JSON.stringify(manifesto()), [chiaveArchivio(X, Y)]: TESSERA_ARCHIVIO });
+  assert.equal(await (await chiediConArchivio(archivio)).text(), TESSERA_ARCHIVIO);
+  await Promise.all(attese);
+  const letti = archivio.letti.length;
+  const seconda = await chiediConArchivio(archivio);
+  assert.equal(await seconda.text(), TESSERA_ARCHIVIO);
+  // Dalla cache: né R2 né Overpass.
+  assert.equal(archivio.letti.length, letti);
+  assert.equal(chiamate.length, 0);
+});
+
+test('il manifesto si rilegge solo ogni tanto', async () => {
+  rispondi = buona;
+  const archivio = r2Finto({ [CHIAVE_MANIFESTO]: JSON.stringify(manifesto()) });
+  await chiediConArchivio(archivio, `/v1/corsie/14/${X}/${Y}`);
+  await chiediConArchivio(archivio, `/v1/corsie/14/${X + 1}/${Y}`);
+  assert.equal(archivio.letti.filter((k) => k === CHIAVE_MANIFESTO).length, 1);
+  assert.equal(chiamate.length, 0);
+});
+
+test('Overpass lento: in tutto meno del tempo dato, poi 502 o la copia vecchia', async () => {
+  assert.ok(TEMPO_OVERPASS_MS < 30000);
+  // Un server che non risponde mai: si ferma solo col tempo scaduto.
+  globalThis.fetch = (server, opzioni) =>
+    new Promise((_, no) => {
+      chiamate.push({ server });
+      opzioni.signal.addEventListener('abort', () => no(opzioni.signal.reason));
+    });
+  // I tempi di AbortSignal.timeout non tengono acceso node: qui sì.
+  const acceso = setInterval(() => {}, 50);
+  const inizio = Date.now();
+  const r = await corsie(new Request(`https://r.dev/v1/corsie/14/${X}/${Y}`), ctx, { attesaMs: 0, tempoMs: 400 });
+  const durata = Date.now() - inizio;
+  clearInterval(acceso);
+  assert.equal(r.status, 502);
+  assert.ok(durata >= 350 && durata < 1000, `durata ${durata}`);
+  // Il primo server ha avuto la metà, il secondo il resto.
+  assert.deepEqual(
+    chiamate.map((c) => c.server),
+    [SERVER_OVERPASS[0], SERVER_OVERPASS[1]],
+  );
+});
+
+test('server occupato e poco tempo: non si aspetta, si passa al secondo', async () => {
+  let n = 0;
+  globalThis.fetch = async (server) => {
+    chiamate.push({ server });
+    n++;
+    return server === SERVER_OVERPASS[0] ? new Response('troppe', { status: 429 }) : buona();
+  };
+  const inizio = Date.now();
+  const r = await corsie(new Request(`https://r.dev/v1/corsie/14/${X}/${Y}`), ctx, { attesaMs: 5000, tempoMs: 3000 });
+  assert.equal(r.status, 200);
+  assert.ok(Date.now() - inizio < 1000);
+  assert.equal(n, 2);
+  assert.deepEqual(
+    chiamate.map((c) => c.server),
+    [SERVER_OVERPASS[0], SERVER_OVERPASS[1]],
+  );
+});

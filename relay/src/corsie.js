@@ -8,6 +8,12 @@
 // Le corsie in OpenStreetMap cambiano di rado: una tessera resta buona un
 // mese, e se Overpass non risponde se ne serve una copia fino a tre mesi.
 // Alla richiesta arriva solo il numero della tessera, niente di chi la chiede.
+//
+// Per l'Italia le tessere stanno già pronte in un archivio nostro (il bucket
+// R2 `ARCHIVIO_CORSIE`), rifatto ogni mese dall'estratto di OpenStreetMap
+// da `.github/workflows/corsie.yml` con le stesse regole di qui
+// (`strumenti/corsie/archivio.mjs`): Overpass resta per il resto del mondo,
+// e per quando l'archivio non c'è.
 
 import { SERVER_OVERPASS, occupato, rispostaBuona } from './colonnine.js';
 
@@ -95,6 +101,15 @@ export function riquadroTessera(x, y) {
     Math.min(180, lonDi(x + 1) + dLon),
   ].map(sei);
 }
+
+/** Le vie che la richiesta a Overpass qui sotto sceglie, scritte per chi la
+ * rifà senza Overpass (l'archivio): le classi di strada, e le `service` che
+ * non sono corselli, passi carrai o private. Le aree (`area=yes`) le
+ * sceglie anche Overpass, poi `daElementiOsm` le scarta. */
+export const viaDellaRichiesta = (t) =>
+  t.highway === 'service'
+    ? !SERVIZI_ESCLUSI.includes(t.service) && !ACCESSI_ESCLUSI.includes(t.access)
+    : CLASSI_STRADE.has(t.highway);
 
 const alternative = (valori) => `^(${valori.join('|')})$`;
 
@@ -199,29 +214,130 @@ const intestazioni = (salvata) => ({
 const errore = (testo, stato) =>
   new Response(JSON.stringify({ errore: testo }), { status: stato, headers: { 'content-type': 'application/json' } });
 
+// ── L'archivio nostro (R2) ───────────────────────────────────────────
+
+/** Dove stanno le cose nel bucket: una tessera compressa (gzip) per oggetto,
+ * e il manifesto con la data dell'estratto e le tessere che l'archivio copre. */
+export const CHIAVE_MANIFESTO = 'corsie/v1/manifesto.json';
+export const chiaveArchivio = (x, y) => `corsie/v1/${Z}/${x}/${y}.json.gz`;
+
+/** Il manifesto si rilegge al più ogni dieci minuti (per istanza del Worker). */
+export const VITA_MANIFESTO_MS = 10 * 60 * 1000;
+
 /**
- * Una tessera di corsie: dalla cache se è fresca, se no da Overpass (il
- * secondo server se il primo è occupato) e poi in cache. Se Overpass non
- * risponde, la copia vecchia è meglio di niente: la si serve con
- * `x-gdanav-vecchia: 1`.
+ * Se la tessera sta dentro l'archivio: `copertura` è, per ogni riga y, gli
+ * intervalli [x0, x1] (compresi) delle tessere tutte dentro l'estratto. Lì
+ * una tessera che manca è una tessera senza niente, non una da chiedere.
  */
-export async function corsie(richiesta, ctx, { attesaMs = 2000 } = {}) {
+export function dentroCopertura(copertura, x, y) {
+  const intervalli = copertura?.[y];
+  if (!Array.isArray(intervalli)) return false;
+  return intervalli.some((i) => Array.isArray(i) && x >= i[0] && x <= i[1]);
+}
+
+/** Un manifesto si usa solo se è della versione giusta e ha la data. */
+export function manifestoBuono(m) {
+  return m?.v === 1 && m.z === Z && Number.isFinite(Date.parse(m.estratto)) && typeof m.copertura === 'object';
+}
+
+let manifestoLetto = { archivio: null, letto: -Infinity, dati: null };
+
+/** Il manifesto dell'archivio, o null se non c'è (allora l'archivio non si usa). */
+async function leggiManifesto(archivio, ora) {
+  const m = manifestoLetto;
+  if (m.archivio === archivio && ora - m.letto < VITA_MANIFESTO_MS) return m.dati;
+  const oggetto = await archivio.get(CHIAVE_MANIFESTO);
+  let dati = null;
+  if (oggetto) {
+    try {
+      const letto = JSON.parse(await oggetto.text());
+      if (manifestoBuono(letto)) dati = letto;
+    } catch {
+      dati = null;
+    }
+  }
+  manifestoLetto = { archivio, letto: ora, dati };
+  return dati;
+}
+
+/** Il testo di un oggetto dell'archivio: compresso con gzip, o già in chiaro. */
+async function testoDi(oggetto) {
+  const byte = new Uint8Array(await oggetto.arrayBuffer());
+  if (byte[0] === 0x1f && byte[1] === 0x8b) {
+    const flusso = new Blob([byte]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return new Response(flusso).text();
+  }
+  return new TextDecoder().decode(byte);
+}
+
+/**
+ * La tessera dall'archivio: `{ testo, salvata }` (salvata = la data
+ * dell'estratto), o null se l'archivio non c'è, non la copre o non si legge:
+ * allora si va avanti come prima. Una tessera coperta ma senza oggetto è
+ * vuota: dentro non c'è niente da disegnare.
+ */
+export async function dallArchivio(archivio, x, y, ora = Date.now()) {
+  if (!archivio) return null;
+  try {
+    const m = await leggiManifesto(archivio, ora);
+    if (!m) return null;
+    const salvata = Date.parse(m.estratto);
+    const oggetto = await archivio.get(chiaveArchivio(x, y));
+    if (oggetto) {
+      const testo = await testoDi(oggetto);
+      const dati = JSON.parse(testo);
+      if (dati?.v !== 1 || dati.x !== x || dati.y !== y) return null;
+      return { testo, salvata };
+    }
+    if (dentroCopertura(m.copertura, x, y)) return { testo: JSON.stringify(daElementiOsm([], { x, y })), salvata };
+    return null;
+  } catch (e) {
+    console.log(`corsie: archivio non letto (${e})`);
+    return null;
+  }
+}
+
+// ── La richiesta ─────────────────────────────────────────────────────
+
+/** Overpass in tutto ha 25 secondi (l'app aspetta 35): il primo server ne ha
+ * la metà, il secondo quel che resta. */
+export const TEMPO_OVERPASS_MS = 25000;
+
+/**
+ * Una tessera di corsie: dalla cache se è fresca, se no dall'archivio, se
+ * no da Overpass (il secondo server se il primo è occupato o lento) e poi in
+ * cache. Se Overpass non risponde, la copia vecchia è meglio di niente: la si
+ * serve con `x-gdanav-vecchia: 1`.
+ */
+export async function corsie(richiesta, ctx, { attesaMs = 2000, tempoMs = TEMPO_OVERPASS_MS, archivio = null } = {}) {
   const r = leggiTessera(richiesta.method, richiesta.url);
   if (r.errore) return errore(r.errore, r.stato);
   const chiave = new Request(`https://cache.gdanav/corsie/v1/${Z}/${r.x}/${r.y}`);
   const inCache = await caches.default.match(chiave);
   if (inCache && fresca(Number(inCache.headers.get('x-gdanav-salvata')), Date.now())) return inCache;
 
+  const dallo = await dallArchivio(archivio, r.x, r.y);
+  if (dallo) {
+    const buona = new Response(dallo.testo, { headers: intestazioni(dallo.salvata) });
+    ctx.waitUntil(caches.default.put(chiave, buona.clone()));
+    return buona;
+  }
+
   const corpo = new URLSearchParams({ data: richiestaOverpass(r.x, r.y) });
+  const fine = Date.now() + tempoMs;
   let ultimo = 'nessun server';
-  for (const server of SERVER_OVERPASS) {
+  for (const [i, server] of SERVER_OVERPASS.entries()) {
     for (let tentativo = 0; tentativo < 2; tentativo++) {
+      // Il tempo che resta, diviso fra questo server e quelli dopo.
+      const resta = fine - Date.now();
+      const perQuesto = Math.floor(resta / (SERVER_OVERPASS.length - i));
+      if (perQuesto <= 0) break;
       try {
         const risposta = await fetch(server, {
           method: 'POST',
           body: corpo,
           headers: { 'user-agent': 'gdanav relay (github.com/danigio15/gdanav)' },
-          signal: AbortSignal.timeout(25000),
+          signal: AbortSignal.timeout(perQuesto),
         });
         const testo = await risposta.text();
         if (risposta.ok && rispostaBuona(testo)) {
@@ -232,7 +348,11 @@ export async function corsie(richiesta, ctx, { attesaMs = 2000 } = {}) {
         }
         ultimo = `${new URL(server).host}: ${risposta.status}`;
         if (!occupato(risposta.status)) break;
-        if (attesaMs > 0) await new Promise((fatto) => setTimeout(fatto, attesaMs));
+        if (attesaMs > 0) {
+          // Senza il tempo per aspettare e riprovare, meglio il server dopo.
+          if (fine - Date.now() <= attesaMs) break;
+          await new Promise((fatto) => setTimeout(fatto, attesaMs));
+        }
       } catch (e) {
         ultimo = `${new URL(server).host}: ${e}`;
         break;
