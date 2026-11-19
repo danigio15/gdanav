@@ -392,8 +392,12 @@ const GESTORI = {
       for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
       dati = u.buffer;
     }
-    if (S.attesaEdifici?.chiave === k) S.attesaEdifici.fatto(dati);
-    else ricordaEdifici(k, dati);
+    if (S.attesaEdifici?.chiave === k) return S.attesaEdifici.fatto(dati);
+    // Arrivati tardi (l'app li ha letti in rete): la tessera s'era fatta con
+    // quelli di sempre, o si sta facendo. Si rifà con questi.
+    const prima = edificiDa(k);
+    ricordaEdifici(k, dati);
+    if (dati && !prima && (S.costruite.has(k) || S.lavoro?.chiave === k)) rifaiTessere([k]);
   },
   /** La velocità dell'auto dal cruscotto (Android Auto, il dongle): più volte al secondo. */
   velocita(m) {
@@ -1151,11 +1155,12 @@ function vicineDi(k) {
  * di OpenFreeMap sono quelli di OpenStreetMap, e in tanti paesi non ci sono.
  * L'app ha, per la zona, quelli di Overture (OpenStreetMap più quelli che
  * Microsoft ha ricavato dalle foto dal satellite, con l'altezza), in un
- * pacchetto sul telefono: prima di costruire una tessera li si chiede, e se
- * arrivano prendono il posto di quelli di sempre. Si aspetta poco: senza
- * pacchetto (non ancora scaricato, o zona che non c'è) la tessera si fa con
- * quelli di sempre, e la risposta «niente» si richiede dopo un minuto (il
- * pacchetto intanto può essere arrivato). */
+ * pacchetto sul telefono o, finché non c'è, letti in rete una tessera alla
+ * volta: prima di costruire una tessera li si chiede, e se arrivano prendono
+ * il posto di quelli di sempre. Si aspetta poco: se non arrivano in tempo la
+ * tessera si fa con quelli di sempre, e quando arrivano (dalla rete, in auto,
+ * ci vuole anche qualche secondo) la si rifà con loro. La risposta «niente»
+ * si richiede dopo un minuto (il pacchetto intanto può essere arrivato). */
 const ATTESA_EDIFICI_MS = 1500;
 const RIPROVA_EDIFICI_MS = 60000;
 const EDIFICI_TENUTI = 48;
