@@ -607,3 +607,22 @@ test('il pezzo rifatto sulle strade vere non si sposta, e ai capi si raccorda se
   fermiSuStrada(x, Float64Array.from([1, 2, 3]), 0, 4, []);
   assert.deepEqual([...x], [1, 2, 3]);
 });
+
+test('il profilo più fitto: le quote e gli spostamenti in mezzo in linea retta', () => {
+  const p = new Profilo(100, 4, Float64Array.from([0, 4, 8]), Uint8Array.from([0, 1, 1]), Float64Array.from([2, 2, 6]), Float64Array.from([0, -4, 0]));
+  p.trovata = Uint8Array.from([1, 0, 1]);
+  const f = p.piuFitto(2);
+  assert.equal(f.passo, 2);
+  assert.equal(f.s0, 100);
+  assert.equal(f.s1, p.s1);
+  assert.deepEqual([...f.h], [0, 2, 4, 6, 8]);
+  assert.deepEqual([...f.dx], [2, 2, 2, 4, 6]);
+  assert.deepEqual([...f.dy], [0, -2, -4, -2, 0]);
+  for (const s of [100, 101, 103.5, 105, 107.9, 108]) {
+    assert.ok(Math.abs(f.quota(s) - p.quota(s)) < 1e-12);
+    assert.deepEqual(f.sposta(s).map((v) => +v.toFixed(9)), p.sposta(s).map((v) => +v.toFixed(9)));
+  }
+  assert.equal(f.galleria.length, 5);
+  assert.equal(f.trovata.length, 5);
+  assert.equal(p.piuFitto(4), p, 'non più rado');
+});

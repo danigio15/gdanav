@@ -13,7 +13,7 @@ import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, lon
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { AggancioStrada, SOGLIA_M } from './aggancio.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
-import { alzataDeiNastri, direzioneDisegnata, IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti } from './percorso.js';
+import { alzataDeiNastri, direzioneDisegnata, fasciaSullaCorsia, IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti } from './percorso.js';
 import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
 import { dallaScorta, nellaScorta } from './scorte.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
@@ -44,6 +44,11 @@ const PIU_VICINO_CORSIE = 2.5;
 const ZOOM_MASSIMO_CORSIE = 20.6;
 /** La fascia della corsia: quanto è larga (m) e quanto sta sopra l'asfalto. */
 const FASCIA_CORSIA = { largo: 2.7, sopra: 0.3 };
+/** Ogni quanti metri un punto della fascia (il profilo del «3D aumentato» ne ha uno ogni quattro). */
+const PASSO_CORSIE = 2;
+/** La freccia della manovra: nel «3D aumentato», e sulla fascia della vista «Corsie». */
+const FRECCIA = { largo: 3.0, sopra: 0.7, punta: 1 };
+const FRECCIA_CORSIA = { largo: 2.1, sopra: FASCIA_CORSIA.sopra + 0.12, punta: 0.75 };
 /** Fin dove attorno a una tessera si mandano le vie con le corsie (gradi, ~200 m). */
 const MARGINE_CORSIE = 0.002;
 
@@ -517,6 +522,23 @@ window.gdanav3d = {
       const v = new THREE.Vector3(S.auto.x, S.auto.y, S.auto.z + 2.5).project(S.camera3d);
       const c = S.mappa.getCanvas();
       return { x: ((v.x + 1) / 2) * c.clientWidth, y: ((1 - v.y) / 2) * c.clientHeight, dietro: v.z > 1 };
+    },
+    /**
+     * La linea del percorso disegnata (nella vista «Corsie» il mezzo della
+     * fascia), un punto `[s, lon, lat]` ogni [passo] metri: per misurare se
+     * sta sull'asfalto.
+     */
+    lineaDisegnata(passo = 1) {
+      const p = S.percorso;
+      const pr = p?.profilo;
+      if (!pr || p.da === null || p.da === undefined || !S.origine) return null;
+      const out = [];
+      for (let s = p.da; s <= p.a; s += passo) {
+        const [x, y] = p.linea.a(s);
+        const [sx, sy] = pr.sposta(s);
+        out.push([s, ...S.origine.lonLat(x + sx, y + sy)]);
+      }
+      return out;
     },
     /** Le quote delle strade sopra e sotto l'auto, per la luce sotto i cavalcavia. */
     quoteQui() {
@@ -1505,25 +1527,27 @@ function aggiornaPercorso(adesso) {
 /**
  * Il percorso [p] sulla corsia giusta: allo spostamento che lo mette sulla
  * strada (il profilo) si aggiunge quello di lato fino al mezzo della corsia
- * (vedi `corsieLungoIlPercorso`). Lo seguono la fascia e l'auto.
+ * (vedi `corsieLungoIlPercorso`), e alle svolte la curva da una corsia
+ * all'altra (vedi `fasciaSullaCorsia`). Lo seguono la fascia e l'auto. Il
+ * profilo si fa più fitto ([PASSO_CORSIE]): le curve sono di pochi metri.
  */
 function sullaCorsia(p) {
   if (!S.indiceCorsie) indicizzaCorsie();
-  const pr = p.profilo;
-  if (!S.indiceCorsie || !pr?.dx) return;
+  if (!S.indiceCorsie || !p.profilo?.dx) return;
+  const pr = (p.profilo = p.profilo.piuFitto(PASSO_CORSIE));
   const n = pr.dx.length;
+  const linea = [];
   const punti = [];
   for (let k = 0; k < n; k++) {
     const [x, y] = p.linea.a(pr.s0 + k * pr.passo);
+    linea.push([x, y]);
     punti.push([x + pr.dx[k], y + pr.dy[k]]);
   }
   const r = corsieLungoIlPercorso(punti, S.indiceCorsie, { passo: pr.passo, s0: pr.s0, suggerimenti: S.suggerimenti });
+  const fascia = fasciaSullaCorsia(punti, r, pr.passo);
   for (let k = 0; k < n; k++) {
-    const a = punti[Math.max(0, k - 1)];
-    const b = punti[Math.min(n - 1, k + 1)];
-    const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-    pr.dx[k] += (-(b[1] - a[1]) / l) * r.sposta[k];
-    pr.dy[k] += ((b[0] - a[0]) / l) * r.sposta[k];
+    pr.dx[k] = fascia[k][0] - linea[k][0];
+    pr.dy[k] = fascia[k][1] - linea[k][1];
   }
   p.manovreCorsie = r.manovre.map((m) => ({ s: m.s, dir: m.dir }));
 }
@@ -1609,8 +1633,7 @@ function aggiornaFreccia() {
   S.sporco.freccia = false;
   S.rifatti.freccia++;
   const p = S.percorso;
-  // Nella vista «Corsie» la manovra la dice la fascia verde sulla corsia.
-  if (!p?.profilo || !S.manovra || S.corsie) {
+  if (!p?.profilo || !S.manovra) {
     scena.impostaNastro('freccia', null);
     scena.impostaPunta(null);
     return;
@@ -1624,12 +1647,17 @@ function aggiornaFreccia() {
     scena.impostaPunta(null);
     return;
   }
-  scena.impostaNastro('freccia', nastro(p.linea, p.profilo, inizio, fine, 3.0, 0.7, { passo: 1.5 }), 'freccia', 6);
+  /* Nella vista «Corsie» la freccia sta sopra la fascia verde, sulla sua
+   * corsia (il profilo è già spostato lì, vedi [sullaCorsia]), più stretta.
+   * Prima lì non c'era: «oltre agli incroci e svincoli mancano le frecce sul
+   * percorso». */
+  const f = S.corsie ? FRECCIA_CORSIA : FRECCIA;
+  scena.impostaNastro('freccia', nastro(p.linea, p.profilo, inizio, fine, f.largo, f.sopra, { passo: 1.5 }), 'freccia', 6);
   const [x, y] = p.linea.a(fine);
   const [sx, sy] = p.profilo.sposta(fine);
   // La punta guarda come il nastro che chiude, non come la linea di TomTom
   // sotto: dove la linea si sposta di più (alla rotonda) erano due versi.
-  scena.impostaPunta([x + sx, y + sy, p.profilo.quota(fine) + 0.72, direzioneDisegnata(p.linea, p.profilo, fine)]);
+  scena.impostaPunta([x + sx, y + sy, p.profilo.quota(fine) + f.sopra + 0.02, direzioneDisegnata(p.linea, p.profilo, fine)], f.punta);
   S.frecciaDa = inizio;
 }
 

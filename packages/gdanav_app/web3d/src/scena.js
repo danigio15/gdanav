@@ -1307,8 +1307,11 @@ export class Scena {
     }
   }
 
-  /** La punta della freccia di manovra in [x, y, z], girata come [dir]. */
-  impostaPunta(p) {
+  /**
+   * La punta della freccia di manovra in [x, y, z], girata come [dir];
+   * [scala] la rimpicciolisce (nella vista «Corsie» sta sulla corsia).
+   */
+  impostaPunta(p, scala = 1) {
     if (this.punta) {
       this.mondo.remove(this.punta);
       this.punta.geometry.dispose();
@@ -1322,7 +1325,9 @@ export class Scena {
     const ty = Math.sin(dir);
     const g = new THREE.BufferGeometry();
     // Contata dal suo posto, non dall'origine della scena (vedi [pezziDelNastro]).
-    g.setAttribute('position', new THREE.Float32BufferAttribute([nx * 3.6, ny * 3.6, 0, -nx * 3.6, -ny * 3.6, 0, tx * 7, ty * 7, 0], 3));
+    const m = 3.6 * scala;
+    const l = 7 * scala;
+    g.setAttribute('position', new THREE.Float32BufferAttribute([nx * m, ny * m, 0, -nx * m, -ny * m, 0, tx * l, ty * l, 0], 3));
     g.setIndex([0, 1, 2]);
     this.punta = new THREE.Mesh(g, this.mat.punta);
     this.punta.position.set(x, y, z);
