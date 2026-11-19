@@ -552,7 +552,7 @@ export function fermiSuStrada(dx, dy, s0, passo, suStrada) {
 /** Da quanti gradi in su, fra otto metri prima e otto dopo, la fascia arrotonda la svolta. */
 const SMUSSO_GRADI = 18;
 /** E quanto prima (e dopo) dello spigolo comincia la curva, al più (m). */
-const SMUSSO_M = 14;
+const SMUSSO_M = 24;
 
 /**
  * Le svolte della fascia della vista «Corsie», arrotondate.
