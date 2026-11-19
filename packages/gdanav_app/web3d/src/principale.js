@@ -44,6 +44,9 @@ const PIU_VICINO_CORSIE = 2.5;
 const ZOOM_MASSIMO_CORSIE = 20.6;
 /** La fascia della corsia: quanto è larga (m) e quanto sta sopra l'asfalto. */
 const FASCIA_CORSIA = { largo: 2.7, sopra: 0.3 };
+/** La freccia della manovra: nel «3D aumentato», e sulla fascia della vista «Corsie». */
+const FRECCIA = { largo: 3.0, sopra: 0.7, punta: 1 };
+const FRECCIA_CORSIA = { largo: 2.1, sopra: FASCIA_CORSIA.sopra + 0.12, punta: 0.75 };
 /** Fin dove attorno a una tessera si mandano le vie con le corsie (gradi, ~200 m). */
 const MARGINE_CORSIE = 0.002;
 
@@ -1609,8 +1612,7 @@ function aggiornaFreccia() {
   S.sporco.freccia = false;
   S.rifatti.freccia++;
   const p = S.percorso;
-  // Nella vista «Corsie» la manovra la dice la fascia verde sulla corsia.
-  if (!p?.profilo || !S.manovra || S.corsie) {
+  if (!p?.profilo || !S.manovra) {
     scena.impostaNastro('freccia', null);
     scena.impostaPunta(null);
     return;
@@ -1624,12 +1626,17 @@ function aggiornaFreccia() {
     scena.impostaPunta(null);
     return;
   }
-  scena.impostaNastro('freccia', nastro(p.linea, p.profilo, inizio, fine, 3.0, 0.7, { passo: 1.5 }), 'freccia', 6);
+  /* Nella vista «Corsie» la freccia sta sopra la fascia verde, sulla sua
+   * corsia (il profilo è già spostato lì, vedi [sullaCorsia]), più stretta.
+   * Prima lì non c'era: «oltre agli incroci e svincoli mancano le frecce sul
+   * percorso». */
+  const f = S.corsie ? FRECCIA_CORSIA : FRECCIA;
+  scena.impostaNastro('freccia', nastro(p.linea, p.profilo, inizio, fine, f.largo, f.sopra, { passo: 1.5 }), 'freccia', 6);
   const [x, y] = p.linea.a(fine);
   const [sx, sy] = p.profilo.sposta(fine);
   // La punta guarda come il nastro che chiude, non come la linea di TomTom
   // sotto: dove la linea si sposta di più (alla rotonda) erano due versi.
-  scena.impostaPunta([x + sx, y + sy, p.profilo.quota(fine) + 0.72, direzioneDisegnata(p.linea, p.profilo, fine)]);
+  scena.impostaPunta([x + sx, y + sy, p.profilo.quota(fine) + f.sopra + 0.02, direzioneDisegnata(p.linea, p.profilo, fine)], f.punta);
   S.frecciaDa = inizio;
 }
 
