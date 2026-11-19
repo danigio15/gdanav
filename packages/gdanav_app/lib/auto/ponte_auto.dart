@@ -1262,10 +1262,7 @@ class PonteAuto {
       if (_freccia != null) {
         _freccia = null;
         _manda('sorgenti', {
-          'dati': {
-            sorgenteManovra: jsonEncode(datiManovra(null, null)),
-            sorgenteCorsie: jsonEncode(datiCorsie(null, null)),
-          },
+          'dati': {sorgenteManovra: jsonEncode(datiManovra(null, null))},
         });
       }
       _cruscotto();
@@ -1341,18 +1338,6 @@ class PonteAuto {
               chiave == null ? null : p.viaggio,
               a?.prossima,
               sullaMappa: guida.sullaMappaDi(p.viaggio.percorso),
-              // La vista immersiva disegna le corsie, e la freccia ne esce.
-              corsie: true,
-            ),
-          ),
-          // Le corsie sulla strada: le disegna solo la vista immersiva, che
-          // ha la sorgente; l'auto in 2D e in 3D le lascia cadere.
-          sorgenteCorsie: jsonEncode(
-            datiCorsie(
-              chiave == null ? null : p.viaggio,
-              a?.prossima,
-              sullaMappa: guida.sullaMappaDi(p.viaggio.percorso),
-              classe: (m) => guida.classeSullaMappa(p.viaggio.percorso, m) ?? '',
             ),
           ),
         },

@@ -56,8 +56,7 @@ const _raccordoM = 40.0;
 /// La linea da disegnare per un percorso: i [punti] e, per ognuno, i [metri]
 /// del percorso da cui viene (in salita).
 class SullaMappa {
-  SullaMappa._(this.percorso, this.punti, this.metri, [List<String?>? classi])
-      : classi = classi ?? List.filled(punti.length, null);
+  SullaMappa._(this.percorso, this.punti, this.metri);
 
   /// Com'è il percorso: nessuno spostamento.
   factory SullaMappa(List<Punto> percorso) {
@@ -69,10 +68,6 @@ class SullaMappa {
   final List<Punto> percorso;
   final List<Punto> punti;
   final List<double> metri;
-
-  /// La classe di OpenMapTiles della strada su cui sta ogni punto (`null`
-  /// dove non si sa): le corsie disegnate prendono il suo colore.
-  final List<String?> classi;
 
   /// La linea da disegnare, coi metri del percorso.
   late final Linea linea = Linea.conMetri(punti, metri);
@@ -97,12 +92,11 @@ class SullaMappa {
     if (a - da < passoM * 3 || percorso.length < 2) return this;
     final nuovi = _spostamenti(vera, strade, da, a);
     if (nuovi == null) return this;
-    final (ms, ps, cs) = nuovi;
-    final out = <Punto>[], outM = <double>[], outC = <String?>[];
+    final (ms, ps) = nuovi;
+    final out = <Punto>[], outM = <double>[];
     for (var i = 0; i < punti.length && metri[i] < ms.first; i++) {
       out.add(punti[i]);
       outM.add(metri[i]);
-      outC.add(classi[i]);
     }
     for (var k = 0; k < ms.length; k++) {
       final m = ms[k];
@@ -121,40 +115,14 @@ class SullaMappa {
         );
       }
       outM.add(m);
-      outC.add(cs[k]);
     }
     for (var i = 0; i < punti.length; i++) {
       if (metri[i] > outM.last) {
         out.add(punti[i]);
         outM.add(metri[i]);
-        outC.add(classi[i]);
       }
     }
-    return SullaMappa._(percorso, List.unmodifiable(out), List.unmodifiable(outM), List.unmodifiable(outC));
-  }
-
-  /// La classe della strada sotto la linea a [m] metri, se si sa (il punto
-  /// più vicino, entro venti metri).
-  String? classeA(double m) {
-    var basso = 0, alto = metri.length - 1;
-    while (basso < alto) {
-      final mezzo = (basso + alto) >> 1;
-      if (metri[mezzo] < m) {
-        basso = mezzo + 1;
-      } else {
-        alto = mezzo;
-      }
-    }
-    String? meglio;
-    var d = 20.0;
-    for (var i = math.max(0, basso - 8); i < math.min(metri.length, basso + 8); i++) {
-      final c = classi[i];
-      if (c != null && (metri[i] - m).abs() <= d) {
-        d = (metri[i] - m).abs();
-        meglio = c;
-      }
-    }
-    return meglio;
+    return SullaMappa._(percorso, List.unmodifiable(out), List.unmodifiable(outM));
   }
 
   /// Il punto della linea da disegnare a [m] metri lungo il percorso.
@@ -163,8 +131,7 @@ class SullaMappa {
 
 /// I punti spostati fra [da] e [a] (ogni [passoM] metri, più i vertici del
 /// percorso), coi loro metri; `null` se lì sotto non c'è nessuna strada.
-(List<double>, List<Punto>, List<String?>)? _spostamenti(
-    Linea vera, Iterable<TrattoStrada> strade, double da, double a) {
+(List<double>, List<Punto>)? _spostamenti(Linea vera, Iterable<TrattoStrada> strade, double da, double a) {
   final totale = vera.lunghezzaM;
   // Un po' di strada in più ai lati: le medie hanno bisogno dei vicini.
   final w0 = math.max(0.0, da - 60), w1 = math.min(totale, a + 60);
@@ -207,7 +174,6 @@ class SullaMappa {
 
   // 1. Quanto sta di lato la strada, col segno; NaN dove non c'è.
   final lato = Float64List(n)..fillRange(0, n, double.nan);
-  final classe = List<String?>.filled(n, null);
   final coseno = math.cos(_direzioneGradi * math.pi / 180);
   _Segmento? ultima;
   var trovati = 0;
@@ -215,7 +181,6 @@ class SullaMappa {
     final c = rete.piuVicina(px[k], py[k], tx[k], ty[k], coseno, prima: ultima);
     if (c == null) continue;
     ultima = c.$3;
-    classe[k] = c.$3.classe.isEmpty ? null : c.$3.classe;
     lato[k] = (c.$1 - px[k]) * nx[k] + (c.$2 - py[k]) * ny[k];
     trovati++;
   }
@@ -336,15 +301,14 @@ class SullaMappa {
     if (rotti == 0) break;
   }
 
-  final outM = <double>[], outP = <Punto>[], outC = <String?>[];
+  final outM = <double>[], outP = <Punto>[];
   for (var q = 0; q < n; q++) {
     if (ms[q] < da - 0.01 || ms[q] > a + 0.01) continue;
     outM.add(ms[q]);
     outP.add(piano.punto(px[q] + dx[q], py[q] + dy[q]));
-    outC.add(classe[q]);
   }
   if (outM.length < 2) return null;
-  return (outM, outP, outC);
+  return (outM, outP);
 }
 
 /// Il punto di [linea] a [metri] dalla partenza (coi suoi metri).
