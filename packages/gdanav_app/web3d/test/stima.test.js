@@ -7,7 +7,7 @@ import { ESTENSIONE, latDaMerc, lonDaMerc } from '../src/geo.js';
 import { decodifica } from '../src/messaggi.js';
 import { trattini, trattiniAdattati } from '../src/segnaletica.js';
 import { classeStimata, corsieStimate, idStimato, preparaStimate, tagStimati } from '../src/stima.js';
-import { costruisciTessera } from '../src/tessera.js';
+import { costruisciTessera, stimaTriangoli } from '../src/tessera.js';
 import { byteTessera, cavalcavia, strato } from './finte.js';
 
 const X = 8605;
@@ -214,7 +214,11 @@ test('la tessera con le corsie stimate: asfalto, righe e marciapiedi; niente sem
   assert.ok((con.strade.motorway?.indici.length ?? 0) < senza.strade.motorway.indici.length / 4);
   assert.ok((con.strade.primary2?.indici.length ?? 0) < (senza.strade.primary2?.indici.length ?? 0) / 4);
   assert.deepEqual(con.conti.edificiFatti, senza.conti.edificiFatti);
-  assert.ok(con.conti.triangoli > senza.conti.triangoli, 'le corsie contano nel budget');
+  // Le corsie contano nel budget (sulle vie stimate, dritte, sono pochi
+  // triangoli: anche meno dei nastri di sempre che tolgono).
+  const triCorsie = Object.values(con.corsie).reduce((n, g) => n + (g ? g.indici.length / 3 : 0), 0);
+  assert.ok(triCorsie > 0);
+  assert.equal(con.conti.triangoli, stimaTriangoli({ ...con, corsie: null }) + triCorsie, 'le corsie contano nel budget');
   // L'autostrada stimata: due corsie, la riga tratteggiata in mezzo; il ponte
   // a 8 m (layer 1) anche con le corsie.
   const ponte = pronte.strade.find((v) => v.ponte);

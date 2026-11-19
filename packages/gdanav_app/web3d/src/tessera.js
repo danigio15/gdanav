@@ -71,10 +71,20 @@ const SOPRA = { motorway: 0.24, trunk: 0.23, primary: 0.21, secondary: 0.2, tert
  * ridotta ne teneva 736: le case piccole restavano fuori appena la tessera non
  * era quella dell'auto. Con 100 000 ne entrano quasi tutte; il tetto di tutta
  * la scena (`BUDGET.triangoli`) resta quello, e se non ci si sta si lasciano
- * le tessere più lontane. */
+ * le tessere più lontane.
+ *
+ * «La visuale dei palazzi non è completa.» Con gli edifici di Overture una
+ * tessera di periferia ne ha più di tremila: ridotta ne teneva meno della
+ * metà (1363 su 3141), e da lontano i quartieri erano a buchi. Un edificio
+ * intero costa dieci triangoli per lato (il muro, il cornicione con la sua
+ * ombra, l'ombra a terra) più il tetto e la sua ombra; uno «leggero» solo il
+ * muro e il tetto, un terzo. Le tessere ridotte li fanno tutti leggeri (da
+ * lontano il cornicione è un pixel), le piene solo oltre [leggeriOltre]
+ * triangoli (il tetto di prima: dove ci stavano, restano come prima; i
+ * piccoli, che vengono per ultimi, non restano più fuori). */
 export const LIMITI = {
-  pieno: { alberi: 1800, triangoliEdifici: 200000, lampioni: 400, margine: 450 },
-  ridotto: { alberi: 0, triangoliEdifici: 100000, lampioni: 0, margine: 250 },
+  pieno: { alberi: 1800, triangoliEdifici: 240000, leggeriOltre: 190000, lampioni: 400, margine: 450 },
+  ridotto: { alberi: 0, triangoliEdifici: 100000, leggeriOltre: 0, lampioni: 0, margine: 250 },
 };
 
 const tipoDi = (f) =>
@@ -904,9 +914,12 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   };
   let triEdifici = 0;
   let edificiFatti = 0;
+  let edificiLeggeri = 0;
   const seme = semeTessera(z, x, y);
   for (const [bi, b] of edificiOut.entries()) {
     if (triEdifici > lim.triangoliEdifici) break;
+    // Leggero: solo il muro e il tetto (vedi [LIMITI]).
+    const leggero = triEdifici >= (lim.leggeriOltre ?? Infinity);
     // Colore, facciata e tetto dall'id dell'edificio, non dalla tessera: un
     // palazzo a cavallo di due tessere si disegna a pezzi, e ogni pezzo
     // prendeva il suo colore e la sua facciata («a destra la facciata
@@ -978,6 +991,10 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           const v0 = m0 / (PIANO * 4) + voff;
           const v1 = h / (PIANO * 4) + voff;
           gb.quad([a[0], a[1], m0, u0, v0], [c[0], c[1], m0, u1, v0], [c[0], c[1], h, u1, v1], [a[0], a[1], h, u0, v1], [nx, ny, 0], cg, cn);
+          if (leggero) {
+            per += l;
+            continue;
+          }
           // Il cornicione: una fascia chiara in cima, il bordo del palazzo si legge.
           const fx = nx * 0.25;
           const fy = ny * 0.25;
@@ -1012,7 +1029,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     for (let k = 0; k < facce.length; k += 3) {
       const [i0, i1, i2] = [facce[k], facce[k + 1], facce[k + 2]];
       tetti.triPunti([piatti[2 * i0], piatti[2 * i0 + 1], h], [piatti[2 * i1], piatti[2 * i1 + 1], h], [piatti[2 * i2], piatti[2 * i2 + 1], h], [0, 0, 1], rg, rn);
-      if (m0 < 1) {
+      if (m0 < 1 && !leggero) {
         ombre.triPunti(
           [piatti[2 * i0] + sox * hOmbra, piatti[2 * i0 + 1] + soy * hOmbra, 0],
           [piatti[2 * i1] + sox * hOmbra, piatti[2 * i1 + 1] + soy * hOmbra, 0],
@@ -1023,6 +1040,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     }
     triEdifici += gb.triangoli + tetti.triangoli + ombre.triangoli - prima;
     edificiFatti++;
+    if (leggero) edificiLeggeri++;
   }
 
   // ── Gli alberi ────────────────────────────────────────────────────────
@@ -1214,6 +1232,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     ombre: ombre.triangoli + ombrePonti.triangoli + ombreAlberi.triangoli,
     edifici: triEdifici,
     edificiFatti,
+    edificiLeggeri,
     edificiTotali: edificiOut.length,
     piloni: piloni.length,
     alberi: alberi.length,

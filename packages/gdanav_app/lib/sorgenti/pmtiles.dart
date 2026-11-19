@@ -1,8 +1,15 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-/// Un pacchetto PMTiles (versione 3) sul telefono: le tessere si leggono dal
-/// file quando servono, senza caricarlo tutto.
+import 'package:http/http.dart' as http;
+
+/// Da dove si leggono i byte di un pacchetto: [lunghezza] byte da [inizio].
+typedef LeggiByte = Future<Uint8List> Function(int inizio, int lunghezza);
+
+/// Un pacchetto PMTiles (versione 3): le tessere si leggono quando servono,
+/// senza caricarlo tutto. Dal file sul telefono ([apri]) o, un pezzo alla
+/// volta, dal server che lo tiene ([inRete]).
 ///
 /// Serve agli edifici di Overture per la scena 3D ([GestoreEdifici]): un
 /// pacchetto per zona, scaricato una volta. Il formato è quello di
@@ -10,24 +17,44 @@ import 'dart:typed_data';
 /// cartelle compresse con gli indirizzi delle tessere (numerate lungo la curva
 /// di Hilbert), e le tessere.
 class LettorePmtiles {
-  LettorePmtiles._(this._file, this._h);
+  LettorePmtiles._(this._leggiByte, this._h, this._chiudi, [this._testa]);
 
-  final RandomAccessFile _file;
+  final LeggiByte _leggiByte;
   final _Intestazione _h;
+  final Future<void> Function() _chiudi;
+
+  /// I primi byte del pacchetto, già letti all'apertura (in rete: l'intestazione
+  /// e la cartella principale con una richiesta sola).
+  final Uint8List? _testa;
 
   /// Le cartelle già lette, per non rileggerle a ogni tessera.
   final _cartelle = <int, List<_Voce>>{};
+
+  /// Quanti byte si leggono all'apertura di un pacchetto in rete: l'intestazione
+  /// e, quasi sempre, la cartella principale (il formato la vuole entro i
+  /// primi 16 KiB).
+  static const testaInRete = 16384;
 
   /// Apre [percorso]; solleva [FormatException] se non è un PMTiles v3.
   static Future<LettorePmtiles> apri(String percorso) async {
     final f = await File(percorso).open();
     try {
       final h = _Intestazione.leggi(await _leggi(f, 0, 127));
-      return LettorePmtiles._(f, h);
+      return LettorePmtiles._((i, n) => _leggi(f, i, n), h, f.close);
     } catch (_) {
       await f.close();
       rethrow;
     }
+  }
+
+  /// Apre un pacchetto che non è sul telefono, leggendolo a pezzi ([leggi]:
+  /// per esempio [SorgenteHttp.leggi]). La prima lettura prende
+  /// [testaInRete] byte (o meno, se il pacchetto è più corto: [lunghezza]).
+  static Future<LettorePmtiles> daSorgente(LeggiByte leggi, {int? lunghezza}) async {
+    final n = lunghezza == null ? testaInRete : lunghezza.clamp(127, testaInRete);
+    final testa = await leggi(0, n);
+    final h = _Intestazione.leggi(testa);
+    return LettorePmtiles._(leggi, h, () async {}, testa);
   }
 
   /// Zoom minimo e massimo delle tessere dentro.
@@ -47,7 +74,7 @@ class LettorePmtiles {
       if (v == null) return null;
       if (v.ripetute > 0) {
         if (id >= v.id + v.ripetute) return null;
-        final dati = await _leggi(_file, _h.datiInizio + v.posizione, v.lunghezza);
+        final dati = await _byte(_h.datiInizio + v.posizione, v.lunghezza);
         return _h.compressioneTessere == _gzip ? Uint8List.fromList(gzip.decode(dati)) : dati;
       }
       // Una cartella foglia.
@@ -57,12 +84,21 @@ class LettorePmtiles {
     return null;
   }
 
-  Future<void> chiudi() => _file.close();
+  Future<void> chiudi() => _chiudi();
+
+  /// [lunghezza] byte da [inizio]: dalla testa già letta, se ci sono.
+  Future<Uint8List> _byte(int inizio, int lunghezza) {
+    final t = _testa;
+    if (t != null && inizio + lunghezza <= t.length) {
+      return Future.value(Uint8List.sublistView(t, inizio, inizio + lunghezza));
+    }
+    return _leggiByte(inizio, lunghezza);
+  }
 
   Future<List<_Voce>> _cartella(int inizio, int lunghezza) async {
     final gia = _cartelle[inizio];
     if (gia != null) return gia;
-    var dati = await _leggi(_file, inizio, lunghezza);
+    var dati = await _byte(inizio, lunghezza);
     if (_h.compressioneInterna == _gzip) dati = Uint8List.fromList(gzip.decode(dati));
     final voci = _leggiCartella(dati);
     if (_cartelle.length > 64) _cartelle.remove(_cartelle.keys.first);
@@ -79,6 +115,95 @@ class LettorePmtiles {
 }
 
 const _gzip = 2;
+
+/// I byte di un pacchetto sul server, a pezzi (richieste HTTP «Range»).
+///
+/// I pacchetti degli edifici stanno nella release di GitHub, che risponde
+/// con un rinvio (302) a un indirizzo firmato per mezz'ora: lo si chiede una
+/// volta e lo si tiene per [validitaRinvio], così ogni tessera è una
+/// richiesta sola. Un server che non dà pezzi (risponde 200 col pacchetto
+/// intero) è un errore: si scaricherebbero decine di megabyte per una
+/// tessera.
+class SorgenteHttp {
+  SorgenteHttp(
+    this._http,
+    this.indirizzo, {
+    this.validitaRinvio = const Duration(minutes: 20),
+    this.attesa = const Duration(seconds: 12),
+    this.letti,
+  });
+
+  final http.Client _http;
+
+  /// Dove sta il pacchetto (quello pubblico, prima del rinvio).
+  final Uri indirizzo;
+
+  /// Quanto si tiene l'indirizzo firmato del rinvio.
+  final Duration validitaRinvio;
+
+  /// Quanto si aspetta una risposta.
+  final Duration attesa;
+
+  /// Chi conta i byte arrivati (per il limite sui dati a consumo).
+  final void Function(int byte)? letti;
+
+  Uri? _vero;
+  DateTime? _veroDal;
+
+  Future<Uint8List> leggi(int inizio, int lunghezza) async {
+    try {
+      return await _leggi(inizio, lunghezza, rinvioNuovo: false);
+    } on _RinvioScaduto {
+      // L'indirizzo firmato è scaduto prima del previsto: se ne chiede un altro.
+      return _leggi(inizio, lunghezza, rinvioNuovo: true);
+    }
+  }
+
+  Future<Uint8List> _leggi(int inizio, int lunghezza, {required bool rinvioNuovo}) async {
+    if (lunghezza <= 0) return Uint8List(0);
+    final dal = _veroDal;
+    final usaVero = !rinvioNuovo && _vero != null && dal != null && DateTime.now().difference(dal) < validitaRinvio;
+    final r = http.Request('GET', usaVero ? _vero! : indirizzo)
+      ..followRedirects = false
+      ..headers['Range'] = 'bytes=$inizio-${inizio + lunghezza - 1}';
+    var risposta = await _http.send(r).timeout(attesa);
+    if (!usaVero && (risposta.statusCode == 301 || risposta.statusCode == 302 || risposta.statusCode == 307)) {
+      final dove = risposta.headers['location'];
+      await risposta.stream.drain<void>();
+      if (dove == null) throw const HttpException('rinvio senza indirizzo');
+      _vero = indirizzo.resolve(dove);
+      _veroDal = DateTime.now();
+      final r2 = http.Request('GET', _vero!)
+        ..followRedirects = false
+        ..headers['Range'] = r.headers['Range']!;
+      risposta = await _http.send(r2).timeout(attesa);
+    } else if (!usaVero && risposta.statusCode == 206) {
+      // Nessun rinvio: il server dà i pezzi da sé.
+      _vero = indirizzo;
+      _veroDal = DateTime.now();
+    }
+    if (usaVero && (risposta.statusCode == 401 || risposta.statusCode == 403)) {
+      await risposta.stream.drain<void>();
+      _vero = null;
+      throw const _RinvioScaduto();
+    }
+    if (risposta.statusCode != 206) {
+      // Niente pezzi (200: il pacchetto intero): non lo si legge, e la
+      // connessione si chiude subito — svuotarla vorrebbe dire scaricare
+      // tutto il pacchetto sui dati a consumo, fuori dal conto.
+      unawaited(risposta.stream.listen(null, onError: (Object _) {}).cancel());
+      throw HttpException('pacchetto in rete: risposta ${risposta.statusCode}');
+    }
+    final b = await risposta.stream.toBytes().timeout(attesa);
+    letti?.call(b.length);
+    if (b.length != lunghezza) throw const FormatException('PMTiles in rete: pezzo troncato');
+    return b;
+  }
+}
+
+class _RinvioScaduto implements Exception {
+  const _RinvioScaduto();
+}
 
 /// Il numero della tessera [z]/[x]/[y] lungo la curva di Hilbert, come nel
 /// formato PMTiles: prima tutte quelle degli zoom più bassi.

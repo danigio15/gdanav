@@ -20,6 +20,45 @@ import { ritagliaLinea } from './ritaglio.js';
 export const MARCIAPIEDI = { primary: 2.5, secondary: 2.5, tertiary: 2.2, unclassified: 1.8, residential: 1.8, living_street: 1.5 };
 export const ALTO_MARCIAPIEDE = 0.14;
 
+/*
+ * Come si vede il marciapiede.
+ *
+ * «Non si capisce che sono marciapiedi»: erano una banda grigia piatta,
+ * come una banchina. Adesso, come nelle mappe delle corsie dei navigatori:
+ *  - il cordolo: la fascia chiara di pietra verso la strada ([CORDOLO_M]),
+ *    lo spigolo scuro, la faccia verticale in ombra;
+ *  - le lastre: le fughe sottili e il tono che cambia appena da una lastra
+ *    all'altra, disegnati dalla scheda grafica con le uv (`u` i metri dal
+ *    cordolo, `v` quelli lungo la via: vedi `corsie-marciapiedi` in
+ *    scena.js), nessun triangolo in più;
+ *  - gli angoli tondi agli incroci: il cordolo gira da una via all'altra,
+ *    e l'asfalto riempie l'angolo (vedi [angoloMarciapiede]);
+ *  - lo scivolo alle strisce pedonali: il marciapiede scende quasi
+ *    all'asfalto, il cordolo sparisce, il piano cambia tono (le piastrelle
+ *    per i ciechi).
+ * Il colore delle facce e degli scivoli sta nei vertici (moltiplica quello
+ * del materiale, che è della tavolozza: giorno o notte).
+ */
+/** La fascia chiara del cordolo, dal bordo della strada (m). */
+export const CORDOLO_M = 0.35;
+/** Lo scivolo: il piano basso lungo quanto le strisce (dal mezzo, m), la rampa, e quanto resta sopra l'asfalto. */
+export const SCIVOLO = { mezzo: 1.6, rampa: 1.0, alto: 0.02 };
+/** Il raggio voluto degli angoli tondi oltre la larghezza del marciapiede, e quanto lunga al più la curva su ogni via (m). */
+export const ANGOLO = { raggio: 2.5, lungo: 14, minimo: (25 * Math.PI) / 180, massimo: (155 * Math.PI) / 180 };
+// I colori nei vertici (moltiplicano il colore del materiale): la faccia
+// del cordolo in ombra, il piano dello scivolo. Giorno e notte.
+const FACCIA = [
+  [104, 104, 110],
+  [118, 118, 126],
+];
+const TATTILE = [
+  [246, 230, 190],
+  [226, 216, 188],
+];
+const PIENO = [255, 255, 255];
+/** Quanto si può semplificare la linea dei marciapiedi (m): il cordolo resta sul bordo dell'asfalto. */
+const SEMPLIFICA_M = 0.04;
+
 /** Larghezze delle righe (m): un poco più larghe del codice, che da lontano non spariscano. */
 export const RIGHE = { corsia: 0.18, corsiaGrande: 0.2, bordo: 0.2, bordoGrande: 0.25, mezzeria: 0.2, doppia: 0.16, decelerazione: 0.5, arresto: 0.5 };
 
@@ -190,27 +229,6 @@ export function striscia(c, r, oa, ob, dz, meta) {
         c.tri(l0, l0 + 3, l0 + 1);
         c.tri(l0, l0 + 2, l0 + 3);
       }
-    }
-  }
-}
-
-/**
- * Una parete lungo la linea ricca [r], allo spostamento [o], da [dz0] a
- * [dz1] sopra la quota, girata verso [lato] (1 a sinistra, -1 a destra): il
- * cordolo del marciapiede.
- */
-export function parete(c, r, o, dz0, dz1, lato, meta) {
-  for (const pezzo of ritagliaLinea(r, -meta, -meta, meta, meta)) {
-    if (pezzo.length < 2) continue;
-    for (let k = 1; k < pezzo.length; k++) {
-      const P = (p, dz) => {
-        const nl = Math.hypot(p[3], p[4]) || 1;
-        return [p[0] + (p[3] / nl) * o, p[1] + (p[4] / nl) * o, p[2] + dz];
-      };
-      const a = pezzo[k - 1];
-      const b = pezzo[k];
-      const nl = Math.hypot(a[3], a[4]) || 1;
-      c.quad(P(a, dz0), P(b, dz0), P(b, dz1), P(a, dz1), [(a[3] / nl) * lato, (a[4] / nl) * lato, 0]);
     }
   }
 }
@@ -459,6 +477,272 @@ export function senzaMarciapiede(r, i, lato, bordo, largo, asfalto, utile = () =
 }
 
 /**
+ * Il pezzo di linea ricca fra [a] e [b] metri con un punto anche a ogni
+ * metro di [tagli] (dove comincia e finisce uno scivolo). Restituisce i
+ * punti e quelli da tenere comunque (i capi e i tagli).
+ */
+export function pezzoConTagli(r, a, b, tagli = []) {
+  const pz = pezzoFra(r, a, b);
+  const fissi = new Set([pz[0], pz[pz.length - 1]]);
+  const dentro = [...new Set(tagli)].filter((s) => s > a + 0.05 && s < b - 0.05).sort((p, q) => p - q);
+  if (!dentro.length) return { pz, fissi };
+  const out = [];
+  let j = 0;
+  for (const p of pz) {
+    while (j < dentro.length && dentro[j] < p[5] - 1e-6) {
+      const q = pezzoFra(r, dentro[j], dentro[j])[0];
+      out.push(q);
+      fissi.add(q);
+      j++;
+    }
+    if (j < dentro.length && Math.abs(dentro[j] - p[5]) <= 1e-6) {
+      fissi.add(p);
+      j++;
+    }
+    out.push(p);
+  }
+  return { pz: out, fissi };
+}
+
+/** La distanza di [p] dal segmento [a]-[b] (`[x, y]`). */
+function distanzaSegmento(p, a, b) {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const l2 = dx * dx + dy * dy;
+  const t = l2 > 1e-12 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2)) : 0;
+  return Math.hypot(p[0] - a[0] - dx * t, p[1] - a[1] - dy * t);
+}
+
+/**
+ * Il pezzo [pz] (linea ricca) con meno punti: si tolgono quelli che non
+ * spostano di più di [eps] né il bordo [o1] né quello [o2] (gli spostamenti
+ * a sinistra del cordolo e del filo esterno) né la quota. Sulle vie dritte
+ * il marciapiede resta di quattro vertici (prima uno ogni punto della via,
+ * che dopo i raccordi ne ha uno ogni quattro metri). I [fissi] restano.
+ */
+export function semplificaPezzo(pz, o1, o2, eps = SEMPLIFICA_M, fissi = new Set()) {
+  const n = pz.length;
+  if (n <= 2) return pz;
+  const sposta = (p, o) => {
+    const nl = Math.hypot(p[3], p[4]) || 1;
+    return [p[0] + (p[3] / nl) * o, p[1] + (p[4] / nl) * o];
+  };
+  const A = pz.map((p) => sposta(p, o1));
+  const Bq = pz.map((p) => sposta(p, o2));
+  const tieni = new Uint8Array(n);
+  tieni[0] = 1;
+  tieni[n - 1] = 1;
+  pz.forEach((p, k) => {
+    if (fissi.has(p)) tieni[k] = 1;
+  });
+  const pila = [];
+  let prima = 0;
+  for (let k = 1; k < n; k++) {
+    if (!tieni[k]) continue;
+    pila.push([prima, k]);
+    prima = k;
+  }
+  while (pila.length) {
+    const [i, j] = pila.pop();
+    if (j - i < 2) continue;
+    let peggio = -1;
+    let dmax = eps;
+    const ds = pz[j][5] - pz[i][5] || 1e-9;
+    for (let k = i + 1; k < j; k++) {
+      const t = (pz[k][5] - pz[i][5]) / ds;
+      const dz = Math.abs(pz[k][2] - (pz[i][2] + (pz[j][2] - pz[i][2]) * t));
+      const d = Math.max(dz, distanzaSegmento(A[k], A[i], A[j]), distanzaSegmento(Bq[k], Bq[i], Bq[j]));
+      if (d > dmax) {
+        dmax = d;
+        peggio = k;
+      }
+    }
+    if (peggio < 0) continue;
+    tieni[peggio] = 1;
+    pila.push([i, peggio], [peggio, j]);
+  }
+  return pz.filter((_, k) => tieni[k]);
+}
+
+/** Il triangolo [i0, i1, i2] di [c], girato in modo che la sua normale vada come [n]. */
+function triVerso(c, i0, i1, i2, n) {
+  const p = c.p;
+  const ux = p[3 * i1] - p[3 * i0];
+  const uy = p[3 * i1 + 1] - p[3 * i0 + 1];
+  const uz = p[3 * i1 + 2] - p[3 * i0 + 2];
+  const vx = p[3 * i2] - p[3 * i0];
+  const vy = p[3 * i2 + 1] - p[3 * i0 + 1];
+  const vz = p[3 * i2 + 2] - p[3 * i0 + 2];
+  const g = (uy * vz - uz * vy) * n[0] + (uz * vx - ux * vz) * n[1] + (ux * vy - uy * vx) * n[2];
+  if (g >= 0) c.tri(i0, i1, i2);
+  else c.tri(i0, i2, i1);
+}
+
+/**
+ * Un marciapiede in [c] lungo i punti del cordolo [punti] (`{x, y, nx, ny,
+ * zb, w, f, s}`: dove sta il bordo dell'asfalto, la direzione verso il
+ * marciapiede, la quota dell'asfalto, la larghezza, 1 dove è alto e 0 sullo
+ * scivolo, i metri lungo la via): il piano in cima e la faccia del cordolo
+ * verso la strada. Le uv: `u` i metri dal cordolo (sullo scivolo il
+ * cordolo non c'è: comincia più in là), `v` i metri lungo.
+ */
+export function nastroMarciapiede(c, punti) {
+  if (punti.length < 2) return;
+  const sopra = [];
+  const faccia = [];
+  for (const q of punti) {
+    const f = Math.max(0, Math.min(1, q.f));
+    const zt = q.zb + SCIVOLO.alto + (ALTO_MARCIAPIEDE - SCIVOLO.alto) * f;
+    const cg = TATTILE[0].map((v, k) => Math.round(v + (PIENO[k] - v) * f));
+    const cn = TATTILE[1].map((v, k) => Math.round(v + (PIENO[k] - v) * f));
+    const u0 = (CORDOLO_M + 0.06) * (1 - f);
+    sopra.push(c.v(q.x, q.y, zt, 0, 0, 1, u0, q.s, cg, cn), c.v(q.x + q.nx * q.w, q.y + q.ny * q.w, zt, 0, 0, 1, Math.max(q.w, u0 + 0.1), q.s, cg, cn));
+    faccia.push(c.v(q.x, q.y, q.zb - 0.05, -q.nx, -q.ny, 0, 0, q.s, ...FACCIA), c.v(q.x, q.y, zt, -q.nx, -q.ny, 0, 0, q.s, ...FACCIA));
+  }
+  for (let k = 1; k < punti.length; k++) {
+    const [a0, a1] = [sopra[2 * k - 2], sopra[2 * k - 1]];
+    const [b0, b1] = [sopra[2 * k], sopra[2 * k + 1]];
+    triVerso(c, a0, a1, b1, [0, 0, 1]);
+    triVerso(c, a0, b1, b0, [0, 0, 1]);
+    const n = [-(punti[k].nx + punti[k - 1].nx), -(punti[k].ny + punti[k - 1].ny), 0];
+    const [f0, f1] = [faccia[2 * k - 2], faccia[2 * k - 1]];
+    const [g0, g1] = [faccia[2 * k], faccia[2 * k + 1]];
+    triVerso(c, f0, g0, g1, n);
+    triVerso(c, f0, g1, f1, n);
+  }
+}
+
+/**
+ * Le bocche delle strisce pedonali: dove il marciapiede scende. [bocche]:
+ * `{x, y, tx, ty, mezza}` (il mezzo delle strisce sull'asse della
+ * carreggiata, il verso della via, mezza larghezza dell'asfalto).
+ * Restituisce `(x, y) => f`: 1 dove il marciapiede è alto, 0 sullo scivolo.
+ */
+export function scivoli(bocche) {
+  return (x, y) => {
+    let f = 1;
+    for (const b of bocche) {
+      const dx = x - b.x;
+      const dy = y - b.y;
+      if (Math.abs(dx) > b.mezza + 6 && Math.abs(dy) > b.mezza + 6) continue;
+      const lungo = Math.abs(dx * b.tx + dy * b.ty);
+      const traverso = Math.abs(dx * b.ty - dy * b.tx);
+      if (traverso > b.mezza + 2.5 || lungo > SCIVOLO.mezzo + SCIVOLO.rampa) continue;
+      f = Math.min(f, Math.max(0, (lungo - SCIVOLO.mezzo) / SCIVOLO.rampa));
+    }
+    return f;
+  };
+}
+
+/**
+ * L'angolo tondo fra due vie che si incontrano in un nodo, da [A] a [Bv]
+ * (in senso antiorario): `{i, k, passo}` (il ramo: la via, il nodo, verso
+ * dove va), [strade]/[ricche]/[bordi] come in [asfaltoDelleVie], [sopra]
+ * l'altezza dell'asfalto. Il cordolo del lato di [A] verso [Bv] gira, con un
+ * arco, in quello di [Bv] verso [A]: i due marciapiedi finiscono dove
+ * comincia l'arco, e l'arco ha il suo marciapiede. Restituisce l'arco
+ * (`punti`: il cordolo, verso il marciapiede; `C`: lo spigolo che l'arco
+ * taglia, dove l'asfalto riempie l'angolo) e dove finiscono i due
+ * marciapiedi dritti, o null se lì l'angolo non si fa (le vie quasi dritte o
+ * quasi parallele, troppo corte, o un'altra via sull'arco).
+ */
+export function angoloMarciapiede(A, Bv, strade, ricche, bordi, sopra, asfalto) {
+  const capo = (x, lato) => {
+    const v = strade[x.i];
+    const r = ricche[x.i];
+    const L = r[r.length - 1][5];
+    const Lvia = v.sVia[v.sVia.length - 1] || L;
+    const s = (v.sVia[x.k] * L) / Lvia;
+    const bordo = lato > 0 ? bordi[x.i][0] : bordi[x.i][1];
+    const p0 = puntoA(r, s, 0);
+    const p1 = puntoA(r, Math.max(0, Math.min(L, s + x.passo * 8)), 0);
+    const l = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+    if (l < 2) return null;
+    return { i: x.i, k: x.k, passo: x.passo, lato, s, L, r, bordo, d: [(p1[0] - p0[0]) / l, (p1[1] - p0[1]) / l], K: puntoA(r, s, bordo), w: MARCIAPIEDI[v.hw], z0: sopra(v.hw) };
+  };
+  const a = capo(A, A.passo);
+  const b = capo(Bv, -Bv.passo);
+  if (!a || !b) return null;
+  const croce = (u, v) => u[0] * v[1] - u[1] * v[0];
+  const th = Math.atan2(croce(a.d, b.d), a.d[0] * b.d[0] + a.d[1] * b.d[1]);
+  if (th < ANGOLO.minimo || th > ANGOLO.massimo) return null;
+  // Lo spigolo: dove si incontrano i due cordoli.
+  const e = [b.K[0] - a.K[0], b.K[1] - a.K[1]];
+  const cr = croce(a.d, b.d);
+  const ta = croce(e, b.d) / cr;
+  const tb = croce(e, a.d) / cr;
+  if (ta < -1 || tb < -1 || ta > 30 || tb > 30) return null;
+  const largo = Math.max(a.w, b.w);
+  let raggio = largo + ANGOLO.raggio;
+  let lungo = raggio / Math.tan(th / 2);
+  if (lungo > ANGOLO.lungo) {
+    lungo = ANGOLO.lungo;
+    raggio = lungo * Math.tan(th / 2);
+  }
+  if (raggio < largo + 0.6) return null;
+  for (const [x, t] of [
+    [a, ta],
+    [b, tb],
+  ]) {
+    x.sT = x.s + x.passo * (t + lungo);
+    if (x.sT < 0.5 || x.sT > x.L - 0.5) return null;
+    x.T = puntoA(x.r, x.sT, x.bordo);
+    // Il verso della via lì, fuori dal nodo.
+    x.dT = [x.T[3] * x.passo, x.T[4] * x.passo];
+  }
+  // L'arco: da dove finisce il marciapiede di [a] a dove comincia quello di
+  // [b], tangente ai due cordoli (una conica: il cerchio se i due lati sono uguali).
+  const f = [b.T[0] - a.T[0], b.T[1] - a.T[1]];
+  const crT = croce(a.dT, b.dT);
+  if (Math.abs(crT) < 0.2) return null;
+  const al = -croce(f, b.dT) / crT;
+  const be = -croce(f, a.dT) / crT;
+  if (al < 0.3 || be < 0.3) return null;
+  const C = [a.T[0] - a.dT[0] * al, a.T[1] - a.dT[1] * al];
+  const thT = Math.atan2(crT, a.dT[0] * b.dT[0] + a.dT[1] * b.dT[1]);
+  const om = Math.sin(Math.max(0.2, thT) / 2);
+  const N = Math.max(2, Math.ceil((Math.PI - thT) / (Math.PI / 8)));
+  const xy = [];
+  for (let j = 0; j <= N; j++) {
+    const t = j / N;
+    const p0 = (1 - t) * (1 - t);
+    const p1 = 2 * om * t * (1 - t);
+    const p2 = t * t;
+    const S = p0 + p1 + p2;
+    xy.push([(p0 * a.T[0] + p1 * C[0] + p2 * b.T[0]) / S, (p0 * a.T[1] + p1 * C[1] + p2 * b.T[1]) / S]);
+  }
+  const punti = [];
+  let s = 0;
+  for (let j = 0; j <= N; j++) {
+    const t = j / N;
+    const pa = xy[Math.max(0, j - 1)];
+    const pb = xy[Math.min(N, j + 1)];
+    const l = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]) || 1;
+    // Il marciapiede a destra di chi va da [a] a [b] (verso l'isolato); ai
+    // capi proprio come quelli dritti, che i fili esterni si attacchino.
+    let nx = (pb[1] - pa[1]) / l;
+    let ny = -(pb[0] - pa[0]) / l;
+    if (j === 0) [nx, ny] = [-a.dT[1], a.dT[0]];
+    if (j === N) [nx, ny] = [b.dT[1], -b.dT[0]];
+    if (j) s += Math.hypot(xy[j][0] - xy[j - 1][0], xy[j][1] - xy[j - 1][1]);
+    const h = a.T[2] + (b.T[2] - a.T[2]) * t;
+    const w = a.w + (b.w - a.w) * t;
+    // Nessun'altra via sotto l'arco.
+    for (const o of [0.5, w / 2, w - 0.25]) {
+      if (asfalto && asfalto.sotto(xy[j][0] + nx * o, xy[j][1] + ny * o, h, -1, 0.1)) return null;
+    }
+    punti.push({ x: xy[j][0], y: xy[j][1], nx, ny, h, zb: h + a.z0 + (b.z0 - a.z0) * t, w, f: 1, s: a.sT + s });
+  }
+  // Lo spigolo dell'asfalto che riempie l'angolo, un poco dentro le due vie:
+  // fra l'angolo e le strisce dell'asfalto nessuna fessura.
+  const bx = -(a.dT[0] + b.dT[0]);
+  const by = -(a.dT[1] + b.dT[1]);
+  const bl = Math.hypot(bx, by) || 1;
+  const riempi = [C[0] + (bx / bl) * 0.3, C[1] + (by / bl) * 0.3];
+  return { a, b, C, riempi, zC: (punti[0].zb + punti[N].zb) / 2, punti };
+}
+
+/**
  * La segnaletica di una tessera. [strade]: le vie (vedi `normalizza` in
  * corsie.js) con `xy` (la geometria da disegnare, metri della tessera),
  * `xyVia` (quella vera, per i nodi) e `h` (la quota di ogni punto di `xy`);
@@ -469,7 +753,8 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
   const asfalto = new Costruttore();
   const vernice = new Costruttore();
   const segnali = new Costruttore({ colori: true });
-  const marciapiedi = new Costruttore();
+  // Coi colori nei vertici (le facce, gli scivoli) e le uv (le lastre, il cordolo).
+  const marciapiedi = new Costruttore({ uv: true, colori: true });
   const dentro = (x, y) => x >= -meta && x <= meta && y >= -meta && y <= meta;
   const righe = new Map();
 
@@ -521,6 +806,42 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
     const attaccato = (q) => (tocchi.get(chiave(q)) ?? []).some((t) => t.i !== i);
     return attaccato(v.xyVia[0]) && attaccato(v.xyVia[v.xyVia.length - 1]);
   };
+  const conMarciapiede = (v, i) => !!MARCIAPIEDI[v.hw] && !v.galleria && !dentroLIncrocio(v, i);
+
+  // ── Gli angoli tondi dei marciapiedi, prima di tutto ────────────────
+  // Per ogni nodo, fra due rami vicini (in senso antiorario) di due vie col
+  // marciapiede: dove finiscono i due marciapiedi dritti (i loro buchi) e
+  // l'arco; si disegnano alla fine, se i due dritti ci arrivano davvero.
+  const angoli = [];
+  const buchiAngoli = strade.map(() => ({ 1: [], [-1]: [] }));
+  const conAngolo = new Set();
+  if (strade.some(conMarciapiede)) {
+    copertura = asfaltoDelleVie(strade, ricche, bordiAsfalto);
+    for (const [kk, elenco] of tocchi) {
+      if (new Set(elenco.map((t) => t.i)).size < 2) continue;
+      // Tutti i rami, anche quelli senza marciapiede: fra due vicini e basta.
+      const rami = ramiDi(kk)
+        .map((x) => ({ ...x, ang: Math.atan2(x.dy, x.dx) }))
+        .sort((p, q) => p.ang - q.ang);
+      for (let j = 0; j < rami.length && rami.length >= 2; j++) {
+        const A = rami[j];
+        const Bv = rami[(j + 1) % rami.length];
+        if (A.i === Bv.i || !conMarciapiede(strade[A.i], A.i) || !conMarciapiede(strade[Bv.i], Bv.i)) continue;
+        const ang = angoloMarciapiede(A, Bv, strade, ricche, bordiAsfalto, sopra, copertura);
+        if (!ang) continue;
+        angoli.push(ang);
+        for (const x of [ang.a, ang.b]) {
+          buchiAngoli[x.i][x.lato].push(x.passo > 0 ? [x.s, x.sT] : [x.sT, x.s]);
+          conAngolo.add(`${x.i}:${x.k}:${x.passo}:${x.lato}`);
+        }
+      }
+    }
+  }
+  // I marciapiedi dritti (si disegnano alla fine, con gli scivoli) e i
+  // pezzi di ogni lato di ogni via (`i:lato`), per gli angoli.
+  const daFare = [];
+  const pezziMarciapiede = new Map();
+  const bocche = [];
 
   strade.forEach((v, i) => {
     const r = ricche[i];
@@ -534,6 +855,9 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
     // ── I buchi delle righe agli incroci ──────────────────────────────
     const buchiTutte = [];
     const buchiLato = { sinistra: [], destra: [] };
+    // Quelli dei marciapiedi: dove arriva un'altra strada (col suo
+    // marciapiede: un poco di più), salvo dove c'è l'angolo tondo, che ha i suoi.
+    const buchiMarciapiede = { 1: [...buchiAngoli[i][1]], [-1]: [...buchiAngoli[i][-1]] };
     v.xyVia.forEach((q, k) => {
       const rami = ramiDi(chiave(q));
       const vie = new Set(rami.map((x) => x.i));
@@ -565,11 +889,17 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
         const sen = tx * o.dy - ty * o.dx;
         const r2 = Math.min(18, o.mezza / Math.max(0.35, Math.abs(sen)) + 0.8);
         buchiLato[sen > 0 ? 'sinistra' : 'destra'].push([s - r2, s + r2]);
+        const lato = sen > 0 ? 1 : -1;
+        if (!conAngolo.has(`${i}:${k}:-1:${lato}`)) buchiMarciapiede[lato].push([s - r2 - 2.5, s]);
+        if (!conAngolo.has(`${i}:${k}:1:${lato}`)) buchiMarciapiede[lato].push([s, s + r2 + 2.5]);
       }
     });
 
     // ── L'asfalto ──────────────────────────────────────────────────────
-    striscia(asfalto, r, B.sinistra + mS, B.destra - mD, z0, meta);
+    // Coi punti che servono (dopo i raccordi uno ogni quattro metri anche
+    // sulle vie dritte): i triangoli risparmiati qui e nelle righe pagano
+    // gli angoli tondi dei marciapiedi.
+    striscia(asfalto, semplificaPezzo(r, B.sinistra + mS, B.destra - mD, SEMPLIFICA_M * 0.75), B.sinistra + mS, B.destra - mD, z0, meta);
     // I capi tondi: dove due vie si incontrano di sbieco non resta un dente.
     for (const fine of [0, 1]) {
       const p = r[fine ? r.length - 1 : 0];
@@ -584,8 +914,19 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       // Verso fuori: avanti alla fine, indietro all'inizio.
       const fx = fine ? ny : -ny;
       const fy = fine ? -nx : nx;
+      const N = 6;
+      // Dove il capo sta tutto sull'asfalto di un'altra via (la via che
+      // continua, quella in cui sbocca) non serve: triangoli risparmiati.
+      copertura ??= asfaltoDelleVie(strade, ricche, bordiAsfalto);
+      let coperto = !!copertura.sotto(cx, cy, p[2], i, 0);
+      for (let j = 0; j <= N && coperto; j++) {
+        const a = -Math.PI / 2 + (Math.PI * j) / N;
+        const ux = Math.cos(a) * fx - Math.sin(a) * fy;
+        const uy = Math.cos(a) * fy + Math.sin(a) * fx;
+        coperto = !!copertura.sotto(cx + ux * (rad - 0.15), cy + uy * (rad - 0.15), p[2], i, 0);
+      }
+      if (coperto) continue;
       const centro = asfalto.v(cx, cy, p[2] + z0 - 0.004, 0, 0, 1);
-      const N = 8;
       const giro = [];
       for (let j = 0; j <= N; j++) {
         const a = -Math.PI / 2 + (Math.PI * j) / N;
@@ -608,22 +949,19 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
     if (v.galleria) return;
 
     // ── I marciapiedi, col cordolo verso la strada ─────────────────────
-    // Aperti dove arriva un'altra strada (col suo marciapiede: un poco di più).
+    // Aperti dove arriva un'altra strada; si disegnano alla fine.
     const largoM = MARCIAPIEDI[v.hw];
     if (largoM && !dentroLIncrocio(v, i)) {
-      copertura ??= asfaltoDelleVie(strade, ricche, bordiAsfalto);
-      const piu = (bb) => bb.map(([a, b]) => [a - 2.5, b + 2.5]);
-      for (const [lato, bordo, buchi] of [
-        [1, B.sinistra + mS, [...buchiTutte, ...piu(buchiLato.sinistra)]],
-        [-1, B.destra - mD, [...buchiTutte, ...piu(buchiLato.destra)]],
+      // Fin oltre la tessera: un angolo tondo dentro può finire su un dritto di fuori.
+      const fin = meta + largoM + ANGOLO.lungo + 4;
+      for (const [lato, bordo] of [
+        [1, B.sinistra + mS],
+        [-1, B.destra - mD],
       ]) {
-        const no = senzaMarciapiede(r, i, lato, bordo, largoM, copertura, (x, y) => Math.abs(x) <= meta + largoM + 2 && Math.abs(y) <= meta + largoM + 2);
-        for (const [a, b] of togli([[0, L]], [...buchi, ...no])) {
-          if (b - a < 1.5) continue;
-          const pz = pezzoFra(r, a, b);
-          striscia(marciapiedi, pz, lato > 0 ? bordo + largoM : bordo, lato > 0 ? bordo : bordo - largoM, z0 + ALTO_MARCIAPIEDE, meta);
-          parete(marciapiedi, pz, bordo, z0 - 0.05, z0 + ALTO_MARCIAPIEDE, -lato, meta);
-        }
+        const no = senzaMarciapiede(r, i, lato, bordo, largoM, copertura, (x, y) => Math.abs(x) <= fin && Math.abs(y) <= fin);
+        const pezzi = togli([[0, L]], [...buchiTutte, ...buchiMarciapiede[lato], ...no]).filter(([a, b]) => b - a >= 1.5);
+        pezziMarciapiede.set(`${i}:${lato}`, pezzi);
+        for (const [a, b] of pezzi) daFare.push({ i, lato, bordo, largo: largoM, z0, a, b });
       }
     }
 
@@ -633,7 +971,7 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       const pezzi = tipo === 'continua' ? togli([[0, L]], buchi) : v.stimata ? trattiniAdattati(L, pieno, vuoto, buchi) : trattini(L, pieno, vuoto, buchi);
       for (const [a, b] of pezzi) {
         if (b - a < 0.2) continue;
-        striscia(vernice, pezzoFra(r, a, b), o + w / 2, o - w / 2, dz, meta);
+        striscia(vernice, semplificaPezzo(pezzoFra(r, a, b), o + w / 2, o - w / 2, SEMPLIFICA_M * 0.75), o + w / 2, o - w / 2, dz, meta);
       }
       righe.set(tipo, (righe.get(tipo) ?? 0) + pezzi.length);
     };
@@ -798,6 +1136,10 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       const chiaveZebra = `${ramo.i}:${Math.round(sZebra)}:zebra`;
       if (zebra && sZebra > lungoZ / 2 && sZebra < L - lungoZ / 2 && !fatti.has(chiaveZebra)) {
         fatti.add(chiaveZebra);
+        // Lo scivolo dei marciapiedi ai due capi (anche se le strisce le fa la tessera accanto).
+        const [ba, bb] = bordiAsfalto[ramo.i];
+        const [bx, by, , btx, bty] = puntoA(r, sZebra, (ba + bb) / 2);
+        bocche.push({ i: ramo.i, s: sZebra, x: bx, y: by, tx: btx, ty: bty, mezza: (ba - bb) / 2 });
         const pz = pezzoFra(r, sZebra - lungoZ / 2, sZebra + lungoZ / 2);
         const m = pz[Math.floor(pz.length / 2)];
         if (dentro(m[0], m[1])) {
@@ -870,6 +1212,49 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
         }
       }
     }
+  }
+  // ── I marciapiedi: i dritti, con gli scivoli; poi gli angoli tondi ──
+  const scivolo = scivoli(bocche);
+  for (const { i, lato, bordo, largo, z0, a, b } of daFare) {
+    const r = ricche[i];
+    // I punti dove comincia e finisce lo scivolo, per le strisce di questa via.
+    const tagli = [];
+    for (const q of bocche) {
+      if (q.i !== i) continue;
+      const m = SCIVOLO.mezzo;
+      tagli.push(q.s - m - SCIVOLO.rampa, q.s - m, q.s + m, q.s + m + SCIVOLO.rampa);
+    }
+    const { pz, fissi } = pezzoConTagli(r, a, b, tagli);
+    const pochi = semplificaPezzo(pz, bordo, bordo + lato * largo, SEMPLIFICA_M, fissi);
+    for (const pezzo of ritagliaLinea(pochi, -meta, -meta, meta, meta)) {
+      if (pezzo.length < 2) continue;
+      nastroMarciapiede(
+        marciapiedi,
+        pezzo.map((p) => {
+          const nl = Math.hypot(p[3], p[4]) || 1;
+          const nx = p[3] / nl;
+          const ny = p[4] / nl;
+          const x = p[0] + nx * bordo;
+          const y = p[1] + ny * bordo;
+          return { x, y, nx: nx * lato, ny: ny * lato, zb: p[2] + z0, w: largo, f: scivolo(x, y), s: p[5] };
+        }),
+      );
+    }
+  }
+  for (const ang of angoli) {
+    // Una tessera sola (quella dello spigolo), e solo se i due marciapiedi
+    // dritti arrivano proprio dove comincia l'arco.
+    if (!dentro(ang.C[0], ang.C[1])) continue;
+    const arriva = (x) => (pezziMarciapiede.get(`${x.i}:${x.lato}`) ?? []).some(([p0, p1]) => Math.abs((x.passo > 0 ? p0 : p1) - x.sT) < 1e-6);
+    if (!arriva(ang.a) || !arriva(ang.b)) continue;
+    nastroMarciapiede(
+      marciapiedi,
+      ang.punti.map((q) => ({ ...q, f: scivolo(q.x, q.y) })),
+    );
+    // L'asfalto nell'angolo, fra lo spigolo dei due bordi e l'arco.
+    const ic = asfalto.v(ang.riempi[0], ang.riempi[1], ang.zC - 0.004, 0, 0, 1);
+    const giro = ang.punti.map((q) => asfalto.v(q.x, q.y, q.zb - 0.004, 0, 0, 1));
+    for (let j = 1; j < giro.length; j++) triVerso(asfalto, ic, giro[j - 1], giro[j], [0, 0, 1]);
   }
   return { asfalto, vernice, segnali, marciapiedi, righe, semafori };
 }

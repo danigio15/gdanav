@@ -75,7 +75,10 @@ export const CORSIE = {
   prato: '#DDEACC',
   bosco: '#C9DFB6',
   acqua: '#BDDCF3',
-  marciapiede: '#D7DBE1',
+  // I marciapiedi: le lastre grigio pietra, più scure del suolo e lontane
+  // dal blu dell'asfalto; il cordolo di pietra chiara verso la strada.
+  marciapiede: '#D3CEC4',
+  cordolo: '#F4F2ED',
   nebbia: '#EEF1F5',
   asfalto: '#2E394C',
   asfaltoGrande: '#2B3648',
@@ -93,7 +96,8 @@ export const CORSIE = {
 
 /** E di notte: l'asfalto quasi nero, gli edifici grigio fumo. */
 export const CORSIE_NOTTE = {
-  marciapiede: '#3A4253',
+  marciapiede: '#4F5667',
+  cordolo: '#8E95A6',
   asfalto: '#1A2130',
   asfaltoGrande: '#182030',
   asfaltoPonte: '#252E40',

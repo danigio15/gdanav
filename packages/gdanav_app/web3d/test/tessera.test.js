@@ -348,3 +348,40 @@ test('una strada segnata in costruzione si disegna come la strada che è', () =>
   }
   assert.ok(sopra > 7, `la rampa in quota sopra l'autostrada (${sopra})`);
 });
+
+/** Una tessera senza strade con [n] case quadrate di 10 m (circa), in fila. */
+function quartiere(n) {
+  const case_ = [];
+  for (let i = 0; i < n; i++) {
+    const x0 = 100 + (i % 60) * 60;
+    const y0 = 100 + Math.floor(i / 60) * 60;
+    case_.push({ tipo: 3, p: { render_height: 9 }, g: [[[x0, y0], [x0, y0 + 30], [x0 + 30, y0 + 30], [x0 + 30, y0], [x0, y0]]] });
+  }
+  return { building: strato(case_) };
+}
+
+test('da lontano tutti gli edifici, leggeri: solo il muro e il tetto', () => {
+  // «La visuale dei palazzi non è completa»: le tessere ridotte tenevano i
+  // grandi e lasciavano fuori i piccoli. Adesso li tengono tutti, senza
+  // cornicione né ombre.
+  const una = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': quartiere(1) }, dettaglio: 'ridotto' });
+  assert.equal(una.conti.edificiFatti, 1);
+  assert.equal(una.conti.edificiLeggeri, 1);
+  // Quattro muri (due triangoli l'uno) e il tetto (due).
+  assert.equal(una.conti.edifici, 10);
+  const piena = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': quartiere(1) } });
+  assert.equal(piena.conti.edificiLeggeri, 0);
+  assert.ok(piena.conti.edifici > 3 * una.conti.edifici, `${piena.conti.edifici}`);
+});
+
+test('una tessera piena di case: oltre il limite leggere, non fuori', () => {
+  const limiti = { triangoliEdifici: 20000, leggeriOltre: 10000 };
+  const t = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': quartiere(1000) }, limiti });
+  assert.equal(t.conti.edificiTotali, 1000);
+  assert.equal(t.conti.edificiFatti, 1000);
+  assert.ok(t.conti.edificiLeggeri > 600 && t.conti.edificiLeggeri < 1000, `${t.conti.edificiLeggeri}`);
+  assert.ok(t.conti.edifici <= 20000 + 40);
+  // Come prima (tutte intere fino al limite) ne entravano poco più della metà.
+  const prima = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': quartiere(1000) }, limiti: { triangoliEdifici: 20000, leggeriOltre: Infinity } });
+  assert.ok(prima.conti.edificiFatti < 600, `${prima.conti.edificiFatti}`);
+});

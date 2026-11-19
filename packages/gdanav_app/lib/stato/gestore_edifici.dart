@@ -24,6 +24,14 @@ import '../sorgenti/pmtiles.dart';
 /// nessun server da chiamare a ogni tessera, e va anche senza rete. Finché
 /// non c'è, la scena usa gli edifici di sempre.
 ///
+/// Finché il pacchetto intero non c'è (non si è mai stati sul Wi-Fi con la
+/// scena aperta, o la zona è nuova: in auto il telefono va coi dati a
+/// consumo), le tessere si leggono una per una dal pacchetto della release,
+/// a pezzi (HTTP «Range», vedi [SorgenteHttp]): una ventina di kilobyte per
+/// tessera, al più [limiteAConsumo] al giorno sui dati a consumo. Quelle lette
+/// restano sul telefono ([limiteCopie] in tutto), e tornando per la stessa
+/// strada non si richiedono.
+///
 /// Ogni mese il pacchetto si rifà con l'ultimo rilascio di Overture. Ognuno
 /// sul telefono si ricorda da che versione viene (un file accanto, `.versione`):
 /// quando l'indice ne dice un'altra, lo si riscarica alle stesse condizioni, e
@@ -37,7 +45,12 @@ class GestoreEdifici {
     Uri? base,
     this.indiceValido = const Duration(days: 1),
     this.riprovaIndice = const Duration(minutes: 5),
+    this.limiteAConsumo = 30 * 1000 * 1000,
+    this.limiteCopie = 80 * 1000 * 1000,
+    this.riprovaInRete = const Duration(minutes: 1),
+    DateTime Function()? orologio,
   }) : _http = client ?? http.Client(),
+       _ora = orologio ?? DateTime.now,
        _cartellaDi = cartella ?? (() async => Directory('${(await getApplicationSupportDirectory()).path}/edifici')),
        _aConsumo = aConsumo ?? reteAConsumo,
        _base = base ?? Uri.parse('https://github.com/danigio15/gdanav/releases/download/edifici/');
@@ -58,6 +71,30 @@ class GestoreEdifici {
 
   /// Ogni quanto si rilegge l'indice dei pacchetti.
   final Duration indiceValido;
+
+  /// Quanti byte al giorno si leggono in rete, a tessere, sui dati a consumo.
+  final int limiteAConsumo;
+
+  /// Quanti byte di tessere lette in rete si tengono sul telefono.
+  final int limiteCopie;
+
+  /// Dopo un pacchetto in rete che non si è aperto, quanto si aspetta a riprovare.
+  final Duration riprovaInRete;
+
+  final DateTime Function() _ora;
+
+  /// I pacchetti letti in rete, a pezzi, per cella (finché non c'è quello intero).
+  final _inRete = <String, Future<LettorePmtiles?>>{};
+
+  /// Quando un pacchetto in rete non si è aperto: fino a [riprovaInRete] dopo non si richiede.
+  final _inReteFallito = <String, DateTime>{};
+
+  /// I byte letti in rete oggi ([_giornoConsumo]), sui dati a consumo.
+  int? _consumoOggi;
+  String? _giornoConsumo;
+
+  /// Le copie scritte da quando si è guardato quanto pesano.
+  var _copieNuove = 0;
 
   final _lettori = <String, Future<LettorePmtiles?>>{};
 
@@ -85,17 +122,19 @@ class GestoreEdifici {
 
   static String fileDi(String cella) => 'edifici-${cella.replaceAll('/', '-')}.pmtiles';
 
-  /// La tessera z14 [x]/[y] coi soli edifici, se il pacchetto della sua
-  /// zona c'è; altrimenti `null`, e il pacchetto si chiede (non si aspetta:
-  /// la scena intanto usa gli edifici di sempre).
+  /// La tessera [z]/[x]/[y] coi soli edifici: dal pacchetto della sua zona,
+  /// se è sul telefono; altrimenti la si legge in rete (vedi [_tesseraInRete])
+  /// e il pacchetto intero si chiede. `null`: non ci sono (la scena usa gli
+  /// edifici di sempre).
   Future<Uint8List?> tessera(int z, int x, int y) async {
     if (z < zoomCelle) return null;
     final cella = cellaDi(z, x, y);
     try {
       final l = await _lettore(cella);
       if (l == null) {
+        // Il pacchetto intero, quando si può; intanto questa tessera, in rete.
         unawaited(scarica(cella));
-        return null;
+        return await _tesseraInRete(cella, z, x, y);
       }
       // C'è: si guarda, una volta per indice, se ne è uscito uno più nuovo.
       if (!_controllate.contains(cella) || _daRileggere) unawaited(scarica(cella));
@@ -161,11 +200,128 @@ class GestoreEdifici {
       await _fileVersione(f).writeAsString(voce.versione);
       final vecchio = _lettori.remove(cella);
       if (vecchio != null) unawaited(_chiudiPoi(vecchio));
+      // Col pacchetto intero le tessere lette in rete non servono più.
+      _inRete.remove(cella);
+      await _cartellaCopie(dir, cella).delete(recursive: true).catchError((Object _) => dir);
       return true;
     } catch (e) {
       debugPrint('edifici: non scaricato $cella: $e');
       return presente;
     }
+  }
+
+  /// La tessera letta in rete, a pezzi, dal pacchetto della release: dalla
+  /// copia sul telefono se c'è (della versione dell'indice), altrimenti una
+  /// richiesta. Sui dati a consumo al più [limiteAConsumo] byte al giorno.
+  Future<Uint8List?> _tesseraInRete(String cella, int z, int x, int y) async {
+    final indice = await _leggiIndice();
+    final voce = indice?[cella];
+    if (voce == null) return null;
+    final dir = await _cartellaDi();
+    final copie = _cartellaCopie(dir, cella);
+    final copia = File('${copie.path}/$z-$x-$y.mvt');
+    final versione = File('${copie.path}/versione');
+    if (await copia.exists()) {
+      if (await versione.exists() && (await versione.readAsString()).trim() == voce.versione) {
+        final b = await copia.readAsBytes();
+        // Vuota: in quella tessera di edifici non ce ne sono.
+        return b.isEmpty ? null : b;
+      }
+      // Di un pacchetto vecchio: via tutte.
+      await copie.delete(recursive: true).catchError((Object _) => copie);
+    }
+    final aConsumo = await _aConsumo();
+    if (aConsumo && await _consumati() >= limiteAConsumo) return null;
+    final fallito = _inReteFallito[cella];
+    if (fallito != null && _ora().difference(fallito) < riprovaInRete) return null;
+    final lettore = await (_inRete[cella] ??= _apriInRete(cella, voce));
+    if (lettore == null) return null;
+    final dati = await lettore.tessera(z, x, y);
+    try {
+      await copie.create(recursive: true);
+      if (!await versione.exists()) await versione.writeAsString(voce.versione);
+      await copia.writeAsBytes(dati ?? Uint8List(0), flush: false);
+      if (++_copieNuove >= 40) {
+        _copieNuove = 0;
+        unawaited(_potaCopie(dir));
+      }
+    } catch (e) {
+      debugPrint('edifici: copia non scritta $cella: $e');
+    }
+    return dati;
+  }
+
+  Future<LettorePmtiles?> _apriInRete(String cella, VocePacchetto voce) async {
+    try {
+      final sorgente = SorgenteHttp(_http, _base.resolve(fileDi(cella)), letti: _conta);
+      return await LettorePmtiles.daSorgente(sorgente.leggi, lunghezza: voce.byte);
+    } catch (e) {
+      debugPrint('edifici: in rete non si apre $cella: $e');
+      _inRete.remove(cella);
+      _inReteFallito[cella] = _ora();
+      return null;
+    }
+  }
+
+  static Directory _cartellaCopie(Directory dir, String cella) =>
+      Directory('${dir.path}/tessere/${cella.replaceAll('/', '-')}');
+
+  String _oggi() {
+    final o = _ora();
+    return '${o.year}-${o.month}-${o.day}';
+  }
+
+  File _fileConsumo(Directory dir) => File('${dir.path}/consumo-in-rete.json');
+
+  /// I byte letti in rete oggi (si ricordano anche chiudendo l'app).
+  Future<int> _consumati() async {
+    final oggi = _oggi();
+    if (_giornoConsumo == oggi && _consumoOggi != null) return _consumoOggi!;
+    var n = 0;
+    try {
+      final f = _fileConsumo(await _cartellaDi());
+      if (await f.exists()) {
+        final j = jsonDecode(await f.readAsString());
+        if (j is Map && j['giorno'] == oggi && j['byte'] is num) n = (j['byte'] as num).toInt();
+      }
+    } catch (_) {}
+    _giornoConsumo = oggi;
+    _consumoOggi = n;
+    return n;
+  }
+
+  /// Conta i byte arrivati (tutti: anche sul Wi-Fi, ma il limite vale solo a consumo).
+  void _conta(int byte) {
+    unawaited(() async {
+      try {
+        if (!await _aConsumo()) return;
+        final n = await _consumati() + byte;
+        _consumoOggi = n;
+        final dir = await _cartellaDi();
+        await dir.create(recursive: true);
+        await _fileConsumo(dir).writeAsString(jsonEncode({'giorno': _giornoConsumo, 'byte': n}));
+      } catch (_) {}
+    }());
+  }
+
+  /// Le copie delle tessere oltre [limiteCopie]: via le più vecchie.
+  Future<void> _potaCopie(Directory dir) async {
+    try {
+      final radice = Directory('${dir.path}/tessere');
+      if (!await radice.exists()) return;
+      final file = <(File, FileStat)>[];
+      await for (final e in radice.list(recursive: true)) {
+        if (e is File && e.path.endsWith('.mvt')) file.add((e, await e.stat()));
+      }
+      var tot = file.fold<int>(0, (a, f) => a + f.$2.size);
+      if (tot <= limiteCopie) return;
+      file.sort((a, b) => a.$2.modified.compareTo(b.$2.modified));
+      for (final (f, st) in file) {
+        if (tot <= limiteCopie * 3 ~/ 4) break;
+        await f.delete().catchError((Object _) => f);
+        tot -= st.size;
+      }
+    } catch (_) {}
   }
 
   /// Se il pacchetto [f] sul telefono è quello che dice l'indice.
@@ -220,6 +376,9 @@ class GestoreEdifici {
       };
       _indiceLetto = DateTime.now();
       _controllate.clear();
+      // Un indice nuovo può dire pacchetti nuovi: quelli in rete si riaprono.
+      _inRete.clear();
+      _inReteFallito.clear();
     } catch (_) {}
     return _indice;
   }
