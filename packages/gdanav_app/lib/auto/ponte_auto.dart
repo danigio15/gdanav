@@ -132,6 +132,7 @@ class PonteAuto {
     viaggio.addListener(_viaggio);
     viaggio.addListener(_opzioni);
     guida.addListener(_guida);
+    guida.versioneSullaMappa.addListener(_sullaMappa);
     // Anche dalla guida: l'avanzamento arriva dopo la posizione, e mandare
     // quello vecchio faceva passi a volte lunghi a volte corti.
     guida.addListener(_posizione);
@@ -641,6 +642,7 @@ class PonteAuto {
     guida.avvisi.removeListener(_opzioni);
     ztl?.removeListener(_opzioni);
     guida.removeListener(_guida);
+    guida.versioneSullaMappa.removeListener(_sullaMappa);
     guida.removeListener(_posizione);
     posizione.removeListener(_posizione);
     luoghi?.removeListener(_luoghi);
@@ -833,7 +835,8 @@ class PonteAuto {
         ],
       },
     });
-    final dati = datiViaggio(stato is ViaggioPronto && arrivati == null ? stato.viaggio : null);
+    final v = stato is ViaggioPronto && arrivati == null ? stato.viaggio : null;
+    final dati = datiViaggio(v, sullaMappa: guida.sullaMappaDi(v?.percorso));
     _manda('sorgenti', {
       'dati': {for (final MapEntry(:key, :value) in dati.entries) key: jsonEncode(value)},
     });
@@ -1333,10 +1336,23 @@ class PonteAuto {
       _freccia = chiave;
       _manda('sorgenti', {
         'dati': {
-          sorgenteManovra: jsonEncode(datiManovra(chiave == null ? null : p.viaggio, a?.prossima)),
+          sorgenteManovra: jsonEncode(
+            datiManovra(
+              chiave == null ? null : p.viaggio,
+              a?.prossima,
+              sullaMappa: guida.sullaMappaDi(p.viaggio.percorso),
+            ),
+          ),
           // Le corsie sulla strada: le disegna solo la vista immersiva, che
           // ha la sorgente; l'auto in 2D e in 3D le lascia cadere.
-          sorgenteCorsie: jsonEncode(datiCorsie(chiave == null ? null : p.viaggio, a?.prossima)),
+          sorgenteCorsie: jsonEncode(
+            datiCorsie(
+              chiave == null ? null : p.viaggio,
+              a?.prossima,
+              sullaMappa: guida.sullaMappaDi(p.viaggio.percorso),
+              classe: (m) => guida.classeSullaMappa(p.viaggio.percorso, m) ?? '',
+            ),
+          ),
         },
       });
     }
@@ -1407,26 +1423,43 @@ class PonteAuto {
     // in guida sopra un pezzo del percorso (`pista`, a coppie lat, lon), dove
     // l'auto è a `pista_qui` metri dal suo inizio. Agli svincoli e nelle
     // rotonde non esce di strada (`MotoSullaStrada` in gdanav_core).
-    final strada = stimata == null ? null : guida.strada;
+    // Sulla linea che la mappa disegna, appoggiata sulle sue strade
+    // ([GestoreGuida.stradaSullaMappa]): coi metri del percorso.
+    final strada = stimata == null ? null : guida.stradaSullaMappa;
     final metri = stimata == null ? null : guida.metriStimati();
     final da = metri == null ? 0.0 : math.max(0.0, metri - pistaIndietroM);
     final pista = strada == null || metri == null ? null : trattoDiStrada(strada, da, metri + pistaAvantiM);
+    final mostrata = switch ((strada, metri)) {
+      (final l?, final m?) => sullaStrada(l, m).punto,
+      _ when a?.posizioneSulPercorso != null => guida.sullaMappaA(a!.percorsiM) ?? qui,
+      _ => qui,
+    };
     _manda('posizione', {
-      'lat': qui.lat,
-      'lon': qui.lon,
+      'lat': mostrata.lat,
+      'lon': mostrata.lon,
       'rotta': a?.rottaMappa ?? rotta,
       'rotta_io': rotta,
       'velocita_ms': velocita.isFinite ? velocita : 0.0,
       'icona': _icona,
-      if (pista != null && metri != null) ...{
+      if ((pista, strada, metri) case (final pista?, final strada?, final metri?)) ...{
         'pista': [
           for (final p in pista) ...[p.lat, p.lon],
         ],
-        'pista_qui': metri - da,
+        // Quanto è lunga la pista fin dove è l'auto: la mappa dell'auto la
+        // misura su di sé, e la linea spostata non ha i metri del percorso.
+        'pista_qui': Linea(trattoDiStrada(strada, da, metri)).lunghezzaM,
       },
     });
     _cruscotto();
     unawaited(_zone());
+  }
+
+  /// La linea sulla mappa è cambiata: di nuovo il percorso, e freccia e
+  /// corsie alla prossima lettura.
+  void _sullaMappa() {
+    _viaggio();
+    _freccia = null;
+    _guida();
   }
 
   /// La lettura della guida già mandata all'auto.

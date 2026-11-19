@@ -128,7 +128,20 @@ export class Moto {
     this.ultimoFix = this.colFiltro ? lettura.metri : metri;
     this.vFix = this.colFiltro && Number.isFinite(lettura.v) ? lettura.v : v || 0;
     const prima = this.lettura;
-    const vel = Math.max(0, v || 0);
+    let vel = Math.max(0, v || 0);
+    /* Senza percorso, la velocità che dicono le letture stesse, se l'app non
+     * ne dice una che va: «senza navigazione di nuovo fermo, non cammina».
+     * L'app mandava zero (la velocità rimasta dalla guida finita, o un
+     * telefono che non la dà) e la freccia, che lungo la strada va con la
+     * velocità della lettura, restava indietro e si fermava ad aspettare. */
+    if (metri === null && prima && prima.metri === null && vel < 1.5 && x !== null && prima.x !== null) {
+      // Solo strada fatta davvero nel verso dell'auto, e non poca: da fermi
+      // il GPS balla di qualche metro, e la freccia non deve partire da sola.
+      const t = (quando - prima.quando) / 1000;
+      const ar = ((90 - rotta) * Math.PI) / 180;
+      const avanti = (x - prima.x) * Math.cos(ar) + (y - prima.y) * Math.sin(ar);
+      if (t > 0.3 && t < 4 && avanti > 4 && avanti / t > 1.5 && avanti / t < 70) vel = avanti / t;
+    }
     // Frenando, il punto portato avanti con la velocità di adesso va oltre
     // dove l'auto si ferma: l'accelerazione dalle ultime due letture.
     const tra = prima ? (quando - prima.quando) / 1000 : 0;

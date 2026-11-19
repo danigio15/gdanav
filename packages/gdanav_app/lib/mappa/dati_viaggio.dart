@@ -33,6 +33,10 @@ Map<String, Object?> datiTraccia(List<Punto> traccia) {
 /// Ogni sorgente per conto suo, e la linea del percorso prima di tutto: una
 /// colonnina o una coda storte lasciano vuota la loro, non le altre. Prima
 /// un errore qualunque qui dentro lasciava la mappa senza percorso.
+///
+/// [sullaMappa]: la linea del percorso appoggiata sulle strade della mappa
+/// (`GestoreGuida.sullaMappa`), coi metri del percorso: la linea e le code
+/// si disegnano lì sopra.
 Map<String, Map<String, Object?>> datiViaggio(
   Viaggio? v, {
   List<PercorsoCalcolato> scelte = const [],
@@ -40,6 +44,7 @@ Map<String, Map<String, Object?>> datiViaggio(
   List<Luogo> tappe = const [],
   bool passandoci = false,
   int? eco,
+  Linea? sullaMappa,
 }) {
   if (v == null) {
     return {
@@ -52,7 +57,8 @@ Map<String, Map<String, Object?>> datiViaggio(
       sorgentePassandoci: _collezione([]),
     };
   }
-  final strada = _linea(v.percorso.punti);
+  final mostrata = _mostrata(v.percorso, sullaMappa);
+  final strada = _linea(mostrata?.punti ?? v.percorso.punti);
   return {
     sorgentePercorso: _collezione([
       if (strada.length > 1) _elemento({'type': 'LineString', 'coordinates': strada}, const {}),
@@ -62,7 +68,7 @@ Map<String, Map<String, Object?>> datiViaggio(
       if (v.percorso.punti.lastOrNull case final fine? when _scrivibile(fine))
         _elemento({'type': 'Point', 'coordinates': _xy(fine)}, const {'arrivo': true}),
     ]),
-    sorgenteCode: _oVuota('code', () => datiCode(v.percorso)),
+    sorgenteCode: _oVuota('code', () => datiCode(v.percorso, sullaMappa: mostrata)),
     sorgenteAlternative: _oVuota('alternative', () => datiAlternative(scelte, scelta, eco: eco)),
     sorgenteTappe: _oVuota(
       'tappe',
@@ -207,9 +213,9 @@ Map<String, Object?> datiZtl(Iterable<ZonaLimitata> zone, DateTime ora) => _coll
 
 /// Le code sul percorso, per colorarlo: gialle i rallentamenti, arancioni
 /// le code, rosse le code ferme, bordeaux le strade chiuse.
-Map<String, Object?> datiCode(PercorsoCalcolato p) {
+Map<String, Object?> datiCode(PercorsoCalcolato p, {Linea? sullaMappa}) {
   if (p.code.isEmpty || p.punti.length < 2) return _collezione([]);
-  final linea = Linea(p.punti);
+  final linea = _mostrata(p, sullaMappa) ?? Linea(p.punti);
   return _collezione([
     for (final c in p.code)
       if (_linea(_tratto(linea, c.daM, c.aM)) case final pezzo when pezzo.length > 1)
@@ -309,22 +315,24 @@ const _senzaFreccia = {0, 1, 2, 3, 4, 5, 6, 7, 8};
 /// Adesso la larghezza è quella della linea (vedi lo stile), la punta è
 /// un'icona in pixel posata sulla fine del tratto (un punto con la sua
 /// [rotta]), e il tratto si ferma dieci metri prima della manovra dopo.
-Map<String, Object?> datiManovra(Viaggio? v, Manovra? m, {double primaM = 60, double dopoM = 45}) {
+Map<String, Object?> datiManovra(Viaggio? v, Manovra? m, {double primaM = 60, double dopoM = 45, Linea? sullaMappa}) {
   if (v == null || m == null || _senzaFreccia.contains(m.tipo) || v.percorso.punti.length < 2) {
     return _collezione([]);
   }
   final l = Linea(v.percorso.punti);
   final centro = l.cumulate[m.inizio.clamp(0, l.punti.length - 1)];
   final fine = _fineFreccia(v, m, l, centro, dopoM);
+  // I metri dal percorso, i punti dalla linea che si disegna.
+  final g = _mostrata(v.percorso, sullaMappa) ?? l;
   final tratto = [
-    _aMetri(l, math.max(0, centro - primaM)),
-    for (var i = 0; i < l.punti.length; i++)
-      if (l.cumulate[i] > centro - primaM && l.cumulate[i] < fine) l.punti[i],
-    _aMetri(l, fine),
+    _aMetri(g, math.max(0, centro - primaM)),
+    for (var i = 0; i < g.punti.length; i++)
+      if (g.cumulate[i] > centro - primaM && g.cumulate[i] < fine) g.punti[i],
+    _aMetri(g, fine),
   ];
   if (tratto.length < 2 || fine - centro < 5) return _collezione([]);
   // La punta guarda come l'ultimo pezzo del tratto.
-  final rotta = rottaGradi(_aMetri(l, fine - 4), tratto.last);
+  final rotta = rottaGradi(_aMetri(g, fine - 4), tratto.last);
   /* La freccia sta sulla linea blu del percorso, in tutte le viste.
    *
    * «La linea bianca non combacia con quella blu, e sul continuo del
@@ -374,16 +382,30 @@ double _fineFreccia(Viaggio v, Manovra m, Linea l, double centro, double dopoM) 
 /// carreggiata: la corsia `i` di `n` sta a `(i - (n-1)/2)` corsie dal centro
 /// (a destra il segno è più, come per `line-offset`). Solo quando servono
 /// ([Manovra.corsieUtili]): se vanno bene tutte non c'è niente da dire.
-Map<String, Object?> datiCorsie(Viaggio? v, Manovra? m, {double primaM = 160}) {
+///
+/// [classe]: la strada su cui si sta («motorway», «primary»…), dalle strade
+/// della mappa ([GestoreGuida.classeSullaMappa]): le corsie che non sono
+/// quella giusta hanno il suo colore, e sulla strada si vedono le righe e la
+/// corsia giusta, non una lastra più chiara appoggiata sopra.
+Map<String, Object?> datiCorsie(
+  Viaggio? v,
+  Manovra? m, {
+  double primaM = 160,
+  Linea? sullaMappa,
+  String Function(double metri)? classe,
+}) {
   if (v == null || m == null || !m.corsieUtili || v.percorso.punti.length < 2) return _collezione([]);
   final l = Linea(v.percorso.punti);
   final centro = l.cumulate[m.inizio.clamp(0, l.punti.length - 1)];
   final da = math.max(0.0, centro - primaM);
+  // Le corsie sulla strada della mappa, non accanto: attorno alla linea che
+  // si disegna («la lastra è sbagliata»: stavano di lato, fuori strada).
+  final g = _mostrata(v.percorso, sullaMappa) ?? l;
   final tratto = [
-    _aMetri(l, da),
-    for (var i = 0; i < l.punti.length; i++)
-      if (l.cumulate[i] > da && l.cumulate[i] < centro) l.punti[i],
-    _aMetri(l, centro),
+    _aMetri(g, da),
+    for (var i = 0; i < g.punti.length; i++)
+      if (g.cumulate[i] > da && g.cumulate[i] < centro) g.punti[i],
+    _aMetri(g, centro),
   ];
   if (tratto.length < 2 || centro - da < 20) return _collezione([]);
   final linea = {
@@ -391,16 +413,26 @@ Map<String, Object?> datiCorsie(Viaggio? v, Manovra? m, {double primaM = 160}) {
     'coordinates': [for (final p in tratto) _xy(p)],
   };
   final n = m.corsie.length;
+  final classeCorsie = classe?.call(math.max(da, centro - 40)) ?? '';
   return _collezione([
     for (var i = 0; i < n; i++)
       _elemento(linea, {
         'tipo': 'corsia',
         'giusta': m.corsie[i].giusta,
+        'classe': classeCorsie,
         'spostamento': (i - (n - 1) / 2) * larghezzaCorsia,
       }),
     for (var i = 0; i <= n; i++)
       _elemento(linea, {'tipo': i == 0 || i == n ? 'bordo' : 'riga', 'spostamento': (i - n / 2) * larghezzaCorsia}),
   ]);
+}
+
+/// La linea [sullaMappa] se è di questo percorso (coi suoi metri: la stessa
+/// lunghezza), se no `null`.
+Linea? _mostrata(PercorsoCalcolato p, Linea? sullaMappa) {
+  if (sullaMappa == null || sullaMappa.punti.length < 2 || p.punti.length < 2) return null;
+  final l = Linea(p.punti).lunghezzaM;
+  return (sullaMappa.lunghezzaM - l).abs() < 0.5 ? sullaMappa : null;
 }
 
 /// Quanto prima della manovra dopo si ferma il tratto della freccia.

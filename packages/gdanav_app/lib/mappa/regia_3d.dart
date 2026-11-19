@@ -433,7 +433,8 @@ class Regia3d {
         rotta: stimata?.rotta ?? a?.rotta ?? posizione.rotta,
         rottaIncerta: stimata == null && a == null && !posizione.rottaConosciuta,
         metri: metri,
-        velocitaMs: (g.velocitaMs ?? posizione.velocitaAdesso() / 3.6),
+        // Fuori guida quella del GPS: la guida ha quella di quando guidava.
+        velocitaMs: ((g.attiva ? g.velocitaMs : null) ?? posizione.velocitaAdesso() / 3.6),
         zoom:
             zoom3d(
               vista(),

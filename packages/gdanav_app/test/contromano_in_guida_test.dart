@@ -151,6 +151,36 @@ void main() {
     expect(diarioSensi.voci.first, contains('contromano evitato'));
   });
 
+  testWidgets('la linea da disegnare sta sulle strade della mappa; la guida resta sul percorso', (tester) async {
+    // «Linee fuori strada»: il fornitore corre sei metri a nord della strada.
+    final (a, g, _) = await prepara(tester, (_) async => _strade);
+    var cambiata = 0;
+    g.versioneSullaMappa.addListener(() => cambiata++);
+    g.avvia();
+    await guida(tester, a, _sulRamoGiusto.take(3));
+    final percorso = (a.viaggio.stato as ViaggioPronto).viaggio.percorso;
+    final linea = g.sullaMappaDi(percorso);
+    expect(linea, isNotNull);
+    expect(cambiata, greaterThan(0));
+    double passaA(List<Punto> punti, Punto q) {
+      var d = double.infinity;
+      for (var i = 1; i < punti.length; i++) {
+        d = math.min(d, Linea([punti[i - 1], punti[i]]).proietta(q).lontanoM);
+      }
+      return d;
+    }
+
+    // Sulla strada verso est, lontano dalle svolte: sopra la strada, non sei metri più su.
+    for (final x in [-500.0, -400.0, -300.0]) {
+      expect(passaA(linea!.punti, _a(x, 0)), lessThan(0.6), reason: 'a x = $x');
+      expect(passaA(percorso.punti, _a(x, 0)), greaterThan(5), reason: 'la guida resta sul percorso del fornitore');
+    }
+    // La freccia dell'auto: sulla linea disegnata, agli stessi metri.
+    final m = g.avanzamento!.percorsiM;
+    expect(distanzaM(g.sullaMappaA(m)!, sullaStrada(Linea(percorso.punti), m).punto), closeTo(6, 0.7));
+    expect(identical(g.stradaSullaMappa, linea), isTrue);
+  });
+
   testWidgets('se le strade non sono arrivate in tempo e si prende il ramo giusto, niente ricalcolo', (tester) async {
     var chiamate = 0;
     final (a, g, voce) = await prepara(tester, (_) async => chiamate++ == 0 ? const <TrattoStrada>[] : _strade);

@@ -440,6 +440,11 @@ class GestoreGuida extends ChangeNotifier {
     _svegliaStima?.cancel();
     _svegliaStima = null;
     _stima.dimentica();
+    // La velocità della guida è di quando si guidava: finita, non vale più
+    // («senza navigazione di nuovo fermo, non cammina»: restava lo zero
+    // dell'arrivo, e la mappa 3D lo prendeva per la velocità di adesso).
+    _velocitaMs = null;
+    _velocitaGps = null;
     if (zittisci) await voce.zitta();
     _racconta(inViaggio: false);
     notifyListeners();
@@ -609,6 +614,60 @@ class GestoreGuida extends ChangeNotifier {
   /// La linea del percorso che si sta seguendo, su cui la freccia scorre
   /// ([MotoSullaStrada]): agli svincoli e nelle rotonde non esce di strada.
   Linea? get strada => _guida?.linea;
+
+  /* ─── La linea sulle strade della mappa ───────────────────────────────────
+   *
+   * «Linee fuori strada.» La mappa di sempre e la vista immersiva disegnano
+   * le strade di OpenStreetMap, e il percorso di TomTom ci sta di lato di
+   * cinque, dieci metri. Con le strade vere che si leggono già per i sensi
+   * unici ([strade]) la linea da DISEGNARE si appoggia su quelle
+   * ([SullaMappa]), un pezzo alla volta davanti all'auto; la guida resta sul
+   * percorso. La scena 3D lo fa da sé, e usa [strada]. */
+
+  SullaMappa? _sullaMappa;
+
+  /// Quante volte è cambiata la linea sulla mappa: per chi la disegna.
+  final versioneSullaMappa = ValueNotifier(0);
+
+  /// La linea del percorso [p] sulle strade della mappa, coi metri del
+  /// percorso; `null` se non è di [p] o non è spostata.
+  Linea? sullaMappaDi(PercorsoCalcolato? p) {
+    final s = _sullaMappa;
+    if (p == null || s == null || !identical(s.percorso, p.punti) || !s.spostata) return null;
+    return s.linea;
+  }
+
+  /// La classe della strada della mappa sotto il percorso [p] a [metri]
+  /// («motorway», «primary»…), se si sa: le corsie ne prendono il colore.
+  String? classeSullaMappa(PercorsoCalcolato? p, double metri) {
+    final s = _sullaMappa;
+    if (p == null || s == null || !identical(s.percorso, p.punti)) return null;
+    return s.classeA(metri);
+  }
+
+  /// La linea su cui la freccia scorre nella mappa di sempre: [strada], ma
+  /// sulle strade della mappa se si sa.
+  Linea? get stradaSullaMappa => sullaMappaDi(pronto?.viaggio.percorso) ?? strada;
+
+  /// Il punto della mappa di sempre a [metri] lungo il percorso.
+  Punto? sullaMappaA(double metri) {
+    final l = stradaSullaMappa;
+    return l == null ? null : sullaStrada(l, metri).punto;
+  }
+
+  /// La linea del percorso [p] appoggiata sulle [rete] fra [daM] e [aM].
+  void _allinea(PercorsoCalcolato p, List<TrattoStrada> rete, double daM, double aM) {
+    try {
+      final prima = _sullaMappa;
+      final base = prima != null && identical(prima.percorso, p.punti) ? prima : SullaMappa(p.punti);
+      final nuova = base.allineata(rete, daM: daM, aM: aM);
+      if (identical(nuova, prima)) return;
+      _sullaMappa = nuova;
+      if (nuova.spostata || (prima?.spostata ?? false)) versioneSullaMappa.value++;
+    } catch (e) {
+      debugPrint('linea sulla mappa: $e');
+    }
+  }
 
   /* ─── In galleria, senza GPS ──────────────────────────────────────────────
    *
@@ -914,7 +973,9 @@ class GestoreGuida extends ChangeNotifier {
         diario: diarioSensi.scrivi,
       );
       String km(double m) => (m / 1000).toStringAsFixed(1).replaceAll('.', ',');
+      // La linea da disegnare, sulle strade appena lette (anche dove l'auto è).
       if (corretto == null) {
+        _allinea(percorso, rete, math.max(0, daM - 150), aM);
         diarioSensi.scrivi('guardato da ${km(daM)} a ${km(aM)} km (${rete.length} strade): niente da correggere');
         return false;
       }
@@ -931,6 +992,19 @@ class GestoreGuida extends ChangeNotifier {
         diarioSensi.scrivi('contromano evitato a ${km(d.daM)} km: rifatto sul ramo giusto (${d.lunghezzaM.round()} m)');
       }
       notifyListeners();
+      // Il percorso è nuovo: la sua linea sulla mappa da dove è l'auto, con le
+      // strade anche di lì (le tessere sono già lette).
+      final qui = avanzamento?.percorsiM ?? daM;
+      final daQui = math.max(0.0, math.min(qui, daM) - 150);
+      final altre = daQui < daM - 250
+          ? await s([
+              for (var i = 0; i < punti.length; i++)
+                if (c[i] >= daQui - 100 && c[i] <= daM) punti[i],
+            ])
+          : const <TrattoStrada>[];
+      if (identical(pronto?.viaggio.percorso, corretto.percorso)) {
+        _allinea(corretto.percorso, [...altre, ...rete], daQui, corretto.metriNuovi(aM));
+      }
       return true;
     } catch (e) {
       debugPrint('sensi unici: $e');
@@ -1526,6 +1600,7 @@ class GestoreGuida extends ChangeNotifier {
   void dispose() {
     _iscrizione?.cancel();
     _svegliaStima?.cancel();
+    versioneSullaMappa.dispose();
     super.dispose();
   }
 }

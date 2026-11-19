@@ -1379,13 +1379,27 @@ Map<String, Object> stileMappa({
           'paint': {
             // Piene: sotto ci sono la linea del percorso e il grigio della
             // strada, e una corsia trasparente li lascerebbe vedere.
+            // Le altre del colore della strada su cui stanno («la lastra è
+            // sbagliata»: grigio chiaro sopra l'autostrada più scura, sembrava
+            // un blocco appoggiato sopra la strada).
             'line-color': [
               'case',
               ['get', 'giusta'],
               t.percorso,
-              t.strada,
+              [
+                'match',
+                ['get', 'classe'],
+                ['motorway', 'trunk'],
+                t.autostrada,
+                ['primary', 'secondary'],
+                t.principale,
+                t.strada,
+              ],
             ],
-            'line-width': _metri(larghezzaCorsia * 0.94),
+            // Larghe una corsia intera: fra una e l'altra non si vede la
+            // linea del percorso sotto (prima un filo, a tratti, del colore
+            // del traffico).
+            'line-width': _metri(larghezzaCorsia),
             'line-offset': _metriDa('spostamento'),
           },
         },

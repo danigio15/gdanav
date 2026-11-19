@@ -244,11 +244,17 @@ void main() {
     final a = await inViaggio(tester);
     await tester.tap(find.text('Avvia'));
     await tester.pumpAndSettle();
+    // Fermi a una lettura: la guida sa la sua velocità, zero.
+    await vai(tester, a, PuntoInMoto(45, 9, velocitaMs: 0, alle: DateTime.now()));
+    expect(a.guida.velocitaMs, 0);
     await tester.tap(find.text('Fine'));
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
     await tester.pumpAndSettle();
     expect(a.guida.attiva, isFalse);
     expect(find.text('Dove andiamo?'), findsOneWidget);
+    // Finita, quella velocità non vale più: senza navigazione la mappa 3D
+    // non deve credere che l'auto sia ancora ferma.
+    expect(a.guida.velocitaMs, isNull);
   });
 
   testWidgets('la voce si silenzia', (tester) async {

@@ -165,6 +165,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     widget.controllo.addListener(_comandi);
     widget.posizione.addListener(_dallaPosizione);
     widget.guida?.addListener(_io);
+    widget.guida?.versioneSullaMappa.addListener(_sullaMappa);
     widget.segnalazioni?.addListener(_segnalazioni);
     widget.guida?.avvisi.addListener(_segnalazioni);
     widget.vicini?.addListener(_vicini);
@@ -191,6 +192,7 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     widget.controllo.removeListener(_comandi);
     widget.posizione.removeListener(_dallaPosizione);
     widget.guida?.removeListener(_io);
+    widget.guida?.versioneSullaMappa.removeListener(_sullaMappa);
     widget.segnalazioni?.removeListener(_segnalazioni);
     widget.guida?.avvisi.removeListener(_segnalazioni);
     widget.vicini?.removeListener(_vicini);
@@ -572,7 +574,9 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
       _fotogrammi?.stop();
       return;
     }
-    final strada = g.strada, stimata = g.metriStimati();
+    // La linea su cui disegnarla: quella sulle strade della mappa, coi metri
+    // del percorso (vedi [GestoreGuida.stradaSullaMappa]).
+    final strada = g.stradaSullaMappa, stimata = g.metriStimati();
     if (strada == null || stimata == null) return;
     final a = g.avanzamento;
     // La guida porta già avanti l'auto lungo la strada: qui la si insegue,
@@ -909,12 +913,15 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
     if (chiave == _frecciaDisegnata) return;
     // Segnata prima, perché chi arriva nel frattempo non la riscriva.
     _frecciaDisegnata = chiave;
-    final dati = chiave == null ? datiManovra(null, null) : datiManovra(v, a?.prossima);
+    final sulla = g?.sullaMappaDi(v?.percorso);
+    final dati = chiave == null ? datiManovra(null, null) : datiManovra(v, a?.prossima, sullaMappa: sulla);
     try {
       await m.setGeoJsonSource(sorgenteManovra, dati.cast<String, dynamic>());
       // Le corsie sulla strada: solo la vista immersiva le ha nello stile.
       if (_immersiva) {
-        final corsie = chiave == null ? datiCorsie(null, null) : datiCorsie(v, a?.prossima);
+        final corsie = chiave == null
+            ? datiCorsie(null, null)
+            : datiCorsie(v, a?.prossima, sullaMappa: sulla, classe: (m) => g?.classeSullaMappa(v?.percorso, m) ?? '');
         await m.setGeoJsonSource(sorgenteCorsie, corsie.cast<String, dynamic>());
       }
     } catch (_) {
@@ -1163,9 +1170,21 @@ class _MappaViaggioState extends State<MappaViaggio> with SingleTickerProviderSt
             // Quella che risparmia energia, verde come nelle schede.
             eco: stradaCheRisparmia(stato.scelte, _gestoreRisparmio),
           )
-        : datiViaggio(viaggio, tappe: stato is ViaggioPronto ? stato.tappe : const []);
+        : datiViaggio(
+            viaggio,
+            tappe: stato is ViaggioPronto ? stato.tappe : const [],
+            sullaMappa: widget.guida?.sullaMappaDi(viaggio?.percorso),
+          );
     _datiFatti = (stato, dati);
     return dati;
+  }
+
+  /// La linea del percorso sulle strade della mappa è cambiata: si riscrive
+  /// (senza toccare la telecamera), e la freccia della manovra con lei.
+  void _sullaMappa() {
+    _datiFatti = null;
+    _frecciaDisegnata = _frecciaIgnota;
+    unawaited(_ridisegna(ancora: true));
   }
 
   Future<void> _tocco(Point<double> punto) async {
