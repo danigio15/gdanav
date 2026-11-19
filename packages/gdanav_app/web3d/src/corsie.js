@@ -760,6 +760,13 @@ function sulTratto(v, k, x, y) {
   return { d: Math.hypot(x - qx, y - qy), qx, qy, tx: dx / l, ty: dy / l, s };
 }
 
+/** Da quanti gradi in su, passando da una via all'altra, la fascia ha uno spigolo (vedi `fasciaSullaCorsia`). */
+const SPIGOLO_GRADI = 20;
+/** E al più quanti metri senza via fra le due (dentro l'incrocio). */
+const SPIGOLO_VUOTO_M = 40;
+/** Il percorso va di traverso alla via sotto se il coseno fra i due versi è sotto questo (una decina di gradi). */
+const TRAVERSO_COS = Math.cos(Math.PI / 18);
+
 /**
  * Su quale corsia sta il percorso, punto per punto: di quanto spostarlo di
  * lato (a sinistra positivo, rispetto al suo verso).
@@ -773,10 +780,20 @@ function sulTratto(v, k, x, y) {
  * (`turn:lanes`), o dai suggerimenti di chi calcola il percorso
  * ([suggerimenti]: `{s, giuste: [bool, …]}` da sinistra, come le corsie di
  * TomTom), altrimenti la più a destra (o la più a sinistra per girare a
- * sinistra). Il cambio di corsia si fa piano, in una trentina di metri.
+ * sinistra). Il cambio di corsia si fa piano, in una trentina di metri, ma
+ * non attraverso uno spigolo: dove si passa da una via a un'altra girando
+ * (o si torna indietro sulla stessa) lo spostamento di lato prima e dopo è
+ * quello della sua corsia, ognuno per conto suo (lì «di lato» cambia
+ * verso). Lo spigolo della fascia lo mette `fasciaSullaCorsia` (percorso.js)
+ * dove le due corsie si incontrano.
  *
- * Restituisce `{sposta, vie, corsie, manovre}`: lo spostamento di ogni punto,
- * la via e la corsia sotto (-1 dove non si sa), le manovre trovate.
+ * Restituisce `{sposta, vie, corsie, manovre, spigoli, centri, versi}`:
+ * lo spostamento di ogni punto, la via e la corsia sotto (-1 dove non si
+ * sa), le manovre trovate, le svolte (`{k, kb, pA, tA, pB, tB, gradi}`:
+ * l'ultimo punto prima dello spigolo e il primo noto dopo, il mezzo della
+ * corsia in quei punti e la sua direzione, e di quanto si gira), il mezzo
+ * della corsia sotto ogni punto (`[x, y]`, `null` dove non si sa) e la sua
+ * direzione.
  */
 export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzonte = 300, orizzonteGrande = 1200, suggerimenti = [], morbidezza = 32 } = {}) {
   const n = punti.length;
@@ -819,7 +836,7 @@ export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzo
   for (let k = 0; k < n; ) {
     let j = k;
     while (j < n && via[j] === via[k]) j++;
-    if (via[k] >= 0 && j - k < 3 && k > 0 && j < n) via.fill(-1, k, j);
+    if (via[k] >= 0 && (j - k) * passo < 12 && k > 0 && j < n) via.fill(-1, k, j);
     k = j;
   }
   // 2. Le manovre: dove si cambia via, con altri rami da cui uscire. E per
@@ -832,7 +849,7 @@ export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzo
   for (let k = 0; k < n; k++) {
     if (via[k] < 0) continue;
     if (ultimo >= 0 && via[k] !== via[ultimo]) {
-      const m = manovraFra(punti, dir, indice, via[ultimo], via[k], ultimo, k, avanti[ultimo]);
+      const m = manovraFra(punti, dir, indice, via[ultimo], via[k], ultimo, k, avanti[ultimo], passo);
       if (m) manovre.push({ ...m, s: s0 + m.k * passo });
       else {
         const b = strade[via[k]];
@@ -845,6 +862,19 @@ export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzo
   // 3. La corsia, punto per punto, per la prossima manovra.
   const corsie = new Int32Array(n).fill(-1);
   const sposta = new Float64Array(n).fill(NaN);
+  // Il mezzo della corsia, e la sua direzione, dove si sa; e quanto ci
+  // mette il raccordo della via (che è già morbido: non si leviga).
+  const centro = new Array(n).fill(null);
+  const versoCorsia = new Array(n).fill(null);
+  const raccordo = new Float64Array(n);
+  const diRaccordo = new Float64Array(n).fill(NaN);
+  /** Lo spostamento di lato del punto [k] fino al mezzo della corsia, per chi va verso [d]. */
+  const di = (k, d) => {
+    const nx = -d[1];
+    const ny = d[0];
+    sposta[k] = (centro[k][0] - punti[k][0]) * nx + (centro[k][1] - punti[k][1]) * ny;
+    diRaccordo[k] = raccordo[k] * (-versoCorsia[k][1] * nx + versoCorsia[k][0] * ny);
+  };
   let mi = 0;
   for (let k = 0; k < n; k++) {
     if (via[k] < 0) continue;
@@ -868,16 +898,85 @@ export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzo
     // Il mezzo della corsia (col raccordo della via, vedi [raccordi]), e
     // quanto sta di lato rispetto al percorso.
     const t = sul[k];
-    const o = centroCorsia(v, c, av) + (v.raccordo && v.sxy ? spostamentoRaccordo(v.raccordo, t.s, v.sxy.at(-1)) : 0) * (av ? 1 : -1);
+    const or = (v.raccordo && v.sxy ? spostamentoRaccordo(v.raccordo, t.s, v.sxy.at(-1)) : 0) * (av ? 1 : -1);
+    const o = centroCorsia(v, c, av) + or;
     const nx = (av ? -t.ty : t.ty) * o;
     const ny = (av ? t.tx : -t.tx) * o;
-    const cx = t.qx + nx - punti[k][0];
-    const cy = t.qy + ny - punti[k][1];
-    sposta[k] = cx * -dir[k][1] + cy * dir[k][0];
+    centro[k] = [t.qx + nx, t.qy + ny];
+    versoCorsia[k] = av ? [t.tx, t.ty] : [-t.tx, -t.ty];
+    raccordo[k] = or;
+    di(k, dir[k]);
   }
-  // 4. Dove non si sa (dentro gli incroci) si va dritti fra prima e dopo; poi piano.
-  riempi(sposta);
-  return { sposta: liscia(sposta, Math.max(1, Math.round(morbidezza / passo / 2))), vie: via, corsie, manovre };
+  // 4. Gli spigoli: dove si passa da una via all'altra (o si torna indietro
+  // sulla stessa) girando di almeno [SPIGOLO_GRADI].
+  const spigoli = [];
+  let kp = -1;
+  for (let k = 0; k < n; k++) {
+    if (!centro[k]) continue;
+    if (kp >= 0 && (via[k] !== via[kp] || avanti[k] !== avanti[kp]) && (k - kp) * passo <= SPIGOLO_VUOTO_M) {
+      const a = versoCorsia[kp];
+      const b = versoCorsia[k];
+      const gradi = (Math.atan2(Math.abs(a[0] * b[1] - a[1] * b[0]), a[0] * b[0] + a[1] * b[1]) * 180) / Math.PI;
+      if (gradi >= SPIGOLO_GRADI) spigoli.push({ k: kp, kb: k, pA: centro[kp], tA: a, pB: centro[k], tB: b, gradi });
+    }
+    kp = k;
+  }
+  // Accanto a uno spigolo il verso del percorso è quello del suo pezzo (non
+  // la media col pezzo di là, di traverso): lo stesso con cui la fascia
+  // sposta i punti (`fasciaSullaCorsia`); -1 l'ultimo punto prima, +1 il
+  // primo dopo. E dove il percorso va di traverso alla sua via (vicino alle
+  // svolte il calcolatore taglia l'angolo, o lo supera e torna) lo
+  // spostamento di lato non dice dov'è la corsia: lì non si sa (la
+  // levigatura lo porterebbe ai punti accanto); la fascia lì segue i mezzi
+  // delle corsie ([centri]).
+  const bordo = new Map();
+  for (const g of spigoli) bordo.set(g.k, -1).set(g.k + 1, 1);
+  for (let k = 0; k < n; k++) {
+    if (!centro[k]) continue;
+    let d = dir[k];
+    if (bordo.has(k)) {
+      const a = punti[bordo.get(k) < 0 ? Math.max(0, k - 1) : k];
+      const b = punti[bordo.get(k) < 0 ? k : Math.min(n - 1, k + 1)];
+      const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      d = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+      di(k, d);
+    }
+    if (Math.abs(d[0] * versoCorsia[k][0] + d[1] * versoCorsia[k][1]) < TRAVERSO_COS) {
+      sposta[k] = NaN;
+      diRaccordo[k] = NaN;
+    }
+  }
+  // 5. Dove non si sa (dentro gli incroci) si va dritti fra prima e dopo; poi
+  // piano (i cambi di corsia; il raccordo lungo una via no, è già morbido). Pezzo
+  // per pezzo, fra uno spigolo e l'altro: allo spigolo il pezzo continua col
+  // suo ultimo valore (non con la media dei soli punti di qua), la corsia
+  // arriva fin lì intera.
+  const r = Math.max(1, Math.round(morbidezza / passo / 2));
+  const liscio = new Float64Array(n);
+  let lo = 0;
+  for (const hi of [...spigoli.map((g) => g.k), n - 1]) {
+    // Il raccordo, lungo una via sola: dove si passa da una via all'altra
+    // (o dove non si sa) quello che cambia resta nella parte che si leviga,
+    // che non salti (il raccordo di un ramo comincia dove finisce la corsia
+    // dell'altra via, non da zero).
+    const racc = new Float64Array(hi + 1 - lo);
+    for (let j = 1; j < racc.length; j++) {
+      const k = lo + j;
+      const stessa = via[k] >= 0 && via[k] === via[k - 1] && !Number.isNaN(diRaccordo[k]) && !Number.isNaN(diRaccordo[k - 1]);
+      racc[j] = racc[j - 1] + (stessa ? diRaccordo[k] - diRaccordo[k - 1] : 0);
+    }
+    const pezzo = riempi(sposta.slice(lo, hi + 1).map((v, j) => v - racc[j]));
+    const prima = lo > 0 ? 2 * r : 0;
+    const dopo = hi < n - 1 ? 2 * r : 0;
+    const lungo = new Float64Array(prima + pezzo.length + dopo);
+    lungo.fill(pezzo[0], 0, prima);
+    lungo.set(pezzo, prima);
+    lungo.fill(pezzo[pezzo.length - 1], prima + pezzo.length);
+    const l = liscia(lungo, r);
+    for (let j = 0; j < pezzo.length; j++) liscio[lo + j] = l[prima + j] + racc[j];
+    lo = hi + 1;
+  }
+  return { sposta: liscio, vie: via, corsie, manovre, spigoli, centri: centro, versi: versoCorsia };
 }
 
 /** Le direzioni dei rami da cui si esce dal nodo [q], in radianti, senza quello da cui si arriva. */
@@ -908,7 +1007,7 @@ function ramiDa(indice, q, arrivo) {
 }
 
 /** La manovra fra la via [ia] (fino al punto [ka]) e la via [ib] (dal punto [kb]), se è un incrocio. */
-function manovraFra(punti, dir, indice, ia, ib, ka, kb, av) {
+function manovraFra(punti, dir, indice, ia, ib, ka, kb, av, passo = 4) {
   const b = indice.strade[ib];
   // Il nodo: il punto della via [ib] più vicino a dove il percorso ci arriva.
   let q = null;
@@ -922,11 +1021,12 @@ function manovraFra(punti, dir, indice, ia, ib, ka, kb, av) {
   }
   if (!q) return null;
   // Come si arriva: la direzione del percorso una ventina di metri prima.
-  const prima = Math.max(0, ka - 5);
+  const venti = Math.round(20 / passo);
+  const prima = Math.max(0, ka - venti);
   const arrivo = Math.atan2(punti[ka][1] - punti[prima][1], punti[ka][0] - punti[prima][0]) || Math.atan2(dir[ka][1], dir[ka][0]);
   const rami = ramiDa(indice, q, arrivo);
   if (rami.length < 2) return null;
-  const dopo = Math.min(punti.length - 1, kb + 5);
+  const dopo = Math.min(punti.length - 1, kb + venti);
   const uscita = Math.atan2(punti[dopo][1] - punti[kb][1], punti[dopo][0] - punti[kb][0]);
   const gradi = (x) => (Math.atan2(Math.sin(x - arrivo), Math.cos(x - arrivo)) * 180) / Math.PI;
   // Il ramo del percorso: quello che va più come il percorso dopo il nodo.

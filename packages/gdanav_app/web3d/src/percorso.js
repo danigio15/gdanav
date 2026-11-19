@@ -452,6 +452,38 @@ export class Profilo {
     const t = f - i;
     return [this.dx[i] + (this.dx[i + 1] - this.dx[i]) * t, this.dy[i] + (this.dy[i + 1] - this.dy[i]) * t];
   }
+  /**
+   * Lo stesso profilo con un campione ogni [passo] metri (meno del suo): le
+   * quote e gli spostamenti in mezzo in linea retta, il resto dal campione
+   * più vicino. Per la fascia della vista «Corsie», che alle svolte fa curve
+   * di pochi metri.
+   */
+  piuFitto(passo) {
+    if (!(passo < this.passo) || this.h.length < 2) return this;
+    const n = Math.round(((this.h.length - 1) * this.passo) / passo) + 1;
+    const ultimo = this.h.length - 1;
+    const fra = (a, f) => {
+      const i = Math.min(ultimo - 1, Math.floor(f));
+      return a[i] + (a[i + 1] - a[i]) * (f - i);
+    };
+    const vicino = (a, f) => a[Math.min(ultimo, Math.round(f))];
+    const h = new Float64Array(n);
+    const dx = this.dx ? new Float64Array(n) : null;
+    const dy = this.dy ? new Float64Array(n) : null;
+    const galleria = this.galleria ? new Uint8Array(n) : null;
+    const trovata = this.trovata ? new Uint8Array(n) : null;
+    for (let k = 0; k < n; k++) {
+      const f = Math.min(ultimo, (k * passo) / this.passo);
+      h[k] = fra(this.h, f);
+      if (dx) dx[k] = fra(this.dx, f);
+      if (dy) dy[k] = fra(this.dy, f);
+      if (galleria) galleria[k] = vicino(this.galleria, f);
+      if (trovata) trovata[k] = vicino(this.trovata, f);
+    }
+    const p = new Profilo(this.s0, passo, h, galleria, dx, dy);
+    if (trovata) p.trovata = trovata;
+    return p;
+  }
   /** I tratti in galleria, in metri: `[da, a]`. */
   get gallerie() {
     const out = [];
@@ -549,56 +581,213 @@ export function fermiSuStrada(dx, dy, s0, passo, suStrada) {
   }
 }
 
-/** Da quanti gradi in su, fra otto metri prima e otto dopo, la fascia arrotonda la svolta. */
-const SMUSSO_GRADI = 18;
-/** E quanto prima (e dopo) dello spigolo comincia la curva, al più (m). */
-const SMUSSO_M = 24;
+/** Il raggio della curva della fascia della vista «Corsie» alle svolte (m): una corsia. */
+const SVOLTA_RAGGIO_M = 3;
+/**
+ * Fin dove, prima e dopo lo spigolo delle due corsie, la curva comincia e
+ * finisce (m): nelle svolte strette (un tornante) la curva si stringe, che
+ * resti sull'asfalto; in quelle larghe (un bivio) è almeno [SVOLTA_TANGENTE_MIN_M],
+ * che non sia uno scalino.
+ */
+const SVOLTA_TANGENTE_M = 4;
+const SVOLTA_TANGENTE_MIN_M = 2.5;
+/** Attorno alla curva, quanti metri della fascia si rimettono in fila sulle due corsie. */
+const SVOLTA_ZONA_M = 10;
+/** Le corsie attorno allo spigolo vanno «dritte» finché il coseno con la loro direzione lì sta sopra questo (una ventina di gradi). */
+const SVOLTA_DRITTO_COS = Math.cos(Math.PI / 9);
+/** Lo spigolo delle due corsie sta al più così lontano dai loro punti noti (m), o non è quello. */
+const SVOLTA_LONTANO_M = 20;
 
 /**
- * Le svolte della fascia della vista «Corsie», arrotondate.
+ * La fascia della vista «Corsie»: il percorso [punti] (`[x, y]` sulla
+ * strada, uno ogni [passo] metri) spostato di lato fino al mezzo della
+ * corsia, e alle svolte la curva vera da una corsia all'altra. [corsie]: il
+ * risultato di `corsieLungoIlPercorso` (corsie.js) sugli stessi punti, di
+ * cui servono `sposta` (lo spostamento di lato), `spigoli` (le svolte),
+ * `centri` e `versi` (il mezzo della corsia sotto ogni punto, dove si sa, e
+ * la sua direzione). Restituisce i punti `[x, y]` della fascia, uno per
+ * punto del percorso.
  *
- * «Non gira bene nella corsia, va più avanti»: il percorso gira dove si
- * incontrano le linee di mezzo delle due strade, e la fascia, spostata
- * sulla corsia di destra prima e nel mezzo del ramo dopo, tirava dritto
- * oltre il punto in cui il ramo si stacca e poi girava ad angolo. Qui ogni
- * spigolo diventa una curva (una Bézier con lo spigolo per controllo) che
- * comincia fino a [SMUSSO_M] metri prima: la fascia entra nel ramo da dove
- * il ramo comincia, come la strada vera.
- *
- * [punti] `[x, y]` già spostati sulla strada e sulla corsia, uno ogni
- * [passo] metri; si cambiano al loro posto.
+ * «Ancora non va»: il percorso gira dove si incontrano le linee di mezzo
+ * delle due vie, e la fascia, sulla corsia di destra prima e nel mezzo del
+ * ramo dopo, prima tirava dritto oltre il punto in cui il ramo si stacca;
+ * arrotondata in una ventina di metri, poi, tagliava l'angolo, fuori
+ * dall'asfalto, sul marciapiede fra la via e il ramo. Qui, a ogni svolta,
+ * lo spostamento di lato vale prima quello della corsia di prima e dopo
+ * quello della corsia di dopo, ognuno con le normali del suo pezzo (a uno
+ * spigolo «di lato» cambia verso); lo spigolo della fascia sta dove si
+ * incontrano le due linee spostate (la stessa matematica di [alleSvolte]),
+ * cioè dove la corsia incontra quella del ramo; e lì una curva piccola, del
+ * raggio di una corsia. Dove le due linee non si incontrano (un'inversione:
+ * vanno di qua e di là, parallele) la curva è un mezzo giro fra le due
+ * corsie, dove il percorso torna indietro. Attorno, per [SVOLTA_ZONA_M]
+ * metri, i punti della fascia si mettono in fila sulle due corsie e sulla
+ * curva, a passo uguale: sulle due corsie i loro mezzi veri (`centri`),
+ * non il percorso spostato di lato, che lì spesso gira già per conto suo
+ * (il percorso del calcolatore taglia l'angolo, o lo supera di qualche
+ * metro).
  */
-export function smussaLeSvolte(punti, passo = 4) {
+export function fasciaSullaCorsia(punti, { sposta, spigoli = [], centri = null, versi = null }, passo = 4) {
   const n = punti.length;
-  const w = Math.max(1, Math.round(8 / passo));
-  if (n < 2 * w + 3) return punti;
-  const verso = (a, b) => Math.atan2(b[1] - a[1], b[0] - a[0]);
-  const giro = new Float64Array(n);
-  for (let k = w; k < n - w; k++) {
-    let d = verso(punti[k], punti[k + w]) - verso(punti[k - w], punti[k]);
-    d = Math.atan2(Math.sin(d), Math.cos(d));
-    giro[k] = Math.abs(d) * (180 / Math.PI);
-  }
-  const m0 = Math.max(1, Math.round(SMUSSO_M / passo));
-  let libero = 0;
-  for (let k = w; k < n - w; k++) {
-    if (giro[k] < SMUSSO_GRADI || giro[k] < giro[k - 1] || giro[k] < giro[k + 1]) continue;
-    const m = Math.min(m0, k - libero, n - 1 - k);
-    if (m < 1) continue;
-    const p0 = punti[k - m];
-    const p1 = [...punti[k]];
-    const p2 = punti[k + m];
-    for (let j = -m + 1; j < m; j++) {
-      const t = (j + m) / (2 * m);
-      const a = (1 - t) * (1 - t);
-      const b = 2 * t * (1 - t);
-      const c = t * t;
-      punti[k + j] = [a * p0[0] + b * p1[0] + c * p2[0], a * p0[1] + b * p1[1] + c * p2[1]];
+  const out = new Array(n);
+  // Lo spostamento di lato, con le normali di ogni pezzo fra due spigoli.
+  const tagli = [...spigoli.map((g) => g.k), n - 1];
+  let lo = 0;
+  for (const hi of tagli) {
+    for (let k = lo; k <= hi; k++) {
+      const a = punti[Math.max(lo, k - 1)];
+      const b = punti[Math.min(hi, k + 1)];
+      const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const o = sposta[k] || 0;
+      out[k] = [punti[k][0] - ((b[1] - a[1]) / l) * o, punti[k][1] + ((b[0] - a[0]) / l) * o];
     }
-    libero = k + m;
-    k = k + m;
+    lo = hi + 1;
   }
-  return punti;
+  // Le svolte.
+  const dot = (p, q, t) => (p[0] - q[0]) * t[0] + (p[1] - q[1]) * t[1];
+  let libero = 0;
+  spigoli.forEach((g, j) => {
+    const c = curvaDellaSvolta(g, punti, passo, centri, versi);
+    if (!c) return;
+    const limite = j + 1 < spigoli.length ? spigoli[j + 1].k : n - 1;
+    if (g.k < libero || g.k + 1 > limite) return;
+    // Da dove a dove i punti si rimettono in fila: fin dove le due corsie
+    // vanno dritte (non dentro una rotonda, che gira).
+    const dritto = (m, t) => {
+      const v = versi?.[m];
+      return !v || v[0] * t[0] + v[1] * t[1] >= SVOLTA_DRITTO_COS;
+    };
+    let i0 = g.k;
+    while (i0 > libero && dot(out[i0], c.curva[0], c.tA) > -SVOLTA_ZONA_M && dritto(i0 - 1, c.tA)) i0--;
+    let i1 = g.k + 1;
+    while (i1 < limite && dot(out[i1], c.curva.at(-1), c.tB) < SVOLTA_ZONA_M && dritto(i1 + 1, c.tB)) i1++;
+    // La strada: dal punto i0 lungo la corsia di prima (i suoi punti fino
+    // all'inizio della curva), la curva, la corsia di dopo (i suoi punti
+    // dalla fine della curva) fino a i1. Senza i pezzi di curva che
+    // tornerebbero indietro (due svolte vicine).
+    const p0 = c.curva[0];
+    const p1 = c.curva.at(-1);
+    const curva = c.curva.filter((q) => dot(q, out[i0], c.tA) > 0 && dot(out[i1], q, c.tB) > 0);
+    const qui = (m) => centri?.[m] ?? out[m];
+    const via = [out[i0]];
+    for (let m = i0 + 1; m <= g.k; m++) if (dot(qui(m), p0, c.tA) < 0 && dot(qui(m), via.at(-1), c.tA) > 0) via.push(qui(m));
+    via.push(...curva);
+    for (let m = g.k + 1; m < i1; m++) if (dot(qui(m), p1, c.tB) > 0 && dot(out[i1], qui(m), c.tB) > 0 && dot(qui(m), via.at(-1), c.tB) > 0) via.push(qui(m));
+    via.push(out[i1]);
+    const lunghi = [0];
+    for (let q = 1; q < via.length; q++) lunghi.push(lunghi[q - 1] + Math.hypot(via[q][0] - via[q - 1][0], via[q][1] - via[q - 1][1]));
+    const L = lunghi.at(-1);
+    let q = 1;
+    for (let m = i0 + 1; m < i1; m++) {
+      const s = (L * (m - i0)) / (i1 - i0);
+      while (q < via.length - 1 && lunghi[q] < s) q++;
+      const f = (s - lunghi[q - 1]) / Math.max(1e-9, lunghi[q] - lunghi[q - 1]);
+      out[m] = [via[q - 1][0] + (via[q][0] - via[q - 1][0]) * f, via[q - 1][1] + (via[q][1] - via[q - 1][1]) * f];
+    }
+    libero = i1;
+  });
+  return out;
+}
+
+/**
+ * Dove si incontrano la corsia di prima (il suo mezzo [pA], la direzione
+ * [tA]) e quella di dopo ([pB], [tB]), contando dal punto [O]: `null` se
+ * sono quasi parallele o se lo spigolo sta più in là di
+ * [SVOLTA_LONTANO_M] dai due punti.
+ */
+function spigoloDelleCorsie(O, pA, tA, pB, tB) {
+  const l1 = (pA[0] - O[0]) * -tA[1] + (pA[1] - O[1]) * tA[0];
+  const l2 = (pB[0] - O[0]) * -tB[1] + (pB[1] - O[1]) * tB[0];
+  const v = incontroDeiLati(tA, l1, tB, l2, Math.sin(Math.PI / 36));
+  if (!v) return null;
+  const X = [O[0] + v[0], O[1] + v[1]];
+  return Math.hypot(X[0] - pA[0], X[1] - pA[1]) <= SVOLTA_LONTANO_M && Math.hypot(X[0] - pB[0], X[1] - pB[1]) <= SVOLTA_LONTANO_M ? X : null;
+}
+
+/**
+ * La curva della fascia alla svolta [g] (vedi `corsieLungoIlPercorso`):
+ * `{curva, tA, tB}`, i punti dalla corsia di prima a quella di dopo (uno
+ * ogni mezzo metro circa) e le direzioni delle due corsie lì, o `null` se la
+ * svolta non si capisce. [centri] e [versi]: il mezzo della corsia, e la sua
+ * direzione, sotto ogni punto del percorso.
+ */
+function curvaDellaSvolta(g, punti, passo, centri, versi) {
+  const { k } = g;
+  let { pA, tA, pB, tB } = g;
+  const O = punti[k];
+  let X = spigoloDelleCorsie(O, pA, tA, pB, tB);
+  if (X && centri && versi) {
+    // La via di prima (o di dopo) può piegare vicino al nodo: la corsia si
+    // prende nel suo punto più vicino allo spigolo, da questa parte (prima
+    // dello spigolo per la corsia di prima, dopo per quella di dopo), e lo
+    // spigolo si rifà.
+    const vicino = (da, verso, t0) => {
+      let meglio = da;
+      let d0 = Infinity;
+      const fino = Math.round(SVOLTA_LONTANO_M / passo);
+      for (let j = 0, m = da; j <= fino && m >= 0 && m < punti.length; j++, m += verso) {
+        const c = centri[m];
+        const t = versi[m];
+        if (!c || !t || t[0] * t0[0] + t[1] * t0[1] < 0.9 || ((c[0] - X[0]) * t0[0] + (c[1] - X[1]) * t0[1]) * verso < 0) continue;
+        const d = Math.hypot(c[0] - X[0], c[1] - X[1]);
+        if (d < d0) [meglio, d0] = [m, d];
+      }
+      return meglio;
+    };
+    const a = vicino(k, -1, tA);
+    const b = vicino(g.kb ?? k + 1, 1, tB);
+    if (centri[a] && centri[b] && (a !== k || b !== g.kb)) {
+      const Y = spigoloDelleCorsie(O, centri[a], versi[a], centri[b], versi[b]);
+      if (Y) [X, pA, tA, pB, tB] = [Y, centri[a], versi[a], centri[b], versi[b]];
+    }
+  }
+  const nA = [-tA[1], tA[0]];
+  const cos = tA[0] * tB[0] + tA[1] * tB[1];
+  const sen = tA[0] * tB[1] - tA[1] * tB[0];
+  const angolo = Math.atan2(Math.abs(sen), cos);
+  const lato = sen >= 0 ? 1 : -1;
+  if (X) {
+    // Un arco di cerchio tangente alle due corsie.
+    const T = Math.min(SVOLTA_TANGENTE_M, Math.max(SVOLTA_TANGENTE_MIN_M, SVOLTA_RAGGIO_M * Math.tan(angolo / 2)));
+    const R = T / Math.tan(angolo / 2);
+    const p0 = [X[0] - tA[0] * T, X[1] - tA[1] * T];
+    const c = [p0[0] + nA[0] * R * lato, p0[1] + nA[1] * R * lato];
+    const a0 = Math.atan2(p0[1] - c[1], p0[0] - c[0]);
+    const m = Math.max(2, Math.ceil((R * angolo) / 0.5));
+    const curva = [];
+    for (let j = 0; j <= m; j++) {
+      const a = a0 + (lato * angolo * j) / m;
+      curva.push([c[0] + R * Math.cos(a), c[1] + R * Math.sin(a)]);
+    }
+    return { curva, tA, tB };
+  }
+  if (angolo < (2 * Math.PI) / 3) return null;
+  // Un'inversione: le due corsie vanno di qua e di là, una accanto all'altra.
+  // Il mezzo giro fra le due, che arriva fin dove arriva il percorso.
+  const lungo = (q) => (q[0] - O[0]) * tA[0] + (q[1] - O[1]) * tA[1];
+  let cima = Math.max(lungo(pA), lungo(pB));
+  const zona = Math.round(SVOLTA_ZONA_M / passo);
+  for (let j = Math.max(0, k - zona); j <= Math.min(punti.length - 1, k + 1 + zona); j++) cima = Math.max(cima, lungo(punti[j]));
+  const raggio = Math.abs((pB[0] - pA[0]) * nA[0] + (pB[1] - pA[1]) * nA[1]) / 2;
+  if (raggio < 0.5 || cos > -0.5) return null;
+  const u = cima - raggio - lungo(pA);
+  const p0 = [pA[0] + tA[0] * u, pA[1] + tA[1] * u];
+  const w = (cima - raggio - lungo(pB)) / cos;
+  const p3 = [pB[0] + tB[0] * w, pB[1] + tB[1] * w];
+  const h = (4 / 3) * raggio;
+  const p1 = [p0[0] + tA[0] * h, p0[1] + tA[1] * h];
+  const p2 = [p3[0] - tB[0] * h, p3[1] - tB[1] * h];
+  const m = Math.max(4, Math.ceil((Math.PI * raggio) / 0.5));
+  const curva = [];
+  for (let j = 0; j <= m; j++) {
+    const t = j / m;
+    const a = (1 - t) ** 3;
+    const b = 3 * t * (1 - t) ** 2;
+    const d = 3 * t * t * (1 - t);
+    const e = t ** 3;
+    curva.push([a * p0[0] + b * p1[0] + d * p2[0] + e * p3[0], a * p0[1] + b * p1[1] + d * p2[1] + e * p3[1]]);
+  }
+  return { curva, tA, tB };
 }
 
 /** Più di così non si sposta: oltre, la strada giusta è un'altra.
@@ -825,6 +1014,23 @@ const SVOLTA_GRADI = 35;
 const RAMO_DRITTO_GRADI = 12;
 
 /**
+ * Lo spostamento `[vx, vy]` che sta [l1] metri a sinistra di chi va verso
+ * [t1] e [l2] metri a sinistra di chi va verso [t2] (direzioni unitarie):
+ * dove si incontrano le due linee spostate di lato. `null` se le due
+ * direzioni sono quasi parallele (il seno dell'angolo sotto [minimo]): lì
+ * le due linee non si incontrano, o lontano.
+ */
+export function incontroDeiLati(t1, l1, t2, l2, minimo = 0.5) {
+  const n1 = [-t1[1], t1[0]];
+  const n2 = [-t2[1], t2[0]];
+  const det = n1[0] * n2[1] - n1[1] * n2[0];
+  if (Math.abs(det) < minimo) return null;
+  const vx = (l1 * n2[1] - l2 * n1[1]) / det;
+  const vy = (n1[0] * l2 - n2[0] * l1) / det;
+  return [vx, vy];
+}
+
+/**
  * Alle svolte lo spostamento è un vettore intero, non solo di lato.
  *
  * «I punti per strada non sono corretti, soprattutto gli svincoli»: il
@@ -895,13 +1101,10 @@ function alleSvolte(dx, dy, visto, punti, passo) {
     // non ha un verso solo, il conto dava spostamenti di una decina di metri
     // e la linea faceva un giro largo fuori dalla rotonda.
     if (!dritto(prima[0], prima[1]) || !dritto(dopo[0], dopo[1])) continue;
-    const n1 = [-t1[1], t1[0]];
-    const n2 = [-t2[1], t2[0]];
-    const det = n1[0] * n2[1] - n1[1] * n2[0];
     // Due rami quasi paralleli (una curva larga, un'inversione): niente da risolvere.
-    if (Math.abs(det) < 0.5) continue;
-    const vx = (l1 * n2[1] - l2 * n1[1]) / det;
-    const vy = (n1[0] * l2 - n2[0] * l1) / det;
+    const v = incontroDeiLati(t1, l1, t2, l2);
+    if (!v) continue;
+    const [vx, vy] = v;
     if (Math.hypot(vx, vy) > SPOSTAMENTO_MAX_M) continue;
     for (let j = Math.max(0, cima - largo); j <= Math.min(n - 1, cima + largo); j++) {
       const d = Math.abs(j - cima);
