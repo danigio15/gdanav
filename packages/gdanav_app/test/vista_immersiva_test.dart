@@ -175,6 +175,43 @@ void main() {
     }
   });
 
+  test("a un'uscita la freccia arriva fin dove la rampa gira, e la punta guarda lì", () {
+    // «Deve esserci la freccia che esce»: la rampa corre dritta accanto alla
+    // strada per 150 m, poi gira a destra. Prima la freccia finiva 45 m dopo
+    // e puntava dritta.
+    final rampa = [
+      for (var i = 0; i <= 36; i++) Punto(45 + i * 0.0001, 9),
+      for (var i = 1; i <= 20; i++) Punto(45.0036, 9 + i * 0.00014),
+    ];
+    const esci = Manovra(istruzione: 'Esci a destra', lunghezzaM: 300, secondi: 20, inizio: 20, tipo: 20);
+    final v = Viaggio(
+      percorso: PercorsoCalcolato(punti: rampa, tratti: const [], manovre: [esci]),
+      colonnine: const [],
+      piano: null,
+    );
+    final elementi = (datiManovra(v, esci)['features']! as List).cast<Map>();
+    final punta = elementi.firstWhere((e) => (e['geometry'] as Map)['type'] == 'Point');
+    // La punta guarda verso est (la rampa che gira), non a nord.
+    expect(((punta['properties'] as Map)['rotta'] as num).toDouble(), greaterThan(20));
+    // E sta oltre l'inizio della curva, non 45 m dopo la manovra.
+    final dove = ((punta['geometry'] as Map)['coordinates'] as List).cast<double>();
+    expect(dove[1], greaterThan(45.0035));
+    // A una svolta vera (girata subito) la freccia resta corta.
+    const gira = Manovra(istruzione: 'Gira a destra', lunghezzaM: 300, secondi: 20, inizio: 36, tipo: 10);
+    final v2 = Viaggio(
+      percorso: PercorsoCalcolato(punti: rampa, tratti: const [], manovre: [gira]),
+      colonnine: const [],
+      piano: null,
+    );
+    final corta =
+        ((datiManovra(v2, gira)['features']! as List).cast<Map>().firstWhere(
+                  (e) => (e['geometry'] as Map)['type'] == 'Point',
+                )['geometry']
+                as Map)['coordinates']
+            as List;
+    expect(((corta[0] as double) - 9) * 111195.08 * 0.7071, lessThan(50));
+  });
+
   test('se le corsie vanno bene tutte, o non si sanno, non si disegna niente', () {
     final tutte = Manovra(
       istruzione: 'Esci a destra',

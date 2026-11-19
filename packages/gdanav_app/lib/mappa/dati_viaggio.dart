@@ -358,11 +358,44 @@ Map<String, Object?> datiManovra(
 
 /// Dove finisce la freccia: poco dopo la manovra, mai fin sulla manovra dopo
 /// (la punta ci arriverebbe sopra, e sembrerebbe di dover girare lì).
+///
+/// «Deve esserci la freccia che esce»: a un'uscita la rampa corre accanto
+/// alla strada per un bel pezzo, e la freccia, finita [dopoM] metri dopo,
+/// puntava dritta: sembrava di dover tirare dritto. Se la strada gira più in
+/// là (entro [_allungoMaxM]), la freccia arriva fin dove ha girato di
+/// [_giratoGradi]: la punta guarda dove si va.
 double _fineFreccia(Viaggio v, Manovra m, Linea l, double centro, double dopoM) {
   final manovre = v.percorso.manovre;
   final k = manovre.indexWhere((x) => x.inizio > m.inizio);
   final dopo = k < 0 ? l.lunghezzaM : l.cumulate[manovre[k].inizio.clamp(0, l.punti.length - 1)];
-  return math.min(math.max(centro + 10, math.min(centro + dopoM, dopo - _primaDellaDopoM)), l.lunghezzaM);
+  var voluta = centro + dopoM;
+  final prima = _aMetri(l, math.max(0, centro - 30)), qui = _aMetri(l, centro);
+  if (distanzaM(prima, qui) > 5) {
+    final verso = rottaGradi(prima, qui);
+    // Girata già entro [dopoM] (una svolta a un incrocio): resta com'era.
+    if (_girata(l, verso, centro + dopoM) == null) {
+      for (var s = centro + dopoM + 5; s <= math.min(centro + _allungoMaxM, l.lunghezzaM); s += 5) {
+        if (_girata(l, verso, s) != null) {
+          voluta = s;
+          break;
+        }
+      }
+    }
+  }
+  return math.min(math.max(centro + 10, math.min(voluta, dopo - _primaDellaDopoM)), l.lunghezzaM);
+}
+
+/// Fin dove si allunga la freccia di un'uscita, al più.
+const _allungoMaxM = 250.0;
+
+/// Di quanto deve aver girato la strada perché la freccia lo mostri.
+const _giratoGradi = 20.0;
+
+/// [s] se a [s] metri la strada va a più di [_giratoGradi] da [verso].
+double? _girata(Linea l, double verso, double s) {
+  final a = _aMetri(l, math.max(0, s - 15)), b = _aMetri(l, s);
+  if (distanzaM(a, b) < 5) return null;
+  return diQuantoSiGira(verso, rottaGradi(a, b)).abs() >= _giratoGradi ? s : null;
 }
 
 /// Il tratto della freccia della manovra [m] in metri lungo il percorso (da,
