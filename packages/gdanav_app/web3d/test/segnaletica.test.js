@@ -511,3 +511,42 @@ test('semplificare un pezzo: sulle vie dritte restano i capi, in curva no, i fis
   const pochi = semplificaPezzo(arco, 3, 5);
   assert.ok(pochi.length > 4 && pochi.length < arco.length);
 });
+
+/** Le strisce di sbieco della zebratura: i quadrilateri lunghi più di 80 cm di traverso. */
+function zebrature(sg) {
+  const p = sg.vernice.p;
+  const out = [];
+  for (let i = 0; i + 11 < p.length; i += 12) {
+    const dy = p[i + 7] - p[i + 4];
+    const dx = p[i + 6] - p[i + 3];
+    if (Math.abs(dy) > 0.8 && Math.abs(dy) > Math.abs(dx) * 0.5) out.push([(p[i] + p[i + 6]) / 2, (p[i + 1] + p[i + 7]) / 2]);
+  }
+  return out;
+}
+
+test('la zebratura dove la carreggiata si divide: nel triangolo, mai sulle corsie', () => {
+  const arriva = via({ id: 1, hw: 'motorway', lanes: '3', oneway: 'yes' }, [
+    [-200, 0],
+    [0, 0],
+  ]);
+  const dritta = via({ id: 2, hw: 'motorway', lanes: '2', oneway: 'yes' }, [
+    [0, 0],
+    [300, 0],
+  ]);
+  const esce = via({ id: 3, hw: 'motorway_link', lanes: '1', oneway: 'yes' }, [
+    [0, 0],
+    [300, -60],
+  ]);
+  const z = zebrature(costruisciSegnaletica({ strade: [arriva, dritta, esce], meta: 1000 }));
+  assert.ok(z.length >= 3, `le strisce nel triangolo (${z.length})`);
+  // Nei dati la rampa resta sovrapposta alla carreggiata per sessanta metri:
+  // lì niente strisce, che andavano di traverso sulle corsie.
+  const sovrapposta = via({ id: 3, hw: 'motorway_link', lanes: '1', oneway: 'yes' }, [
+    [0, 0],
+    [60, -3],
+    [300, -60],
+  ]);
+  const z2 = zebrature(costruisciSegnaletica({ strade: [arriva, dritta, sovrapposta], meta: 1000 }));
+  const sulleCorsie = z2.filter(([, y]) => y > -3.75);
+  assert.deepEqual(sulleCorsie, [], `strisce sulle corsie: ${JSON.stringify(sulleCorsie)}`);
+});
