@@ -982,6 +982,8 @@ function strato3d() {
         const vs = new THREE.Vector3(S.auto.x, S.auto.y, S.auto.z + 1.2).project(camera);
         ue.uAutoSchermo.value.set(vs.x, vs.y, vs.z);
       } else ue.uAutoSchermo.value.set(0, -2, -1);
+      // Le strade e i ponti sopra l'auto, fra lei e la telecamera, non si disegnano.
+      scena.uniformiTaglio.uQuotaAuto.value = S.auto ? S.auto.z : 1e9;
       if (S.auto) {
         const va = new THREE.Vector3(S.auto.x, S.auto.y, S.auto.z + 1).project(camera);
         const ax = ((va.x + 1) / 2) * m.getCanvas().clientWidth;

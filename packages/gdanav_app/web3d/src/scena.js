@@ -657,6 +657,13 @@ void main() {
   a = mix(a, 0.9, chev * 0.5);
   a *= smoothstep(uInizio, uInizio + 5.0, vUv.y);
   a *= 1.0 - smoothstep(uFine - 3.0, uFine, vUv.y);
+  // In galleria (un sottopasso) la strada non si vede: piena, la fascia
+  // correva sul prato e sui tornanti del sottopasso, a zig zag («ancora tutto
+  // sbagliato»). Come nella vista di sempre: tenue e tratteggiata, senza punte,
+  // così si capisce che passa sotto.
+  float sotto = step(9.5, vLivello);
+  c = mix(c, mix(core, vec3(1.0), 0.2), sotto * chev);
+  a *= mix(1.0, (0.35 + 0.65 * step(0.5, fract(vUv.y / 6.0))) * 0.55, sotto);
   gl_FragColor = vec4(c * (1.0 + 0.25 * uNotte), a * uOpacita);
   #include <colorspace_fragment>
 }`;
@@ -788,6 +795,8 @@ export class Scena {
     // tratteggiato. Quasi pieno (85%) sembrava passare sopra il ponte: «la
     // linea non può salire sul ponte se la strada è sotto».
     this.uniformiFantasma = { ...this.uniformiPercorso, uInizio: { value: -1e9 }, uOpacita: { value: 0.32 }, uSotto: { value: 1 } };
+    // Le strade e i ponti sopra l'auto, fra lei e la telecamera (vedi [tagliaSopra]).
+    this.uniformiTaglio = { uQuotaAuto: { value: 1e9 } };
     // Gli edifici di vetro attorno all'auto (vedi [vetroVicino]).
     this.uniformiEdifici = {
       uAuto: { value: new THREE.Vector2(1e9, 1e9) },
@@ -1079,7 +1088,68 @@ export class Scena {
     m.fatto = nastro(FRAMMENTO_NASTRO, this.uniformiFatto, { polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -2 });
     m.fattoVicino = nastro(FRAMMENTO_NASTRO, this.uniformiFattoVicino, { polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -2 });
     m.traffico = nastro(FRAMMENTO_CODA, { uNotte: { value: notte ? 1 : 0 } }, { polygonOffset: true, polygonOffsetFactor: SPINTA_DI_SBIECO, polygonOffsetUnits: -2 });
+    // Strade, ponti, piloni, corsie e marciapiedi: niente sopra l'auto fra lei
+    // e la telecamera (vedi [tagliaSopra]).
+    // Solo nella vista «Corsie», dove la telecamera sta bassa dietro l'auto:
+    // in quella di sempre, da più in alto, il ponte sopra si vede (e il
+    // percorso sotto è tratteggiato), e tagliarlo lasciava i piloni nudi.
+    if (this.corsie) {
+      for (const [nome, mat] of Object.entries(m)) {
+        if (nome === 'opere' || nome === 'fusto' || nome === 'capitello' || (nome.startsWith('strada-') && nome !== 'strada-galleria') || nome.startsWith('corsie-')) {
+          this.tagliaSopra(mat, nome);
+        }
+      }
+    }
     return m;
+  }
+
+  /**
+   * «Ancora tutto sbagliato»: sotto il viadotto di uno svincolo, nella vista
+   * «Corsie», lo schermo era tutto grigio con la linea verde a pezzi. La
+   * telecamera sta dietro e sopra l'auto: con l'auto sotto un ponte, la
+   * telecamera finiva dentro l'impalcato di sopra (o appena sopra), e il ponte
+   * copriva tutto. I navigatori lo tolgono di mezzo: qui strade, ponti e
+   * piloni **più alti dell'auto di tre metri e fra lei e la telecamera** non
+   * si disegnano. Quello che sta oltre l'auto, o alla sua quota, o sotto,
+   * resta com'è: i ponti davanti si vedono, quello sopra la testa no.
+   *
+   * Si aggiunge a quello che il materiale fa già nello shader (luce propria,
+   * lastre dei marciapiedi): non lo sostituisce.
+   */
+  tagliaSopra(materiale, nome) {
+    // I piloni e il cemento dei ponti (spalle, parapetti, travi) fra la
+    // telecamera e l'auto, tutti: da sotto un viadotto un pilone riempiva lo
+    // schermo, e la spalla della rampa copriva mezza strada. Dietro l'auto
+    // non dicono niente a chi guida.
+    const sopra = nome === 'fusto' || nome === 'capitello' || nome === 'opere' ? -1e6 : 3.0;
+    const prima = materiale.onBeforeCompile;
+    const chiave = materiale.customProgramCacheKey;
+    const u = this.uniformiTaglio;
+    const ue = this.uniformiEdifici;
+    materiale.onBeforeCompile = (sh, renderer) => {
+      if (prima && prima !== THREE.Material.prototype.onBeforeCompile) prima.call(materiale, sh, renderer);
+      sh.uniforms.uQuotaAuto = u.uQuotaAuto;
+      sh.uniforms.uAutoSchermo = ue.uAutoSchermo;
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', `#include <common>
+          varying float vQuotaTaglio;`)
+        .replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+          vQuotaTaglio = (modelMatrix * vec4(transformed, 1.0)).z;`,
+        );
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', `#include <common>
+          varying float vQuotaTaglio;
+          uniform float uQuotaAuto;
+          uniform vec3 uAutoSchermo;`)
+        .replace(
+          '#include <clipping_planes_fragment>',
+          `#include <clipping_planes_fragment>
+          if (vQuotaTaglio > uQuotaAuto + ${sopra.toFixed(1)} && gl_FragCoord.z < uAutoSchermo.z * 0.5 + 0.5) discard;`,
+        );
+    };
+    materiale.customProgramCacheKey = () => (chiave && chiave !== THREE.Material.prototype.customProgramCacheKey ? chiave.call(materiale) : nome) + '-taglio';
   }
 
   /**

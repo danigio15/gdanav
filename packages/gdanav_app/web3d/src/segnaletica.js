@@ -12,6 +12,9 @@ import { Costruttore } from './costruttore.js';
 import { bordiCorsie, centroCorsia, larghezzaCorsie, normali, progressive } from './corsie.js';
 import { ritagliaLinea } from './ritaglio.js';
 
+
+/** Più lunga di così una zebratura non è (m): oltre è una carreggiata a parte. */
+const ZEBRATURA_AL_PIU_M = 150;
 /**
  * I marciapiedi delle strade di città (m): larghi secondo la strada, alti
  * [ALTO_MARCIAPIEDE] sopra l'asfalto, col cordolo. Non in autostrada, sulle
@@ -1040,6 +1043,12 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
   // Fra il bordo destro del ramo di sinistra e quello sinistro del ramo di
   // destra (una rampa d'uscita), finché i due sono a meno di sette metri:
   // strisce di sbieco, come sulle autostrade italiane.
+  //
+  // Solo nel triangolo, dove i due rami si allargano. «Ancora tutto
+  // sbagliato»: a uno svincolo due rampe corrono affiancate a quattro metri
+  // per centinaia di metri (lì c'è un cordolo, o il guardrail), e la
+  // zebratura andava avanti per tutti e trecento, una scala bianca lunga fra
+  // le due strade. Dove la distanza smette di crescere, il triangolo è finito.
   for (const elenco of tocchi.values()) {
     const finiscono = elenco.filter(({ i, k }) => strade[i].senso && k === strade[i].xyVia.length - 1);
     const partono = elenco.filter(({ i, k }) => strade[i].senso && k === 0);
@@ -1064,7 +1073,8 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
     const bordoS = [];
     for (let s = 0; s <= Math.min(LS, 300); s += 1) bordoS.push(puntoA(rS, s, bS));
     const dz = sopra(des.hw) + 0.02;
-    for (let s = 3; s < Math.min(LD, 300); s += 5) {
+    let dPrima = -Infinity;
+    for (let s = 3; s < Math.min(LD, ZEBRATURA_AL_PIU_M); s += 5) {
       const P = puntoA(rD, s, bD);
       let Q = null;
       let d = Infinity;
@@ -1076,6 +1086,9 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
         }
       }
       if (d > 7) break;
+      // Non si allargano più (paralleli, o di nuovo vicini): fine del triangolo.
+      if (s > 20 && d < dPrima + 0.1) break;
+      dPrima = d;
       if (d < 0.8 || !dentro(P[0], P[1])) continue;
       // Di sbieco: dal bordo della rampa indietro verso la punta del triangolo.
       const [tx, ty] = [P[3], P[4]];
