@@ -237,6 +237,9 @@ class GestoreEdifici {
     final lettore = await (_inRete[cella] ??= _apriInRete(cella, voce));
     if (lettore == null) return null;
     final dati = await lettore.tessera(z, x, y);
+    // Intanto è arrivato il pacchetto intero (lo scarica [tessera] in
+    // sottofondo, e ha già tolto le copie): una copia adesso resterebbe lì.
+    if (await File('${dir.path}/${fileDi(cella)}').exists()) return dati;
     try {
       await copie.create(recursive: true);
       if (!await versione.exists()) await versione.writeAsString(voce.versione);
