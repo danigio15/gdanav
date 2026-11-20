@@ -970,7 +970,21 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
 
     // ── Le righe ───────────────────────────────────────────────────────
     const dz = z0 + 0.02;
+    // Dove la riga starebbe sull'asfalto di un'altra via (alla stessa
+    // quota, più di sessanta centimetri dentro): dove due carreggiate si
+    // dividono e i raccordi non le mettono del tutto in fila, il bordo di
+    // una passava di traverso sulle corsie dell'altra.
+    copertura ??= asfaltoDelleVie(strade, ricche, bordiAsfalto);
+    const sullAltra = (o) => {
+      const out = [];
+      for (let s = 0; s <= L; s += 1) {
+        const P = puntoA(r, s, o);
+        if (copertura.sotto(P[0], P[1], P[2], i, -0.6)) out.push([s - 0.6, s + 0.6]);
+      }
+      return out;
+    };
     const riga = (o, w, buchi, tipo = 'continua', pieno = 3, vuoto = 3) => {
+      buchi = [...buchi, ...sullAltra(o)];
       const pezzi = tipo === 'continua' ? togli([[0, L]], buchi) : v.stimata ? trattiniAdattati(L, pieno, vuoto, buchi) : trattini(L, pieno, vuoto, buchi);
       for (const [a, b] of pezzi) {
         if (b - a < 0.2) continue;
