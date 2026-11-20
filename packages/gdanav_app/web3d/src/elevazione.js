@@ -58,15 +58,22 @@ export const altezzaLivello = (livello) => (livello > 0 ? livello * ALTEZZA_LIVE
  * Le estremità tagliate sui bordi delle tessere si uniscono: due strade che
  * escono da tessere vicine nello stesso punto (entro 4 pixel) diventano una.
  * [strade]: `{p, g}` con `g` in pixel globali (tx*4096+px).
+ *
+ * Solo strade dello stesso genere (livello, ponte, galleria): sono i due
+ * pezzi della stessa via. Allo svincolo di una tangenziale il bordo passava
+ * dove un viadotto al terzo livello corre proprio sopra una rampa a terra, a
+ * un metro in pianta: i quattro capi diventavano un nodo solo, e la rampa
+ * saliva a ventiquattro metri («una salita con strade in mezzo»).
  */
 export function uniscIBordi(strade, estensione = 4096) {
   const pts = [];
   for (const r of strade) {
+    const genere = `${livelloStrada(r.p)}${r.p.brunnel === 'tunnel' ? 'g' : ''}${r.p.class === 'rail' ? 'f' : ''}|`;
     for (const fine of [r.g[0], r.g[r.g.length - 1]]) {
       if (Math.abs(fine[0] / estensione - Math.round(fine[0] / estensione)) < 1e-9) {
-        pts.push({ riga: 'x' + fine[0], lungo: fine[1], pt: fine });
+        pts.push({ riga: genere + 'x' + fine[0], lungo: fine[1], pt: fine });
       } else if (Math.abs(fine[1] / estensione - Math.round(fine[1] / estensione)) < 1e-9) {
-        pts.push({ riga: 'y' + fine[1], lungo: fine[0], pt: fine });
+        pts.push({ riga: genere + 'y' + fine[1], lungo: fine[0], pt: fine });
       }
     }
   }
@@ -79,7 +86,7 @@ export function uniscIBordi(strade, estensione = 4096) {
     if (j - i > 1) {
       const m = pts.slice(i, j).reduce((s, q) => s + q.lungo, 0) / (j - i);
       for (let k = i; k < j; k++) {
-        if (pts[k].riga[0] === 'x') pts[k].pt[1] = m;
+        if (pts[k].riga.split('|')[1][0] === 'x') pts[k].pt[1] = m;
         else pts[k].pt[0] = m;
       }
       unite++;
@@ -401,34 +408,6 @@ export function altezze(nodi, feats, iterazioni = 1500) {
     n.hPonte = hPonte;
     n.diversi = diversi;
   }
-  /*
-   * «Una salita con strade in mezzo, non si capisce niente.» In uno svincolo
-   * la rampa scendeva da un ponte di livello 3 a uno di livello 1, ma fra i
-   * due c'era un pezzo di rampa di trenta metri che nei dati non è un ponte:
-   * i due ponti restavano alla loro quota fino all'ultimo nodo, e i sedici
-   * metri di dislivello stavano tutti in quei trenta (più del 50%). Un capo di
-   * ponte che, per strade non ponti, arriva entro [VICINO_M] a un ponte di
-   * un'altra quota è un giunto come quello diretto: libero anche lui.
-   */
-  const VICINO_M = 60;
-  const pontePocoOltre = (da, h) => {
-    const visti = new Map([[da, 0]]);
-    const coda = [da];
-    while (coda.length) {
-      const i = coda.shift();
-      const d = visti.get(i);
-      for (const e of nodi[i].adj) {
-        const fe = feats[e.f];
-        if (fe.livello > 0 || fe.galleria) continue;
-        const nd = d + e.d;
-        if (nd > VICINO_M || (visti.has(e.to) && visti.get(e.to) <= nd)) continue;
-        if (nodi[e.to].hPonte !== null && nodi[e.to].hPonte !== h) return true;
-        visti.set(e.to, nd);
-        coda.push(e.to);
-      }
-    }
-    return false;
-  };
   // I nodi di un ponte vicini a un ponte di altro livello sono liberi: lì si
   // sale o si scende da un livello all'altro.
   for (const f of feats) {
@@ -443,7 +422,7 @@ export function altezze(nodi, feats, iterazioni = 1500) {
     }
     const estremi = [0, f.nodi.length - 1].filter((k) => {
       const n = nodi[f.nodi[k]];
-      return n.diversi || n.feats.some((o) => feats[o].livello > 0 && hDi(feats[o]) !== hDi(f)) || pontePocoOltre(f.nodi[k], hDi(f));
+      return n.diversi || n.feats.some((o) => feats[o].livello > 0 && hDi(feats[o]) !== hDi(f));
     });
     for (let k = 0; k < f.nodi.length; k++) {
       const n = nodi[f.nodi[k]];

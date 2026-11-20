@@ -2313,7 +2313,10 @@ function muovi(adesso, dt) {
     }
     x += cx;
     y += cy;
-    const q = (v) => (prof && v >= prof.s0 && v <= prof.s1 ? prof.quota(v) : 0);
+    // Fuori dal tratto del profilo (si sta rifacendo, l'auto è scattata
+    // avanti) la quota del capo più vicino: a zero l'auto cadeva a terra da
+    // un viadotto per un fotogramma, e la telecamera con lei.
+    const q = (v) => (prof ? prof.quota(v) : (S.auto?.z ?? 0));
     z = q(s) + cz;
     // La strada su cui si sta, non quella dove si andrà: da cinque metri
     // dietro a uno avanti. Centrata, la freccia girava prima dell'angolo.
@@ -2446,7 +2449,10 @@ function copertaDaUnPonte(x, y, z, dir) {
   const dx = Math.cos(dir);
   const dy = Math.sin(dir);
   let coperta = false;
-  for (let d = -40; d <= 6 && !coperta; d += 4) {
+  // Nella vista «Corsie» quello che sta sopra fra la telecamera e l'auto non
+  // si disegna (vedi `tagliaSopra` in scena.js): niente la copre, e la sagoma
+  // rossa piatta sembrava un'auto rotta.
+  for (let d = -40; d <= 6 && !coperta && !S.corsie; d += 4) {
     for (const c of indice.candidati(x + dx * d, y + dy * d, 0, 0, 9)) {
       if (c.h > z + 3) {
         coperta = true;

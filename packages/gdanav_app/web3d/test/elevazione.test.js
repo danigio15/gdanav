@@ -76,21 +76,6 @@ test('due ponti di livello diverso si raccordano', () => {
   assert.ok(giunto > L + 0.5 && giunto < 2 * L - 0.5, `al giunto fra un livello e due (${giunto})`);
 });
 
-test('due ponti di livello diverso con un pezzo di rampa a terra in mezzo: la discesa non sta tutta lì', () => {
-  const strade = [
-    { p: { class: 'trunk', brunnel: 'bridge', layer: 3, ramp: 1 }, g: [[0, 0], [300, 0]] },
-    { p: { class: 'motorway', ramp: 1 }, g: [[300, 0], [330, 0]] },
-    { p: { class: 'motorway', brunnel: 'bridge', layer: 1, ramp: 1 }, g: [[330, 0], [700, 0]] },
-  ];
-  const g = grafoStrade(strade, metri);
-  const L = ALTEZZA_LIVELLO;
-  assert.ok(Math.abs(quotaA(g, 50) - 3 * L) < 0.1);
-  assert.ok(Math.abs(quotaA(g, 650) - L) < 0.1);
-  let ripida = 0;
-  for (let x = 200; x <= 440; x += 10) ripida = Math.max(ripida, Math.abs(quotaA(g, x + 10) - quotaA(g, x)) / 10);
-  assert.ok(ripida < 0.15, `pendenza al più 15% (${(ripida * 100).toFixed(0)}%)`);
-});
-
 test('i capi tagliati sul bordo delle tessere si uniscono', () => {
   const strade = [
     { p: {}, g: [[100, 200], [4096, 1000]] },
@@ -98,6 +83,27 @@ test('i capi tagliati sul bordo delle tessere si uniscono', () => {
   ];
   assert.equal(uniscIBordi(strade), 1);
   assert.deepEqual(strade[0].g[1], strade[1].g[0]);
+});
+
+test('sul bordo della tessera il viadotto non si unisce alla rampa a terra che gli passa sotto', () => {
+  // Il bordo (x = 4096) passa dove un viadotto al terzo livello corre sopra
+  // una rampa a terra, a un pixel e mezzo in pianta: ognuno col suo seguito.
+  const viadotto = { class: 'trunk', brunnel: 'bridge', layer: 3, ramp: 1 };
+  const rampa = { class: 'motorway', ramp: 1 };
+  const strade = [
+    { p: viadotto, g: [[3000, 1000], [4096, 1000]] },
+    { p: viadotto, g: [[4096, 1001], [5200, 1000]] },
+    { p: rampa, g: [[3000, 1003], [4096, 1002.5]] },
+    { p: rampa, g: [[4096, 1002], [5200, 1100]] },
+  ];
+  assert.equal(uniscIBordi(strade), 2);
+  assert.deepEqual(strade[0].g[1], strade[1].g[0]);
+  assert.deepEqual(strade[2].g[1], strade[3].g[0]);
+  assert.ok(Math.abs(strade[0].g[1][1] - strade[2].g[1][1]) > 1, 'i due capi restano dove sono');
+  // E nel grafo la rampa resta a terra lontano dal viadotto.
+  const g = grafoStrade(strade, metri);
+  const L = ALTEZZA_LIVELLO;
+  for (const n of g.nodi) if (Math.abs(n.x - 4096) < 300 && n.y < -1001.2) assert.ok(n.h < L, `la rampa sotto il viadotto (${n.x.toFixed(0)}, ${n.y.toFixed(1)}: ${n.h.toFixed(1)})`);
 });
 
 /** Un anello di raggio [r] attorno a [cx, cy], a [n] lati, come strada a sé. */

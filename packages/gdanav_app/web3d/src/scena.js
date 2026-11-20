@@ -1141,12 +1141,12 @@ export class Scena {
             vMondoTaglio = (modelMatrix * vec4(transformed, 1.0)).xyz;
           #endif`,
         );
-      // Solo in un tubo attorno alla linea fra la telecamera e l'auto, e
-      // solo nella parte verso la telecamera (i sei decimi): è lì che un
-      // impalcato copre tutto. Il resto della scena, anche più in alto
-      // dell'auto, resta: prima, con la telecamera alta, spariva mezza città;
-      // e il ponte che passa proprio sopra l'auto si vede, con l'auto sotto
-      // in sagoma (vedi `copertaDaUnPonte` in principale.js).
+      // Solo in un tubo attorno alla linea fra la telecamera e l'auto: da
+      // dietro l'auto è quello che copre la vista (sotto un viadotto che
+      // corre sopra la rampa, tutto lo schermo), da più in alto è un buco
+      // attorno all'auto nel ponte che le passa sopra. Il resto della scena,
+      // anche più in alto dell'auto, resta: prima, con la telecamera alta,
+      // spariva mezza città.
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', `#include <common>
           varying vec3 vMondoTaglio;
@@ -1159,7 +1159,7 @@ export class Scena {
             vec3 ba = uAutoTaglio - uOcchioTaglio;
             float k = dot(vMondoTaglio - uOcchioTaglio, ba) / max(dot(ba, ba), 1e-6);
             float r = clamp(0.35 * length(ba), 10.0, 25.0);
-            if (k < 0.6 && length(vMondoTaglio - uOcchioTaglio - ba * clamp(k, 0.0, 1.0)) < r) discard;
+            if (k < 1.0 && length(vMondoTaglio - uOcchioTaglio - ba * clamp(k, 0.0, 1.0)) < r) discard;
           }`,
         );
     };
