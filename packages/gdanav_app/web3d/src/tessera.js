@@ -191,6 +191,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     }
     strettaFraLeCase(feats, nodi, poligoni);
   }
+  carreggiateAffiancate(feats, nodi);
   // Per il collaudo (la verifica delle strade su tessere vere): il grafo con le quote.
   const grafoPerIlCollaudo = grafo ? { nodi, feats } : undefined;
   const tGrafo = Date.now() - t0;
@@ -392,6 +393,8 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   const piloni = [];
   const lampioni = [];
   const segmenti = [];
+  // Per il collaudo: le mezze larghezze disegnate di ogni segmento, [sinistra, destra].
+  const latiSegmenti = grafo ? [] : null;
   // Il cemento: un colore di giorno e uno di notte, più scuro in basso (gli
   // angoli in ombra), più chiaro sul cordolo in cima all'impalcato.
   const tinta = (c, k) => c.map((v) => Math.min(255, Math.round(v * k)));
@@ -487,6 +490,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           const a = pezzo[k - 1];
           const b = pezzo[k];
           segmenti.push(a[0], a[1], a[2] + zs, b[0], b[1], b[2] + zs, f.w, codice + (f.rampa ? 16 : 0) + (f.ponte ? 32 : 0) + (f.galleria ? 64 : 0));
+          latiSegmenti?.push(((a[6] ?? f.w / 2) + (b[6] ?? f.w / 2)) / 2, ((a[7] ?? f.w / 2) + (b[7] ?? f.w / 2)) / 2);
         }
       }
     }
@@ -1401,7 +1405,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     ms: Date.now() - t0,
   };
   out.conti.triangoli = stimaTriangoli(out);
-  if (grafoPerIlCollaudo) out.grafo = { ...grafoPerIlCollaudo, corsie: conCorsie?.strade ?? null };
+  if (grafoPerIlCollaudo) out.grafo = { ...grafoPerIlCollaudo, corsie: conCorsie?.strade ?? null, latiSegmenti };
   return out;
 }
 
@@ -1538,6 +1542,161 @@ export function strettaFraLeCase(feats, nodi, poligoni) {
     strette++;
   }
   return strette;
+}
+
+/** Quanto si stringe per metro una carreggiata dalla parte dell'altra: alle
+ * biforcazioni strette i rami si staccano in pochi metri, come la cuspide fra
+ * le due (più svelto delle case, [STRETTA_PASSO]). */
+const AFFIANCATE_PASSO = 0.6;
+/** Ogni quanto un punto in più, sui tratti lunghi accanto a un'altra carreggiata. */
+const AFFIANCATE_PUNTI_M = 1.5;
+
+/**
+ * Le carreggiate affiancate a quote diverse (due rampe una accanto
+ * all'altra, una che sale e una che scende): le linee delle tessere stanno
+ * più vicine della somma delle due mezze larghezze, e i due nastri si
+ * sovrapponevano di lato, uno dentro l'altro. Ognuna si stringe dal lato
+ * dell'altra fino a metà dello spazio fra le due linee (mai sotto 0,8 m), e
+ * la larghezza cambia piano. Sui tratti lunghi lì accanto mette dei punti in
+ * più (la larghezza fra due punti cambia dritta, e alla biforcazione il
+ * cuneo è corto). Mette `larghezze` (vedi [strettaFraLeCase]).
+ */
+export function carreggiateAffiancate(feats, nodi) {
+  const G = 15;
+  const usabile = (f) => !f.galleria && f.cls !== 'rail' && f.nodi.length >= 2;
+  let griglia;
+  const indicizza = () => {
+    griglia = new Map();
+    feats.forEach((f, fi) => {
+      if (!usabile(f)) return;
+      for (let k = 1; k < f.nodi.length; k++) {
+        const a = nodi[f.nodi[k - 1]];
+        const b = nodi[f.nodi[k]];
+        for (let gx = Math.floor(Math.min(a.x, b.x) / G); gx <= Math.floor(Math.max(a.x, b.x) / G); gx++) {
+          for (let gy = Math.floor(Math.min(a.y, b.y) / G); gy <= Math.floor(Math.max(a.y, b.y) / G); gy++) {
+            const key = gx + ',' + gy;
+            if (!griglia.has(key)) griglia.set(key, []);
+            griglia.get(key).push([fi, k]);
+          }
+        }
+      }
+    });
+  };
+  // Le altre carreggiate quasi parallele a quota diversa vicino al punto
+  // (x, y, h) della strada fi, che va nella direzione (tx, ty): per ognuna
+  // la distanza e se sta a sinistra.
+  const accanto = (fi, x, y, h, tx, ty, salta) => {
+    const out = [];
+    const visti = new Set();
+    for (let ox = -1; ox <= 1; ox++) {
+      for (let oy = -1; oy <= 1; oy++) {
+        for (const [gi, gk] of griglia.get(Math.floor(x / G) + ox + ',' + (Math.floor(y / G) + oy)) ?? []) {
+          if (gi === fi || visti.has(gi * 100000 + gk)) continue;
+          visti.add(gi * 100000 + gk);
+          const g = feats[gi];
+          if (salta !== undefined && (salta === g.nodi[gk - 1] || salta === g.nodi[gk])) continue;
+          const c = nodi[g.nodi[gk - 1]];
+          const d = nodi[g.nodi[gk]];
+          const ex = d.x - c.x;
+          const ey = d.y - c.y;
+          const el = Math.hypot(ex, ey) || 1;
+          if (Math.abs((ex * tx + ey * ty) / el) < 0.85) continue;
+          const u = Math.max(0, Math.min(1, ((x - c.x) * ex + (y - c.y) * ey) / (el * el)));
+          const qx = c.x + ex * u;
+          const qy = c.y + ey * u;
+          // Alla stessa quota sono una strada sola; sotto un viadotto (oltre
+          // 4,5 m) passano una sotto l'altra e non si toccano.
+          const dz = Math.abs(c.h + (d.h - c.h) * u - h);
+          if (dz <= 0.6 || dz >= 4.5) continue;
+          const dist = Math.hypot(qx - x, qy - y);
+          if (dist >= (feats[fi].w + g.w) / 2) continue;
+          out.push([dist, tx * (qy - y) - ty * (qx - x) > 0]);
+        }
+      }
+    }
+    return out;
+  };
+  indicizza();
+  // I punti in più sui tratti lunghi che corrono accanto a un'altra: prima
+  // si sceglie dove (la griglia guarda i tratti com'erano), poi si mettono.
+  const daInfittire = feats.map((f, fi) => {
+    const tratti = new Set();
+    if (!usabile(f)) return tratti;
+    for (let k = 1; k < f.nodi.length; k++) {
+      const a = nodi[f.nodi[k - 1]];
+      const b = nodi[f.nodi[k]];
+      const l = Math.hypot(b.x - a.x, b.y - a.y);
+      if (Math.floor(l / AFFIANCATE_PUNTI_M) < 2) continue;
+      const tx = (b.x - a.x) / l;
+      const ty = (b.y - a.y) / l;
+      if ([0.25, 0.5, 0.75].some((t) => accanto(fi, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.h + (b.h - a.h) * t, tx, ty).length)) tratti.add(k);
+    }
+    return tratti;
+  });
+  let aggiunti = 0;
+  feats.forEach((f, fi) => {
+    if (!daInfittire[fi].size) return;
+    const nuovi = [f.nodi[0]];
+    const larghe = f.larghezze ? [f.larghezze[0]] : null;
+    for (let k = 1; k < f.nodi.length; k++) {
+      if (daInfittire[fi].has(k)) {
+        const a = nodi[f.nodi[k - 1]];
+        const b = nodi[f.nodi[k]];
+        const quanti = Math.floor(Math.hypot(b.x - a.x, b.y - a.y) / AFFIANCATE_PUNTI_M);
+        for (let q = 1; q < quanti; q++) {
+          const t = q / quanti;
+          nuovi.push(nodi.length);
+          nodi.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, h: a.h + (b.h - a.h) * t, adj: [], feats: [fi], fisso: null });
+          if (larghe) {
+            const [s0, d0] = f.larghezze[k - 1];
+            const [s1, d1] = f.larghezze[k];
+            larghe.push([s0 + (s1 - s0) * t, d0 + (d1 - d0) * t]);
+          }
+          aggiunti++;
+        }
+      }
+      nuovi.push(f.nodi[k]);
+      if (larghe) larghe.push(f.larghezze[k]);
+    }
+    f.nodi = nuovi;
+    if (larghe) f.larghezze = larghe;
+  });
+  if (aggiunti) indicizza();
+  let cambiate = 0;
+  feats.forEach((f, fi) => {
+    if (!usabile(f)) return;
+    const n = f.nodi.length;
+    const hw = f.w / 2;
+    const sx = Float64Array.from(f.larghezze ? f.larghezze.map((q) => q[0]) : new Array(n).fill(hw));
+    const dx = Float64Array.from(f.larghezze ? f.larghezze.map((q) => q[1]) : new Array(n).fill(hw));
+    let toccata = false;
+    for (let k = 0; k < n; k++) {
+      const p = nodi[f.nodi[k]];
+      const a = nodi[f.nodi[Math.max(0, k - 1)]];
+      const b = nodi[f.nodi[Math.min(n - 1, k + 1)]];
+      const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      for (const [dist, sinistra] of accanto(fi, p.x, p.y, p.h, (b.x - a.x) / l, (b.y - a.y) / l, f.nodi[k])) {
+        const meta = Math.max(0.8, dist / 2 - 0.05);
+        if (sinistra && meta < sx[k]) {
+          sx[k] = meta;
+          toccata = true;
+        } else if (!sinistra && meta < dx[k]) {
+          dx[k] = meta;
+          toccata = true;
+        }
+      }
+    }
+    if (!toccata) return;
+    const s = [0];
+    for (let k = 1; k < n; k++) s.push(s[k - 1] + Math.hypot(nodi[f.nodi[k]].x - nodi[f.nodi[k - 1]].x, nodi[f.nodi[k]].y - nodi[f.nodi[k - 1]].y));
+    for (const v of [sx, dx]) {
+      for (let k = 1; k < n; k++) v[k] = Math.min(v[k], v[k - 1] + AFFIANCATE_PASSO * (s[k] - s[k - 1]));
+      for (let k = n - 2; k >= 0; k--) v[k] = Math.min(v[k], v[k + 1] + AFFIANCATE_PASSO * (s[k + 1] - s[k]));
+    }
+    f.larghezze = [...sx].map((v, k) => [v, dx[k]]);
+    cambiate++;
+  });
+  return cambiate;
 }
 
 /** Triangoli di una geometria istanziata, per le stime. */

@@ -828,14 +828,14 @@ export function altezze(nodi, feats) {
    * di lei (al più del PENDENZA_MAX), se la sua quota non serve. */
   const affianca = () => {
     let cambiate = 0;
-    const altra = (p, i) => (i === p.a || i === p.b ? h[p.c] + (h[p.d] - h[p.c]) * p.u : h[p.a] + (h[p.b] - h[p.a]) * 0.5);
+    const altra = (p, i) => (i === p.a || i === p.b ? h[p.c] + (h[p.d] - h[p.c]) * p.u : h[p.a] + (h[p.b] - h[p.a]) * (p.t ?? 0.5));
     for (const p of affiancate) {
       // Due strade a terra: non si alza quella bassa (il viale salirebbe
       // tutto); scende quella che la salita di un ponte ha tirato su. Ma se
       // quella in alto ci deve stare (sale verso un ponte che scavalca),
       // sale l'altra: la rampa si stacca alla quota della carreggiata.
       if (p.aTerraTutte) {
-        const ha = (h[p.a] + h[p.b]) / 2;
+        const ha = h[p.a] + (h[p.b] - h[p.a]) * (p.t ?? 0.5);
         const hb = h[p.c] + (h[p.d] - h[p.c]) * p.u;
         const [alti, bassi] = ha > hb ? [[p.a, p.b], [p.c, p.d]] : [[p.c, p.d], [p.a, p.b]];
         if (!alti.every((i) => obbligata[i] > h[i] - 0.3)) continue;
@@ -869,7 +869,7 @@ export function altezze(nodi, feats) {
     let scese = 0;
     for (const p of affiancate) {
       const hb = h[p.c] + (h[p.d] - h[p.c]) * p.u;
-      const ha = (h[p.a] + h[p.b]) / 2;
+      const ha = h[p.a] + (h[p.b] - h[p.a]) * (p.t ?? 0.5);
       const [alti, basso] = ha > hb ? [[p.a, p.b], hb] : [[p.c, p.d], ha];
       if (Math.abs(ha - hb) < 0.5) continue;
       for (const i of alti) {
@@ -982,18 +982,21 @@ export function altezze(nodi, feats) {
    * sopra quella di una strada scavalcata, né muovere i sottopassi. */
   // Le quote decise per ultime (vedi sotto): non si muovono più.
   const ferme = new Uint8Array(N);
-  const limita = (forte = false) => {
+  const limita = (forte = false, da = null, quanti = 4) => {
     // Solo i tratti da sistemare: una lista di lavoro, che si riempie coi
     // tratti attorno ai nodi che si sono mossi (girare tutto il grafo
-    // centinaia di volte costava secondi per tessera).
+    // centinaia di volte costava secondi per tessera). [da]: i nodi da cui
+    // partire (tutti, se null).
     const inLista = new Uint8Array(N);
     const lista = [];
-    for (let i = 0; i < N; i++) {
+    for (const i of da ?? nodi.keys()) {
+      if (inLista[i]) continue;
       inLista[i] = 1;
       lista.push(i);
     }
     let passi = 0;
-    while (lista.length && passi++ < 15 * N) {
+    const toccati = new Set();
+    while (lista.length && passi++ < quanti * N) {
       const i = lista.pop();
       inLista[i] = 0;
       for (const e of nodi[i].adj) {
@@ -1011,6 +1014,7 @@ export function altezze(nodi, feats) {
         const g = su === Infinity ? quanto / 2 : (quanto * giu) / (giu + su || 1);
         h[alto] -= Math.min(giu, g);
         h[basso] += Math.min(su, quanto - Math.min(giu, g));
+        toccati.add(alto).add(basso);
         for (const k of [alto, basso]) {
           if (!inLista[k]) {
             inLista[k] = 1;
@@ -1019,6 +1023,7 @@ export function altezze(nodi, feats) {
         }
       }
     }
+    return toccati;
   };
 
   /* Il risolutore: le carreggiate ancora una dentro l'altra (un tratto a
@@ -1035,31 +1040,76 @@ export function altezze(nodi, feats) {
     if (f.galleria || f.cls === 'rail') continue;
     const A = nodi[a];
     const B = nodi[b];
-    const mx = (A.x + B.x) / 2;
-    const my = (A.y + B.y) / 2;
+    // Più punti lungo i tratti lunghi: col solo punto di mezzo, due
+    // carreggiate affiancate per un pezzo del tratto sfuggivano.
+    const quanti = Math.max(1, Math.ceil(Math.hypot(B.x - A.x, B.y - A.y) / 6));
+    const migliore = new Map();
     const visti = new Set();
-    celle({ x: mx - 6, y: my - 6 }, { x: mx + 6, y: my + 6 }, (k) => {
+    celle({ x: Math.min(A.x, B.x) - 6, y: Math.min(A.y, B.y) - 6 }, { x: Math.max(A.x, B.x) + 6, y: Math.max(A.y, B.y) + 6 }, (k) => {
       for (const tj of griglia.get(k) || []) {
         if (visti.has(tj)) continue;
         visti.add(tj);
         const [c, d, fj] = tratti[tj];
         const g = feats[fj];
-        if (fj === fi || g.galleria || g.cls === 'rail' || c === a || c === b || d === a || d === b) continue;
+        if (fj === fi || g.galleria || g.cls === 'rail') continue;
+        // Con un capo in comune si toccano lì, ed è giusto; ma se corrono
+        // affiancate lontano da quel capo (un'inversione a U, due rami che
+        // si staccano stretti) contano come due carreggiate una dentro l'altra.
+        const comune = c === a || c === b ? nodi[c] : d === a || d === b ? nodi[d] : null;
+        if (comune && ((c === a || c === b) && (d === a || d === b))) continue;
+        const lontano = (f.w + g.w) / 2 + 1;
         const C = nodi[c];
         const D = nodi[d];
         const ex = D.x - C.x;
         const ey = D.y - C.y;
         const l2 = ex * ex + ey * ey;
-        const u = l2 ? Math.max(0, Math.min(1, ((mx - C.x) * ex + (my - C.y) * ey) / l2)) : 0;
-        if (Math.hypot(mx - C.x - ex * u, my - C.y - ey * u) >= Math.min(f.w, g.w) / 2) continue;
-        sovrapposti.push({ a, b, c, d, u, fi, fj });
+        for (let q = 0; q < quanti; q++) {
+          const t = (q + 0.5) / quanti;
+          const mx = A.x + (B.x - A.x) * t;
+          const my = A.y + (B.y - A.y) * t;
+          const u = l2 ? Math.max(0, Math.min(1, ((mx - C.x) * ex + (my - C.y) * ey) / l2)) : 0;
+          const dist = Math.hypot(mx - C.x - ex * u, my - C.y - ey * u);
+          if (comune && Math.hypot(mx - comune.x, my - comune.y) < lontano) continue;
+          if (dist >= Math.min(f.w, g.w) / 2) continue;
+          if (!migliore.has(tj) || dist < migliore.get(tj).dist) migliore.set(tj, { a, b, c, d, u, t, fi, fj, dist });
+        }
       }
     });
+    for (const p of migliore.values()) sovrapposti.push(p);
   }
+  // Per i controlli locali: le coppie sovrapposte di ogni nodo.
+  const coppieDi = new Map();
+  sovrapposti.forEach((p, n) => {
+    for (const i of [p.a, p.b, p.c, p.d]) {
+      if (!coppieDi.has(i)) coppieDi.set(i, []);
+      coppieDi.get(i).push(n);
+    }
+  });
+  /** Quanti scalini e quante coppie una dentro l'altra attorno ai nodi [qui]. */
+  const dannoQui = (qui) => {
+    let n = 0;
+    const viste = new Set();
+    for (const i of qui) {
+      for (const e of nodi[i].adj) {
+        const chiave = Math.min(i, e.to) * N + Math.max(i, e.to);
+        if (viste.has(chiave)) continue;
+        viste.add(chiave);
+        if (Math.abs(h[i] - h[e.to]) - PENDENZA_MAX * e.d > 0.05) n += 1000;
+      }
+      for (const q of coppieDi.get(i) ?? []) {
+        if (viste.has(-q - 1)) continue;
+        viste.add(-q - 1);
+        const p = sovrapposti[q];
+        const dz = Math.abs((h[p.a] + (h[p.b] - h[p.a]) * p.t) - (h[p.c] + (h[p.d] - h[p.c]) * p.u));
+        if (dz > 0.6 && dz < 4.6) n++;
+      }
+    }
+    return n;
+  };
   const contrasti = () => {
     const out = [];
     for (const p of sovrapposti) {
-      const hm = (h[p.a] + h[p.b]) / 2;
+      const hm = (h[p.a] + (h[p.b] - h[p.a]) * p.t);
       const hc = h[p.c] + (h[p.d] - h[p.c]) * p.u;
       const dz = Math.abs(hm - hc);
       if (dz > 0.6 && dz < 4.6) out.push({ ...p, sopra: hm > hc });
@@ -1078,8 +1128,9 @@ export function altezze(nodi, feats) {
       if (su.ponte && (su.livello > giu.livello || !giu.ponte) && !vicine(sa, p.sopra ? p.c : p.a, p.sopra ? p.d : p.b)) {
         // Il ponte sopra: almeno la luce sopra quella di sotto. Prima scende
         // quella di sotto, se la sua quota non serve; se no sale il ponte.
-        const [lc, ld, lu] = p.sopra ? [p.c, p.d, p.u] : [p.a, p.b, 0.5];
-        const hSu = (h[sa] + h[sb]) / 2;
+        const [lc, ld, lu] = p.sopra ? [p.c, p.d, p.u] : [p.a, p.b, p.t];
+        const tSu = p.sopra ? p.t : p.u;
+        const hSu = h[sa] + (h[sb] - h[sa]) * tSu;
         const voluta = hSu - SCAVALCO_M;
         if (voluta >= 0 && [lc, ld].every((i) => obbligata[i] <= voluta + 0.05 && !sottopasso[i])) {
           for (const i of [lc, ld]) if (voluta < abbassate[i]) abbassate[i] = voluta;
@@ -1090,7 +1141,7 @@ export function altezze(nodi, feats) {
           sottoAl[ld] = Math.min(sottoAl[ld], h[ld]);
         }
       } else {
-        affiancate.push({ a: p.a, b: p.b, c: p.c, d: p.d, u: p.u, aTerraTutte: !feats[p.fi].ponte && !feats[p.fj].ponte });
+        affiancate.push({ a: p.a, b: p.b, c: p.c, d: p.d, u: p.u, t: p.t, aTerraTutte: !feats[p.fi].ponte && !feats[p.fj].ponte });
       }
     }
     // Le strade da abbassare: un tetto in più, che sale del PENDENZA_MAX.
@@ -1124,8 +1175,8 @@ export function altezze(nodi, feats) {
   // guastarlo, finché non resta niente (o quasi: tre volte).
   for (let volta = 0; volta < 3; volta++) {
     risolvi();
-    limita();
-    limita(true);
+    limita(false, null, 8);
+    limita(true, null, 15);
     if (!contrasti().length) break;
   }
   /* L'ultima parola, dove due strade si uniscono (o corrono affiancate a
@@ -1137,6 +1188,75 @@ export function altezze(nodi, feats) {
     for (let i = 0; i < N; i++) for (const e of nodi[i].adj) if (e.to > i && Math.abs(h[i] - h[e.to]) - PENDENZA_MAX * e.d > 0.05) n++;
     return n;
   };
+  /* Le biforcazioni strette (e le confluenze): dove due rami partono dallo
+   * stesso nodo quasi paralleli, finché le due carreggiate si sovrappongono
+   * stanno alla quota del nodo, e solo dopo uno sale e l'altro scende. Prima
+   * uno saliva e l'altro scendeva da subito, e nel cuneo le due carreggiate
+   * erano una dentro l'altra. Un nodo alla volta, solo se non fa danni. */
+  for (let J = 0; J < N; J++) {
+    const nj = nodi[J];
+    if (nj.adj.length < 3 || sottopasso[J]) continue;
+    // Il ramo che parte da J lungo l'arco [e]: i nodi in fila, con quanto distano da J.
+    const ramo = (e) => {
+      const f = feats[e.f];
+      const k0 = f.nodi.indexOf(J);
+      const k1 = f.nodi.indexOf(e.to);
+      if (k0 < 0 || k1 < 0) return [];
+      const passo = k1 > k0 ? 1 : -1;
+      const out = [];
+      let d = 0;
+      for (let k = k1; k >= 0 && k < f.nodi.length && d < 60; k += passo) {
+        const a = nodi[f.nodi[k - passo]];
+        const b = nodi[f.nodi[k]];
+        d += Math.hypot(b.x - a.x, b.y - a.y);
+        out.push([f.nodi[k], d]);
+      }
+      return out;
+    };
+    const daFermare = new Set();
+    for (let x = 0; x < nj.adj.length; x++) {
+      for (let y = x + 1; y < nj.adj.length; y++) {
+        const ex = nj.adj[x];
+        const ey = nj.adj[y];
+        const A = nodi[ex.to];
+        const B = nodi[ey.to];
+        const cos = ((A.x - nj.x) * (B.x - nj.x) + (A.y - nj.y) * (B.y - nj.y)) / (Math.hypot(A.x - nj.x, A.y - nj.y) * Math.hypot(B.x - nj.x, B.y - nj.y) || 1);
+        if (cos < Math.cos((35 * Math.PI) / 180)) continue;
+        const ra = ramo(ex);
+        const rb = ramo(ey);
+        const largo = ((feats[ex.f].w + feats[ey.f].w) / 2) * 0.9;
+        for (const [ra1, rb1] of [
+          [ra, rb],
+          [rb, ra],
+        ]) {
+          for (const [i] of ra1) {
+            const P = nodi[i];
+            const vicino = Math.min(...rb1.map(([j]) => Math.hypot(nodi[j].x - P.x, nodi[j].y - P.y)));
+            if (vicino >= largo) break;
+            daFermare.add(i);
+          }
+        }
+      }
+    }
+    if (!daFermare.size) continue;
+    const lista = [...daFermare].filter((i) => !sottopasso[i] && Math.abs(h[i] - h[J]) > 0.05);
+    if (!lista.length) continue;
+    const prima = Float64Array.from(h);
+    const fermePrima = Uint8Array.from(ferme);
+    for (const i of lista) {
+      h[i] = h[J];
+      ferme[i] = 1;
+    }
+    ferme[J] = 1;
+    const toccati = limita(true, [...lista, J]);
+    const qui = new Set([...lista, J, ...toccati]);
+    const dopo = dannoQui(qui);
+    const ora = Float64Array.from(h);
+    h.set(prima);
+    const primaDanno = dannoQui(qui);
+    if (dopo > primaDanno) ferme.set(fermePrima);
+    else h.set(ora);
+  }
   // Una coppia alla volta: si tiene solo se non fa nascere scalini e non
   // lascia più carreggiate una dentro l'altra di prima.
   for (let volta = 0; volta < 2; volta++) {
@@ -1146,24 +1266,47 @@ export function altezze(nodi, feats) {
       const fj = feats[p.fj];
       const unite = vicine(p.a, p.c, p.d) || (!fi.ponte && !fj.ponte) || fi.livello === fj.livello;
       if (!unite) continue;
-      const nodiQui = [p.a, p.b, p.c, p.d].filter((i) => !sottopasso[i]);
-      if (nodiQui.length < 4) continue;
+      const tutti = [...new Set([p.a, p.b, p.c, p.d])];
+      const nodiQui = tutti.filter((i) => !sottopasso[i]);
+      if (nodiQui.length < tutti.length) continue;
       const hb = h[p.c] + (h[p.d] - h[p.c]) * p.u;
-      if (Math.abs((h[p.a] + h[p.b]) / 2 - hb) <= 0.6) continue;
+      if (Math.abs((h[p.a] + (h[p.b] - h[p.a]) * p.t) - hb) <= 0.6) continue;
       const prima = Float64Array.from(h);
       const fermePrima = Uint8Array.from(ferme);
-      const scaliniPrima = scalini();
-      const contrastiPrima = contrasti().length;
-      const media = nodiQui.reduce((t, i) => t + h[i], 0) / nodiQui.length;
-      for (const i of nodiQui) {
-        h[i] = media;
-        ferme[i] = 1;
-      }
-      limita(true);
-      if (scalini() > scaliniPrima || contrasti().length >= contrastiPrima) {
+      // Il danno attorno, prima e dopo (solo lì: tutto il grafo costava troppo).
+      const prova = (fai) => {
+        fai();
+        const toccati = limita(true, nodiQui);
+        const qui = new Set([...nodiQui, ...toccati]);
+        const dopo = dannoQui(qui);
+        const ora = Float64Array.from(h);
         h.set(prima);
-        ferme.set(fermePrima);
-      } else tenute++;
+        const ok = dopo < dannoQui(qui);
+        if (ok) h.set(ora);
+        else ferme.set(fermePrima);
+        return ok;
+      };
+      const media = nodiQui.reduce((t, i) => t + h[i], 0) / nodiQui.length;
+      let ok = prova(() => {
+        for (const i of nodiQui) {
+          h[i] = media;
+          ferme[i] = 1;
+        }
+      });
+      if (!ok) {
+        // Meno: solo quanto basta, mezzo metro fra le due, muovendo quella
+        // che non è un ponte (o la più bassa).
+        const ha = (h[p.a] + (h[p.b] - h[p.a]) * p.t);
+        const [muovi, verso] = !fi.ponte && fj.ponte ? [[p.a, p.b], hb] : fi.ponte && !fj.ponte ? [[p.c, p.d], ha] : ha < hb ? [[p.a, p.b], hb] : [[p.c, p.d], ha];
+        ok = prova(() => {
+          for (const i of muovi) {
+            if (sottopasso[i]) continue;
+            h[i] = h[i] < verso ? verso - 0.5 : verso + 0.5;
+            ferme[i] = 1;
+          }
+        });
+      }
+      if (ok) tenute++;
     }
     if (!tenute) break;
   }

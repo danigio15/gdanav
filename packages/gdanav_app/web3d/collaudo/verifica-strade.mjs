@@ -74,7 +74,8 @@ export async function costruisci(X, Y, { corsie = !process.env.SENZA_CORSIE } = 
   const ox = (X + 0.5) * sys.lato, oy = -(Y + 0.5) * sys.lato;
   const segs = [];
   const S = t.segmenti;
-  for (let k = 0; k < S.length; k += 8) segs.push({ a: [S[k] + ox, S[k + 1] + oy, S[k + 2]], b: [S[k + 3] + ox, S[k + 4] + oy, S[k + 5]], w: S[k + 6], f: S[k + 7] });
+  const L = t.grafo.latiSegmenti;
+  for (let k = 0; k < S.length; k += 8) segs.push({ a: [S[k] + ox, S[k + 1] + oy, S[k + 2]], b: [S[k + 3] + ox, S[k + 4] + oy, S[k + 5]], w: S[k + 6], f: S[k + 7], lati: L ? [L[k / 4], L[k / 4 + 1]] : [S[k + 6] / 2, S[k + 6] / 2] });
   const piloni = [];
   for (let i = 0; i < t.fusti.length; i += 16) piloni.push({ x: t.fusti[i + 12] + ox, y: t.fusti[i + 13] + oy, h: Math.hypot(t.fusti[i + 8], t.fusti[i + 9], t.fusti[i + 10]) + 0.8 });
   // Le vie con le corsie: i loro punti in metri globali, con la quota.
@@ -114,6 +115,19 @@ function distSeg(px, py, a, b) {
   const u = l2 ? Math.max(0, Math.min(1, ((px - a[0]) * ex + (py - a[1]) * ey) / l2)) : 0;
   return [Math.hypot(px - a[0] - ex * u, py - a[1] - ey * u), a[2] + (b[2] - a[2]) * u];
 }
+// La mezza larghezza disegnata di `s` (nel suo punto `p`) dalla parte del punto `q`.
+function lato(s, p, q) {
+  const ex = s.b[0] - s.a[0], ey = s.b[1] - s.a[1];
+  const c = ex * (q[1] - p[1]) - ey * (q[0] - p[0]);
+  // Se `q` è proprio sulla linea, la più larga.
+  if (Math.abs(c) < 1e-6) return Math.max(...s.lati);
+  return c > 0 ? s.lati[0] : s.lati[1];
+}
+const proietta = (p, o) => {
+  const fx = o.b[0] - o.a[0], fy = o.b[1] - o.a[1];
+  const u = Math.max(0, Math.min(1, ((p[0] - o.a[0]) * fx + (p[1] - o.a[1]) * fy) / (fx * fx + fy * fy || 1)));
+  return [o.a[0] + fx * u, o.a[1] + fy * u];
+};
 export function controlla(T) {
   const err = [];
   const metti = (tipo, x, y, info) => err.push({ tipo, ll: lonLat(T.sys, T.X, T.Y, x, y).map((v) => +v.toFixed(5)), info });
@@ -145,13 +159,26 @@ export function controlla(T) {
   T.segs.forEach((s, i) => {
     if (!dentro(T, s.a) || s.f & 64) return;
     const m = [(s.a[0] + s.b[0]) / 2, (s.a[1] + s.b[1]) / 2, (s.a[2] + s.b[2]) / 2];
+    // I pezzi che seguono sulla stessa linea non sono un'altra strada (su
+    // una strada larga i pezzi corti stanno tutti dentro la mezza larghezza).
+    const seguito = new Set();
+    for (let k = i + 1; k < T.segs.length && k <= i + 6; k++) {
+      const p = T.segs[k - 1].b, q = T.segs[k].a;
+      if (Math.hypot(p[0] - q[0], p[1] - q[1]) > 0.01) break;
+      seguito.add(k);
+    }
     for (const j of vicini(m[0], m[1])) {
-      if (j <= i) continue;
+      if (j <= i || seguito.has(j)) continue;
       const o = T.segs[j];
       if (o.f & 64) continue;
       const [d, zo] = distSeg(m[0], m[1], o.a, o.b);
       const dz = Math.abs(zo - m[2]);
-      if (d < Math.min(s.w, o.w) / 2 && dz > 0.8 && dz < 4.5) metti('compenetrati', m[0], m[1], `dz ${dz.toFixed(1)} (${m[2].toFixed(1)}/${zo.toFixed(1)}) cls${s.f & 15}/${o.f & 15}`);
+      if (dz <= 0.8 || dz >= 4.5 || d >= Math.min(s.w, o.w) / 2) continue;
+      // Con le larghezze disegnate (dove le carreggiate si stringono una
+      // dall'altra): si compenetrano se i due nastri entrano uno nell'altro.
+      const q = proietta(m, o);
+      if (lato(s, m, q) + lato(o, q, m) - d < 0.3) continue;
+      metti('compenetrati', m[0], m[1], `dz ${dz.toFixed(1)} (${m[2].toFixed(1)}/${zo.toFixed(1)}) cls${s.f & 15}/${o.f & 15}`);
     }
   });
   // D. Piloni sull'asfalto di una strada più bassa

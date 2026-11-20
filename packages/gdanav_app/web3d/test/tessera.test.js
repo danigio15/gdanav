@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { bufferDellaTessera, costruisciTessera, iSottopassi, LIMITI, NASTRI, stimaTriangoli, stradaVera } from '../src/tessera.js';
+import { bufferDellaTessera, carreggiateAffiancate, costruisciTessera, iSottopassi, LIMITI, NASTRI, stimaTriangoli, stradaVera } from '../src/tessera.js';
 import { ALTEZZA_LIVELLO, SPESSORE_IMPALCATO, altezzaViadotto } from '../src/elevazione.js';
 import { cavalcavia, cavalcaviaConRampa, cavalcaviaDueCarreggiate, ponteLungo, sottopasso, sottopassoConNome, strato } from './finte.js';
 
@@ -414,4 +414,33 @@ test('i piloni del viadotto alto non stanno sull\'asfalto della rampa di sotto, 
   const basso = Math.min(...xs);
   const sulBasso = alti.filter((x) => x - basso > 2.5 && x - basso < 4.5 + 0.8);
   assert.deepEqual(sulBasso, [], `piloni del ponte alto sull'impalcato basso: ${sulBasso}`);
+});
+
+test('due carreggiate affiancate a quote diverse si stringono dal lato dell\'altra', () => {
+  // Due linee parallele a 6 m, larghe 8 m: una a terra, una a 4 m.
+  const nodi = [];
+  const feats = [];
+  for (const [y, h] of [[0, 0], [6, 4]]) {
+    const ids = [];
+    for (let x = 0; x <= 100; x += 10) {
+      ids.push(nodi.length);
+      nodi.push({ x, y, h });
+    }
+    feats.push({ nodi: ids, w: 8, cls: 'primary' });
+  }
+  assert.equal(carreggiateAffiancate(feats, nodi), 2);
+  const [bassa, alta] = feats;
+  // La bassa ha l'altra a sinistra (y crescente), l'alta a destra.
+  for (const [sx, dx] of bassa.larghezze) {
+    assert.ok(sx <= 3 + 1e-9);
+    assert.equal(dx, 4);
+  }
+  for (const [sx, dx] of alta.larghezze) {
+    assert.equal(sx, 4);
+    assert.ok(dx <= 3 + 1e-9);
+  }
+  // Alla stessa quota non si toccano.
+  const piane = feats.map((f) => ({ ...f, larghezze: undefined }));
+  for (const n of nodi) n.h = 0;
+  assert.equal(carreggiateAffiancate(piane, nodi), 0);
 });
