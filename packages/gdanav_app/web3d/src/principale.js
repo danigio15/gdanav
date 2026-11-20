@@ -398,6 +398,12 @@ const GESTORI = {
     moto.velocitaAuto(m.ms, m.alle, S.orologioProva ?? Date.now());
     sveglia();
   },
+  /** L'accelerazione di marcia dall'accelerometro del telefono: le frenate
+   * e le ripartenze quando succedono, non un secondo dopo col GPS. */
+  accelerazione(m) {
+    moto.accelerazione(m.a, m.alle, S.orologioProva ?? Date.now(), m.ritardo ?? null);
+    sveglia();
+  },
   /** Un dito sullo schermo dell'auto: la mappa si sposta e smette di seguire. */
   sposta(m) {
     if (!S.mappa) return;

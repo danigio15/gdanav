@@ -41,6 +41,9 @@ export const RITARDO_S = 0.8;
  * cruscotto (fresca, senza ritardo) la frenata si sa subito: [RITARDO_S]. */
 export const RITARDO_SOLO_GPS_S = 0.4;
 
+/** Un'accelerazione del telefono più vecchia di così non si usa (ms). */
+const ACCELERAZIONE_VECCHIA_MS = 600;
+
 /** Una velocità del cruscotto più vecchia di così non si usa (ms). */
 const VELOCITA_VECCHIA_MS = 1500;
 /** Il ritardo della velocità dell'auto (s): poco, viene dal cruscotto. */
@@ -78,6 +81,8 @@ const somma = (A, B) => A.map((r, i) => r.map((x, j) => x + B[i][j]));
 export class FiltroSullaStrada {
   constructor({ ritardo = RITARDO_S } = {}) {
     this.ritardo = ritardo;
+    /** Il ritardo del GPS misurato per questo telefono (s), se l'app lo sa. */
+    this.ritardoMisurato = null;
     this.reset();
   }
 
@@ -92,6 +97,9 @@ export class FiltroSullaStrada {
     this.mostrato = null;
     this.velMostrata = 0;
     this.ultimaVelocitaAuto = null;
+    this.ultimaAccelerazione = null;
+    /** Le accelerazioni del telefono degli ultimi secondi: `[ms, a]`. */
+    this.storiaAcc = [];
     this.ultimoPasso = null;
   }
 
@@ -155,8 +163,12 @@ export class FiltroSullaStrada {
   misura({ metri, alle, v = null, precisione = null }, adesso) {
     if (!Number.isFinite(metri)) return;
     const quando = Number.isFinite(alle) && alle <= adesso && adesso - alle < 5000 ? alle : adesso;
-    const autoFresca0 = this.ultimaVelocitaAuto != null && adesso - this.ultimaVelocitaAuto < VELOCITA_VECCHIA_MS;
-    const indietro = (autoFresca0 ? this.ritardo : Math.min(this.ritardo, RITARDO_SOLO_GPS_S)) + (adesso - quando) / 1000;
+    // Con la velocità del cruscotto o l'accelerometro la frenata si sa
+    // subito, e si può togliere tutto il ritardo del GPS.
+    const subito =
+      (this.ultimaVelocitaAuto != null && adesso - this.ultimaVelocitaAuto < VELOCITA_VECCHIA_MS) || this.accelerometroVivo(adesso);
+    const pieno = this.accelerometroVivo(adesso) && this.ritardoMisurato != null ? this.ritardoMisurato : this.ritardo;
+    const indietro = (subito ? pieno : Math.min(this.ritardo, RITARDO_SOLO_GPS_S)) + (adesso - quando) / 1000;
     const vm = Number.isFinite(v) ? Math.max(0, v) : null;
     if (this.x !== null) {
       this.predici(adesso);
@@ -192,6 +204,20 @@ export class FiltroSullaStrada {
       ];
     }
     const autoFresca = this.ultimaVelocitaAuto != null && adesso - this.ultimaVelocitaAuto < 1500;
+    /* Con l'accelerometro si sa come è cambiata la velocità nel ritardo del
+     * GPS, accelerazione per accelerazione: la lettura di allora si porta ad
+     * adesso con quelle, non supponendo un'accelerazione costante. Fermandosi
+     * a metà del ritardo, quella costante faceva scivolare avanti la stima
+     * di qualche metro dopo la fermata. */
+    const int = this.accelerometroVivo(adesso) ? this.integraliAcc(adesso - indietro * 1000, adesso) : null;
+    if (int) {
+      if (vm !== null) this.correggi([0, 1, 0], Math.max(0, vm + int.dv), autoFresca ? 4 : 0.06);
+      const sigma = Math.min(25, Math.max(3, precisione ?? 6));
+      // s(allora) = s − v·T + ds
+      this.correggi([1, -indietro, 0], metri - int.ds, sigma * sigma);
+      if (this.x[1] < 0) this.x[1] = 0;
+      return;
+    }
     if (this.fermo && !autoFresca) {
       // Fermi: la velocità e l'accelerazione sono quasi zero. Quasi: un
       // filtro certo dello zero ci mette secondi a credere alla ripartenza,
@@ -289,6 +315,57 @@ export class FiltroSullaStrada {
     this.ultimaVelocitaAuto = adesso;
     this.correggi([0, 1, -indietro], vm, 0.02);
     if (this.x[1] < 0) this.x[1] = 0;
+  }
+
+  /**
+   * L'accelerazione di marcia dall'accelerometro del telefono ([a] m/s²,
+   * misurata [alle] ms), arrivata [adesso]: tarata sull'asse dell'auto
+   * dall'app (`AccelerazioneDiMarcia`). Il GPS dice la frenata un secondo
+   * dopo; l'accelerometro quando comincia, e la freccia frena con l'auto:
+   * non va oltre dove si ferma, e non deve tornare indietro.
+   */
+  accelerazione(a, alle, adesso, ritardo = null) {
+    // Il ritardo del GPS di questo telefono, misurato dall'app confrontando
+    // le frenate dell'accelerometro con quelle del GPS.
+    if (Number.isFinite(ritardo) && ritardo >= 0 && ritardo <= 2) this.ritardoMisurato = ritardo;
+    if (this.x === null || !Number.isFinite(a)) return;
+    if (!Number.isFinite(alle) || adesso - alle > ACCELERAZIONE_VECCHIA_MS) return;
+    this.predici(adesso);
+    this.ultimaAccelerazione = adesso;
+    this.storiaAcc.push([Math.min(alle, adesso), a]);
+    while (this.storiaAcc.length > 2 && this.storiaAcc[0][0] < adesso - 4000) this.storiaAcc.shift();
+    this.correggi([0, 0, 1], a, 0.6);
+    if (this.x[1] < 0) this.x[1] = 0;
+  }
+
+  /**
+   * Dal tempo [da] ad [a] (ms) con le accelerazioni misurate: quanto è
+   * cambiata la velocità (`dv`) e quanto meno strada si è fatta rispetto
+   * ad andare alla velocità finale (`ds`): `s(a) − s(da) = v(a)·T − ds`.
+   * `null` se l'accelerometro non copre l'intervallo.
+   */
+  integraliAcc(da, a) {
+    const h = this.storiaAcc;
+    if (h.length < 2 || h[0][0] > da + 150 || h[h.length - 1][0] < a - 300) return null;
+    let dv = 0;
+    let ds = 0;
+    for (let i = 0; i < h.length; i++) {
+      const t0 = Math.max(da, h[i][0]);
+      const t1 = Math.min(a, i + 1 < h.length ? h[i + 1][0] : a);
+      if (t1 <= t0) continue;
+      const acc = h[i][1];
+      const T0 = (t0 - da) / 1000;
+      const T1 = (t1 - da) / 1000;
+      dv += acc * (T1 - T0);
+      // ∫ (τ − da)·a dτ
+      ds += (acc * (T1 * T1 - T0 * T0)) / 2;
+    }
+    return { dv, ds };
+  }
+
+  /** Se l'accelerometro del telefono parla (e allora la frenata si sa subito). */
+  accelerometroVivo(adesso) {
+    return this.ultimaAccelerazione != null && adesso - this.ultimaAccelerazione < ACCELERAZIONE_VECCHIA_MS;
   }
 
   /** Quanto si va secondo il filtro (m/s). */

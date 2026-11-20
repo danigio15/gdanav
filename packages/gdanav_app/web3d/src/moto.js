@@ -125,6 +125,11 @@ export class Moto {
     if (this.colFiltro) this.filtro.velocitaAuto(v, alle, adesso);
   }
 
+  /** L'accelerazione di marcia dall'accelerometro del telefono: [a] m/s² letta [alle], arrivata [adesso]. */
+  accelerazione(a, alle, adesso, ritardo = null) {
+    if (this.colFiltro) this.filtro.accelerazione(a, alle, adesso, ritardo);
+  }
+
   /**
    * Una lettura nuova. [metri] lungo il percorso (o null), [x, y] in metri
    * della scena. [lettura]: il GPS com'era (`{metri, alle, v, precisione}`),
