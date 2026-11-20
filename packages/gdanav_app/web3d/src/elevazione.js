@@ -980,6 +980,8 @@ export function altezze(nodi, feats) {
    * resta uno scalino (due quote che si vogliono vicine), i due capi si
    * vengono incontro; senza scendere sotto la quota che serve, né salire
    * sopra quella di una strada scavalcata, né muovere i sottopassi. */
+  // Le quote decise per ultime (vedi sotto): non si muovono più.
+  const ferme = new Uint8Array(N);
   const limita = (forte = false) => {
     for (let giro = 0; giro < 400; giro++) {
       let troppo = 0;
@@ -992,8 +994,8 @@ export function altezze(nodi, feats) {
           const [alto, basso] = h[i] > h[j] ? [i, j] : [j, i];
           // Quanto può scendere quello alto e salire quello basso.
           // (Forte: l'ultima volta, se lo scalino resta, cedono anche le quote che servono.)
-          const giu = sottopasso[alto] ? 0 : Math.max(0, h[alto] - (forte ? 0 : Math.max(0, serve[alto])));
-          const su = sottopasso[basso] ? 0 : forte ? Infinity : Math.max(0, sottoAl[basso] - h[basso]);
+          const giu = sottopasso[alto] || ferme[alto] ? 0 : Math.max(0, h[alto] - (forte ? 0 : Math.max(0, serve[alto])));
+          const su = sottopasso[basso] || ferme[basso] ? 0 : forte ? Infinity : Math.max(0, sottoAl[basso] - h[basso]);
           if (giu + su < 0.01) continue;
           troppo++;
           const quanto = Math.min(eccesso, giu + su);
@@ -1107,6 +1109,44 @@ export function altezze(nodi, feats) {
     limita();
     limita(true);
     if (!contrasti().length) break;
+  }
+  /* L'ultima parola, dove due strade si uniscono (o corrono affiancate a
+   * terra) e restano una dentro l'altra: alla stessa quota, la media, che
+   * non si muove più; le salite attorno si raccordano al 10%. */
+  // Quanti tratti più ripidi del PENDENZA_MAX (per non cambiare un errore con un altro).
+  const scalini = () => {
+    let n = 0;
+    for (let i = 0; i < N; i++) for (const e of nodi[i].adj) if (e.to > i && Math.abs(h[i] - h[e.to]) - PENDENZA_MAX * e.d > 0.05) n++;
+    return n;
+  };
+  for (let volta = 0; volta < 3; volta++) {
+    const prima = Float64Array.from(h);
+    const fermePrima = Uint8Array.from(ferme);
+    const scaliniPrima = scalini();
+    const contrastiPrima = contrasti().length;
+    let fatte = 0;
+    for (const p of contrasti()) {
+      const fi = feats[p.fi];
+      const fj = feats[p.fj];
+      const unite = vicine(p.a, p.c, p.d) || (!fi.ponte && !fj.ponte) || fi.livello === fj.livello;
+      if (!unite) continue;
+      const nodiQui = [p.a, p.b, p.c, p.d].filter((i) => !sottopasso[i]);
+      if (nodiQui.length < 4) continue;
+      const media = nodiQui.reduce((t, i) => t + h[i], 0) / nodiQui.length;
+      for (const i of nodiQui) {
+        h[i] = media;
+        ferme[i] = 1;
+      }
+      fatte++;
+    }
+    if (!fatte) break;
+    limita(true);
+    // Se ha fatto più danni che altro, si torna indietro.
+    if (scalini() > scaliniPrima || contrasti().length >= contrastiPrima) {
+      h.set(prima);
+      ferme.set(fermePrima);
+      break;
+    }
   }
   for (let i = 0; i < N; i++) nodi[i].h = h[i];
   return scavalchi.length;
