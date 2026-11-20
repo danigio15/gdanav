@@ -320,9 +320,10 @@ class Guida {
      * lontanissimo: la distanza restava piccola, il cursore saltava in avanti,
      * e il navigatore diceva che quella strada l'avevi già fatta. */
     final passo = _precedente == null ? null : distanzaM(_precedente!, qui);
-    final p = _precedente == null
+    var p = _precedente == null
         ? _primaProiezione(qui)
         : _linea.proiettaTra(qui, _indietro(), _segmento + _quantiAvanti(qui), preferito: _preferito(qui, passo));
+    p = _senzaSaltiAvanti(qui, p, passo);
     /* Una lettura che non può dire «sei fuori strada» non lo dice.
      *
      * «Durante la navigazione all'improvviso perde il percorso e lo
@@ -349,7 +350,10 @@ class Guida {
     if (alle != null && !vecchia) _ultimaAlle = alle;
     final soglia = math.max(sogliaFuoriM, precisione ?? 0);
     if (p.lontanoM <= soglia) {
-      if (p.lontanoM <= sogliaFuoriM || !incerta) _segmento = p.segmento;
+      if (p.lontanoM <= sogliaFuoriM || !incerta) {
+        _segmento = p.segmento;
+        if (!incerta) _lungoPrima = p.lungoM;
+      }
       if (!incerta) _fuori = 0;
     } else if (!incerta) {
       _fuori++;
@@ -477,6 +481,66 @@ class Guida {
   }
 
   /// La direzione del segmento [i]; se è cortissimo, quella dei successivi.
+  /* Mai più avanti di quanto si è potuto andare.
+   *
+   * «Ero ancora all'incrocio e la freccia più avanti della posizione reale»,
+   * entrando in una rotonda a passo d'uomo. Il più vicino alla lettura non è
+   * sempre dove si è: all'ingresso di una rotonda, o accanto a una curva
+   * stretta, il GPS che cade di qualche metro verso l'anello è più vicino al
+   * pezzo di percorso venti metri più avanti che alla strada su cui si sta, e
+   * la posizione saltava là. I navigatori tengono conto di dove si era: fra
+   * due letture si va avanti di quanto ci si è spostati, non di più.
+   *
+   * Oltre [_avantiConcessoM] la proiezione costa un metro di distanza per ogni
+   * metro di troppo: vince solo se è più vicina davvero di tanto (un GPS che
+   * ha saltato un tratto, una galleria). Il più vicino dentro il concesso,
+   * altrimenti. */
+  Proiezione _senzaSaltiAvanti(Punto qui, Proiezione p, double? passo) {
+    final prima = _lungoPrima;
+    if (prima == null || passo == null || p.lontanoM.isInfinite) return p;
+    /* La strada fatta: quanto ci si è spostati fra le due letture. Non la
+     * velocità per il tempo fra le loro ore: il GPS del telefono e quello
+     * dell'auto hanno orologi loro, e due letture a un istante l'una
+     * dall'altra possono stare a venti metri. */
+    if (qui is PuntoInMoto && qui.alle != null && _ultimaAlle != null) {
+      // Dopo un buco di segnale non si sa per dove si è passati: il più vicino.
+      if (qui.alle!.difference(_ultimaAlle!).inMilliseconds / 1000 > _buco) return p;
+    }
+    final strada = passo;
+    final fino = prima + strada * 1.5 + _avantiConcessoM;
+    if (p.lungoM <= fino) return p;
+    final c = _linea.cumulate;
+    var j = _segmento;
+    while (j + 1 < c.length && c[j] < fino) {
+      j++;
+    }
+    final dentro = _linea.proiettaTra(qui, _indietro(), j, preferito: (i) => i >= _segmento);
+    if (dentro.lontanoM.isInfinite) return p;
+    // La parte del segmento oltre il concesso non vale: lì ci si ferma.
+    final d = dentro.lungoM > fino ? _proiettaA(qui, fino) : dentro;
+    return p.lontanoM + (p.lungoM - fino) < d.lontanoM ? p : d;
+  }
+
+  /// Quanto si concede in più, oltre la strada fatta fra due letture (m).
+  static const _avantiConcessoM = 6.0;
+
+  /// Oltre questo silenzio fra due letture si è nel buco di segnale (s).
+  static const _buco = 5.0;
+
+  /// La proiezione fissata a [metri] lungo il percorso.
+  Proiezione _proiettaA(Punto qui, double metri) {
+    final c = _linea.cumulate;
+    var i = 0;
+    while (i + 2 < c.length && c[i + 1] < metri) {
+      i++;
+    }
+    final l = c[i + 1] - c[i];
+    final t = l <= 0 ? 0.0 : ((metri - c[i]) / l).clamp(0.0, 1.0);
+    return Proiezione(lungoM: metri, lontanoM: distanzaM(qui, _punto(i, t)), segmento: i, t: t);
+  }
+
+  double? _lungoPrima;
+
   /* Fin dove ha senso cercarsi sul percorso.
    *
    * Fra due letture GPS passa un secondo: anche a duecento all'ora sono

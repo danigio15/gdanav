@@ -29,10 +29,11 @@ test('a velocità costante la freccia sta sulla posizione, non dietro', () => {
   assert.ok(Math.abs(s - 140) < 1, `a 10 s deve stare a 140 m, sta a ${s.toFixed(1)}`);
 });
 
-test('frenando si ferma dove si ferma l\'auto, e oltre va solo quanto non si può sapere', () => {
+test('frenando si ferma dove si ferma l\'auto, e oltre va solo quanto non si può sapere; mai indietro', () => {
   const m = new Moto();
   let s = 0;
   let massimo = 0;
+  let indietro = 0;
   // 14 m/s per 5 s, poi frena fino a fermarsi a 80 m.
   for (let t = 0; t <= 13000; t += 33) {
     if (t % 1000 < 33) {
@@ -41,13 +42,17 @@ test('frenando si ferma dove si ferma l\'auto, e oltre va solo quanto non si pu�
       const v = k <= 5 ? 14 : Math.max(0, 14 * (1 - (k - 5) / 2));
       m.posizione({ metri, v, quando: t });
     }
+    const prima = s;
     s = m.passo(t).s;
+    indietro = Math.max(indietro, prima - s);
     massimo = Math.max(massimo, s);
   }
   // Fino alla lettura dopo (un secondo) la frenata non si sa: l'ultima
   // lettura (70 m a 14 m/s) porta a 84 m. Oltre quello, poco.
   assert.ok(massimo < 87.5, `troppo oltre: ${massimo.toFixed(1)}`);
-  assert.ok(Math.abs(s - 80) <= 3.2, `ferma a 80, sta a ${s.toFixed(1)}`);
+  // «Quando mi fermo la freccia va avanti e poi ritorna indietro»: no.
+  assert.ok(indietro < 0.01, `è tornata indietro di ${indietro.toFixed(2)} m`);
+  assert.ok(s >= 80 - 0.5 && s <= 87.5, `ferma a 80 o poco oltre, sta a ${s.toFixed(1)}`);
 });
 
 test('non torna mai indietro per poco, salta per tanto', () => {
@@ -80,12 +85,16 @@ test('al semaforo, ferma un poco avanti alla lettura, è arrivata: la scena smet
   }
   assert.ok(!m.fermo, 'andando non è ferma');
   const dove = 100 + 15 * 4 + 2;
-  // (Da oltre i tre metri la freccia torna piano: qualche secondo.)
+  // La freccia resta dove si è fermata, un poco avanti: non torna indietro.
+  let fermata = null;
   for (let i = 0; i < 12; i++) {
     m.posizione({ metri: dove, v: 0, quando: t });
     for (let k = 0; k < 30; k++) m.passo((t += 1000 / 30));
+    if (i === 8) fermata = m.s;
   }
-  assert.ok(m.s >= dove && m.s - dove <= 3.05, `ferma entro tre metri: ${(m.s - dove).toFixed(2)}`);
+  // (Qui da 15 m/s a ferma di colpo: oltre gli otto metri torna, fino a lì.)
+  assert.ok(m.s >= dove && m.s - dove <= 8.05, `ferma poco avanti: ${(m.s - dove).toFixed(2)}`);
+  assert.ok(Math.abs(m.s - fermata) < 0.01, `ferma, resta lì (${fermata.toFixed(2)} → ${m.s.toFixed(2)})`);
   assert.ok(m.fermo, 'ferma: niente più fotogrammi');
   // Il GPS che da ferma balla (sotto la freccia) non la risveglia; una lettura in marcia sì.
   for (const balla of [2, 0.5, 1.5]) {
@@ -146,10 +155,14 @@ test('senza percorso, ferma un poco avanti alla lettura: resta lì, ed è arriva
   m.posizione({ metri: null, v: 0, x: 1, y: 0, rotta: 0, quando: 6000 });
   for (let t = 6000; t <= 9000; t += 33) p = m.passo(t);
   assert.ok(Math.abs(p.x - 1) < 0.05, `di lato sì (${p.x.toFixed(2)})`);
-  // Oltre i tre metri torna, piano.
-  m.posizione({ metri: null, v: 0, x: 1, y: -6, rotta: 0, quando: 9000 });
-  for (let t = 9000; t <= 15000; t += 33) p = m.passo(t);
-  assert.ok(p.y < -2.5 && p.y > -3.2, `torna fino a tre metri dalla lettura (${p.y.toFixed(2)})`);
+  // Sei metri indietro: resta lì, come i navigatori.
+  m.posizione({ metri: null, v: 0, x: 1, y: -4, rotta: 0, quando: 9000 });
+  for (let t = 9000; t <= 12000; t += 33) p = m.passo(t);
+  assert.ok(Math.abs(p.y - 2) < 0.01, `sei metri: resta a 2 m (${p.y.toFixed(2)})`);
+  // Oltre gli otto metri torna, piano.
+  m.posizione({ metri: null, v: 0, x: 1, y: -25, rotta: 0, quando: 12000 });
+  for (let t = 12000; t <= 20000; t += 33) p = m.passo(t);
+  assert.ok(p.y < -16.5 && p.y > -17.2, `torna fino a otto metri dalla lettura (${p.y.toFixed(2)})`);
 });
 
 test('alle svolte, fermi o quasi, la freccia non gira prima dell\'auto', async () => {

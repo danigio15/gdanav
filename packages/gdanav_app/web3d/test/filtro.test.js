@@ -147,3 +147,28 @@ test('una velocità del cruscotto vecchia non si usa', () => {
   f.velocitaAuto(5, 10_150, 10_200);
   assert.ok(f.velocita > 3);
 });
+
+test('fermandosi col GPS in ritardo la freccia frena e resta lì: mai indietro', () => {
+  // «Quando mi fermo la freccia va avanti e poi ritorna indietro.» Il GPS
+  // dice che ci si è fermati un secondo dopo, quando la freccia è già oltre.
+  const f = new FiltroSullaStrada();
+  let ultima = null;
+  let indietro = 0;
+  for (let t = 0; t <= 20000; t += 33) {
+    if (t % 1000 < 33) {
+      const k = t / 1000;
+      // 12 m/s per 6 s, poi una frenata di 3 s fino a 90 m; il GPS (posizione
+      // e velocità) arriva un secondo in ritardo, come quello del telefono.
+      const pos = (q) => (q <= 6 ? 12 * q : q >= 9 ? 90 : 72 + 12 * (q - 6) - 2 * (q - 6) ** 2);
+      const vel = (q) => (q <= 6 ? 12 : Math.max(0, 12 - 4 * (q - 6)));
+      const metri = pos(Math.max(0, k - 1));
+      const v = vel(Math.max(0, k - 1));
+      f.misura({ metri, alle: t, v, precisione: 5 }, t);
+    }
+    const s = f.passo(t);
+    if (ultima !== null) indietro = Math.max(indietro, ultima - s);
+    ultima = s;
+  }
+  assert.ok(indietro < 0.01, `è tornata indietro di ${indietro.toFixed(2)} m`);
+  assert.ok(ultima - 90 < 8 && ultima >= 90 - 1, `ferma a 90 o poco oltre: ${ultima.toFixed(1)} m`);
+});
