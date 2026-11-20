@@ -313,11 +313,22 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   // Solo una strada che si stacca da questa (un punto in comune): due
   // carreggiate vicine, l'una accanto all'altra, tengono lo spartitraffico.
   const puntiDi = new Map();
+  const giaLegate = new Map();
   const legate = (i, j) => {
+    const chiaveCoppia = i < j ? i * 1e6 + j : j * 1e6 + i;
+    const saputo = giaLegate.get(chiaveCoppia);
+    if (saputo !== undefined) return saputo;
     for (const x of [i, j]) if (!puntiDi.has(x)) puntiDi.set(x, new Set(linee[x].map(ek)));
     const pj = puntiDi.get(j);
-    for (const q of puntiDi.get(i)) if (pj.has(q)) return true;
-    return false;
+    let si = false;
+    for (const q of puntiDi.get(i)) {
+      if (pj.has(q)) {
+        si = true;
+        break;
+      }
+    }
+    giaLegate.set(chiaveCoppia, si);
+    return si;
   };
   const suAltraStrada = (px, py, pz, fi) => {
     for (let ax = -1; ax <= 1; ax++) {

@@ -983,28 +983,41 @@ export function altezze(nodi, feats) {
   // Le quote decise per ultime (vedi sotto): non si muovono più.
   const ferme = new Uint8Array(N);
   const limita = (forte = false) => {
-    for (let giro = 0; giro < 400; giro++) {
-      let troppo = 0;
-      for (let i = 0; i < N; i++) {
-        for (const e of nodi[i].adj) {
-          const j = e.to;
-          if (j < i) continue;
-          const eccesso = Math.abs(h[i] - h[j]) - PENDENZA_MAX * e.d;
-          if (eccesso <= 0.01) continue;
-          const [alto, basso] = h[i] > h[j] ? [i, j] : [j, i];
-          // Quanto può scendere quello alto e salire quello basso.
-          // (Forte: l'ultima volta, se lo scalino resta, cedono anche le quote che servono.)
-          const giu = sottopasso[alto] || ferme[alto] ? 0 : Math.max(0, h[alto] - (forte ? 0 : Math.max(0, serve[alto])));
-          const su = sottopasso[basso] || ferme[basso] ? 0 : forte ? Infinity : Math.max(0, sottoAl[basso] - h[basso]);
-          if (giu + su < 0.01) continue;
-          troppo++;
-          const quanto = Math.min(eccesso, giu + su);
-          const g = su === Infinity ? quanto / 2 : (quanto * giu) / (giu + su || 1);
-          h[alto] -= Math.min(giu, g);
-          h[basso] += Math.min(su, quanto - Math.min(giu, g));
+    // Solo i tratti da sistemare: una lista di lavoro, che si riempie coi
+    // tratti attorno ai nodi che si sono mossi (girare tutto il grafo
+    // centinaia di volte costava secondi per tessera).
+    const inLista = new Uint8Array(N);
+    const lista = [];
+    for (let i = 0; i < N; i++) {
+      inLista[i] = 1;
+      lista.push(i);
+    }
+    let passi = 0;
+    while (lista.length && passi++ < 15 * N) {
+      const i = lista.pop();
+      inLista[i] = 0;
+      for (const e of nodi[i].adj) {
+        const j = e.to;
+        const eccesso = Math.abs(h[i] - h[j]) - PENDENZA_MAX * e.d;
+        if (eccesso <= 0.01) continue;
+        const [alto, basso] = h[i] > h[j] ? [i, j] : [j, i];
+        // Quanto può scendere quello alto e salire quello basso.
+        // (Forte: l'ultima volta, se lo scalino resta, cedono anche le quote che servono.)
+        const giu = sottopasso[alto] || ferme[alto] ? 0 : Math.max(0, h[alto] - (forte ? 0 : Math.max(0, serve[alto])));
+        const su = sottopasso[basso] || ferme[basso] ? 0 : forte ? Infinity : Math.max(0, sottoAl[basso] - h[basso]);
+        if (giu + su < 0.01) continue;
+        const quanto = Math.min(eccesso, giu + su);
+        if (quanto < 0.005) continue;
+        const g = su === Infinity ? quanto / 2 : (quanto * giu) / (giu + su || 1);
+        h[alto] -= Math.min(giu, g);
+        h[basso] += Math.min(su, quanto - Math.min(giu, g));
+        for (const k of [alto, basso]) {
+          if (!inLista[k]) {
+            inLista[k] = 1;
+            lista.push(k);
+          }
         }
       }
-      if (!troppo) break;
     }
   };
 
@@ -1014,37 +1027,42 @@ export function altezze(nodi, feats) {
    * cerca la verifica (collaudo/verifica-strade.mjs). Un ponte troppo basso
    * sopra un'altra strada sale; due strade affiancate o che si incrociano a
    * terra vanno alla stessa quota. Poi di nuovo tutto, al più quattro volte. */
+  // Le coppie di tratti una sopra l'altra in pianta: la geometria non cambia,
+  // si cercano una volta sola; poi ogni volta si guardano solo le quote.
+  const sovrapposti = [];
+  for (const [a, b, fi] of tratti) {
+    const f = feats[fi];
+    if (f.galleria || f.cls === 'rail') continue;
+    const A = nodi[a];
+    const B = nodi[b];
+    const mx = (A.x + B.x) / 2;
+    const my = (A.y + B.y) / 2;
+    const visti = new Set();
+    celle({ x: mx - 6, y: my - 6 }, { x: mx + 6, y: my + 6 }, (k) => {
+      for (const tj of griglia.get(k) || []) {
+        if (visti.has(tj)) continue;
+        visti.add(tj);
+        const [c, d, fj] = tratti[tj];
+        const g = feats[fj];
+        if (fj === fi || g.galleria || g.cls === 'rail' || c === a || c === b || d === a || d === b) continue;
+        const C = nodi[c];
+        const D = nodi[d];
+        const ex = D.x - C.x;
+        const ey = D.y - C.y;
+        const l2 = ex * ex + ey * ey;
+        const u = l2 ? Math.max(0, Math.min(1, ((mx - C.x) * ex + (my - C.y) * ey) / l2)) : 0;
+        if (Math.hypot(mx - C.x - ex * u, my - C.y - ey * u) >= Math.min(f.w, g.w) / 2) continue;
+        sovrapposti.push({ a, b, c, d, u, fi, fj });
+      }
+    });
+  }
   const contrasti = () => {
     const out = [];
-    for (const [a, b, fi] of tratti) {
-      const f = feats[fi];
-      if (f.galleria || f.cls === 'rail') continue;
-      const A = nodi[a];
-      const B = nodi[b];
-      const mx = (A.x + B.x) / 2;
-      const my = (A.y + B.y) / 2;
-      const hm = (h[a] + h[b]) / 2;
-      const visti = new Set();
-      celle({ x: mx - 6, y: my - 6 }, { x: mx + 6, y: my + 6 }, (k) => {
-        for (const tj of griglia.get(k) || []) {
-          if (visti.has(tj)) continue;
-          visti.add(tj);
-          const [c, d, fj] = tratti[tj];
-          const g = feats[fj];
-          if (fj === fi || g.galleria || g.cls === 'rail' || c === a || c === b || d === a || d === b) continue;
-          const C = nodi[c];
-          const D = nodi[d];
-          const ex = D.x - C.x;
-          const ey = D.y - C.y;
-          const l2 = ex * ex + ey * ey;
-          const u = l2 ? Math.max(0, Math.min(1, ((mx - C.x) * ex + (my - C.y) * ey) / l2)) : 0;
-          if (Math.hypot(mx - C.x - ex * u, my - C.y - ey * u) >= Math.min(f.w, g.w) / 2) continue;
-          const hc = h[c] + (h[d] - h[c]) * u;
-          const dz = Math.abs(hm - hc);
-          if (dz <= 0.6 || dz >= 4.6) continue;
-          out.push({ a, b, c, d, u, fi, fj, sopra: hm > hc });
-        }
-      });
+    for (const p of sovrapposti) {
+      const hm = (h[p.a] + h[p.b]) / 2;
+      const hc = h[p.c] + (h[p.d] - h[p.c]) * p.u;
+      const dz = Math.abs(hm - hc);
+      if (dz > 0.6 && dz < 4.6) out.push({ ...p, sopra: hm > hc });
     }
     return out;
   };
