@@ -886,7 +886,7 @@ export function altezze(nodi, feats) {
    * resta uno scalino (due quote che si vogliono vicine), i due capi si
    * vengono incontro; senza scendere sotto la quota che serve, né salire
    * sopra quella di una strada scavalcata, né muovere i sottopassi. */
-  const limita = () => {
+  const limita = (forte = false) => {
     for (let giro = 0; giro < 80; giro++) {
       let troppo = 0;
       for (let i = 0; i < N; i++) {
@@ -897,12 +897,13 @@ export function altezze(nodi, feats) {
           if (eccesso <= 0.01) continue;
           const [alto, basso] = h[i] > h[j] ? [i, j] : [j, i];
           // Quanto può scendere quello alto e salire quello basso.
-          const giu = sottopasso[alto] ? 0 : Math.max(0, h[alto] - Math.max(0, serve[alto]));
-          const su = sottopasso[basso] ? 0 : Math.max(0, sottoAl[basso] - h[basso]);
+          // (Forte: l'ultima volta, se lo scalino resta, cedono anche le quote che servono.)
+          const giu = sottopasso[alto] ? 0 : Math.max(0, h[alto] - (forte ? 0 : Math.max(0, serve[alto])));
+          const su = sottopasso[basso] ? 0 : forte ? Infinity : Math.max(0, sottoAl[basso] - h[basso]);
           if (giu + su < 0.01) continue;
           troppo++;
           const quanto = Math.min(eccesso, giu + su);
-          const g = (quanto * giu) / (giu + su || 1);
+          const g = su === Infinity ? quanto / 2 : (quanto * giu) / (giu + su || 1);
           h[alto] -= Math.min(giu, g);
           h[basso] += Math.min(su, quanto - Math.min(giu, g));
         }
@@ -952,6 +953,7 @@ export function altezze(nodi, feats) {
     return out;
   };
   const abbassate = new Float64Array(N).fill(Infinity);
+  const risolvi = () => {
   for (let giro = 0; giro < 4; giro++) {
     const cc = contrasti();
     if (!cc.length) break;
@@ -1003,7 +1005,15 @@ export function altezze(nodi, feats) {
     for (let k = 0; k < 2; k++) if (!affianca()) break;
     limita();
   }
-  limita();
+  };
+  // Il risolutore e lo scalino a turno: quello che uno sistema l'altro può
+  // guastarlo, finché non resta niente (o quasi: tre volte).
+  for (let volta = 0; volta < 3; volta++) {
+    risolvi();
+    limita();
+    limita(true);
+    if (!contrasti().length) break;
+  }
   for (let i = 0; i < N; i++) nodi[i].h = h[i];
   return scavalchi.length;
 }
