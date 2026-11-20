@@ -498,16 +498,15 @@ class Guida {
   Proiezione _senzaSaltiAvanti(Punto qui, Proiezione p, double? passo) {
     final prima = _lungoPrima;
     if (prima == null || passo == null || p.lontanoM.isInfinite) return p;
-    /* La strada fatta: quanto ci si è spostati, o — se lo spostamento è più
-     * di quanto dice la velocità, il GPS che balla di lato fra i palazzi —
-     * quanto si è andati a quella velocità in quel tempo. */
-    var strada = passo;
+    /* La strada fatta: quanto ci si è spostati fra le due letture. Non la
+     * velocità per il tempo fra le loro ore: il GPS del telefono e quello
+     * dell'auto hanno orologi loro, e due letture a un istante l'una
+     * dall'altra possono stare a venti metri. */
     if (qui is PuntoInMoto && qui.alle != null && _ultimaAlle != null) {
-      final dt = qui.alle!.difference(_ultimaAlle!).inMilliseconds / 1000;
       // Dopo un buco di segnale non si sa per dove si è passati: il più vicino.
-      if (dt > _buco) return p;
-      if (dt > 0 && qui.velocitaMs != null) strada = math.min(passo, qui.velocitaMs! * dt + 2);
+      if (qui.alle!.difference(_ultimaAlle!).inMilliseconds / 1000 > _buco) return p;
     }
+    final strada = passo;
     final fino = prima + strada * 1.5 + _avantiConcessoM;
     if (p.lungoM <= fino) return p;
     final c = _linea.cumulate;
