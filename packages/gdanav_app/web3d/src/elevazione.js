@@ -567,6 +567,37 @@ export function altezze(nodi, feats) {
       }
     });
   }
+  /* Le strade affiancate che si uniscono (o si dividono): le due linee
+   * corrono sovrapposte per qualche decina di metri prima del nodo, e una
+   * rampa che sale stava lì quattro metri sotto la carreggiata in cui
+   * entrava, una dentro l'altra. Dove si sovrappongono stanno alla stessa
+   * quota (vedi `affianca`). */
+  const affiancate = [];
+  for (const [a, b, fi] of tratti) {
+    const f = feats[fi];
+    if (f.galleria) continue;
+    const visti = new Set();
+    celle(nodi[a], nodi[b], (k) => {
+      for (const tj of griglia.get(k) || []) {
+        if (visti.has(tj)) continue;
+        visti.add(tj);
+        const [c, d, fj] = tratti[tj];
+        const g = feats[fj];
+        if (fj === fi || g.galleria || (g.cls === 'rail') !== (f.cls === 'rail') || c === a || c === b || d === a || d === b) continue;
+        // Collegate lì vicino (si uniscono): affiancate quasi parallele. Tutte e
+        // due a terra (le due carreggiate di un viale, o un incrocio dove le
+        // tessere hanno perso il nodo in comune): anche se si incrociano.
+        const [A, B, C, D] = [nodi[a], nodi[b], nodi[c], nodi[d]];
+        const aTerraTutte = !f.ponte && !g.ponte;
+        const coseno = ((B.x - A.x) * (D.x - C.x) + (B.y - A.y) * (D.y - C.y)) / (Math.hypot(B.x - A.x, B.y - A.y) * Math.hypot(D.x - C.x, D.y - C.y) || 1);
+        let u = Math.abs(coseno) < 0.75 ? null : sovrapposte(A, B, C, D, ((f.w + g.w) / 2) * 0.6);
+        if (u === null && aTerraTutte) u = incrocia(A, B, C, D);
+        if (u === null) continue;
+        if (!aTerraTutte && !vicine(a, c, d)) continue;
+        affiancate.push({ a, b, c, d, u, aTerraTutte });
+      }
+    });
+  }
   /* I punti a terra: le rotonde (vedi `segnaRotonde`), i sottopassi e la
    * carreggiata principale dove se ne stacca una rampa (ma non se, poco più
    * in là, diventa lei un ponte: lì è la salita del viadotto). */
@@ -674,6 +705,8 @@ export function altezze(nodi, feats) {
     }
     return v;
   };
+  // Il tetto in più delle strade affiancate (vedi sotto), e le sue sorgenti.
+  const tettoAffiancate = new Float64Array(N).fill(Infinity);
   const calcola = () => {
     // Quelle che servono scendono anche più ripide (come le rampe vere),
     // quando un punto a terra non lascia spazio per la salita dolce.
@@ -683,8 +716,74 @@ export function altezze(nodi, feats) {
       const vs = spandi(serve, PENDENZA_MAX, false, rotaie);
       const vv = spandi(tutte, PENDENZA, true, rotaie);
       // Un nodo con una strada sta alla quota della strada (il passaggio a livello).
-      for (let i = 0; i < N; i++) if (binari[i] === rotaie) h[i] = sottopasso[i] ? 0 : Math.max(0, vs[i], Math.min(vv[i], tetto[i]));
+      for (let i = 0; i < N; i++) {
+        if (binari[i] === rotaie) h[i] = sottopasso[i] ? 0 : Math.max(0, vs[i], Math.min(vv[i], tetto[i], tettoAffiancate[i]));
+      }
     }
+  };
+  /* Le affiancate alla stessa quota: prima si alza quella più bassa (se
+   * niente la tiene a terra); se non si può, quella più alta scende verso
+   * di lei (al più del PENDENZA_MAX), se la sua quota non serve. */
+  const affianca = () => {
+    let cambiate = 0;
+    const altra = (p, i) => (i === p.a || i === p.b ? h[p.c] + (h[p.d] - h[p.c]) * p.u : h[p.a] + (h[p.b] - h[p.a]) * 0.5);
+    for (const p of affiancate) {
+      // Due strade a terra: non si alza quella bassa (il viale salirebbe
+      // tutto); scende quella che la salita di un ponte ha tirato su.
+      if (p.aTerraTutte) continue;
+      const qui = altra(p, p.a);
+      for (const i of [p.a, p.b]) {
+        if (qui > h[i] + 0.3 && qui <= tetto[i] && qui > vorrei[i] + 0.01) {
+          vorrei[i] = qui;
+          cambiate++;
+        }
+      }
+      const la = altra(p, p.c);
+      for (const i of [p.c, p.d]) {
+        if (la > h[i] + 0.3 && la <= tetto[i] && la > vorrei[i] + 0.01) {
+          vorrei[i] = la;
+          cambiate++;
+        }
+      }
+    }
+    if (cambiate) calcola();
+    // Dove la più bassa non è potuta salire, scende la più alta.
+    const sorgenti = new Float64Array(N).fill(Infinity);
+    let scese = 0;
+    for (const p of affiancate) {
+      const hb = h[p.c] + (h[p.d] - h[p.c]) * p.u;
+      const ha = (h[p.a] + h[p.b]) / 2;
+      const [alti, basso] = ha > hb ? [[p.a, p.b], hb] : [[p.c, p.d], ha];
+      if (Math.abs(ha - hb) < 0.5) continue;
+      for (const i of alti) {
+        if (nodi[i].anelloInQuota) continue;
+        if (serve[i] < basso + 0.5 && basso < sorgenti[i]) {
+          sorgenti[i] = basso;
+          scese++;
+        }
+      }
+    }
+    if (!scese) return cambiate;
+    const mucchio = new Mucchio(false);
+    for (let i = 0; i < N; i++) {
+      if (sorgenti[i] < tettoAffiancate[i]) {
+        tettoAffiancate[i] = sorgenti[i];
+        mucchio.push(sorgenti[i], i);
+      }
+    }
+    while (mucchio.length) {
+      const [x, i] = mucchio.pop();
+      if (x > tettoAffiancate[i]) continue;
+      for (const e of nodi[i].adj) {
+        const nx = x + PENDENZA_MAX * e.d;
+        if (nx < tettoAffiancate[e.to]) {
+          tettoAffiancate[e.to] = nx;
+          mucchio.push(nx, e.to);
+        }
+      }
+    }
+    calcola();
+    return cambiate + scese;
   };
   // Fra due punti alti un ponte non scende; una rotonda con un pezzo di ponte resta in piano.
   const inPiano = () => {
@@ -749,6 +848,7 @@ export function altezze(nodi, feats) {
     }
     if (!cambiati) break;
   }
+  for (let k = 0; k < 2; k++) if (!affianca()) break;
   // Un poco di levigatura per raccordi più morbidi (non dove la quota serve).
   for (let it = 0; it < 6; it++) {
     const nh = Float64Array.from(h);
