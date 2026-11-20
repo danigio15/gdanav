@@ -707,6 +707,8 @@ export function altezze(nodi, feats) {
   };
   // Il tetto in più delle strade affiancate (vedi sotto), e le sue sorgenti.
   const tettoAffiancate = new Float64Array(N).fill(Infinity);
+  // La parte della quota che serve (la salita verso uno scavalco): non scende.
+  const obbligata = new Float64Array(N);
   const calcola = () => {
     // Quelle che servono scendono anche più ripide (come le rampe vere),
     // quando un punto a terra non lascia spazio per la salita dolce.
@@ -717,7 +719,9 @@ export function altezze(nodi, feats) {
       const vv = spandi(tutte, PENDENZA, true, rotaie);
       // Un nodo con una strada sta alla quota della strada (il passaggio a livello).
       for (let i = 0; i < N; i++) {
-        if (binari[i] === rotaie) h[i] = sottopasso[i] ? 0 : Math.max(0, vs[i], Math.min(vv[i], tetto[i], tettoAffiancate[i]));
+        if (binari[i] !== rotaie) continue;
+        h[i] = sottopasso[i] ? 0 : Math.max(0, vs[i], Math.min(vv[i], tetto[i], tettoAffiancate[i]));
+        obbligata[i] = sottopasso[i] ? 0 : Math.max(0, vs[i]);
       }
     }
   };
@@ -729,8 +733,23 @@ export function altezze(nodi, feats) {
     const altra = (p, i) => (i === p.a || i === p.b ? h[p.c] + (h[p.d] - h[p.c]) * p.u : h[p.a] + (h[p.b] - h[p.a]) * 0.5);
     for (const p of affiancate) {
       // Due strade a terra: non si alza quella bassa (il viale salirebbe
-      // tutto); scende quella che la salita di un ponte ha tirato su.
-      if (p.aTerraTutte) continue;
+      // tutto); scende quella che la salita di un ponte ha tirato su. Ma se
+      // quella in alto ci deve stare (sale verso un ponte che scavalca),
+      // sale l'altra: la rampa si stacca alla quota della carreggiata.
+      if (p.aTerraTutte) {
+        const ha = (h[p.a] + h[p.b]) / 2;
+        const hb = h[p.c] + (h[p.d] - h[p.c]) * p.u;
+        const [alti, bassi] = ha > hb ? [[p.a, p.b], [p.c, p.d]] : [[p.c, p.d], [p.a, p.b]];
+        if (!alti.every((i) => obbligata[i] > h[i] - 0.3)) continue;
+        for (const i of bassi) {
+          const q = Math.max(ha, hb);
+          if (q > h[i] + 0.3 && q <= tetto[i] && q > vorrei[i] + 0.01) {
+            vorrei[i] = q;
+            cambiate++;
+          }
+        }
+        continue;
+      }
       const qui = altra(p, p.a);
       for (const i of [p.a, p.b]) {
         if (qui > h[i] + 0.3 && qui <= tetto[i] && qui > vorrei[i] + 0.01) {
@@ -858,6 +877,32 @@ export function altezze(nodi, feats) {
       nh[i] = (h[i] * 2 + h[n.adj[0].to] + h[n.adj[1].to]) / 4;
     }
     h.set(nh);
+  }
+  /* Ultima rifinitura: nessun tratto più ripido del PENDENZA_MAX. Dove
+   * resta uno scalino (due quote che si vogliono vicine), i due capi si
+   * vengono incontro; senza scendere sotto la quota che serve, né salire
+   * sopra quella di una strada scavalcata, né muovere i sottopassi. */
+  for (let giro = 0; giro < 80; giro++) {
+    let troppo = 0;
+    for (let i = 0; i < N; i++) {
+      for (const e of nodi[i].adj) {
+        const j = e.to;
+        if (j < i) continue;
+        const eccesso = Math.abs(h[i] - h[j]) - PENDENZA_MAX * e.d;
+        if (eccesso <= 0.01) continue;
+        const [alto, basso] = h[i] > h[j] ? [i, j] : [j, i];
+        // Quanto può scendere quello alto e salire quello basso.
+        const giu = sottopasso[alto] ? 0 : Math.max(0, h[alto] - Math.max(0, serve[alto]));
+        const su = sottopasso[basso] ? 0 : Math.max(0, sottoAl[basso] - h[basso]);
+        if (giu + su < 0.01) continue;
+        troppo++;
+        const quanto = Math.min(eccesso, giu + su);
+        const g = (quanto * giu) / (giu + su || 1);
+        h[alto] -= Math.min(giu, g);
+        h[basso] += Math.min(su, quanto - Math.min(giu, g));
+      }
+    }
+    if (!troppo) break;
   }
   for (let i = 0; i < N; i++) nodi[i].h = h[i];
   return scavalchi.length;

@@ -8,7 +8,9 @@
 // - pilone: un pilone sull'asfalto di una strada più bassa;
 // - bordo: la stessa strada a quote diverse di qua e di là del bordo.
 // DETTAGLI=n stampa i primi n; SALVA=<file> li scrive in JSON.
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const W = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -16,6 +18,7 @@ const { VectorTile } = await import(`${W}/node_modules/@mapbox/vector-tile/index
 const Pbf = (await import(`${W}/node_modules/pbf/index.js`)).default;
 const { scarica } = await import(`${W}/collaudo/strada.mjs`);
 const { costruisciTessera } = await import(`${W}/src/tessera.js`);
+const { preparaCorsie } = await import(`${W}/src/corsie.js`);
 const { sistemaTessera } = await import(`${W}/src/geo.js`);
 const z = 14;
 const tj = JSON.parse((await scarica('https://tiles.openfreemap.org/planet')).corpo.toString());
@@ -28,10 +31,43 @@ async function strato(x, y) {
   }
   return strati.get(k);
 }
-export async function costruisci(X, Y) {
+// Le corsie del relay (la vista «Corsie»), dalle nove tessere attorno.
+const relay = new Map();
+async function corsieRelay(x, y) {
+  const k = x + ',' + y;
+  if (!relay.has(k)) {
+    // Con curl: passa dal proxy dell'ambiente, se c'è.
+    const f = path.join(os.tmpdir(), `relay-corsie-14-${x}-${y}.json`);
+    if (!fs.existsSync(f)) {
+      try {
+        execFileSync('curl', ['-s', '-f', '-o', f, `https://gdanav.gdahome.org/v1/corsie/14/${x}/${y}`]);
+      } catch {
+        relay.set(k, null);
+        return null;
+      }
+    }
+    relay.set(k, JSON.parse(fs.readFileSync(f, 'utf8')));
+  }
+  return relay.get(k);
+}
+export async function costruisci(X, Y, { corsie = !process.env.SENZA_CORSIE } = {}) {
   const livelli = {};
   for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) livelli[`${dx},${dy}`] = await strato(X + dx, Y + dy);
-  const t = costruisciTessera({ z, x: X, y: Y, livelli, grafo: true });
+  let datiCorsie = null;
+  if (corsie) {
+    const unite = { strade: new Map(), nodi: new Map(), alberi: new Map(), filari: [] };
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const d = await corsieRelay(X + dx, Y + dy);
+        if (!d) continue;
+        for (const v of d.strade ?? []) unite.strade.set(v.id, v);
+        for (const n of d.nodi ?? []) unite.nodi.set(n.id, n);
+        for (const a of d.alberi ?? []) unite.alberi.set(a.join(), a);
+      }
+    }
+    datiCorsie = preparaCorsie({ strade: [...unite.strade.values()], nodi: [...unite.nodi.values()], alberi: [...unite.alberi.values()], filari: [] });
+  }
+  const t = costruisciTessera({ z, x: X, y: Y, livelli, grafo: true, datiCorsie, vistaCorsie: !!datiCorsie });
   const sys = sistemaTessera(z, X, Y);
   // In metri «globali» (mercatore in metri della tessera di mezzo): per confrontare le vicine.
   const ox = (X + 0.5) * sys.lato, oy = -(Y + 0.5) * sys.lato;
@@ -40,7 +76,9 @@ export async function costruisci(X, Y) {
   for (let k = 0; k < S.length; k += 8) segs.push({ a: [S[k] + ox, S[k + 1] + oy, S[k + 2]], b: [S[k + 3] + ox, S[k + 4] + oy, S[k + 5]], w: S[k + 6], f: S[k + 7] });
   const piloni = [];
   for (let i = 0; i < t.fusti.length; i += 16) piloni.push({ x: t.fusti[i + 12] + ox, y: t.fusti[i + 13] + oy, h: Math.hypot(t.fusti[i + 8], t.fusti[i + 9], t.fusti[i + 10]) + 0.8 });
-  return { t, sys, segs, piloni, ox, oy, X, Y };
+  // Le vie con le corsie: i loro punti in metri globali, con la quota.
+  const corsieVie = (t.grafo.corsie ?? []).map((v) => ({ id: v.id, hw: v.hw, ponte: !!v.ponte, galleria: !!v.galleria, w: (v.avanti + v.indietro) * v.lw, p: v.xy.map(([x, y], k) => [x + ox, y + oy, v.h[k]]) }));
+  return { t, sys, segs, piloni, corsieVie, ox, oy, X, Y };
 }
 const lonLat = (sys, X, Y, gx, gy) => {
   // dai metri globali a lon/lat (per i rapporti)
@@ -107,6 +145,50 @@ export function controlla(T) {
       }
     }
   }
+  // E. Le corsie: salti lungo una via, una via sopra un'altra a meno di
+  // 4,5 m, una via staccata dall'asfalto della mappa sotto di lei.
+  for (const v of T.corsieVie) {
+    for (let k = 1; k < v.p.length; k++) {
+      const [a, b] = [v.p[k - 1], v.p[k]];
+      if (!dentro(T, a)) continue;
+      const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (l < 2) continue;
+      const p = Math.abs(b[2] - a[2]) / l;
+      if (p > 0.12) metti('corsie-pendenza', (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, `${(p * 100).toFixed(0)}% ${a[2].toFixed(1)}→${b[2].toFixed(1)} ${v.hw}${v.ponte ? ' ponte' : ''} ${v.id}`);
+    }
+  }
+  const GC = 20;
+  const gc = new Map();
+  T.corsieVie.forEach((v, vi) => {
+    for (let k = 1; k < v.p.length; k++) {
+      const key = Math.floor(v.p[k][0] / GC) + ',' + Math.floor(v.p[k][1] / GC);
+      if (!gc.has(key)) gc.set(key, []);
+      gc.get(key).push([vi, k]);
+    }
+  });
+  T.corsieVie.forEach((v, vi) => {
+    if (v.galleria) return;
+    for (let k = 1; k < v.p.length; k++) {
+      const m = [(v.p[k - 1][0] + v.p[k][0]) / 2, (v.p[k - 1][1] + v.p[k][1]) / 2, (v.p[k - 1][2] + v.p[k][2]) / 2];
+      if (!dentro(T, m)) continue;
+      const visti = new Set();
+      for (let ax = -1; ax <= 1; ax++) {
+        for (let ay = -1; ay <= 1; ay++) {
+          for (const [wi, j] of gc.get(Math.floor(m[0] / GC) + ax + ',' + (Math.floor(m[1] / GC) + ay)) || []) {
+            if (wi <= vi || visti.has(wi)) continue;
+            const o = T.corsieVie[wi];
+            if (o.galleria) continue;
+            const [d, zo] = distSeg(m[0], m[1], o.p[j - 1], o.p[j]);
+            const dz = Math.abs(zo - m[2]);
+            if (d < Math.min(v.w, o.w) / 2 && dz > 0.8 && dz < 4.5) {
+              visti.add(wi);
+              metti('corsie-compenetrate', m[0], m[1], `dz ${dz.toFixed(1)} (${m[2].toFixed(1)}/${zo.toFixed(1)}) ${v.hw}/${o.hw} ${v.id}/${o.id}`);
+            }
+          }
+        }
+      }
+    }
+  });
   return err;
 }
 // C. Bordi: la stessa strada alla stessa quota di qua e di là.

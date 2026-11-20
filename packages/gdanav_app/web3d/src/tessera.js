@@ -10,7 +10,7 @@
 
 import { generatore, mescola, semeTessera } from './caso.js';
 import { Costruttore, matrice } from './costruttore.js';
-import { CLASSI_STRADE, SPESSORE_IMPALCATO, altezzaViadotto, grafoStrade, uniscIBordi } from './elevazione.js';
+import { CLASSI_STRADE, PENDENZA_MAX, SPESSORE_IMPALCATO, altezzaViadotto, grafoStrade, uniscIBordi } from './elevazione.js';
 import { ESTENSIONE, sistemaTessera } from './geo.js';
 import {
   anelliPoligoni,
@@ -1360,7 +1360,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     ms: Date.now() - t0,
   };
   out.conti.triangoli = stimaTriangoli(out);
-  if (grafoPerIlCollaudo) out.grafo = grafoPerIlCollaudo;
+  if (grafoPerIlCollaudo) out.grafo = { ...grafoPerIlCollaudo, corsie: conCorsie?.strade ?? null };
   return out;
 }
 
@@ -1792,6 +1792,30 @@ function distanzaLinea(px, py, l) {
 /** I colori dei blocchi nella vista «Corsie»: bianchi, grigi chiari, appena caldi o freddi. */
 const CORSIE_FACCIATE = ['#f6f7f8', '#f1f3f5', '#eceff2', '#f6f4f1', '#eff1f4', '#f3f3f1'];
 
+/**
+ * Nessun tratto di una via più ripido del [PENDENZA_MAX]: dove succede (una
+ * quota presa dalla strada sbagliata), i due capi si vengono incontro e lo
+ * scalino diventa una salita. Cambia [h] lungo i punti [xy].
+ */
+export function limitaPendenza(h, xy, fissi = null) {
+  for (let giro = 0; giro < 60; giro++) {
+    let troppo = 0;
+    for (let k = 1; k < h.length; k++) {
+      const d = Math.hypot(xy[k][0] - xy[k - 1][0], xy[k][1] - xy[k - 1][1]);
+      const eccesso = Math.abs(h[k] - h[k - 1]) - PENDENZA_MAX * d;
+      if (eccesso <= 0.01) continue;
+      troppo++;
+      const verso = Math.sign(h[k] - h[k - 1]);
+      const fa = fissi?.[k - 1] ? 0 : fissi?.[k] ? 1 : 0.5;
+      const fb = fissi?.[k] ? 0 : fissi?.[k - 1] ? 1 : 0.5;
+      h[k - 1] += verso * eccesso * fa;
+      h[k] -= verso * eccesso * fb;
+    }
+    if (!troppo) break;
+  }
+  return h;
+}
+
 /** Quanto sopra la quota sta l'asfalto delle corsie: come il nastro della sua classe, un poco sopra. */
 function sopraCorsie(hw) {
   const b = String(hw ?? '').replace(/_link$/, '');
@@ -1904,8 +1928,13 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
         for (const q of cand[k]) {
           let meglio = Infinity;
           let chi = 0;
+          // Un salto di quota oltre la pendenza di una strada vera costa
+          // molto: è passare da una strada all'altra («la salita con
+          // strade in mezzo», lo zig-zag del percorso sulle rampe).
+          const passo = Math.hypot(xy[k][0] - xy[k - 1][0], xy[k][1] - xy[k - 1][1]);
           cand[k - 1].forEach((p, r) => {
-            const v = costi[k - 1 - i][r] + 2 * Math.abs(q[0] - p[0]);
+            const salto = Math.abs(q[0] - p[0]);
+            const v = costi[k - 1 - i][r] + 2 * salto + 12 * Math.max(0, salto - PENDENZA_MAX * passo - 0.2);
             if (v < meglio) {
               meglio = v;
               chi = r;
@@ -1933,6 +1962,7 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
       for (let j = ultimo + 1; j < k; j++) h[j] = ultimo < 0 ? (k < h.length ? h[k] : 0) : k >= h.length ? h[ultimo] : h[ultimo] + ((h[k] - h[ultimo]) * (j - ultimo)) / (k - ultimo);
       ultimo = k;
     }
+    limitaPendenza(h, xy);
     strade.push({ ...v0, xy, xyVia: inMetri(v0.llVia ?? v0.ll), h });
   }
   const nodi = (corsie.nodi ?? []).map((n) => ({ ...n, xy: sys.daLonLat(n.g[0], n.g[1]) })).filter((n) => vicina(n.xy));
