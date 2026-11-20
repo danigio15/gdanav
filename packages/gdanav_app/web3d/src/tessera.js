@@ -221,6 +221,61 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     }
     return false;
   };
+  /* «Tutto sballato, linee ovunque»: due parapetti bianchi che tagliavano in
+   * diagonale la carreggiata, in viadotto. Era una rampa che si stacca dalla
+   * carreggiata quasi parallela: per un centinaio di metri le due strade si
+   * sovrappongono, e il parapetto della rampa correva sull'asfalto dell'altra
+   * (i quaranta metri attorno allo svincolo non bastano, a un angolo così
+   * stretto). Un parapetto sull'asfalto della strada da cui si stacca, alla
+   * stessa quota, non c'è: lì le due strade sono ancora una. */
+  const asfalti = new Map();
+  linee.forEach((pts, i) => {
+    const f = visibili[i];
+    if (f.cls === 'rail' || f.galleria) return;
+    for (let k = 1; k < pts.length; k++) {
+      const a = pts[k - 1];
+      const b = pts[k];
+      const voce = [a, b, f.w / 2, i];
+      const visti = new Set();
+      // Ogni cella che il segmento attraversa (passo mezza cella).
+      const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const passi = Math.max(1, Math.ceil(l / (GRIGLIA / 2)));
+      for (let s = 0; s <= passi; s++) {
+        const key = Math.floor((a[0] + ((b[0] - a[0]) * s) / passi) / GRIGLIA) + ',' + Math.floor((a[1] + ((b[1] - a[1]) * s) / passi) / GRIGLIA);
+        if (visti.has(key)) continue;
+        visti.add(key);
+        if (!asfalti.has(key)) asfalti.set(key, []);
+        asfalti.get(key).push(voce);
+      }
+    }
+  });
+  // Solo una strada che si stacca da questa (un punto in comune): due
+  // carreggiate vicine, l'una accanto all'altra, tengono lo spartitraffico.
+  const puntiDi = new Map();
+  const legate = (i, j) => {
+    for (const x of [i, j]) if (!puntiDi.has(x)) puntiDi.set(x, new Set(linee[x].map(ek)));
+    const pj = puntiDi.get(j);
+    for (const q of puntiDi.get(i)) if (pj.has(q)) return true;
+    return false;
+  };
+  const suAltraStrada = (px, py, pz, fi) => {
+    for (let ax = -1; ax <= 1; ax++) {
+      for (let ay = -1; ay <= 1; ay++) {
+        for (const [a, b, hw, i] of asfalti.get(Math.floor(px / GRIGLIA) + ax + ',' + (Math.floor(py / GRIGLIA) + ay)) || []) {
+          if (i === fi || !legate(fi, i)) continue;
+          const dx = b[0] - a[0];
+          const dy = b[1] - a[1];
+          const l2 = dx * dx + dy * dy || 1;
+          const t = Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / l2));
+          const qx = a[0] + dx * t;
+          const qy = a[1] + dy * t;
+          if (Math.hypot(px - qx, py - qy) > hw - 0.3) continue;
+          if (Math.abs(a[2] + (b[2] - a[2]) * t - pz) < 2) return true;
+        }
+      }
+    }
+    return false;
+  };
   // Gli svincoli in quota: lì niente parapetti in mezzo alla biforcazione.
   const grado = new Map();
   linee.forEach((pts, i) => {
@@ -482,51 +537,72 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         }
         for (const lato of [1, -1]) {
           const A = lato > 0 ? L : R;
-          const on0 = [-pezzo[k - 1][4] * lato, pezzo[k - 1][3] * lato];
-          const on1 = [-pezzo[k][4] * lato, pezzo[k][3] * lato];
+          const onA = [-pezzo[k - 1][4] * lato, pezzo[k - 1][3] * lato];
+          const onB = [-pezzo[k][4] * lato, pezzo[k][3] * lato];
           const fuori = (P0, on, d) => [P0[0] + on[0] * d, P0[1] + on[1] * d];
-          const a = A[k - 1];
-          const b = A[k];
-          const nrm = [(on0[0] + on1[0]) / 2, (on0[1] + on1[1]) / 2, 0];
-          const inr = [-nrm[0], -nrm[1], 0];
-          if (f.cls !== 'rail' && !f.cucita && !vicinoASvincolo((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 40)) {
-            // Il parapetto: cemento chiaro, e sopra il corrimano scuro.
-            const ph = f.ponte ? 1.05 : 0.9;
-            const pr = 0.16;
-            const a0 = fuori(a, on0, 0.12);
-            const b0 = fuori(b, on1, 0.12);
-            const a1 = fuori(a, on0, -0.23);
-            const b1 = fuori(b, on1, -0.23);
-            opere.quad([a0[0], a0[1], a[2] - 0.1], [b0[0], b0[1], b[2] - 0.1], [b0[0], b0[1], b[2] + ph - pr], [a0[0], a0[1], a[2] + ph - pr], nrm, ...sfuma(cCemento, 0.86, 1.06));
-            opere.quad([a0[0], a0[1], a[2] + ph - pr], [b0[0], b0[1], b[2] + ph - pr], [b0[0], b0[1], b[2] + ph], [a0[0], a0[1], a[2] + ph], nrm, ...sfuma(CORRIMANO, 1, 1.1));
-            opere.quad([a0[0], a0[1], a[2] + ph], [b0[0], b0[1], b[2] + ph], [b1[0], b1[1], b[2] + ph], [a1[0], a1[1], a[2] + ph], [0, 0, 1], ...sfuma(CORRIMANO, 1.15, 1.15));
-            opere.quad([a1[0], a1[1], a[2]], [b1[0], b1[1], b[2]], [b1[0], b1[1], b[2] + ph], [a1[0], a1[1], a[2] + ph], inr, ...sfuma(cCemento, 0.7, 0.95));
-          }
-          if (comePonte) {
-            // Il fianco dell'impalcato: il cordolo chiaro che sporge un poco
-            // (col suo sottile ventre in ombra), poi la trave più scura, rientrata.
-            const CO = 0.55;
-            const c0 = fuori(a, on0, 0.38);
-            const c1 = fuori(b, on1, 0.38);
-            const t0 = fuori(a, on0, 0.0);
-            const t1 = fuori(b, on1, 0.0);
-            const p0 = fuori(a, on0, 0.12);
-            const p1 = fuori(b, on1, 0.12);
-            opere.quad([c0[0], c0[1], a[2] - CO], [c1[0], c1[1], b[2] - CO], [c1[0], c1[1], b[2] + 0.02], [c0[0], c0[1], a[2] + 0.02], nrm, ...sfuma(CORDOLO, 1, 1.08));
-            opere.quad([p0[0], p0[1], a[2] + 0.02], [p1[0], p1[1], b[2] + 0.02], [c1[0], c1[1], b[2] + 0.02], [c0[0], c0[1], a[2] + 0.02], [0, 0, 1], ...sfuma(CORDOLO, 1.04, 1.04));
-            opere.quad([t0[0], t0[1], a[2] - CO], [t1[0], t1[1], b[2] - CO], [c1[0], c1[1], b[2] - CO], [c0[0], c0[1], a[2] - CO], [0, 0, -1], ...sfuma(SOTTO, 1, 1));
-            opere.quad(
-              [t0[0], t0[1], a[2] - SPESSORE_IMPALCATO],
-              [t1[0], t1[1], b[2] - SPESSORE_IMPALCATO],
-              [t1[0], t1[1], b[2] - CO],
-              [t0[0], t0[1], a[2] - CO],
-              nrm,
-              ...sfuma(TRAVE, 0.6, 0.86),
-            );
-          } else {
-            const a0 = fuori(a, on0, 0.1);
-            const b0 = fuori(b, on1, 0.1);
-            opere.quad([a0[0], a0[1], 0], [b0[0], b0[1], 0], [b0[0], b0[1], b[2]], [a0[0], a0[1], a[2]], nrm, ...sfuma(cCemento, 0.66, 0.98));
+          const mix = (p, q, u) => p.map((v, i) => v + (q[i] - v) * u);
+          const AA = A[k - 1];
+          const BB = A[k];
+          // Sull'asfalto di un'altra strada (vedi [suAltraStrada]): dove il
+          // bordo ci passa sopra solo in parte, si taglia a pezzi di 8 m.
+          const sopraAltra = (u) => {
+            const q = mix(AA, BB, u);
+            const on = mix(onA, onB, u);
+            return suAltraStrada(q[0] + on[0] * 0.12, q[1] + on[1] * 0.12, q[2], fi);
+          };
+          const prove = [0.05, 0.25, 0.5, 0.75, 0.95].map(sopraAltra);
+          const misto = prove.some((x) => x) && !prove.every((x) => x);
+          const pezzi = misto ? Math.max(1, Math.ceil(Math.hypot(BB[0] - AA[0], BB[1] - AA[1]) / 8)) : 1;
+          for (let j = 0; j < pezzi; j++) {
+            const u0 = j / pezzi;
+            const u1 = (j + 1) / pezzi;
+            const a = pezzi === 1 ? AA : mix(AA, BB, u0);
+            const b = pezzi === 1 ? BB : mix(AA, BB, u1);
+            const on0 = pezzi === 1 ? onA : mix(onA, onB, u0);
+            const on1 = pezzi === 1 ? onB : mix(onA, onB, u1);
+            const nrm = [(on0[0] + on1[0]) / 2, (on0[1] + on1[1]) / 2, 0];
+            const inr = [-nrm[0], -nrm[1], 0];
+            const sopra = pezzi === 1 ? prove[2] && prove.every((x) => x) : sopraAltra((u0 + u1) / 2);
+            if (sopra) continue;
+            if (f.cls !== 'rail' && !f.cucita && !vicinoASvincolo((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 40)) {
+              // Il parapetto: cemento chiaro, e sopra il corrimano scuro.
+              const ph = f.ponte ? 1.05 : 0.9;
+              const pr = 0.16;
+              const a0 = fuori(a, on0, 0.12);
+              const b0 = fuori(b, on1, 0.12);
+              const a1 = fuori(a, on0, -0.23);
+              const b1 = fuori(b, on1, -0.23);
+              opere.quad([a0[0], a0[1], a[2] - 0.1], [b0[0], b0[1], b[2] - 0.1], [b0[0], b0[1], b[2] + ph - pr], [a0[0], a0[1], a[2] + ph - pr], nrm, ...sfuma(cCemento, 0.86, 1.06));
+              opere.quad([a0[0], a0[1], a[2] + ph - pr], [b0[0], b0[1], b[2] + ph - pr], [b0[0], b0[1], b[2] + ph], [a0[0], a0[1], a[2] + ph], nrm, ...sfuma(CORRIMANO, 1, 1.1));
+              opere.quad([a0[0], a0[1], a[2] + ph], [b0[0], b0[1], b[2] + ph], [b1[0], b1[1], b[2] + ph], [a1[0], a1[1], a[2] + ph], [0, 0, 1], ...sfuma(CORRIMANO, 1.15, 1.15));
+              opere.quad([a1[0], a1[1], a[2]], [b1[0], b1[1], b[2]], [b1[0], b1[1], b[2] + ph], [a1[0], a1[1], a[2] + ph], inr, ...sfuma(cCemento, 0.7, 0.95));
+            }
+            if (comePonte) {
+              // Il fianco dell'impalcato: il cordolo chiaro che sporge un poco
+              // (col suo sottile ventre in ombra), poi la trave più scura, rientrata.
+              const CO = 0.55;
+              const c0 = fuori(a, on0, 0.38);
+              const c1 = fuori(b, on1, 0.38);
+              const t0 = fuori(a, on0, 0.0);
+              const t1 = fuori(b, on1, 0.0);
+              const p0 = fuori(a, on0, 0.12);
+              const p1 = fuori(b, on1, 0.12);
+              opere.quad([c0[0], c0[1], a[2] - CO], [c1[0], c1[1], b[2] - CO], [c1[0], c1[1], b[2] + 0.02], [c0[0], c0[1], a[2] + 0.02], nrm, ...sfuma(CORDOLO, 1, 1.08));
+              opere.quad([p0[0], p0[1], a[2] + 0.02], [p1[0], p1[1], b[2] + 0.02], [c1[0], c1[1], b[2] + 0.02], [c0[0], c0[1], a[2] + 0.02], [0, 0, 1], ...sfuma(CORDOLO, 1.04, 1.04));
+              opere.quad([t0[0], t0[1], a[2] - CO], [t1[0], t1[1], b[2] - CO], [c1[0], c1[1], b[2] - CO], [c0[0], c0[1], a[2] - CO], [0, 0, -1], ...sfuma(SOTTO, 1, 1));
+              opere.quad(
+                [t0[0], t0[1], a[2] - SPESSORE_IMPALCATO],
+                [t1[0], t1[1], b[2] - SPESSORE_IMPALCATO],
+                [t1[0], t1[1], b[2] - CO],
+                [t0[0], t0[1], a[2] - CO],
+                nrm,
+                ...sfuma(TRAVE, 0.6, 0.86),
+              );
+            } else {
+              const a0 = fuori(a, on0, 0.1);
+              const b0 = fuori(b, on1, 0.1);
+              opere.quad([a0[0], a0[1], 0], [b0[0], b0[1], 0], [b0[0], b0[1], b[2]], [a0[0], a0[1], a[2]], nrm, ...sfuma(cCemento, 0.66, 0.98));
+            }
           }
         }
         if (comePonte) {
