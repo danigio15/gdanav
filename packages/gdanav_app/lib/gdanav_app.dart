@@ -30,6 +30,7 @@ import 'stato/gestore_vicini.dart';
 import 'stato/licenza.dart';
 import 'stato/gestore_viaggio.dart';
 import 'stato/gestore_edifici.dart';
+import 'stato/sensori_di_marcia.dart';
 import 'stato/gestore_ztl.dart';
 import 'stato/strade_osm.dart';
 import 'stato/viaggi_pianificati.dart';
@@ -185,6 +186,16 @@ Future<GdanavApp> preparaGdanav({
     avvisi: ScelteAvvisi(await archivio.scelteAvvisi(), (s) => unawaited(archivio.salvaScelteAvvisi(s))),
     // Mai contromano: le strade vere (OpenStreetMap) dei prossimi chilometri.
     strade: StradeOsm(TessereOpenFreeMap().call).attorno,
+    // Le frenate quando succedono: l'accelerometro del telefono. Non nella
+    // dimostrazione, dove le posizioni sono finte e il telefono è fermo.
+    sensori: dimostrazione != null
+        ? null
+        : SensoriDiMarcia.attuale = SensoriDiMarcia(
+            velocitaAuto: () {
+              final kmh = auto.velocitaAuto(), alle = auto.velocitaLettaAlle;
+              return kmh == null || alle == null ? null : (ms: kmh / 3.6, alle: alle);
+            },
+          ),
   );
   // La velocità dell'auto entra anche qui: serve a sapere se si è fermi, e da
   // fermi il segnaposto non deve girare dietro al ballonzolamento del GPS.

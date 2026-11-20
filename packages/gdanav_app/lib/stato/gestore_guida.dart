@@ -10,6 +10,7 @@ import 'gestore_consumo.dart';
 import 'gestore_risparmio.dart';
 import 'gestore_viaggio.dart';
 import 'scelte_avvisi.dart';
+import 'sensori_di_marcia.dart';
 import 'strade_osm.dart';
 import 'voce.dart';
 
@@ -29,10 +30,15 @@ class GestoreGuida extends ChangeNotifier {
     DateTime Function()? orologio,
     this.stimaInGalleria = true,
     this.strade,
+    this.sensori,
   }) : _ora = orologio ?? DateTime.now,
        avvisi = avvisi ?? ScelteAvvisi() {
     audio = audioIniziale;
   }
+
+  /// L'accelerometro del telefono: le frenate quando succedono, non un
+  /// secondo dopo col GPS ([SensoriDiMarcia]). Acceso solo in guida.
+  final SensoriDiMarcia? sensori;
 
   /// Il consumo imparato: in guida lo si misura e lo si corregge.
   final GestoreConsumo? consumo;
@@ -407,6 +413,7 @@ class GestoreGuida extends ChangeNotifier {
     // Un errore del GPS non deve finire nel vuoto né chiudere la guida: la
     // posizione dopo arriva lo stesso.
     _iscrizione = posizioni().listen(_posizione, onError: (Object e) => debugPrint('posizioni in guida: $e'));
+    sensori?.avvia();
     // I sensi unici dei primi chilometri si guardano subito, senza aspettare
     // la prima posizione: si parte spesso a due passi dall'incrocio, e
     // guardandoli dopo la linea giusta arrivava quando l'auto era già lì.
@@ -440,6 +447,7 @@ class GestoreGuida extends ChangeNotifier {
     _svegliaStima?.cancel();
     _svegliaStima = null;
     _stima.dimentica();
+    await sensori?.ferma();
     // La velocità della guida è di quando si guidava: finita, non vale più
     // («senza navigazione di nuovo fermo, non cammina»: restava lo zero
     // dell'arrivo, e la mappa 3D lo prendeva per la velocità di adesso).
@@ -612,8 +620,21 @@ class GestoreGuida extends ChangeNotifier {
     final a = avanzamento;
     if (a == null || _guida == null || a.posizioneSulPercorso == null || a.rotta == null) return null;
     final v = _velocitaMs, alle = _lettaAlle;
-    if (v == null || alle == null || v < 1.5) return a.percorsiM;
-    var eta = _ora().difference(alle);
+    if (v == null || alle == null) return a.percorsiM;
+    final ora = _ora();
+    /* Con l'accelerometro tarato: dalla lettura (com'era quando il GPS l'ha
+     * fatta, cioè il suo ritardo prima) ad adesso, con le accelerazioni
+     * misurate. Frenando la freccia frena quando frena l'auto, e si ferma
+     * dove si ferma lei: né oltre, né indietro dopo. */
+    final acc = sensori?.stima;
+    if (acc != null && acc.tarata) {
+      final ritardo = acc.ritardoGpsMisurato ?? anticipo;
+      final v0 = _velocitaGps ?? v;
+      final strada = acc.strada(alle.subtract(ritardo), ora, v0);
+      if (strada != null) return a.percorsiM + strada.clamp(0.0, avantiAlPiuM);
+    }
+    if (v < 1.5) return a.percorsiM;
+    var eta = ora.difference(alle);
     if (eta.isNegative) eta = Duration.zero;
     if (eta > const Duration(seconds: 2)) eta = const Duration(seconds: 2);
     final metri = v * (eta + anticipo).inMilliseconds / 1000;
@@ -767,6 +788,8 @@ class GestoreGuida extends ChangeNotifier {
     _velocitaGps = qui is PuntoInMoto ? qui.velocitaMs : null;
     _precisioneM = qui is PuntoInMoto ? qui.precisioneM : null;
     _velocitaMs = kmh != null ? kmh / 3.6 : _velocitaGps;
+    final vGps = _velocitaGps;
+    if (!stimata && vGps != null) sensori?.velocitaGps(_lettaAlle!, vGps);
     _forseChiediDati();
     final g = _guida;
     if (g == null || !attiva) return;

@@ -199,6 +199,17 @@ Map<String, Object?> msgPosizione({
 Map<String, Object?> msgVelocita({required double ms, required DateTime alle}) =>
     _m('velocita', {'ms': (math.max(0.0, ms) * 100).roundToDouble() / 100, 'alle': alle.millisecondsSinceEpoch});
 
+/// L'accelerazione di marcia dall'accelerometro del telefono ([a] m/s²,
+/// positiva accelerando), misurata [alle]; e il [ritardo] del GPS di questo
+/// telefono, se misurato ([AccelerazioneDiMarcia]): il filtro della scena
+/// sa la frenata quando comincia.
+Map<String, Object?> msgAccelerazione({required double a, required DateTime alle, Duration? ritardo}) =>
+    _m('accelerazione', {
+      'a': (a * 100).roundToDouble() / 100,
+      'alle': alle.millisecondsSinceEpoch,
+      if (ritardo != null) 'ritardo': ritardo.inMilliseconds / 1000,
+    });
+
 /// Come si muove la telecamera.
 enum ModoCamera3d { segui, libera, panoramica }
 

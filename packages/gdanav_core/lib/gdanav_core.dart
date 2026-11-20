@@ -22,6 +22,7 @@ export 'src/guida/guida.dart';
 export 'src/guida/limite_della_strada.dart';
 export 'src/guida/moto_fluido.dart';
 export 'src/guida/riepilogo.dart';
+export 'src/guida/accelerazione_di_marcia.dart';
 export 'src/guida/stima_senza_gps.dart';
 export 'src/luoghi/google.dart';
 export 'src/luoghi/luoghi.dart';

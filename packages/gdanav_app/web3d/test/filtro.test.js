@@ -172,3 +172,43 @@ test('fermandosi col GPS in ritardo la freccia frena e resta lì: mai indietro',
   assert.ok(indietro < 0.01, `è tornata indietro di ${indietro.toFixed(2)} m`);
   assert.ok(ultima - 90 < 8 && ultima >= 90 - 1, `ferma a 90 o poco oltre: ${ultima.toFixed(1)} m`);
 });
+
+test('con l\'accelerometro del telefono la freccia frena con l\'auto: si ferma lì, né oltre né indietro', () => {
+  // «Deve avere la posizione reale sempre.» Solo il GPS del telefono, un
+  // secondo in ritardo; l'accelerometro tarato (al 93%, rumoroso) dice la
+  // frenata quando comincia.
+  let seme = 11;
+  const rnd = () => (seme = (seme * 16807) % 2147483647) / 2147483647;
+  const rumore = () => (rnd() - 0.5) * 0.8;
+  for (const frenata of [2.5, 4, 6]) {
+    const f = new FiltroSullaStrada();
+    const tb = 6, v0 = 12, ts = tb + v0 / frenata, fermo = v0 * tb + (v0 * v0) / (2 * frenata);
+    const acc = (q) => (q > tb && q < ts ? -frenata : 0);
+    const pos = (q) => (q <= tb ? v0 * q : q >= ts ? fermo : v0 * tb + v0 * (q - tb) - 0.5 * frenata * (q - tb) ** 2);
+    const vel = (q) => (q <= tb ? v0 : Math.max(0, v0 - frenata * (q - tb)));
+    let ultima = null, indietro = 0, oltre = 0, crociera = 0;
+    for (let t = 0; t <= 20000; t += 16) {
+      const k = t / 1000;
+      if (t % 1000 < 16) f.misura({ metri: pos(Math.max(0, k - 1)), alle: t, v: vel(Math.max(0, k - 1)), precisione: 5 }, t);
+      if (t % 64 < 16) f.accelerazione(acc(k - 0.1) * 0.93 + rumore(), t, t, 1);
+      const s = f.passo(t);
+      if (ultima !== null) indietro = Math.max(indietro, ultima - s);
+      if (k > 3) oltre = Math.max(oltre, s - pos(k));
+      if (k > 4 && k < 5.5) crociera = Math.max(crociera, Math.abs(s - pos(k)));
+      ultima = s;
+    }
+    assert.ok(indietro < 0.01, `${frenata} m/s²: indietro di ${indietro.toFixed(2)} m`);
+    // Mezza auto, anche frenando forte (senza accelerometro: fino a otto metri).
+    assert.ok(oltre < 3, `${frenata} m/s²: oltre di ${oltre.toFixed(1)} m`);
+    assert.ok(ultima - fermo > -2.5, `${frenata} m/s²: ferma ${(ultima - fermo).toFixed(1)} m prima`);
+    assert.ok(crociera < 2, `${frenata} m/s²: andando a ${crociera.toFixed(1)} m`);
+  }
+});
+
+test('senza accelerometro da un po\', il ritardo misurato non conta più', () => {
+  const f = new FiltroSullaStrada();
+  f.misura({ metri: 0, alle: 0, v: 10 }, 0);
+  f.accelerazione(0, 100, 100, 1.2);
+  assert.equal(f.accelerometroVivo(500), true);
+  assert.equal(f.accelerometroVivo(2000), false);
+});

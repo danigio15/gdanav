@@ -71,6 +71,8 @@ const CONTROLLI = {
   // Dall'app, sul telefono: sull'auto gira un'altra scena (`Regia3d.sullAuto`).
   leggera: (m) => typeof m.si === 'boolean',
   velocita: (m) => numero(m.ms) && m.ms >= 0 && numero(m.alle),
+  // L'accelerazione di marcia dal telefono (`AccelerazioneDiMarcia`): m/s².
+  accelerazione: (m) => numero(m.a) && Math.abs(m.a) <= 15 && numero(m.alle) && (m.ritardo === undefined || numero(m.ritardo)),
   edifici: (m) =>
     [m.z, m.x, m.y].every((n) => Number.isInteger(n) && n >= 0) && (m.dati === null || m.dati === undefined || typeof m.dati === 'string'),
 };

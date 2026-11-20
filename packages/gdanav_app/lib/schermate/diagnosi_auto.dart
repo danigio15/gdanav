@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../stato/sensori_di_marcia.dart';
 import '../stato/strade_osm.dart';
 import '../tema.dart';
 
@@ -88,6 +89,11 @@ class DiagnosiAuto extends StatelessWidget {
             ),
             for (final (titolo, ok, dettaglio) in vociTraffico(d['traffico'])) voce(titolo, ok, dettaglio),
           ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Text('La freccia: frenate e ripartenze', style: t.titleMedium),
+          ),
+          for (final (titolo, ok, dettaglio) in vociFreccia(SensoriDiMarcia.attuale)) voce(titolo, ok, dettaglio),
           const DiarioDeiSensi(),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -107,6 +113,48 @@ class DiagnosiAuto extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Da dove la freccia sa le frenate quando succedono: la velocità del
+/// cruscotto (se l'auto la dice ad Android Auto) e l'accelerometro del
+/// telefono (tarato guidando). «Quando mi fermo la freccia va avanti»: qui
+/// si vede se la freccia ha l'una o l'altra, o solo il GPS in ritardo.
+List<(String, bool?, String)> vociFreccia(SensoriDiMarcia? s, {DateTime? ora}) {
+  if (s == null) return [('Non disponibile', null, 'In questa modalità i sensori non si usano.')];
+  final adesso = ora ?? DateTime.now();
+  final prima = s.primaCruscotto, ultima = s.ultimaCruscotto;
+  final String cruscotto;
+  bool? okCruscotto;
+  if (s.lettureCruscotto == 0 || prima == null || ultima == null) {
+    cruscotto = 'Non arriva: l\'auto non la dice ad Android Auto (si usa il GPS del telefono).';
+    okCruscotto = false;
+  } else {
+    final secondi = ultima.difference(prima).inMilliseconds / 1000;
+    final alSecondo = secondi > 0 ? (s.lettureCruscotto - 1) / secondi : 0.0;
+    final eta = adesso.difference(ultima).inSeconds;
+    cruscotto =
+        'Arriva: ${alSecondo.toStringAsFixed(1).replaceAll('.', ',')} volte al secondo'
+        '${eta > 5 ? ', l\'ultima ${eta}s fa' : ''}.';
+    okCruscotto = alSecondo >= 1;
+  }
+  final a = s.stima;
+  final String accelerometro;
+  bool? okAccelerometro;
+  if (!s.accelerometroSentito) {
+    accelerometro = 'Non ancora sentito: avvia una guida.';
+  } else if (!a.tarata) {
+    accelerometro = 'Si sta tarando: qualche frenata e ripartenza col telefono fermo nel supporto.';
+  } else {
+    final r = a.ritardoGpsMisurato;
+    accelerometro =
+        'Tarato (${(a.qualita * 100).round()}%)'
+        '${r == null ? '' : ' · GPS in ritardo di ${(r.inMilliseconds / 1000).toStringAsFixed(1).replaceAll('.', ',')} s'}.';
+    okAccelerometro = true;
+  }
+  return [
+    ('Velocità dell\'auto', okCruscotto, cruscotto),
+    ('Accelerometro del telefono', okAccelerometro, accelerometro),
+  ];
 }
 
 /// Cosa ha visto del traffico la mappa dell'auto nell'ultimo viaggio

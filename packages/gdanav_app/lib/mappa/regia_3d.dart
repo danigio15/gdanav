@@ -157,6 +157,7 @@ class Regia3d {
   var _finita = false;
   Timer? _attesa;
   Timer? _guardia;
+  Timer? _accelerometro;
 
   /// Quello che la pagina ha già: non si rimanda uguale.
   bool? _notte;
@@ -205,6 +206,18 @@ class Regia3d {
     });
     // Col GPS muto nessuno chiama: la telecamera la si sistema da qui.
     _guardia = Timer.periodic(const Duration(seconds: 2), (_) => dallaGuida());
+    // L'accelerazione del telefono, una quindicina di volte al secondo, in
+    // guida e quando è tarata: il filtro della scena frena con l'auto.
+    _accelerometro = Timer.periodic(const Duration(milliseconds: 66), (_) => _dallAccelerometro());
+  }
+
+  void _dallAccelerometro() {
+    if (!_caricata || !guida.attiva) return;
+    final s = guida.sensori?.stima;
+    final ora = _ora();
+    final a = s?.adesso(ora);
+    if (s == null || a == null) return;
+    _manda(msgAccelerazione(a: a, alle: ora, ritardo: s.ritardoGpsMisurato));
   }
 
   void ferma() {
@@ -225,6 +238,7 @@ class Regia3d {
     }
     _attesa?.cancel();
     _guardia?.cancel();
+    _accelerometro?.cancel();
   }
 
   /// Il 3D non va: si ferma, e chi lo mostra torna alla mappa di sempre.
