@@ -41,8 +41,14 @@ const RITARDO_AUTO_S = 0.1;
 const OMEGA = 4.5;
 /** L'accelerazione della freccia, al più (m/s²). */
 const ACC_MAX = 12;
+/** La frenata della freccia avanti alla stima, al più (m/s²). */
+const FRENATA_MAX = 20;
 /** Da ferma la freccia non si muove per meno di così (m). */
 const FERMO_TOLLERATO_M = 2.5;
+/** Avanti alla stima, fin qui la freccia non torna mai indietro: frena e
+ * resta lì, come nei navigatori («quando mi fermo la freccia va avanti e poi
+ * ritorna indietro»). Oltre, piano indietro; oltre [SALTO_INDIETRO_M] salta. */
+export const INDIETRO_AL_PIU_M = 8;
 
 /** Quanto può cambiare l'accelerazione (m/s³): un'auto, non un razzo. */
 const STRAPPO = 6;
@@ -204,8 +210,9 @@ export class FiltroSullaStrada {
    * velocità sue, e va verso lo stato come una molla smorzata: tirata dalla
    * distanza, frenata dalla differenza di velocità, con l'accelerazione al
    * più [ACC_MAX]. A velocità costante sta sullo stato; una correzione la
-   * raggiunge in un secondo circa, senza strappi. Andando non torna indietro;
-   * da ferma non si muove per meno di [FERMO_TOLLERATO_M].
+   * raggiunge in un secondo circa, senza strappi. Non torna indietro, né
+   * andando né da ferma, se non per più di [INDIETRO_AL_PIU_M]; da ferma non
+   * si muove per meno di [FERMO_TOLLERATO_M].
    */
   passo(adesso) {
     if (this.x === null) return null;
@@ -229,9 +236,11 @@ export class FiltroSullaStrada {
       let acc;
       if (vf <= FERMO_MS && Math.abs(errore) < FERMO_TOLLERATO_M) acc = -2 * w * this.velMostrata;
       else acc = w * w * errore + 2 * w * (vf - this.velMostrata) + af;
-      acc = Math.max(-ACC_MAX, Math.min(ACC_MAX, acc));
+      // Avanti alla stima (si è frenato, e il GPS lo dice tardi) frena più
+      // decisa: va oltre di meno, e da lì non torna indietro.
+      acc = Math.max(errore < 0 ? -FRENATA_MAX : -ACC_MAX, Math.min(ACC_MAX, acc));
       this.velMostrata += acc * h;
-      if (this.velMostrata < 0 && vf > FERMO_MS) this.velMostrata = 0;
+      if (this.velMostrata < 0 && (vf > FERMO_MS || errore > -INDIETRO_AL_PIU_M)) this.velMostrata = 0;
       this.mostrato += this.velMostrata * h;
     }
     return this.mostrato;

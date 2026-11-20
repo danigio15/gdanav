@@ -76,8 +76,17 @@ const AVANTI_MAX_S = 2.5;
 const RECUPERO_S = 0.9;
 /** Quanto più veloce della lettura può andare la freccia per recuperare (m/s). */
 const VELOCITA_IN_PIU = 8;
-/** Quanto può restare avanti la freccia ferma, senza tornare indietro (m). */
-const AVANTI_TOLLERATO_M = 3;
+/** Quanto può restare avanti la freccia ferma, senza tornare indietro (m).
+ *
+ * «Quando mi fermo la freccia va avanti e poi ritorna indietro: guarda le
+ * logiche degli altri navigatori.» Il GPS dice che ci si è fermati con un
+ * secondo di ritardo, e la freccia intanto va un poco oltre. Con 3 m poi
+ * tornava indietro; i navigatori non lo fanno mai per così poco: la freccia
+ * frena e resta lì, e quando si riparte l'auto la raggiunge. Indietro solo
+ * oltre questo (un'auto che fa davvero retromarcia, un GPS che si corregge
+ * di tanto), e oltre 40 m (`v.s < this.s - 40`) si salta. Lo stesso valore del filtro
+ * (`INDIETRO_AL_PIU_M` in filtro.js). */
+const AVANTI_TOLLERATO_M = 8;
 /** Sotto questa velocità la freccia non passa una svolta prima del GPS (m/s). */
 const PIANO_MS = 3;
 /** Una svolta è passata quando il GPS è oltre l'angolo di tanto (m). */
