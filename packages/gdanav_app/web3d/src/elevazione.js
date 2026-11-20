@@ -153,7 +153,101 @@ class Mucchio {
  * [metri]: dai pixel globali ai metri locali. Restituisce i nodi (`x`, `y`,
  * `h`) e le strade (`nodi`, `cls`, `w`, `ponte`, `livello`, …).
  */
+/** Il raggio delle curve di una strada (m): quanto si arrotondano gli angoli delle tessere. */
+const RAGGIO_CURVE = { motorway: 150, trunk: 100, primary: 50, secondary: 35, tertiary: 25, minor: 12, service: 8, rail: 150 };
+
+/**
+ * Le curve arrotondate. Le tessere danno le strade semplificate, pochi
+ * tratti dritti: ogni vertice era uno spigolo («le strade sulle curve a
+ * volte sono spigolose»). Qui ogni vertice in mezzo a una strada (non un
+ * incrocio, non un capo: [fermi]) diventa un arco col raggio della sua
+ * classe ([RAGGIO_CURVE], in metri; [pxm]: pixel per metro), al più fino a
+ * metà dei due tratti accanto; un punto ogni dieci gradi. [g]: i punti in
+ * pixel. Restituisce i punti nuovi.
+ */
+export function arrotonda(g, raggio, pxm, fermi = () => false) {
+  // Prima le linee che tornano indietro su sé stesse (vertici sbagliati nei
+  // dati, a volte più d'uno di fila): via, finché ce ne sono.
+  for (let pulita = false; !pulita && g.length >= 3; ) {
+    pulita = true;
+    for (let k = 1; k < g.length - 1; k++) {
+      const [A, B, C] = [g[k - 1], g[k], g[k + 1]];
+      const t1 = Math.atan2(B[1] - A[1], B[0] - A[0]);
+      const t2 = Math.atan2(C[1] - B[1], C[0] - B[0]);
+      const giro = Math.abs(Math.atan2(Math.sin(t2 - t1), Math.cos(t2 - t1)));
+      const corto = Math.hypot(B[0] - A[0], B[1] - A[1]) < 1e-9 || Math.hypot(C[0] - B[0], C[1] - B[1]) < 1e-9;
+      if ((giro > (140 * Math.PI) / 180 || corto) && !fermi(B)) {
+        g = [...g.slice(0, k), ...g.slice(k + 1)];
+        pulita = false;
+        break;
+      }
+    }
+  }
+  if (g.length < 3) return g;
+  const out = [g[0]];
+  // Quanto di ogni tratto è già usato dall'arco del vertice prima.
+  let usato = 0;
+  for (let k = 1; k < g.length - 1; k++) {
+    const [A, B, C] = [g[k - 1], g[k], g[k + 1]];
+    const ab = Math.hypot(B[0] - A[0], B[1] - A[1]);
+    const bc = Math.hypot(C[0] - B[0], C[1] - B[1]);
+    const u1 = ab ? [(A[0] - B[0]) / ab, (A[1] - B[1]) / ab] : [0, 0];
+    const u2 = bc ? [(C[0] - B[0]) / bc, (C[1] - B[1]) / bc] : [0, 0];
+    const cos = -(u1[0] * u2[0] + u1[1] * u2[1]);
+    const giro = Math.acos(Math.max(-1, Math.min(1, cos)));
+    if (fermi(B) || !ab || !bc || giro < (3 * Math.PI) / 180 || giro > (150 * Math.PI) / 180) {
+      out.push(B);
+      usato = 0;
+      continue;
+    }
+    const tMax = Math.min(ab - usato, bc / 2);
+    let t = raggio * pxm * Math.tan(giro / 2);
+    if (t > tMax) t = Math.max(0, tMax);
+    if (t < 0.3 * pxm) {
+      out.push(B);
+      usato = 0;
+      continue;
+    }
+    const r = t / Math.tan(giro / 2);
+    const P1 = [B[0] + u1[0] * t, B[1] + u1[1] * t];
+    const P2 = [B[0] + u2[0] * t, B[1] + u2[1] * t];
+    // Il centro, sulla bisettrice dentro la curva.
+    const bx = u1[0] + u2[0];
+    const by = u1[1] + u2[1];
+    const bl = Math.hypot(bx, by) || 1;
+    const dc = Math.hypot(t, r);
+    const O = [B[0] + (bx / bl) * dc, B[1] + (by / bl) * dc];
+    const a1 = Math.atan2(P1[1] - O[1], P1[0] - O[0]);
+    let a2 = Math.atan2(P2[1] - O[1], P2[0] - O[0]);
+    let da = a2 - a1;
+    while (da > Math.PI) da -= 2 * Math.PI;
+    while (da < -Math.PI) da += 2 * Math.PI;
+    const n = Math.max(2, Math.ceil(Math.abs(da) / ((10 * Math.PI) / 180)));
+    for (let j = 0; j <= n; j++) {
+      const a = a1 + (da * j) / n;
+      out.push([O[0] + Math.cos(a) * r, O[1] + Math.sin(a) * r]);
+    }
+    usato = t;
+  }
+  out.push(g[g.length - 1]);
+  return out;
+}
+
 export function grafoStrade(strade, metri) {
+  // Le curve arrotondate (vedi [arrotonda]), ma non dove le strade si
+  // toccano: un vertice che sta su due strade (o al capo di una) resta.
+  {
+    const conta = new Map();
+    const k = (q) => Math.round(q[0] * 4) + ',' + Math.round(q[1] * 4);
+    for (const r of strade) for (const q of r.g) conta.set(k(q), (conta.get(k(q)) ?? 0) + 1);
+    const [x0, y0] = metri(0, 0);
+    const [x1, y1] = metri(1000, 0);
+    const pxm = 1000 / (Math.hypot(x1 - x0, y1 - y0) || 1);
+    for (const r of strade) {
+      const raggio = RAGGIO_CURVE[r.p.class] ?? 12;
+      r.g = arrotonda(r.g, raggio, pxm, (q) => (conta.get(k(q)) ?? 0) > 1);
+    }
+  }
   const nodi = [];
   const indice = new Map();
   const nodoPer = (gx, gy) => {
@@ -887,7 +981,7 @@ export function altezze(nodi, feats) {
    * vengono incontro; senza scendere sotto la quota che serve, né salire
    * sopra quella di una strada scavalcata, né muovere i sottopassi. */
   const limita = (forte = false) => {
-    for (let giro = 0; giro < 80; giro++) {
+    for (let giro = 0; giro < 400; giro++) {
       let troppo = 0;
       for (let i = 0; i < N; i++) {
         for (const e of nodi[i].adj) {

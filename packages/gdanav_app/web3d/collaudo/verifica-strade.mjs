@@ -79,7 +79,27 @@ export async function costruisci(X, Y, { corsie = !process.env.SENZA_CORSIE } = 
   for (let i = 0; i < t.fusti.length; i += 16) piloni.push({ x: t.fusti[i + 12] + ox, y: t.fusti[i + 13] + oy, h: Math.hypot(t.fusti[i + 8], t.fusti[i + 9], t.fusti[i + 10]) + 0.8 });
   // Le vie con le corsie: i loro punti in metri globali, con la quota.
   const corsieVie = (t.grafo.corsie ?? []).map((v) => ({ id: v.id, hw: v.hw, ponte: !!v.ponte, galleria: !!v.galleria, w: (v.avanti + v.indietro) * v.lw, p: v.xy.map(([x, y], k) => [x + ox, y + oy, v.h[k]]) }));
-  return { t, sys, segs, piloni, corsieVie, ox, oy, X, Y, datiCorsie };
+  // Gli edifici della tessera di mezzo: i contorni in metri locali.
+  const edifici = [];
+  for (const [chiaveOff, layers] of Object.entries(livelli)) {
+    const B = layers?.building;
+    if (!B) continue;
+    const [ddx, ddy] = chiaveOff.split(',').map(Number);
+    for (let i = 0; i < B.length; i++) {
+      const f = B.feature(i);
+      if (f.type !== 3) continue;
+      let verso = 0;
+      for (const anello of f.loadGeometry()) {
+        let area = 0;
+        for (let j = 0, m = anello.length - 1; j < anello.length; m = j++) area += (anello[m].x - anello[j].x) * (anello[j].y + anello[m].y);
+        if (!area) continue;
+        if (!verso) verso = Math.sign(area);
+        if (Math.sign(area) !== verso) continue; // un cortile
+        edifici.push(anello.map((q) => sys.metri((X + ddx) * 4096 + q.x, (Y + ddy) * 4096 + q.y)));
+      }
+    }
+  }
+  return { t, sys, segs, piloni, corsieVie, ox, oy, X, Y, datiCorsie, edifici };
 }
 const lonLat = (sys, X, Y, gx, gy) => {
   // dai metri globali a lon/lat (per i rapporti)
@@ -143,6 +163,87 @@ export function controlla(T) {
       if (d < o.w / 2 - 0.3 && zo < p.h - 3) {
         metti('pilone', p.x, p.y, `su strada a ${zo.toFixed(1)} (pilone ${p.h.toFixed(1)}) cls${o.f & 15}`);
         break;
+      }
+    }
+  }
+  // G. Gli spigoli: dove una strada gira più di 20° in un punto che non è un incrocio.
+  {
+    const { nodi, feats } = T.t.grafo;
+    for (const f of feats) {
+      if (f.cls === 'service' && ['parking_aisle', 'driveway', 'drive-through'].includes(f.sv)) continue;
+      for (let k = 1; k < f.nodi.length - 1; k++) {
+        const b = nodi[f.nodi[k]];
+        if (b.adj.length !== 2) continue;
+        const a = nodi[f.nodi[k - 1]];
+        const c = nodi[f.nodi[k + 1]];
+        if (Math.hypot(b.x - a.x, b.y - a.y) < 1 || Math.hypot(c.x - b.x, c.y - b.y) < 1) continue;
+        const t1 = Math.atan2(b.y - a.y, b.x - a.x);
+        const t2 = Math.atan2(c.y - b.y, c.x - b.x);
+        const giro = Math.abs(Math.atan2(Math.sin(t2 - t1), Math.cos(t2 - t1)));
+        if (giro > (20 * Math.PI) / 180 && dentro(T, [b.x + T.ox, b.y + T.oy])) metti('spigolo', b.x + T.ox, b.y + T.oy, `${((giro * 180) / Math.PI).toFixed(0)}° ${f.cls}`);
+      }
+    }
+  }
+  // H. Le case sull'asfalto: il bordo di una strada (a terra) dentro un edificio.
+  {
+    const { nodi, feats } = T.t.grafo;
+    const GE = 25;
+    const ge = new Map();
+    T.edifici.forEach((poly, i) => {
+      const xs = poly.map((q) => q[0]);
+      const ys = poly.map((q) => q[1]);
+      for (let gx = Math.floor(Math.min(...xs) / GE); gx <= Math.floor(Math.max(...xs) / GE); gx++) {
+        for (let gy = Math.floor(Math.min(...ys) / GE); gy <= Math.floor(Math.max(...ys) / GE); gy++) {
+          const kk = gx + ',' + gy;
+          if (!ge.has(kk)) ge.set(kk, []);
+          ge.get(kk).push(i);
+        }
+      }
+    });
+    const dentroPoly = (x, y, poly) => {
+      let d = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const [xi, yi] = poly[i];
+        const [xj, yj] = poly[j];
+        if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) d = !d;
+      }
+      return d;
+    };
+    for (const f of feats) {
+      // (Come il disegno: i passi carrai e i parcheggi non si disegnano.)
+      if (f.ponte || f.galleria || f.cls === 'rail' || (f.cls === 'service' && ['parking_aisle', 'driveway', 'drive-through'].includes(f.sv))) continue;
+      let ultimo = -1e9;
+      let s = 0;
+      for (let k = 1; k < f.nodi.length; k++) {
+        const a = nodi[f.nodi[k - 1]];
+        const b = nodi[f.nodi[k]];
+        const l = Math.hypot(b.x - a.x, b.y - a.y);
+        if (!l) continue;
+        const nx = -(b.y - a.y) / l;
+        const ny = (b.x - a.x) / l;
+        for (let t = 0; t < l; t += 2) {
+          const px = a.x + ((b.x - a.x) * t) / l;
+          const py = a.y + ((b.y - a.y) * t) / l;
+          if (s + t - ultimo < 30 || !dentro(T, [px + T.ox, py + T.oy]) || a.h > 1) continue;
+          const vicini0 = ge.get(Math.floor(px / GE) + ',' + Math.floor(py / GE)) ?? [];
+          // Un androne: la strada nei dati passa sotto il palazzo.
+          if (vicini0.some((i) => dentroPoly(px, py, T.edifici[i]))) continue;
+          for (const lato of [1, -1]) {
+            const lw = f.larghezze ? f.larghezze[k - 1][lato > 0 ? 0 : 1] + (f.larghezze[k][lato > 0 ? 0 : 1] - f.larghezze[k - 1][lato > 0 ? 0 : 1]) * (t / l) : f.w / 2;
+            // (Una strada stretta a meno di un metro fra due case che si
+            // toccano è un passaggio: non c'è asfalto da far entrare.)
+            if (lw < 0.5) continue;
+            const qx = px + nx * lato * (lw - 0.4);
+            const qy = py + ny * lato * (lw - 0.4);
+            const lista = ge.get(Math.floor(qx / GE) + ',' + Math.floor(qy / GE)) ?? [];
+            if (lista.some((i) => dentroPoly(qx, qy, T.edifici[i]))) {
+              metti('casa-su-strada', qx + T.ox, qy + T.oy, `${f.cls} larga ${f.w.toFixed(1)} m`);
+              ultimo = s + t;
+              break;
+            }
+          }
+        }
+        s += l;
       }
     }
   }

@@ -164,6 +164,33 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   uniscIBordi(strade);
   segnaViadotti(livelli, x, y, strade, sys);
   const { nodi, feats } = grafoStrade(strade, sys.metri);
+  // Le strade strette fra le case (vedi [strettaFraLeCase]): gli edifici delle
+  // nove tessere, in metri.
+  {
+    const poligoni = [];
+    for (const [chiaveOff, layers] of Object.entries(livelli)) {
+      const Bd = layers?.building;
+      if (!Bd) continue;
+      const [dx, dy] = chiaveOff.split(',').map(Number);
+      for (let i = 0; i < Bd.length; i++) {
+        const f = Bd.feature(i);
+        if (f.type !== 3) continue;
+        // Solo i contorni esterni: un anello girato al contrario del primo è
+        // un cortile (un buco nel palazzo), non un palazzo.
+        let verso = 0;
+        for (const anello of f.loadGeometry()) {
+          let area = 0;
+          for (let j = 0, m = anello.length - 1; j < anello.length; m = j++) area += (anello[m].x - anello[j].x) * (anello[j].y + anello[m].y);
+          if (!area) continue;
+          if (!verso) verso = Math.sign(area);
+          if (Math.sign(area) !== verso) continue;
+          const pts = anello.map((q) => sys.metri((x + dx) * ESTENSIONE + q.x, (y + dy) * ESTENSIONE + q.y));
+          if (pts.some(([px, py]) => Math.abs(px) < meta + 80 && Math.abs(py) < meta + 80)) poligoni.push(pts);
+        }
+      }
+    }
+    strettaFraLeCase(feats, nodi, poligoni);
+  }
   // Per il collaudo (la verifica delle strade su tessere vere): il grafo con le quote.
   const grafoPerIlCollaudo = grafo ? { nodi, feats } : undefined;
   const tGrafo = Date.now() - t0;
@@ -434,7 +461,8 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
       lungo.push(acc);
     }
     // [x, y, h, tx, ty, s]: si taglia sulla tessera e tutto si interpola.
-    const ricca = tutta.map((p, k) => [p[0], p[1], p[2], tang[k][0], tang[k][1], lungo[k]]);
+    // (Con le mezze larghezze a sinistra e a destra, dove la strada si stringe fra le case.)
+    const ricca = tutta.map((p, k) => (f.larghezze ? [p[0], p[1], p[2], tang[k][0], tang[k][1], lungo[k], f.larghezze[k][0], f.larghezze[k][1]] : [p[0], p[1], p[2], tang[k][0], tang[k][1], lungo[k]]));
     const semePezzo = mescola(Math.round(tutta[0][0] * 7), Math.round(tutta[0][1] * 7));
     const zs = f.galleria ? SOPRA_GALLERIA : (SOPRA[f.cls] ?? 0.15) + (fi % 7) * 0.002;
 
@@ -505,8 +533,10 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         }
         const zz = pezzo[k][2] + zs;
         const v = pezzo[k][5] / PERIODO_STRADA;
-        L.push([pezzo[k][0] + nx * hw * m, pezzo[k][1] + ny * hw * m, zz, 0, v]);
-        R.push([pezzo[k][0] - nx * hw * m, pezzo[k][1] - ny * hw * m, zz, 1, v]);
+        const hs = pezzo[k][6] ?? hw;
+        const hd = pezzo[k][7] ?? hw;
+        L.push([pezzo[k][0] + nx * hs * m, pezzo[k][1] + ny * hs * m, zz, 0, v]);
+        R.push([pezzo[k][0] - nx * hd * m, pezzo[k][1] - ny * hd * m, zz, 1, v]);
       }
       // Dove c'è la via con le corsie, il nastro di sempre non c'è.
       const coperto = conCorsie ? pezzo.map((q) => conCorsie.copre(q[0], q[1], q[3], q[4], q[2])) : null;
@@ -1362,6 +1392,141 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   out.conti.triangoli = stimaTriangoli(out);
   if (grafoPerIlCollaudo) out.grafo = { ...grafoPerIlCollaudo, corsie: conCorsie?.strade ?? null };
   return out;
+}
+
+/** Mai più stretta di così una strada fra le case (m). */
+const STRETTA_MIN_M = 3;
+/** Di quanto può cambiare la larghezza di una strada per metro, stringendosi fra le case. */
+const STRETTA_PASSO = 0.15;
+
+/**
+ * Le strade strette fra le case. La larghezza viene dalla classe
+ * ([larghezzaStrada]), e nei vicoli del centro, con le case a filo strada,
+ * l'asfalto entrava nelle facciate («le case si sovrappongono alle
+ * strade»). Qui, a ogni nodo di ogni strada a terra, si misura quanto c'è
+ * fino alla facciata a sinistra e a destra; la strada lì arriva fin quasi
+ * alla facciata (trenta centimetri prima), mai sotto [STRETTA_MIN_M] in
+ * tutto, e la sua larghezza cambia piano ([STRETTA_PASSO] per metro).
+ * [poligoni]: i contorni degli edifici, in metri. Mette in [feats] che si
+ * stringono `larghezze`: per ogni nodo `[sinistra, destra]` (mezze
+ * larghezze). Dove la strada passa sotto un palazzo (un androne) resta così.
+ */
+export function strettaFraLeCase(feats, nodi, poligoni) {
+  if (!poligoni.length) return 0;
+  const G = 20;
+  const griglia = new Map();
+  poligoni.forEach((poly, i) => {
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const [px, py] of poly) {
+      x0 = Math.min(x0, px);
+      y0 = Math.min(y0, py);
+      x1 = Math.max(x1, px);
+      y1 = Math.max(y1, py);
+    }
+    for (let gx = Math.floor(x0 / G); gx <= Math.floor(x1 / G); gx++) {
+      for (let gy = Math.floor(y0 / G); gy <= Math.floor(y1 / G); gy++) {
+        const k = gx + ',' + gy;
+        if (!griglia.has(k)) griglia.set(k, []);
+        griglia.get(k).push(i);
+      }
+    }
+  });
+  // La distanza dal punto alla facciata più vicina da un lato ([nx, ny] verso
+  // quel lato), guardando fino a [fin] metri: Infinity se non ce n'è, e
+  // null se il punto sta dentro un palazzo (un androne).
+  const lato = (px, py, nx, ny, fin) => {
+    let d = Infinity;
+    const qx = px + nx * fin;
+    const qy = py + ny * fin;
+    const visti = new Set();
+    for (let gx = Math.floor(Math.min(px, qx) / G); gx <= Math.floor(Math.max(px, qx) / G); gx++) {
+      for (let gy = Math.floor(Math.min(py, qy) / G); gy <= Math.floor(Math.max(py, qy) / G); gy++) {
+        for (const i of griglia.get(gx + ',' + gy) ?? []) {
+          if (visti.has(i)) continue;
+          visti.add(i);
+          const poly = poligoni[i];
+          let dentro = false;
+          for (let j = 0, m = poly.length - 1; j < poly.length; m = j++) {
+            const [ax, ay] = poly[m];
+            const [bx, by] = poly[j];
+            if (ay > py !== by > py && px < ((bx - ax) * (py - ay)) / (by - ay) + ax) dentro = !dentro;
+            const ex = bx - ax;
+            const ey = by - ay;
+            const den = nx * ey - ny * ex;
+            if (Math.abs(den) < 1e-9) continue;
+            const t = ((ax - px) * ey - (ay - py) * ex) / den;
+            const u = ((ax - px) * ny - (ay - py) * nx) / den;
+            if (t >= 0 && t < d && u >= 0 && u <= 1) d = t;
+          }
+          if (dentro) return null;
+        }
+      }
+    }
+    return d;
+  };
+  let strette = 0;
+  for (const f of feats) {
+    if (f.ponte || f.galleria || f.cls === 'rail') continue;
+    const n = f.nodi.length;
+    if (n < 2) continue;
+    const hw = f.w / 2;
+    const sx = new Float64Array(n).fill(hw);
+    const dx = new Float64Array(n).fill(hw);
+    let stretta = false;
+    // Lungo ogni tratto, un punto ogni due metri: lo spazio più stretto vale
+    // per i due nodi del tratto (fra un nodo e l'altro lo spigolo di una casa
+    // può sporgere).
+    for (let k = 1; k < n; k++) {
+      const a = nodi[f.nodi[k - 1]];
+      const b = nodi[f.nodi[k]];
+      const l = Math.hypot(b.x - a.x, b.y - a.y);
+      if (!l) continue;
+      const nx = -(b.y - a.y) / l;
+      const ny = (b.x - a.x) / l;
+      for (let t = 0; t <= l; t += 2) {
+        const px = a.x + ((b.x - a.x) * Math.min(t, l)) / l;
+        const py = a.y + ((b.y - a.y) * Math.min(t, l)) / l;
+        const ls = lato(px, py, nx, ny, hw + 1);
+        const ld = lato(px, py, -nx, -ny, hw + 1);
+        if (ls === null || ld === null) continue;
+        if (ls < hw + 0.3) {
+          sx[k - 1] = Math.min(sx[k - 1], ls - 0.3);
+          sx[k] = Math.min(sx[k], ls - 0.3);
+          stretta = true;
+        }
+        if (ld < hw + 0.3) {
+          dx[k - 1] = Math.min(dx[k - 1], ld - 0.3);
+          dx[k] = Math.min(dx[k], ld - 0.3);
+          stretta = true;
+        }
+      }
+    }
+    for (let k = 0; k < n; k++) {
+      // Al minimo in tutto allargandosi dal lato libero, se c'è; con le case
+      // da tutte e due le parti il vicolo è stretto davvero (non meno di 1,6 m).
+      sx[k] = Math.max(sx[k], 0.3);
+      dx[k] = Math.max(dx[k], 0.3);
+      const manca = STRETTA_MIN_M - sx[k] - dx[k];
+      if (manca > 0) {
+        if (sx[k] >= hw - 0.01) sx[k] += manca;
+        else if (dx[k] >= hw - 0.01) dx[k] += manca;
+      }
+    }
+    if (!stretta) continue;
+    // Piano: la larghezza cambia al più di STRETTA_PASSO per metro.
+    const s = [0];
+    for (let k = 1; k < n; k++) s.push(s[k - 1] + Math.hypot(nodi[f.nodi[k]].x - nodi[f.nodi[k - 1]].x, nodi[f.nodi[k]].y - nodi[f.nodi[k - 1]].y));
+    for (const v of [sx, dx]) {
+      for (let k = 1; k < n; k++) v[k] = Math.min(v[k], v[k - 1] + STRETTA_PASSO * (s[k] - s[k - 1]));
+      for (let k = n - 2; k >= 0; k--) v[k] = Math.min(v[k], v[k + 1] + STRETTA_PASSO * (s[k + 1] - s[k]));
+    }
+    f.larghezze = [...sx].map((v, k) => [v, dx[k]]);
+    strette++;
+  }
+  return strette;
 }
 
 /** Triangoli di una geometria istanziata, per le stime. */

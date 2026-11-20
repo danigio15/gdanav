@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ALTEZZA_LIVELLO, PENDENZA, SCAVALCO_M, altezzaLivello, grafoStrade, larghezzaStrada, livelloStrada, segnaRotonde, uniscIBordi } from '../src/elevazione.js';
+import { ALTEZZA_LIVELLO, PENDENZA, SCAVALCO_M, altezzaLivello, arrotonda, grafoStrade, larghezzaStrada, livelloStrada, segnaRotonde, uniscIBordi } from '../src/elevazione.js';
 
 // Metri = pixel, per semplicità.
 const metri = (x, y) => [x, -y];
@@ -187,4 +187,25 @@ test('le rotonde: un anello tondo sì, un isolato quadrato no', () => {
   assert.ok(g.nodi.filter((n) => n.rotonda).every((n) => Math.hypot(n.x, n.y) < 16));
   assert.ok(g.nodi.some((n) => n.rotonda));
   assert.equal(segnaRotonde([], []), 0);
+});
+
+test('le curve arrotondate: niente spigoli, gli incroci restano dove sono', () => {
+  // Una strada che gira ad angolo retto a (100, 0), un metro = un pixel.
+  const g = arrotonda([[0, 0], [100, 0], [100, 100]], 35, 1);
+  assert.ok(g.length > 6, `un arco (${g.length} punti)`);
+  let peggio = 0;
+  for (let k = 1; k < g.length - 1; k++) {
+    const a = Math.atan2(g[k][1] - g[k - 1][1], g[k][0] - g[k - 1][0]);
+    const b = Math.atan2(g[k + 1][1] - g[k][1], g[k + 1][0] - g[k][0]);
+    peggio = Math.max(peggio, Math.abs(Math.atan2(Math.sin(b - a), Math.cos(b - a))));
+  }
+  assert.ok(peggio <= (11 * Math.PI) / 180, `al più dieci gradi per punto (${((peggio * 180) / Math.PI).toFixed(1)})`);
+  // Il raggio: l'arco passa a r(√2−1) dall'angolo.
+  const vicino = Math.min(...g.map((q) => Math.hypot(q[0] - 100, q[1])));
+  assert.ok(Math.abs(vicino - 35 * (Math.SQRT2 - 1)) < 0.5, `raggio 35 m (${vicino.toFixed(1)})`);
+  assert.deepEqual(g[0], [0, 0]);
+  assert.deepEqual(g.at(-1), [100, 100]);
+  // Un incrocio non si sposta.
+  const f = arrotonda([[0, 0], [100, 0], [100, 100]], 35, 1, (q) => q[0] === 100 && q[1] === 0);
+  assert.deepEqual(f, [[0, 0], [100, 0], [100, 100]]);
 });
