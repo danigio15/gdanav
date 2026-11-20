@@ -12,8 +12,16 @@
 // quasi sei metri di luce, e da dietro l'auto il vuoto sotto il ponte si vede.
 export const ALTEZZA_LIVELLO = 8.0;
 export const PENDENZA = 0.055;
+/** Al più così ripida, la salita che arriva a un punto che sta a terra (una rotonda). */
+export const PENDENZA_MAX = 0.1;
+/** Fin dove una carreggiata che diventa un ponte non resta a terra allo svincolo. */
+const PONTE_VICINO_M = 150;
+/** Due strade attaccate entro tanti metri, se si incrociano in pianta, si stanno unendo. */
+const ATTACCATE_M = 50;
 /** Lo spessore dell'impalcato di un ponte, dall'asfalto al ventre. */
 export const SPESSORE_IMPALCATO = 1.9;
+/** Dove un ponte scavalca una strada, quanto sta sopra di lei: cinque metri di luce e l'impalcato. */
+export const SCAVALCO_M = 5.1 + SPESSORE_IMPALCATO;
 const PASSO_FITTO = 6; // metri fra due nodi lungo le strade grandi
 const PASSO_RADO = 12; // e lungo le piccole
 
@@ -145,7 +153,7 @@ class Mucchio {
  * [metri]: dai pixel globali ai metri locali. Restituisce i nodi (`x`, `y`,
  * `h`) e le strade (`nodi`, `cls`, `w`, `ponte`, `livello`, …).
  */
-export function grafoStrade(strade, metri, { iterazioni = 1500 } = {}) {
+export function grafoStrade(strade, metri) {
   const nodi = [];
   const indice = new Map();
   const nodoPer = (gx, gy) => {
@@ -298,7 +306,7 @@ export function grafoStrade(strade, metri, { iterazioni = 1500 } = {}) {
   }
 
   segnaRotonde(nodi, feats);
-  altezze(nodi, feats, iterazioni);
+  altezze(nodi, feats);
   return { nodi, feats };
 }
 
@@ -323,7 +331,8 @@ const ROTONDA_SVOLTA_MAX = 75;
  * Segna `rotonda` sui nodi; restituisce quante ne ha trovate.
  */
 export function segnaRotonde(nodi, feats) {
-  const buona = (f) => !f.ponte && !f.galleria && !f.rampa && f.cls !== 'rail';
+  // Anche coi pezzi di ponte: una rotonda in quota si riconosce, e resta in piano.
+  const buona = (f) => !f.galleria && !f.rampa && f.cls !== 'rail';
   const sMax = (ROTONDA_SVOLTA_MAX * Math.PI) / 180;
   const sMin = (-8 * Math.PI) / 180;
   const lunghezzaMax = 2 * Math.PI * ROTONDA_RAGGIO_MAX * 1.15;
@@ -384,7 +393,11 @@ export function segnaRotonde(nodi, feats) {
       const anello = cerca(a, f.nodi[k + 1], Math.sign(t));
       if (!anello) continue;
       // Con un pezzo di ponte suo (un nodo in comune con un ponte) la rotonda è in quota.
-      if (anello.some((i) => nodi[i].feats.some((fi) => feats[fi].livello > 0))) continue;
+      if (anello.some((i) => nodi[i].feats.some((fi) => feats[fi].livello > 0))) {
+        // Ed è tutta in piano, alla quota del suo ponte (vedi `altezze`).
+        for (const i of anello) nodi[i].anelloInQuota = anello;
+        continue;
+      }
       for (const i of anello) nodi[i].rotonda = true;
       trovate++;
     }
@@ -392,123 +405,349 @@ export function segnaRotonde(nodi, feats) {
   return trovate;
 }
 
-/** Le altezze dei nodi del grafo (vedi in cima). */
-export function altezze(nodi, feats, iterazioni = 1500) {
-  const hDi = (f) => Math.max(altezzaLivello(f.livello), f.altezza ?? 0);
-  for (const n of nodi) {
-    let hPonte = null;
-    let diversi = false;
-    for (const fi of n.feats) {
-      const f = feats[fi];
-      if (f.livello > 0) {
-        if (hPonte !== null && hPonte !== hDi(f)) diversi = true;
-        hPonte = hPonte === null ? hDi(f) : Math.max(hPonte, hDi(f));
+/**
+ * Le altezze dei nodi del grafo.
+ *
+ * Il `layer` delle tessere dice solo chi passa sopra chi, non quanto in
+ * alto: un ponte al terzo livello sta otto metri sopra quello che scavalca,
+ * non a ventiquattro. Prima ogni ponte stava a otto metri per livello e
+ * certi incroci erano inchiodati a terra: dove un viadotto «di terzo
+ * livello» finiva su una carreggiata a terra scendeva di ventiquattro metri
+ * in venticinque («una salita con strade in mezzo»), e le rampe fra due
+ * ponti facevano scalini.
+ *
+ * Adesso, un livello alla volta dal basso, due specie di quote:
+ * - quelle che servono: dove un ponte scavalca un'altra strada (o un ponte
+ *   più basso), [ALTEZZA_LIVELLO] metri sopra di lei;
+ * - quelle che si vorrebbero: un ponte almeno a [ALTEZZA_LIVELLO] metri, un
+ *   viadotto sulle valli più in alto (vedi `segnaViadotti` in tessera.js)
+ *   man mano che si allontana dai capi, un ponte in piano fra due punti alti,
+ *   una rotonda con un pezzo di ponte tutta in piano.
+ * Da quei punti la strada scende al più del [PENDENZA], per tutte le strade
+ * attaccate, ponti o no. Le seconde però cedono ai punti che stanno a terra
+ * (le rotonde, la carreggiata dove si stacca una rampa, i sottopassi): lì la
+ * salita arriva al più del [PENDENZA_MAX]. Le gallerie lunghe (in montagna)
+ * vanno alla quota della strada che ci entra: senza il terreno, una galleria
+ * a terra accanto a un viadotto era un muro.
+ */
+export function altezze(nodi, feats) {
+  const N = nodi.length;
+  const tuttaGalleria = (n) => n.feats.length > 0 && n.feats.every((fi) => feats[fi].galleria);
+  // I tratti di ogni strada, e dove un ponte ne scavalca un altro più basso.
+  const tratti = [];
+  feats.forEach((f, fi) => {
+    for (let k = 1; k < f.nodi.length; k++) tratti.push([f.nodi[k - 1], f.nodi[k], fi]);
+  });
+  const G = 30;
+  const griglia = new Map();
+  const celle = (A, B, fn) => {
+    for (let gx = Math.floor(Math.min(A.x, B.x) / G); gx <= Math.floor(Math.max(A.x, B.x) / G); gx++) {
+      for (let gy = Math.floor(Math.min(A.y, B.y) / G); gy <= Math.floor(Math.max(A.y, B.y) / G); gy++) fn(gx + ',' + gy);
+    }
+  };
+  tratti.forEach(([a, b], ti) =>
+    celle(nodi[a], nodi[b], (k) => {
+      if (!griglia.has(k)) griglia.set(k, []);
+      griglia.get(k).push(ti);
+    }),
+  );
+  // I sottopassi: le gallerie dove passano sotto un'altra strada restano a
+  // terra; le altre (in collina, in montagna) vanno con la strada.
+  const sottopasso = new Uint8Array(N);
+  const incrocia = (A, B, C, D) => {
+    const rx = B.x - A.x;
+    const ry = B.y - A.y;
+    const sx = D.x - C.x;
+    const sy = D.y - C.y;
+    const den = rx * sy - ry * sx;
+    if (Math.abs(den) < 1e-9) return null;
+    const t = ((C.x - A.x) * sy - (C.y - A.y) * sx) / den;
+    const u = ((C.x - A.x) * ry - (C.y - A.y) * rx) / den;
+    return t < 0 || t > 1 || u < 0 || u > 1 ? null : u;
+  };
+  {
+    const vista = new Uint8Array(feats.length);
+    for (let i = 0; i < feats.length; i++) {
+      if (!feats[i].galleria || vista[i]) continue;
+      const catena = [];
+      const coda = [i];
+      vista[i] = 1;
+      while (coda.length) {
+        const j = coda.pop();
+        const f = feats[j];
+        catena.push(j);
+        for (const e of [f.nodi[0], f.nodi[f.nodi.length - 1]]) {
+          for (const q of nodi[e].feats) {
+            if (vista[q] || !feats[q].galleria) continue;
+            vista[q] = 1;
+            coda.push(q);
+          }
+        }
+      }
+      // A terra solo dove passa sotto: il resto scende dentro, dall'imbocco.
+      for (const j of catena) {
+        const f = feats[j];
+        for (let k = 1; k < f.nodi.length; k++) {
+          const [a, b] = [f.nodi[k - 1], f.nodi[k]];
+          celle(nodi[a], nodi[b], (cella) => {
+            for (const tj of griglia.get(cella) || []) {
+              const [c, d, fj] = tratti[tj];
+              if (feats[fj].galleria || c === a || c === b || d === a || d === b) continue;
+              if (incrocia(nodi[a], nodi[b], nodi[c], nodi[d]) !== null) {
+                if (tuttaGalleria(nodi[a])) sottopasso[a] = 1;
+                if (tuttaGalleria(nodi[b])) sottopasso[b] = 1;
+              }
+            }
+          });
+        }
       }
     }
-    n.hPonte = hPonte;
-    n.diversi = diversi;
   }
-  // I nodi di un ponte vicini a un ponte di altro livello sono liberi: lì si
-  // sale o si scende da un livello all'altro.
-  for (const f of feats) {
-    if (f.livello === 0) continue;
-    const lungo = [0];
-    let acc = 0;
-    for (let k = 1; k < f.nodi.length; k++) {
-      const a = nodi[f.nodi[k - 1]];
-      const b = nodi[f.nodi[k]];
-      acc += Math.hypot(a.x - b.x, a.y - b.y);
-      lungo.push(acc);
+  // Due strade attaccate a pochi metri si incrociano in pianta dove si
+  // uniscono (le rampe di uno svincolo): non è uno scavalco.
+  const vicine = (da, a, b) => {
+    const visti = new Map([[da, 0]]);
+    const coda = [da];
+    while (coda.length) {
+      const i = coda.shift();
+      if (i === a || i === b) return true;
+      for (const e of nodi[i].adj) {
+        const d = visti.get(i) + e.d;
+        if (d > ATTACCATE_M || (visti.has(e.to) && visti.get(e.to) <= d)) continue;
+        visti.set(e.to, d);
+        coda.push(e.to);
+      }
     }
-    const estremi = [0, f.nodi.length - 1].filter((k) => {
-      const n = nodi[f.nodi[k]];
-      return n.diversi || n.feats.some((o) => feats[o].livello > 0 && hDi(feats[o]) !== hDi(f));
+    return false;
+  };
+  // Il punto di CD (0..1) sotto AB, se le due carreggiate si sovrappongono (più vicine di [entro]).
+  const sovrapposte = (A, B, C, D, entro) => {
+    const sul = (P, Q, R) => {
+      const ex = R.x - Q.x;
+      const ey = R.y - Q.y;
+      const l2 = ex * ex + ey * ey;
+      const t = l2 ? Math.max(0, Math.min(1, ((P.x - Q.x) * ex + (P.y - Q.y) * ey) / l2)) : 0;
+      return [Math.hypot(P.x - Q.x - ex * t, P.y - Q.y - ey * t), t];
+    };
+    // Tutto un tratto sopra l'altro, non solo un capo che sfiora.
+    const [da, ta] = sul(A, C, D);
+    const [db, tb] = sul(B, C, D);
+    if (da < entro && db < entro) return (ta + tb) / 2;
+    const [dc] = sul(C, A, B);
+    const [dd] = sul(D, A, B);
+    if (dc < entro && dd < entro) return 0.5;
+    return null;
+  };
+  const scavalchi = [];
+  for (const [a, b, fi] of tratti) {
+    const f = feats[fi];
+    if (!f.ponte) continue;
+    const A = nodi[a];
+    const B = nodi[b];
+    const visti = new Set();
+    celle(A, B, (k) => {
+      for (const tj of griglia.get(k) || []) {
+        if (visti.has(tj)) continue;
+        visti.add(tj);
+        const [c, d, fj] = tratti[tj];
+        const g = feats[fj];
+        // (Una galleria sta sotto terra: passarci sopra non chiede quota.)
+        if (fj === fi || g.livello >= f.livello || g.galleria || c === a || c === b || d === a || d === b) continue;
+        // Anche senza incrociarsi: le due carreggiate una sopra l'altra
+        // (allo svincolo il viadotto correva sopra la rampa, quasi parallelo,
+        // e restava tre metri sopra di lei).
+        let u = incrocia(A, B, nodi[c], nodi[d]);
+        if (u === null) {
+          const sopraVicine = sovrapposte(A, B, nodi[c], nodi[d], ((f.w + g.w) / 2) * 0.5);
+          if (sopraVicine === null) continue;
+          u = sopraVicine;
+        }
+        if (vicine(a, c, d)) continue;
+        scavalchi.push({ a, b, c, d, u, livello: f.livello });
+      }
     });
-    for (let k = 0; k < f.nodi.length; k++) {
-      const n = nodi[f.nodi[k]];
-      let libero = n.diversi;
-      for (const e of estremi) if (Math.abs(lungo[k] - lungo[e]) < 70) libero = true;
-      if (n.fisso === null || n.fisso === 'libero') n.fisso = libero ? 'libero' : hDi(f);
-      else if (!libero) n.fisso = Math.max(n.fisso, hDi(f));
-    }
   }
-  for (const n of nodi) if (n.fisso === null && n.feats.length && n.feats.every((fi) => feats[fi].galleria)) n.fisso = 0;
-  // Le rotonde a terra (vedi `segnaRotonde`): la salita resta nei bracci.
-  for (const n of nodi) if (n.fisso === null && n.rotonda) n.fisso = 0;
-  const principale = (f) => (f.cls === 'motorway' || f.cls === 'trunk') && !f.rampa && f.livello === 0;
-  for (const n of nodi) {
-    if (n.fisso !== null) continue;
-    const princ = n.feats.filter((fi) => principale(feats[fi])).length;
-    // Dove una rampa si stacca da una carreggiata a terra, la carreggiata resta a terra.
-    if (n.adj.length >= 3 && princ >= 1 && n.feats.some((fi) => feats[fi].rampa)) n.fisso = 0;
-  }
-  // Fin dove arriva la salita di un ponte: (h/pendenza − distanza) > 0.
-  const arriva = new Float64Array(nodi.length).fill(-1);
-  const mucchio = new Mucchio(true);
-  nodi.forEach((n, i) => {
-    if (n.hPonte) {
-      arriva[i] = n.hPonte / PENDENZA;
-      mucchio.push(arriva[i], i);
+  /* I punti a terra: le rotonde (vedi `segnaRotonde`), i sottopassi e la
+   * carreggiata principale dove se ne stacca una rampa (ma non se, poco più
+   * in là, diventa lei un ponte: lì è la salita del viadotto). */
+  const principale = (f) => (f.cls === 'motorway' || f.cls === 'trunk') && !f.rampa;
+  const ponteVicino = (da) => {
+    const visti = new Map([[da, 0]]);
+    const coda = [da];
+    while (coda.length) {
+      const i = coda.shift();
+      for (const e of nodi[i].adj) {
+        const f = feats[e.f];
+        if (!principale(f)) continue;
+        if (f.ponte) return true;
+        const d = visti.get(i) + e.d;
+        if (d > PONTE_VICINO_M || (visti.has(e.to) && visti.get(e.to) <= d)) continue;
+        visti.set(e.to, d);
+        coda.push(e.to);
+      }
     }
+    return false;
+  };
+  const aTerra = nodi.map((n, i) => {
+    if (sottopasso[i] || n.rotonda) return true;
+    if (n.adj.length < 3 || !n.feats.some((fi) => feats[fi].rampa)) return false;
+    if (!n.feats.some((fi) => principale(feats[fi]) && !feats[fi].ponte)) return false;
+    return !ponteVicino(i);
   });
-  while (mucchio.length) {
-    const [v, i] = mucchio.pop();
-    if (v < arriva[i]) continue;
-    if (nodi[i].fisso === 0) continue;
-    for (const e of nodi[i].adj) {
-      const nv = v - e.d;
-      if (nv > arriva[e.to]) {
-        arriva[e.to] = nv;
-        mucchio.push(nv, e.to);
+  // Il tetto che i punti a terra mettono alle quote che si vorrebbero.
+  const tetto = new Float64Array(N).fill(Infinity);
+  {
+    const mucchio = new Mucchio(false);
+    for (let i = 0; i < N; i++) {
+      if (aTerra[i]) {
+        tetto[i] = 0;
+        mucchio.push(0, i);
+      }
+    }
+    while (mucchio.length) {
+      const [x, i] = mucchio.pop();
+      if (x > tetto[i]) continue;
+      for (const e of nodi[i].adj) {
+        const nx = x + PENDENZA_MAX * e.d;
+        if (nx < tetto[e.to]) {
+          tetto[e.to] = nx;
+          mucchio.push(nx, e.to);
+        }
       }
     }
   }
-  nodi.forEach((n, i) => {
-    if (typeof n.fisso === 'number') n.h = n.fisso;
-    else if (n.fisso === 'libero' || arriva[i] > 0) {
-      n.fisso = 'libero';
-      n.h = n.hPonte ?? 0;
-    } else {
-      n.fisso = 0;
-      n.h = 0;
-    }
-  });
-  // Il rilassamento armonico dei nodi liberi.
-  const liberi = [];
-  nodi.forEach((n, i) => {
-    if (n.fisso === 'libero') liberi.push(i);
-  });
-  for (let it = 0; it < iterazioni; it++) {
-    let maxd = 0;
-    for (const i of liberi) {
+  // Quanto è lontano ogni nodo di un ponte dal capo del ponte (per i viadotti alti).
+  const dalCapo = new Float64Array(N).fill(Infinity);
+  {
+    const mucchio = new Mucchio(false);
+    for (let i = 0; i < N; i++) {
       const n = nodi[i];
-      let s = 0;
-      let w = 0;
-      for (const e of n.adj) {
-        const ww = 1 / Math.max(e.d, 0.5);
-        s += nodi[e.to].h * ww;
-        w += ww;
-      }
-      if (w) {
-        const nh = s / w;
-        maxd = Math.max(maxd, Math.abs(nh - n.h));
-        n.h = nh;
+      if (!n.feats.some((fi) => feats[fi].ponte)) continue;
+      if (n.adj.length < 2 || n.adj.some((e) => !feats[e.f].ponte)) {
+        dalCapo[i] = 0;
+        mucchio.push(0, i);
       }
     }
-    if (maxd < 1e-3) break;
-  }
-  // Un poco di levigatura per raccordi più morbidi (i ponti restano in quota).
-  for (let it = 0; it < 6; it++) {
-    const nh = nodi.map((n) => n.h);
-    nodi.forEach((n, i) => {
-      if (n.adj.length !== 2 || n.h < 0.05) return;
-      if (typeof n.fisso === 'number' && n.fisso > 0) {
-        const vicini = n.adj.map((e) => nodi[e.to].h);
-        if (Math.max(...vicini.map((v) => Math.abs(v - n.h))) < 0.01) return;
+    while (mucchio.length) {
+      const [x, i] = mucchio.pop();
+      if (x > dalCapo[i]) continue;
+      for (const e of nodi[i].adj) {
+        if (!feats[e.f].ponte) continue;
+        const nx = x + e.d;
+        if (nx < dalCapo[e.to]) {
+          dalCapo[e.to] = nx;
+          mucchio.push(nx, e.to);
+        }
       }
-      nh[i] = (n.h * 2 + nodi[n.adj[0].to].h + nodi[n.adj[1].to].h) / 4;
-    });
-    nodi.forEach((n, i) => (n.h = nh[i]));
+    }
   }
-  return liberi.length;
+  // Dove una strada è scavalcata, il ponte di sopra non la tira su (la sua
+  // salita la scavalca, non ci passa): la quota che aveva prima di lui.
+  const sottoAl = new Float64Array(N).fill(Infinity);
+  const serve = new Float64Array(N).fill(-Infinity);
+  const vorrei = new Float64Array(N).fill(-Infinity);
+  const h = new Float64Array(N);
+  const spandi = (sorgente, pendenza, fermaATerra) => {
+    const v = Float64Array.from(sorgente);
+    const mucchio = new Mucchio(true);
+    for (let i = 0; i < N; i++) if (v[i] > 0) mucchio.push(v[i], i);
+    while (mucchio.length) {
+      const [x, i] = mucchio.pop();
+      if (x < v[i]) continue;
+      if (fermaATerra && aTerra[i] && !(serve[i] > 0)) continue;
+      for (const e of nodi[i].adj) {
+        if (sottopasso[e.to]) continue;
+        const nx = Math.min(x - pendenza * e.d, sottoAl[e.to]);
+        if (nx > v[e.to] && nx > 0) {
+          v[e.to] = nx;
+          mucchio.push(nx, e.to);
+        }
+      }
+    }
+    return v;
+  };
+  const calcola = () => {
+    // Quelle che servono scendono anche più ripide (come le rampe vere),
+    // quando un punto a terra non lascia spazio per la salita dolce.
+    const vs = spandi(serve, PENDENZA_MAX, false);
+    const tutte = new Float64Array(N);
+    for (let i = 0; i < N; i++) tutte[i] = Math.max(serve[i], vorrei[i]);
+    const vv = spandi(tutte, PENDENZA, true);
+    for (let i = 0; i < N; i++) h[i] = sottopasso[i] ? 0 : Math.max(0, vs[i], Math.min(vv[i], tetto[i]));
+  };
+  // Fra due punti alti un ponte non scende; una rotonda con un pezzo di ponte resta in piano.
+  const inPiano = () => {
+    let alzati = 0;
+    const alza = (i, p) => {
+      if (p > vorrei[i] + 0.01 && p > h[i] + 0.01) {
+        vorrei[i] = p;
+        alzati++;
+      }
+    };
+    for (const f of feats) {
+      if (!f.ponte) continue;
+      const n = f.nodi.length;
+      const prima = new Float64Array(n);
+      const dopo = new Float64Array(n);
+      for (let k = 0; k < n; k++) prima[k] = Math.max(k ? prima[k - 1] : 0, h[f.nodi[k]]);
+      for (let k = n - 1; k >= 0; k--) dopo[k] = Math.max(k < n - 1 ? dopo[k + 1] : 0, h[f.nodi[k]]);
+      for (let k = 0; k < n; k++) alza(f.nodi[k], Math.min(prima[k], dopo[k]));
+    }
+    for (let i = 0; i < N; i++) {
+      const anello = nodi[i].anelloInQuota;
+      if (!anello || i !== anello[0]) continue;
+      const p = Math.max(...anello.map((j) => h[j]));
+      for (const j of anello) alza(j, p);
+    }
+    return alzati;
+  };
+  const livelloMax = feats.reduce((m, f) => Math.max(m, f.livello), 0);
+  for (let giro = 0; giro < 3; giro++) {
+    let cambiati = 0;
+    for (let L = 1; L <= livelloMax; L++) {
+      for (const f of feats) {
+        if (f.livello !== L) continue;
+        for (const i of f.nodi) {
+          if (tuttaGalleria(nodi[i])) continue;
+          const alta = f.altezza ? Math.min(f.altezza, ALTEZZA_LIVELLO + PENDENZA * dalCapo[i]) : 0;
+          vorrei[i] = Math.max(vorrei[i], ALTEZZA_LIVELLO, alta);
+        }
+      }
+      if (giro === 0) {
+        // (Con le quote che il livello vuole già messe: la rampa che parte dal
+        // ponte accanto sale con lui; quello che si ferma è la rincorsa.)
+        calcola();
+        for (const s of scavalchi) {
+          if (s.livello !== L) continue;
+          sottoAl[s.c] = Math.min(sottoAl[s.c], Math.max(h[s.c], serve[s.c]));
+          sottoAl[s.d] = Math.min(sottoAl[s.d], Math.max(h[s.d], serve[s.d]));
+        }
+      }
+      for (const s of scavalchi) {
+        if (s.livello !== L) continue;
+        const sopra = h[s.c] + (h[s.d] - h[s.c]) * s.u + SCAVALCO_M;
+        for (const i of [s.a, s.b]) {
+          if (sopra > serve[i] + 0.05) {
+            serve[i] = sopra;
+            cambiati++;
+          }
+        }
+      }
+      calcola();
+      if (inPiano()) calcola();
+    }
+    if (!cambiati) break;
+  }
+  // Un poco di levigatura per raccordi più morbidi (non dove la quota serve).
+  for (let it = 0; it < 6; it++) {
+    const nh = Float64Array.from(h);
+    for (let i = 0; i < N; i++) {
+      const n = nodi[i];
+      if (n.adj.length !== 2 || h[i] < 0.05 || sottopasso[i] || h[i] <= Math.max(serve[i], Math.min(vorrei[i], tetto[i])) + 0.01) continue;
+      nh[i] = (h[i] * 2 + h[n.adj[0].to] + h[n.adj[1].to]) / 4;
+    }
+    h.set(nh);
+  }
+  for (let i = 0; i < N; i++) nodi[i].h = h[i];
+  return scavalchi.length;
 }

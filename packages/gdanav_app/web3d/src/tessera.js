@@ -116,7 +116,7 @@ export const CODICI_CLASSE = { motorway: 1, trunk: 2, primary: 3, secondary: 4, 
  * `"dx,dy"` (da -1 a 1; quella di mezzo è "0,0"); [dettaglio]: «pieno» o
  * «ridotto» (lontano: niente alberi né lampioni, meno edifici).
  */
-export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limiti, datiCorsie = null, vistaCorsie = false }) {
+export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limiti, datiCorsie = null, vistaCorsie = false, grafo = false }) {
   const lim = { ...LIMITI[dettaglio], ...limiti };
   const sys = sistemaTessera(z, x, y);
   const meta = sys.lato / 2;
@@ -164,6 +164,8 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   uniscIBordi(strade);
   segnaViadotti(livelli, x, y, strade, sys);
   const { nodi, feats } = grafoStrade(strade, sys.metri);
+  // Per il collaudo (la verifica delle strade su tessere vere): il grafo con le quote.
+  const grafoPerIlCollaudo = grafo ? { nodi, feats } : undefined;
   const tGrafo = Date.now() - t0;
 
   // ── I nastri delle strade ─────────────────────────────────────────────
@@ -1358,6 +1360,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     ms: Date.now() - t0,
   };
   out.conti.triangoli = stimaTriangoli(out);
+  if (grafoPerIlCollaudo) out.grafo = grafoPerIlCollaudo;
   return out;
 }
 
