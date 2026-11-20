@@ -548,7 +548,15 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           const sopraAltra = (u) => {
             const q = mix(AA, BB, u);
             const on = mix(onA, onB, u);
-            return suAltraStrada(q[0] + on[0] * 0.12, q[1] + on[1] * 0.12, q[2], fi);
+            const px = q[0] + on[0] * 0.12;
+            const py = q[1] + on[1] * 0.12;
+            // Con le corsie anche il loro asfalto: le vie vere sono spesso più
+            // larghe della strada della mappa, e un parapetto in mezzo a una
+            // corsia (fra due rampe che si separano) non c'è.
+            if (suAltraStrada(px, py, q[2], fi) || conCorsie?.inMezzoAllAsfalto(px, py, q[2])) return true;
+            // Fra due rampe che si separano, finché sono a meno di due metri
+            // l'una dall'altra, c'è la zebratura sull'asfalto, non un muro.
+            return suAltraStrada(q[0] + on[0] * 2, q[1] + on[1] * 2, q[2], fi);
           };
           const prove = [0.05, 0.25, 0.5, 0.75, 0.95].map(sopraAltra);
           const misto = prove.some((x) => x) && !prove.every((x) => x);
@@ -1899,9 +1907,21 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
     }
     return false;
   };
+  /** Ben dentro l'asfalto di una via con le corsie (più di [dentro] metri dal bordo), alla quota [h]. */
+  const inMezzoAllAsfalto = (px, py, h, dentro = 1.5) => {
+    for (const [a, b, mezza] of coperte.get(Math.floor(px / G) + ',' + Math.floor(py / G)) ?? []) {
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const l2 = dx * dx + dy * dy || 1e-9;
+      const u = Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / l2));
+      if (Math.hypot(a[0] + dx * u - px, a[1] + dy * u - py) > mezza - dentro) continue;
+      if (Math.abs(a[2] + (b[2] - a[2]) * u - h) < 2) return true;
+    }
+    return false;
+  };
   // Mai sull'asfalto (un nodo messo male, o la strada disegnata più larga).
   const alberi = puntiAlberi.filter((q) => nellaTessera(q) && !sullAsfalto(q[0], q[1])).map((q) => [q[0], q[1], 0.6 + mescola(Math.round(q[0] * 7), Math.round(q[1] * 7)) * 0.25]);
-  return { strade, nodi, copre, sullAsfalto, alberi };
+  return { strade, nodi, copre, sullAsfalto, inMezzoAllAsfalto, alberi };
 }
 
 /** Tutti i buffer di una tessera fatta, da trasferire. */
