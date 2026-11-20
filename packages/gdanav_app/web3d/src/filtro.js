@@ -32,6 +32,15 @@
  * a 50 all'ora la freccia stava una decina di metri dietro con 0,3 s. */
 export const RITARDO_S = 0.8;
 
+/** Il ritardo che si toglie al solo GPS del telefono, senza la velocità
+ * dell'auto (s). «Non deve tornare indietro e non deve stare avanti.» Col
+ * solo GPS la frenata si sa un secondo dopo: portare avanti la lettura di
+ * tutto [RITARDO_S] la faceva fermare sette metri oltre l'auto. Così, in
+ * marcia, sta qualche metro indietro; ma al semaforo si ferma dove ci si
+ * ferma, e non c'è niente da tornare indietro. Con la velocità del
+ * cruscotto (fresca, senza ritardo) la frenata si sa subito: [RITARDO_S]. */
+export const RITARDO_SOLO_GPS_S = 0.4;
+
 /** Una velocità del cruscotto più vecchia di così non si usa (ms). */
 const VELOCITA_VECCHIA_MS = 1500;
 /** Il ritardo della velocità dell'auto (s): poco, viene dal cruscotto. */
@@ -42,7 +51,7 @@ const OMEGA = 4.5;
 /** L'accelerazione della freccia, al più (m/s²). */
 const ACC_MAX = 12;
 /** La frenata della freccia avanti alla stima, al più (m/s²). */
-const FRENATA_MAX = 20;
+const FRENATA_MAX = 30;
 /** Da ferma la freccia non si muove per meno di così (m). */
 const FERMO_TOLLERATO_M = 2.5;
 /** Avanti alla stima, fin qui la freccia non torna mai indietro: frena e
@@ -146,7 +155,8 @@ export class FiltroSullaStrada {
   misura({ metri, alle, v = null, precisione = null }, adesso) {
     if (!Number.isFinite(metri)) return;
     const quando = Number.isFinite(alle) && alle <= adesso && adesso - alle < 5000 ? alle : adesso;
-    const indietro = this.ritardo + (adesso - quando) / 1000;
+    const autoFresca0 = this.ultimaVelocitaAuto != null && adesso - this.ultimaVelocitaAuto < VELOCITA_VECCHIA_MS;
+    const indietro = (autoFresca0 ? this.ritardo : Math.min(this.ritardo, RITARDO_SOLO_GPS_S)) + (adesso - quando) / 1000;
     const vm = Number.isFinite(v) ? Math.max(0, v) : null;
     if (this.x !== null) {
       this.predici(adesso);
@@ -234,8 +244,14 @@ export class FiltroSullaStrada {
       resto -= h;
       const errore = sf + vf * (dt - resto - h) - this.mostrato;
       let acc;
-      if (vf <= FERMO_MS && Math.abs(errore) < FERMO_TOLLERATO_M) acc = -2 * w * this.velMostrata;
-      else acc = w * w * errore + 2 * w * (vf - this.velMostrata) + af;
+      if (vf <= FERMO_MS && Math.abs(errore) < FERMO_TOLLERATO_M) {
+        // Ferma: non si muove per il GPS che balla. Ma se è rimasta indietro
+        // (si è fermata prima dell'auto) la raggiunge, piano, in avanti.
+        acc = -2 * w * this.velMostrata + (errore > 1 ? Math.min(1.5, errore - 1) * 2 * w * 0.3 : 0);
+      } else acc = w * w * errore + 2 * w * (vf - this.velMostrata) + af;
+      // Avanti alla stima: mai più svelta di lei, anzi più piano finché non la
+      // riprende (prima la molla la portava oltre per slancio). Senza strappi.
+      if (errore < 0) acc = Math.min(acc, (Math.max(0, vf + 2 * errore) - this.velMostrata) / 0.3);
       // Avanti alla stima (si è frenato, e il GPS lo dice tardi) frena più
       // decisa: va oltre di meno, e da lì non torna indietro.
       acc = Math.max(errore < 0 ? -FRENATA_MAX : -ACC_MAX, Math.min(ACC_MAX, acc));
