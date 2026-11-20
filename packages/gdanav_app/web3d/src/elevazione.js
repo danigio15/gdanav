@@ -886,28 +886,124 @@ export function altezze(nodi, feats) {
    * resta uno scalino (due quote che si vogliono vicine), i due capi si
    * vengono incontro; senza scendere sotto la quota che serve, né salire
    * sopra quella di una strada scavalcata, né muovere i sottopassi. */
-  for (let giro = 0; giro < 80; giro++) {
-    let troppo = 0;
-    for (let i = 0; i < N; i++) {
-      for (const e of nodi[i].adj) {
-        const j = e.to;
-        if (j < i) continue;
-        const eccesso = Math.abs(h[i] - h[j]) - PENDENZA_MAX * e.d;
-        if (eccesso <= 0.01) continue;
-        const [alto, basso] = h[i] > h[j] ? [i, j] : [j, i];
-        // Quanto può scendere quello alto e salire quello basso.
-        const giu = sottopasso[alto] ? 0 : Math.max(0, h[alto] - Math.max(0, serve[alto]));
-        const su = sottopasso[basso] ? 0 : Math.max(0, sottoAl[basso] - h[basso]);
-        if (giu + su < 0.01) continue;
-        troppo++;
-        const quanto = Math.min(eccesso, giu + su);
-        const g = (quanto * giu) / (giu + su || 1);
-        h[alto] -= Math.min(giu, g);
-        h[basso] += Math.min(su, quanto - Math.min(giu, g));
+  const limita = () => {
+    for (let giro = 0; giro < 80; giro++) {
+      let troppo = 0;
+      for (let i = 0; i < N; i++) {
+        for (const e of nodi[i].adj) {
+          const j = e.to;
+          if (j < i) continue;
+          const eccesso = Math.abs(h[i] - h[j]) - PENDENZA_MAX * e.d;
+          if (eccesso <= 0.01) continue;
+          const [alto, basso] = h[i] > h[j] ? [i, j] : [j, i];
+          // Quanto può scendere quello alto e salire quello basso.
+          const giu = sottopasso[alto] ? 0 : Math.max(0, h[alto] - Math.max(0, serve[alto]));
+          const su = sottopasso[basso] ? 0 : Math.max(0, sottoAl[basso] - h[basso]);
+          if (giu + su < 0.01) continue;
+          troppo++;
+          const quanto = Math.min(eccesso, giu + su);
+          const g = (quanto * giu) / (giu + su || 1);
+          h[alto] -= Math.min(giu, g);
+          h[basso] += Math.min(su, quanto - Math.min(giu, g));
+        }
+      }
+      if (!troppo) break;
+    }
+  };
+
+  /* Il risolutore: le carreggiate ancora una dentro l'altra (un tratto a
+   * meno di metà carreggiata da un altro, a una quota fra 0,6 e 4,6 m di
+   * differenza: né la stessa strada né una che passa sopra), cercate come le
+   * cerca la verifica (collaudo/verifica-strade.mjs). Un ponte troppo basso
+   * sopra un'altra strada sale; due strade affiancate o che si incrociano a
+   * terra vanno alla stessa quota. Poi di nuovo tutto, al più quattro volte. */
+  const contrasti = () => {
+    const out = [];
+    for (const [a, b, fi] of tratti) {
+      const f = feats[fi];
+      if (f.galleria || f.cls === 'rail') continue;
+      const A = nodi[a];
+      const B = nodi[b];
+      const mx = (A.x + B.x) / 2;
+      const my = (A.y + B.y) / 2;
+      const hm = (h[a] + h[b]) / 2;
+      const visti = new Set();
+      celle({ x: mx - 6, y: my - 6 }, { x: mx + 6, y: my + 6 }, (k) => {
+        for (const tj of griglia.get(k) || []) {
+          if (visti.has(tj)) continue;
+          visti.add(tj);
+          const [c, d, fj] = tratti[tj];
+          const g = feats[fj];
+          if (fj === fi || g.galleria || g.cls === 'rail' || c === a || c === b || d === a || d === b) continue;
+          const C = nodi[c];
+          const D = nodi[d];
+          const ex = D.x - C.x;
+          const ey = D.y - C.y;
+          const l2 = ex * ex + ey * ey;
+          const u = l2 ? Math.max(0, Math.min(1, ((mx - C.x) * ex + (my - C.y) * ey) / l2)) : 0;
+          if (Math.hypot(mx - C.x - ex * u, my - C.y - ey * u) >= Math.min(f.w, g.w) / 2) continue;
+          const hc = h[c] + (h[d] - h[c]) * u;
+          const dz = Math.abs(hm - hc);
+          if (dz <= 0.6 || dz >= 4.6) continue;
+          out.push({ a, b, c, d, u, fi, fj, sopra: hm > hc });
+        }
+      });
+    }
+    return out;
+  };
+  const abbassate = new Float64Array(N).fill(Infinity);
+  for (let giro = 0; giro < 4; giro++) {
+    const cc = contrasti();
+    if (!cc.length) break;
+    for (const p of cc) {
+      const [su, giu] = p.sopra ? [feats[p.fi], feats[p.fj]] : [feats[p.fj], feats[p.fi]];
+      const [sa, sb] = p.sopra ? [p.a, p.b] : [p.c, p.d];
+      // (Due strade attaccate lì vicino si stanno unendo: alla stessa quota.)
+      if (su.ponte && (su.livello > giu.livello || !giu.ponte) && !vicine(sa, p.sopra ? p.c : p.a, p.sopra ? p.d : p.b)) {
+        // Il ponte sopra: almeno la luce sopra quella di sotto. Prima scende
+        // quella di sotto, se la sua quota non serve; se no sale il ponte.
+        const [lc, ld, lu] = p.sopra ? [p.c, p.d, p.u] : [p.a, p.b, 0.5];
+        const hSu = (h[sa] + h[sb]) / 2;
+        const voluta = hSu - SCAVALCO_M;
+        if (voluta >= 0 && [lc, ld].every((i) => obbligata[i] <= voluta + 0.05 && !sottopasso[i])) {
+          for (const i of [lc, ld]) if (voluta < abbassate[i]) abbassate[i] = voluta;
+        } else {
+          const sopra = h[lc] + (h[ld] - h[lc]) * lu + SCAVALCO_M;
+          for (const i of [sa, sb]) if (sopra > serve[i]) serve[i] = sopra;
+          sottoAl[lc] = Math.min(sottoAl[lc], h[lc]);
+          sottoAl[ld] = Math.min(sottoAl[ld], h[ld]);
+        }
+      } else {
+        affiancate.push({ a: p.a, b: p.b, c: p.c, d: p.d, u: p.u, aTerraTutte: !feats[p.fi].ponte && !feats[p.fj].ponte });
       }
     }
-    if (!troppo) break;
+    // Le strade da abbassare: un tetto in più, che sale del PENDENZA_MAX.
+    {
+      const mucchio = new Mucchio(false);
+      for (let i = 0; i < N; i++) {
+        if (abbassate[i] < tettoAffiancate[i]) {
+          tettoAffiancate[i] = abbassate[i];
+          mucchio.push(abbassate[i], i);
+        }
+      }
+      while (mucchio.length) {
+        const [x, i] = mucchio.pop();
+        if (x > tettoAffiancate[i]) continue;
+        for (const e of nodi[i].adj) {
+          const nx = x + PENDENZA_MAX * e.d;
+          if (nx < tettoAffiancate[e.to]) {
+            tettoAffiancate[e.to] = nx;
+            mucchio.push(nx, e.to);
+          }
+        }
+      }
+    }
+    calcola();
+    if (inPiano()) calcola();
+    for (let k = 0; k < 2; k++) if (!affianca()) break;
+    limita();
   }
+  limita();
   for (let i = 0; i < N; i++) nodi[i].h = h[i];
   return scavalchi.length;
 }

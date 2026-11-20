@@ -13,7 +13,7 @@ import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, lon
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { AggancioStrada, SOGLIA_M } from './aggancio.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
-import { alzataDeiNastri, direzioneDisegnata, fasciaSullaCorsia, IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti } from './percorso.js';
+import { alzataDeiNastri, direzioneDisegnata, fasciaSullaCorsia, IndiceSegmenti, levigaFascia, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti } from './percorso.js';
 import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
 import { dallaScorta, nellaScorta } from './scorte.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
@@ -1590,7 +1590,7 @@ function sullaCorsia(p) {
     punti.push([x + pr.dx[k], y + pr.dy[k]]);
   }
   const r = corsieLungoIlPercorso(punti, S.indiceCorsie, { passo: pr.passo, s0: pr.s0, suggerimenti: S.suggerimenti });
-  const fascia = fasciaSullaCorsia(punti, r, pr.passo);
+  const fascia = levigaFascia(punti, fasciaSullaCorsia(punti, r, pr.passo), pr.passo);
   for (let k = 0; k < n; k++) {
     pr.dx[k] = fascia[k][0] - linea[k][0];
     pr.dy[k] = fascia[k][1] - linea[k][1];

@@ -19,7 +19,7 @@ const Pbf = (await import(`${W}/node_modules/pbf/index.js`)).default;
 const { scarica } = await import(`${W}/collaudo/strada.mjs`);
 const { costruisciTessera } = await import(`${W}/src/tessera.js`);
 const { preparaCorsie, IndiceCorsie, corsieLungoIlPercorso } = await import(`${W}/src/corsie.js`);
-const { IndiceSegmenti, Linea, profiloDi, fasciaSullaCorsia } = await import(`${W}/src/percorso.js`);
+const { IndiceSegmenti, Linea, profiloDi, fasciaSullaCorsia, levigaFascia } = await import(`${W}/src/percorso.js`);
 const { sistemaTessera } = await import(`${W}/src/geo.js`);
 const z = 14;
 const tj = JSON.parse((await scarica('https://tiles.openfreemap.org/planet')).corpo.toString());
@@ -255,7 +255,7 @@ export function percorsi(T, quanti = 60) {
       punti.push([x + pr.dx[k], y + pr.dy[k]]);
     }
     const r = corsieLungoIlPercorso(punti, indiceCorsie, { passo: pr.passo, s0: pr.s0 });
-    const fascia = fasciaSullaCorsia(punti, r, pr.passo);
+    const fascia = levigaFascia(punti, fasciaSullaCorsia(punti, r, pr.passo), pr.passo);
     const metti = (tipo, q, info) => {
       const n2 = 2 ** z;
       const mx = sys.mx + q[0] * sys.s;
