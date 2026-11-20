@@ -431,6 +431,9 @@ export function lungoLaLinea(linea, punti, da, a, entro = 12, quota = 0.6) {
   return vicini >= visti * quota;
 }
 
+/** Al più così ripida la fascia del percorso (10%: le rampe vere). */
+const PENDENZA_FASCIA = 0.1;
+
 /** Il profilo delle quote di un tratto della linea: un campione ogni [passo] metri. */
 export class Profilo {
   constructor(s0, passo, h, galleria = null, dx = null, dy = null) {
@@ -536,7 +539,23 @@ export function profiloDi(linea, s0, s1, indice, passo = 4, ancora = null, suStr
   const grezze = quote(punti, indice, ia >= 0 && ia < n ? { i: ia, h: ancora.h } : null);
   const [dx, dy] = spostamenti(grezze.dx, grezze.dy, punti, passo, grezze.galleria);
   fermiSuStrada(dx, dy, s0, passo, suStrada);
-  const profilo = new Profilo(s0, passo, riempiQuote(grezze), grezze.galleria, dx, dy);
+  // La fascia mai più ripida di una strada vera: dove sotto due strade che
+  // si uniscono hanno quote diverse (o una è sbagliata), lo scalino diventa
+  // una salita.
+  const h = riempiQuote(grezze);
+  for (let giro = 0; giro < 40; giro++) {
+    let troppo = 0;
+    for (let k = 1; k < h.length; k++) {
+      const eccesso = Math.abs(h[k] - h[k - 1]) - PENDENZA_FASCIA * passo;
+      if (eccesso <= 0.005) continue;
+      troppo++;
+      const verso = Math.sign(h[k] - h[k - 1]);
+      h[k - 1] += (verso * eccesso) / 2;
+      h[k] -= (verso * eccesso) / 2;
+    }
+    if (!troppo) break;
+  }
+  const profilo = new Profilo(s0, passo, h, grezze.galleria, dx, dy);
   profilo.trovata = Uint8Array.from(grezze, (v) => (Number.isNaN(v) ? 0 : 1));
   return profilo;
 }
