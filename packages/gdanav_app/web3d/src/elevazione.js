@@ -401,6 +401,34 @@ export function altezze(nodi, feats, iterazioni = 1500) {
     n.hPonte = hPonte;
     n.diversi = diversi;
   }
+  /*
+   * «Una salita con strade in mezzo, non si capisce niente.» In uno svincolo
+   * la rampa scendeva da un ponte di livello 3 a uno di livello 1, ma fra i
+   * due c'era un pezzo di rampa di trenta metri che nei dati non è un ponte:
+   * i due ponti restavano alla loro quota fino all'ultimo nodo, e i sedici
+   * metri di dislivello stavano tutti in quei trenta (più del 50%). Un capo di
+   * ponte che, per strade non ponti, arriva entro [VICINO_M] a un ponte di
+   * un'altra quota è un giunto come quello diretto: libero anche lui.
+   */
+  const VICINO_M = 60;
+  const pontePocoOltre = (da, h) => {
+    const visti = new Map([[da, 0]]);
+    const coda = [da];
+    while (coda.length) {
+      const i = coda.shift();
+      const d = visti.get(i);
+      for (const e of nodi[i].adj) {
+        const fe = feats[e.f];
+        if (fe.livello > 0 || fe.galleria) continue;
+        const nd = d + e.d;
+        if (nd > VICINO_M || (visti.has(e.to) && visti.get(e.to) <= nd)) continue;
+        if (nodi[e.to].hPonte !== null && nodi[e.to].hPonte !== h) return true;
+        visti.set(e.to, nd);
+        coda.push(e.to);
+      }
+    }
+    return false;
+  };
   // I nodi di un ponte vicini a un ponte di altro livello sono liberi: lì si
   // sale o si scende da un livello all'altro.
   for (const f of feats) {
@@ -415,7 +443,7 @@ export function altezze(nodi, feats, iterazioni = 1500) {
     }
     const estremi = [0, f.nodi.length - 1].filter((k) => {
       const n = nodi[f.nodi[k]];
-      return n.diversi || n.feats.some((o) => feats[o].livello > 0 && hDi(feats[o]) !== hDi(f));
+      return n.diversi || n.feats.some((o) => feats[o].livello > 0 && hDi(feats[o]) !== hDi(f)) || pontePocoOltre(f.nodi[k], hDi(f));
     });
     for (let k = 0; k < f.nodi.length; k++) {
       const n = nodi[f.nodi[k]];

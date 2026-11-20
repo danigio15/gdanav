@@ -426,6 +426,8 @@ const GESTORI = {
     if (m.modo === 'panoramica' && m.riquadro && S.mappa) {
       const [s, o, n, e] = m.riquadro;
       const H = S.mappa.getCanvas().clientHeight;
+      // Dall'alto il centro sta a terra (seguendo l'auto era alla sua quota).
+      if (S.mappa.getCenterElevation()) S.mappa.setCenterElevation(0);
       S.mappa.fitBounds(
         [
           [o, s],
@@ -559,6 +561,23 @@ window.gdanav3d = {
       }
       return out;
     },
+    /**
+     * Le quote del percorso fra [da] e [a] metri, una ogni [passo]: quella
+     * scelta e quelle delle strade lì sotto (per capire un salto).
+     */
+    quoteDelPercorso(da, a, passo = 5) {
+      const p = S.percorso;
+      const pr = p?.profilo;
+      if (!pr) return null;
+      const out = [];
+      for (let s = Math.max(da, pr.s0); s <= Math.min(a, pr.s1); s += passo) {
+        const [x, y] = p.linea.a(s);
+        const v = p.linea.direzione(s, 3);
+        const strade = indice.candidati(x, y, Math.cos(v), Math.sin(v), 12, 12).map((c) => [Math.round(c.h * 10) / 10, Math.round(c.d * 10) / 10]);
+        out.push([s, Math.round(pr.quota(s) * 10) / 10, strade]);
+      }
+      return out;
+    },
     /** Le quote delle strade sopra e sotto l'auto, per la luce sotto i cavalcavia. */
     quoteQui() {
       if (!S.auto) return null;
@@ -609,6 +628,9 @@ function creaMappa(stile) {
       pixelRatio: rapportoPixel({ dpr: window.devicePixelRatio || 1, larghezza: window.innerWidth, altezza: window.innerHeight, inAuto: comeInAuto(), livello: ritmo.livello }),
       canvasContextAttributes: { antialias: true, preserveDrawingBuffer: new URLSearchParams(location.search).has('prova') },
       fadeDuration: 150,
+      // Senza terreno MapLibre rimetterebbe a zero la quota del centro a ogni
+      // fotogramma: la decide la telecamera (vedi [muovi]).
+      centerClampedToGround: false,
     });
   } catch (e) {
     manda('errore', { motivo: 'mappa', dettaglio: String(e).slice(0, 300) });
@@ -983,7 +1005,9 @@ function strato3d() {
         ue.uAutoSchermo.value.set(vs.x, vs.y, vs.z);
       } else ue.uAutoSchermo.value.set(0, -2, -1);
       // Le strade e i ponti sopra l'auto, fra lei e la telecamera, non si disegnano.
-      scena.uniformiTaglio.uQuotaAuto.value = S.auto ? S.auto.z : 1e9;
+      if (S.auto) scena.uniformiTaglio.uAutoTaglio.value.set(S.auto.x, S.auto.y, S.auto.z);
+      else scena.uniformiTaglio.uAutoTaglio.value.set(0, 0, 1e9);
+      scena.uniformiTaglio.uOcchioTaglio.value.setFromMatrixPosition(camera.matrixWorld);
       if (S.auto) {
         const va = new THREE.Vector3(S.auto.x, S.auto.y, S.auto.z + 1).project(camera);
         const ax = ((va.x + 1) / 2) * m.getCanvas().clientWidth;
@@ -2377,7 +2401,12 @@ function muovi(adesso, dt) {
     // diviso sull'auto («la navigazione si nasconde sotto l'altro pezzo di
     // schermo»).
     const [sinistra, destra] = marginiAiLati(S.camera.sinistra ?? 0, S.camera.destra ?? 0, W);
-    let voluta = { center: [lon, lat], zoom: c.zoom, pitch: c.pitch, bearing: c.rotta, padding: { top: sopra, bottom: 0, left: sinistra, right: destra } };
+    /* La quota del centro: l'auto sul viadotto. Nella vista di sempre, da
+     * lontano, sette, quattordici metri non si notano; in quella «Corsie» la
+     * telecamera sta una ventina di metri sopra il centro, e sulla rampa di
+     * uno svincolo a 24 m l'auto usciva dallo schermo in alto e la telecamera
+     * finiva dentro il viadotto di sopra (lo schermo tutto grigio). */
+    let voluta = { center: [lon, lat], zoom: c.zoom, pitch: c.pitch, bearing: c.rotta, elevation: S.corsie ? c.quota : 0, padding: { top: sopra, bottom: 0, left: sinistra, right: destra } };
     const tr = S.transizione;
     if (tr) {
       tr.partenza ??= { center: m.getCenter().toArray(), zoom: m.getZoom(), pitch: m.getPitch(), bearing: m.getBearing() };

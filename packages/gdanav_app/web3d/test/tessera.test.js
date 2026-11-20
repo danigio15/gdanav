@@ -385,3 +385,25 @@ test('una tessera piena di case: oltre il limite leggere, non fuori', () => {
   const prima = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': quartiere(1000) }, limiti: { triangoliEdifici: 20000, leggeriOltre: Infinity } });
   assert.ok(prima.conti.edificiFatti < 600, `${prima.conti.edificiFatti}`);
 });
+
+test('i piloni del viadotto alto non stanno sull\'asfalto della rampa di sotto, che gli corre accanto', () => {
+  // Due ponti paralleli a cinque metri: al secondo livello e al primo.
+  const livelli = {
+    '0,0': {
+      transportation: strato([
+        { p: { class: 'primary' }, g: [[[2048, 4096], [2048, 3000]]] },
+        { p: { class: 'primary', brunnel: 'bridge', layer: 1 }, g: [[[2048, 3000], [2048, 1000]]] },
+        { p: { class: 'primary' }, g: [[[2048, 1000], [2048, 0]]] },
+        { p: { class: 'primary', brunnel: 'bridge', layer: 2 }, g: [[[2060, 4096], [2060, 0]]] },
+      ]),
+    },
+  };
+  const t = costruisciTessera({ z: 14, x: X, y: Y, livelli });
+  // Dov'è il ponte basso in metri (x del suo mezzo) e quello alto.
+  const xs = [];
+  for (let i = 0; i < t.fusti.length; i += 16) xs.push(t.fusti[i + 12]);
+  assert.ok(xs.length > 5, 'ci sono piloni');
+  const basso = Math.min(...xs);
+  const sulBasso = xs.filter((x) => x - basso > 2.5 && x - basso < 4.5 + 0.8);
+  assert.deepEqual(sulBasso, [], `piloni del ponte alto sull'impalcato basso: ${sulBasso}`);
+});

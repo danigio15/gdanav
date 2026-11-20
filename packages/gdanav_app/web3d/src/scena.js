@@ -796,7 +796,7 @@ export class Scena {
     // linea non può salire sul ponte se la strada è sotto».
     this.uniformiFantasma = { ...this.uniformiPercorso, uInizio: { value: -1e9 }, uOpacita: { value: 0.32 }, uSotto: { value: 1 } };
     // Le strade e i ponti sopra l'auto, fra lei e la telecamera (vedi [tagliaSopra]).
-    this.uniformiTaglio = { uQuotaAuto: { value: 1e9 } };
+    this.uniformiTaglio = { uAutoTaglio: { value: new THREE.Vector3(0, 0, 1e9) }, uOcchioTaglio: { value: new THREE.Vector3() } };
     // Gli edifici di vetro attorno all'auto (vedi [vetroVicino]).
     this.uniformiEdifici = {
       uAuto: { value: new THREE.Vector2(1e9, 1e9) },
@@ -1125,28 +1125,42 @@ export class Scena {
     const prima = materiale.onBeforeCompile;
     const chiave = materiale.customProgramCacheKey;
     const u = this.uniformiTaglio;
-    const ue = this.uniformiEdifici;
     materiale.onBeforeCompile = (sh, renderer) => {
       if (prima && prima !== THREE.Material.prototype.onBeforeCompile) prima.call(materiale, sh, renderer);
-      sh.uniforms.uQuotaAuto = u.uQuotaAuto;
-      sh.uniforms.uAutoSchermo = ue.uAutoSchermo;
+      sh.uniforms.uAutoTaglio = u.uAutoTaglio;
+      sh.uniforms.uOcchioTaglio = u.uOcchioTaglio;
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', `#include <common>
-          varying float vQuotaTaglio;`)
+          varying vec3 vMondoTaglio;`)
         .replace(
           '#include <begin_vertex>',
           `#include <begin_vertex>
-          vQuotaTaglio = (modelMatrix * vec4(transformed, 1.0)).z;`,
+          #ifdef USE_INSTANCING
+            vMondoTaglio = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
+          #else
+            vMondoTaglio = (modelMatrix * vec4(transformed, 1.0)).xyz;
+          #endif`,
         );
+      // Solo in un tubo attorno alla linea fra la telecamera e l'auto, e
+      // solo nella parte verso la telecamera (i sei decimi): è lì che un
+      // impalcato copre tutto. Il resto della scena, anche più in alto
+      // dell'auto, resta: prima, con la telecamera alta, spariva mezza città;
+      // e il ponte che passa proprio sopra l'auto si vede, con l'auto sotto
+      // in sagoma (vedi `copertaDaUnPonte` in principale.js).
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', `#include <common>
-          varying float vQuotaTaglio;
-          uniform float uQuotaAuto;
-          uniform vec3 uAutoSchermo;`)
+          varying vec3 vMondoTaglio;
+          uniform vec3 uAutoTaglio;
+          uniform vec3 uOcchioTaglio;`)
         .replace(
           '#include <clipping_planes_fragment>',
           `#include <clipping_planes_fragment>
-          if (vQuotaTaglio > uQuotaAuto + ${sopra.toFixed(1)} && gl_FragCoord.z < uAutoSchermo.z * 0.5 + 0.5) discard;`,
+          if (vMondoTaglio.z > uAutoTaglio.z + ${sopra.toFixed(1)}) {
+            vec3 ba = uAutoTaglio - uOcchioTaglio;
+            float k = dot(vMondoTaglio - uOcchioTaglio, ba) / max(dot(ba, ba), 1e-6);
+            float r = clamp(0.35 * length(ba), 10.0, 25.0);
+            if (k < 0.6 && length(vMondoTaglio - uOcchioTaglio - ba * clamp(k, 0.0, 1.0)) < r) discard;
+          }`,
         );
     };
     materiale.customProgramCacheKey = () => (chiave && chiave !== THREE.Material.prototype.customProgramCacheKey ? chiave.call(materiale) : nome) + '-taglio';

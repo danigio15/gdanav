@@ -211,6 +211,38 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
       }
     }
   });
+  /* E tutte le altre, a ogni quota: il pilone di un viadotto alto non passa
+   * attraverso la rampa di sotto. Allo svincolo una rampa scendeva dal terzo
+   * livello accanto a un'altra che saliva da terra, a due metri: i piloni di
+   * quella alta stavano piantati sull'asfalto di quella bassa, davanti
+   * all'auto. */
+  const tutte = new Map();
+  linee.forEach((pts, i) => {
+    for (let k = 1; k < pts.length; k++) {
+      const a = pts[k - 1];
+      const b = pts[k];
+      for (const q of [a, b]) {
+        const key = Math.floor(q[0] / GRIGLIA) + ',' + Math.floor(q[1] / GRIGLIA);
+        if (!tutte.has(key)) tutte.set(key, []);
+        tutte.get(key).push([a, b, visibili[i].w / 2]);
+      }
+    }
+  });
+  const suStradaSotto = (px, py, margine, sopra) => {
+    for (let ax = -1; ax <= 1; ax++) {
+      for (let ay = -1; ay <= 1; ay++) {
+        for (const [a, b, hw] of tutte.get(Math.floor(px / GRIGLIA) + ax + ',' + (Math.floor(py / GRIGLIA) + ay)) || []) {
+          const ex = b[0] - a[0];
+          const ey = b[1] - a[1];
+          const l2 = ex * ex + ey * ey;
+          const t = l2 ? Math.max(0, Math.min(1, ((px - a[0]) * ex + (py - a[1]) * ey) / l2)) : 0;
+          if (Math.hypot(px - a[0] - ex * t, py - a[1] - ey * t) >= hw + margine) continue;
+          if (a[2] + (b[2] - a[2]) * t < sopra - 3) return true;
+        }
+      }
+    }
+    return false;
+  };
   const suStradaATerra = (px, py, margine) => {
     for (let ax = -1; ax <= 1; ax++) {
       for (let ay = -1; ay <= 1; ay++) {
@@ -687,7 +719,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           if (h < (f.ponte ? 2.5 : ALTO_COME_PONTE)) return false;
           const tl = Math.hypot(tx, ty) || 1;
           const offs = f.w > 9 ? [-f.w * 0.27, f.w * 0.27] : [0];
-          for (const o of offs) if (suStradaATerra(px - (ty / tl) * o, py + (tx / tl) * o, 0.8)) return false;
+          for (const o of offs) if (suStradaATerra(px - (ty / tl) * o, py + (tx / tl) * o, 0.8) || suStradaSotto(px - (ty / tl) * o, py + (tx / tl) * o, 0.8, h)) return false;
           piloni.push({ x: px, y: py, h: h + zs - SPESSORE_IMPALCATO, ang: Math.atan2(ty, tx), w: f.w, offs, alto: h > 14 });
           return true;
         };
@@ -1776,7 +1808,8 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
   const G = 20;
   const griglia = new Map();
   linee.forEach((pts, i) => {
-    if (visibili[i].cls === 'rail') return;
+    const f = visibili[i];
+    if (f.cls === 'rail') return;
     for (let k = 1; k < pts.length; k++) {
       const a = pts[k - 1];
       const b = pts[k];
@@ -1784,12 +1817,12 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
         for (let cy = Math.floor(Math.min(a[1], b[1]) / G); cy <= Math.floor(Math.max(a[1], b[1]) / G); cy++) {
           const key = cx + ',' + cy;
           if (!griglia.has(key)) griglia.set(key, []);
-          griglia.get(key).push([a, b]);
+          griglia.get(key).push([a, b, f]);
         }
       }
     }
   });
-  /** Le quote possibili in [px, py] lungo (tx, ty): `[h, distanza]`. */
+  /** Le quote possibili in [px, py] lungo (tx, ty): `[h, distanza, strada della mappa]`. */
   const quoteQui = (px, py, tx, ty) => {
     const out = [];
     const visti = new Set();
@@ -1803,7 +1836,7 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
         }
       }
     }
-    for (const [a, b] of vicini) {
+    for (const [a, b, f] of vicini) {
       const dx = b[0] - a[0];
       const dy = b[1] - a[1];
       const l2 = dx * dx + dy * dy || 1e-9;
@@ -1811,7 +1844,7 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
       const d = Math.hypot(a[0] + dx * u - px, a[1] + dy * u - py);
       if (d > 8) continue;
       if (Math.abs((dx * tx + dy * ty) / Math.sqrt(l2)) < 0.55) continue;
-      out.push([a[2] + (b[2] - a[2]) * u, d]);
+      out.push([a[2] + (b[2] - a[2]) * u, d, f]);
     }
     return out;
   };
@@ -1826,24 +1859,69 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
     const xy = inMetri(v0.ll);
     if (!xy.some(vicina)) continue;
     const h = new Array(xy.length).fill(NaN);
-    let prima = null;
-    for (let k = 0; k < xy.length; k++) {
+    /* La quota di ogni punto: quella di una strada della mappa lì vicino.
+     *
+     * «Una salita con strade in mezzo, non si capisce niente»: dove le rampe
+     * di uno svincolo passano una sopra l'altra, vicino a ogni punto ci sono
+     * strade della mappa a tre quote diverse. Si sceglieva punto per punto
+     * la più vicina che non saltasse dalla quota di prima, e chi partiva sul
+     * livello sbagliato ci restava: le corsie di una rampa a terra finivano
+     * sopra l'auto, quelle del viadotto a terra. Adesso conta anche che cosa
+     * è la strada — un ponte, a che livello (`layer`), una galleria — come la
+     * via con le corsie dice di sé, e la quota si sceglie su tutta la via
+     * insieme (Viterbi): il meno lontano, il più somigliante, senza salti. */
+    // Il livello come lo conta la mappa (`livelloStrada`): un ponte almeno al primo, il resto a terra.
+    const mio = v0.ponte ? Math.min(5, Math.max(1, v0.livello || 1)) : 0;
+    const costo = (q) => {
+      const f = q[2];
+      let c = q[1];
+      c += 3 * Math.abs((f.livello ?? 0) - mio);
+      if (!!f.ponte !== !!v0.ponte) c += 4;
+      if (!!f.galleria !== !!v0.galleria) c += 6;
+      return c;
+    };
+    const cand = xy.map((_, k) => {
       const a = xy[Math.max(0, k - 1)];
       const b = xy[Math.min(xy.length - 1, k + 1)];
       const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-      const qq = quoteQui(xy[k][0], xy[k][1], (b[0] - a[0]) / l, (b[1] - a[1]) / l);
-      if (!qq.length) continue;
-      let meglio = qq[0];
-      let bv = Infinity;
-      for (const q of qq) {
-        const voto = q[1] + (prima !== null ? 2 * Math.abs(q[0] - prima) : v0.ponte ? -0.5 * q[0] : 0.5 * q[0]);
-        if (voto < bv) {
-          bv = voto;
-          meglio = q;
-        }
+      return quoteQui(xy[k][0], xy[k][1], (b[0] - a[0]) / l, (b[1] - a[1]) / l);
+    });
+    for (let i = 0; i < xy.length; ) {
+      if (!cand[i].length) {
+        i++;
+        continue;
       }
-      h[k] = meglio[0];
-      prima = meglio[0];
+      let j = i;
+      while (j < xy.length && cand[j].length) j++;
+      const costi = [cand[i].map(costo)];
+      const da = [cand[i].map(() => -1)];
+      for (let k = i + 1; k < j; k++) {
+        const cc = [];
+        const dd = [];
+        for (const q of cand[k]) {
+          let meglio = Infinity;
+          let chi = 0;
+          cand[k - 1].forEach((p, r) => {
+            const v = costi[k - 1 - i][r] + 2 * Math.abs(q[0] - p[0]);
+            if (v < meglio) {
+              meglio = v;
+              chi = r;
+            }
+          });
+          cc.push(meglio + costo(q));
+          dd.push(chi);
+        }
+        costi.push(cc);
+        da.push(dd);
+      }
+      const ultimi = costi[j - 1 - i];
+      let r = 0;
+      for (let t = 1; t < ultimi.length; t++) if (ultimi[t] < ultimi[r]) r = t;
+      for (let k = j - 1; k >= i; k--) {
+        h[k] = cand[k][r][0];
+        r = da[k - i][r];
+      }
+      i = j;
     }
     // Dove non c'è una strada sotto: fra le quote attorno, o a terra.
     let ultimo = -1;

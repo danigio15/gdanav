@@ -76,6 +76,21 @@ test('due ponti di livello diverso si raccordano', () => {
   assert.ok(giunto > L + 0.5 && giunto < 2 * L - 0.5, `al giunto fra un livello e due (${giunto})`);
 });
 
+test('due ponti di livello diverso con un pezzo di rampa a terra in mezzo: la discesa non sta tutta lì', () => {
+  const strade = [
+    { p: { class: 'trunk', brunnel: 'bridge', layer: 3, ramp: 1 }, g: [[0, 0], [300, 0]] },
+    { p: { class: 'motorway', ramp: 1 }, g: [[300, 0], [330, 0]] },
+    { p: { class: 'motorway', brunnel: 'bridge', layer: 1, ramp: 1 }, g: [[330, 0], [700, 0]] },
+  ];
+  const g = grafoStrade(strade, metri);
+  const L = ALTEZZA_LIVELLO;
+  assert.ok(Math.abs(quotaA(g, 50) - 3 * L) < 0.1);
+  assert.ok(Math.abs(quotaA(g, 650) - L) < 0.1);
+  let ripida = 0;
+  for (let x = 200; x <= 440; x += 10) ripida = Math.max(ripida, Math.abs(quotaA(g, x + 10) - quotaA(g, x)) / 10);
+  assert.ok(ripida < 0.15, `pendenza al più 15% (${(ripida * 100).toFixed(0)}%)`);
+});
+
 test('i capi tagliati sul bordo delle tessere si uniscono', () => {
   const strade = [
     { p: {}, g: [[100, 200], [4096, 1000]] },
