@@ -620,7 +620,11 @@ export function altezze(nodi, feats) {
     return false;
   };
   const aTerra = nodi.map((n, i) => {
-    if (sottopasso[i] || n.rotonda) return true;
+    if (sottopasso[i]) return true;
+    // Un nodo di un ponte non sta a terra (dove nei dati un ponte comincia
+    // proprio dove si stacca una rampa, il ponte partiva da zero).
+    if (n.feats.some((fi) => feats[fi].ponte)) return false;
+    if (n.rotonda) return true;
     if (n.adj.length < 3 || !n.feats.some((fi) => feats[fi].rampa)) return false;
     if (!n.feats.some((fi) => principale(feats[fi]) && !feats[fi].ponte)) return false;
     return !ponteVicino(i);
