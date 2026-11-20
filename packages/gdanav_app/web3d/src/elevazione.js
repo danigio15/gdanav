@@ -1137,12 +1137,10 @@ export function altezze(nodi, feats) {
     for (let i = 0; i < N; i++) for (const e of nodi[i].adj) if (e.to > i && Math.abs(h[i] - h[e.to]) - PENDENZA_MAX * e.d > 0.05) n++;
     return n;
   };
-  for (let volta = 0; volta < 3; volta++) {
-    const prima = Float64Array.from(h);
-    const fermePrima = Uint8Array.from(ferme);
-    const scaliniPrima = scalini();
-    const contrastiPrima = contrasti().length;
-    let fatte = 0;
+  // Una coppia alla volta: si tiene solo se non fa nascere scalini e non
+  // lascia più carreggiate una dentro l'altra di prima.
+  for (let volta = 0; volta < 2; volta++) {
+    let tenute = 0;
     for (const p of contrasti()) {
       const fi = feats[p.fi];
       const fj = feats[p.fj];
@@ -1150,21 +1148,24 @@ export function altezze(nodi, feats) {
       if (!unite) continue;
       const nodiQui = [p.a, p.b, p.c, p.d].filter((i) => !sottopasso[i]);
       if (nodiQui.length < 4) continue;
+      const hb = h[p.c] + (h[p.d] - h[p.c]) * p.u;
+      if (Math.abs((h[p.a] + h[p.b]) / 2 - hb) <= 0.6) continue;
+      const prima = Float64Array.from(h);
+      const fermePrima = Uint8Array.from(ferme);
+      const scaliniPrima = scalini();
+      const contrastiPrima = contrasti().length;
       const media = nodiQui.reduce((t, i) => t + h[i], 0) / nodiQui.length;
       for (const i of nodiQui) {
         h[i] = media;
         ferme[i] = 1;
       }
-      fatte++;
+      limita(true);
+      if (scalini() > scaliniPrima || contrasti().length >= contrastiPrima) {
+        h.set(prima);
+        ferme.set(fermePrima);
+      } else tenute++;
     }
-    if (!fatte) break;
-    limita(true);
-    // Se ha fatto più danni che altro, si torna indietro.
-    if (scalini() > scaliniPrima || contrasti().length >= contrastiPrima) {
-      h.set(prima);
-      ferme.set(fermePrima);
-      break;
-    }
+    if (!tenute) break;
   }
   for (let i = 0; i < N; i++) nodi[i].h = h[i];
   return scavalchi.length;
