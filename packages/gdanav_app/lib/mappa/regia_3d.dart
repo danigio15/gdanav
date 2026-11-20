@@ -449,6 +449,7 @@ class Regia3d {
         quando: _ora(),
         lettura: g.letturaSulPercorso,
         zoomSubito: _zoomSubito,
+        zoomScelto: zoomScelto?.call() ?? 0,
       ),
     );
     _zoomSubito = false;

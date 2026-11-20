@@ -18,7 +18,7 @@ import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
 import { dallaScorta, nellaScorta } from './scorte.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
 import { tavolozza } from './tavolozza.js';
-import { corsiaDellAuto, corsieLungoIlPercorso, IndiceCorsie, preparaCorsie, riquadroCorsie, riquadroLonLat, tessereConCorsieVere } from './corsie.js';
+import { corsiaDellAuto, corsieLungoIlPercorso, zoomCorsie, IndiceCorsie, preparaCorsie, riquadroCorsie, riquadroLonLat, tessereConCorsieVere } from './corsie.js';
 import './gdanav3d.css';
 
 /** Gli strati da toccare (come `stratiToccabili` in stile.dart). */
@@ -35,13 +35,6 @@ const VISTE = { inclinata: { pitch: 70, zoom: 17.9 }, immersiva: { pitch: 74, zo
  */
 const VISTA_CORSIE = { pitch: 62, zoom: 18.6 };
 const OBIETTIVO_CORSIE_GRADI = 44;
-/**
- * Quanto lo zoom chiesto dall'app (secondo la velocità) si avvicina nella
- * vista «Corsie», e fin dove: le corsie si devono contare, una corsia di
- * città resta larga una quarantina di punti accanto all'auto.
- */
-const PIU_VICINO_CORSIE = 2.5;
-const ZOOM_MASSIMO_CORSIE = 20.6;
 /** La fascia della corsia: quanto è larga (m) e quanto sta sopra l'asfalto. */
 const FASCIA_CORSIA = { largo: 2.7, sopra: 0.3 };
 /** Ogni quanti metri un punto della fascia (il profilo del «3D aumentato» ne ha uno ogni quattro). */
@@ -368,6 +361,7 @@ const GESTORI = {
     } else aggancio.dimentica();
     S.posizione = rotta === m.rotta ? m : { ...m, rotta };
     if (m.zoom !== undefined) S.zoomVoluto = m.zoom;
+    S.zoomScelto = m.zoomScelto ?? 0;
     // Lo zoom scelto coi tasti: subito, non piano come quello che cambia da sé.
     if (m.zoomSubito) S.zoomSubitoFino = performance.now() + ZOOM_SUBITO_MS;
     moto.posizione({
@@ -402,6 +396,21 @@ const GESTORI = {
   /** La velocità dell'auto dal cruscotto (Android Auto, il dongle): più volte al secondo. */
   velocita(m) {
     moto.velocitaAuto(m.ms, m.alle, S.orologioProva ?? Date.now());
+    sveglia();
+  },
+  /** Un dito sullo schermo dell'auto: la mappa si sposta e smette di seguire. */
+  sposta(m) {
+    if (!S.mappa) return;
+    const r = window.devicePixelRatio || 1;
+    S.mappa.panBy([m.dx / r, m.dy / r], { duration: 0 });
+    if (S.camera.modo === 'segui') S.camera.modo = 'libera';
+    sveglia();
+  },
+  /** «Centra» sull'auto (o il tempo scaduto): si torna a seguire. */
+  riprendi() {
+    if (S.camera.modo !== 'libera') return;
+    S.camera.modo = 'segui';
+    S.transizione = { da: performance.now(), dur: 900, partenza: null };
     sveglia();
   },
   camera(m) {
@@ -2329,7 +2338,7 @@ function muovi(adesso, dt) {
   if (S.camera.modo === 'segui') {
     // Nella vista «Corsie» più vicini di quanto chiede l'app, sempre con la
     // sua inclinazione (anche sull'auto).
-    const zoomVoluto = S.corsie ? Math.min(ZOOM_MASSIMO_CORSIE, (S.zoomVoluto ?? 17.9) + PIU_VICINO_CORSIE) : (S.zoomVoluto ?? vista.zoom);
+    const zoomVoluto = S.corsie ? zoomCorsie(S.zoomVoluto ?? 17.9, S.zoomScelto ?? 0) : (S.zoomVoluto ?? vista.zoom);
     // L'inclinazione: quella della vista, o quella chiesta (sull'auto più
     // dall'alto: «voglio vederla un po' più dall'alto»).
     const pitchVoluto = S.corsie ? vista.pitch : (S.camera.pitch ?? vista.pitch);
