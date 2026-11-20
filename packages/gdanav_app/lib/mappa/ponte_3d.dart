@@ -165,6 +165,7 @@ Map<String, Object?> msgPosizione({
   ({double metri, DateTime alle, double? velocitaMs, double? precisioneM})? lettura,
   bool zoomSubito = false,
   bool rottaIncerta = false,
+  double zoomScelto = 0,
 }) => _m('posizione', {
   'lat': _sei(qui.lat),
   'lon': _sei(qui.lon),
@@ -177,6 +178,9 @@ Map<String, Object?> msgPosizione({
   'zoom': (zoom * 100).roundToDouble() / 100,
   // Lo zoom l'ha appena scelto chi guida, coi tasti: la pagina ci va subito.
   if (zoomSubito) 'zoomSubito': true,
+  // Quanto di [zoom] l'ha scelto chi guida coi tasti: la vista «Corsie» ha
+  // un tetto per lo zoom che si fa da sé, e i tasti vanno oltre.
+  if (zoomScelto != 0 && zoomScelto.isFinite) 'zoomScelto': (zoomScelto * 100).roundToDouble() / 100,
   'quando': quando.millisecondsSinceEpoch,
   if (lettura != null && lettura.metri.isFinite)
     'lettura': {

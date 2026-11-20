@@ -449,8 +449,14 @@ class RendererMappa(
 
     override fun onScroll(distanceX: Float, distanceY: Float) {
         toccoVisto()
-        // Con la scena 3D la mappa sotto non si sposta: la scena segue l'auto.
-        if (scena != null) return
+        // Con la scena 3D si sposta la scena («nemmeno lo spostamento con le
+        // dita»: prima la scena seguiva l'auto e il dito non faceva niente).
+        // Torna a seguire da sola dopo un po', o con «Centra».
+        scena?.let {
+            liberaPerUnPo()
+            it.esegui(alla3d("{\"v\":1,\"tipo\":\"sposta\",\"dx\":${distanceX},\"dy\":${distanceY}}"))
+            return
+        }
         val m = mappa ?: return
         liberaPerUnPo()
         m.scrollBy(-distanceX, -distanceY)
@@ -458,8 +464,12 @@ class RendererMappa(
 
     override fun onFling(velocityX: Float, velocityY: Float) {
         toccoVisto()
-        // Con la scena 3D la mappa sotto non si sposta: la scena segue l'auto.
-        if (scena != null) return
+        // Con la scena 3D: uno spostamento solo, verso dove andava il dito.
+        scena?.let {
+            liberaPerUnPo()
+            it.esegui(alla3d("{\"v\":1,\"tipo\":\"sposta\",\"dx\":${-velocityX / 8f},\"dy\":${-velocityY / 8f}}"))
+            return
+        }
         val m = mappa ?: return
         liberaPerUnPo()
         m.scrollBy(velocityX / 8f, velocityY / 8f, 300)
@@ -501,6 +511,9 @@ class RendererMappa(
         }
     }
 
+    /** Un messaggio per la pagina della scena 3D, come `chiamata3d` in Dart. */
+    private fun alla3d(json: String) = "window.gdanav3d&&window.gdanav3d.ricevi($json);"
+
     /** I tasti + e −: seguendo l'auto cambiano lo zoom (in guida, o lo scarto senza percorso), e si ricorda. */
     fun zoom(passo: Double) {
         // Nella scena 3D un tasto è mezzo livello: un livello intero era un salto.
@@ -538,6 +551,8 @@ class RendererMappa(
     /** «Centra»: di nuovo sull'auto. */
     fun segui() {
         principale.removeCallbacks(torna)
+        // La scena spostata col dito torna sull'auto.
+        scena?.esegui(alla3d("{\"v\":1,\"tipo\":\"riprendi\"}"))
         // Chiesto con la scheda di un punto aperta: chiusa, resta sull'auto.
         liberaPrima = false
         if (libera) {

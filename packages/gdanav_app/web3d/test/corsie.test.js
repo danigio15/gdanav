@@ -20,6 +20,9 @@ import {
   scegliCorsia,
   scostamentoPosa,
   sensoUnico,
+  zoomCorsie,
+  PIU_VICINO_CORSIE,
+  ZOOM_MASSIMO_CORSIE,
 } from '../src/corsie.js';
 import { decodifica } from '../src/messaggi.js';
 
@@ -254,4 +257,15 @@ test('senza percorso l\'auto sta nella sua corsia, a destra, non sulla riga di m
 test('il riquadro di un messaggio corsie: vie, nodi, alberi; niente se è vuoto', () => {
   assert.deepEqual(riquadroCorsie({ strade: [{ g: [1, 2, 3, 4] }], nodi: [{ g: [0, 5] }], alberi: [[4, 1]] }), [0, 1, 4, 5]);
   assert.equal(riquadroCorsie({ strade: [] }), null);
+});
+
+test('vista «Corsie»: il tetto dello zoom vale per quello automatico, i tasti vanno oltre', () => {
+  // In auto lo zoom di partenza era già sul tetto: «+» e «−» non cambiavano
+  // niente, e premendo «−» si finiva lontani.
+  const base = 19.5;
+  assert.equal(zoomCorsie(base), ZOOM_MASSIMO_CORSIE);
+  assert.equal(zoomCorsie(base + 1, 1), ZOOM_MASSIMO_CORSIE + 1);
+  assert.equal(zoomCorsie(base - 1, -1), ZOOM_MASSIMO_CORSIE - 1);
+  // Sotto il tetto, come prima: più vicino di PIU_VICINO_CORSIE.
+  assert.equal(zoomCorsie(16), 16 + PIU_VICINO_CORSIE);
 });

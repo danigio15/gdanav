@@ -1073,3 +1073,22 @@ export function liscia(a, r) {
   }
   return x;
 }
+
+/**
+ * Quanto lo zoom chiesto dall'app (secondo la velocità) si avvicina nella
+ * vista «Corsie», e fin dove: le corsie si devono contare, una corsia di
+ * città resta larga una quarantina di punti accanto all'auto.
+ */
+export const PIU_VICINO_CORSIE = 2.5;
+export const ZOOM_MASSIMO_CORSIE = 20.6;
+
+/**
+ * Lo zoom della vista «Corsie»: più vicino di [PIU_VICINO_CORSIE], fino a
+ * [ZOOM_MASSIMO_CORSIE]. Il tetto vale per lo zoom che si fa da sé, non per
+ * quello scelto coi tasti ([scelto], già dentro [voluto]): in auto lo zoom di
+ * partenza era già sul tetto, e «+» e «−» non cambiavano niente; premendo
+ * «−» ancora e ancora si finiva lontani e in alto.
+ */
+export function zoomCorsie(voluto, scelto = 0) {
+  return Math.min(ZOOM_MASSIMO_CORSIE, voluto - scelto + PIU_VICINO_CORSIE) + scelto;
+}

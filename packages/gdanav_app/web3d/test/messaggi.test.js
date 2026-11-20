@@ -172,3 +172,13 @@ test('il percorso coi pezzi già sulle strade: da, a, raccordo', () => {
   assert.equal(decodifica({ v: 1, tipo: 'percorso', punti: [9, 45, 9.1, 45.1], suStrada: [[10, 80]] }), null);
   assert.equal(decodifica({ v: 1, tipo: 'percorso', punti: [9, 45, 9.1, 45.1], suStrada: 'tutto' }), null);
 });
+
+test('dall\'auto: il dito che sposta la scena, e «Centra»', () => {
+  assert.ok(decodifica({ v: 1, tipo: 'sposta', dx: 12.5, dy: -3 }));
+  assert.equal(decodifica({ v: 1, tipo: 'sposta', dx: 'x', dy: 0 }), null);
+  assert.ok(decodifica({ v: 1, tipo: 'riprendi' }));
+  // Lo zoom scelto coi tasti viaggia con la posizione.
+  const p = { v: 1, tipo: 'posizione', lat: 45, lon: 9, rotta: 0, metri: null, velocita: 0, quando: 1, zoom: 18 };
+  assert.ok(decodifica({ ...p, zoomScelto: -1.5 }));
+  assert.equal(decodifica({ ...p, zoomScelto: 'meno' }), null);
+});
