@@ -18,7 +18,8 @@ const { VectorTile } = await import(`${W}/node_modules/@mapbox/vector-tile/index
 const Pbf = (await import(`${W}/node_modules/pbf/index.js`)).default;
 const { scarica } = await import(`${W}/collaudo/strada.mjs`);
 const { costruisciTessera } = await import(`${W}/src/tessera.js`);
-const { preparaCorsie } = await import(`${W}/src/corsie.js`);
+const { preparaCorsie, IndiceCorsie, corsieLungoIlPercorso } = await import(`${W}/src/corsie.js`);
+const { IndiceSegmenti, Linea, profiloDi, fasciaSullaCorsia } = await import(`${W}/src/percorso.js`);
 const { sistemaTessera } = await import(`${W}/src/geo.js`);
 const z = 14;
 const tj = JSON.parse((await scarica('https://tiles.openfreemap.org/planet')).corpo.toString());
@@ -78,7 +79,7 @@ export async function costruisci(X, Y, { corsie = !process.env.SENZA_CORSIE } = 
   for (let i = 0; i < t.fusti.length; i += 16) piloni.push({ x: t.fusti[i + 12] + ox, y: t.fusti[i + 13] + oy, h: Math.hypot(t.fusti[i + 8], t.fusti[i + 9], t.fusti[i + 10]) + 0.8 });
   // Le vie con le corsie: i loro punti in metri globali, con la quota.
   const corsieVie = (t.grafo.corsie ?? []).map((v) => ({ id: v.id, hw: v.hw, ponte: !!v.ponte, galleria: !!v.galleria, w: (v.avanti + v.indietro) * v.lw, p: v.xy.map(([x, y], k) => [x + ox, y + oy, v.h[k]]) }));
-  return { t, sys, segs, piloni, corsieVie, ox, oy, X, Y };
+  return { t, sys, segs, piloni, corsieVie, ox, oy, X, Y, datiCorsie };
 }
 const lonLat = (sys, X, Y, gx, gy) => {
   // dai metri globali a lon/lat (per i rapporti)
@@ -191,6 +192,105 @@ export function controlla(T) {
   });
   return err;
 }
+// F. Il percorso nella vista «Corsie», come lo disegna l'app (`sullaCorsia`
+// in principale.js), lungo percorsi veri: dalle rampe e dai ponti della
+// tessera, seguendo le vie del relay per 400 m. Salti di quota della fascia
+// e spostamenti di lato bruschi (lo zig-zag).
+export function percorsi(T, quanti = 60) {
+  const err = [];
+  if (!T.datiCorsie?.strade?.length) return err;
+  const { sys } = T;
+  const strade = T.datiCorsie.strade.map((v) => ({ ...v, xy: [] }));
+  for (const v of strade) for (let i = 0; i < v.llVia.length; i += 2) v.xy.push(sys.daLonLat(v.llVia[i], v.llVia[i + 1]));
+  const indiceCorsie = new IndiceCorsie(strade);
+  const indice = new IndiceSegmenti();
+  indice.aggiungi('t', T.t.segmenti, 0, 0, 1);
+  const meta = sys.lato / 2;
+  const qui = (q) => Math.abs(q[0]) < meta && Math.abs(q[1]) < meta;
+  const chiave = (q) => Math.round(q[0] * 2) + ',' + Math.round(q[1] * 2);
+  const partono = new Map();
+  for (const v of strade) {
+    if (!v.senso) continue;
+    const k = chiave(v.xy[0]);
+    if (!partono.has(k)) partono.set(k, []);
+    partono.get(k).push(v);
+  }
+  const avvii = strade.filter((v) => v.senso && /_link$/.test(v.hw) && v.xy.some(qui)).slice(0, quanti);
+  for (const v0 of avvii) {
+    // Avanti, la via più dritta a ogni nodo, per 400 m.
+    let pts = [...v0.xy];
+    let lungo = 0;
+    for (let k = 1; k < pts.length; k++) lungo += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+    const usate = new Set([v0]);
+    while (lungo < 400) {
+      const a = pts[pts.length - 2];
+      const b = pts[pts.length - 1];
+      const dir = Math.atan2(b[1] - a[1], b[0] - a[0]);
+      let meglio = null;
+      for (const w of partono.get(chiave(b)) ?? []) {
+        if (usate.has(w) || w.xy.length < 2) continue;
+        const d = Math.atan2(w.xy[1][1] - w.xy[0][1], w.xy[1][0] - w.xy[0][0]);
+        const t = Math.abs(Math.atan2(Math.sin(d - dir), Math.cos(d - dir)));
+        if (t < 1.2 && (!meglio || t < meglio[0])) meglio = [t, w];
+      }
+      if (!meglio) break;
+      usate.add(meglio[1]);
+      for (let k = 1; k < meglio[1].xy.length; k++) {
+        lungo += Math.hypot(meglio[1].xy[k][0] - pts[pts.length - 1][0], meglio[1].xy[k][1] - pts[pts.length - 1][1]);
+        pts.push(meglio[1].xy[k]);
+      }
+    }
+    if (lungo < 60) continue;
+    const linea = new Linea(pts.flat());
+    const L = linea.lunghezza;
+    const profilo = profiloDi(linea, 0, L, indice, 4);
+    if (!profilo?.dx) continue;
+    const pr = profilo.piuFitto(2);
+    const n = pr.dx.length;
+    const asse = [];
+    const punti = [];
+    for (let k = 0; k < n; k++) {
+      const [x, y] = linea.a(pr.s0 + k * pr.passo);
+      asse.push([x, y]);
+      punti.push([x + pr.dx[k], y + pr.dy[k]]);
+    }
+    const r = corsieLungoIlPercorso(punti, indiceCorsie, { passo: pr.passo, s0: pr.s0 });
+    const fascia = fasciaSullaCorsia(punti, r, pr.passo);
+    const metti = (tipo, q, info) => {
+      const n2 = 2 ** z;
+      const mx = sys.mx + q[0] * sys.s;
+      const my = sys.my - q[1] * sys.s;
+      err.push({ tipo, ll: [+(mx * 360 - 180).toFixed(5), +((Math.atan(Math.sinh(Math.PI * (1 - 2 * my))) * 180) / Math.PI).toFixed(5)], info: `${info} via ${v0.id}` });
+    };
+    let ultimo = -Infinity;
+    // (Non gli ultimi metri: lì la fascia finisce.)
+    for (let k = 2; k < n - 4; k++) {
+      if (!qui(asse[k]) || pr.s0 + k * pr.passo - ultimo < 30) continue;
+      const pend = Math.abs(pr.h[k] - pr.h[k - 1]) / pr.passo;
+      // Lo spostamento di lato fra due punti, tolto l'andare avanti.
+      const tx = asse[k][0] - asse[k - 1][0];
+      const ty = asse[k][1] - asse[k - 1][1];
+      const tl = Math.hypot(tx, ty) || 1;
+      const o = (q, a) => ((q[0] - a[0]) * -ty + (q[1] - a[1]) * tx) / tl;
+      const dl = Math.abs(o(fascia[k], asse[k]) - o(fascia[k - 1], asse[k - 1]));
+      // Alle svolte (il percorso gira più di 20° in dieci metri) «di lato»
+      // cambia verso: lì la fascia fa la sua curva, non conta.
+      const a0 = asse[Math.max(0, k - 3)];
+      const a1 = asse[k];
+      const a2 = asse[Math.min(n - 1, k + 3)];
+      const giro = Math.abs(Math.atan2((a1[0] - a0[0]) * (a2[1] - a1[1]) - (a1[1] - a0[1]) * (a2[0] - a1[0]), (a1[0] - a0[0]) * (a2[0] - a1[0]) + (a1[1] - a0[1]) * (a2[1] - a1[1])));
+      if (giro > (20 * Math.PI) / 180 && pend <= 0.12) continue;
+      if (pend > 0.12) {
+        metti('percorso-pendenza', asse[k], `${(pend * 100).toFixed(0)}% ${pr.h[k - 1].toFixed(1)}→${pr.h[k].toFixed(1)}`);
+        ultimo = pr.s0 + k * pr.passo;
+      } else if (dl > 0.9) {
+        metti('percorso-di-lato', asse[k], `${dl.toFixed(1)} m in 2 m`);
+        ultimo = pr.s0 + k * pr.passo;
+      }
+    }
+  }
+  return err;
+}
 // C. Bordi: la stessa strada alla stessa quota di qua e di là.
 export function bordo(A, B, asse) {
   const err = [];
@@ -221,7 +321,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const X = Math.floor(((lon + 180) / 360) * 2 ** z);
   const Y = Math.floor(((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * 2 ** z);
   const A = await costruisci(X, Y), E = await costruisci(X + 1, Y), S = await costruisci(X, Y + 1);
-  const tutti = [...controlla(A), ...bordo(A, E, 'x'), ...bordo(A, S, 'y')];
+  const tutti = [...controlla(A), ...bordo(A, E, 'x'), ...bordo(A, S, 'y'), ...percorsi(A)];
   const conti = {};
   for (const e of tutti) conti[e.tipo] = (conti[e.tipo] ?? 0) + 1;
   console.log(process.argv[4] ?? '', X, Y, 'strade', A.segs.length, 'piloni', A.piloni.length, JSON.stringify(conti));

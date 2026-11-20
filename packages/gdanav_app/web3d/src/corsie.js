@@ -815,7 +815,12 @@ export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzo
     for (const [i, kk] of indice.vicini(x, y)) {
       const v = strade[i];
       const t = sulTratto(v, kk, x, y);
-      if (t.d > 9) continue;
+      // Il percorso sta su questa via se è dentro la sua carreggiata (più un
+      // poco): prima bastavano nove metri, e una rampa a una corsia prendeva
+      // il percorso della carreggiata accanto; la fascia ci saltava sopra e
+      // poi tornava indietro di colpo (lo zig-zag sulle rampe).
+      const mezza = ((v.avanti + v.indietro) * (v.lw ?? 3.5)) / 2 + (v.margini ? Math.max(v.margini[0], v.margini[1]) : 0);
+      if (t.d > Math.min(9, mezza + 2)) continue;
       const cos = t.tx * dir[k][0] + t.ty * dir[k][1];
       if (Math.abs(cos) < 0.7 || (v.senso && cos < 0)) continue;
       const voto = t.d + 15 * (1 - Math.abs(cos)) - (k && via[k - 1] === i ? 1.5 : 0);
