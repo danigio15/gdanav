@@ -647,16 +647,24 @@ export function altezze(nodi, feats) {
   const serve = new Float64Array(N).fill(-Infinity);
   const vorrei = new Float64Array(N).fill(-Infinity);
   const h = new Float64Array(N);
-  const spandi = (sorgente, pendenza, fermaATerra) => {
-    const v = Float64Array.from(sorgente);
+  // Le ferrovie salgono per conto loro: la salita di un ponte della ferrovia
+  // non passa alle strade dal passaggio a livello (e viceversa).
+  const binari = nodi.map((n) => n.feats.length > 0 && n.feats.every((fi) => feats[fi].cls === 'rail'));
+  const spandi = (sorgente, pendenza, fermaATerra, rotaie) => {
+    const v = new Float64Array(N).fill(-Infinity);
     const mucchio = new Mucchio(true);
-    for (let i = 0; i < N; i++) if (v[i] > 0) mucchio.push(v[i], i);
+    for (let i = 0; i < N; i++) {
+      if (sorgente[i] > 0 && nodi[i].feats.some((fi) => (feats[fi].cls === 'rail') === rotaie)) {
+        v[i] = sorgente[i];
+        mucchio.push(v[i], i);
+      }
+    }
     while (mucchio.length) {
       const [x, i] = mucchio.pop();
       if (x < v[i]) continue;
       if (fermaATerra && aTerra[i] && !(serve[i] > 0)) continue;
       for (const e of nodi[i].adj) {
-        if (sottopasso[e.to]) continue;
+        if (sottopasso[e.to] || (feats[e.f].cls === 'rail') !== rotaie) continue;
         const nx = Math.min(x - pendenza * e.d, sottoAl[e.to]);
         if (nx > v[e.to] && nx > 0) {
           v[e.to] = nx;
@@ -669,11 +677,14 @@ export function altezze(nodi, feats) {
   const calcola = () => {
     // Quelle che servono scendono anche più ripide (come le rampe vere),
     // quando un punto a terra non lascia spazio per la salita dolce.
-    const vs = spandi(serve, PENDENZA_MAX, false);
     const tutte = new Float64Array(N);
     for (let i = 0; i < N; i++) tutte[i] = Math.max(serve[i], vorrei[i]);
-    const vv = spandi(tutte, PENDENZA, true);
-    for (let i = 0; i < N; i++) h[i] = sottopasso[i] ? 0 : Math.max(0, vs[i], Math.min(vv[i], tetto[i]));
+    for (const rotaie of [false, true]) {
+      const vs = spandi(serve, PENDENZA_MAX, false, rotaie);
+      const vv = spandi(tutte, PENDENZA, true, rotaie);
+      // Un nodo con una strada sta alla quota della strada (il passaggio a livello).
+      for (let i = 0; i < N; i++) if (binari[i] === rotaie) h[i] = sottopasso[i] ? 0 : Math.max(0, vs[i], Math.min(vv[i], tetto[i]));
+    }
   };
   // Fra due punti alti un ponte non scende; una rotonda con un pezzo di ponte resta in piano.
   const inPiano = () => {
