@@ -492,7 +492,19 @@ export function segnaRotonde(nodi, feats) {
         for (const i of anello) nodi[i].anelloInQuota = anello;
         continue;
       }
-      for (const i of anello) nodi[i].rotonda = true;
+      // Il centro e il raggio, per chi la disegna: in una rotonda piccola la
+      // carreggiata non deve entrare nell'isola (vedi `isolaDelleRotonde`).
+      let cx = 0;
+      let cy = 0;
+      for (const i of anello) {
+        cx += nodi[i].x / anello.length;
+        cy += nodi[i].y / anello.length;
+      }
+      const r = anello.reduce((t, i) => t + Math.hypot(nodi[i].x - cx, nodi[i].y - cy), 0) / anello.length;
+      for (const i of anello) {
+        nodi[i].rotonda = true;
+        nodi[i].centroRotonda = { x: cx, y: cy, r };
+      }
       trovate++;
     }
   }

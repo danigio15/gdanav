@@ -192,6 +192,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     strettaFraLeCase(feats, nodi, poligoni);
   }
   carreggiateAffiancate(feats, nodi);
+  isolaDelleRotonde(feats, nodi);
   // Per il collaudo (la verifica delle strade su tessere vere): il grafo con le quote.
   const grafoPerIlCollaudo = grafo ? { nodi, feats } : undefined;
   const tGrafo = Date.now() - t0;
@@ -1542,6 +1543,51 @@ export function strettaFraLeCase(feats, nodi, poligoni) {
     strette++;
   }
   return strette;
+}
+
+/** L'isola in mezzo a una rotonda: almeno questo raggio (m). */
+const ISOLA_MIN_M = 1.8;
+/** E la carreggiata dell'anello, dalla parte dell'isola, almeno questa mezza larghezza (m). */
+const ANELLO_MIN_M = 1.6;
+
+/**
+ * Le rotonde piccole: la carreggiata dell'anello non entra nell'isola.
+ *
+ * «Verifica le rotonde»: una rotonda di cinque metri di raggio con una
+ * carreggiata larga sette, il bordo di dentro passava oltre il centro e si
+ * incrociava con se stesso: l'isola usciva a punta, coi marciapiedi di
+ * traverso e le righe una sopra l'altra. Dalla parte dell'isola la
+ * carreggiata si stringe fino a lasciarle [ISOLA_MIN_M] metri (mai sotto
+ * [ANELLO_MIN_M]); dalla parte di fuori resta com'e'. Mette `larghezze`.
+ */
+export function isolaDelleRotonde(feats, nodi) {
+  let cambiate = 0;
+  for (const f of feats) {
+    if (f.galleria || f.cls === 'rail' || f.nodi.length < 2) continue;
+    if (!f.nodi.every((i) => nodi[i].centroRotonda)) continue;
+    const n = f.nodi.length;
+    const hw = f.w / 2;
+    const lati = f.larghezze ? f.larghezze.map((q) => [...q]) : Array.from({ length: n }, () => [hw, hw]);
+    let toccata = false;
+    for (let k = 0; k < n; k++) {
+      const p = nodi[f.nodi[k]];
+      const c = p.centroRotonda;
+      const massimo = Math.max(ANELLO_MIN_M, c.r - ISOLA_MIN_M);
+      const a = nodi[f.nodi[Math.max(0, k - 1)]];
+      const b = nodi[f.nodi[Math.min(n - 1, k + 1)]];
+      // Il centro a sinistra (prodotto positivo) o a destra della strada.
+      const sinistra = (b.x - a.x) * (c.y - p.y) - (b.y - a.y) * (c.x - p.x) > 0;
+      const q = sinistra ? 0 : 1;
+      if (lati[k][q] > massimo) {
+        lati[k][q] = massimo;
+        toccata = true;
+      }
+    }
+    if (!toccata) continue;
+    f.larghezze = lati;
+    cambiate++;
+  }
+  return cambiate;
 }
 
 /** Quanto si stringe per metro una carreggiata dalla parte dell'altra: alle
