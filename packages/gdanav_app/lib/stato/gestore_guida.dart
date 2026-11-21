@@ -421,6 +421,7 @@ class GestoreGuida extends ChangeNotifier {
       _sensiDi = p.viaggio.percorso;
       _sensiFinoA = finestraSensiM;
       _sensiRiprovaDopo = null;
+      _sensiTentativi = 0;
       unawaited(_correggiISensi(daM: 0, aM: finestraSensiM, protettoM: 0));
     }
     _ultimaRichiestaDati = DateTime(0);
@@ -446,6 +447,8 @@ class GestoreGuida extends ChangeNotifier {
     _iscrizione = null;
     _svegliaStima?.cancel();
     _svegliaStima = null;
+    _sensiSveglia?.cancel();
+    _sensiSveglia = null;
     _stima.dimentica();
     await sensori?.ferma();
     // La velocità della guida è di quando si guidava: finita, non vale più
@@ -920,6 +923,13 @@ class GestoreGuida extends ChangeNotifier {
   /// Senza strade (niente rete, tessera che non arriva) si riprova dopo.
   DateTime? _sensiRiprovaDopo;
 
+  /// E si riprova da sé, senza aspettare una posizione: «GPS assente» alla
+  /// partenza, le tessere non ancora lette, e la linea restava quella di
+  /// TomTom, contromano sul ramo vietato del triangolo, finché non arrivava
+  /// una lettura del GPS (che non arrivava).
+  Timer? _sensiSveglia;
+  var _sensiTentativi = 0;
+
   void _guardaAvantiISensi({required Avanzamento p0}) {
     final p = pronto;
     if (strade == null || p == null || _sensiInCorso) return;
@@ -971,6 +981,9 @@ class GestoreGuida extends ChangeNotifier {
     if (s == null || p == null || g == null || !attiva || _sensiInCorso) return false;
     final percorso = p.viaggio.percorso;
     _sensiInCorso = true;
+    // Si guarda adesso: il tentativo a tempo, se c'era, non serve più.
+    _sensiSveglia?.cancel();
+    _sensiSveglia = null;
     try {
       final c = g.linea.cumulate, punti = g.linea.punti;
       final pezzo = [
@@ -984,6 +997,18 @@ class GestoreGuida extends ChangeNotifier {
         // Non si è visto niente: quel pezzo resta da guardare, fra un poco.
         _sensiRiprovaDopo = _ora().add(const Duration(seconds: 15));
         if (identical(_sensiDi, percorso)) _sensiFinoA = math.min(_sensiFinoA, daM);
+        // Anche se il GPS tace (una lettura lo farebbe dopo, in
+        // [_guardaAvantiISensi]): qualche volta, poi si lascia stare.
+        _sensiSveglia?.cancel();
+        if (_sensiTentativi++ < 8) {
+          _sensiSveglia = Timer(const Duration(seconds: 15), () {
+            _sensiSveglia = null;
+            if (!attiva || !identical(pronto?.viaggio.percorso, percorso) || _sensiInCorso) return;
+            _sensiRiprovaDopo = null;
+            _sensiFinoA = math.max(_sensiFinoA, aM);
+            unawaited(_correggiISensi(daM: daM, aM: aM, protettoM: protettoM));
+          });
+        }
         return false;
       }
       // Nel frattempo è cambiato il percorso, o si è finito.
@@ -1624,6 +1649,7 @@ class GestoreGuida extends ChangeNotifier {
   void dispose() {
     _iscrizione?.cancel();
     _svegliaStima?.cancel();
+    _sensiSveglia?.cancel();
     versioneSullaMappa.dispose();
     super.dispose();
   }

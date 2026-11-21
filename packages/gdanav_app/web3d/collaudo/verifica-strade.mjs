@@ -333,6 +333,7 @@ export function percorsi(T, quanti = 60) {
   const indiceCorsie = new IndiceCorsie(strade);
   const indice = new IndiceSegmenti();
   indice.aggiungi('t', T.t.segmenti, 0, 0, 1);
+  const asfalto = nastriDisegnati(T);
   const meta = sys.lato / 2;
   const qui = (q) => Math.abs(q[0]) < meta && Math.abs(q[1]) < meta;
   const chiave = (q) => Math.round(q[0] * 2) + ',' + Math.round(q[1] * 2);
@@ -343,36 +344,62 @@ export function percorsi(T, quanti = 60) {
     if (!partono.has(k)) partono.set(k, []);
     partono.get(k).push(v);
   }
-  const avvii = strade.filter((v) => v.senso && /_link$/.test(v.hw) && v.xy.some(qui)).slice(0, quanti);
-  for (const v0 of avvii) {
-    // Avanti, la via più dritta a ogni nodo, per 400 m.
-    let pts = [...v0.xy];
+  // Avanti per 400 m: al primo nodo la via scelta da [scegli] (la più
+  // dritta, la più a destra, la più a sinistra), poi la più dritta.
+  const segui = (v0, scegli) => {
+    const pts = [...v0.xy];
     let lungo = 0;
     for (let k = 1; k < pts.length; k++) lungo += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
     const usate = new Set([v0]);
+    let primo = true;
     while (lungo < 400) {
       const a = pts[pts.length - 2];
       const b = pts[pts.length - 1];
       const dir = Math.atan2(b[1] - a[1], b[0] - a[0]);
-      let meglio = null;
+      const scelte = [];
       for (const w of partono.get(chiave(b)) ?? []) {
         if (usate.has(w) || w.xy.length < 2) continue;
         const d = Math.atan2(w.xy[1][1] - w.xy[0][1], w.xy[1][0] - w.xy[0][0]);
-        const t = Math.abs(Math.atan2(Math.sin(d - dir), Math.cos(d - dir)));
-        if (t < 1.2 && (!meglio || t < meglio[0])) meglio = [t, w];
+        const t = Math.atan2(Math.sin(d - dir), Math.cos(d - dir));
+        if (Math.abs(t) < 2.2) scelte.push([t, w]);
       }
-      if (!meglio) break;
-      usate.add(meglio[1]);
-      for (let k = 1; k < meglio[1].xy.length; k++) {
-        lungo += Math.hypot(meglio[1].xy[k][0] - pts[pts.length - 1][0], meglio[1].xy[k][1] - pts[pts.length - 1][1]);
-        pts.push(meglio[1].xy[k]);
+      if (!scelte.length) break;
+      const tutte = primo ? scelte : scelte.filter(([t]) => Math.abs(t) < 1.2);
+      if (!tutte.length) break;
+      const w = (primo ? scegli : 'dritta') === 'dritta' ? tutte.reduce((m, c) => (Math.abs(c[0]) < Math.abs(m[0]) ? c : m))[1] : scegli === 'destra' ? tutte.reduce((m, c) => (c[0] < m[0] ? c : m))[1] : tutte.reduce((m, c) => (c[0] > m[0] ? c : m))[1];
+      primo = false;
+      usate.add(w);
+      for (let k = 1; k < w.xy.length; k++) {
+        lungo += Math.hypot(w.xy[k][0] - pts[pts.length - 1][0], w.xy[k][1] - pts[pts.length - 1][1]);
+        pts.push(w.xy[k]);
       }
     }
-    if (lungo < 60) continue;
-    const linea = new Linea(pts.flat());
+    return [pts, lungo];
+  };
+  const avvii = strade.filter((v) => v.senso && v.xy.some(qui) && (/_link$/.test(v.hw) || v.xy.length >= 2)).slice(0, quanti);
+  const visti = new Set();
+  for (const v0 of avvii) {
+    for (const scegli of ['dritta', 'destra', 'sinistra']) {
+      const [pts, lungo] = segui(v0, scegli);
+      if (lungo < 60) continue;
+      const firma = pts.map(chiave).join('|');
+      if (visti.has(firma)) continue;
+      visti.add(firma);
+      // Come la linea vera del percorso: quella del calcolatore (TomTom) sta
+      // qualche metro di lato e taglia gli angoli agli incroci.
+      for (const [nome, linea] of [
+        ['osm', new Linea(pts.flat())],
+        ['di lato', new Linea(comeTomTom(pts, 3.5, 7).flat())],
+        ['dall\'altro lato', new Linea(comeTomTom(pts, -3.5, 7).flat())],
+      ]) {
+        fasciaDelPercorso(linea, nome, v0, scegli);
+      }
+    }
+  }
+  function fasciaDelPercorso(linea, nome, v0, scegli) {
     const L = linea.lunghezza;
     const profilo = profiloDi(linea, 0, L, indice, 4);
-    if (!profilo?.dx) continue;
+    if (!profilo?.dx) return;
     const pr = profilo.piuFitto(2);
     const n = pr.dx.length;
     const asse = [];
@@ -385,15 +412,24 @@ export function percorsi(T, quanti = 60) {
     const r = corsieLungoIlPercorso(punti, indiceCorsie, { passo: pr.passo, s0: pr.s0 });
     const fascia = levigaFascia(punti, fasciaSullaCorsia(punti, r, pr.passo), pr.passo);
     const metti = (tipo, q, info) => {
-      const n2 = 2 ** z;
       const mx = sys.mx + q[0] * sys.s;
       const my = sys.my - q[1] * sys.s;
-      err.push({ tipo, ll: [+(mx * 360 - 180).toFixed(5), +((Math.atan(Math.sinh(Math.PI * (1 - 2 * my))) * 180) / Math.PI).toFixed(5)], info: `${info} via ${v0.id}` });
+      err.push({ tipo, ll: [+(mx * 360 - 180).toFixed(5), +((Math.atan(Math.sinh(Math.PI * (1 - 2 * my))) * 180) / Math.PI).toFixed(5)], info: `${info} via ${v0.id} ${scegli} ${nome}` });
     };
     let ultimo = -Infinity;
+    let ultimoFuori = -Infinity;
     // (Non gli ultimi metri: lì la fascia finisce.)
     for (let k = 2; k < n - 4; k++) {
-      if (!qui(asse[k]) || pr.s0 + k * pr.passo - ultimo < 30) continue;
+      const sk = pr.s0 + k * pr.passo;
+      // La fascia sull'asfalto disegnato (non in galleria: lì è sotto terra).
+      if (qui(fascia[k]) && !pr.galleria?.[k] && sk - ultimoFuori >= 30 && sk > 10) {
+        const fuori = asfalto.fuori(fascia[k][0], fascia[k][1], pr.h[k]);
+        if (fuori > 0.8) {
+          metti('percorso-fuori', fascia[k], `${fuori.toFixed(1)} m fuori dall'asfalto`);
+          ultimoFuori = sk;
+        }
+      }
+      if (!qui(asse[k]) || sk - ultimo < 30) continue;
       const pend = Math.abs(pr.h[k] - pr.h[k - 1]) / pr.passo;
       // Lo spostamento di lato fra due punti, tolto l'andare avanti.
       const tx = asse[k][0] - asse[k - 1][0];
@@ -410,14 +446,96 @@ export function percorsi(T, quanti = 60) {
       if (giro > (20 * Math.PI) / 180 && pend <= 0.12) continue;
       if (pend > 0.12) {
         metti('percorso-pendenza', asse[k], `${(pend * 100).toFixed(0)}% ${pr.h[k - 1].toFixed(1)}→${pr.h[k].toFixed(1)}`);
-        ultimo = pr.s0 + k * pr.passo;
+        ultimo = sk;
       } else if (dl > 0.9) {
         metti('percorso-di-lato', asse[k], `${dl.toFixed(1)} m in 2 m`);
-        ultimo = pr.s0 + k * pr.passo;
+        ultimo = sk;
       }
     }
   }
   return err;
+}
+/**
+ * Una linea come quella di un calcolatore di percorsi con altre mappe: [lato]
+ * metri di lato (a destra se positivo) e, agli spigoli che girano più di 25°,
+ * l'angolo tagliato [taglio] metri prima e dopo.
+ */
+export function comeTomTom(pts, lato, taglio) {
+  const fitti = [];
+  for (let k = 1; k < pts.length; k++) {
+    const [a, b] = [pts[k - 1], pts[k]];
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const m = Math.max(1, Math.ceil(l / 2));
+    for (let q = 0; q < m; q++) fitti.push([a[0] + ((b[0] - a[0]) * q) / m, a[1] + ((b[1] - a[1]) * q) / m]);
+  }
+  fitti.push(pts.at(-1));
+  const passi = Math.round(taglio / 2);
+  const tagliati = fitti.map((p) => [...p]);
+  for (let k = passi; k < fitti.length - passi; k++) {
+    const a = fitti[k - passi];
+    const b = fitti[k];
+    const c = fitti[k + passi];
+    const giro = Math.abs(Math.atan2((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]), (b[0] - a[0]) * (c[0] - b[0]) + (b[1] - a[1]) * (c[1] - b[1])));
+    if (giro < (25 * Math.PI) / 180) continue;
+    for (let q = k - passi + 1; q < k + passi; q++) {
+      const t = (q - (k - passi)) / (2 * passi);
+      tagliati[q] = [a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t];
+    }
+    k += passi;
+  }
+  return tagliati.map((p, k) => {
+    const a = tagliati[Math.max(0, k - 1)];
+    const b = tagliati[Math.min(tagliati.length - 1, k + 1)];
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    return [p[0] + ((b[1] - a[1]) / l) * lato, p[1] - ((b[0] - a[0]) / l) * lato];
+  });
+}
+/**
+ * Le strade disegnate della tessera, per sapere se un punto sta
+ * sull'asfalto: `fuori(x, y, h)` dice di quanti metri il punto sta fuori dal
+ * nastro più vicino a quella quota (0 se ci sta sopra).
+ */
+function nastriDisegnati(T) {
+  const S = T.t.segmenti;
+  const L = T.t.grafo.latiSegmenti;
+  const G = 10;
+  const griglia = new Map();
+  for (let k = 0; k < S.length; k += 8) {
+    const i = k / 8;
+    for (let gx = Math.floor(Math.min(S[k], S[k + 3]) / G); gx <= Math.floor(Math.max(S[k], S[k + 3]) / G); gx++) {
+      for (let gy = Math.floor(Math.min(S[k + 1], S[k + 4]) / G); gy <= Math.floor(Math.max(S[k + 1], S[k + 4]) / G); gy++) {
+        const c = gx + ',' + gy;
+        if (!griglia.has(c)) griglia.set(c, []);
+        griglia.get(c).push(i);
+      }
+    }
+  }
+  return {
+    fuori(x, y, h) {
+      let meglio = Infinity;
+      for (let ox = -2; ox <= 2; ox++) {
+        for (let oy = -2; oy <= 2; oy++) {
+          for (const i of griglia.get(Math.floor(x / G) + ox + ',' + (Math.floor(y / G) + oy)) ?? []) {
+            const k = 8 * i;
+            const ex = S[k + 3] - S[k];
+            const ey = S[k + 4] - S[k + 1];
+            const l2 = ex * ex + ey * ey || 1;
+            const u = Math.max(0, Math.min(1, ((x - S[k]) * ex + (y - S[k + 1]) * ey) / l2));
+            const qh = S[k + 2] + (S[k + 5] - S[k + 2]) * u;
+            if (Math.abs(qh - h) > 2.5) continue;
+            const px = S[k] + ex * u;
+            const py = S[k + 1] + ey * u;
+            const d = Math.hypot(x - px, y - py);
+            // Il lato del nastro dalla parte del punto.
+            const sinistra = ex * (y - py) - ey * (x - px) > 0;
+            const mezza = L ? L[2 * i + (sinistra ? 0 : 1)] : S[k + 6] / 2;
+            meglio = Math.min(meglio, Math.max(0, d - mezza));
+          }
+        }
+      }
+      return meglio;
+    },
+  };
 }
 // C. Bordi: la stessa strada alla stessa quota di qua e di là.
 export function bordo(A, B, asse) {

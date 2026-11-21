@@ -72,6 +72,11 @@ const FERMO_MS = 0.3;
 const SILENZIO_S = 2.5;
 /** Una lettura così lontana dalla stima è un altro percorso: si riparte. */
 const SALTO_AVANTI_M = 150;
+/** Fermi da tanto cosi' (ms), la lettura del GPS e' quella vera: il ritardo
+ * non conta piu'. */
+const FERMO_FIDATO_MS = 2000;
+/** E se la freccia ne sta piu' lontana di cosi' (m), va dove dice il GPS. */
+const FERMO_LONTANO_M = 5;
 const SALTO_INDIETRO_M = 40;
 
 const mul = (A, B) => A.map((r) => B[0].map((_, j) => r.reduce((s, x, k) => s + x * B[k][j], 0)));
@@ -101,6 +106,9 @@ export class FiltroSullaStrada {
     /** Le accelerazioni del telefono degli ultimi secondi: `[ms, a]`. */
     this.storiaAcc = [];
     this.ultimoPasso = null;
+    /** Da quando si e' fermi (ms), e le letture da allora. */
+    this.fermoDa = null;
+    this.lettureDaFermo = [];
   }
 
   /** Porta lo stato all'istante [t] (ms). */
@@ -202,6 +210,35 @@ export class FiltroSullaStrada {
         [0, Math.max(this.P[1][1], 9), 0],
         [0, 0, Math.max(this.P[2][2], 4)],
       ];
+    }
+    /* Fermi al semaforo: «continua a essere piu' dietro rispetto alla
+     * posizione reale». Fermandosi la stima toglie il ritardo del GPS a
+     * occhio, e puo' fermarsi prima dell'auto; poi, da fermo, il filtro era
+     * cosi' sicuro di dove si era fermato che ogni lettura nuova lo spostava
+     * di pochi centimetri, e la freccia restava venti metri indietro per un
+     * minuto. Da fermi il ritardo non conta: dopo [FERMO_FIDATO_MS] la
+     * mediana delle letture e' dove si e'. */
+    if (this.fermo) {
+      this.fermoDa ??= adesso;
+      this.lettureDaFermo.push(metri);
+      if (this.lettureDaFermo.length > 7) this.lettureDaFermo.shift();
+      const n = this.lettureDaFermo.length;
+      if (adesso - this.fermoDa >= FERMO_FIDATO_MS && n >= 4) {
+        const ordinate = [...this.lettureDaFermo].sort((a, b) => a - b);
+        const mediana = ordinate[n >> 1];
+        // Quasi tutte dalla stessa parte: non e' il GPS che balla.
+        const avanti = this.lettureDaFermo.filter((m) => m - this.x[0] > FERMO_LONTANO_M / 2).length;
+        const dietro = this.lettureDaFermo.filter((m) => this.x[0] - m > FERMO_LONTANO_M / 2).length;
+        const daccordo = Math.max(avanti, dietro) >= Math.ceil(0.7 * n);
+        if (daccordo && Math.abs(mediana - this.x[0]) > FERMO_LONTANO_M) {
+          this.x = [mediana, 0, 0];
+          this.P[0][0] = Math.max(this.P[0][0], 4);
+          return;
+        }
+      }
+    } else {
+      this.fermoDa = null;
+      this.lettureDaFermo = [];
     }
     const autoFresca = this.ultimaVelocitaAuto != null && adesso - this.ultimaVelocitaAuto < 1500;
     /* Con l'accelerometro si sa come è cambiata la velocità nel ritardo del

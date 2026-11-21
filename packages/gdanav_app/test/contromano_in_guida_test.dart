@@ -192,11 +192,32 @@ void main() {
     expect(voce.frasi, isNot(contains('Ricalcolo il percorso.')));
   });
 
+  testWidgets('se alla partenza le strade non arrivano e il GPS tace, si riprova da sé', (tester) async {
+    // «GPS assente» alla partenza: senza una posizione il controllo non
+    // ripartiva, e la linea restava contromano sul ramo vietato.
+    var chiamate = 0;
+    final (a, g, _) = await prepara(tester, (_) async => chiamate++ == 0 ? const <TrattoStrada>[] : _strade);
+    final prima = (a.viaggio.stato as ViaggioPronto).viaggio.percorso;
+    g.avvia();
+    await tester.pump();
+    expect(identical((a.viaggio.stato as ViaggioPronto).viaggio.percorso, prima), isTrue);
+    // Nessuna posizione: passano solo i secondi.
+    await tester.pump(const Duration(seconds: 16));
+    await tester.pump();
+    expect(chiamate, 2);
+    final dopo = (a.viaggio.stato as ViaggioPronto).viaggio.percorso;
+    expect(identical(dopo, prima), isFalse, reason: 'corretto senza nessuna posizione');
+    expect(dopo.manovre.where((m) => distanzaM(dopo.punti[m.inizio], _a(0, 0)) < 15), isEmpty);
+  });
+
   testWidgets('senza strade da guardare la guida fa come prima', (tester) async {
     final (a, g, _) = await prepara(tester, (_) async => const <TrattoStrada>[]);
     final prima = (a.viaggio.stato as ViaggioPronto).viaggio.percorso;
     g.avvia();
     await guida(tester, a, _sulRamoGiusto.take(5));
+    expect(identical((a.viaggio.stato as ViaggioPronto).viaggio.percorso, prima), isTrue);
+    // Riprova da sé qualche volta, poi lascia stare.
+    await tester.pump(const Duration(minutes: 3));
     expect(identical((a.viaggio.stato as ViaggioPronto).viaggio.percorso, prima), isTrue);
   });
 }

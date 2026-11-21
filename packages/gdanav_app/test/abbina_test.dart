@@ -8,9 +8,11 @@ import 'package:gdanav_core/gdanav_core.dart';
 
 import 'aiuti.dart';
 
-/// Il collegamento vero (archivio, relay) fa passare tempo reale.
+/// Il collegamento vero (archivio, relay) fa passare tempo reale: su una
+/// macchina carica anche più di due secondi, quindi fino a dieci (si esce
+/// appena è fatto).
 Future<void> aspetta(WidgetTester tester, bool Function() fatto) async {
-  for (var i = 0; i < 40 && !fatto(); i++) {
+  for (var i = 0; i < 200 && !fatto(); i++) {
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
     await tester.pump(const Duration(milliseconds: 400));
   }

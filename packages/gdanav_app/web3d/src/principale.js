@@ -1117,9 +1117,14 @@ function doveGuardo() {
  * mano lontano dall'auto; `null` se si segue l'auto o si guarda altrove.
  */
 function fuocoSulPercorso(p) {
-  if (!p?.linea || !S.auto || S.camera.modo === 'segui') return null;
+  if (!p?.linea) return null;
+  // Senza l'auto («GPS assente») si guarda sempre dove sta la mappa: prima il
+  // nastro sulle strade arrivava solo ai primi chilometri, e più in là il
+  // percorso era la linea piatta della mappa, fuori dalle strade e sotto i
+  // viadotti.
+  if (S.auto && S.camera.modo === 'segui') return null;
   const qui = doveGuardo();
-  if (!qui || (qui[0] === S.auto.x && qui[1] === S.auto.y)) return null;
+  if (!qui || (S.auto && qui[0] === S.auto.x && qui[1] === S.auto.y)) return null;
   const q = p.linea.proietta(qui[0], qui[1]);
   return q.d < 1500 ? q.s : null;
 }

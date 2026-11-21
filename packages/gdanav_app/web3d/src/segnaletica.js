@@ -59,6 +59,8 @@ const TATTILE = [
   [226, 216, 188],
 ];
 const PIENO = [255, 255, 255];
+/** Quanto e' alta l'isola di una rotonda sopra l'asfalto (m): come un cordolo. */
+const ISOLA_ALTA = 0.16;
 /** Quanto si può semplificare la linea dei marciapiedi (m): il cordolo resta sul bordo dell'asfalto. */
 const SEMPLIFICA_M = 0.04;
 
@@ -752,7 +754,7 @@ export function angoloMarciapiede(A, Bv, strade, ricche, bordi, sopra, asfalto) 
  * [nodi]: con `xy`. [sopra(hw)]: quanto sopra la quota sta l'asfalto;
  * [meta]: mezzo lato della tessera. Restituisce le tre geometrie.
  */
-export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, meta }) {
+export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, meta, rotonde = [] }) {
   const asfalto = new Costruttore();
   const vernice = new Costruttore();
   const segnali = new Costruttore({ colori: true });
@@ -773,6 +775,32 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
     });
   });
   const larghezzaTotale = (v) => larghezzaCorsie(v) + v.margini[0] + v.margini[1];
+  /* Le rotonde ([rotonde]: `{x, y, r}`, il centro e il raggio dell'anello):
+   * quali vie sono il loro anello, e fin dove arriva il suo asfalto.
+   *
+   * «E' sbagliato proprio il disegno della rotonda: vedi le strade che ci
+   * finiscono dentro». Le vie che arrivano finiscono sulla linea di mezzo
+   * dell'anello; in una rotonda piccola i loro bordi, la mezzeria e i
+   * marciapiedi passavano sulla carreggiata dell'anello e fino all'isola.
+   * Dentro il cerchio dell'anello, di quelle vie non si disegna ne' riga ne'
+   * marciapiede: c'e' l'anello. */
+  const anelli = rotonde.map((c) => {
+    const suoi = new Set();
+    let fuori = c.r + 2;
+    let dentro = Infinity;
+    let z = null;
+    strade.forEach((v, i) => {
+      if (v.xyVia.length < 3) return;
+      if (!v.xyVia.every((q) => Math.abs(Math.hypot(q[0] - c.x, q[1] - c.y) - c.r) < 2.5)) return;
+      suoi.add(i);
+      fuori = Math.max(fuori, c.r + larghezzaTotale(v) / 2);
+      dentro = Math.min(dentro, c.r - larghezzaTotale(v) / 2);
+      const h = (v.h ?? []).filter(Number.isFinite);
+      if (h.length) z = h.reduce((a, b) => a + b, 0) / h.length + sopra(v.hw);
+    });
+    return { ...c, suoi, fuori, dentro, z };
+  });
+  const nellaRotonda = (x, y, i) => anelli.some((c) => !c.suoi.has(i) && Math.hypot(x - c.x, y - c.y) < c.fuori - 0.2);
   // I rami di un nodo: per ogni via che lo tocca, verso dove va (a una decina di metri).
   const ramiDi = (kk) => {
     const out = [];
@@ -962,7 +990,15 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
         [-1, B.destra - mD],
       ]) {
         const no = senzaMarciapiede(r, i, lato, bordo, largoM, copertura, (x, y) => Math.abs(x) <= fin && Math.abs(y) <= fin);
-        const pezzi = togli([[0, L]], [...buchiTutte, ...buchiMarciapiede[lato], ...no]).filter(([a, b]) => b - a >= 1.5);
+        // Nella rotonda il marciapiede dei rami non entra (vedi [nellaRotonda]).
+        const inRotonda = [];
+        if (anelli.length) {
+          for (let s = 0; s <= L; s += 1) {
+            const P = puntoA(r, s, bordo + (lato * largoM) / 2);
+            if (nellaRotonda(P[0], P[1], i)) inRotonda.push([s - 0.8, s + 0.8]);
+          }
+        }
+        const pezzi = togli([[0, L]], [...buchiTutte, ...buchiMarciapiede[lato], ...no, ...inRotonda]).filter(([a, b]) => b - a >= 1.5);
         pezziMarciapiede.set(`${i}:${lato}`, pezzi);
         for (const [a, b] of pezzi) daFare.push({ i, lato, bordo, largo: largoM, z0, a, b });
       }
@@ -979,7 +1015,7 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       const out = [];
       for (let s = 0; s <= L; s += 1) {
         const P = puntoA(r, s, o);
-        if (copertura.sotto(P[0], P[1], P[2], i, -0.6)) out.push([s - 0.6, s + 0.6]);
+        if (copertura.sotto(P[0], P[1], P[2], i, -0.6) || nellaRotonda(P[0], P[1], i)) out.push([s - 0.6, s + 0.6]);
       }
       return out;
     };
@@ -1298,6 +1334,39 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
     const ic = asfalto.v(ang.riempi[0], ang.riempi[1], ang.zC - 0.004, 0, 0, 1);
     const giro = ang.punti.map((q) => asfalto.v(q.x, q.y, q.zb - 0.004, 0, 0, 1));
     for (let j = 1; j < giro.length; j++) triVerso(asfalto, ic, giro[j - 1], giro[j], [0, 0, 1]);
+  }
+  // L'isola delle rotonde: un'aiuola tonda e rialzata, col cordolo, dove
+  // dentro l'anello si vedevano pezzi di prato e di terra.
+  for (const c of anelli) {
+    if (!c.suoi.size || c.z === null || !dentro(c.x, c.y)) continue;
+    const raggio = Math.max(0.8, Math.min(c.dentro, c.r) - 0.15);
+    const N = 36;
+    const z0 = c.z - 0.02;
+    const z1 = c.z + ISOLA_ALTA;
+    const verde = [[132, 170, 98], [52, 72, 44]];
+    const cordolo = [[214, 214, 218], [92, 96, 104]];
+    const centro = segnali.v(c.x, c.y, z1, 0, 0, 1, 0, 0, verde[0], verde[1]);
+    const giro = [];
+    for (let j = 0; j <= N; j++) {
+      const a = (2 * Math.PI * j) / N;
+      giro.push([Math.cos(a), Math.sin(a)]);
+    }
+    for (let j = 1; j <= N; j++) {
+      const [ax, ay] = giro[j - 1];
+      const [bx, by] = giro[j];
+      const A = segnali.v(c.x + ax * raggio, c.y + ay * raggio, z1, 0, 0, 1, 0, 0, verde[0], verde[1]);
+      const B = segnali.v(c.x + bx * raggio, c.y + by * raggio, z1, 0, 0, 1, 0, 0, verde[0], verde[1]);
+      segnali.tri(centro, A, B);
+      // Il cordolo: la fascia di lato, verso fuori.
+      const nx = (ax + bx) / 2;
+      const ny = (ay + by) / 2;
+      const a0 = segnali.v(c.x + ax * raggio, c.y + ay * raggio, z0, nx, ny, 0, 0, 0, cordolo[0], cordolo[1]);
+      const b0 = segnali.v(c.x + bx * raggio, c.y + by * raggio, z0, nx, ny, 0, 0, 0, cordolo[0], cordolo[1]);
+      const a1 = segnali.v(c.x + ax * raggio, c.y + ay * raggio, z1, nx, ny, 0, 0, 0, cordolo[0], cordolo[1]);
+      const b1 = segnali.v(c.x + bx * raggio, c.y + by * raggio, z1, nx, ny, 0, 0, 0, cordolo[0], cordolo[1]);
+      segnali.tri(a0, b0, b1);
+      segnali.tri(a0, b1, a1);
+    }
   }
   return { asfalto, vernice, segnali, marciapiedi, righe, semafori };
 }
