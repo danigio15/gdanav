@@ -895,6 +895,10 @@ class GestoreGuida extends ChangeNotifier {
     _guida = Guida(nuovo);
     final qui = _ultimaPosizione;
     avanzamento = qui == null ? null : Guida(nuovo).aggiorna(qui);
+    // Un percorso nuovo (ricalcolo, strada proposta, tappa): i sensi unici
+    // si guardano subito, senza aspettare la prossima posizione del GPS (da
+    // fermi può tardare, e intanto si vedeva la linea di TomTom).
+    if (attiva) scheduleMicrotask(_sensiPiuAvanti);
   }
 
   /* ─── Mai contromano ──────────────────────────────────────────────────────
@@ -913,8 +917,15 @@ class GestoreGuida extends ChangeNotifier {
    * prima di ricalcolare si riguarda lì: se rifatto il percorso ci passa,
    * nessun «Ricalcolo il percorso». */
 
-  /// Quanto avanti si guardano i sensi unici.
+  /// Quanto avanti si guardano i sensi unici, un pezzo alla volta.
   static const finestraSensiM = 2000.0;
+
+  /// E fin dove, un pezzo dopo l'altro, appena il percorso c'è: «ste linee
+  /// le sistemi o no?», con la mappa spostata col dito sul triangolo di Via
+  /// Nobel, da fermi. La fascia 3D si vede dove si guarda, e oltre i primi
+  /// due chilometri la linea era ancora quella di TomTom, contromano: si
+  /// sarebbe corretta solo arrivandoci vicino.
+  static const avantiSensiM = 30000.0;
 
   PercorsoCalcolato? _sensiDi;
   var _sensiFinoA = -1.0;
@@ -945,6 +956,28 @@ class GestoreGuida extends ChangeNotifier {
     final da = math.max(qui, _sensiFinoA - 100);
     _sensiFinoA = qui + finestraSensiM;
     unawaited(_correggiISensi(daM: da, aM: _sensiFinoA, protettoM: qui + 30));
+  }
+
+  /// Il pezzo dopo quelli già guardati, fino a [avantiSensiM] davanti
+  /// all'auto (o alla partenza): uno alla volta, finito uno parte l'altro.
+  /// Senza strade si aspetta il tentativo a tempo di [_correggiISensi].
+  void _sensiPiuAvanti() {
+    final p = pronto, g = _guida;
+    if (strade == null || p == null || g == null || !attiva || _sensiInCorso) return;
+    if (_sensiRiprovaDopo case final t? when _ora().isBefore(t)) return;
+    final percorso = p.viaggio.percorso;
+    if (!identical(g.percorso, percorso)) return;
+    final a = avanzamento;
+    final qui = a?.percorsiM ?? 0.0;
+    if (!identical(_sensiDi, percorso)) {
+      _sensiDi = percorso;
+      _sensiFinoA = -1;
+    }
+    final fine = math.min(g.linea.lunghezzaM, qui + avantiSensiM);
+    if (_sensiFinoA >= fine) return;
+    final da = _sensiFinoA < 0 ? qui : math.max(qui, _sensiFinoA - 100);
+    _sensiFinoA = da + finestraSensiM;
+    unawaited(_correggiISensi(daM: da, aM: _sensiFinoA, protettoM: a == null ? 0 : qui + 30));
   }
 
   /// Fuori strada: prima di ricalcolare, si guarda se si è sul ramo giusto
@@ -1060,6 +1093,8 @@ class GestoreGuida extends ChangeNotifier {
       return false;
     } finally {
       _sensiInCorso = false;
+      // E il pezzo dopo, finché non si è guardato abbastanza avanti.
+      if (attiva) scheduleMicrotask(_sensiPiuAvanti);
     }
   }
 

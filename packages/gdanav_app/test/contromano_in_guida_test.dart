@@ -80,6 +80,45 @@ CostruisciPianificatore _pianificatore() =>
       preferenze: preferenze,
     );
 
+/// Lo stesso triangolo cinque chilometri più a est, e la strada per arrivarci.
+Punto _sposta(Punto p, double est) => Punto(p.lat, p.lon + est / (_mpg * math.cos(_origine.lat * math.pi / 180)));
+
+CostruisciPianificatore _pianificatoreLontano() =>
+    (_, profilo, preferenze, _) => PianificatoreViaggio(
+      percorsi: (_) async {
+        final p = _delFornitore();
+        final punti = [
+          ..._fitta([(-600, 6), (4400, 6)]).take(625),
+          for (final q in p.punti) _sposta(q, 5000),
+        ];
+        final c = Linea(punti).cumulate;
+        final da = punti.length - p.punti.length;
+        return PercorsoCalcolato(
+          punti: punti,
+          tratti: [Tratto(lunghezzaM: c.last, velocitaKmh: 40)],
+          limiti: [for (var i = 0; i < punti.length - 1; i++) 50],
+          manovre: [
+            for (final m in p.manovre)
+              Manovra(
+                istruzione: m.istruzione,
+                voce: m.voce,
+                tipo: m.tipo,
+                strada: m.strada,
+                inizio: m.inizio == 0 ? 0 : m.inizio + da,
+                lunghezzaM: m.inizio == 0 ? c[p.manovre[1].inizio + da] : m.lunghezzaM,
+                secondi: m.secondi,
+              ),
+          ],
+        );
+      },
+      colonnine: ColonnineFinte(),
+      profilo: profilo,
+      preferenze: preferenze,
+    );
+
+/// Quanto la linea [punti] passa vicino a [q] (sui vertici, fitti).
+double passaVicino(List<Punto> punti, Punto q) => punti.map((p) => distanzaM(p, q)).reduce(math.min);
+
 /// Si guida davvero sul ramo giusto: da ovest fino a W, giù, poi a sud.
 final _sulRamoGiusto = _fitta([(-600, 0), _w, (-100, -60), _n, (0, -400)], passo: 10);
 
@@ -88,10 +127,11 @@ void main() {
 
   Future<(Ambiente, GestoreGuida, VoceFinta)> prepara(
     WidgetTester tester,
-    Future<List<TrattoStrada>> Function(List<Punto>) strade,
-  ) async {
+    Future<List<TrattoStrada>> Function(List<Punto>) strade, {
+    CostruisciPianificatore? costruisci,
+  }) async {
     preparaPiattaforma(portachiavi: impostazioniComplete);
-    final a = await ambiente(tester, km: 2, costruisci: _pianificatore());
+    final a = await ambiente(tester, km: 2, costruisci: costruisci ?? _pianificatore());
     a.auto.manuale.imposta(90);
     await tester.runAsync(() => a.viaggio.vaiA(Luogo(nome: 'Sud', posizione: _a(0, -700))));
     final voce = VoceFinta();
@@ -208,6 +248,29 @@ void main() {
     final dopo = (a.viaggio.stato as ViaggioPronto).viaggio.percorso;
     expect(identical(dopo, prima), isFalse, reason: 'corretto senza nessuna posizione');
     expect(dopo.manovre.where((m) => distanzaM(dopo.punti[m.inizio], _a(0, 0)) < 15), isEmpty);
+  });
+
+  testWidgets('anche lontano: fermi alla partenza, il contromano a chilometri di distanza si corregge subito', (
+    tester,
+  ) async {
+    // «Ste linee le sistemi o no?»: da fermi, spostando la mappa sul
+    // triangolo più avanti, la fascia 3D era ancora la linea di TomTom.
+    // Si guardava solo i primi due chilometri.
+    final lontano = [
+      for (final t in _strade)
+        TrattoStrada([for (final p in t.punti) _sposta(p, 5000)], senso: t.senso, classe: t.classe),
+      _strada([(-600, 0), (4400, 0)]),
+    ];
+    final (a, g, _) = await prepara(tester, (_) async => lontano, costruisci: _pianificatoreLontano());
+    final prima = (a.viaggio.stato as ViaggioPronto).viaggio.percorso;
+    g.avvia();
+    for (var i = 0; i < 10; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 5)));
+    }
+    final dopo = (a.viaggio.stato as ViaggioPronto).viaggio.percorso;
+    expect(identical(dopo, prima), isFalse, reason: 'il triangolo a cinque chilometri va corretto da subito');
+    expect(dopo.manovre.where((m) => distanzaM(dopo.punti[m.inizio], _a(5000, 0)) < 15), isEmpty);
+    expect(passaVicino(dopo.punti, _a(4900, -30)), lessThan(8), reason: 'sul ramo giusto');
   });
 
   testWidgets('senza strade da guardare la guida fa come prima', (tester) async {
