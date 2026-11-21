@@ -121,6 +121,39 @@ export class IndiceSegmenti {
   }
 
   /**
+   * L'asfalto vicino a [x, y] alla quota [h] (entro [dz]): per ogni strada il
+   * punto del suo asse piu' vicino e la sua mezza larghezza. I binari no.
+   */
+  asfaltoVicino(x, y, h, raggio = 12, dz = 2.5) {
+    const out = [];
+    const c = this.cella;
+    for (const t of this.tessere.values()) {
+      if (x < t.minx - raggio || x > t.maxx + raggio || y < t.miny - raggio || y > t.maxy + raggio) continue;
+      const visti = new Set();
+      for (let cx = Math.floor((x - raggio) / c); cx <= Math.floor((x + raggio) / c); cx++) {
+        for (let cy = Math.floor((y - raggio) / c); cy <= Math.floor((y + raggio) / c); cy++) {
+          for (const i of t.griglia.get(cx * 100003 + cy) || []) {
+            if (visti.has(i)) continue;
+            visti.add(i);
+            const o = 8 * i;
+            const s = t.s;
+            if ((s[o + 7] & 15) === 8) continue;
+            const sx = s[o + 3] - s[o];
+            const sy = s[o + 4] - s[o + 1];
+            const l2 = sx * sx + sy * sy;
+            if (l2 < 1e-6) continue;
+            const u = Math.max(0, Math.min(1, ((x - s[o]) * sx + (y - s[o + 1]) * sy) / l2));
+            const z = s[o + 2] + (s[o + 5] - s[o + 2]) * u;
+            if (Math.abs(z - h) > dz) continue;
+            out.push({ qx: s[o] + sx * u, qy: s[o + 1] + sy * u, meta: s[o + 6] / 2 });
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  /**
    * Le quote delle strade vicine al punto che vanno come [dx, dy] (anche
    * contromano, ma non sui sensi unici); ognuna con la sua distanza dal punto.
    */
@@ -453,7 +486,28 @@ export class Profilo {
     if (!(f >= 0) || f > n - 1) return [0, 0];
     const i = Math.min(n - 2, Math.floor(f));
     const t = f - i;
-    return [this.dx[i] + (this.dx[i + 1] - this.dx[i]) * t, this.dy[i] + (this.dy[i + 1] - this.dy[i]) * t];
+    const dx = this.dx[i] + (this.dx[i + 1] - this.dx[i]) * t;
+    const dy = this.dy[i] + (this.dy[i + 1] - this.dy[i]) * t;
+    const l = this.ancorata;
+    if (!l || t === 0) return [dx, dy];
+    // Fra due campioni il punto sta sul segmento fra i due punti spostati,
+    // non sulla linea di sotto più lo spostamento in mezzo: dove la linea di
+    // sotto piega fra un campione e l'altro (stretta attorno a un'isola, o
+    // che torna indietro) quella piega finiva nella fascia, e la direzione
+    // presa a metà fra i campioni girava di traverso: il dente di sega.
+    const [ax, ay] = l.a(this.s0 + i * this.passo);
+    const [bx, by] = l.a(this.s0 + (i + 1) * this.passo);
+    const [x, y] = l.a(s);
+    return [ax + this.dx[i] + (bx + this.dx[i + 1] - ax - this.dx[i]) * t - x, ay + this.dy[i] + (by + this.dy[i + 1] - ay - this.dy[i]) * t - y];
+  }
+  /**
+   * Da qui in poi lo spostamento in mezzo ai campioni segue la retta fra i
+   * punti spostati della [linea] (vedi [sposta]): per un profilo i cui punti
+   * sono già quelli da disegnare, come la fascia sulla corsia.
+   */
+  ancora(linea) {
+    this.ancorata = linea;
+    return this;
   }
   /**
    * Lo stesso profilo con un campione ogni [passo] metri (meno del suo): le
@@ -719,11 +773,152 @@ const FASCIA_DI_LATO = 0.35;
  * corsia di una via che finisce, una via sotto che cambia) diventa un
  * raccordo. Cambia [fascia].
  */
+/**
+ * La fascia dentro l'asfalto: l'ultima parola, qualunque linea abbia mandato
+ * il fornitore. «La linea deve essere sempre agganciata all'asfalto, non deve
+ * andare fuori strada su tutte le strade.» Dove la linea di TomTom arriva
+ * spostata di qualche metro e lo spostamento non la riporta tutta, il centro
+ * della fascia restava un metro o due oltre il bordo della strada disegnata.
+ *
+ * Per ogni punto [cerca](x, y, h) dice l'asfalto vicino a quella quota —
+ * `{qx, qy, meta}`, il punto dell'asse e la mezza larghezza — e se il punto
+ * non ci sta dentro (meno [margine] dal bordo) lo si porta verso l'asse
+ * della strada piu' vicina, di quel tanto. Oltre [lontano] metri fuori non
+ * si tocca: li' la strada non c'e' (un parcheggio, una strada che la mappa
+ * non ha) e tirarlo su un'altra sarebbe peggio.
+ */
+export function dentroLAsfalto(fascia, h, cerca, { margine = 0.6, lontano = 6, rampa = 0.3 } = {}) {
+  const n = fascia.length;
+  const cx = new Float64Array(n);
+  const cy = new Float64Array(n);
+  /* Fra due carreggiate (la linea di TomTom nel mezzo) le strade vicine sono
+   * due, una per parte: scegliendo ogni volta la piu' vicina la fascia
+   * saltava da una all'altra. Si sceglie anche col punto di prima: la
+   * correzione piu' simile a quella appena fatta. */
+  let px = 0;
+  let py = 0;
+  for (let k = 0; k < n; k++) {
+    const q = fascia[k];
+    let meglio = null;
+    let dentro = false;
+    for (const a of cerca(q[0], q[1], h[k] ?? 0)) {
+      const d = Math.hypot(q[0] - a.qx, q[1] - a.qy);
+      const fuori = d - Math.max(0, a.meta - margine);
+      if (fuori <= 0) {
+        dentro = true;
+        break;
+      }
+      if (fuori > lontano || d < 1e-6) continue;
+      const vx = ((a.qx - q[0]) * fuori) / d;
+      const vy = ((a.qy - q[1]) * fuori) / d;
+      const costo = fuori + Math.hypot(vx - px, vy - py);
+      if (!meglio || costo < meglio.costo) meglio = { vx, vy, costo };
+    }
+    if (dentro || !meglio) {
+      px = py = 0;
+      continue;
+    }
+    cx[k] = px = meglio.vx;
+    cy[k] = py = meglio.vy;
+  }
+  /* Senza scalini: la correzione cresce e cala di al piu' [rampa] metri per
+   * punto, prima e dopo dove serve (altrimenti la fascia dava uno strattone
+   * di lato dove la regola si accendeva: lo zig-zag). Chi ne ha bisogno la
+   * tiene tutta; i vicini ne prendono un po'. */
+  const smussa = (k, j) => {
+    const lj = Math.hypot(cx[j], cy[j]);
+    const lk = Math.hypot(cx[k], cy[k]);
+    if (lj - rampa <= lk) return;
+    const f = (lj - rampa) / lj;
+    cx[k] = cx[j] * f;
+    cy[k] = cy[j] * f;
+  };
+  for (let k = 1; k < n; k++) smussa(k, k - 1);
+  for (let k = n - 2; k >= 0; k--) smussa(k, k + 1);
+  /* E senza svolte brusche della correzione: la media su cinque punti. */
+  const mx = Float64Array.from(cx);
+  const my = Float64Array.from(cy);
+  for (let k = 0; k < n; k++) {
+    let sx = 0;
+    let sy = 0;
+    let m = 0;
+    for (let j = Math.max(0, k - 2); j <= Math.min(n - 1, k + 2); j++) {
+      sx += mx[j];
+      sy += my[j];
+      m++;
+    }
+    cx[k] = sx / m;
+    cy[k] = sy / m;
+  }
+  return fascia.map((q, k) => (cx[k] || cy[k] ? [q[0] + cx[k], q[1] + cy[k]] : q));
+}
+
+/**
+ * Toglie i denti di sega dalla [fascia]: dove gira di più di [gradi] da una
+ * parte e subito dopo di più di [gradi] dall'altra (un punto fuori fila),
+ * i punti del dente si avvicinano al mezzo dei vicini, un po' per volta,
+ * finché il dente non c'è più. Le curve vere girano sempre dalla stessa
+ * parte e i cambi di corsia di pochi gradi per punto: non si toccano. Ogni
+ * punto si sposta al più di [massimo] metri.
+ *
+ * Il dente arriva dalla linea del fornitore, che dove piega a scatti li ha
+ * già, e dall'aggancio alle corsie fra un pezzo di via e l'altro; sullo
+ * schermo è lo zig-zag della fascia verde.
+ */
+export function togliDenti(fascia, { gradi = 20, massimo = 1.5, giri = 12 } = {}) {
+  const n = fascia.length;
+  if (n < 4) return fascia;
+  const p = fascia.map((q) => [q[0], q[1]]);
+  const limite = (gradi * Math.PI) / 180;
+  const gira = (j) => {
+    const a = p[j - 1];
+    const b = p[j];
+    const c = p[j + 1];
+    const ux = b[0] - a[0];
+    const uy = b[1] - a[1];
+    const vx = c[0] - b[0];
+    const vy = c[1] - b[1];
+    if (Math.hypot(ux, uy) < 1e-6 || Math.hypot(vx, vy) < 1e-6) return 0;
+    return Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+  };
+  for (let giro = 0; giro < giri; giro++) {
+    let denti = 0;
+    for (let k = 1; k + 2 < n; k++) {
+      const g0 = gira(k);
+      const g1 = gira(k + 1);
+      if (Math.sign(g0) === Math.sign(g1) || Math.min(Math.abs(g0), Math.abs(g1)) <= limite) continue;
+      denti++;
+      for (const j of [k, k + 1]) {
+        const mx = (p[j - 1][0] + p[j + 1][0]) / 2;
+        const my = (p[j - 1][1] + p[j + 1][1]) / 2;
+        let x = p[j][0] + (mx - p[j][0]) * 0.5;
+        let y = p[j][1] + (my - p[j][1]) * 0.5;
+        const dx = x - fascia[j][0];
+        const dy = y - fascia[j][1];
+        const d = Math.hypot(dx, dy);
+        if (d > massimo) {
+          x = fascia[j][0] + (dx * massimo) / d;
+          y = fascia[j][1] + (dy * massimo) / d;
+        }
+        p[j] = [x, y];
+      }
+    }
+    if (!denti) break;
+  }
+  return p;
+}
+
+/** Da quanto piega la linea fra un punto e l'altro, uno scalino (vedi [levigaFascia]). */
+const SCALINO = (15 * Math.PI) / 180;
+
 export function levigaFascia(punti, fascia, passo) {
   const n = punti.length;
   if (n < 3) return fascia;
   const nor = new Array(n);
   const fermo = new Uint8Array(n);
+  // Gli scalini: lì lo spostamento di lato non si confronta coi vicini
+  // (non si sposta e non sposta nessuno).
+  const scalino = new Uint8Array(n);
   const o = new Float64Array(n);
   for (let k = 0; k < n; k++) {
     const a = punti[Math.max(0, k - 1)];
@@ -736,13 +931,23 @@ export function levigaFascia(punti, fascia, passo) {
     const p1 = punti[k];
     const giro = Math.abs(Math.atan2((p1[0] - p0[0]) * (p2[1] - p1[1]) - (p1[1] - p0[1]) * (p2[0] - p1[0]), (p1[0] - p0[0]) * (p2[0] - p1[0]) + (p1[1] - p0[1]) * (p2[1] - p1[1])));
     if (giro > (20 * Math.PI) / 180) fermo[k] = 1;
+    // E dove la linea fa uno scalino da un punto all'altro: lì la sua
+    // perpendicolare gira di colpo, e lo spostamento «di lato» misurato su
+    // quella spingeva il punto di traverso, di metri (il dente di sega
+    // attorno a un'isola, dove la linea di TomTom piega a scatti).
+    if (k > 0 && k < n - 1) {
+      const c = punti[k];
+      const u0 = [c[0] - a[0], c[1] - a[1]];
+      const u1 = [b[0] - c[0], b[1] - c[1]];
+      if (Math.hypot(...u0) > 1e-6 && Math.hypot(...u1) > 1e-6 && Math.abs(Math.atan2(u0[0] * u1[1] - u0[1] * u1[0], u0[0] * u1[0] + u0[1] * u1[1])) > SCALINO) scalino[k] = fermo[k] = 1;
+    }
   }
   const max = FASCIA_DI_LATO * passo;
   for (let giro = 0; giro < 60; giro++) {
     let troppo = 0;
     for (let k = 1; k < n; k++) {
       const e = Math.abs(o[k] - o[k - 1]) - max;
-      if (e <= 0.005 || (fermo[k] && fermo[k - 1])) continue;
+      if (e <= 0.005 || (fermo[k] && fermo[k - 1]) || scalino[k] || scalino[k - 1]) continue;
       troppo++;
       const v = Math.sign(o[k] - o[k - 1]);
       const fa = fermo[k - 1] ? 0 : fermo[k] ? 1 : 0.5;

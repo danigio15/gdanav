@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:gdanav_core/gdanav_core.dart';
@@ -35,6 +36,7 @@ import '../stato/gestore_posizione.dart';
 import '../stato/gestore_viaggio.dart';
 import '../stato/gestore_vicini.dart';
 import '../stato/gestore_ztl.dart';
+import '../stato/percorso_per_assistenza.dart';
 import 'abbina_home_assistant.dart';
 import 'avvisi_guida.dart';
 import 'notifiche_nel_navigatore.dart';
@@ -795,6 +797,21 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                         ),
                       ),
                     ),
+                    // Il percorso di adesso, negli appunti: per rifare uguale un
+                    // difetto della linea (vedi `percorso_per_assistenza.dart`).
+                    if (widget.viaggio.stato case ViaggioPronto(:final viaggio))
+                      _VoceMenu(
+                        icona: Icons.content_copy_rounded,
+                        colore: const Color(0xFF0E7490),
+                        titolo: 'Copia il percorso per l\'assistenza',
+                        sotto: 'Da incollare a chi ti aiuta: resta sul telefono',
+                        onTap: () async {
+                          final messaggi = ScaffoldMessenger.maybeOf(context);
+                          await Clipboard.setData(ClipboardData(text: percorsoPerLAssistenza(viaggio.percorso)));
+                          chiudi();
+                          messaggi?.showSnackBar(const SnackBar(content: Text('Percorso copiato negli appunti')));
+                        },
+                      ),
                     if (widget.premium case final p?)
                       _VoceMenu(
                         icona: Icons.workspace_premium_rounded,

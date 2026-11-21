@@ -609,6 +609,65 @@ export function altezze(nodi, feats) {
       }
     }
   }
+  /* La strada sopra la ferrovia: «il ponte che vedi in realtà è a livello
+   * strada, è la ferrovia che è sotto in basso». OpenStreetMap segna il
+   * ponte, e la strada saliva con le sue rampe fino alle rotonde. Un ponte
+   * corto che scavalca solo binari resta a terra; i binari scendono in
+   * trincea sotto di lui (vedi in fondo, [TRINCEA_M]). Ai passaggi a livello
+   * niente cambia: lì non c'è ponte e le due stanno alla stessa quota. */
+  const sottoLaStrada = [];
+  {
+    const visto = new Uint8Array(feats.length);
+    const lunghezza = (f) => {
+      let l = 0;
+      for (let k = 1; k < f.nodi.length; k++) l += Math.hypot(nodi[f.nodi[k]].x - nodi[f.nodi[k - 1]].x, nodi[f.nodi[k]].y - nodi[f.nodi[k - 1]].y);
+      return l;
+    };
+    for (let i = 0; i < feats.length; i++) {
+      const f0 = feats[i];
+      if (visto[i] || !f0.ponte || f0.galleria || f0.cls === 'rail') continue;
+      // Il ponte intero: i pezzi attaccati, allo stesso livello.
+      const gruppo = [];
+      const coda = [i];
+      visto[i] = 1;
+      while (coda.length) {
+        const j = coda.pop();
+        gruppo.push(j);
+        const f = feats[j];
+        for (const e of [f.nodi[0], f.nodi[f.nodi.length - 1]]) {
+          for (const q of nodi[e].feats) {
+            const g = feats[q];
+            if (visto[q] || !g.ponte || g.galleria || g.cls === 'rail' || g.livello !== f0.livello) continue;
+            visto[q] = 1;
+            coda.push(q);
+          }
+        }
+      }
+      if (gruppo.reduce((s, j) => s + lunghezza(feats[j]), 0) > PONTE_SUI_BINARI_M) continue;
+      const nelGruppo = new Set(gruppo);
+      const binari = [];
+      let altro = false;
+      for (const j of gruppo) {
+        const f = feats[j];
+        for (let k = 1; k < f.nodi.length && !altro; k++) {
+          const [a, b] = [f.nodi[k - 1], f.nodi[k]];
+          celle(nodi[a], nodi[b], (cella) => {
+            for (const tj of griglia.get(cella) || []) {
+              const [c, d, fj] = tratti[tj];
+              const g = feats[fj];
+              if (nelGruppo.has(fj) || g.livello >= f.livello || g.galleria || c === a || c === b || d === a || d === b) continue;
+              if (incrocia(nodi[a], nodi[b], nodi[c], nodi[d]) === null) continue;
+              if (g.cls === 'rail') binari.push([c, d]);
+              else altro = true;
+            }
+          });
+        }
+      }
+      if (altro || !binari.length) continue;
+      for (const j of gruppo) Object.assign(feats[j], { ponte: false, livello: 0, sopraIBinari: true });
+      sottoLaStrada.push(...binari);
+    }
+  }
   // Due strade attaccate a pochi metri si incrociano in pianta dove si
   // uniscono (le rampe di uno svincolo): non è uno scavalco.
   const vicine = (da, a, b) => {
@@ -1322,6 +1381,40 @@ export function altezze(nodi, feats) {
     }
     if (!tenute) break;
   }
+  // La trincea: sotto la strada i binari stanno [TRINCEA_M] più in basso, e
+  // ci arrivano con la pendenza di una ferrovia. Solo i nodi di soli binari
+  // (un passaggio a livello lì vicino resta alla quota della strada).
+  if (sottoLaStrada.length) {
+    const fondo = new Float64Array(N);
+    const mucchio = new Mucchio(true);
+    for (const [c, d] of sottoLaStrada) {
+      for (const i of [c, d]) {
+        if (fondo[i] < TRINCEA_M) {
+          fondo[i] = TRINCEA_M;
+          mucchio.push(TRINCEA_M, i);
+        }
+      }
+    }
+    while (mucchio.length) {
+      const [x, i] = mucchio.pop();
+      if (x < fondo[i]) continue;
+      for (const e of nodi[i].adj) {
+        if (feats[e.f].cls !== 'rail') continue;
+        const nx = x - PENDENZA_TRINCEA * e.d;
+        if (nx > fondo[e.to] && nx > 0.05) {
+          fondo[e.to] = nx;
+          mucchio.push(nx, e.to);
+        }
+      }
+    }
+    for (let i = 0; i < N; i++) if (fondo[i] > 0 && binari[i]) h[i] = Math.min(h[i], -fondo[i]);
+  }
   for (let i = 0; i < N; i++) nodi[i].h = h[i];
   return scavalchi.length;
 }
+
+/** Il ponte più lungo che, sopra soli binari, resta a terra (vedi `altezze`). */
+const PONTE_SUI_BINARI_M = 80;
+/** Quanto stanno sotto la strada i binari in trincea, e con che pendenza ci arrivano. */
+export const TRINCEA_M = 6.5;
+const PENDENZA_TRINCEA = 0.035;

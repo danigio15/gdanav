@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ALTEZZA_LIVELLO, PENDENZA, SCAVALCO_M, altezzaLivello, arrotonda, grafoStrade, larghezzaStrada, livelloStrada, segnaRotonde, uniscIBordi } from '../src/elevazione.js';
+import { ALTEZZA_LIVELLO, PENDENZA, SCAVALCO_M, TRINCEA_M, altezzaLivello, arrotonda, grafoStrade, larghezzaStrada, livelloStrada, segnaRotonde, uniscIBordi } from '../src/elevazione.js';
 
 // Metri = pixel, per semplicità.
 const metri = (x, y) => [x, -y];
@@ -89,6 +89,49 @@ test('un ponte sta sopra quello che scavalca (luce e impalcato), non otto metri 
   for (let k = 1; k < lungo.length; k++) ripida = Math.max(ripida, Math.abs(lungo[k].h - lungo[k - 1].h) / Math.max(1, lungo[k].y - lungo[k - 1].y));
   assert.ok(ripida <= PENDENZA + 0.01, `al più del ${PENDENZA * 100}% (${(ripida * 100).toFixed(1)}%)`);
   assert.equal(vicino(500, -690).h, 0, 'in fondo alla rampa a terra');
+});
+
+test('la strada sopra la ferrovia resta a terra, e i binari passano sotto in trincea', () => {
+  // «Il ponte che vedi in realtà è a livello strada, è la ferrovia che è sotto
+  // in basso.» Un ponte corto sopra soli binari: nessuna salita, la ferrovia scende.
+  const strade = [
+    { p: { class: 'secondary' }, g: [[0, 0], [470, 0]] },
+    { p: { class: 'secondary', brunnel: 'bridge', layer: 1 }, g: [[470, 0], [530, 0]] },
+    { p: { class: 'secondary' }, g: [[530, 0], [1000, 0]] },
+    { p: { class: 'rail' }, g: [[500, -600], [500, 600]] },
+  ];
+  const g = grafoStrade(strade, metri);
+  const strada = g.nodi.filter((n) => n.feats.every((fi) => g.feats[fi].cls === 'secondary'));
+  for (const n of strada) assert.ok(Math.abs(n.h) < 0.05, `la strada a terra (${n.x}: ${n.h})`);
+  const binari = g.nodi.filter((n) => n.feats.every((fi) => g.feats[fi].cls === 'rail')).sort((p, q) => p.y - q.y);
+  const sotto = binari.reduce((m, n) => (Math.abs(n.y) < Math.abs(m.y) ? n : m));
+  assert.ok(Math.abs(sotto.h + TRINCEA_M) < 0.3, `sotto la strada i binari in basso (${sotto.h})`);
+  assert.ok(binari.every((n) => n.h <= 0.01), 'mai sopra la strada');
+  const lontano = binari.find((n) => n.y > 500);
+  assert.ok(Math.abs(lontano.h) < 0.05, 'lontano di nuovo a terra');
+  let ripida = 0;
+  for (let k = 1; k < binari.length; k++) ripida = Math.max(ripida, Math.abs(binari[k].h - binari[k - 1].h) / Math.max(1, binari[k].y - binari[k - 1].y));
+  assert.ok(ripida < 0.04, `una pendenza da ferrovia (${(ripida * 100).toFixed(1)}%)`);
+});
+
+test('al passaggio a livello niente ponte; e sopra binari e strada il ponte resta un ponte', () => {
+  const livello = grafoStrade(
+    [
+      { p: { class: 'secondary' }, g: [[0, 0], [1000, 0]] },
+      { p: { class: 'rail' }, g: [[500, -600], [500, 600]] },
+    ],
+    metri,
+  );
+  for (const n of livello.nodi) assert.ok(Math.abs(n.h) < 0.05, `tutto a terra (${n.x}, ${n.y}: ${n.h})`);
+  const misto = grafoStrade(
+    [
+      ...ponte(),
+      { p: { class: 'rail' }, g: [[520, -500], [520, 500]] },
+      { p: { class: 'primary' }, g: [[600, -500], [600, 500]] },
+    ],
+    metri,
+  );
+  assert.ok(quotaA(misto, 560) > ALTEZZA_LIVELLO - 0.5, 'scavalca anche una strada: resta in quota');
 });
 
 test('i capi tagliati sul bordo delle tessere si uniscono', () => {

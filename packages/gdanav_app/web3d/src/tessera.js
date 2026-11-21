@@ -39,6 +39,8 @@ const SOPRA_GALLERIA = 0.06;
 /** Oltre questa quota (m) una strada non segnata come ponte si disegna come un viadotto. */
 const ALTO_COME_PONTE = 6.5;
 
+/** Quanto si allarga la trincea dei binari per metro di profondità (le scarpate). */
+const SCARPATA = 1.5;
 /** Metri di strada per una ripetizione della trama. */
 export const PERIODO_STRADA = 12;
 export const PIANO = 3.2;
@@ -390,6 +392,28 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   // strato solo: la scena scurisce ogni punto una volta (lo stencil), e due
   // strati quasi alla stessa quota litigavano a righe.
   const ombrePonti = new Costruttore();
+  // I muri della trincea visti da fuori (sono sotto terra): non si
+  // disegnano, ma nascondono quello che sta dietro (vedi la scena).
+  const maschera = new Costruttore();
+  // I binari in trincea, per non mettere un muro fra due binari affiancati.
+  const binariSotto = [];
+  for (const g of feats) {
+    if (g.cls !== 'rail') continue;
+    for (let k = 1; k < g.nodi.length; k++) {
+      const a = nodi[g.nodi[k - 1]];
+      const b = nodi[g.nodi[k]];
+      if (a.h < -0.3 || b.h < -0.3) binariSotto.push([a.x, a.y, b.x, b.y, g]);
+    }
+  }
+  const altriBinariInTrincea = (x, y, f, entro) =>
+    binariSotto.some(([ax, ay, bx, by, g]) => {
+      if (g === f) return false;
+      const dx = bx - ax;
+      const dy = by - ay;
+      const l2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l2));
+      return Math.hypot(ax + dx * t - x, ay + dy * t - y) < entro;
+    });
   const [sox, soy] = spostamentoOmbra();
   const piloni = [];
   const lampioni = [];
@@ -415,6 +439,9 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   const cCemento = CEM;
   const cSotto = SOTTO;
   const cBuio = [rgb('#15181e'), rgb('#07080b')];
+  // La trincea dei binari: la ghiaia del fondo, l'erba delle scarpate.
+  const GHIAIA = [rgb('#9a958c'), rgb('#3b3f47')];
+  const SCARPA = [rgb('#a7b086'), rgb('#3a4234')];
   /** Una scatola (cinque facce, senza il fondo) in [opere]. */
   const scatola = (cx, cy, z0, z1, ux, uy, lu, lv, colore) => {
     const vx = -uy;
@@ -579,6 +606,45 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         } else {
           gb.tri(l0, r1, r0);
           gb.tri(l0, l1, r1);
+        }
+      }
+      // I binari in trincea (sotto una strada a livello, vedi `altezze`): il
+      // fondo di ghiaia e le due scarpate, larghe in cima come quelle vere (da
+      // sbieco si vede dentro). Di fuori le scarpate non si vedono ma
+      // nascondono (sono sotto terra): da fuori non si guarda dentro.
+      if (f.cls === 'rail' && pezzo.some((q) => q[2] < -0.3)) {
+        for (let k = 1; k < n; k++) {
+          const za = Math.min(0, pezzo[k - 1][2]);
+          const zb = Math.min(0, pezzo[k][2]);
+          if (za > -0.3 && zb > -0.3) continue;
+          for (const lato of [1, -1]) {
+            const na = [-pezzo[k - 1][4] * lato, pezzo[k - 1][3] * lato];
+            const nb = [-pezzo[k][4] * lato, pezzo[k][3] * lato];
+            const piede = hw + 1.2;
+            const su = (P, nn, z, piu = 0) => [P[0] + nn[0] * (piede + -z * SCARPATA + piu), P[1] + nn[1] * (piede + -z * SCARPATA + piu)];
+            const a = [pezzo[k - 1][0] + na[0] * piede, pezzo[k - 1][1] + na[1] * piede];
+            const b = [pezzo[k][0] + nb[0] * piede, pezzo[k][1] + nb[1] * piede];
+            // Fra due binari in trincea uno accanto all'altro niente scarpata:
+            // la trincea è una, larga per tutti e due.
+            const mezza = (-(za + zb) / 2) * SCARPATA * 0.5;
+            const mm = [(a[0] + b[0]) / 2 + ((na[0] + nb[0]) / 2) * mezza, (a[1] + b[1]) / 2 + ((na[1] + nb[1]) / 2) * mezza];
+            if (altriBinariInTrincea(mm[0], mm[1], f, mezza + 2.6)) continue;
+            const ta = su(pezzo[k - 1], na, za);
+            const tb = su(pezzo[k], nb, zb);
+            const dentroN = [-(na[0] + nb[0]) / 2, -(na[1] + nb[1]) / 2, 0.8];
+            const fuoriN = [-dentroN[0], -dentroN[1], -0.8];
+            opere.quad([a[0], a[1], za], [b[0], b[1], zb], [tb[0], tb[1], 0.02], [ta[0], ta[1], 0.02], dentroN, ...sfuma(SCARPA, 0.72, 1));
+            // Sotto la scarpata, un poco più giù: da fuori vince sul suo retro.
+            const af = [pezzo[k - 1][0] + na[0] * (piede + 0.1), pezzo[k - 1][1] + na[1] * (piede + 0.1)];
+            const bf = [pezzo[k][0] + nb[0] * (piede + 0.1), pezzo[k][1] + nb[1] * (piede + 0.1)];
+            const atf = su(pezzo[k - 1], na, za, 0.15);
+            const btf = su(pezzo[k], nb, zb, 0.15);
+            maschera.quad([bf[0], bf[1], zb - 0.15], [af[0], af[1], za - 0.15], [atf[0], atf[1], -0.02], [btf[0], btf[1], -0.02], fuoriN);
+            // Il fondo, dal binario al piede della scarpata.
+            const c0 = [pezzo[k - 1][0] + na[0] * hw, pezzo[k - 1][1] + na[1] * hw];
+            const c1 = [pezzo[k][0] + nb[0] * hw, pezzo[k][1] + nb[1] * hw];
+            opere.quad([c0[0], c0[1], za + 0.02], [c1[0], c1[1], zb + 0.02], [b[0], b[1], zb + 0.02], [a[0], a[1], za + 0.02], [0, 0, 1], ...sfuma(GHIAIA, 0.9, 1));
+          }
         }
       }
       if (f.galleria || (f.cls === 'rail' && !f.ponte)) continue;
@@ -1375,6 +1441,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     opere: opere.triangoli ? opere.fatto() : null,
     ombre: ombre.triangoli ? ombre.fatto() : null,
     ombrePonti: ombrePonti.triangoli ? ombrePonti.fatto() : null,
+    maschera: maschera.triangoli ? maschera.fatto() : null,
     ombreAlberi: ombreAlberi.triangoli ? ombreAlberi.fatto() : null,
     facciate: Object.fromEntries(STILI.filter((s) => facciate[s].triangoli).map((s) => [s, facciate[s].fatto()])),
     tetti: tetti.triangoli ? tetti.fatto() : null,
@@ -2429,6 +2496,7 @@ export function bufferDellaTessera(t) {
   geo(t.opere);
   geo(t.ombre);
   geo(t.ombrePonti);
+  geo(t.maschera);
   geo(t.ombreAlberi);
   geo(t.tetti);
   for (const g of Object.values(t.facciate)) geo(g);

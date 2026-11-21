@@ -626,3 +626,82 @@ test('il profilo più fitto: le quote e gli spostamenti in mezzo in linea retta'
   assert.equal(f.trovata.length, 5);
   assert.equal(p.piuFitto(4), p, 'non più rado');
 });
+
+test('la fascia resta dentro l’asfalto: fuori torna dentro, dentro non si tocca, fra due carreggiate non salta', async () => {
+  const { dentroLAsfalto } = await import('../src/percorso.js');
+  // Una strada lungo y = 0, larga 7 m (mezza 3,5).
+  const strada = (x, y) => [{ qx: x, qy: 0, meta: 3.5 }];
+  // La linea esce piano piano di due metri oltre il bordo, e rientra.
+  const fuori = Array.from({ length: 40 }, (_, k) => [k * 2, 1 + 4.5 * Math.max(0, Math.min(1, (k - 6) / 6, (30 - k) / 6))]);
+  const h = new Array(40).fill(0);
+  const dopo = dentroLAsfalto(fuori, h, strada);
+  for (const [x, y] of dopo) assert.ok(Math.abs(y) <= 3.2, `dentro (${x}: ${y.toFixed(2)})`);
+  assert.deepEqual(dopo[0], fuori[0], 'lontano da dove serve, dentro non si tocca');
+  for (let k = 1; k < 40; k++) assert.ok(Math.abs(dopo[k][1] - dopo[k - 1][1]) < 0.6, `senza strattoni (${k})`);
+  // Due carreggiate a y = ±6, la linea nel mezzo che oscilla di poco: sempre la stessa.
+  const due = (x, y) => [{ qx: x, qy: 6, meta: 3 }, { qx: x, qy: -6, meta: 3 }];
+  const mezzo = Array.from({ length: 30 }, (_, k) => [k * 2, k % 2 ? 0.2 : -0.2]);
+  const scelto = dentroLAsfalto(mezzo, new Array(30).fill(0), due);
+  const lati = new Set(scelto.slice(2, 28).map(([, y]) => Math.sign(y)));
+  assert.equal(lati.size, 1, 'una carreggiata sola, non a zig-zag');
+});
+
+test('fra due campioni la fascia ancorata sta sulla retta fra i punti spostati, non sulla piega della linea di sotto', async () => {
+  const { Linea, Profilo } = await import('../src/percorso.js');
+  // La linea va dritta, a metà fra due campioni fa un dente di 3 m, e torna.
+  const l = new Linea([0, 0, 3, 0, 4, 3, 5, 0, 20, 0]);
+  const passo = (l.lunghezza - 0) / 4;
+  const dx = new Float64Array(5);
+  const dy = new Float64Array(5);
+  for (let k = 0; k < 5; k++) {
+    const [x, y] = l.a(k * passo);
+    // I punti da disegnare: tutti su y = 0.
+    dx[k] = k * passo * (20 / l.lunghezza) - x;
+    dy[k] = -y;
+  }
+  const p = new Profilo(0, passo, new Float64Array(5), null, dx, dy).ancora(l);
+  for (let s = 0; s <= l.lunghezza; s += 0.25) {
+    const [x, y] = l.a(s);
+    const [sx, sy] = p.sposta(s);
+    assert.ok(Math.abs(y + sy) < 1e-9, `sulla retta (${s.toFixed(2)}: ${(x + sx).toFixed(2)}, ${(y + sy).toFixed(2)})`);
+  }
+});
+
+test('la levigatura non spinge di traverso i punti dove la linea di sotto fa uno scalino', async () => {
+  const { levigaFascia } = await import('../src/percorso.js');
+  // La linea di sotto: dritta lungo x, con un punto che salta di lato di
+  // tre metri e torna (la linea del fornitore attorno a un'isola).
+  const linea = [];
+  for (let k = 0; k < 20; k++) linea.push([k * 2, k === 10 ? 3 : 0]);
+  // La fascia: dritta lungo y = -1.
+  const fascia = linea.map((_, k) => [k * 2, -1]);
+  const dopo = levigaFascia(linea, fascia.map((q) => [...q]), 2);
+  for (let k = 0; k < 20; k++) {
+    const d = Math.hypot(dopo[k][0] - fascia[k][0], dopo[k][1] - fascia[k][1]);
+    assert.ok(d < 0.05 || Math.abs(dopo[k][1] + 6) < 0.05, `il punto ${k} resta dov'era (${d.toFixed(2)} m)`);
+  }
+});
+
+test('senza denti di sega: il punto fuori fila torna in fila, le curve e i cambi di corsia restano', async () => {
+  const { togliDenti } = await import('../src/percorso.js');
+  const gira = (f, j) => {
+    const [a, b, c] = [f[j - 1], f[j], f[j + 1]];
+    const u = [b[0] - a[0], b[1] - a[1]];
+    const v = [c[0] - b[0], c[1] - b[1]];
+    return (Math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1]) * 180) / Math.PI;
+  };
+  // Dritta con due punti a dente di sega.
+  const dente = Array.from({ length: 30 }, (_, k) => [k * 2, k === 12 ? 1.2 : k === 13 ? -0.8 : 0]);
+  const liscia = togliDenti(dente);
+  for (let k = 2; k < 27; k++) {
+    const a = gira(liscia, k);
+    const b = gira(liscia, k + 1);
+    assert.ok(Math.sign(a) === Math.sign(b) || Math.min(Math.abs(a), Math.abs(b)) <= 20, `nessun dente a ${k} (${a.toFixed(0)}°, ${b.toFixed(0)}°)`);
+  }
+  for (let k = 0; k < 30; k++) assert.ok(Math.abs(liscia[k][1]) < 1.3 && Math.abs(liscia[k][0] - k * 2) < 1.5, `vicino a dov'era (${k})`);
+  // Una svolta stretta (raggio 6 m, un punto ogni 2 m) e un cambio di corsia: identici.
+  const svolta = Array.from({ length: 12 }, (_, k) => [6 * Math.sin(k / 3), 6 - 6 * Math.cos(k / 3)]);
+  assert.deepEqual(togliDenti(svolta), svolta);
+  const corsia = Array.from({ length: 30 }, (_, k) => [k * 2, 3.5 / (1 + Math.exp(-(k - 15) / 2))]);
+  assert.deepEqual(togliDenti(corsia), corsia);
+});

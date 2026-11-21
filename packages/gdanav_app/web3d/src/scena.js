@@ -915,6 +915,8 @@ export class Scena {
     Object.assign(m['strada-galleria'], { transparent: true, opacity: notte ? 0.5 : 0.55, depthWrite: false });
     m['strada-galleria'].color.set(notte ? 0x3a3f4a : 0x5d636c);
     m.opere = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    // La terra attorno alla trincea dei binari: scrive solo la profondità.
+    m.maschera = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide });
     // Un poco di luce propria, nel colore del cemento: anche il fianco in
     // ombra di un ponte tiene il cordolo chiaro e la trave scura.
     const lucePropria = notte ? 0.12 : 0.24;
@@ -1299,6 +1301,9 @@ export class Scena {
       o.position.z = 0.42;
       aggiungi('ombreAlberi', o, 2);
     }
+    // Prima di tutto il resto: i muri della trincea visti da fuori nascondono
+    // i binari laggiù (sotto terra), senza colore.
+    if (t.maschera) aggiungi('maschera', new THREE.Mesh(geometria(t.maschera, notte)), 0);
     if (t.opere) aggiungi('opere', new THREE.Mesh(geometria(t.opere, notte)), 3);
     for (const [s, d] of Object.entries(t.facciate)) aggiungi('facciata-' + s, new THREE.Mesh(geometria(d, notte)), 3);
     if (t.tetti) aggiungi('tetti', new THREE.Mesh(geometria(t.tetti, notte)), 3);
