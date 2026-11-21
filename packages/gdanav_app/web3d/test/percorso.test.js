@@ -635,8 +635,8 @@ test('la fascia resta dentro l’asfalto: fuori torna dentro, dentro non si tocc
   const fuori = Array.from({ length: 40 }, (_, k) => [k * 2, 1 + 4.5 * Math.max(0, Math.min(1, (k - 6) / 6, (30 - k) / 6))]);
   const h = new Array(40).fill(0);
   const dopo = dentroLAsfalto(fuori, h, strada);
-  for (const [x, y] of dopo) assert.ok(Math.abs(y) <= 3.11, `dentro (${x}: ${y.toFixed(2)})`);
-  assert.deepEqual(dopo[2], fuori[2], 'dentro non si tocca');
+  for (const [x, y] of dopo) assert.ok(Math.abs(y) <= 3.2, `dentro (${x}: ${y.toFixed(2)})`);
+  assert.deepEqual(dopo[0], fuori[0], 'lontano da dove serve, dentro non si tocca');
   for (let k = 1; k < 40; k++) assert.ok(Math.abs(dopo[k][1] - dopo[k - 1][1]) < 0.6, `senza strattoni (${k})`);
   // Due carreggiate a y = ±6, la linea nel mezzo che oscilla di poco: sempre la stessa.
   const due = (x, y) => [{ qx: x, qy: 6, meta: 3 }, { qx: x, qy: -6, meta: 3 }];

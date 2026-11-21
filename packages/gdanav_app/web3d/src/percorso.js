@@ -766,7 +766,7 @@ const FASCIA_DI_LATO = 0.35;
  * si tocca: li' la strada non c'e' (un parcheggio, una strada che la mappa
  * non ha) e tirarlo su un'altra sarebbe peggio.
  */
-export function dentroLAsfalto(fascia, h, cerca, { margine = 0.4, lontano = 6, rampa = 0.3 } = {}) {
+export function dentroLAsfalto(fascia, h, cerca, { margine = 0.6, lontano = 6, rampa = 0.3 } = {}) {
   const n = fascia.length;
   const cx = new Float64Array(n);
   const cy = new Float64Array(n);
@@ -814,6 +814,21 @@ export function dentroLAsfalto(fascia, h, cerca, { margine = 0.4, lontano = 6, r
   };
   for (let k = 1; k < n; k++) smussa(k, k - 1);
   for (let k = n - 2; k >= 0; k--) smussa(k, k + 1);
+  /* E senza svolte brusche della correzione: la media su cinque punti. */
+  const mx = Float64Array.from(cx);
+  const my = Float64Array.from(cy);
+  for (let k = 0; k < n; k++) {
+    let sx = 0;
+    let sy = 0;
+    let m = 0;
+    for (let j = Math.max(0, k - 2); j <= Math.min(n - 1, k + 2); j++) {
+      sx += mx[j];
+      sy += my[j];
+      m++;
+    }
+    cx[k] = sx / m;
+    cy[k] = sy / m;
+  }
   return fascia.map((q, k) => (cx[k] || cy[k] ? [q[0] + cx[k], q[1] + cy[k]] : q));
 }
 
