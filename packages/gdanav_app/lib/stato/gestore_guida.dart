@@ -147,9 +147,7 @@ class GestoreGuida extends ChangeNotifier {
   /// vengono sia [minutiDiTraffico] sia le etichette della striscia.
   Duration get ritardoDavanti {
     final a = avanzamento, p = pronto;
-    return a?.ritardoTraffico ??
-        p?.viaggio.percorso.ritardoTraffico ??
-        Duration.zero;
+    return a?.ritardoTraffico ?? p?.viaggio.percorso.ritardoTraffico ?? Duration.zero;
   }
 
   final _ritardoMostrato = RitardoMostrato();
@@ -173,24 +171,18 @@ class GestoreGuida extends ChangeNotifier {
     final p = pronto;
     if (p == null || p.soloPercorso) return null;
     final s = auto.stato;
-    if (s == null)
-      return (
-        valore: _prevista(p, (avanzamento?.percorsiM ?? 0) / 1000),
-        misurata: false,
-      );
+    if (s == null) return (valore: _prevista(p, (avanzamento?.percorsiM ?? 0) / 1000), misurata: false);
     return (valore: s.batteria, misurata: _dallAuto(s.sorgente));
   }
 
   /// Una sorgente che è l'auto: non la stima, non la batteria scritta a mano.
-  static bool _dallAuto(TipoSorgente? t) =>
-      t != null && t != TipoSorgente.stima && t != TipoSorgente.manuale;
+  static bool _dallAuto(TipoSorgente? t) => t != null && t != TipoSorgente.stima && t != TipoSorgente.manuale;
 
   /// La batteria di adesso parte da una lettura dell'auto, anche se stimata.
   bool get _ancorataAllAuto {
     final s = auto.stato;
     if (s == null) return false;
-    return _dallAuto(s.sorgente) ||
-        (s.sorgente == TipoSorgente.stima && _dallAuto(s.stimataDa));
+    return _dallAuto(s.sorgente) || (s.sorgente == TipoSorgente.stima && _dallAuto(s.stimataDa));
   }
 
   /// La batteria all'arrivo: il piano, con la pendenza corretta da quanto la
@@ -224,19 +216,12 @@ class GestoreGuida extends ChangeNotifier {
   /// dice all'auto, che ne fa la stima fra due letture. Con le soste del
   /// piano la curva risale: è la ricarica prevista, che conta come prima.
   void _consuma(ViaggioPronto p, double km) {
-    if (p.soloPercorso ||
-        p.viaggio.piano == null ||
-        !identical(p, _pianoConsumo))
-      return;
+    if (p.soloPercorso || p.viaggio.piano == null || !identical(p, _pianoConsumo)) return;
     final da = _kmConsumo;
     // Un passo indietro del GPS non ricarica la batteria.
     if (km <= da) return;
     _kmConsumo = km;
-    auto.consumato(
-      (_prevista(p, da) - _prevista(p, km)) /
-          100 *
-          auto.veicolo.capacitaUtileKwh,
-    );
+    auto.consumato((_prevista(p, da) - _prevista(p, km)) / 100 * auto.veicolo.capacitaUtileKwh);
   }
 
   /// Quanto la macchina beve davvero rispetto al piano, o niente se non si è
@@ -272,14 +257,10 @@ class GestoreGuida extends ChangeNotifier {
     if (!auto.elettrica || (pronto?.termica ?? false)) return null;
     final s = auto.stato;
     final b = batteriaOra?.valore ?? s?.batteria;
-    if (autonomiaDellAuto(s, batteriaAdesso: b, ora: _ora()) case final km?)
-      return (km: km, dallAuto: true);
+    if (autonomiaDellAuto(s, batteriaAdesso: b, ora: _ora()) case final km?) return (km: km, dallAuto: true);
     final c = _consumoMisurato ?? _consumoDelPianoPerAutonomia;
     if (b != null && c != null && c > 5) {
-      return (
-        km: b / 100 * auto.veicolo.capacitaUtileKwh / c * 100,
-        dallAuto: false,
-      );
+      return (km: b / 100 * auto.veicolo.capacitaUtileKwh / c * 100, dallAuto: false);
     }
     final k = auto.autonomiaKm();
     return k == null ? null : (km: k, dallAuto: false);
@@ -304,16 +285,14 @@ class GestoreGuida extends ChangeNotifier {
   /// Misurato sui tratti guidati con i dati dell'auto, ricariche escluse.
   double? get _consumoMisurato {
     final ora = batteriaOra;
-    if (pronto == null || ora == null || !ora.misurata || _kmMisurati < 3)
-      return null;
+    if (pronto == null || ora == null || !ora.misurata || _kmMisurati < 3) return null;
     return _whMisurati / _kmMisurati / 10;
   }
 
   double? get _consumoDelPiano {
     final p = pronto;
     if (p == null) return null;
-    final piano = p.viaggio.piano,
-        totale = p.viaggio.percorso.lunghezzaM / 1000;
+    final piano = p.viaggio.piano, totale = p.viaggio.percorso.lunghezzaM / 1000;
     if (piano == null || totale <= 0 || piano.energiaKwh <= 0) return null;
     return piano.energiaKwh / totale * 100;
   }
@@ -355,10 +334,7 @@ class GestoreGuida extends ChangeNotifier {
   CostoPedaggio? get pedaggioDavanti {
     final p = pronto;
     if (p == null) return null;
-    return viaggio.opzioni.tariffaPedaggio.stima(
-      p.viaggio.percorso,
-      daM: avanzamento?.percorsiM ?? 0,
-    );
+    return viaggio.opzioni.tariffaPedaggio.stima(p.viaggio.percorso, daM: avanzamento?.percorsiM ?? 0);
   }
 
   /// La prossima sosta ancora davanti, e quanto manca.
@@ -367,8 +343,7 @@ class GestoreGuida extends ChangeNotifier {
     if (p == null) return null;
     final fatti = a?.percorsiM ?? 0;
     for (final s in p.viaggio.piano?.soste ?? const <Sosta>[]) {
-      if (s.colonnina.distanzaM > fatti)
-        return (s, s.colonnina.distanzaM - fatti);
+      if (s.colonnina.distanzaM > fatti) return (s, s.colonnina.distanzaM - fatti);
     }
     return null;
   }
@@ -383,8 +358,7 @@ class GestoreGuida extends ChangeNotifier {
   static const _puntiTracciaMassimi = 6000;
 
   void _allungaTraccia(Punto qui) {
-    if (traccia.isNotEmpty && distanzaM(traccia.last, qui) < _passoTraccia)
-      return;
+    if (traccia.isNotEmpty && distanzaM(traccia.last, qui) < _passoTraccia) return;
     traccia.add(qui);
     // Un viaggio lunghissimo: un punto su due, la forma resta.
     if (traccia.length > _puntiTracciaMassimi) {
@@ -438,10 +412,7 @@ class GestoreGuida extends ChangeNotifier {
     auto.addListener(_seguiLeRicariche);
     // Un errore del GPS non deve finire nel vuoto né chiudere la guida: la
     // posizione dopo arriva lo stesso.
-    _iscrizione = posizioni().listen(
-      _posizione,
-      onError: (Object e) => debugPrint('posizioni in guida: $e'),
-    );
+    _iscrizione = posizioni().listen(_posizione, onError: (Object e) => debugPrint('posizioni in guida: $e'));
     sensori?.avvia();
     // I sensi unici dei primi chilometri si guardano subito, senza aspettare
     // la prima posizione: si parte spesso a due passi dall'incrocio, e
@@ -622,20 +593,10 @@ class GestoreGuida extends ChangeNotifier {
   /// insieme alla posizione) e con che precisione. Senza portarla avanti:
   /// lo fa il filtro della scena 3D (`web3d/src/filtro.js`), che sa il
   /// ritardo del GPS e ha la velocità del cruscotto. `null` fuori percorso.
-  ({double metri, DateTime alle, double? velocitaMs, double? precisioneM})?
-  get letturaSulPercorso {
+  ({double metri, DateTime alle, double? velocitaMs, double? precisioneM})? get letturaSulPercorso {
     final a = avanzamento, alle = _lettaAlle;
-    if (a == null ||
-        _guida == null ||
-        a.posizioneSulPercorso == null ||
-        alle == null)
-      return null;
-    return (
-      metri: a.percorsiM,
-      alle: alle,
-      velocitaMs: _velocitaGps,
-      precisioneM: _precisioneM,
-    );
+    if (a == null || _guida == null || a.posizioneSulPercorso == null || alle == null) return null;
+    return (metri: a.percorsiM, alle: alle, velocitaMs: _velocitaGps, precisioneM: _precisioneM);
   }
 
   double? _velocitaGps;
@@ -648,17 +609,9 @@ class GestoreGuida extends ChangeNotifier {
     // quello dell'ultima lettura, e la scena 3D teneva l'auto lì, ferma
     // («senza navigazione di nuovo fermo, non cammina»; solo il 2D andava).
     if (!attiva) return null;
-    final a = avanzamento,
-        g = _guida,
-        sulla = a?.posizioneSulPercorso,
-        rotta = a?.rotta;
+    final a = avanzamento, g = _guida, sulla = a?.posizioneSulPercorso, rotta = a?.rotta;
     final metri = metriStimati();
-    if (a == null ||
-        g == null ||
-        sulla == null ||
-        rotta == null ||
-        metri == null)
-      return null;
+    if (a == null || g == null || sulla == null || rotta == null || metri == null) return null;
     if (metri == a.percorsiM) return (punto: sulla, rotta: rotta);
     return g.avanti(metri, 0);
   }
@@ -668,11 +621,7 @@ class GestoreGuida extends ChangeNotifier {
   double? metriStimati() {
     if (!attiva) return null;
     final a = avanzamento;
-    if (a == null ||
-        _guida == null ||
-        a.posizioneSulPercorso == null ||
-        a.rotta == null)
-      return null;
+    if (a == null || _guida == null || a.posizioneSulPercorso == null || a.rotta == null) return null;
     final v = _velocitaMs, alle = _lettaAlle;
     if (v == null || alle == null) return a.percorsiM;
     final ora = _ora();
@@ -717,18 +666,13 @@ class GestoreGuida extends ChangeNotifier {
   /// percorso; `null` se non è di [p] o non è spostata.
   Linea? sullaMappaDi(PercorsoCalcolato? p) {
     final s = _sullaMappa;
-    if (p == null ||
-        s == null ||
-        !identical(s.percorso, p.punti) ||
-        !s.spostata)
-      return null;
+    if (p == null || s == null || !identical(s.percorso, p.punti) || !s.spostata) return null;
     return s.linea;
   }
 
   /// La linea su cui la freccia scorre nella mappa di sempre: [strada], ma
   /// sulle strade della mappa se si sa.
-  Linea? get stradaSullaMappa =>
-      sullaMappaDi(pronto?.viaggio.percorso) ?? strada;
+  Linea? get stradaSullaMappa => sullaMappaDi(pronto?.viaggio.percorso) ?? strada;
 
   /// Il punto della mappa di sempre a [metri] lungo il percorso.
   Punto? sullaMappaA(double metri) {
@@ -737,22 +681,14 @@ class GestoreGuida extends ChangeNotifier {
   }
 
   /// La linea del percorso [p] appoggiata sulle [rete] fra [daM] e [aM].
-  void _allinea(
-    PercorsoCalcolato p,
-    List<TrattoStrada> rete,
-    double daM,
-    double aM,
-  ) {
+  void _allinea(PercorsoCalcolato p, List<TrattoStrada> rete, double daM, double aM) {
     try {
       final prima = _sullaMappa;
-      final base = prima != null && identical(prima.percorso, p.punti)
-          ? prima
-          : SullaMappa(p.punti);
+      final base = prima != null && identical(prima.percorso, p.punti) ? prima : SullaMappa(p.punti);
       final nuova = base.allineata(rete, daM: daM, aM: aM);
       if (identical(nuova, prima)) return;
       _sullaMappa = nuova;
-      if (nuova.spostata || (prima?.spostata ?? false))
-        versioneSullaMappa.value++;
+      if (nuova.spostata || (prima?.spostata ?? false)) versioneSullaMappa.value++;
     } catch (e) {
       debugPrint('linea sulla mappa: $e');
     }
@@ -821,13 +757,7 @@ class GestoreGuida extends ChangeNotifier {
       final v = kmh != null ? kmh / 3.6 : (_velocitaMs ?? 0);
       unawaited(
         _posizione(
-          PuntoInMoto(
-            dove.punto.lat,
-            dove.punto.lon,
-            rotta: dove.rotta,
-            velocitaMs: v,
-            alle: ora,
-          ),
+          PuntoInMoto(dove.punto.lat, dove.punto.lon, rotta: dove.rotta, velocitaMs: v, alle: ora),
           stimata: true,
         ),
       );
@@ -854,10 +784,7 @@ class GestoreGuida extends ChangeNotifier {
     final ora = _ora();
     // L'ora della lettura del GPS, se è credibile; altrimenti adesso.
     final letta = qui is PuntoInMoto ? qui.alle : null;
-    _lettaAlle =
-        letta != null &&
-            !letta.isAfter(ora) &&
-            ora.difference(letta) < const Duration(seconds: 5)
+    _lettaAlle = letta != null && !letta.isAfter(ora) && ora.difference(letta) < const Duration(seconds: 5)
         ? letta
         : ora;
     final kmh = auto.velocitaAuto();
@@ -873,11 +800,7 @@ class GestoreGuida extends ChangeNotifier {
     avanzamento = a;
     if (!stimata) {
       if (a.posizioneSulPercorso != null && _stima.buona(_precisioneM)) {
-        _stima.lettura(
-          metri: a.percorsiM,
-          alle: _lettaAlle!,
-          velocitaMs: _velocitaMs,
-        );
+        _stima.lettura(metri: a.percorsiM, alle: _lettaAlle!, velocitaMs: _velocitaMs);
         _armaStima(_stima.dopo + const Duration(milliseconds: 100));
       } else if (a.posizioneSulPercorso == null) {
         // Fuori dal percorso non si stima lungo il percorso.
@@ -920,15 +843,11 @@ class GestoreGuida extends ChangeNotifier {
       unawaited(aggiornaTraffico());
     }
     final ultimoConfronto = _ultimoControlloStrade ??= _ora();
-    if (risparmio != null &&
-        !ricalcolando &&
-        _ora().difference(ultimoConfronto) >= intervalloStrade) {
+    if (risparmio != null && !ricalcolando && _ora().difference(ultimoConfronto) >= intervalloStrade) {
       _ultimoControlloStrade = _ora();
       unawaited(controllaStrade());
     }
-    if (_ultimoRacconto == null ||
-        _ora().difference(_ultimoRacconto!) > const Duration(minutes: 1))
-      _racconta();
+    if (_ultimoRacconto == null || _ora().difference(_ultimoRacconto!) > const Duration(minutes: 1)) _racconta();
     notifyListeners();
   }
 
@@ -969,10 +888,7 @@ class GestoreGuida extends ChangeNotifier {
       _metriPrima += fatti;
       final tariffa = viaggio.opzioni.tariffaPedaggio;
       final tutto = tariffa.stima(vecchia.percorso);
-      final pagato = math.max(
-        0.0,
-        tutto.euro - tariffa.stima(vecchia.percorso, daM: fatti).euro,
-      );
+      final pagato = math.max(0.0, tutto.euro - tariffa.stima(vecchia.percorso, daM: fatti).euro);
       _euroPedaggioPrima += pagato;
       if (pagato > 0 && tutto.stimato) _pedaggioPrimaStimato = true;
     }
@@ -1047,8 +963,7 @@ class GestoreGuida extends ChangeNotifier {
   /// Senza strade si aspetta il tentativo a tempo di [_correggiISensi].
   void _sensiPiuAvanti() {
     final p = pronto, g = _guida;
-    if (strade == null || p == null || g == null || !attiva || _sensiInCorso)
-      return;
+    if (strade == null || p == null || g == null || !attiva || _sensiInCorso) return;
     if (_sensiRiprovaDopo case final t? when _ora().isBefore(t)) return;
     final percorso = p.viaggio.percorso;
     if (!identical(g.percorso, percorso)) return;
@@ -1062,13 +977,7 @@ class GestoreGuida extends ChangeNotifier {
     if (_sensiFinoA >= fine) return;
     final da = _sensiFinoA < 0 ? qui : math.max(qui, _sensiFinoA - 100);
     _sensiFinoA = da + finestraSensiM;
-    unawaited(
-      _correggiISensi(
-        daM: da,
-        aM: _sensiFinoA,
-        protettoM: a == null ? 0 : qui + 30,
-      ),
-    );
+    unawaited(_correggiISensi(daM: da, aM: _sensiFinoA, protettoM: a == null ? 0 : qui + 30));
   }
 
   /// Fuori strada: prima di ricalcolare, si guarda se si è sul ramo giusto
@@ -1100,14 +1009,9 @@ class GestoreGuida extends ChangeNotifier {
 
   /// Corregge il percorso fra [daM] e [aM] se ci va contromano; `true` se
   /// l'ha corretto.
-  Future<bool> _correggiISensi({
-    required double daM,
-    required double aM,
-    required double protettoM,
-  }) async {
+  Future<bool> _correggiISensi({required double daM, required double aM, required double protettoM}) async {
     final s = strade, p = pronto, g = _guida;
-    if (s == null || p == null || g == null || !attiva || _sensiInCorso)
-      return false;
+    if (s == null || p == null || g == null || !attiva || _sensiInCorso) return false;
     final percorso = p.viaggio.percorso;
     _sensiInCorso = true;
     // Si guarda adesso: il tentativo a tempo, se c'era, non serve più.
@@ -1122,23 +1026,17 @@ class GestoreGuida extends ChangeNotifier {
       if (pezzo.isEmpty) return false;
       final rete = await s(pezzo);
       if (rete.isEmpty) {
-        diarioSensi.scrivi(
-          'nessuna strada vera attorno al percorso: si riprova fra 15 s',
-        );
+        diarioSensi.scrivi('nessuna strada vera attorno al percorso: si riprova fra 15 s');
         // Non si è visto niente: quel pezzo resta da guardare, fra un poco.
         _sensiRiprovaDopo = _ora().add(const Duration(seconds: 15));
-        if (identical(_sensiDi, percorso))
-          _sensiFinoA = math.min(_sensiFinoA, daM);
+        if (identical(_sensiDi, percorso)) _sensiFinoA = math.min(_sensiFinoA, daM);
         // Anche se il GPS tace (una lettura lo farebbe dopo, in
         // [_guardaAvantiISensi]): qualche volta, poi si lascia stare.
         _sensiSveglia?.cancel();
         if (_sensiTentativi++ < 8) {
           _sensiSveglia = Timer(const Duration(seconds: 15), () {
             _sensiSveglia = null;
-            if (!attiva ||
-                !identical(pronto?.viaggio.percorso, percorso) ||
-                _sensiInCorso)
-              return;
+            if (!attiva || !identical(pronto?.viaggio.percorso, percorso) || _sensiInCorso) return;
             _sensiRiprovaDopo = null;
             _sensiFinoA = math.max(_sensiFinoA, aM);
             unawaited(_correggiISensi(daM: daM, aM: aM, protettoM: protettoM));
@@ -1147,10 +1045,7 @@ class GestoreGuida extends ChangeNotifier {
         return false;
       }
       // Nel frattempo è cambiato il percorso, o si è finito.
-      if (!attiva ||
-          !identical(pronto?.viaggio.percorso, percorso) ||
-          !identical(_guida, g))
-        return false;
+      if (!attiva || !identical(pronto?.viaggio.percorso, percorso) || !identical(_guida, g)) return false;
       final corretto = correggiContromano(
         percorso,
         rete,
@@ -1163,9 +1058,7 @@ class GestoreGuida extends ChangeNotifier {
       // La linea da disegnare, sulle strade appena lette (anche dove l'auto è).
       if (corretto == null) {
         _allinea(percorso, rete, math.max(0, daM - 150), aM);
-        diarioSensi.scrivi(
-          'guardato da ${km(daM)} a ${km(aM)} km (${rete.length} strade): niente da correggere',
-        );
+        diarioSensi.scrivi('guardato da ${km(daM)} a ${km(aM)} km (${rete.length} strade): niente da correggere');
         return false;
       }
       final vecchio = pronto;
@@ -1175,13 +1068,10 @@ class GestoreGuida extends ChangeNotifier {
       _guida = g.conCorrezione(corretto);
       _sensiDi = corretto.percorso;
       _sensiFinoA = corretto.metriNuovi(_sensiFinoA);
-      if (_ultimaPosizione case final qui?)
-        avanzamento = Guida(corretto.percorso).aggiorna(qui);
+      if (_ultimaPosizione case final qui?) avanzamento = Guida(corretto.percorso).aggiorna(qui);
       debugPrint('contromano evitato: ${corretto.deviazioni}');
       for (final d in corretto.deviazioni) {
-        diarioSensi.scrivi(
-          'contromano evitato a ${km(d.daM)} km: rifatto sul ramo giusto (${d.lunghezzaM.round()} m)',
-        );
+        diarioSensi.scrivi('contromano evitato a ${km(d.daM)} km: rifatto sul ramo giusto (${d.lunghezzaM.round()} m)');
       }
       notifyListeners();
       // Il percorso è nuovo: la sua linea sulla mappa da dove è l'auto, con le
@@ -1195,12 +1085,7 @@ class GestoreGuida extends ChangeNotifier {
             ])
           : const <TrattoStrada>[];
       if (identical(pronto?.viaggio.percorso, corretto.percorso)) {
-        _allinea(
-          corretto.percorso,
-          [...altre, ...rete],
-          daQui,
-          corretto.metriNuovi(aM),
-        );
+        _allinea(corretto.percorso, [...altre, ...rete], daQui, corretto.metriNuovi(aM));
       }
       return true;
     } catch (e) {
@@ -1247,14 +1132,7 @@ class GestoreGuida extends ChangeNotifier {
   /// Quale ricarica chiedere a chi guida («quanto hai speso?»), se c'è.
   int? daChiedere;
 
-  ({
-    double socDa,
-    double socA,
-    double? energiaDa,
-    double? energiaA,
-    double percorsiM,
-  })?
-  _inCarica;
+  ({double socDa, double socA, double? energiaDa, double? energiaA, double percorsiM})? _inCarica;
 
   /// L'arrivo, per rifare il riepilogo quando si dice quanto si è pagato.
   (ViaggioPronto, Avanzamento)? _arrivo;
@@ -1278,23 +1156,17 @@ class GestoreGuida extends ChangeNotifier {
     } finally {
       _chiedendoAllaCasa = false;
     }
-    if (e == null || quale != _viaggioN || !(attiva || riepilogo != null))
-      return;
+    if (e == null || quale != _viaggioN || !(attiva || riepilogo != null)) return;
     _energiaDiCasa = e;
     final r = e.ricarica;
-    _ricaricaDiCasa =
-        r != null &&
-            r.valePer(partenza: partenza, batteriaPartenza: _batteriaInizio)
-        ? r
-        : null;
+    _ricaricaDiCasa = r != null && r.valePer(partenza: partenza, batteriaPartenza: _batteriaInizio) ? r : null;
     _rifaiIlRiepilogo();
     notifyListeners();
   }
 
   /// Dopo l'ultima ricarica a casa si è caricato altrove: l'energia con cui
   /// si è partiti non ha il prezzo di casa, nemmeno quello della tariffa.
-  bool get _caricatoAltrove =>
-      _energiaDiCasa?.ricarica?.superataDa(_batteriaInizio) ?? false;
+  bool get _caricatoAltrove => _energiaDiCasa?.ricarica?.superataDa(_batteriaInizio) ?? false;
 
   /// Perché il prezzo dell'energia non è quello della ricarica di casa, da
   /// dire nel riepilogo; `null` se lo è, e in GdANav da sola.
@@ -1332,17 +1204,13 @@ class GestoreGuida extends ChangeNotifier {
     }
     if (c == null) return;
     _inCarica = null;
-    final dallEnergia = c.energiaDa != null && c.energiaA != null
-        ? c.energiaA! - c.energiaDa!
-        : null;
+    final dallEnergia = c.energiaDa != null && c.energiaA != null ? c.energiaA! - c.energiaDa! : null;
     final kwh = dallEnergia != null && dallEnergia > 0
         ? dallEnergia
         : (c.socA - c.socDa) / 100 * auto.veicolo.capacitaUtileKwh;
     if (kwh < 1) return;
     final (nome, stima) = _laColonninaA(c.percorsiM, kwh);
-    ricaricheInViaggio.add(
-      RicaricaInViaggio(dove: nome, kwh: kwh, euroStimati: stima),
-    );
+    ricaricheInViaggio.add(RicaricaInViaggio(dove: nome, kwh: kwh, euroStimati: stima));
     daChiedere = ricaricheInViaggio.length - 1;
     _rifaiIlRiepilogo();
     notifyListeners();
@@ -1355,21 +1223,15 @@ class GestoreGuida extends ChangeNotifier {
     ColonninaSulPercorso? vicina;
     for (final c in p?.viaggio.colonnine ?? const <ColonninaSulPercorso>[]) {
       final quanto = (c.distanzaM - percorsiM).abs();
-      if (quanto <= 500 &&
-          (vicina == null || quanto < (vicina.distanzaM - percorsiM).abs()))
-        vicina = c;
+      if (quanto <= 500 && (vicina == null || quanto < (vicina.distanzaM - percorsiM).abs())) vicina = c;
     }
     if (vicina == null) return ('Ricarica per strada', null);
-    final corrente = vicina.potenzaKw >= 150
-        ? Corrente.hpc
-        : (vicina.potenzaKw >= 50 ? Corrente.dc : Corrente.ac);
+    final corrente = vicina.potenzaKw >= 150 ? Corrente.hpc : (vicina.potenzaKw >= 50 ? Corrente.dc : Corrente.ac);
     final t = vicina.dettaglio?.prezzi?.perCorrente[corrente];
     final energia = t?.energia;
     if (energia == null) return (vicina.nome, null);
     final avvio = t?.avvio;
-    final euro =
-        kwh * (energia.da + energia.a) / 2 +
-        (avvio == null ? 0.0 : (avvio.da + avvio.a) / 2);
+    final euro = kwh * (energia.da + energia.a) / 2 + (avvio == null ? 0.0 : (avvio.da + avvio.a) / 2);
     return (vicina.nome, euro);
   }
 
@@ -1390,8 +1252,7 @@ class GestoreGuida extends ChangeNotifier {
 
   void _rifaiIlRiepilogo() {
     final arrivo = _arrivo;
-    if (riepilogo != null && arrivo != null)
-      riepilogo = _ilRiepilogo(arrivo.$1, arrivo.$2);
+    if (riepilogo != null && arrivo != null) riepilogo = _ilRiepilogo(arrivo.$1, arrivo.$2);
   }
 
   RiepilogoViaggio _ilRiepilogo(ViaggioPronto p, Avanzamento a) {
@@ -1404,21 +1265,16 @@ class GestoreGuida extends ChangeNotifier {
     final pedaggio = _euroPedaggioPrima + ultimo.euro;
     // Stimato solo se una parte è a km: un prezzo di listino (la Tangenziale
     // di Napoli) si scrive senza «~».
-    final pedaggioStimato =
-        _pedaggioPrimaStimato || (ultimo.euro > 0 && ultimo.stimato);
+    final pedaggioStimato = _pedaggioPrimaStimato || (ultimo.euro > 0 && ultimo.stimato);
     final consumo = elettrica ? _kwhDelViaggio(p, metri) : null;
     final inizio = _batteriaInizio;
     final energia = consumo == null
         ? null
         : costoDellEnergia(
             consumatiKwh: consumo.kwh,
-            partenzaKwh: inizio == null
-                ? null
-                : inizio / 100 * auto.veicolo.capacitaUtileKwh,
+            partenzaKwh: inizio == null ? null : inizio / 100 * auto.veicolo.capacitaUtileKwh,
             casa: _ricaricaDiCasa,
-            euroAlKwhDiCasa: _caricatoAltrove
-                ? null
-                : _energiaDiCasa?.euroAlKwh,
+            euroAlKwhDiCasa: _caricatoAltrove ? null : _energiaDiCasa?.euroAlKwh,
             soste: List.of(ricaricheInViaggio),
             euroAlKwhDiRiserva: o.euroAlKwh,
           );
@@ -1433,13 +1289,7 @@ class GestoreGuida extends ChangeNotifier {
       kwhPiuOMeno: consumo?.piuOMeno,
       euroAlKwh: o.euroAlKwh,
       euroAlLitro: o.euroAlLitro,
-      pedaggio: pedaggio > 0
-          ? CostoPedaggio(
-              euro: pedaggio,
-              classe: o.classePedaggio,
-              stimato: pedaggioStimato,
-            )
-          : null,
+      pedaggio: pedaggio > 0 ? CostoPedaggio(euro: pedaggio, classe: o.classePedaggio, stimato: pedaggioStimato) : null,
       energia: energia,
       senzaPrezzoVero: energia == null ? null : _senzaPrezzoVero,
       soste: List.of(ricaricheInViaggio),
@@ -1461,44 +1311,27 @@ class GestoreGuida extends ChangeNotifier {
   /// si parlano (stanno una nell'incertezza dell'altra), vale la più stretta;
   /// se non si parlano (una partenza letta vecchia) resta quella dell'auto. E
   /// quanto è larga lo si dice.
-  ({double kwh, bool stimato, double? piuOMeno})? _kwhDelViaggio(
-    ViaggioPronto p,
-    double metri,
-  ) {
+  ({double kwh, bool stimato, double? piuOMeno})? _kwhDelViaggio(ViaggioPronto p, double metri) {
     final inizio = _batteriaInizio, ora = batteriaOra;
     final capacita = auto.veicolo.capacitaUtileKwh;
     // Un punto di batteria, in kWh: quanto è larga una lettura.
     final punto = capacita / 100;
-    final ricariche =
-        (p.viaggio.piano?.soste.isNotEmpty ?? false) ||
-        ricaricheInViaggio.isNotEmpty;
+    final ricariche = (p.viaggio.piano?.soste.isNotEmpty ?? false) || ricaricheInViaggio.isNotEmpty;
     // Dalla partenza all'arrivo, senza ricariche nel mezzo.
-    final scesi =
-        inizio != null &&
-            ora != null &&
-            ora.misurata &&
-            !ricariche &&
-            inizio > ora.valore
+    final scesi = inizio != null && ora != null && ora.misurata && !ricariche && inizio > ora.valore
         ? (inizio - ora.valore) / 100 * capacita
         : null;
     if (_kmMisurati > 1 && _whMisurati > 0) {
       final kwh = _whMisurati / 1000 / _kmMisurati * metri / 1000;
       // In kWh veri (l'auto dice l'energia che resta) la misura è stretta.
-      final largo = auto.stato?.energiaKwh != null
-          ? 0.0
-          : kwh * math.min(1.0, punto / (_whMisurati / 1000));
-      if (scesi != null &&
-          punto < largo &&
-          (scesi - kwh).abs() <= punto + largo) {
+      final largo = auto.stato?.energiaKwh != null ? 0.0 : kwh * math.min(1.0, punto / (_whMisurati / 1000));
+      if (scesi != null && punto < largo && (scesi - kwh).abs() <= punto + largo) {
         return (kwh: scesi, stimato: false, piuOMeno: punto);
       }
       return (kwh: kwh, stimato: false, piuOMeno: largo > 0 ? largo : null);
     }
     // Con le ricariche viste: quella scesa più quella presa per strada.
-    if (inizio != null &&
-        ora != null &&
-        ora.misurata &&
-        ricaricheInViaggio.isNotEmpty) {
+    if (inizio != null && ora != null && ora.misurata && ricaricheInViaggio.isNotEmpty) {
       final presi = ricaricheInViaggio.fold(0.0, (s, r) => s + r.kwh);
       final kwh = (inizio - ora.valore) / 100 * capacita + presi;
       if (kwh > 0) return (kwh: kwh, stimato: false, piuOMeno: punto);
@@ -1508,10 +1341,7 @@ class GestoreGuida extends ChangeNotifier {
     final lunghezza = tratti.fold(0.0, (s, t) => s + t.lunghezzaM);
     if (lunghezza <= 0) return null;
     final condizioni = viaggio.condizioni ?? const Condizioni();
-    final wh = tratti.fold(
-      0.0,
-      (s, t) => s + energiaTrattoWh(t, auto.veicolo, condizioni),
-    );
+    final wh = tratti.fold(0.0, (s, t) => s + energiaTrattoWh(t, auto.veicolo, condizioni));
     return (kwh: wh / 1000 * metri / lunghezza, stimato: true, piuOMeno: null);
   }
 
@@ -1522,14 +1352,7 @@ class GestoreGuida extends ChangeNotifier {
     if (lunghezza <= 0) return null;
     final litri = tratti.fold(
       0.0,
-      (s, t) =>
-          s +
-          ModelloConsumoTomTom.litriTratto(
-            t.lunghezzaM,
-            t.velocitaKmh,
-            auto.carburante,
-            ibrida: auto.ibrida,
-          ),
+      (s, t) => s + ModelloConsumoTomTom.litriTratto(t.lunghezzaM, t.velocitaKmh, auto.carburante, ibrida: auto.ibrida),
     );
     return litri * metri / lunghezza;
   }
@@ -1547,9 +1370,7 @@ class GestoreGuida extends ChangeNotifier {
     // Le condizioni del piano (col clima dal meteo), senza correttivo: se
     // no il clima finiva dentro il correttivo e si contava due volte.
     final senza =
-        viaggio.condizioni?.senzaCorrettivo ??
-        consumo?.condizioni(auto.stato, conFattore: false) ??
-        const Condizioni();
+        viaggio.condizioni?.senzaCorrettivo ?? consumo?.condizioni(auto.stato, conFattore: false) ?? const Condizioni();
     _fattorePiano = consumo?.imparato.fattore ?? 1;
     _misuratore = MisuratoreConsumo(
       percorso: p.viaggio.percorso,
@@ -1562,13 +1383,7 @@ class GestoreGuida extends ChangeNotifier {
   /// allontana dal piano, si ricalcolano le soste da dove si è.
   void _datiAuto() {
     final p = pronto, s = auto.stato, ora = batteriaOra;
-    if (!attiva ||
-        p == null ||
-        p.soloPercorso ||
-        s == null ||
-        ora == null ||
-        !ora.misurata)
-      return;
+    if (!attiva || p == null || p.soloPercorso || s == null || ora == null || !ora.misurata) return;
     final metri = avanzamento?.percorsiM ?? 0;
     final misura = _misuratore?.registra(
       batteria: s.batteria,
@@ -1584,8 +1399,7 @@ class GestoreGuida extends ChangeNotifier {
     if (s.inCarica == true || ricalcolando) return;
     if (_ora().difference(_ultimoRicalcolo) < intervalloRicalcolo) return;
     final scarto = (ora.valore - _prevista(p, metri / 1000)).abs();
-    final fattoreCambiato =
-        ((consumo?.imparato.fattore ?? 1) - _fattorePiano).abs() > 0.05;
+    final fattoreCambiato = ((consumo?.imparato.fattore ?? 1) - _fattorePiano).abs() > 0.05;
     if (scarto < scartoPerRicalcolo && !fattoreCambiato) return;
     if (viaggio.opzioni.ricalcoloAutomatico) {
       unawaited(_ricalcola(perConsumo: true));
@@ -1692,15 +1506,10 @@ class GestoreGuida extends ChangeNotifier {
     final davanti = restoDelPercorso(percorso, a.percorsiM);
     if (davanti.length < 2) return;
     // Le code ancora davanti: se ce ne sono, magari un'altra strada è più rapida.
-    final code = percorso.code
-        .where((c) => c.aM > a.percorsiM)
-        .fold(Duration.zero, (t, c) => t + c.ritardo);
+    final code = percorso.code.where((c) => c.aM > a.percorsiM).fold(Duration.zero, (t, c) => t + c.ritardo);
     final pr = await r.controlla(
       davanti: davanti,
-      evita: PercorsiConZtl.rettangoli(percorso.ztl?.evitate ?? const [], [
-        davanti.first,
-        davanti.last,
-      ]),
+      evita: PercorsiConZtl.rettangoli(percorso.ztl?.evitate ?? const [], [davanti.first, davanti.last]),
       opzioni: viaggio.opzioni,
       condizioni: viaggio.condizioni ?? const Condizioni(),
       conCode: code >= r.soglie.rapidaDi,
@@ -1711,8 +1520,7 @@ class GestoreGuida extends ChangeNotifier {
       r.lascia();
       return;
     }
-    if (!muto)
-      unawaited(voce.parla(frasePropostaVoce(pr, elettrica: auto.elettrica)));
+    if (!muto) unawaited(voce.parla(frasePropostaVoce(pr, elettrica: auto.elettrica)));
     notifyListeners();
   }
 
@@ -1729,9 +1537,7 @@ class GestoreGuida extends ChangeNotifier {
       if (!muto) {
         unawaited(
           voce.parla(
-            pr.motivo == MotivoProposta.rapida
-                ? 'Prendo la strada più rapida.'
-                : 'Prendo la strada a risparmio.',
+            pr.motivo == MotivoProposta.rapida ? 'Prendo la strada più rapida.' : 'Prendo la strada a risparmio.',
           ),
         );
       }
@@ -1764,11 +1570,7 @@ class GestoreGuida extends ChangeNotifier {
   double? batteriaArrivoCon(PropostaStrada pr) {
     final arrivo = batteriaArrivo;
     final capacita = auto.veicolo.capacitaUtileKwh;
-    if (arrivo == null ||
-        !auto.elettrica ||
-        prossimaSosta != null ||
-        capacita <= 0)
-      return null;
+    if (arrivo == null || !auto.elettrica || prossimaSosta != null || capacita <= 0) return null;
     return (arrivo + pr.risparmio / capacita * 100).clamp(0.0, 100.0);
   }
 
@@ -1781,13 +1583,10 @@ class GestoreGuida extends ChangeNotifier {
     ricalcolando = true;
     _ultimoRicalcolo = _ora();
     try {
-      final prima = pronto?.viaggio.piano?.soste
-          .map((s) => s.colonnina.id)
-          .toList();
+      final prima = pronto?.viaggio.piano?.soste.map((s) => s.colonnina.id).toList();
       // Le soste scelte già passate non valgono più: si riparte da qui.
       final fatti = avanzamento?.percorsiM ?? 0;
-      for (final c
-          in pronto?.viaggio.colonnine ?? const <ColonninaSulPercorso>[]) {
+      for (final c in pronto?.viaggio.colonnine ?? const <ColonninaSulPercorso>[]) {
         if (c.distanzaM <= fatti) viaggio.obbligate.remove(c.id);
       }
       // Le tappe e il distributore già passati non si ripetono.
@@ -1816,13 +1615,9 @@ class GestoreGuida extends ChangeNotifier {
         if (pronto case final p? when fatto && !identical(p, vecchio)) {
           _cambiaGuida(p.viaggio.percorso);
           _nuovoPiano(p);
-          final dopo = p.viaggio.piano?.soste
-              .map((s) => s.colonnina.id)
-              .toList();
+          final dopo = p.viaggio.piano?.soste.map((s) => s.colonnina.id).toList();
           if (perConsumo && !detto && !listEquals(prima, dopo) && !muto) {
-            unawaited(
-              voce.parla('Ho aggiornato le soste in base al consumo reale.'),
-            );
+            unawaited(voce.parla('Ho aggiornato le soste in base al consumo reale.'));
           }
         }
         return;
@@ -1837,9 +1632,7 @@ class GestoreGuida extends ChangeNotifier {
         _nuovoPiano(p);
         final dopo = p.viaggio.piano?.soste.map((s) => s.colonnina.id).toList();
         if (perConsumo && !detto && !listEquals(prima, dopo) && !muto) {
-          unawaited(
-            voce.parla('Ho aggiornato le soste in base al consumo reale.'),
-          );
+          unawaited(voce.parla('Ho aggiornato le soste in base al consumo reale.'));
         }
       }
     } catch (e) {
@@ -1871,10 +1664,7 @@ class GestoreGuida extends ChangeNotifier {
                 'eta': ?arrivoAlle?.toUtc().toIso8601String(),
                 'batteria_arrivo': ?p.viaggio.piano?.batteriaArrivo,
                 if (sosta != null)
-                  'prossima_sosta': {
-                    'nome': sosta.$1.colonnina.nome,
-                    'batteria_arrivo': sosta.$1.batteriaArrivo,
-                  },
+                  'prossima_sosta': {'nome': sosta.$1.colonnina.nome, 'batteria_arrivo': sosta.$1.batteriaArrivo},
               },
             ),
           )
@@ -1886,14 +1676,7 @@ class GestoreGuida extends ChangeNotifier {
     final r = auto.relay;
     if (r == null) return;
     unawaited(
-      r
-          .manda(
-            Messaggio(
-              tipo: TipoMessaggio.evento,
-              dati: {'evento': nome, ...dati},
-            ),
-          )
-          .catchError((Object _) {}),
+      r.manda(Messaggio(tipo: TipoMessaggio.evento, dati: {'evento': nome, ...dati})).catchError((Object _) {}),
     );
   }
 
