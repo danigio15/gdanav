@@ -486,7 +486,28 @@ export class Profilo {
     if (!(f >= 0) || f > n - 1) return [0, 0];
     const i = Math.min(n - 2, Math.floor(f));
     const t = f - i;
-    return [this.dx[i] + (this.dx[i + 1] - this.dx[i]) * t, this.dy[i] + (this.dy[i + 1] - this.dy[i]) * t];
+    const dx = this.dx[i] + (this.dx[i + 1] - this.dx[i]) * t;
+    const dy = this.dy[i] + (this.dy[i + 1] - this.dy[i]) * t;
+    const l = this.ancorata;
+    if (!l || t === 0) return [dx, dy];
+    // Fra due campioni il punto sta sul segmento fra i due punti spostati,
+    // non sulla linea di sotto più lo spostamento in mezzo: dove la linea di
+    // sotto piega fra un campione e l'altro (stretta attorno a un'isola, o
+    // che torna indietro) quella piega finiva nella fascia, e la direzione
+    // presa a metà fra i campioni girava di traverso: il dente di sega.
+    const [ax, ay] = l.a(this.s0 + i * this.passo);
+    const [bx, by] = l.a(this.s0 + (i + 1) * this.passo);
+    const [x, y] = l.a(s);
+    return [ax + this.dx[i] + (bx + this.dx[i + 1] - ax - this.dx[i]) * t - x, ay + this.dy[i] + (by + this.dy[i + 1] - ay - this.dy[i]) * t - y];
+  }
+  /**
+   * Da qui in poi lo spostamento in mezzo ai campioni segue la retta fra i
+   * punti spostati della [linea] (vedi [sposta]): per un profilo i cui punti
+   * sono già quelli da disegnare, come la fascia sulla corsia.
+   */
+  ancora(linea) {
+    this.ancorata = linea;
+    return this;
   }
   /**
    * Lo stesso profilo con un campione ogni [passo] metri (meno del suo): le
@@ -832,11 +853,17 @@ export function dentroLAsfalto(fascia, h, cerca, { margine = 0.6, lontano = 6, r
   return fascia.map((q, k) => (cx[k] || cy[k] ? [q[0] + cx[k], q[1] + cy[k]] : q));
 }
 
+/** Da quanto piega la linea fra un punto e l'altro, uno scalino (vedi [levigaFascia]). */
+const SCALINO = (15 * Math.PI) / 180;
+
 export function levigaFascia(punti, fascia, passo) {
   const n = punti.length;
   if (n < 3) return fascia;
   const nor = new Array(n);
   const fermo = new Uint8Array(n);
+  // Gli scalini: lì lo spostamento di lato non si confronta coi vicini
+  // (non si sposta e non sposta nessuno).
+  const scalino = new Uint8Array(n);
   const o = new Float64Array(n);
   for (let k = 0; k < n; k++) {
     const a = punti[Math.max(0, k - 1)];
@@ -849,13 +876,23 @@ export function levigaFascia(punti, fascia, passo) {
     const p1 = punti[k];
     const giro = Math.abs(Math.atan2((p1[0] - p0[0]) * (p2[1] - p1[1]) - (p1[1] - p0[1]) * (p2[0] - p1[0]), (p1[0] - p0[0]) * (p2[0] - p1[0]) + (p1[1] - p0[1]) * (p2[1] - p1[1])));
     if (giro > (20 * Math.PI) / 180) fermo[k] = 1;
+    // E dove la linea fa uno scalino da un punto all'altro: lì la sua
+    // perpendicolare gira di colpo, e lo spostamento «di lato» misurato su
+    // quella spingeva il punto di traverso, di metri (il dente di sega
+    // attorno a un'isola, dove la linea di TomTom piega a scatti).
+    if (k > 0 && k < n - 1) {
+      const c = punti[k];
+      const u0 = [c[0] - a[0], c[1] - a[1]];
+      const u1 = [b[0] - c[0], b[1] - c[1]];
+      if (Math.hypot(...u0) > 1e-6 && Math.hypot(...u1) > 1e-6 && Math.abs(Math.atan2(u0[0] * u1[1] - u0[1] * u1[0], u0[0] * u1[0] + u0[1] * u1[1])) > SCALINO) scalino[k] = fermo[k] = 1;
+    }
   }
   const max = FASCIA_DI_LATO * passo;
   for (let giro = 0; giro < 60; giro++) {
     let troppo = 0;
     for (let k = 1; k < n; k++) {
       const e = Math.abs(o[k] - o[k - 1]) - max;
-      if (e <= 0.005 || (fermo[k] && fermo[k - 1])) continue;
+      if (e <= 0.005 || (fermo[k] && fermo[k - 1]) || scalino[k] || scalino[k - 1]) continue;
       troppo++;
       const v = Math.sign(o[k] - o[k - 1]);
       const fa = fermo[k - 1] ? 0 : fermo[k] ? 1 : 0.5;

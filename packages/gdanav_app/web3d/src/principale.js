@@ -1606,6 +1606,7 @@ function sullaCorsia(p) {
     pr.dx[k] = fascia[k][0] - linea[k][0];
     pr.dy[k] = fascia[k][1] - linea[k][1];
   }
+  pr.ancora(p.linea);
   p.manovreCorsie = r.manovre.map((m) => ({ s: m.s, dir: m.dir }));
 }
 
