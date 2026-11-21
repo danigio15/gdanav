@@ -212,3 +212,21 @@ test('senza accelerometro da un po\', il ritardo misurato non conta più', () =>
   assert.equal(f.accelerometroVivo(500), true);
   assert.equal(f.accelerometroVivo(2000), false);
 });
+
+test('fermi al semaforo con la freccia rimasta indietro: in pochi secondi va dove si e\'', () => {
+  // «Continua a essere piu' dietro rispetto alla posizione reale»: la
+  // stima si e' fermata venti metri prima dell'auto, e il GPS da fermo dice
+  // dov'e' davvero l'auto (con il suo rumore).
+  const f = new FiltroSullaStrada();
+  const T0 = 1_000_000;
+  f.misura({ metri: 100, alle: T0, v: 0 }, T0);
+  for (let k = 0; k < 20; k++) f.passo(T0 + k * 50);
+  const r = rumore(7);
+  let ultimo = null;
+  for (let k = 1; k <= 8; k++) {
+    const t = T0 + k * 1000;
+    f.misura({ metri: 120 + r() * 2, alle: t, v: 0.1 }, t);
+    for (let q = 0; q < 20; q++) ultimo = f.passo(t + q * 50);
+  }
+  assert.ok(Math.abs(ultimo - 120) < 3, `la freccia e' a ${ultimo.toFixed(1)} m, l'auto a 120`);
+});
