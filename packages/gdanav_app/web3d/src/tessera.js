@@ -10,7 +10,7 @@
 
 import { generatore, mescola, semeTessera } from './caso.js';
 import { Costruttore, matrice } from './costruttore.js';
-import { CLASSI_STRADE, SPESSORE_IMPALCATO, altezzaViadotto, grafoStrade, uniscIBordi } from './elevazione.js';
+import { CLASSI_STRADE, PENDENZA_MAX, SPESSORE_IMPALCATO, altezzaViadotto, grafoStrade, uniscIBordi } from './elevazione.js';
 import { ESTENSIONE, sistemaTessera } from './geo.js';
 import {
   anelliPoligoni,
@@ -116,7 +116,7 @@ export const CODICI_CLASSE = { motorway: 1, trunk: 2, primary: 3, secondary: 4, 
  * `"dx,dy"` (da -1 a 1; quella di mezzo è "0,0"); [dettaglio]: «pieno» o
  * «ridotto» (lontano: niente alberi né lampioni, meno edifici).
  */
-export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limiti, datiCorsie = null, vistaCorsie = false }) {
+export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limiti, datiCorsie = null, vistaCorsie = false, grafo = false }) {
   const lim = { ...LIMITI[dettaglio], ...limiti };
   const sys = sistemaTessera(z, x, y);
   const meta = sys.lato / 2;
@@ -164,6 +164,36 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   uniscIBordi(strade);
   segnaViadotti(livelli, x, y, strade, sys);
   const { nodi, feats } = grafoStrade(strade, sys.metri);
+  // Le strade strette fra le case (vedi [strettaFraLeCase]): gli edifici delle
+  // nove tessere, in metri.
+  {
+    const poligoni = [];
+    for (const [chiaveOff, layers] of Object.entries(livelli)) {
+      const Bd = layers?.building;
+      if (!Bd) continue;
+      const [dx, dy] = chiaveOff.split(',').map(Number);
+      for (let i = 0; i < Bd.length; i++) {
+        const f = Bd.feature(i);
+        if (f.type !== 3) continue;
+        // Solo i contorni esterni: un anello girato al contrario del primo è
+        // un cortile (un buco nel palazzo), non un palazzo.
+        let verso = 0;
+        for (const anello of f.loadGeometry()) {
+          let area = 0;
+          for (let j = 0, m = anello.length - 1; j < anello.length; m = j++) area += (anello[m].x - anello[j].x) * (anello[j].y + anello[m].y);
+          if (!area) continue;
+          if (!verso) verso = Math.sign(area);
+          if (Math.sign(area) !== verso) continue;
+          const pts = anello.map((q) => sys.metri((x + dx) * ESTENSIONE + q.x, (y + dy) * ESTENSIONE + q.y));
+          if (pts.some(([px, py]) => Math.abs(px) < meta + 80 && Math.abs(py) < meta + 80)) poligoni.push(pts);
+        }
+      }
+    }
+    strettaFraLeCase(feats, nodi, poligoni);
+  }
+  carreggiateAffiancate(feats, nodi);
+  // Per il collaudo (la verifica delle strade su tessere vere): il grafo con le quote.
+  const grafoPerIlCollaudo = grafo ? { nodi, feats } : undefined;
   const tGrafo = Date.now() - t0;
 
   // ── I nastri delle strade ─────────────────────────────────────────────
@@ -211,6 +241,38 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
       }
     }
   });
+  /* E tutte le altre, a ogni quota: il pilone di un viadotto alto non passa
+   * attraverso la rampa di sotto. Allo svincolo una rampa scendeva dal terzo
+   * livello accanto a un'altra che saliva da terra, a due metri: i piloni di
+   * quella alta stavano piantati sull'asfalto di quella bassa, davanti
+   * all'auto. */
+  const tutte = new Map();
+  linee.forEach((pts, i) => {
+    for (let k = 1; k < pts.length; k++) {
+      const a = pts[k - 1];
+      const b = pts[k];
+      for (const q of [a, b]) {
+        const key = Math.floor(q[0] / GRIGLIA) + ',' + Math.floor(q[1] / GRIGLIA);
+        if (!tutte.has(key)) tutte.set(key, []);
+        tutte.get(key).push([a, b, visibili[i].w / 2]);
+      }
+    }
+  });
+  const suStradaSotto = (px, py, margine, sopra) => {
+    for (let ax = -1; ax <= 1; ax++) {
+      for (let ay = -1; ay <= 1; ay++) {
+        for (const [a, b, hw] of tutte.get(Math.floor(px / GRIGLIA) + ax + ',' + (Math.floor(py / GRIGLIA) + ay)) || []) {
+          const ex = b[0] - a[0];
+          const ey = b[1] - a[1];
+          const l2 = ex * ex + ey * ey;
+          const t = l2 ? Math.max(0, Math.min(1, ((px - a[0]) * ex + (py - a[1]) * ey) / l2)) : 0;
+          if (Math.hypot(px - a[0] - ex * t, py - a[1] - ey * t) >= hw + margine) continue;
+          if (a[2] + (b[2] - a[2]) * t < sopra - 3) return true;
+        }
+      }
+    }
+    return false;
+  };
   const suStradaATerra = (px, py, margine) => {
     for (let ax = -1; ax <= 1; ax++) {
       for (let ay = -1; ay <= 1; ay++) {
@@ -252,11 +314,22 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   // Solo una strada che si stacca da questa (un punto in comune): due
   // carreggiate vicine, l'una accanto all'altra, tengono lo spartitraffico.
   const puntiDi = new Map();
+  const giaLegate = new Map();
   const legate = (i, j) => {
+    const chiaveCoppia = i < j ? i * 1e6 + j : j * 1e6 + i;
+    const saputo = giaLegate.get(chiaveCoppia);
+    if (saputo !== undefined) return saputo;
     for (const x of [i, j]) if (!puntiDi.has(x)) puntiDi.set(x, new Set(linee[x].map(ek)));
     const pj = puntiDi.get(j);
-    for (const q of puntiDi.get(i)) if (pj.has(q)) return true;
-    return false;
+    let si = false;
+    for (const q of puntiDi.get(i)) {
+      if (pj.has(q)) {
+        si = true;
+        break;
+      }
+    }
+    giaLegate.set(chiaveCoppia, si);
+    return si;
   };
   const suAltraStrada = (px, py, pz, fi) => {
     for (let ax = -1; ax <= 1; ax++) {
@@ -320,6 +393,8 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   const piloni = [];
   const lampioni = [];
   const segmenti = [];
+  // Per il collaudo: le mezze larghezze disegnate di ogni segmento, [sinistra, destra].
+  const latiSegmenti = grafo ? [] : null;
   // Il cemento: un colore di giorno e uno di notte, più scuro in basso (gli
   // angoli in ombra), più chiaro sul cordolo in cima all'impalcato.
   const tinta = (c, k) => c.map((v) => Math.min(255, Math.round(v * k)));
@@ -400,7 +475,8 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
       lungo.push(acc);
     }
     // [x, y, h, tx, ty, s]: si taglia sulla tessera e tutto si interpola.
-    const ricca = tutta.map((p, k) => [p[0], p[1], p[2], tang[k][0], tang[k][1], lungo[k]]);
+    // (Con le mezze larghezze a sinistra e a destra, dove la strada si stringe fra le case.)
+    const ricca = tutta.map((p, k) => (f.larghezze ? [p[0], p[1], p[2], tang[k][0], tang[k][1], lungo[k], f.larghezze[k][0], f.larghezze[k][1]] : [p[0], p[1], p[2], tang[k][0], tang[k][1], lungo[k]]));
     const semePezzo = mescola(Math.round(tutta[0][0] * 7), Math.round(tutta[0][1] * 7));
     const zs = f.galleria ? SOPRA_GALLERIA : (SOPRA[f.cls] ?? 0.15) + (fi % 7) * 0.002;
 
@@ -414,6 +490,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           const a = pezzo[k - 1];
           const b = pezzo[k];
           segmenti.push(a[0], a[1], a[2] + zs, b[0], b[1], b[2] + zs, f.w, codice + (f.rampa ? 16 : 0) + (f.ponte ? 32 : 0) + (f.galleria ? 64 : 0));
+          latiSegmenti?.push(((a[6] ?? f.w / 2) + (b[6] ?? f.w / 2)) / 2, ((a[7] ?? f.w / 2) + (b[7] ?? f.w / 2)) / 2);
         }
       }
     }
@@ -471,8 +548,10 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         }
         const zz = pezzo[k][2] + zs;
         const v = pezzo[k][5] / PERIODO_STRADA;
-        L.push([pezzo[k][0] + nx * hw * m, pezzo[k][1] + ny * hw * m, zz, 0, v]);
-        R.push([pezzo[k][0] - nx * hw * m, pezzo[k][1] - ny * hw * m, zz, 1, v]);
+        const hs = pezzo[k][6] ?? hw;
+        const hd = pezzo[k][7] ?? hw;
+        L.push([pezzo[k][0] + nx * hs * m, pezzo[k][1] + ny * hs * m, zz, 0, v]);
+        R.push([pezzo[k][0] - nx * hd * m, pezzo[k][1] - ny * hd * m, zz, 1, v]);
       }
       // Dove c'è la via con le corsie, il nastro di sempre non c'è.
       const coperto = conCorsie ? pezzo.map((q) => conCorsie.copre(q[0], q[1], q[3], q[4], q[2])) : null;
@@ -687,7 +766,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           if (h < (f.ponte ? 2.5 : ALTO_COME_PONTE)) return false;
           const tl = Math.hypot(tx, ty) || 1;
           const offs = f.w > 9 ? [-f.w * 0.27, f.w * 0.27] : [0];
-          for (const o of offs) if (suStradaATerra(px - (ty / tl) * o, py + (tx / tl) * o, 0.8)) return false;
+          for (const o of offs) if (suStradaATerra(px - (ty / tl) * o, py + (tx / tl) * o, 0.8) || suStradaSotto(px - (ty / tl) * o, py + (tx / tl) * o, 0.8, h)) return false;
           piloni.push({ x: px, y: py, h: h + zs - SPESSORE_IMPALCATO, ang: Math.atan2(ty, tx), w: f.w, offs, alto: h > 14 });
           return true;
         };
@@ -1326,7 +1405,298 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     ms: Date.now() - t0,
   };
   out.conti.triangoli = stimaTriangoli(out);
+  if (grafoPerIlCollaudo) out.grafo = { ...grafoPerIlCollaudo, corsie: conCorsie?.strade ?? null, latiSegmenti };
   return out;
+}
+
+/** Mai più stretta di così una strada fra le case (m). */
+const STRETTA_MIN_M = 3;
+/** Di quanto può cambiare la larghezza di una strada per metro, stringendosi fra le case. */
+const STRETTA_PASSO = 0.15;
+
+/**
+ * Le strade strette fra le case. La larghezza viene dalla classe
+ * ([larghezzaStrada]), e nei vicoli del centro, con le case a filo strada,
+ * l'asfalto entrava nelle facciate («le case si sovrappongono alle
+ * strade»). Qui, a ogni nodo di ogni strada a terra, si misura quanto c'è
+ * fino alla facciata a sinistra e a destra; la strada lì arriva fin quasi
+ * alla facciata (trenta centimetri prima), mai sotto [STRETTA_MIN_M] in
+ * tutto, e la sua larghezza cambia piano ([STRETTA_PASSO] per metro).
+ * [poligoni]: i contorni degli edifici, in metri. Mette in [feats] che si
+ * stringono `larghezze`: per ogni nodo `[sinistra, destra]` (mezze
+ * larghezze). Dove la strada passa sotto un palazzo (un androne) resta così.
+ */
+export function strettaFraLeCase(feats, nodi, poligoni) {
+  if (!poligoni.length) return 0;
+  const G = 20;
+  const griglia = new Map();
+  poligoni.forEach((poly, i) => {
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const [px, py] of poly) {
+      x0 = Math.min(x0, px);
+      y0 = Math.min(y0, py);
+      x1 = Math.max(x1, px);
+      y1 = Math.max(y1, py);
+    }
+    for (let gx = Math.floor(x0 / G); gx <= Math.floor(x1 / G); gx++) {
+      for (let gy = Math.floor(y0 / G); gy <= Math.floor(y1 / G); gy++) {
+        const k = gx + ',' + gy;
+        if (!griglia.has(k)) griglia.set(k, []);
+        griglia.get(k).push(i);
+      }
+    }
+  });
+  // La distanza dal punto alla facciata più vicina da un lato ([nx, ny] verso
+  // quel lato), guardando fino a [fin] metri: Infinity se non ce n'è, e
+  // null se il punto sta dentro un palazzo (un androne).
+  const lato = (px, py, nx, ny, fin) => {
+    let d = Infinity;
+    const qx = px + nx * fin;
+    const qy = py + ny * fin;
+    const visti = new Set();
+    for (let gx = Math.floor(Math.min(px, qx) / G); gx <= Math.floor(Math.max(px, qx) / G); gx++) {
+      for (let gy = Math.floor(Math.min(py, qy) / G); gy <= Math.floor(Math.max(py, qy) / G); gy++) {
+        for (const i of griglia.get(gx + ',' + gy) ?? []) {
+          if (visti.has(i)) continue;
+          visti.add(i);
+          const poly = poligoni[i];
+          let dentro = false;
+          for (let j = 0, m = poly.length - 1; j < poly.length; m = j++) {
+            const [ax, ay] = poly[m];
+            const [bx, by] = poly[j];
+            if (ay > py !== by > py && px < ((bx - ax) * (py - ay)) / (by - ay) + ax) dentro = !dentro;
+            const ex = bx - ax;
+            const ey = by - ay;
+            const den = nx * ey - ny * ex;
+            if (Math.abs(den) < 1e-9) continue;
+            const t = ((ax - px) * ey - (ay - py) * ex) / den;
+            const u = ((ax - px) * ny - (ay - py) * nx) / den;
+            if (t >= 0 && t < d && u >= 0 && u <= 1) d = t;
+          }
+          if (dentro) return null;
+        }
+      }
+    }
+    return d;
+  };
+  let strette = 0;
+  for (const f of feats) {
+    if (f.ponte || f.galleria || f.cls === 'rail') continue;
+    const n = f.nodi.length;
+    if (n < 2) continue;
+    const hw = f.w / 2;
+    const sx = new Float64Array(n).fill(hw);
+    const dx = new Float64Array(n).fill(hw);
+    let stretta = false;
+    // Lungo ogni tratto, un punto ogni due metri: lo spazio più stretto vale
+    // per i due nodi del tratto (fra un nodo e l'altro lo spigolo di una casa
+    // può sporgere).
+    for (let k = 1; k < n; k++) {
+      const a = nodi[f.nodi[k - 1]];
+      const b = nodi[f.nodi[k]];
+      const l = Math.hypot(b.x - a.x, b.y - a.y);
+      if (!l) continue;
+      const nx = -(b.y - a.y) / l;
+      const ny = (b.x - a.x) / l;
+      for (let t = 0; t <= l; t += 2) {
+        const px = a.x + ((b.x - a.x) * Math.min(t, l)) / l;
+        const py = a.y + ((b.y - a.y) * Math.min(t, l)) / l;
+        const ls = lato(px, py, nx, ny, hw + 1);
+        const ld = lato(px, py, -nx, -ny, hw + 1);
+        if (ls === null || ld === null) continue;
+        if (ls < hw + 0.3) {
+          sx[k - 1] = Math.min(sx[k - 1], ls - 0.3);
+          sx[k] = Math.min(sx[k], ls - 0.3);
+          stretta = true;
+        }
+        if (ld < hw + 0.3) {
+          dx[k - 1] = Math.min(dx[k - 1], ld - 0.3);
+          dx[k] = Math.min(dx[k], ld - 0.3);
+          stretta = true;
+        }
+      }
+    }
+    for (let k = 0; k < n; k++) {
+      // Al minimo in tutto allargandosi dal lato libero, se c'è; con le case
+      // da tutte e due le parti il vicolo è stretto davvero (non meno di 1,6 m).
+      sx[k] = Math.max(sx[k], 0.3);
+      dx[k] = Math.max(dx[k], 0.3);
+      const manca = STRETTA_MIN_M - sx[k] - dx[k];
+      if (manca > 0) {
+        if (sx[k] >= hw - 0.01) sx[k] += manca;
+        else if (dx[k] >= hw - 0.01) dx[k] += manca;
+      }
+    }
+    if (!stretta) continue;
+    // Piano: la larghezza cambia al più di STRETTA_PASSO per metro.
+    const s = [0];
+    for (let k = 1; k < n; k++) s.push(s[k - 1] + Math.hypot(nodi[f.nodi[k]].x - nodi[f.nodi[k - 1]].x, nodi[f.nodi[k]].y - nodi[f.nodi[k - 1]].y));
+    for (const v of [sx, dx]) {
+      for (let k = 1; k < n; k++) v[k] = Math.min(v[k], v[k - 1] + STRETTA_PASSO * (s[k] - s[k - 1]));
+      for (let k = n - 2; k >= 0; k--) v[k] = Math.min(v[k], v[k + 1] + STRETTA_PASSO * (s[k + 1] - s[k]));
+    }
+    f.larghezze = [...sx].map((v, k) => [v, dx[k]]);
+    strette++;
+  }
+  return strette;
+}
+
+/** Quanto si stringe per metro una carreggiata dalla parte dell'altra: alle
+ * biforcazioni strette i rami si staccano in pochi metri, come la cuspide fra
+ * le due (più svelto delle case, [STRETTA_PASSO]). */
+const AFFIANCATE_PASSO = 0.6;
+/** Ogni quanto un punto in più, sui tratti lunghi accanto a un'altra carreggiata. */
+const AFFIANCATE_PUNTI_M = 1.5;
+
+/**
+ * Le carreggiate affiancate a quote diverse (due rampe una accanto
+ * all'altra, una che sale e una che scende): le linee delle tessere stanno
+ * più vicine della somma delle due mezze larghezze, e i due nastri si
+ * sovrapponevano di lato, uno dentro l'altro. Ognuna si stringe dal lato
+ * dell'altra fino a metà dello spazio fra le due linee (mai sotto 0,8 m), e
+ * la larghezza cambia piano. Sui tratti lunghi lì accanto mette dei punti in
+ * più (la larghezza fra due punti cambia dritta, e alla biforcazione il
+ * cuneo è corto). Mette `larghezze` (vedi [strettaFraLeCase]).
+ */
+export function carreggiateAffiancate(feats, nodi) {
+  const G = 15;
+  const usabile = (f) => !f.galleria && f.cls !== 'rail' && f.nodi.length >= 2;
+  let griglia;
+  const indicizza = () => {
+    griglia = new Map();
+    feats.forEach((f, fi) => {
+      if (!usabile(f)) return;
+      for (let k = 1; k < f.nodi.length; k++) {
+        const a = nodi[f.nodi[k - 1]];
+        const b = nodi[f.nodi[k]];
+        for (let gx = Math.floor(Math.min(a.x, b.x) / G); gx <= Math.floor(Math.max(a.x, b.x) / G); gx++) {
+          for (let gy = Math.floor(Math.min(a.y, b.y) / G); gy <= Math.floor(Math.max(a.y, b.y) / G); gy++) {
+            const key = gx + ',' + gy;
+            if (!griglia.has(key)) griglia.set(key, []);
+            griglia.get(key).push([fi, k]);
+          }
+        }
+      }
+    });
+  };
+  // Le altre carreggiate quasi parallele a quota diversa vicino al punto
+  // (x, y, h) della strada fi, che va nella direzione (tx, ty): per ognuna
+  // la distanza e se sta a sinistra.
+  const accanto = (fi, x, y, h, tx, ty, salta) => {
+    const out = [];
+    const visti = new Set();
+    for (let ox = -1; ox <= 1; ox++) {
+      for (let oy = -1; oy <= 1; oy++) {
+        for (const [gi, gk] of griglia.get(Math.floor(x / G) + ox + ',' + (Math.floor(y / G) + oy)) ?? []) {
+          if (gi === fi || visti.has(gi * 100000 + gk)) continue;
+          visti.add(gi * 100000 + gk);
+          const g = feats[gi];
+          if (salta !== undefined && (salta === g.nodi[gk - 1] || salta === g.nodi[gk])) continue;
+          const c = nodi[g.nodi[gk - 1]];
+          const d = nodi[g.nodi[gk]];
+          const ex = d.x - c.x;
+          const ey = d.y - c.y;
+          const el = Math.hypot(ex, ey) || 1;
+          if (Math.abs((ex * tx + ey * ty) / el) < 0.85) continue;
+          const u = Math.max(0, Math.min(1, ((x - c.x) * ex + (y - c.y) * ey) / (el * el)));
+          const qx = c.x + ex * u;
+          const qy = c.y + ey * u;
+          // Alla stessa quota sono una strada sola; sotto un viadotto (oltre
+          // 4,5 m) passano una sotto l'altra e non si toccano.
+          const dz = Math.abs(c.h + (d.h - c.h) * u - h);
+          if (dz <= 0.6 || dz >= 4.5) continue;
+          const dist = Math.hypot(qx - x, qy - y);
+          if (dist >= (feats[fi].w + g.w) / 2) continue;
+          out.push([dist, tx * (qy - y) - ty * (qx - x) > 0]);
+        }
+      }
+    }
+    return out;
+  };
+  indicizza();
+  // I punti in più sui tratti lunghi che corrono accanto a un'altra: prima
+  // si sceglie dove (la griglia guarda i tratti com'erano), poi si mettono.
+  const daInfittire = feats.map((f, fi) => {
+    const tratti = new Set();
+    if (!usabile(f)) return tratti;
+    for (let k = 1; k < f.nodi.length; k++) {
+      const a = nodi[f.nodi[k - 1]];
+      const b = nodi[f.nodi[k]];
+      const l = Math.hypot(b.x - a.x, b.y - a.y);
+      if (Math.floor(l / AFFIANCATE_PUNTI_M) < 2) continue;
+      const tx = (b.x - a.x) / l;
+      const ty = (b.y - a.y) / l;
+      if ([0.25, 0.5, 0.75].some((t) => accanto(fi, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.h + (b.h - a.h) * t, tx, ty).length)) tratti.add(k);
+    }
+    return tratti;
+  });
+  let aggiunti = 0;
+  feats.forEach((f, fi) => {
+    if (!daInfittire[fi].size) return;
+    const nuovi = [f.nodi[0]];
+    const larghe = f.larghezze ? [f.larghezze[0]] : null;
+    for (let k = 1; k < f.nodi.length; k++) {
+      if (daInfittire[fi].has(k)) {
+        const a = nodi[f.nodi[k - 1]];
+        const b = nodi[f.nodi[k]];
+        const quanti = Math.floor(Math.hypot(b.x - a.x, b.y - a.y) / AFFIANCATE_PUNTI_M);
+        for (let q = 1; q < quanti; q++) {
+          const t = q / quanti;
+          nuovi.push(nodi.length);
+          nodi.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, h: a.h + (b.h - a.h) * t, adj: [], feats: [fi], fisso: null });
+          if (larghe) {
+            const [s0, d0] = f.larghezze[k - 1];
+            const [s1, d1] = f.larghezze[k];
+            larghe.push([s0 + (s1 - s0) * t, d0 + (d1 - d0) * t]);
+          }
+          aggiunti++;
+        }
+      }
+      nuovi.push(f.nodi[k]);
+      if (larghe) larghe.push(f.larghezze[k]);
+    }
+    f.nodi = nuovi;
+    if (larghe) f.larghezze = larghe;
+  });
+  if (aggiunti) indicizza();
+  let cambiate = 0;
+  feats.forEach((f, fi) => {
+    if (!usabile(f)) return;
+    const n = f.nodi.length;
+    const hw = f.w / 2;
+    const sx = Float64Array.from(f.larghezze ? f.larghezze.map((q) => q[0]) : new Array(n).fill(hw));
+    const dx = Float64Array.from(f.larghezze ? f.larghezze.map((q) => q[1]) : new Array(n).fill(hw));
+    let toccata = false;
+    for (let k = 0; k < n; k++) {
+      const p = nodi[f.nodi[k]];
+      const a = nodi[f.nodi[Math.max(0, k - 1)]];
+      const b = nodi[f.nodi[Math.min(n - 1, k + 1)]];
+      const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      for (const [dist, sinistra] of accanto(fi, p.x, p.y, p.h, (b.x - a.x) / l, (b.y - a.y) / l, f.nodi[k])) {
+        const meta = Math.max(0.8, dist / 2 - 0.05);
+        if (sinistra && meta < sx[k]) {
+          sx[k] = meta;
+          toccata = true;
+        } else if (!sinistra && meta < dx[k]) {
+          dx[k] = meta;
+          toccata = true;
+        }
+      }
+    }
+    if (!toccata) return;
+    const s = [0];
+    for (let k = 1; k < n; k++) s.push(s[k - 1] + Math.hypot(nodi[f.nodi[k]].x - nodi[f.nodi[k - 1]].x, nodi[f.nodi[k]].y - nodi[f.nodi[k - 1]].y));
+    for (const v of [sx, dx]) {
+      for (let k = 1; k < n; k++) v[k] = Math.min(v[k], v[k - 1] + AFFIANCATE_PASSO * (s[k] - s[k - 1]));
+      for (let k = n - 2; k >= 0; k--) v[k] = Math.min(v[k], v[k + 1] + AFFIANCATE_PASSO * (s[k + 1] - s[k]));
+    }
+    f.larghezze = [...sx].map((v, k) => [v, dx[k]]);
+    cambiate++;
+  });
+  return cambiate;
 }
 
 /** Triangoli di una geometria istanziata, per le stime. */
@@ -1757,6 +2127,30 @@ function distanzaLinea(px, py, l) {
 /** I colori dei blocchi nella vista «Corsie»: bianchi, grigi chiari, appena caldi o freddi. */
 const CORSIE_FACCIATE = ['#f6f7f8', '#f1f3f5', '#eceff2', '#f6f4f1', '#eff1f4', '#f3f3f1'];
 
+/**
+ * Nessun tratto di una via più ripido del [PENDENZA_MAX]: dove succede (una
+ * quota presa dalla strada sbagliata), i due capi si vengono incontro e lo
+ * scalino diventa una salita. Cambia [h] lungo i punti [xy].
+ */
+export function limitaPendenza(h, xy, fissi = null) {
+  for (let giro = 0; giro < 60; giro++) {
+    let troppo = 0;
+    for (let k = 1; k < h.length; k++) {
+      const d = Math.hypot(xy[k][0] - xy[k - 1][0], xy[k][1] - xy[k - 1][1]);
+      const eccesso = Math.abs(h[k] - h[k - 1]) - PENDENZA_MAX * d;
+      if (eccesso <= 0.01) continue;
+      troppo++;
+      const verso = Math.sign(h[k] - h[k - 1]);
+      const fa = fissi?.[k - 1] ? 0 : fissi?.[k] ? 1 : 0.5;
+      const fb = fissi?.[k] ? 0 : fissi?.[k - 1] ? 1 : 0.5;
+      h[k - 1] += verso * eccesso * fa;
+      h[k] -= verso * eccesso * fb;
+    }
+    if (!troppo) break;
+  }
+  return h;
+}
+
 /** Quanto sopra la quota sta l'asfalto delle corsie: come il nastro della sua classe, un poco sopra. */
 function sopraCorsie(hw) {
   const b = String(hw ?? '').replace(/_link$/, '');
@@ -1776,7 +2170,8 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
   const G = 20;
   const griglia = new Map();
   linee.forEach((pts, i) => {
-    if (visibili[i].cls === 'rail') return;
+    const f = visibili[i];
+    if (f.cls === 'rail') return;
     for (let k = 1; k < pts.length; k++) {
       const a = pts[k - 1];
       const b = pts[k];
@@ -1784,12 +2179,12 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
         for (let cy = Math.floor(Math.min(a[1], b[1]) / G); cy <= Math.floor(Math.max(a[1], b[1]) / G); cy++) {
           const key = cx + ',' + cy;
           if (!griglia.has(key)) griglia.set(key, []);
-          griglia.get(key).push([a, b]);
+          griglia.get(key).push([a, b, f]);
         }
       }
     }
   });
-  /** Le quote possibili in [px, py] lungo (tx, ty): `[h, distanza]`. */
+  /** Le quote possibili in [px, py] lungo (tx, ty): `[h, distanza, strada della mappa]`. */
   const quoteQui = (px, py, tx, ty) => {
     const out = [];
     const visti = new Set();
@@ -1803,7 +2198,7 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
         }
       }
     }
-    for (const [a, b] of vicini) {
+    for (const [a, b, f] of vicini) {
       const dx = b[0] - a[0];
       const dy = b[1] - a[1];
       const l2 = dx * dx + dy * dy || 1e-9;
@@ -1811,7 +2206,7 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
       const d = Math.hypot(a[0] + dx * u - px, a[1] + dy * u - py);
       if (d > 8) continue;
       if (Math.abs((dx * tx + dy * ty) / Math.sqrt(l2)) < 0.55) continue;
-      out.push([a[2] + (b[2] - a[2]) * u, d]);
+      out.push([a[2] + (b[2] - a[2]) * u, d, f]);
     }
     return out;
   };
@@ -1826,24 +2221,74 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
     const xy = inMetri(v0.ll);
     if (!xy.some(vicina)) continue;
     const h = new Array(xy.length).fill(NaN);
-    let prima = null;
-    for (let k = 0; k < xy.length; k++) {
+    /* La quota di ogni punto: quella di una strada della mappa lì vicino.
+     *
+     * «Una salita con strade in mezzo, non si capisce niente»: dove le rampe
+     * di uno svincolo passano una sopra l'altra, vicino a ogni punto ci sono
+     * strade della mappa a tre quote diverse. Si sceglieva punto per punto
+     * la più vicina che non saltasse dalla quota di prima, e chi partiva sul
+     * livello sbagliato ci restava: le corsie di una rampa a terra finivano
+     * sopra l'auto, quelle del viadotto a terra. Adesso conta anche che cosa
+     * è la strada — un ponte, a che livello (`layer`), una galleria — come la
+     * via con le corsie dice di sé, e la quota si sceglie su tutta la via
+     * insieme (Viterbi): il meno lontano, il più somigliante, senza salti. */
+    // Il livello come lo conta la mappa (`livelloStrada`): un ponte almeno al primo, il resto a terra.
+    const mio = v0.ponte ? Math.min(5, Math.max(1, v0.livello || 1)) : 0;
+    const costo = (q) => {
+      const f = q[2];
+      let c = q[1];
+      c += 3 * Math.abs((f.livello ?? 0) - mio);
+      if (!!f.ponte !== !!v0.ponte) c += 4;
+      if (!!f.galleria !== !!v0.galleria) c += 6;
+      return c;
+    };
+    const cand = xy.map((_, k) => {
       const a = xy[Math.max(0, k - 1)];
       const b = xy[Math.min(xy.length - 1, k + 1)];
       const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-      const qq = quoteQui(xy[k][0], xy[k][1], (b[0] - a[0]) / l, (b[1] - a[1]) / l);
-      if (!qq.length) continue;
-      let meglio = qq[0];
-      let bv = Infinity;
-      for (const q of qq) {
-        const voto = q[1] + (prima !== null ? 2 * Math.abs(q[0] - prima) : v0.ponte ? -0.5 * q[0] : 0.5 * q[0]);
-        if (voto < bv) {
-          bv = voto;
-          meglio = q;
-        }
+      return quoteQui(xy[k][0], xy[k][1], (b[0] - a[0]) / l, (b[1] - a[1]) / l);
+    });
+    for (let i = 0; i < xy.length; ) {
+      if (!cand[i].length) {
+        i++;
+        continue;
       }
-      h[k] = meglio[0];
-      prima = meglio[0];
+      let j = i;
+      while (j < xy.length && cand[j].length) j++;
+      const costi = [cand[i].map(costo)];
+      const da = [cand[i].map(() => -1)];
+      for (let k = i + 1; k < j; k++) {
+        const cc = [];
+        const dd = [];
+        for (const q of cand[k]) {
+          let meglio = Infinity;
+          let chi = 0;
+          // Un salto di quota oltre la pendenza di una strada vera costa
+          // molto: è passare da una strada all'altra («la salita con
+          // strade in mezzo», lo zig-zag del percorso sulle rampe).
+          const passo = Math.hypot(xy[k][0] - xy[k - 1][0], xy[k][1] - xy[k - 1][1]);
+          cand[k - 1].forEach((p, r) => {
+            const salto = Math.abs(q[0] - p[0]);
+            const v = costi[k - 1 - i][r] + 2 * salto + 12 * Math.max(0, salto - PENDENZA_MAX * passo - 0.2);
+            if (v < meglio) {
+              meglio = v;
+              chi = r;
+            }
+          });
+          cc.push(meglio + costo(q));
+          dd.push(chi);
+        }
+        costi.push(cc);
+        da.push(dd);
+      }
+      const ultimi = costi[j - 1 - i];
+      let r = 0;
+      for (let t = 1; t < ultimi.length; t++) if (ultimi[t] < ultimi[r]) r = t;
+      for (let k = j - 1; k >= i; k--) {
+        h[k] = cand[k][r][0];
+        r = da[k - i][r];
+      }
+      i = j;
     }
     // Dove non c'è una strada sotto: fra le quote attorno, o a terra.
     let ultimo = -1;
@@ -1852,6 +2297,7 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
       for (let j = ultimo + 1; j < k; j++) h[j] = ultimo < 0 ? (k < h.length ? h[k] : 0) : k >= h.length ? h[ultimo] : h[ultimo] + ((h[k] - h[ultimo]) * (j - ultimo)) / (k - ultimo);
       ultimo = k;
     }
+    limitaPendenza(h, xy);
     strade.push({ ...v0, xy, xyVia: inMetri(v0.llVia ?? v0.ll), h });
   }
   const nodi = (corsie.nodi ?? []).map((n) => ({ ...n, xy: sys.daLonLat(n.g[0], n.g[1]) })).filter((n) => vicina(n.xy));

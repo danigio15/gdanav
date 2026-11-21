@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ALTEZZA_LIVELLO, PENDENZA, altezzaLivello, grafoStrade, larghezzaStrada, livelloStrada, segnaRotonde, uniscIBordi } from '../src/elevazione.js';
+import { ALTEZZA_LIVELLO, PENDENZA, SCAVALCO_M, altezzaLivello, arrotonda, grafoStrade, larghezzaStrada, livelloStrada, segnaRotonde, uniscIBordi } from '../src/elevazione.js';
 
 // Metri = pixel, per semplicità.
 const metri = (x, y) => [x, -y];
@@ -64,16 +64,31 @@ test('la strada che passa sotto resta a terra', () => {
   for (const n of sotto) assert.equal(n.h, 0);
 });
 
-test('due ponti di livello diverso si raccordano', () => {
+test('un ponte sta sopra quello che scavalca (luce e impalcato), non otto metri per livello', () => {
+  // Una strada a terra (x = 300), un cavalcavia al primo livello che la
+  // scavalca (y = 0), e un viadotto al secondo che scavalca il cavalcavia
+  // (x = 500) e poi scende sulla rampa a terra.
   const strade = [
-    { p: { class: 'motorway', brunnel: 'bridge', layer: 1, ramp: 1 }, g: [[0, 0], [300, 0]] },
-    { p: { class: 'motorway', brunnel: 'bridge', layer: 2, ramp: 1 }, g: [[300, 0], [700, 0]] },
+    { p: { class: 'primary' }, g: [[300, -400], [300, 400]] },
+    { p: { class: 'primary', brunnel: 'bridge', layer: 1 }, g: [[150, 0], [700, 0]] },
+    { p: { class: 'primary' }, g: [[0, 0], [150, 0]] },
+    { p: { class: 'primary' }, g: [[700, 0], [900, 0]] },
+    { p: { class: 'motorway', brunnel: 'bridge', layer: 2 }, g: [[500, -300], [500, 200]] },
+    { p: { class: 'motorway' }, g: [[500, 200], [500, 700]] },
   ];
   const g = grafoStrade(strade, metri);
   const L = ALTEZZA_LIVELLO;
-  assert.ok(Math.abs(quotaA(g, 600) - 2 * L) < 0.1);
-  const giunto = quotaA(g, 300);
-  assert.ok(giunto > L + 0.5 && giunto < 2 * L - 0.5, `al giunto fra un livello e due (${giunto})`);
+  const vicino = (x, y) => g.nodi.reduce((m, n) => (Math.hypot(n.x - x, n.y - y) < Math.hypot(m.x - x, m.y - y) ? n : m));
+  assert.ok(Math.abs(vicino(300, 0).h - L) < 0.3, `il cavalcavia sopra la strada (${vicino(300, 0).h})`);
+  const sopra = vicino(500, -1).h;
+  assert.ok(Math.abs(sopra - (L + SCAVALCO_M)) < 0.5, `il viadotto sopra il cavalcavia (${sopra})`);
+  // Altrove il viadotto non sta più in alto del necessario, e scende sulla rampa senza scalini.
+  // (Solo i nodi del viadotto e della sua rampa, non quelli del cavalcavia che incrocia.)
+  const lungo = g.nodi.filter((n) => Math.abs(n.x - 500) < 0.01).sort((p, q) => p.y - q.y);
+  let ripida = 0;
+  for (let k = 1; k < lungo.length; k++) ripida = Math.max(ripida, Math.abs(lungo[k].h - lungo[k - 1].h) / Math.max(1, lungo[k].y - lungo[k - 1].y));
+  assert.ok(ripida <= PENDENZA + 0.01, `al più del ${PENDENZA * 100}% (${(ripida * 100).toFixed(1)}%)`);
+  assert.equal(vicino(500, -690).h, 0, 'in fondo alla rampa a terra');
 });
 
 test('i capi tagliati sul bordo delle tessere si uniscono', () => {
@@ -83,6 +98,27 @@ test('i capi tagliati sul bordo delle tessere si uniscono', () => {
   ];
   assert.equal(uniscIBordi(strade), 1);
   assert.deepEqual(strade[0].g[1], strade[1].g[0]);
+});
+
+test('sul bordo della tessera il viadotto non si unisce alla rampa a terra che gli passa sotto', () => {
+  // Il bordo (x = 4096) passa dove un viadotto al terzo livello corre sopra
+  // una rampa a terra, a un pixel e mezzo in pianta: ognuno col suo seguito.
+  const viadotto = { class: 'trunk', brunnel: 'bridge', layer: 3, ramp: 1 };
+  const rampa = { class: 'motorway', ramp: 1 };
+  const strade = [
+    { p: viadotto, g: [[3000, 1000], [4096, 1000]] },
+    { p: viadotto, g: [[4096, 1001], [5200, 1000]] },
+    { p: rampa, g: [[3000, 1003], [4096, 1002.5]] },
+    { p: rampa, g: [[4096, 1002], [5200, 1100]] },
+  ];
+  assert.equal(uniscIBordi(strade), 2);
+  assert.deepEqual(strade[0].g[1], strade[1].g[0]);
+  assert.deepEqual(strade[2].g[1], strade[3].g[0]);
+  assert.ok(Math.abs(strade[0].g[1][1] - strade[2].g[1][1]) > 1, 'i due capi restano dove sono');
+  // E nel grafo la rampa resta a terra lontano dal viadotto.
+  const g = grafoStrade(strade, metri);
+  const L = ALTEZZA_LIVELLO;
+  for (const n of g.nodi) if (Math.abs(n.x - 4096) < 300 && n.y < -1001.2) assert.ok(n.h < L, `la rampa sotto il viadotto (${n.x.toFixed(0)}, ${n.y.toFixed(1)}: ${n.h.toFixed(1)})`);
 });
 
 /** Un anello di raggio [r] attorno a [cx, cy], a [n] lati, come strada a sé. */
@@ -151,4 +187,25 @@ test('le rotonde: un anello tondo sì, un isolato quadrato no', () => {
   assert.ok(g.nodi.filter((n) => n.rotonda).every((n) => Math.hypot(n.x, n.y) < 16));
   assert.ok(g.nodi.some((n) => n.rotonda));
   assert.equal(segnaRotonde([], []), 0);
+});
+
+test('le curve arrotondate: niente spigoli, gli incroci restano dove sono', () => {
+  // Una strada che gira ad angolo retto a (100, 0), un metro = un pixel.
+  const g = arrotonda([[0, 0], [100, 0], [100, 100]], 35, 1);
+  assert.ok(g.length > 6, `un arco (${g.length} punti)`);
+  let peggio = 0;
+  for (let k = 1; k < g.length - 1; k++) {
+    const a = Math.atan2(g[k][1] - g[k - 1][1], g[k][0] - g[k - 1][0]);
+    const b = Math.atan2(g[k + 1][1] - g[k][1], g[k + 1][0] - g[k][0]);
+    peggio = Math.max(peggio, Math.abs(Math.atan2(Math.sin(b - a), Math.cos(b - a))));
+  }
+  assert.ok(peggio <= (11 * Math.PI) / 180, `al più dieci gradi per punto (${((peggio * 180) / Math.PI).toFixed(1)})`);
+  // Il raggio: l'arco passa a r(√2−1) dall'angolo.
+  const vicino = Math.min(...g.map((q) => Math.hypot(q[0] - 100, q[1])));
+  assert.ok(Math.abs(vicino - 35 * (Math.SQRT2 - 1)) < 0.5, `raggio 35 m (${vicino.toFixed(1)})`);
+  assert.deepEqual(g[0], [0, 0]);
+  assert.deepEqual(g.at(-1), [100, 100]);
+  // Un incrocio non si sposta.
+  const f = arrotonda([[0, 0], [100, 0], [100, 100]], 35, 1, (q) => q[0] === 100 && q[1] === 0);
+  assert.deepEqual(f, [[0, 0], [100, 0], [100, 100]]);
 });

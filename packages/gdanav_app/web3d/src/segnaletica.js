@@ -12,6 +12,9 @@ import { Costruttore } from './costruttore.js';
 import { bordiCorsie, centroCorsia, larghezzaCorsie, normali, progressive } from './corsie.js';
 import { ritagliaLinea } from './ritaglio.js';
 
+
+/** Più lunga di così una zebratura non è (m): oltre è una carreggiata a parte. */
+const ZEBRATURA_AL_PIU_M = 150;
 /**
  * I marciapiedi delle strade di città (m): larghi secondo la strada, alti
  * [ALTO_MARCIAPIEDE] sopra l'asfalto, col cordolo. Non in autostrada, sulle
@@ -967,7 +970,21 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
 
     // ── Le righe ───────────────────────────────────────────────────────
     const dz = z0 + 0.02;
+    // Dove la riga starebbe sull'asfalto di un'altra via (alla stessa
+    // quota, più di sessanta centimetri dentro): dove due carreggiate si
+    // dividono e i raccordi non le mettono del tutto in fila, il bordo di
+    // una passava di traverso sulle corsie dell'altra.
+    copertura ??= asfaltoDelleVie(strade, ricche, bordiAsfalto);
+    const sullAltra = (o) => {
+      const out = [];
+      for (let s = 0; s <= L; s += 1) {
+        const P = puntoA(r, s, o);
+        if (copertura.sotto(P[0], P[1], P[2], i, -0.6)) out.push([s - 0.6, s + 0.6]);
+      }
+      return out;
+    };
     const riga = (o, w, buchi, tipo = 'continua', pieno = 3, vuoto = 3) => {
+      buchi = [...buchi, ...sullAltra(o)];
       const pezzi = tipo === 'continua' ? togli([[0, L]], buchi) : v.stimata ? trattiniAdattati(L, pieno, vuoto, buchi) : trattini(L, pieno, vuoto, buchi);
       for (const [a, b] of pezzi) {
         if (b - a < 0.2) continue;
@@ -1040,6 +1057,12 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
   // Fra il bordo destro del ramo di sinistra e quello sinistro del ramo di
   // destra (una rampa d'uscita), finché i due sono a meno di sette metri:
   // strisce di sbieco, come sulle autostrade italiane.
+  //
+  // Solo nel triangolo, dove i due rami si allargano. «Ancora tutto
+  // sbagliato»: a uno svincolo due rampe corrono affiancate a quattro metri
+  // per centinaia di metri (lì c'è un cordolo, o il guardrail), e la
+  // zebratura andava avanti per tutti e trecento, una scala bianca lunga fra
+  // le due strade. Dove la distanza smette di crescere, il triangolo è finito.
   for (const elenco of tocchi.values()) {
     const finiscono = elenco.filter(({ i, k }) => strade[i].senso && k === strade[i].xyVia.length - 1);
     const partono = elenco.filter(({ i, k }) => strade[i].senso && k === 0);
@@ -1064,7 +1087,14 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
     const bordoS = [];
     for (let s = 0; s <= Math.min(LS, 300); s += 1) bordoS.push(puntoA(rS, s, bS));
     const dz = sopra(des.hw) + 0.02;
-    for (let s = 3; s < Math.min(LD, 300); s += 5) {
+    // Lo spazio fra i due rami, col segno: a destra del bordo del ramo di
+    // sinistra. Vicino alla punta i due rami si sovrappongono ancora (i bordi
+    // delle corsie si incrociano): lì, prima, le strisce andavano di traverso
+    // sulle corsie («righe a scala in mezzo alla strada»), a ogni divisione,
+    // e finivano proprio dove il triangolo cominciava.
+    let gPrima = -Infinity;
+    let aperto = null;
+    for (let s = 3; s < Math.min(LD, ZEBRATURA_AL_PIU_M); s += 2.5) {
       const P = puntoA(rD, s, bD);
       let Q = null;
       let d = Infinity;
@@ -1075,12 +1105,25 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
           Q = q;
         }
       }
-      if (d > 7) break;
-      if (d < 0.8 || !dentro(P[0], P[1])) continue;
-      // Di sbieco: dal bordo della rampa indietro verso la punta del triangolo.
       const [tx, ty] = [P[3], P[4]];
-      const qx = Q[0] - tx * d * 0.8;
-      const qy = Q[1] - ty * d * 0.8;
+      const g = (P[0] - Q[0]) * ty - (P[1] - Q[1]) * tx;
+      if (aperto === null) {
+        if (g < 0.8) {
+          if (s > 60) break;
+          continue;
+        }
+        aperto = s;
+      }
+      if (g > 7) break;
+      // Non si allargano più (paralleli, o di nuovo vicini): fine del triangolo.
+      if (s - aperto > 15 && g < gPrima + 0.1) break;
+      gPrima = Math.max(gPrima, g);
+      // Dove un ramo sale e l'altro no, il triangolo è finito (niente strisce sospese).
+      if (Math.abs(P[2] - Q[2]) > 0.4) break;
+      if (!dentro(P[0], P[1]) || (s - aperto) % 5 > 0.01) continue;
+      // Di sbieco: dal bordo della rampa indietro verso la punta del triangolo.
+      const qx = P[0] - ty * g - tx * g * 0.8;
+      const qy = P[1] + tx * g - ty * g * 0.8;
       const w = 0.25;
       const z = Math.max(P[2], Q[2]) + dz;
       vernice.quad([P[0] - tx * w, P[1] - ty * w, z], [P[0] + tx * w, P[1] + ty * w, z], [qx + tx * w, qy + ty * w, z], [qx - tx * w, qy - ty * w, z], [0, 0, 1]);

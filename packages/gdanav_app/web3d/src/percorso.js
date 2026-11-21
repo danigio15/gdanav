@@ -431,6 +431,9 @@ export function lungoLaLinea(linea, punti, da, a, entro = 12, quota = 0.6) {
   return vicini >= visti * quota;
 }
 
+/** Al più così ripida la fascia del percorso (10%: le rampe vere). */
+const PENDENZA_FASCIA = 0.1;
+
 /** Il profilo delle quote di un tratto della linea: un campione ogni [passo] metri. */
 export class Profilo {
   constructor(s0, passo, h, galleria = null, dx = null, dy = null) {
@@ -536,7 +539,23 @@ export function profiloDi(linea, s0, s1, indice, passo = 4, ancora = null, suStr
   const grezze = quote(punti, indice, ia >= 0 && ia < n ? { i: ia, h: ancora.h } : null);
   const [dx, dy] = spostamenti(grezze.dx, grezze.dy, punti, passo, grezze.galleria);
   fermiSuStrada(dx, dy, s0, passo, suStrada);
-  const profilo = new Profilo(s0, passo, riempiQuote(grezze), grezze.galleria, dx, dy);
+  // La fascia mai più ripida di una strada vera: dove sotto due strade che
+  // si uniscono hanno quote diverse (o una è sbagliata), lo scalino diventa
+  // una salita.
+  const h = riempiQuote(grezze);
+  for (let giro = 0; giro < 40; giro++) {
+    let troppo = 0;
+    for (let k = 1; k < h.length; k++) {
+      const eccesso = Math.abs(h[k] - h[k - 1]) - PENDENZA_FASCIA * passo;
+      if (eccesso <= 0.005) continue;
+      troppo++;
+      const verso = Math.sign(h[k] - h[k - 1]);
+      h[k - 1] += (verso * eccesso) / 2;
+      h[k] -= (verso * eccesso) / 2;
+    }
+    if (!troppo) break;
+  }
+  const profilo = new Profilo(s0, passo, h, grezze.galleria, dx, dy);
   profilo.trovata = Uint8Array.from(grezze, (v) => (Number.isNaN(v) ? 0 : 1));
   return profilo;
 }
@@ -687,6 +706,59 @@ export function fasciaSullaCorsia(punti, { sposta, spigoli = [], centri = null, 
     libero = i1;
   });
   return out;
+}
+
+/** Al più tanto di lato per metro, la fascia fuori dalle svolte (circa 19°). */
+const FASCIA_DI_LATO = 0.35;
+
+/**
+ * La fascia [fascia] (vedi [fasciaSullaCorsia]) senza spostamenti di lato
+ * bruschi: fuori dalle svolte (dove il percorso [punti] gira più di 20° in
+ * una decina di metri) non si sposta di lato più di [FASCIA_DI_LATO] metri
+ * per metro. Un cambio di corsia vero è molto più dolce; uno scatto (la
+ * corsia di una via che finisce, una via sotto che cambia) diventa un
+ * raccordo. Cambia [fascia].
+ */
+export function levigaFascia(punti, fascia, passo) {
+  const n = punti.length;
+  if (n < 3) return fascia;
+  const nor = new Array(n);
+  const fermo = new Uint8Array(n);
+  const o = new Float64Array(n);
+  for (let k = 0; k < n; k++) {
+    const a = punti[Math.max(0, k - 1)];
+    const b = punti[Math.min(n - 1, k + 1)];
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    nor[k] = [-(b[1] - a[1]) / l, (b[0] - a[0]) / l];
+    o[k] = (fascia[k][0] - punti[k][0]) * nor[k][0] + (fascia[k][1] - punti[k][1]) * nor[k][1];
+    const p0 = punti[Math.max(0, k - 3)];
+    const p2 = punti[Math.min(n - 1, k + 3)];
+    const p1 = punti[k];
+    const giro = Math.abs(Math.atan2((p1[0] - p0[0]) * (p2[1] - p1[1]) - (p1[1] - p0[1]) * (p2[0] - p1[0]), (p1[0] - p0[0]) * (p2[0] - p1[0]) + (p1[1] - p0[1]) * (p2[1] - p1[1])));
+    if (giro > (20 * Math.PI) / 180) fermo[k] = 1;
+  }
+  const max = FASCIA_DI_LATO * passo;
+  for (let giro = 0; giro < 60; giro++) {
+    let troppo = 0;
+    for (let k = 1; k < n; k++) {
+      const e = Math.abs(o[k] - o[k - 1]) - max;
+      if (e <= 0.005 || (fermo[k] && fermo[k - 1])) continue;
+      troppo++;
+      const v = Math.sign(o[k] - o[k - 1]);
+      const fa = fermo[k - 1] ? 0 : fermo[k] ? 1 : 0.5;
+      const fb = fermo[k] ? 0 : fermo[k - 1] ? 1 : 0.5;
+      o[k - 1] += v * e * fa;
+      o[k] -= v * e * fb;
+    }
+    if (!troppo) break;
+  }
+  for (let k = 0; k < n; k++) {
+    if (fermo[k]) continue;
+    // Solo lo spostamento di lato: quello lungo la linea resta com'era.
+    const d = o[k] - ((fascia[k][0] - punti[k][0]) * nor[k][0] + (fascia[k][1] - punti[k][1]) * nor[k][1]);
+    fascia[k] = [fascia[k][0] + nor[k][0] * d, fascia[k][1] + nor[k][1] * d];
+  }
+  return fascia;
 }
 
 /**
