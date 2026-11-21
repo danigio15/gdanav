@@ -681,3 +681,27 @@ test('la levigatura non spinge di traverso i punti dove la linea di sotto fa uno
     assert.ok(d < 0.05 || Math.abs(dopo[k][1] + 6) < 0.05, `il punto ${k} resta dov'era (${d.toFixed(2)} m)`);
   }
 });
+
+test('senza denti di sega: il punto fuori fila torna in fila, le curve e i cambi di corsia restano', async () => {
+  const { togliDenti } = await import('../src/percorso.js');
+  const gira = (f, j) => {
+    const [a, b, c] = [f[j - 1], f[j], f[j + 1]];
+    const u = [b[0] - a[0], b[1] - a[1]];
+    const v = [c[0] - b[0], c[1] - b[1]];
+    return (Math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1]) * 180) / Math.PI;
+  };
+  // Dritta con due punti a dente di sega.
+  const dente = Array.from({ length: 30 }, (_, k) => [k * 2, k === 12 ? 1.2 : k === 13 ? -0.8 : 0]);
+  const liscia = togliDenti(dente);
+  for (let k = 2; k < 27; k++) {
+    const a = gira(liscia, k);
+    const b = gira(liscia, k + 1);
+    assert.ok(Math.sign(a) === Math.sign(b) || Math.min(Math.abs(a), Math.abs(b)) <= 20, `nessun dente a ${k} (${a.toFixed(0)}°, ${b.toFixed(0)}°)`);
+  }
+  for (let k = 0; k < 30; k++) assert.ok(Math.abs(liscia[k][1]) < 1.3 && Math.abs(liscia[k][0] - k * 2) < 1.5, `vicino a dov'era (${k})`);
+  // Una svolta stretta (raggio 6 m, un punto ogni 2 m) e un cambio di corsia: identici.
+  const svolta = Array.from({ length: 12 }, (_, k) => [6 * Math.sin(k / 3), 6 - 6 * Math.cos(k / 3)]);
+  assert.deepEqual(togliDenti(svolta), svolta);
+  const corsia = Array.from({ length: 30 }, (_, k) => [k * 2, 3.5 / (1 + Math.exp(-(k - 15) / 2))]);
+  assert.deepEqual(togliDenti(corsia), corsia);
+});

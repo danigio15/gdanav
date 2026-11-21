@@ -13,7 +13,7 @@ import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, lon
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { AggancioStrada, SOGLIA_M } from './aggancio.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
-import { alzataDeiNastri, dentroLAsfalto, direzioneDisegnata, fasciaSullaCorsia, IndiceSegmenti, levigaFascia, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti } from './percorso.js';
+import { alzataDeiNastri, dentroLAsfalto, direzioneDisegnata, fasciaSullaCorsia, IndiceSegmenti, levigaFascia, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti, togliDenti } from './percorso.js';
 import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
 import { dallaScorta, nellaScorta } from './scorte.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
@@ -1601,7 +1601,7 @@ function sullaCorsia(p) {
   // salti non li vedeva (lo zig-zag).
   const sullaStrada = levigaFascia(punti, fasciaSullaCorsia(punti, r, pr.passo), pr.passo);
   const dentro = dentroLAsfalto(sullaStrada, pr.h, (x, y, h) => [...indice.asfaltoVicino(x, y, h), ...asfaltoDelleCorsie(S.indiceCorsie, x, y)]);
-  const fascia = levigaFascia(linea, dentro, pr.passo);
+  const fascia = togliDenti(levigaFascia(linea, dentro, pr.passo));
   for (let k = 0; k < n; k++) {
     pr.dx[k] = fascia[k][0] - linea[k][0];
     pr.dy[k] = fascia[k][1] - linea[k][1];

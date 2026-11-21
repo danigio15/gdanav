@@ -853,6 +853,61 @@ export function dentroLAsfalto(fascia, h, cerca, { margine = 0.6, lontano = 6, r
   return fascia.map((q, k) => (cx[k] || cy[k] ? [q[0] + cx[k], q[1] + cy[k]] : q));
 }
 
+/**
+ * Toglie i denti di sega dalla [fascia]: dove gira di più di [gradi] da una
+ * parte e subito dopo di più di [gradi] dall'altra (un punto fuori fila),
+ * i punti del dente si avvicinano al mezzo dei vicini, un po' per volta,
+ * finché il dente non c'è più. Le curve vere girano sempre dalla stessa
+ * parte e i cambi di corsia di pochi gradi per punto: non si toccano. Ogni
+ * punto si sposta al più di [massimo] metri.
+ *
+ * Il dente arriva dalla linea del fornitore, che dove piega a scatti li ha
+ * già, e dall'aggancio alle corsie fra un pezzo di via e l'altro; sullo
+ * schermo è lo zig-zag della fascia verde.
+ */
+export function togliDenti(fascia, { gradi = 20, massimo = 1.5, giri = 12 } = {}) {
+  const n = fascia.length;
+  if (n < 4) return fascia;
+  const p = fascia.map((q) => [q[0], q[1]]);
+  const limite = (gradi * Math.PI) / 180;
+  const gira = (j) => {
+    const a = p[j - 1];
+    const b = p[j];
+    const c = p[j + 1];
+    const ux = b[0] - a[0];
+    const uy = b[1] - a[1];
+    const vx = c[0] - b[0];
+    const vy = c[1] - b[1];
+    if (Math.hypot(ux, uy) < 1e-6 || Math.hypot(vx, vy) < 1e-6) return 0;
+    return Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+  };
+  for (let giro = 0; giro < giri; giro++) {
+    let denti = 0;
+    for (let k = 1; k + 2 < n; k++) {
+      const g0 = gira(k);
+      const g1 = gira(k + 1);
+      if (Math.sign(g0) === Math.sign(g1) || Math.min(Math.abs(g0), Math.abs(g1)) <= limite) continue;
+      denti++;
+      for (const j of [k, k + 1]) {
+        const mx = (p[j - 1][0] + p[j + 1][0]) / 2;
+        const my = (p[j - 1][1] + p[j + 1][1]) / 2;
+        let x = p[j][0] + (mx - p[j][0]) * 0.5;
+        let y = p[j][1] + (my - p[j][1]) * 0.5;
+        const dx = x - fascia[j][0];
+        const dy = y - fascia[j][1];
+        const d = Math.hypot(dx, dy);
+        if (d > massimo) {
+          x = fascia[j][0] + (dx * massimo) / d;
+          y = fascia[j][1] + (dy * massimo) / d;
+        }
+        p[j] = [x, y];
+      }
+    }
+    if (!denti) break;
+  }
+  return p;
+}
+
 /** Da quanto piega la linea fra un punto e l'altro, uno scalino (vedi [levigaFascia]). */
 const SCALINO = (15 * Math.PI) / 180;
 
