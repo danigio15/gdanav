@@ -421,6 +421,9 @@ export function percorsi(T, quanti = 60) {
     };
     let ultimo = -Infinity;
     let ultimoFuori = -Infinity;
+    let ultimoDente = -Infinity;
+    // Un dente di sega: due giri opposti, ognuno di più di tanti gradi.
+    const DENTE_GRADI = 25;
     // (Non gli ultimi metri: lì la fascia finisce.)
     for (let k = 2; k < n - 4; k++) {
       const sk = pr.s0 + k * pr.passo;
@@ -430,6 +433,22 @@ export function percorsi(T, quanti = 60) {
         if (fuori > 0.8) {
           metti('percorso-fuori', fascia[k], `${fuori.toFixed(1)} m fuori dall'asfalto`);
           ultimoFuori = sk;
+        }
+      }
+      // Il dente di sega della fascia stessa, a prescindere dalla linea di
+      // sotto: gira da una parte e subito dall'altra, di molto. (Lo
+      // «di lato» qui sotto si misura sulla linea del fornitore, che dove
+      // piega a scatti lo segna anche su una fascia dritta.)
+      if (k + 1 < n - 1 && qui(fascia[k]) && sk - ultimoDente >= 30) {
+        const gira = (j) => {
+          const a = fascia[j - 1], b = fascia[j], c = fascia[j + 1];
+          const u = [b[0] - a[0], b[1] - a[1]], v = [c[0] - b[0], c[1] - b[1]];
+          return (Math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1]) * 180) / Math.PI;
+        };
+        const g0 = gira(k), g1 = gira(k + 1);
+        if (Math.sign(g0) !== Math.sign(g1) && Math.min(Math.abs(g0), Math.abs(g1)) > DENTE_GRADI) {
+          metti('percorso-dente', fascia[k], `${g0.toFixed(0)}° e ${g1.toFixed(0)}°`);
+          ultimoDente = sk;
         }
       }
       if (!qui(asse[k]) || sk - ultimo < 30) continue;
