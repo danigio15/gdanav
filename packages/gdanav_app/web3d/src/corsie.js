@@ -1097,3 +1097,21 @@ export const ZOOM_MASSIMO_CORSIE = 20.6;
 export function zoomCorsie(voluto, scelto = 0) {
   return Math.min(ZOOM_MASSIMO_CORSIE, voluto - scelto + PIU_VICINO_CORSIE) + scelto;
 }
+
+/**
+ * L'asfalto delle vie con le corsie vicino a [x, y]: per ognuna il punto del
+ * suo asse e quanto e' larga da li' (le corsie, lo scostamento e la banchina
+ * piu' larga). Per tenere la fascia dentro l'asfalto (`dentroLAsfalto`).
+ */
+export function asfaltoDelleCorsie(indice, x, y) {
+  const out = [];
+  if (!indice) return out;
+  for (const [i, k] of indice.vicini(x, y)) {
+    const v = indice.strade[i];
+    const t = sulTratto(v, k, x, y);
+    if (t.d > 20) continue;
+    const meta = ((v.avanti + v.indietro) * v.lw) / 2 + Math.abs(v.posa || 0) + Math.max(...(v.margini ?? [0.35, 0.35]));
+    out.push({ qx: t.qx, qy: t.qy, meta });
+  }
+  return out;
+}

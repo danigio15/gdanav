@@ -18,8 +18,8 @@ const { VectorTile } = await import(`${W}/node_modules/@mapbox/vector-tile/index
 const Pbf = (await import(`${W}/node_modules/pbf/index.js`)).default;
 const { scarica } = await import(`${W}/collaudo/strada.mjs`);
 const { costruisciTessera } = await import(`${W}/src/tessera.js`);
-const { preparaCorsie, IndiceCorsie, corsieLungoIlPercorso } = await import(`${W}/src/corsie.js`);
-const { IndiceSegmenti, Linea, profiloDi, fasciaSullaCorsia, levigaFascia } = await import(`${W}/src/percorso.js`);
+const { asfaltoDelleCorsie, preparaCorsie, IndiceCorsie, corsieLungoIlPercorso } = await import(`${W}/src/corsie.js`);
+const { IndiceSegmenti, Linea, profiloDi, fasciaSullaCorsia, levigaFascia, dentroLAsfalto } = await import(`${W}/src/percorso.js`);
 const { sistemaTessera } = await import(`${W}/src/geo.js`);
 const z = 14;
 const tj = JSON.parse((await scarica('https://tiles.openfreemap.org/planet')).corpo.toString());
@@ -410,7 +410,11 @@ export function percorsi(T, quanti = 60) {
       punti.push([x + pr.dx[k], y + pr.dy[k]]);
     }
     const r = corsieLungoIlPercorso(punti, indiceCorsie, { passo: pr.passo, s0: pr.s0 });
-    const fascia = levigaFascia(punti, fasciaSullaCorsia(punti, r, pr.passo), pr.passo);
+    // Come la disegna l'app (`sullaCorsia` in principale.js), dentro l'asfalto.
+    const fascia = dentroLAsfalto(levigaFascia(punti, fasciaSullaCorsia(punti, r, pr.passo), pr.passo), pr.h, (x, y, h) => [
+      ...indice.asfaltoVicino(x, y, h),
+      ...asfaltoDelleCorsie(indiceCorsie, x, y),
+    ]);
     const metti = (tipo, q, info) => {
       const mx = sys.mx + q[0] * sys.s;
       const my = sys.my - q[1] * sys.s;
@@ -510,8 +514,47 @@ function nastriDisegnati(T) {
       }
     }
   }
+  /* Nella vista «Corsie» il nastro di sempre non c'e' dove ci sono le
+   * corsie vere: c'e' il loro asfalto, spesso piu' largo della strada della
+   * mappa. Un punto sopra un suo triangolo e' sull'asfalto. */
+  const A = T.t.corsie?.asfalto;
+  const triangoli = new Map();
+  if (A) {
+    const P = A.posizioni;
+    const I = A.indici;
+    for (let k = 0; k < I.length; k += 3) {
+      const [a, b, c] = [I[k], I[k + 1], I[k + 2]];
+      const xs = [P[3 * a], P[3 * b], P[3 * c]];
+      const ys = [P[3 * a + 1], P[3 * b + 1], P[3 * c + 1]];
+      for (let gx = Math.floor(Math.min(...xs) / G); gx <= Math.floor(Math.max(...xs) / G); gx++) {
+        for (let gy = Math.floor(Math.min(...ys) / G); gy <= Math.floor(Math.max(...ys) / G); gy++) {
+          const cella = gx + ',' + gy;
+          if (!triangoli.has(cella)) triangoli.set(cella, []);
+          triangoli.get(cella).push(k);
+        }
+      }
+    }
+  }
+  const sullAsfaltoDelleCorsie = (x, y, h) => {
+    if (!A) return false;
+    const P = A.posizioni;
+    const I = A.indici;
+    for (const k of triangoli.get(Math.floor(x / G) + ',' + Math.floor(y / G)) ?? []) {
+      const [a, b, c] = [I[k], I[k + 1], I[k + 2]];
+      const [ax, ay, az, bx, by, cx, cy] = [P[3 * a], P[3 * a + 1], P[3 * a + 2], P[3 * b], P[3 * b + 1], P[3 * c], P[3 * c + 1]];
+      if (Math.abs(az - h) > 2.5) continue;
+      const d1 = (x - bx) * (ay - by) - (ax - bx) * (y - by);
+      const d2 = (x - cx) * (by - cy) - (bx - cx) * (y - cy);
+      const d3 = (x - ax) * (cy - ay) - (cx - ax) * (y - ay);
+      const neg = d1 < 0 || d2 < 0 || d3 < 0;
+      const pos = d1 > 0 || d2 > 0 || d3 > 0;
+      if (!(neg && pos)) return true;
+    }
+    return false;
+  };
   return {
     fuori(x, y, h) {
+      if (sullAsfaltoDelleCorsie(x, y, h)) return 0;
       let meglio = Infinity;
       for (let ox = -2; ox <= 2; ox++) {
         for (let oy = -2; oy <= 2; oy++) {

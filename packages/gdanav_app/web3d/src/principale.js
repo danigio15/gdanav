@@ -13,12 +13,12 @@ import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, lon
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { AggancioStrada, SOGLIA_M } from './aggancio.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
-import { alzataDeiNastri, direzioneDisegnata, fasciaSullaCorsia, IndiceSegmenti, levigaFascia, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti } from './percorso.js';
+import { alzataDeiNastri, dentroLAsfalto, direzioneDisegnata, fasciaSullaCorsia, IndiceSegmenti, levigaFascia, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti } from './percorso.js';
 import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
 import { dallaScorta, nellaScorta } from './scorte.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
 import { tavolozza } from './tavolozza.js';
-import { corsiaDellAuto, corsieLungoIlPercorso, zoomCorsie, IndiceCorsie, preparaCorsie, riquadroCorsie, riquadroLonLat, tessereConCorsieVere } from './corsie.js';
+import { asfaltoDelleCorsie, corsiaDellAuto, corsieLungoIlPercorso, zoomCorsie, IndiceCorsie, preparaCorsie, riquadroCorsie, riquadroLonLat, tessereConCorsieVere } from './corsie.js';
 import './gdanav3d.css';
 
 /** Gli strati da toccare (come `stratiToccabili` in stile.dart). */
@@ -1595,7 +1595,10 @@ function sullaCorsia(p) {
     punti.push([x + pr.dx[k], y + pr.dy[k]]);
   }
   const r = corsieLungoIlPercorso(punti, S.indiceCorsie, { passo: pr.passo, s0: pr.s0, suggerimenti: S.suggerimenti });
-  const fascia = levigaFascia(punti, fasciaSullaCorsia(punti, r, pr.passo), pr.passo);
+  const fascia = dentroLAsfalto(levigaFascia(punti, fasciaSullaCorsia(punti, r, pr.passo), pr.passo), pr.h, (x, y, h) => [
+    ...indice.asfaltoVicino(x, y, h),
+    ...asfaltoDelleCorsie(S.indiceCorsie, x, y),
+  ]);
   for (let k = 0; k < n; k++) {
     pr.dx[k] = fascia[k][0] - linea[k][0];
     pr.dy[k] = fascia[k][1] - linea[k][1];

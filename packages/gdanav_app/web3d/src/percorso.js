@@ -121,6 +121,39 @@ export class IndiceSegmenti {
   }
 
   /**
+   * L'asfalto vicino a [x, y] alla quota [h] (entro [dz]): per ogni strada il
+   * punto del suo asse piu' vicino e la sua mezza larghezza. I binari no.
+   */
+  asfaltoVicino(x, y, h, raggio = 12, dz = 2.5) {
+    const out = [];
+    const c = this.cella;
+    for (const t of this.tessere.values()) {
+      if (x < t.minx - raggio || x > t.maxx + raggio || y < t.miny - raggio || y > t.maxy + raggio) continue;
+      const visti = new Set();
+      for (let cx = Math.floor((x - raggio) / c); cx <= Math.floor((x + raggio) / c); cx++) {
+        for (let cy = Math.floor((y - raggio) / c); cy <= Math.floor((y + raggio) / c); cy++) {
+          for (const i of t.griglia.get(cx * 100003 + cy) || []) {
+            if (visti.has(i)) continue;
+            visti.add(i);
+            const o = 8 * i;
+            const s = t.s;
+            if ((s[o + 7] & 15) === 8) continue;
+            const sx = s[o + 3] - s[o];
+            const sy = s[o + 4] - s[o + 1];
+            const l2 = sx * sx + sy * sy;
+            if (l2 < 1e-6) continue;
+            const u = Math.max(0, Math.min(1, ((x - s[o]) * sx + (y - s[o + 1]) * sy) / l2));
+            const z = s[o + 2] + (s[o + 5] - s[o + 2]) * u;
+            if (Math.abs(z - h) > dz) continue;
+            out.push({ qx: s[o] + sx * u, qy: s[o + 1] + sy * u, meta: s[o + 6] / 2 });
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  /**
    * Le quote delle strade vicine al punto che vanno come [dx, dy] (anche
    * contromano, ma non sui sensi unici); ognuna con la sua distanza dal punto.
    */
@@ -719,6 +752,71 @@ const FASCIA_DI_LATO = 0.35;
  * corsia di una via che finisce, una via sotto che cambia) diventa un
  * raccordo. Cambia [fascia].
  */
+/**
+ * La fascia dentro l'asfalto: l'ultima parola, qualunque linea abbia mandato
+ * il fornitore. «La linea deve essere sempre agganciata all'asfalto, non deve
+ * andare fuori strada su tutte le strade.» Dove la linea di TomTom arriva
+ * spostata di qualche metro e lo spostamento non la riporta tutta, il centro
+ * della fascia restava un metro o due oltre il bordo della strada disegnata.
+ *
+ * Per ogni punto [cerca](x, y, h) dice l'asfalto vicino a quella quota —
+ * `{qx, qy, meta}`, il punto dell'asse e la mezza larghezza — e se il punto
+ * non ci sta dentro (meno [margine] dal bordo) lo si porta verso l'asse
+ * della strada piu' vicina, di quel tanto. Oltre [lontano] metri fuori non
+ * si tocca: li' la strada non c'e' (un parcheggio, una strada che la mappa
+ * non ha) e tirarlo su un'altra sarebbe peggio.
+ */
+export function dentroLAsfalto(fascia, h, cerca, { margine = 0.4, lontano = 6, rampa = 0.3 } = {}) {
+  const n = fascia.length;
+  const cx = new Float64Array(n);
+  const cy = new Float64Array(n);
+  /* Fra due carreggiate (la linea di TomTom nel mezzo) le strade vicine sono
+   * due, una per parte: scegliendo ogni volta la piu' vicina la fascia
+   * saltava da una all'altra. Si sceglie anche col punto di prima: la
+   * correzione piu' simile a quella appena fatta. */
+  let px = 0;
+  let py = 0;
+  for (let k = 0; k < n; k++) {
+    const q = fascia[k];
+    let meglio = null;
+    let dentro = false;
+    for (const a of cerca(q[0], q[1], h[k] ?? 0)) {
+      const d = Math.hypot(q[0] - a.qx, q[1] - a.qy);
+      const fuori = d - Math.max(0, a.meta - margine);
+      if (fuori <= 0) {
+        dentro = true;
+        break;
+      }
+      if (fuori > lontano || d < 1e-6) continue;
+      const vx = ((a.qx - q[0]) * fuori) / d;
+      const vy = ((a.qy - q[1]) * fuori) / d;
+      const costo = fuori + Math.hypot(vx - px, vy - py);
+      if (!meglio || costo < meglio.costo) meglio = { vx, vy, costo };
+    }
+    if (dentro || !meglio) {
+      px = py = 0;
+      continue;
+    }
+    cx[k] = px = meglio.vx;
+    cy[k] = py = meglio.vy;
+  }
+  /* Senza scalini: la correzione cresce e cala di al piu' [rampa] metri per
+   * punto, prima e dopo dove serve (altrimenti la fascia dava uno strattone
+   * di lato dove la regola si accendeva: lo zig-zag). Chi ne ha bisogno la
+   * tiene tutta; i vicini ne prendono un po'. */
+  const smussa = (k, j) => {
+    const lj = Math.hypot(cx[j], cy[j]);
+    const lk = Math.hypot(cx[k], cy[k]);
+    if (lj - rampa <= lk) return;
+    const f = (lj - rampa) / lj;
+    cx[k] = cx[j] * f;
+    cy[k] = cy[j] * f;
+  };
+  for (let k = 1; k < n; k++) smussa(k, k - 1);
+  for (let k = n - 2; k >= 0; k--) smussa(k, k + 1);
+  return fascia.map((q, k) => (cx[k] || cy[k] ? [q[0] + cx[k], q[1] + cy[k]] : q));
+}
+
 export function levigaFascia(punti, fascia, passo) {
   const n = punti.length;
   if (n < 3) return fascia;

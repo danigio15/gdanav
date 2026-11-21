@@ -626,3 +626,22 @@ test('il profilo più fitto: le quote e gli spostamenti in mezzo in linea retta'
   assert.equal(f.trovata.length, 5);
   assert.equal(p.piuFitto(4), p, 'non più rado');
 });
+
+test('la fascia resta dentro l’asfalto: fuori torna dentro, dentro non si tocca, fra due carreggiate non salta', async () => {
+  const { dentroLAsfalto } = await import('../src/percorso.js');
+  // Una strada lungo y = 0, larga 7 m (mezza 3,5).
+  const strada = (x, y) => [{ qx: x, qy: 0, meta: 3.5 }];
+  // La linea esce piano piano di due metri oltre il bordo, e rientra.
+  const fuori = Array.from({ length: 40 }, (_, k) => [k * 2, 1 + 4.5 * Math.max(0, Math.min(1, (k - 6) / 6, (30 - k) / 6))]);
+  const h = new Array(40).fill(0);
+  const dopo = dentroLAsfalto(fuori, h, strada);
+  for (const [x, y] of dopo) assert.ok(Math.abs(y) <= 3.11, `dentro (${x}: ${y.toFixed(2)})`);
+  assert.deepEqual(dopo[2], fuori[2], 'dentro non si tocca');
+  for (let k = 1; k < 40; k++) assert.ok(Math.abs(dopo[k][1] - dopo[k - 1][1]) < 0.6, `senza strattoni (${k})`);
+  // Due carreggiate a y = ±6, la linea nel mezzo che oscilla di poco: sempre la stessa.
+  const due = (x, y) => [{ qx: x, qy: 6, meta: 3 }, { qx: x, qy: -6, meta: 3 }];
+  const mezzo = Array.from({ length: 30 }, (_, k) => [k * 2, k % 2 ? 0.2 : -0.2]);
+  const scelto = dentroLAsfalto(mezzo, new Array(30).fill(0), due);
+  const lati = new Set(scelto.slice(2, 28).map(([, y]) => Math.sign(y)));
+  assert.equal(lati.size, 1, 'una carreggiata sola, non a zig-zag');
+});
