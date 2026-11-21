@@ -645,3 +645,39 @@ test('la fascia resta dentro l’asfalto: fuori torna dentro, dentro non si tocc
   const lati = new Set(scelto.slice(2, 28).map(([, y]) => Math.sign(y)));
   assert.equal(lati.size, 1, 'una carreggiata sola, non a zig-zag');
 });
+
+test('fra due campioni la fascia ancorata sta sulla retta fra i punti spostati, non sulla piega della linea di sotto', async () => {
+  const { Linea, Profilo } = await import('../src/percorso.js');
+  // La linea va dritta, a metà fra due campioni fa un dente di 3 m, e torna.
+  const l = new Linea([0, 0, 3, 0, 4, 3, 5, 0, 20, 0]);
+  const passo = (l.lunghezza - 0) / 4;
+  const dx = new Float64Array(5);
+  const dy = new Float64Array(5);
+  for (let k = 0; k < 5; k++) {
+    const [x, y] = l.a(k * passo);
+    // I punti da disegnare: tutti su y = 0.
+    dx[k] = k * passo * (20 / l.lunghezza) - x;
+    dy[k] = -y;
+  }
+  const p = new Profilo(0, passo, new Float64Array(5), null, dx, dy).ancora(l);
+  for (let s = 0; s <= l.lunghezza; s += 0.25) {
+    const [x, y] = l.a(s);
+    const [sx, sy] = p.sposta(s);
+    assert.ok(Math.abs(y + sy) < 1e-9, `sulla retta (${s.toFixed(2)}: ${(x + sx).toFixed(2)}, ${(y + sy).toFixed(2)})`);
+  }
+});
+
+test('la levigatura non spinge di traverso i punti dove la linea di sotto fa uno scalino', async () => {
+  const { levigaFascia } = await import('../src/percorso.js');
+  // La linea di sotto: dritta lungo x, con un punto che salta di lato di
+  // tre metri e torna (la linea del fornitore attorno a un'isola).
+  const linea = [];
+  for (let k = 0; k < 20; k++) linea.push([k * 2, k === 10 ? 3 : 0]);
+  // La fascia: dritta lungo y = -1.
+  const fascia = linea.map((_, k) => [k * 2, -1]);
+  const dopo = levigaFascia(linea, fascia.map((q) => [...q]), 2);
+  for (let k = 0; k < 20; k++) {
+    const d = Math.hypot(dopo[k][0] - fascia[k][0], dopo[k][1] - fascia[k][1]);
+    assert.ok(d < 0.05 || Math.abs(dopo[k][1] + 6) < 0.05, `il punto ${k} resta dov'era (${d.toFixed(2)} m)`);
+  }
+});
