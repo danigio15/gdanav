@@ -236,6 +236,8 @@ export function normalizza(s) {
     posa: scostamentoPosa(t.placement ?? t['placement:forward'], c.avanti, c.indietro, lw),
     ponte: !!t.bridge && t.bridge !== 'no',
     galleria: !!t.tunnel && t.tunnel !== 'no',
+    // Un pezzo dell'anello di una rotonda (vedi gli spigoli in `corsieLungoIlPercorso`).
+    anello: t.junction === 'roundabout' || t.junction === 'circular',
     livello: intero(t.layer) ?? 0,
   };
   v.margini = margini(v);
@@ -922,7 +924,14 @@ export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzo
       const a = versoCorsia[kp];
       const b = versoCorsia[k];
       const gradi = (Math.atan2(Math.abs(a[0] * b[1] - a[1] * b[0]), a[0] * b[0] + a[1] * b[1]) * 180) / Math.PI;
-      if (gradi >= SPIGOLO_GRADI) spigoli.push({ k: kp, kb: k, pA: centro[kp], tA: a, pB: centro[k], tB: b, gradi });
+      /* Da un pezzo all'altro dello stesso anello non si svolta: si gira.
+       * In OpenStreetMap l'anello di una rotonda e' spezzato in tanti pezzi
+       * di via, e su un anello piccolo ogni passaggio superava i venti gradi:
+       * una «svolta» con la sua curva dopo l'altra, e la fascia attorno
+       * all'isola veniva a denti di sega («la linea a zig-zag alla
+       * rotonda»). */
+      const sullAnello = strade[via[k]]?.anello && strade[via[kp]]?.anello && avanti[k] === avanti[kp];
+      if (gradi >= SPIGOLO_GRADI && !sullAnello) spigoli.push({ k: kp, kb: k, pA: centro[kp], tA: a, pB: centro[k], tB: b, gradi });
     }
     kp = k;
   }
