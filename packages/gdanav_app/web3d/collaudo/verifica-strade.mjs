@@ -411,10 +411,9 @@ export function percorsi(T, quanti = 60) {
     }
     const r = corsieLungoIlPercorso(punti, indiceCorsie, { passo: pr.passo, s0: pr.s0 });
     // Come la disegna l'app (`sullaCorsia` in principale.js), dentro l'asfalto.
-    const fascia = dentroLAsfalto(levigaFascia(punti, fasciaSullaCorsia(punti, r, pr.passo), pr.passo), pr.h, (x, y, h) => [
-      ...indice.asfaltoVicino(x, y, h),
-      ...asfaltoDelleCorsie(indiceCorsie, x, y),
-    ]);
+    const sullaStrada = levigaFascia(punti, fasciaSullaCorsia(punti, r, pr.passo), pr.passo);
+    const dentro = dentroLAsfalto(sullaStrada, pr.h, (x, y, h) => [...indice.asfaltoVicino(x, y, h), ...asfaltoDelleCorsie(indiceCorsie, x, y)]);
+    const fascia = levigaFascia(asse, dentro, pr.passo);
     const metti = (tipo, q, info) => {
       const mx = sys.mx + q[0] * sys.s;
       const my = sys.my - q[1] * sys.s;

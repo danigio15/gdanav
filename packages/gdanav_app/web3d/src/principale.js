@@ -1595,10 +1595,13 @@ function sullaCorsia(p) {
     punti.push([x + pr.dx[k], y + pr.dy[k]]);
   }
   const r = corsieLungoIlPercorso(punti, S.indiceCorsie, { passo: pr.passo, s0: pr.s0, suggerimenti: S.suggerimenti });
-  const fascia = dentroLAsfalto(levigaFascia(punti, fasciaSullaCorsia(punti, r, pr.passo), pr.passo), pr.h, (x, y, h) => [
-    ...indice.asfaltoVicino(x, y, h),
-    ...asfaltoDelleCorsie(S.indiceCorsie, x, y),
-  ]);
+  // Sulla corsia, dentro l'asfalto, e per ultima levigata anche rispetto
+  // alla linea vera: l'aggancio alle strade (gli spostamenti) a volte salta
+  // da un punto all'altro, e la levigatura sui soli punti agganciati quei
+  // salti non li vedeva (lo zig-zag).
+  const sullaStrada = levigaFascia(punti, fasciaSullaCorsia(punti, r, pr.passo), pr.passo);
+  const dentro = dentroLAsfalto(sullaStrada, pr.h, (x, y, h) => [...indice.asfaltoVicino(x, y, h), ...asfaltoDelleCorsie(S.indiceCorsie, x, y)]);
+  const fascia = levigaFascia(linea, dentro, pr.passo);
   for (let k = 0; k < n; k++) {
     pr.dx[k] = fascia[k][0] - linea[k][0];
     pr.dy[k] = fascia[k][1] - linea[k][1];
