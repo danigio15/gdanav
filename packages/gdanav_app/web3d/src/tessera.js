@@ -1354,7 +1354,9 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   let segnaletica = null;
   let semafori = [];
   if (conCorsie) {
-    const sg = costruisciSegnaletica({ strade: conCorsie.strade, nodi: conCorsie.nodi, sopra: sopraCorsie, meta });
+    // Le rotonde della tessera, dal grafo: centro e raggio dell'anello.
+    const rotonde = [...new Set(nodi.map((n) => n.centroRotonda).filter(Boolean))];
+    const sg = costruisciSegnaletica({ strade: conCorsie.strade, nodi: conCorsie.nodi, sopra: sopraCorsie, meta, rotonde });
     segnaletica = {
       asfalto: sg.asfalto.triangoli ? sg.asfalto.fatto() : null,
       vernice: sg.vernice.triangoli ? sg.vernice.fatto() : null,
