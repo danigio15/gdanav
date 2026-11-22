@@ -13,7 +13,7 @@ import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, lon
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { AggancioStrada, SOGLIA_M } from './aggancio.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
-import { alzataDeiNastri, dentroLAsfalto, direzioneDisegnata, fasciaSullaCorsia, IndiceSegmenti, levigaFascia, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti, togliDenti } from './percorso.js';
+import { alzataDeiNastri, dentroLAsfalto, direzioneDisegnata, fasciaSullaCorsia, IndiceSegmenti, levigaFascia, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti, staccatiDallaVia, togliDenti } from './percorso.js';
 import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
 import { dallaScorta, nellaScorta } from './scorte.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
@@ -36,7 +36,10 @@ const VISTE = { inclinata: { pitch: 70, zoom: 17.9 }, immersiva: { pitch: 74, zo
 const VISTA_CORSIE = { pitch: 62, zoom: 18.6 };
 const OBIETTIVO_CORSIE_GRADI = 44;
 /** La fascia della corsia: quanto è larga (m) e quanto sta sopra l'asfalto. */
-const FASCIA_CORSIA = { largo: 2.7, sopra: 0.3 };
+// Larga meno di una corsia, che ci stia dentro con un margine: in città la
+// corsia è di tre metri, e fra la riga di bordo e quella di mezzo ne restano
+// 2,65; a 2,7 m (e anche a 2,3) la fascia stava sulle righe.
+const FASCIA_CORSIA = { largo: 2.0, sopra: 0.3 };
 /** Ogni quanti metri un punto della fascia (il profilo del «3D aumentato» ne ha uno ogni quattro). */
 const PASSO_CORSIE = 2;
 /** La freccia della manovra: nel «3D aumentato», e sulla fascia della vista «Corsie». */
@@ -1601,7 +1604,7 @@ function sullaCorsia(p) {
   // salti non li vedeva (lo zig-zag).
   const sullaStrada = levigaFascia(punti, fasciaSullaCorsia(punti, r, pr.passo), pr.passo);
   const dentro = dentroLAsfalto(sullaStrada, pr.h, (x, y, h) => [...indice.asfaltoVicino(x, y, h), ...asfaltoDelleCorsie(S.indiceCorsie, x, y)]);
-  const fascia = togliDenti(levigaFascia(linea, dentro, pr.passo));
+  const fascia = togliDenti(levigaFascia(linea, dentro, pr.passo, staccatiDallaVia(r.scarti, pr.passo)));
   for (let k = 0; k < n; k++) {
     pr.dx[k] = fascia[k][0] - linea[k][0];
     pr.dy[k] = fascia[k][1] - linea[k][1];

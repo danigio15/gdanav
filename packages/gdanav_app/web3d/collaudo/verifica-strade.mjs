@@ -19,7 +19,7 @@ const Pbf = (await import(`${W}/node_modules/pbf/index.js`)).default;
 const { scarica } = await import(`${W}/collaudo/strada.mjs`);
 const { costruisciTessera } = await import(`${W}/src/tessera.js`);
 const { asfaltoDelleCorsie, preparaCorsie, IndiceCorsie, corsieLungoIlPercorso } = await import(`${W}/src/corsie.js`);
-const { IndiceSegmenti, Linea, profiloDi, fasciaSullaCorsia, levigaFascia, dentroLAsfalto, togliDenti } = await import(`${W}/src/percorso.js`);
+const { IndiceSegmenti, Linea, profiloDi, fasciaSullaCorsia, levigaFascia, dentroLAsfalto, togliDenti, staccatiDallaVia } = await import(`${W}/src/percorso.js`);
 const { sistemaTessera } = await import(`${W}/src/geo.js`);
 const z = 14;
 const tj = JSON.parse((await scarica('https://tiles.openfreemap.org/planet')).corpo.toString());
@@ -413,7 +413,7 @@ export function percorsi(T, quanti = 60) {
     // Come la disegna l'app (`sullaCorsia` in principale.js), dentro l'asfalto.
     const sullaStrada = levigaFascia(punti, fasciaSullaCorsia(punti, r, pr.passo), pr.passo);
     const dentro = dentroLAsfalto(sullaStrada, pr.h, (x, y, h) => [...indice.asfaltoVicino(x, y, h), ...asfaltoDelleCorsie(indiceCorsie, x, y)]);
-    const fascia = togliDenti(levigaFascia(asse, dentro, pr.passo));
+    const fascia = togliDenti(levigaFascia(asse, dentro, pr.passo, staccatiDallaVia(r.scarti, pr.passo)));
     const metti = (tipo, q, info) => {
       const mx = sys.mx + q[0] * sys.s;
       const my = sys.my - q[1] * sys.s;

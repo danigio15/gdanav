@@ -764,6 +764,10 @@ function sulTratto(v, k, x, y) {
 
 /** Da quanti gradi in su, passando da una via all'altra, la fascia ha uno spigolo (vedi `fasciaSullaCorsia`). */
 const SPIGOLO_GRADI = 20;
+/** Da tanto in su, uno spigolo sulla stessa via è TomTom che torna indietro (vedi `corsieLungoIlPercorso`). */
+const RITORNO_GRADI = 150;
+/** E la svolta vera arriva entro tanto (m). */
+const RITORNO_VICINO_M = 30;
 /** E al più quanti metri senza via fra le due (dentro l'incrocio). */
 const SPIGOLO_VUOTO_M = 40;
 /** Il percorso va di traverso alla via sotto se il coseno fra i due versi è sotto questo (una decina di gradi). */
@@ -935,6 +939,22 @@ export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzo
     }
     kp = k;
   }
+  /* TomTom a volte passa l'incrocio, tocca un punto qualche metro più in là
+   * (una rotondina che per lui è un punto) e torna indietro sulla stessa
+   * via, per poi girare: sulla strada è una svolta stretta all'incrocio, e
+   * si fa lì. La fascia disegnava anche quel pezzo in più, andata e
+   * ritorno, col nodo in cima al «V». Il ritorno sulla stessa via e la
+   * svolta subito dopo sono una svolta sola, dalla corsia di prima a quella
+   * di dopo. */
+  for (let j = 0; j + 1 < spigoli.length; j++) {
+    const g1 = spigoli[j];
+    const g2 = spigoli[j + 1];
+    if (g1.gradi < RITORNO_GRADI || via[g1.k] !== via[g1.kb] || (g2.k - g1.kb) * passo > RITORNO_VICINO_M) continue;
+    const a = g1.tA;
+    const b = g2.tB;
+    const gradi = (Math.atan2(Math.abs(a[0] * b[1] - a[1] * b[0]), a[0] * b[0] + a[1] * b[1]) * 180) / Math.PI;
+    spigoli.splice(j, 2, { k: g1.k, kb: g2.kb, pA: g1.pA, tA: a, pB: g2.pB, tB: b, gradi });
+  }
   // Accanto a uno spigolo il verso del percorso è quello del suo pezzo (non
   // la media col pezzo di là, di traverso): lo stesso con cui la fascia
   // sposta i punti (`fasciaSullaCorsia`); -1 l'ultimo punto prima, +1 il
@@ -990,7 +1010,9 @@ export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzo
     for (let j = 0; j < pezzo.length; j++) liscio[lo + j] = l[prima + j] + racc[j];
     lo = hi + 1;
   }
-  return { sposta: liscio, vie: via, corsie, manovre, spigoli, centri: centro, versi: versoCorsia };
+  // Quanto la linea agganciata sta lontana dall'asse della sua via (vedi `fasciaSullaCorsia`).
+  const scarti = sul.map((t) => t?.d ?? 0);
+  return { sposta: liscio, vie: via, corsie, manovre, spigoli, centri: centro, versi: versoCorsia, scarti };
 }
 
 /** Le direzioni dei rami da cui si esce dal nodo [q], in radianti, senza quello da cui si arriva. */
