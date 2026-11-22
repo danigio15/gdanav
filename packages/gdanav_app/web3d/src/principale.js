@@ -13,7 +13,7 @@ import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, lon
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { AggancioStrada, SOGLIA_M } from './aggancio.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
-import { alzataDeiNastri, dentroLAsfalto, direzioneDisegnata, fasciaSullaCorsia, IndiceSegmenti, levigaFascia, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti, togliDenti } from './percorso.js';
+import { alzataDeiNastri, dentroLAsfalto, direzioneDisegnata, fasciaSullaCorsia, IndiceSegmenti, levigaFascia, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, nastriInsieme, nastroDelGiro, sensiDiMarcia, spostamenti, togliDenti } from './percorso.js';
 import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
 import { dallaScorta, nellaScorta } from './scorte.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
@@ -1555,7 +1555,8 @@ function aggiornaPercorso(adesso) {
       // tenere, una fascia verde trasparente invece della linea blu.
       sullaCorsia(p);
       scena.impostaNastro('alone', null);
-      scena.impostaNastro('percorso', nastro(p.linea, p.profilo, da, a, FASCIA_CORSIA.largo, FASCIA_CORSIA.sopra, { code: p.code }), 'percorsoCorsia', 5);
+      const giri = (p.giri ?? []).filter((g) => g.s >= da && g.s <= a).map((g) => nastroDelGiro(g.punti, p.profilo.quota(g.s), FASCIA_CORSIA.largo, FASCIA_CORSIA.sopra, g.s, g.s1));
+      scena.impostaNastro('percorso', nastriInsieme([nastro(p.linea, p.profilo, da, a, FASCIA_CORSIA.largo, FASCIA_CORSIA.sopra, { code: p.code }), ...giri]), 'percorsoCorsia', 5);
     } else {
       scena.impostaNastro('alone', nastro(p.linea, p.profilo, da, a, 15, 0.55), 'alone', 4);
       scena.impostaNastro('percorso', nastro(p.linea, p.profilo, da, a, 4.6, 0.62, { code: p.code }), 'percorso', 5);
@@ -1608,6 +1609,8 @@ function sullaCorsia(p) {
   }
   pr.ancora(p.linea);
   p.manovreCorsie = r.manovre.map((m) => ({ s: m.s, dir: m.dir }));
+  // I giri delle rotonde dove il percorso torna indietro (vedi `giroDellAnello`).
+  p.giri = r.spigoli.filter((g) => g.giro).map((g) => ({ punti: g.giro, s: pr.s0 + g.k * pr.passo, s1: pr.s0 + (g.kb ?? g.k + 1) * pr.passo }));
 }
 
 /** La strada già fatta: gli ultimi [FATTO_M] metri, all'altezza giusta. */

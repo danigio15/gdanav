@@ -764,6 +764,62 @@ function sulTratto(v, k, x, y) {
 
 /** Da quanti gradi in su, passando da una via all'altra, la fascia ha uno spigolo (vedi `fasciaSullaCorsia`). */
 const SPIGOLO_GRADI = 20;
+/** Fin dove due svolte dalla stessa parte sono una sola (vedi `corsieLungoIlPercorso`). */
+const SPIGOLI_VICINI_M = 30;
+/** Da quanti gradi in su il percorso torna indietro (vedi `giroDellAnello`). */
+const INVERSIONE_ALLA_ROTONDA_GRADI = 150;
+/** Fin dove dal punto dove si torna indietro si cerca la rotonda (m). */
+const ROTONDA_VICINA_M = 25;
+
+/**
+ * Il giro attorno alla rotonda vicina a [O] (dove il percorso torna
+ * indietro): i punti dell'anello, nel suo verso, da quello piu' vicino a
+ * [pA] (la corsia che arriva) a quello piu' vicino a [pB] (la corsia che
+ * riparte). `null` se li' non c'e' una rotonda chiusa.
+ */
+export function giroDellAnello(strade, indice, O, pA, pB) {
+  const pezzi = [];
+  const visti = new Set();
+  for (const [i] of indice.vicini(O[0], O[1])) {
+    if (visti.has(i)) continue;
+    visti.add(i);
+    const v = strade[i];
+    if (!v.anello || !v.xy || v.xy.length < 2) continue;
+    if (!v.xy.some((q) => Math.hypot(q[0] - O[0], q[1] - O[1]) < ROTONDA_VICINA_M)) continue;
+    pezzi.push(v.xy);
+  }
+  if (!pezzi.length) return null;
+  // L'anello: i pezzi uno dopo l'altro, la fine di uno l'inizio del successivo.
+  const vicino = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 0.5;
+  const resto = pezzi.slice(1);
+  const anello = [...pezzi[0]];
+  while (resto.length) {
+    const j = resto.findIndex((p) => vicino(p[0], anello.at(-1)));
+    if (j < 0) break;
+    anello.push(...resto[j].slice(1));
+    resto.splice(j, 1);
+  }
+  if (resto.length || anello.length < 4 || !vicino(anello[0], anello.at(-1))) return null;
+  anello.pop();
+  const n = anello.length;
+  const piuVicino = (p) => {
+    let m = 0;
+    for (let k = 1; k < n; k++) if (Math.hypot(anello[k][0] - p[0], anello[k][1] - p[1]) < Math.hypot(anello[m][0] - p[0], anello[m][1] - p[1])) m = k;
+    return m;
+  };
+  const da = piuVicino(pA);
+  const a = piuVicino(pB);
+  // Entrata e uscita dallo stesso braccio: il giro intero (l'inversione
+  // fatta come si deve, attorno all'isola).
+  const giro = [anello[da]];
+  for (let k = (da + 1) % n; ; k = (k + 1) % n) {
+    giro.push(anello[k]);
+    if (k === a) break;
+  }
+  return giro;
+}
+/** E fin quanti gradi in tutto: oltre (due svolte che quasi tornano indietro) la curva unica viene storta. */
+const SPIGOLI_UNITI_MAX_GRADI = 100;
 /** E al più quanti metri senza via fra le due (dentro l'incrocio). */
 const SPIGOLO_VUOTO_M = 40;
 /** Il percorso va di traverso alla via sotto se il coseno fra i due versi è sotto questo (una decina di gradi). */
@@ -934,6 +990,33 @@ export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzo
       if (gradi >= SPIGOLO_GRADI && !sullAnello) spigoli.push({ k: kp, kb: k, pA: centro[kp], tA: a, pB: centro[k], tB: b, gradi });
     }
     kp = k;
+  }
+  /* Due svolte vicine dalla stessa parte sono una svolta sola. In
+   * OpenStreetMap un incrocio spesso ha il suo pezzetto di via in mezzo
+   * (il raccordo di una ventina di metri fra la via di prima e quella di
+   * dopo): due spigoli, e due curve, una sull'altra. La seconda partiva
+   * dalla corsia del pezzetto, girato di traverso rispetto al percorso, e la
+   * fascia faceva un «<» di due metri e mezzo sull'incrocio. Una curva
+   * sola, dalla corsia di prima a quella di dopo. */
+  const cross = (a, b) => a[0] * b[1] - a[1] * b[0];
+  for (let j = 0; j + 1 < spigoli.length; ) {
+    const g1 = spigoli[j];
+    const g2 = spigoli[j + 1];
+    const gradi = (Math.atan2(Math.abs(cross(g1.tA, g2.tB)), g1.tA[0] * g2.tB[0] + g1.tA[1] * g2.tB[1]) * 180) / Math.PI;
+    const vicini = (g2.k - g1.kb) * passo <= SPIGOLI_VICINI_M;
+    if (vicini && Math.sign(cross(g1.tA, g1.tB)) === Math.sign(cross(g2.tA, g2.tB)) && gradi < SPIGOLI_UNITI_MAX_GRADI) {
+      spigoli.splice(j, 2, { k: g1.k, kb: g2.kb, pA: g1.pA, tA: g1.tA, pB: g2.pB, tB: g2.tB, gradi });
+    } else j++;
+  }
+  /* Tornare indietro a una rotonda è girarle attorno. TomTom ha le rotonde
+   * piccole come un punto solo: la sua linea ci arriva e torna indietro, e
+   * la fascia disegnava un'inversione a U davanti alla rotonda (vietata) col
+   * nodo in cima al «V». Il giro vero, nel verso dell'anello, dall'entrata
+   * piu' vicina alla corsia di prima all'uscita piu' vicina a quella di dopo. */
+  for (const g of spigoli) {
+    if (g.gradi < INVERSIONE_ALLA_ROTONDA_GRADI) continue;
+    const giro = giroDellAnello(strade, indice, punti[g.k], g.pA, g.pB);
+    if (giro) g.giro = giro;
   }
   // Accanto a uno spigolo il verso del percorso è quello del suo pezzo (non
   // la media col pezzo di là, di traverso): lo stesso con cui la fascia

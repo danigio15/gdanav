@@ -664,6 +664,12 @@ const SVOLTA_RAGGIO_M = 3;
  */
 const SVOLTA_TANGENTE_M = 4;
 const SVOLTA_TANGENTE_MIN_M = 2.5;
+/** Il raggio del giro della fascia quando si torna quasi indietro (m): più della sua larghezza. */
+const INVERSIONE_RAGGIO_M = 4;
+/** Ma l'arco comincia al piu' tanto prima dello spigolo (m): un tornante resta stretto. */
+const INVERSIONE_TANGENTE_M = 10;
+/** Da tanto in su è un tornante su due corsie accanto: lì l'arco resta stretto (vedi le prove). */
+const INVERSIONE_TORNANTE = (160 * Math.PI) / 180;
 /** Attorno alla curva, quanti metri della fascia si rimettono in fila sulle due corsie. */
 const SVOLTA_ZONA_M = 10;
 /** Le corsie attorno allo spigolo vanno «dritte» finché il coseno con la loro direzione lì sta sopra questo (una ventina di gradi). */
@@ -720,7 +726,10 @@ export function fasciaSullaCorsia(punti, { sposta, spigoli = [], centri = null, 
   const dot = (p, q, t) => (p[0] - q[0]) * t[0] + (p[1] - q[1]) * t[1];
   let libero = 0;
   spigoli.forEach((g, j) => {
-    const c = curvaDellaSvolta(g, punti, passo, centri, versi);
+    // Tornare indietro a una rotonda: il giro dell'anello (vedi `giroDellAnello`).
+    // (Il giro intero lo disegna un nastro suo, `giriDelleRotonde`: qui la
+    // fascia arriva all'entrata e riparte dall'uscita.)
+    const c = g.giro ? { curva: infittisciGiro([g.giro[0], g.giro.at(-1)]), tA: g.tA, tB: g.tB } : curvaDellaSvolta(g, punti, passo, centri, versi);
     if (!c) return;
     const limite = j + 1 < spigoli.length ? spigoli[j + 1].k : n - 1;
     if (g.k < libero || g.k + 1 > limite) return;
@@ -730,10 +739,16 @@ export function fasciaSullaCorsia(punti, { sposta, spigoli = [], centri = null, 
       const v = versi?.[m];
       return !v || v[0] * t[0] + v[1] * t[1] >= SVOLTA_DRITTO_COS;
     };
+    // Al giro di una rotonda la fascia deve arrivare fin lì: la zona va dal
+    // punto dove TomTom torna indietro all'anello, più la solita (prima, il
+    // doppio: lì vicino, dove TomTom piega, lo spostamento di lato storceva
+    // la fascia).
+    const zonaA = g.giro ? 2 * SVOLTA_ZONA_M + Math.max(0, -dot(out[g.k], c.curva[0], c.tA)) : SVOLTA_ZONA_M;
+    const zonaB = g.giro ? SVOLTA_ZONA_M + Math.max(0, dot(out[g.k + 1], c.curva.at(-1), c.tB)) : SVOLTA_ZONA_M;
     let i0 = g.k;
-    while (i0 > libero && dot(out[i0], c.curva[0], c.tA) > -SVOLTA_ZONA_M && dritto(i0 - 1, c.tA)) i0--;
+    while (i0 > libero && dot(out[i0], c.curva[0], c.tA) > -zonaA && dritto(i0 - 1, c.tA)) i0--;
     let i1 = g.k + 1;
-    while (i1 < limite && dot(out[i1], c.curva.at(-1), c.tB) < SVOLTA_ZONA_M && dritto(i1 + 1, c.tB)) i1++;
+    while (i1 < limite && dot(out[i1], c.curva.at(-1), c.tB) < zonaB && dritto(i1 + 1, c.tB)) i1++;
     // La strada: dal punto i0 lungo la corsia di prima (i suoi punti fino
     // all'inizio della curva), la curva, la corsia di dopo (i suoi punti
     // dalla fine della curva) fino a i1. Senza i pezzi di curva che
@@ -759,6 +774,58 @@ export function fasciaSullaCorsia(punti, { sposta, spigoli = [], centri = null, 
     }
     libero = i1;
   });
+  return out;
+}
+
+/**
+ * Il nastro del giro di una rotonda (vedi `giroDellAnello`): i punti
+ * dell'anello, alla quota [quota]. Il percorso di TomTom li' torna indietro
+ * in un paio di metri, e nella fascia, che ha un punto ogni due metri del
+ * percorso, il giro non ci sta: ha un nastro suo, uguale.
+ */
+export function nastroDelGiro(giro, quota, largo, sopra, s0 = 0, s1 = s0) {
+  const xy = [];
+  for (const q of infittisciGiro(giro)) xy.push(q[0], q[1]);
+  const linea = new Linea(xy);
+  const L = linea.lunghezza;
+  const d = nastro(linea, { quota: () => quota, gallerie: [] }, 0, L, largo, sopra, { passo: 1 });
+  // I metri del percorso, non quelli del giro: la scena sa dove sta l'auto
+  // lungo il percorso, e quello che ha dietro lo spegne.
+  for (let i = 1; i < d.uv.length; i += 2) d.uv[i] = s0 + ((s1 - s0) * d.uv[i]) / (L || 1);
+  return d;
+}
+
+/** Piu' nastri in uno (gli indici dell'uno dopo quelli dell'altro). */
+export function nastriInsieme(nastri) {
+  const pieni = nastri.filter((d) => d && d.indici.length);
+  if (pieni.length < 2) return pieni[0] ?? null;
+  const n = pieni.reduce((t, d) => t + d.posizioni.length / 3, 0);
+  const posizioni = new Float32Array(pieni.reduce((t, d) => t + d.posizioni.length, 0));
+  const uv = new Float32Array(pieni.reduce((t, d) => t + d.uv.length, 0));
+  const livelli = new Float32Array(pieni.reduce((t, d) => t + d.livelli.length, 0));
+  const ind = [];
+  let o = 0, ou = 0, ol = 0, base = 0;
+  for (const d of pieni) {
+    posizioni.set(d.posizioni, o);
+    uv.set(d.uv, ou);
+    livelli.set(d.livelli, ol);
+    for (const i of d.indici) ind.push(i + base);
+    o += d.posizioni.length;
+    ou += d.uv.length;
+    ol += d.livelli.length;
+    base += d.posizioni.length / 3;
+  }
+  return { posizioni, uv, livelli, indici: n > 65535 ? new Uint32Array(ind) : new Uint16Array(ind) };
+}
+
+/** I punti del giro di una rotonda, uno ogni mezzo metro circa. */
+function infittisciGiro(giro) {
+  const out = [giro[0]];
+  for (let k = 1; k < giro.length; k++) {
+    const [a, b] = [giro[k - 1], giro[k]];
+    const m = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.5));
+    for (let j = 1; j <= m; j++) out.push([a[0] + ((b[0] - a[0]) * j) / m, a[1] + ((b[1] - a[1]) * j) / m]);
+  }
   return out;
 }
 
@@ -1025,7 +1092,12 @@ function curvaDellaSvolta(g, punti, passo, centri, versi) {
   const lato = sen >= 0 ? 1 : -1;
   if (X) {
     // Un arco di cerchio tangente alle due corsie.
-    const T = Math.min(SVOLTA_TANGENTE_M, Math.max(SVOLTA_TANGENTE_MIN_M, SVOLTA_RAGGIO_M * Math.tan(angolo / 2)));
+    let T = Math.min(SVOLTA_TANGENTE_M, Math.max(SVOLTA_TANGENTE_MIN_M, SVOLTA_RAGGIO_M * Math.tan(angolo / 2)));
+    // Quasi un'inversione (tornare indietro su un'altra strada, a una
+    // rotondina): col raggio di una svolta l'arco era una forcina di un
+    // metro e la fascia, larga quasi tre, ci si accavallava sopra (il nodo
+    // in cima al «V»). Lì il giro ha almeno [INVERSIONE_RAGGIO_M].
+    if (angolo > (2 * Math.PI) / 3 && angolo < INVERSIONE_TORNANTE) T = Math.min(INVERSIONE_TANGENTE_M, Math.max(T, INVERSIONE_RAGGIO_M * Math.tan(angolo / 2)));
     const R = T / Math.tan(angolo / 2);
     const p0 = [X[0] - tA[0] * T, X[1] - tA[1] * T];
     const c = [p0[0] + nA[0] * R * lato, p0[1] + nA[1] * R * lato];
