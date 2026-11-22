@@ -269,3 +269,40 @@ test('vista «Corsie»: il tetto dello zoom vale per quello automatico, i tasti 
   // Sotto il tetto, come prima: più vicino di PIU_VICINO_CORSIE.
   assert.equal(zoomCorsie(16), 16 + PIU_VICINO_CORSIE);
 });
+
+test('fra due rampe affiancate la fascia non salta dall\'una all\'altra', () => {
+  // Due rampe a una corsia che partono dallo stesso nodo e poi corrono
+  // affiancate a sette metri; la linea del calcolatore (una corda) va piano
+  // dall'una all'altra. Prima, a metà, la via sotto passava a quella accanto
+  // e la fascia saltava di lato sopra il parapetto.
+  const indice = inMetri([
+    { id: 1, hw: 'motorway_link', oneway: 'yes', g: [0, 0, 0, -400] },
+    { id: 2, hw: 'motorway_link', oneway: 'yes', g: [0, 0, 7, -40, 7, -400] },
+  ]);
+  const punti = [];
+  for (let s = 0; s <= 400; s += 4) punti.push([0.5 + (6 * s) / 400, -s]);
+  const r = corsieLungoIlPercorso(punti, indice, { passo: 4 });
+  const usate = new Set([...r.vie].filter((v) => v >= 0));
+  assert.equal(usate.size, 1, `vie usate: ${[...usate]}`);
+  // Il mezzo della corsia non fa mai un salto di lato.
+  const centri = r.centri.filter(Boolean);
+  for (let k = 1; k < centri.length; k++) {
+    const salto = Math.abs(centri[k][0] - centri[k - 1][0]);
+    assert.ok(salto < 1.5, `salto di ${salto.toFixed(1)} m al punto ${k}`);
+  }
+});
+
+test('dove le due vie si toccano, il percorso passa dall\'una all\'altra', () => {
+  // Una via che finisce e un'altra che parte dal suo capo, di sbieco: il
+  // percorso le fa tutte e due.
+  const indice = inMetri([
+    { id: 1, hw: 'primary', oneway: 'yes', g: [0, 0, 0, -200] },
+    { id: 2, hw: 'primary', oneway: 'yes', g: [0, -200, 60, -380] },
+  ]);
+  const punti = [];
+  for (let s = 0; s <= 200; s += 4) punti.push([0, -s]);
+  for (let s = 4; s <= 180; s += 4) punti.push([(60 * s) / 180, -200 - s]);
+  const r = corsieLungoIlPercorso(punti, indice, { passo: 4 });
+  const usate = new Set([...r.vie].filter((v) => v >= 0));
+  assert.equal(usate.size, 2);
+});
