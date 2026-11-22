@@ -1,0 +1,34 @@
+getpwuid_r did not find a match for uid 501
+Timestamp               Ty Process[PID:TID]
+2026-11-22 16:08:21.539 Df Runner[25627:15a5e] [com.apple.network:path] nw_path_libinfo_path_check [01F5933E-8AFB-4567-8CA9-1B0E4854F526 Hostname#3147dc68:0 tcp, legacy-socket, attribution: developer]
+	libinfo check path: satisfied (Path is satisfied), interface: en0
+2026-11-22 16:08:21.540 Df Runner[25627:15a5c] [com.apple.network:path] nw_path_libinfo_path_check [3DEC0F4D-F53E-4AB3-9F32-E2BF4408DF86 Hostname#3147dc68:0 tcp, legacy-socket, attribution: developer]
+	libinfo check path: satisfied (Path is satisfied), interface: en0
+2026-11-22 16:08:21.670 A  Runner[25627:15a60] (Security) SecTrustEvaluateIfNecessary
+2026-11-22 16:08:21.671 Df Runner[25627:15a60] [com.apple.xpc:connection] [0x1244ce840] activating connection: mach=true listener=false peer=false name=com.apple.trustd
+2026-11-22 16:08:21.833 Df Runner[25627:15a60] [com.apple.xpc:connection] [0x1244ce840] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()
+2026-11-22 16:08:23.730 Df Runner[25627:14039] [com.apple.KeyboardArbiter:Client] RX sceneBecameFocused:(null)
+2026-11-22 16:08:30.329 Df Runner[25627:1406b] (Flutter) Waited 1.000000 seconds for a drawable, giving up.
+2026-11-22 16:08:30.332 Df Runner[25627:1406b] (Flutter) [ERROR:flutter/impeller/renderer/backend/metal/surface_mtl.mm(45)] Break on 'ImpellerValidationBreak' to inspect point of failure: Could not acquire current drawable.
+2026-11-22 16:08:49.835 Df Runner[25627:14256] [com.apple.CFNetwork:Default] Task <331E8DC8-2418-421F-A1C8-CA7443C6CC33>.<30> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-22 16:08:49.839 Df Runner[25627:14256] [com.apple.CFNetwork:Default] Task <77D446B0-0182-4CDA-A878-7C3685150856>.<31> resuming, timeouts(60.0, 30.0) qos(0x15) voucher((null)) activity(00000000-0000-0000-0000-000000000000)
+2026-11-22 16:08:49.858 Df Runner[25627:14061] [com.apple.network:connection] [C2] event: client:connection_reused @149.025s
+2026-11-22 16:08:49.860 Df Runner[25627:14061] [com.apple.network:connection] nw_protocol_socket_notify [C2.1.1.1:3] nw_protocol_notification_type_connection_idle is false
+2026-11-22 16:08:49.860 E  Runner[25627:14061] [com.apple.network:connection] nw_socket_set_connection_idle [C2.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-22 16:08:49.863 Df Runner[25627:14061] [com.apple.CFNetwork:Default] Task <331E8DC8-2418-421F-A1C8-CA7443C6CC33>.<30> now using Connection 2
+2026-11-22 16:08:49.863 Df Runner[25627:14061] [com.apple.CFNetwork:Default] Task <77D446B0-0182-4CDA-A878-7C3685150856>.<31> now using Connection 2
+2026-11-22 16:08:49.865 Df Runner[25627:14061] [com.apple.CFNetwork:Default] Task <331E8DC8-2418-421F-A1C8-CA7443C6CC33>.<30> sent request, body N 0
+2026-11-22 16:08:49.865 Df Runner[25627:14061] [com.apple.CFNetwork:Default] Task <77D446B0-0182-4CDA-A878-7C3685150856>.<31> sent request, body N 0
+2026-11-22 16:08:49.892 Df Runner[25627:14061] [com.apple.CFNetwork:Default] Task <331E8DC8-2418-421F-A1C8-CA7443C6CC33>.<30> received response, status 200 content K
+2026-11-22 16:08:49.892 Df Runner[25627:14061] [com.apple.CFNetwork:Default] Task <77D446B0-0182-4CDA-A878-7C3685150856>.<31> received response, status 200 content K
+2026-11-22 16:08:49.893 Df Runner[25627:14061] [com.apple.CFNetwork:Default] Task <331E8DC8-2418-421F-A1C8-CA7443C6CC33>.<30> done using Connection 2
+2026-11-22 16:08:49.893 Df Runner[25627:14061] [com.apple.CFNetwork:Default] Task <77D446B0-0182-4CDA-A878-7C3685150856>.<31> done using Connection 2
+2026-11-22 16:08:49.893 Df Runner[25627:14061] [com.apple.network:connection] [C2] event: client:connection_idle @149.059s
+2026-11-22 16:08:49.893 Df Runner[25627:14061] [com.apple.network:connection] nw_protocol_socket_notify [C2.1.1.1:3] nw_protocol_notification_type_connection_idle is true
+2026-11-22 16:08:49.893 E  Runner[25627:14061] [com.apple.network:connection] nw_socket_set_connection_idle [C2.1.1.1:3] setsockopt SO_CONNECTION_IDLE failed [42: Protocol not available]
+2026-11-22 16:08:49.897 Df Runner[25627:14061] [com.apple.CFNetwork:Default] Task <331E8DC8-2418-421F-A1C8-CA7443C6CC33>.<30> response ended
+2026-11-22 16:08:49.898 Df Runner[25627:14061] [com.apple.CFNetwork:Default] Task <77D446B0-0182-4CDA-A878-7C3685150856>.<31> response ended
+2026-11-22 16:08:49.898 Df Runner[25627:14061] [com.apple.CFNetwork:Summary] Task <331E8DC8-2418-421F-A1C8-CA7443C6CC33>.<30> summary for task success {transaction_duration_ms=49, response_status=200, connection=2, reused=1, reused_after_ms=145250, request_start_ms=15, request_duration_ms=0, response_start_ms=43, response_duration_ms=5, request_bytes=49, request_throughput_kbps=795, response_bytes=3921, response_throughput_kbps=5700, cache_hit=false}
+2026-11-22 16:08:49.898 Df Runner[25627:14061] [com.apple.CFNetwork:Summary] Task <77D446B0-0182-4CDA-A878-7C3685150856>.<31> summary for task success {transaction_duration_ms=48, response_status=200, connection=2, reused=1, reused_after_ms=0, request_start_ms=15, request_duration_ms=0, response_start_ms=43, response_duration_ms=5, request_bytes=49, request_throughput_kbps=670, response_bytes=3469, response_throughput_kbps=5421, cache_hit=false}
+2026-11-22 16:08:49.898 Df Runner[25627:1405a] [com.apple.CFNetwork:Default] Task <331E8DC8-2418-421F-A1C8-CA7443C6CC33>.<30> finished successfully
+2026-11-22 16:08:49.917 Df Runner[25627:1405a] [com.apple.CFNetwork:Default] Task <77D446B0-0182-4CDA-A878-7C3685150856>.<31> finished successfully
