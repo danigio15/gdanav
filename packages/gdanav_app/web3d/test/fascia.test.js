@@ -332,26 +332,3 @@ test('senza svolte la fascia è lo spostamento di lato, levigato come prima', ()
     assert.ok(Math.abs(q[0] - -r.sposta[k]) < 1e-9 && Math.abs(q[1] - punti[k][1]) < 1e-9);
   }
 });
-
-test('tornare indietro a una rotonda è girarle attorno, nel verso dell anello', async () => {
-  const { giroDellAnello } = await import('../src/corsie.js');
-  // Un anello di 10 m in senso antiorario, centrato 25 m a nord; il braccio arriva da sud.
-  const R = 10;
-  const anello = [];
-  for (let j = 0; j <= 16; j++) {
-    const a = -Math.PI / 2 + (j * Math.PI) / 8;
-    anello.push(+(R * Math.cos(a)).toFixed(9), +(25 + R * Math.sin(a)).toFixed(9));
-  }
-  const strade = vie([
-    { id: 1, hw: 'residential', g: [0, -200, 0, 25 - R] },
-    { id: 2, hw: 'residential', junction: 'roundabout', g: anello },
-  ]);
-  const giro = giroDellAnello(strade, new IndiceCorsie(strade), [0, 12], [-1.5, 12], [1.5, 12]);
-  assert.ok(giro && giro.length >= 16, `il giro intero: ${giro?.length}`);
-  // Dalla parte sud, passando per est (x > 0) prima che per ovest: il verso dell'anello.
-  const est = giro.findIndex((q) => q[0] > R * 0.9);
-  const ovest = giro.findIndex((q) => q[0] < -R * 0.9);
-  assert.ok(est >= 0 && ovest > est, `prima est (${est}) poi ovest (${ovest})`);
-  // Senza rotonda vicina, niente giro.
-  assert.equal(giroDellAnello(strade, new IndiceCorsie(strade), [0, -150], [-1.5, -150], [1.5, -150]), null);
-});

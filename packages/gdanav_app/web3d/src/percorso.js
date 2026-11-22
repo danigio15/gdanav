@@ -670,6 +670,26 @@ const INVERSIONE_RAGGIO_M = 4;
 const INVERSIONE_TANGENTE_M = 10;
 /** Da tanto in su è un tornante su due corsie accanto: lì l'arco resta stretto (vedi le prove). */
 const INVERSIONE_TORNANTE = (160 * Math.PI) / 180;
+/**
+ * I punti dove la linea di TomTom sta lontana dall'asse della sua via (lo
+ * [scarti] di `corsieLungoIlPercorso`) e la fascia va sulla corsia della via
+ * (vedi [fasciaSullaCorsia]), con qualche punto attorno: lì la levigatura
+ * rispetto alla linea vera non deve riportarla indietro.
+ */
+export function staccatiDallaVia(scarti, passo) {
+  const n = scarti?.length ?? 0;
+  const out = new Uint8Array(n);
+  const attorno = Math.max(1, Math.round(6 / passo));
+  for (let k = 0; k < n; k++) {
+    if (!(scarti[k] > SCARTO_DALLA_CORSIA_M)) continue;
+    for (let j = Math.max(0, k - attorno); j <= Math.min(n - 1, k + attorno); j++) out[j] = 1;
+  }
+  return out;
+}
+
+/** Da quanto la linea agganciata si scosta dall'asse della sua via prima che la fascia vada sulla corsia (m), e in quanto ci arriva tutta. */
+const SCARTO_DALLA_CORSIA_M = 1.5;
+const SCARTO_RAMPA_M = 1.5;
 /** Attorno alla curva, quanti metri della fascia si rimettono in fila sulle due corsie. */
 const SVOLTA_ZONA_M = 10;
 /** Le corsie attorno allo spigolo vanno «dritte» finché il coseno con la loro direzione lì sta sopra questo (una ventina di gradi). */
@@ -706,7 +726,7 @@ const SVOLTA_LONTANO_M = 20;
  * (il percorso del calcolatore taglia l'angolo, o lo supera di qualche
  * metro).
  */
-export function fasciaSullaCorsia(punti, { sposta, spigoli = [], centri = null, versi = null }, passo = 4) {
+export function fasciaSullaCorsia(punti, { sposta, spigoli = [], centri = null, versi = null, scarti = null }, passo = 4) {
   const n = punti.length;
   const out = new Array(n);
   // Lo spostamento di lato, con le normali di ogni pezzo fra due spigoli.
@@ -719,6 +739,15 @@ export function fasciaSullaCorsia(punti, { sposta, spigoli = [], centri = null, 
       const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
       const o = sposta[k] || 0;
       out[k] = [punti[k][0] - ((b[1] - a[1]) / l) * o, punti[k][1] + ((b[0] - a[0]) / l) * o];
+      // Dove la linea di TomTom si stacca dalla via (taglia in mezzo
+      // all'aiuola di un incrocio invece di seguire il raccordo), spostarla
+      // di lato non basta: la fascia va sul mezzo della corsia della via,
+      // piano piano man mano che lo scarto dall'asse della via cresce.
+      const m = centri?.[k];
+      if (m && scarti) {
+        const w = Math.max(0, Math.min(1, (scarti[k] - SCARTO_DALLA_CORSIA_M) / SCARTO_RAMPA_M));
+        if (w > 0) out[k] = [out[k][0] + (m[0] - out[k][0]) * w, out[k][1] + (m[1] - out[k][1]) * w];
+      }
     }
     lo = hi + 1;
   }
@@ -726,10 +755,7 @@ export function fasciaSullaCorsia(punti, { sposta, spigoli = [], centri = null, 
   const dot = (p, q, t) => (p[0] - q[0]) * t[0] + (p[1] - q[1]) * t[1];
   let libero = 0;
   spigoli.forEach((g, j) => {
-    // Tornare indietro a una rotonda: il giro dell'anello (vedi `giroDellAnello`).
-    // (Il giro intero lo disegna un nastro suo, `giriDelleRotonde`: qui la
-    // fascia arriva all'entrata e riparte dall'uscita.)
-    const c = g.giro ? { curva: infittisciGiro([g.giro[0], g.giro.at(-1)]), tA: g.tA, tB: g.tB } : curvaDellaSvolta(g, punti, passo, centri, versi);
+    const c = curvaDellaSvolta(g, punti, passo, centri, versi);
     if (!c) return;
     const limite = j + 1 < spigoli.length ? spigoli[j + 1].k : n - 1;
     if (g.k < libero || g.k + 1 > limite) return;
@@ -739,16 +765,12 @@ export function fasciaSullaCorsia(punti, { sposta, spigoli = [], centri = null, 
       const v = versi?.[m];
       return !v || v[0] * t[0] + v[1] * t[1] >= SVOLTA_DRITTO_COS;
     };
-    // Al giro di una rotonda la fascia deve arrivare fin lì: la zona va dal
-    // punto dove TomTom torna indietro all'anello, più la solita (prima, il
-    // doppio: lì vicino, dove TomTom piega, lo spostamento di lato storceva
-    // la fascia).
-    const zonaA = g.giro ? 2 * SVOLTA_ZONA_M + Math.max(0, -dot(out[g.k], c.curva[0], c.tA)) : SVOLTA_ZONA_M;
-    const zonaB = g.giro ? SVOLTA_ZONA_M + Math.max(0, dot(out[g.k + 1], c.curva.at(-1), c.tB)) : SVOLTA_ZONA_M;
     let i0 = g.k;
-    while (i0 > libero && dot(out[i0], c.curva[0], c.tA) > -zonaA && dritto(i0 - 1, c.tA)) i0--;
+    while (i0 > libero && dot(out[i0], c.curva[0], c.tA) > -SVOLTA_ZONA_M && dritto(i0 - 1, c.tA)) i0--;
     let i1 = g.k + 1;
-    while (i1 < limite && dot(out[i1], c.curva.at(-1), c.tB) < zonaB && dritto(i1 + 1, c.tB)) i1++;
+    // (E oltre, finché sotto la linea non c'è una via: lì la linea di TomTom
+    // taglia per conto suo, e tornarci dopo la curva era il «<».)
+    while (i1 < limite && (dot(out[i1], c.curva.at(-1), c.tB) < SVOLTA_ZONA_M || (centri && !centri[i1])) && dritto(i1 + 1, c.tB)) i1++;
     // La strada: dal punto i0 lungo la corsia di prima (i suoi punti fino
     // all'inizio della curva), la curva, la corsia di dopo (i suoi punti
     // dalla fine della curva) fino a i1. Senza i pezzi di curva che
@@ -774,58 +796,6 @@ export function fasciaSullaCorsia(punti, { sposta, spigoli = [], centri = null, 
     }
     libero = i1;
   });
-  return out;
-}
-
-/**
- * Il nastro del giro di una rotonda (vedi `giroDellAnello`): i punti
- * dell'anello, alla quota [quota]. Il percorso di TomTom li' torna indietro
- * in un paio di metri, e nella fascia, che ha un punto ogni due metri del
- * percorso, il giro non ci sta: ha un nastro suo, uguale.
- */
-export function nastroDelGiro(giro, quota, largo, sopra, s0 = 0, s1 = s0) {
-  const xy = [];
-  for (const q of infittisciGiro(giro)) xy.push(q[0], q[1]);
-  const linea = new Linea(xy);
-  const L = linea.lunghezza;
-  const d = nastro(linea, { quota: () => quota, gallerie: [] }, 0, L, largo, sopra, { passo: 1 });
-  // I metri del percorso, non quelli del giro: la scena sa dove sta l'auto
-  // lungo il percorso, e quello che ha dietro lo spegne.
-  for (let i = 1; i < d.uv.length; i += 2) d.uv[i] = s0 + ((s1 - s0) * d.uv[i]) / (L || 1);
-  return d;
-}
-
-/** Piu' nastri in uno (gli indici dell'uno dopo quelli dell'altro). */
-export function nastriInsieme(nastri) {
-  const pieni = nastri.filter((d) => d && d.indici.length);
-  if (pieni.length < 2) return pieni[0] ?? null;
-  const n = pieni.reduce((t, d) => t + d.posizioni.length / 3, 0);
-  const posizioni = new Float32Array(pieni.reduce((t, d) => t + d.posizioni.length, 0));
-  const uv = new Float32Array(pieni.reduce((t, d) => t + d.uv.length, 0));
-  const livelli = new Float32Array(pieni.reduce((t, d) => t + d.livelli.length, 0));
-  const ind = [];
-  let o = 0, ou = 0, ol = 0, base = 0;
-  for (const d of pieni) {
-    posizioni.set(d.posizioni, o);
-    uv.set(d.uv, ou);
-    livelli.set(d.livelli, ol);
-    for (const i of d.indici) ind.push(i + base);
-    o += d.posizioni.length;
-    ou += d.uv.length;
-    ol += d.livelli.length;
-    base += d.posizioni.length / 3;
-  }
-  return { posizioni, uv, livelli, indici: n > 65535 ? new Uint32Array(ind) : new Uint16Array(ind) };
-}
-
-/** I punti del giro di una rotonda, uno ogni mezzo metro circa. */
-function infittisciGiro(giro) {
-  const out = [giro[0]];
-  for (let k = 1; k < giro.length; k++) {
-    const [a, b] = [giro[k - 1], giro[k]];
-    const m = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.5));
-    for (let j = 1; j <= m; j++) out.push([a[0] + ((b[0] - a[0]) * j) / m, a[1] + ((b[1] - a[1]) * j) / m]);
-  }
   return out;
 }
 
@@ -978,14 +948,16 @@ export function togliDenti(fascia, { gradi = 20, massimo = 1.5, giri = 12 } = {}
 /** Da quanto piega la linea fra un punto e l'altro, uno scalino (vedi [levigaFascia]). */
 const SCALINO = (15 * Math.PI) / 180;
 
-export function levigaFascia(punti, fascia, passo) {
+export function levigaFascia(punti, fascia, passo, liberi = null) {
   const n = punti.length;
   if (n < 3) return fascia;
   const nor = new Array(n);
   const fermo = new Uint8Array(n);
   // Gli scalini: lì lo spostamento di lato non si confronta coi vicini
-  // (non si sposta e non sposta nessuno).
-  const scalino = new Uint8Array(n);
+  // (non si sposta e non sposta nessuno). E i punti [liberi]: dove la fascia
+  // ha lasciato apposta la linea di sotto (vedi [staccatiDallaVia]).
+  const scalino = liberi ? Uint8Array.from(liberi) : new Uint8Array(n);
+  if (liberi) for (let k = 0; k < n; k++) if (liberi[k]) fermo[k] = 1;
   const o = new Float64Array(n);
   for (let k = 0; k < n; k++) {
     const a = punti[Math.max(0, k - 1)];
