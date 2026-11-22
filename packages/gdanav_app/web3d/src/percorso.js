@@ -779,10 +779,14 @@ export function fasciaSullaCorsia(punti, { sposta, spigoli = [], centri = null, 
     const p1 = c.curva.at(-1);
     const curva = c.curva.filter((q) => dot(q, out[i0], c.tA) > 0 && dot(out[i1], q, c.tB) > 0);
     const qui = (m) => centri?.[m] ?? out[m];
+    // Solo i punti che stanno su una via: dove sotto non c'è una via la linea
+    // di TomTom taglia per conto suo (passa l'incrocio, nell'aiuola) e la
+    // svolta ci tornava sopra dopo la curva: l'uncino, il «<».
+    const suUnaVia = (m) => !centri || !!centri[m];
     const via = [out[i0]];
-    for (let m = i0 + 1; m <= g.k; m++) if (dot(qui(m), p0, c.tA) < 0 && dot(qui(m), via.at(-1), c.tA) > 0) via.push(qui(m));
+    for (let m = i0 + 1; m <= g.k; m++) if (suUnaVia(m) && dot(qui(m), p0, c.tA) < 0 && dot(qui(m), via.at(-1), c.tA) > 0) via.push(qui(m));
     via.push(...curva);
-    for (let m = g.k + 1; m < i1; m++) if (dot(qui(m), p1, c.tB) > 0 && dot(out[i1], qui(m), c.tB) > 0 && dot(qui(m), via.at(-1), c.tB) > 0) via.push(qui(m));
+    for (let m = g.k + 1; m < i1; m++) if (suUnaVia(m) && dot(qui(m), p1, c.tB) > 0 && dot(out[i1], qui(m), c.tB) > 0 && dot(qui(m), via.at(-1), c.tB) > 0) via.push(qui(m));
     via.push(out[i1]);
     const lunghi = [0];
     for (let q = 1; q < via.length; q++) lunghi.push(lunghi[q - 1] + Math.hypot(via[q][0] - via[q - 1][0], via[q][1] - via[q - 1][1]));
