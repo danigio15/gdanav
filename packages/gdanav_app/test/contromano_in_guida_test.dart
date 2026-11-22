@@ -147,10 +147,19 @@ void main() {
     return (a, guida, voce);
   }
 
+  /// Un giro vero (le strade, che arrivano davvero) e poi i timer finti: il
+  /// pezzo dopo dei sensi unici parte al giro dopo, non come microtask.
+  Future<void> giro(WidgetTester tester, int ms) async {
+    for (var i = 0; i < 3; i++) {
+      await tester.runAsync(() => Future<void>.delayed(Duration(milliseconds: ms)));
+      await tester.pump(Duration.zero);
+    }
+  }
+
   Future<void> guida(WidgetTester tester, Ambiente a, Iterable<Punto> punti) async {
     for (final q in punti) {
       a.posizioni.add(q);
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 5)));
+      await giro(tester, 5);
     }
   }
 
@@ -184,7 +193,7 @@ void main() {
     final prima = (a.viaggio.stato as ViaggioPronto).viaggio.percorso;
     g.avvia();
     // Nessuna posizione: si lascia solo il tempo alle strade di arrivare.
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+    await giro(tester, 20);
     final dopo = (a.viaggio.stato as ViaggioPronto).viaggio.percorso;
     expect(identical(dopo, prima), isFalse, reason: 'corretto senza aspettare la prima posizione');
     expect(dopo.manovre.where((m) => distanzaM(dopo.punti[m.inizio], _a(0, 0)) < 15), isEmpty);
@@ -265,7 +274,7 @@ void main() {
     final prima = (a.viaggio.stato as ViaggioPronto).viaggio.percorso;
     g.avvia();
     for (var i = 0; i < 10; i++) {
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 5)));
+      await giro(tester, 5);
     }
     final dopo = (a.viaggio.stato as ViaggioPronto).viaggio.percorso;
     expect(identical(dopo, prima), isFalse, reason: 'il triangolo a cinque chilometri va corretto da subito');
