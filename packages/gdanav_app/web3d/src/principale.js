@@ -1609,9 +1609,39 @@ function sullaCorsia(p) {
     pr.dx[k] = fascia[k][0] - linea[k][0];
     pr.dy[k] = fascia[k][1] - linea[k][1];
   }
+  quoteSullaFascia(pr, punti, fascia);
   pr.ancora(p.linea);
   p.manovreCorsie = r.manovre.map((m) => ({ s: m.s, dir: m.dir }));
 }
+
+/**
+ * Le quote della fascia dove è andata su una strada lontana dalla linea del
+ * calcolatore: quella della strada sotto, non quella del punto da cui è
+ * partita. Sotto Via Porzio la linea taglia sul prato, la fascia segue la
+ * bretella che scende al sottopasso: con la quota del prato restava a pezzi
+ * sotto l'asfalto.
+ */
+function quoteSullaFascia(pr, punti, fascia) {
+  const n = fascia.length;
+  for (let k = 0; k < n; k++) {
+    const [x, y] = fascia[k];
+    const lontano = Math.hypot(x - punti[k][0], y - punti[k][1]);
+    const peso = Math.min(1, Math.max(0, (lontano - QUOTA_FASCIA_DA_M) / 3));
+    if (!peso) continue;
+    const a = fascia[Math.max(0, k - 1)];
+    const b = fascia[Math.min(n - 1, k + 1)];
+    let meglio = null;
+    for (const c of indice.candidati(x, y, b[0] - a[0], b[1] - a[1], 4, 1)) {
+      // La strada sotto la fascia, al piano più vicino a quello di prima.
+      const voto = c.d + Math.abs(c.h - pr.h[k]) / 2;
+      if (Math.abs(c.h - pr.h[k]) < 7 && (!meglio || voto < meglio.voto)) meglio = { h: c.h, voto };
+    }
+    if (meglio) pr.h[k] += (meglio.h - pr.h[k]) * peso;
+  }
+}
+
+/** Da quanti metri dalla linea in su la fascia prende la quota della strada sotto. */
+const QUOTA_FASCIA_DA_M = 2.5;
 
 /** La strada già fatta: gli ultimi [FATTO_M] metri, all'altezza giusta. */
 function aggiornaFatto() {

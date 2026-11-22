@@ -746,6 +746,103 @@ export class IndiceCorsie {
   }
 }
 
+/** Oltre la sua carreggiata (più un poco), quanto costa ogni metro in più dalla via. */
+const FUORI_COSTO = 1;
+/** Fin dove, comunque, una via può essere quella del percorso (m). */
+const FUORI_AL_PIU_M = 9;
+/** E fin dove, se il percorso la stava già seguendo (m). */
+const SEGUITA_AL_PIU_M = 14;
+/** Passare da una via a un'altra dove si toccano. */
+const CAMBIO_COSTO = 1.5;
+/** E per ogni metro di salto di lato fra le due, oltre [SALTO_LIBERO_M]. */
+const SALTO_COSTO = 60;
+const SALTO_LIBERO_M = 3;
+
+/**
+ * La via sotto ogni punto del percorso: `[k, {i, av, t}]`, solo dove ce n'è
+ * una vicina e nel verso giusto.
+ *
+ * Non punto per punto ognuno per conto suo: la scelta migliore lungo tutto il
+ * tratto (Viterbi). Allo svincolo due rampe corrono affiancate a sei metri, e
+ * la linea del calcolatore (pochi punti, una corda) passava in mezzo: la più
+ * vicina era prima l'una e poi l'altra, e la fascia saltava di lato da una
+ * rampa all'altra, sopra il parapetto e sotto la pensilina del casello. Da
+ * una via si passa a un'altra dove si toccano (un nodo, una divisione); un
+ * salto di lato fra due vie staccate costa tanto quanto è largo.
+ */
+function viePerIlPercorso(punti, dir, indice, passo) {
+  const strade = indice.strade;
+  const strati = [];
+  let prima = null;
+  for (let k = 0; k < punti.length; k++) {
+    const [x, y] = punti[k];
+    const perVia = new Map();
+    for (const [i, kk] of indice.vicini(x, y)) {
+      const v = strade[i];
+      const t = sulTratto(v, kk, x, y);
+      // Il percorso sta su questa via se è dentro la sua carreggiata (più un
+      // poco): prima bastavano nove metri, e una rampa a una corsia prendeva
+      // il percorso della carreggiata accanto; la fascia ci saltava sopra e
+      // poi tornava indietro di colpo (lo zig-zag sulle rampe). Un poco più
+      // in là costa, ma resta possibile: per non saltare su quella accanto.
+      const mezza = ((v.avanti + v.indietro) * (v.lw ?? 3.5)) / 2 + (v.margini ? Math.max(v.margini[0], v.margini[1]) : 0);
+      const limite = Math.min(FUORI_AL_PIU_M, mezza + 2);
+      if (t.d > SEGUITA_AL_PIU_M) continue;
+      const cos = t.tx * dir[k][0] + t.ty * dir[k][1];
+      if (Math.abs(cos) < 0.7 || (v.senso && cos < 0)) continue;
+      const av = cos > 0;
+      const voto = t.d + 15 * (1 - Math.abs(cos)) + Math.max(0, t.d - limite) * FUORI_COSTO;
+      const chiave = i * 2 + (av ? 1 : 0);
+      if (!(voto < (perVia.get(chiave)?.voto ?? Infinity))) continue;
+      perVia.set(chiave, { i, av, t, voto, dentro: t.d <= limite, lontana: t.d > FUORI_AL_PIU_M });
+    }
+    const seguita = (c) => prima?.k === k - 1 && prima.stati.some((p) => p.i === c.i && p.av === c.av);
+    const stati = [...perVia.values()].filter((c) => !c.lontana || seguita(c));
+    // Una via solo «un poco più in là» non comincia da sola: continua quella
+    // di prima. Dove non c'è nessuna via dentro, non si sa (come sempre).
+    if (!stati.some((c) => c.dentro)) {
+      const seguite = prima ? stati.filter((c) => prima.stati.some((p) => p.i === c.i && p.av === c.av)) : [];
+      if (!seguite.length) continue;
+      stati.length = 0;
+      stati.push(...seguite);
+    }
+    for (const c of stati) {
+      c.costo = c.voto;
+      c.da = -1;
+      if (!prima) continue;
+      let meglio = Infinity;
+      for (let j = 0; j < prima.stati.length; j++) {
+        const p = prima.stati[j];
+        let cambio = 0;
+        if (p.i !== c.i || p.av !== c.av) {
+          // Di lato rispetto al percorso: in avanti è solo strada fatta. Dopo
+          // un tratto senza vie (un incrocio) si concede di più.
+          const salto = Math.abs((c.t.qx - p.t.qx) * -dir[k][1] + (c.t.qy - p.t.qy) * dir[k][0]);
+          cambio = CAMBIO_COSTO + SALTO_COSTO * Math.max(0, salto - SALTO_LIBERO_M - passo * (k - prima.k - 1));
+        }
+        if (p.costo + cambio < meglio) {
+          meglio = p.costo + cambio;
+          c.da = j;
+        }
+      }
+      c.costo += meglio;
+    }
+    prima = { k, stati };
+    strati.push(prima);
+  }
+  const fuori = [];
+  if (!strati.length) return fuori;
+  let s = strati.length - 1;
+  let j = strati[s].stati.reduce((m, c, q, a) => (c.costo < a[m].costo ? q : m), 0);
+  while (s >= 0 && j >= 0) {
+    const c = strati[s].stati[j];
+    fuori.push([strati[s].k, c]);
+    j = c.da;
+    s--;
+  }
+  return fuori.reverse();
+}
+
 /** Il tratto [k-1, k] della via [v] più vicino a [x, y]: distanza, punto, direzione, normale, scostamento. */
 function sulTratto(v, k, x, y) {
   const a = v.xy[k - 1];
@@ -814,32 +911,10 @@ export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzo
   const via = new Int32Array(n).fill(-1);
   const avanti = new Uint8Array(n);
   const sul = new Array(n).fill(null);
-  for (let k = 0; k < n; k++) {
-    const [x, y] = punti[k];
-    let meglio = null;
-    let bv = Infinity;
-    for (const [i, kk] of indice.vicini(x, y)) {
-      const v = strade[i];
-      const t = sulTratto(v, kk, x, y);
-      // Il percorso sta su questa via se è dentro la sua carreggiata (più un
-      // poco): prima bastavano nove metri, e una rampa a una corsia prendeva
-      // il percorso della carreggiata accanto; la fascia ci saltava sopra e
-      // poi tornava indietro di colpo (lo zig-zag sulle rampe).
-      const mezza = ((v.avanti + v.indietro) * (v.lw ?? 3.5)) / 2 + (v.margini ? Math.max(v.margini[0], v.margini[1]) : 0);
-      if (t.d > Math.min(9, mezza + 2)) continue;
-      const cos = t.tx * dir[k][0] + t.ty * dir[k][1];
-      if (Math.abs(cos) < 0.7 || (v.senso && cos < 0)) continue;
-      const voto = t.d + 15 * (1 - Math.abs(cos)) - (k && via[k - 1] === i ? 1.5 : 0);
-      if (voto < bv) {
-        bv = voto;
-        meglio = { i, t, av: cos > 0 };
-      }
-    }
-    if (meglio) {
-      via[k] = meglio.i;
-      avanti[k] = meglio.av ? 1 : 0;
-      sul[k] = meglio.t;
-    }
+  for (const [k, c] of viePerIlPercorso(punti, dir, indice, passo)) {
+    via[k] = c.i;
+    avanti[k] = c.av ? 1 : 0;
+    sul[k] = c.t;
   }
   // Un pezzo di via di un paio di punti fra due altre (dove due vie partono
   // dallo stesso nodo, una rampa e la strada che continua) non è la via
