@@ -36,7 +36,9 @@ const VISTE = { inclinata: { pitch: 70, zoom: 17.9 }, immersiva: { pitch: 74, zo
 const VISTA_CORSIE = { pitch: 62, zoom: 18.6 };
 const OBIETTIVO_CORSIE_GRADI = 44;
 /** La fascia della corsia: quanto è larga (m) e quanto sta sopra l'asfalto. */
-const FASCIA_CORSIA = { largo: 2.7, sopra: 0.3 };
+// Larga meno di una corsia (tre metri in città), che ci stia dentro con un
+// margine: a 2,7 m bastavano venti centimetri di scarto per toccare le righe.
+const FASCIA_CORSIA = { largo: 2.3, sopra: 0.3 };
 /** Ogni quanti metri un punto della fascia (il profilo del «3D aumentato» ne ha uno ogni quattro). */
 const PASSO_CORSIE = 2;
 /** La freccia della manovra: nel «3D aumentato», e sulla fascia della vista «Corsie». */

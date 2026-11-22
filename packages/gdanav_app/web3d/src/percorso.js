@@ -664,12 +664,6 @@ const SVOLTA_RAGGIO_M = 3;
  */
 const SVOLTA_TANGENTE_M = 4;
 const SVOLTA_TANGENTE_MIN_M = 2.5;
-/** Il raggio del giro della fascia quando si torna quasi indietro (m): più della sua larghezza. */
-const INVERSIONE_RAGGIO_M = 4;
-/** Ma l'arco comincia al piu' tanto prima dello spigolo (m): un tornante resta stretto. */
-const INVERSIONE_TANGENTE_M = 10;
-/** Da tanto in su è un tornante su due corsie accanto: lì l'arco resta stretto (vedi le prove). */
-const INVERSIONE_TORNANTE = (160 * Math.PI) / 180;
 /**
  * I punti dove la linea di TomTom sta lontana dall'asse della sua via (lo
  * [scarti] di `corsieLungoIlPercorso`) e la fascia va sulla corsia della via
@@ -1068,12 +1062,7 @@ function curvaDellaSvolta(g, punti, passo, centri, versi) {
   const lato = sen >= 0 ? 1 : -1;
   if (X) {
     // Un arco di cerchio tangente alle due corsie.
-    let T = Math.min(SVOLTA_TANGENTE_M, Math.max(SVOLTA_TANGENTE_MIN_M, SVOLTA_RAGGIO_M * Math.tan(angolo / 2)));
-    // Quasi un'inversione (tornare indietro su un'altra strada, a una
-    // rotondina): col raggio di una svolta l'arco era una forcina di un
-    // metro e la fascia, larga quasi tre, ci si accavallava sopra (il nodo
-    // in cima al «V»). Lì il giro ha almeno [INVERSIONE_RAGGIO_M].
-    if (angolo > (2 * Math.PI) / 3 && angolo < INVERSIONE_TORNANTE) T = Math.min(INVERSIONE_TANGENTE_M, Math.max(T, INVERSIONE_RAGGIO_M * Math.tan(angolo / 2)));
+    const T = Math.min(SVOLTA_TANGENTE_M, Math.max(SVOLTA_TANGENTE_MIN_M, SVOLTA_RAGGIO_M * Math.tan(angolo / 2)));
     const R = T / Math.tan(angolo / 2);
     const p0 = [X[0] - tA[0] * T, X[1] - tA[1] * T];
     const c = [p0[0] + nA[0] * R * lato, p0[1] + nA[1] * R * lato];
