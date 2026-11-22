@@ -8,10 +8,10 @@ import '../componenti/avvisi_in_guida.dart';
 import '../componenti/avviso_di_casa.dart';
 import '../componenti/mini_lettore.dart';
 import '../stato/gestore_casa_in_guida.dart';
-import '../componenti/icona_manovra.dart';
 import '../componenti/itinerario.dart' show BadgePedaggio;
 import '../componenti/riga_del_viaggio.dart';
 import '../componenti/icone_segnalazioni.dart';
+import '../componenti/riquadro_manovra.dart';
 import '../componenti/risparmio.dart';
 import '../componenti/striscia_traffico.dart';
 import '../componenti/tachimetro.dart';
@@ -975,118 +975,23 @@ class _Ancora extends StatelessWidget {
   }
 }
 
+/// Il riquadro della manovra, coi dati della guida e la dimensione scelta.
 class _Banner extends StatelessWidget {
   const _Banner({super.key, required this.guida});
   final GestoreGuida guida;
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
     final a = guida.avanzamento;
     final m = a?.prossima ?? guida.pronto?.viaggio.percorso.manovre.firstOrNull;
-    final alla = a?.allaProssimaM ?? m?.lunghezzaM ?? 0;
-    // Il riquadro della manovra di Waze: scuro, freccia e distanza grandi.
-    const blu = Color(0xFF2A3140);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      child: Column(
-        children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: blu,
-              borderRadius: BorderRadius.circular(22),
-              boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 18, offset: Offset(0, 6))],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 18, 16),
-              child: Row(
-                children: [
-                  Container(
-                    width: 68,
-                    height: 68,
-                    decoration: BoxDecoration(color: const Color(0xFF3A4458), borderRadius: BorderRadius.circular(16)),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        m == null
-                            ? Icon(iconaManovra(8), color: Colors.white, size: 54)
-                            : SimboloManovra.di(m, size: 54),
-                        // Nelle rotonde, quale uscita.
-                        if (m?.uscitaRotonda case final n?)
-                          Positioned(
-                            right: 4,
-                            bottom: 2,
-                            child: Text(
-                              '$n',
-                              style: t.titleSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w900),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          guida.ricalcolando ? 'Ricalcolo…' : distanzaBreve(alla),
-                          style: t.headlineMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
-                        ),
-                        Text(
-                          m == null ? '' : (m.strada.isNotEmpty ? m.strada : m.istruzione),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: t.titleMedium?.copyWith(color: Colors.white.withValues(alpha: 0.92)),
-                        ),
-                        if (m != null && (m.verso.isNotEmpty || m.uscita.isNotEmpty))
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: CartelloSvincolo(manovra: m),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Le corsie, avvicinandosi allo svincolo: quale prendere.
-          if (m != null && m.corsieUtili && alla <= 2000)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: CorsieSvincolo(corsie: m.corsie),
-            ),
-          if (a?.dopo case final dopo?)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                margin: const EdgeInsets.only(top: 6, left: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(color: const Color(0xFF3A4252), borderRadius: BorderRadius.circular(14)),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Poi ', style: t.labelLarge?.copyWith(color: Colors.white70)),
-                    SimboloManovra.di(dopo, size: 20),
-                    if (dopo.strada.isNotEmpty)
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 200),
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 6),
-                          child: Text(
-                            dopo.strada,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: t.labelLarge?.copyWith(color: Colors.white),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-        ],
+    return ValueListenableBuilder(
+      valueListenable: dimensioneIndicazioni,
+      builder: (context, dimensione, _) => RiquadroManovra(
+        manovra: m,
+        metri: a?.allaProssimaM ?? m?.lunghezzaM ?? 0,
+        dopo: a?.dopo,
+        ricalcolando: guida.ricalcolando,
+        dimensione: dimensione,
       ),
     );
   }

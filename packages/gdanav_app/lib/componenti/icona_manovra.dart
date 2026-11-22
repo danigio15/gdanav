@@ -217,28 +217,31 @@ class CartelloSvincolo extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.white, width: 1.5),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      // A capo se non ci sta: su un telefono stretto, col testo grande,
+      // «Uscita 12» da solo riempiva la riga e la direzione usciva dal riquadro.
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 3,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          if (manovra.uscita.isNotEmpty) ...[
+          if (manovra.uscita.isNotEmpty)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
               child: Text(
                 'Uscita ${manovra.uscita}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: t.labelMedium?.copyWith(fontWeight: FontWeight.w800, color: Colors.black),
               ),
             ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Text(
+          if (manovra.verso.isNotEmpty)
+            Text(
               manovra.verso,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: t.labelLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
             ),
-          ),
         ],
       ),
     );
