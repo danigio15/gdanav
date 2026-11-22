@@ -844,8 +844,23 @@ export function dentroLAsfalto(fascia, h, cerca, { margine = 0.6, lontano = 6, r
         break;
       }
       if (fuori > lontano || d < 1e-6) continue;
-      const vx = ((a.qx - q[0]) * fuori) / d;
-      const vy = ((a.qy - q[1]) * fuori) / d;
+      let vx = ((a.qx - q[0]) * fuori) / d;
+      let vy = ((a.qy - q[1]) * fuori) / d;
+      // Solo di lato: spostarla lungo il percorso non la mette su una strada,
+      // la porta avanti o indietro. Alla partenza, da una stradina che
+      // l'asfalto non ha, la tirava cinque metri avanti, e il resto con lei
+      // fin sul marciapiede della strada dopo.
+      const a0 = fascia[Math.max(0, k - 1)];
+      const a1 = fascia[Math.min(n - 1, k + 1)];
+      const tl = Math.hypot(a1[0] - a0[0], a1[1] - a0[1]);
+      if (tl > 1e-6) {
+        const tx = (a1[0] - a0[0]) / tl;
+        const ty = (a1[1] - a0[1]) / tl;
+        const lungo = vx * tx + vy * ty;
+        vx -= lungo * tx;
+        vy -= lungo * ty;
+      }
+      if (Math.hypot(vx, vy) < 0.05) continue;
       const costo = fuori + Math.hypot(vx - px, vy - py);
       if (!meglio || costo < meglio.costo) meglio = { vx, vy, costo };
     }
