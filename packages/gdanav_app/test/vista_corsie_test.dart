@@ -81,6 +81,34 @@ void main() {
       expect(c.vista, VistaMappa.corsie);
     });
 
+    testWidgets('tutte le viste si vedono senza scorrere, anche col telefono in orizzontale', (tester) async {
+      // «Su iPhone non esce Corsie»: in orizzontale le voci andavano a capo e
+      // la quinta restava sotto il bordo, in un menu che non diceva di scorrere.
+      for (final schermo in [const Size(844, 390), const Size(568, 320), const Size(390, 844), const Size(700, 520)]) {
+        tester.view.physicalSize = schermo * 3;
+        tester.view.devicePixelRatio = 3;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Align(
+                alignment: const Alignment(0.9, 0.8),
+                child: SceltaVista(controllo: ControlloMappa(aumentataPossibile: true)),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.byType(SceltaVista));
+        await tester.pumpAndSettle();
+        for (final v in VistaMappa.values) {
+          final voce = tester.getRect(find.byKey(Key('vista-${v.name}')));
+          expect(voce.top >= 0 && voce.bottom <= schermo.height, isTrue, reason: '${v.nome} a $schermo: $voce');
+        }
+        await tester.tapAt(Offset.zero);
+        await tester.pumpAndSettle();
+      }
+      tester.view.reset();
+    });
+
     testWidgets('dove la pagina 3D non c’è, spenta come il 3D aumentato, col perché', (tester) async {
       final c = await conLaScelta(tester, possibile: false);
       expect(find.text('Non c\'è su questo dispositivo'), findsNWidgets(2), reason: '3D aumentato e corsie');
