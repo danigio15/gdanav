@@ -20,12 +20,17 @@ class SceneDelegate: FlutterSceneDelegate {
   }
 
   override func sceneDidDisconnect(_ scene: UIScene) {
-    super.sceneDidDisconnect(scene)
+    // Il motore resta acceso per CarPlay: si lascia solo la finestra, e PRIMA
+    // di avvisare i plugin. `FlutterSceneDelegate` passa la chiusura della
+    // scena ai plugin dei motori che ci stanno dentro, e quello delle WebView
+    // a quel punto smonta il suo registro: la scena 3D restava viva col
+    // motore, e al primo messaggio dalla pagina l'app si chiudeva (SIGABRT in
+    // `swift_unownedRetainStrong`, dentro `didPostMessage` di WebKit).
     if let app = UIApplication.shared.delegate as? AppDelegate {
       _ = unregisterSceneLifeCycle(with: app.motore)
     }
-    // Il motore resta acceso per CarPlay: si lascia solo la finestra.
     window?.rootViewController = nil
     window = nil
+    super.sceneDidDisconnect(scene)
   }
 }

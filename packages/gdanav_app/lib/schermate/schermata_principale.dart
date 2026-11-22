@@ -37,6 +37,7 @@ import '../stato/gestore_viaggio.dart';
 import '../stato/gestore_vicini.dart';
 import '../stato/gestore_ztl.dart';
 import '../stato/percorso_per_assistenza.dart';
+import '../stato/voce.dart';
 import 'abbina_home_assistant.dart';
 import 'avvisi_guida.dart';
 import 'notifiche_nel_navigatore.dart';
@@ -60,6 +61,7 @@ import 'scheda_punto.dart';
 import 'segnala.dart';
 import 'schermata_guida.dart';
 import 'strade_risparmio.dart';
+import 'voce_guida.dart';
 import 'zone_ztl.dart';
 
 /// La mappa al posto di quella vera (nelle prove e nelle immagini); `null`:
@@ -662,6 +664,18 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                       titolo: 'Avvisi in guida',
                       sotto: widget.guida.avvisi.riassunto,
                       onTap: () => vai(AvvisiGuidaSchermata(scelte: widget.guida.avvisi)),
+                    ),
+                    _VoceMenu(
+                      key: const Key('menu-voce'),
+                      icona: Icons.record_voice_over_rounded,
+                      colore: const Color(0xFF0891B2),
+                      titolo: 'Voce di guida',
+                      sotto: [
+                        voceScelta.value?.etichetta ?? 'Predefinita',
+                        regolazioniVoce.value.$1.nome.toLowerCase(),
+                        regolazioniVoce.value.$2.nome.toLowerCase(),
+                      ].join(' · '),
+                      onTap: () => vai(VoceGuidaSchermata(archivio: widget.archivio)),
                     ),
                     // Gli avvisi di casa (dentro GdAHome) e la musica in guida.
                     if (widget.casaInGuida case final c? when c.coda != null || c.lettore != null)

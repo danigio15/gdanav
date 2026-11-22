@@ -82,11 +82,21 @@ class SceltaVista extends StatelessWidget {
     final v = controllo.vista;
     final grigio = Theme.of(context).disabledColor;
     const testoVoce = TextStyle(fontSize: 17, fontWeight: FontWeight.w800);
+    // Le cinque viste devono starci tutte senza scorrere: «su iPhone non esce
+    // Corsie». Col telefono in orizzontale (sul supporto in auto) lo schermo
+    // è alto meno di quattrocento punti, e le voci, strette, andavano a capo
+    // su due o tre righe: la quinta restava sotto, e il menu non diceva che
+    // scorreva. Il menu più largo (una riga di spiegazione) e voci compatte;
+    // dove proprio non c'è altezza, senza spiegazione.
+    final alto = MediaQuery.sizeOf(context).height;
+    final compatto = alto < 600;
+    final conSpiegazione = alto >= 360;
     return PopupMenuButton<VistaMappa>(
       tooltip: 'Vista: ${v.nome}',
       initialValue: v,
       onSelected: (scelta) => _scegli(context, scelta),
       position: PopupMenuPosition.under,
+      constraints: const BoxConstraints(minWidth: 300, maxWidth: 400),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       itemBuilder: (context) => [
         for (final scelta in VistaMappa.values)
@@ -95,8 +105,11 @@ class SceltaVista extends StatelessWidget {
             return PopupMenuItem(
               key: Key('vista-${scelta.name}'),
               value: scelta,
+              height: compatto ? 40 : kMinInteractiveDimension,
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
+                dense: compatto,
+                visualDensity: compatto ? VisualDensity.compact : null,
                 iconColor: spenta ? grigio : null,
                 textColor: spenta ? grigio : null,
                 leading: SizedBox(
@@ -106,7 +119,13 @@ class SceltaVista extends StatelessWidget {
                   ),
                 ),
                 title: Text(scelta.nome, style: TextStyle(fontWeight: scelta == v ? FontWeight.w800 : FontWeight.w600)),
-                subtitle: Text(spenta ? _perche : _spiega(scelta)),
+                subtitle: conSpiegazione
+                    ? Text(
+                        spenta ? _perche : _spiega(scelta),
+                        maxLines: compatto ? 1 : null,
+                        overflow: compatto ? TextOverflow.ellipsis : null,
+                      )
+                    : null,
                 trailing: scelta == v
                     ? const Icon(Icons.check_rounded)
                     : spenta

@@ -172,6 +172,8 @@ Future<GdanavApp> preparaGdanav({
   final prova = ProvaDiGuida(acceleratore: dimostrazione == null ? 1 : Dimostrazione.acceleratore);
   // Volume e velocità della voce, scelti l'ultima volta (dal menu dell'auto).
   regolazioniVoce.value = await archivio.regolazioniDellaVoce();
+  // E la voce scelta («Voce di guida» nel menu).
+  voceScelta.value = await archivio.voceDiGuida();
   final guida = GestoreGuida(
     viaggio: viaggio,
     auto: auto,

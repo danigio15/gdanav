@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -69,6 +70,110 @@ enum VelocitaVoce {
 /// (il menu dell'auto) e li carica l'app all'avvio.
 final regolazioniVoce = ValueNotifier<(VolumeVoce, VelocitaVoce)>((VolumeVoce.alto, VelocitaVoce.normale));
 
+/// Una voce del telefono, come la dà la sintesi vocale: il nome (quello
+/// che la sintesi riconosce) e la lingua. Su iPhone c'è anche la qualità
+/// (`default`, `enhanced`, `premium`), su Android a volte se serve la rete.
+@immutable
+class VoceDelTelefono {
+  const VoceDelTelefono({required this.nome, required this.lingua, this.qualita, this.inRete = false});
+
+  final String nome;
+  final String lingua;
+  final String? qualita;
+  final bool inRete;
+
+  /// Dalla mappa di `FlutterTts.getVoices`; `null` se non ha nome o lingua.
+  static VoceDelTelefono? daSintesi(Object? m) {
+    if (m is! Map) return null;
+    final nome = m['name']?.toString() ?? '';
+    final lingua = (m['locale'] ?? m['language'])?.toString() ?? '';
+    if (nome.isEmpty || lingua.isEmpty) return null;
+    final rete = m['network_required']?.toString();
+    return VoceDelTelefono(
+      nome: nome,
+      lingua: lingua,
+      qualita: m['quality']?.toString(),
+      inRete: rete == '1' || rete == 'true',
+    );
+  }
+
+  static VoceDelTelefono? daJson(String? testo) {
+    if (testo == null || testo.isEmpty) return null;
+    try {
+      final m = jsonDecode(testo);
+      if (m is! Map) return null;
+      final nome = m['nome']?.toString() ?? '';
+      final lingua = m['lingua']?.toString() ?? '';
+      if (nome.isEmpty || lingua.isEmpty) return null;
+      return VoceDelTelefono(nome: nome, lingua: lingua, qualita: m['qualita']?.toString());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String get json => jsonEncode({'nome': nome, 'lingua': lingua, 'qualita': ?qualita});
+
+  /// È italiana (`it-IT`, `it_IT`, `ita`…).
+  bool get italiana => lingua.toLowerCase().startsWith('it');
+
+  /// Come la si chiama nell'elenco: «Alice», non
+  /// «com.apple.voice.compact.it-IT.Alice» né «it-it-x-itd-local».
+  String get etichetta {
+    if (nome.startsWith('com.apple.')) return nome.split('.').last;
+    final android = RegExp(r'^[a-z]{2}-[a-z]{2}-x-([a-z]+)-(local|network)$', caseSensitive: false).firstMatch(nome);
+    if (android != null) return 'Voce ${android.group(1)!.toUpperCase()}';
+    return nome;
+  }
+
+  /// Sotto il nome: la qualità e se serve internet.
+  String get dettaglio => [
+    switch (qualita?.toLowerCase()) {
+      'premium' => 'Qualità premium',
+      'enhanced' => 'Qualità migliorata',
+      _ => null,
+    },
+    if (inRete || nome.toLowerCase().endsWith('-network')) 'Serve internet',
+  ].nonNulls.join(' · ');
+
+  /// Le migliori prima (premium, migliorata), poi per nome.
+  static int ordine(VoceDelTelefono a, VoceDelTelefono b) {
+    int peso(VoceDelTelefono v) => switch (v.qualita?.toLowerCase()) {
+      'premium' => 0,
+      'enhanced' => 1,
+      _ => 2,
+    };
+    final p = peso(a) - peso(b);
+    return p != 0 ? p : a.etichetta.toLowerCase().compareTo(b.etichetta.toLowerCase());
+  }
+
+  @override
+  bool operator ==(Object other) => other is VoceDelTelefono && other.nome == nome && other.lingua == lingua;
+
+  @override
+  int get hashCode => Object.hash(nome, lingua);
+}
+
+/// La voce scelta per la guida; `null` è quella predefinita del telefono.
+///
+/// «La voce che c'è è un po' fastidiosa»: si parlava sempre con la voce
+/// italiana predefinita del sistema, e per cambiarla bisognava cercarla nelle
+/// impostazioni del telefono. Si sceglie dal menu, «Voce di guida».
+final voceScelta = ValueNotifier<VoceDelTelefono?>(null);
+
+/// Le voci italiane del telefono, le migliori prima.
+Future<List<VoceDelTelefono>> vociItalianeDelTelefono([FlutterTts? tts]) async {
+  try {
+    final tutte = await (tts ?? FlutterTts()).getVoices;
+    final voci = {
+      for (final m in (tutte is List ? tutte : const []))
+        if (VoceDelTelefono.daSintesi(m) case final v? when v.italiana) v,
+    }.toList()..sort(VoceDelTelefono.ordine);
+    return voci;
+  } catch (_) {
+    return const [];
+  }
+}
+
 /// Chi parla durante la guida. Nelle prove se ne usa una che scrive e basta.
 abstract interface class Voce {
   Future<void> parla(String frase);
@@ -137,6 +242,10 @@ class VoceTelefono implements Voce {
   /// Volume e velocità già dati alla sintesi vocale.
   (VolumeVoce, VelocitaVoce)? _regolata;
 
+  /// La voce già data alla sintesi vocale (vedi [voceScelta]); `false` finché
+  /// non se n'è data nessuna.
+  Object? _voceData = false;
+
   @override
   Future<void> parla(String frase) async {
     try {
@@ -160,6 +269,8 @@ class VoceTelefono implements Voce {
         }
         _pronta = true;
       }
+      await _daiLaVoce(_tts, voceScelta.value, _voceData);
+      _voceData = voceScelta.value;
       final r = regolazioniVoce.value;
       if (r != _regolata) {
         await _tts.setVolume(r.$1.valore);
@@ -177,6 +288,34 @@ class VoceTelefono implements Voce {
   Future<void> zitta() async {
     try {
       await _tts.stop();
+    } catch (_) {}
+  }
+
+  /// Dà alla sintesi la voce [v] se è cambiata da [prima]; `null` è la
+  /// predefinita italiana. Una voce che il telefono non ha più (cancellata
+  /// dalle impostazioni) non ferma niente: resta quella di prima.
+  static Future<void> _daiLaVoce(FlutterTts tts, VoceDelTelefono? v, Object? prima) async {
+    if (v == prima) return;
+    try {
+      if (v == null) {
+        await tts.setLanguage('it-IT');
+      } else {
+        await tts.setVoice({'name': v.nome, 'locale': v.lingua});
+      }
+    } catch (_) {}
+  }
+
+  /// Fa sentire la voce [v] (la prova nella scelta della voce), con volume e
+  /// velocità di adesso.
+  static Future<void> prova(FlutterTts tts, VoceDelTelefono? v, String frase) async {
+    try {
+      await tts.stop();
+      await tts.setLanguage('it-IT');
+      await _daiLaVoce(tts, v, null);
+      final r = regolazioniVoce.value;
+      await tts.setVolume(r.$1.valore);
+      await tts.setSpeechRate(r.$2.valore);
+      await tts.speak(frase);
     } catch (_) {}
   }
 

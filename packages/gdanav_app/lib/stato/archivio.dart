@@ -39,6 +39,7 @@ class Archivio {
   static const _avvisiScelti = 'avvisi_scelti';
   static const _volumeVoce = 'voce_volume';
   static const _velocitaVoce = 'voce_velocita';
+  static const _voceScelta = 'voce_scelta';
   static const _vistaPiatta = 'vista_2d';
   static const _vista = 'vista_mappa';
   static const _viaggiPianificati = 'viaggi_pianificati';
@@ -186,6 +187,12 @@ class Archivio {
     await _p.write(key: _volumeVoce, value: r.$1.name);
     await _p.write(key: _velocitaVoce, value: r.$2.name);
   }
+
+  /// La voce scelta per la guida (vedi [voceScelta]); `null` la predefinita.
+  Future<VoceDelTelefono?> voceDiGuida() async => VoceDelTelefono.daJson(await _p.read(key: _voceScelta));
+
+  Future<void> salvaVoceDiGuida(VoceDelTelefono? v) async =>
+      v == null ? _p.delete(key: _voceScelta) : _p.write(key: _voceScelta, value: v.json);
 
   /// Gli avvisi della guida, uno per uno (vedi [ScelteAvvisi]).
   Future<Map<Avviso, ComeAvvisare>> scelteAvvisi() async => ScelteAvvisi.daJson(await _p.read(key: _avvisiScelti));
