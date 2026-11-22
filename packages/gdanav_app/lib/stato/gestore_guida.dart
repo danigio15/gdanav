@@ -898,7 +898,7 @@ class GestoreGuida extends ChangeNotifier {
     // Un percorso nuovo (ricalcolo, strada proposta, tappa): i sensi unici
     // si guardano subito, senza aspettare la prossima posizione del GPS (da
     // fermi può tardare, e intanto si vedeva la linea di TomTom).
-    if (attiva) scheduleMicrotask(_sensiPiuAvanti);
+    if (attiva) _sensiFraUnAttimo();
   }
 
   /* ─── Mai contromano ──────────────────────────────────────────────────────
@@ -958,6 +958,46 @@ class GestoreGuida extends ChangeNotifier {
     unawaited(_correggiISensi(daM: da, aM: _sensiFinoA, protettoM: qui + 30));
   }
 
+  /// Quanti pezzi si guardano al più per un percorso, uno dopo l'altro:
+  /// trenta chilometri sono quindici pezzi, il resto è margine.
+  static const pezziSensiAlPiu = 40;
+
+  var _sensiPezzi = 0;
+
+  /// Il pezzo dopo si chiede al giro dopo, non subito.
+  ///
+  /// «Dopo l'ultimo aggiornamento l'app non si apre più», ferma sul logo
+  /// anche in modalità aereo, finché non si cancellano i dati. Il pezzo dopo
+  /// partiva come microtask, e con le tessere già in memoria
+  /// ([StradeOsm.attorno] risponde con `Future.value`) un pezzo dopo l'altro —
+  /// fino a quindici, ognuno col suo conto contromano — passava senza mai
+  /// tornare al ciclo degli eventi: finché la catena non finiva, il motore non
+  /// disegnava niente, e un'app che si riapre sullo stesso motore resta sul
+  /// logo. Con un timer fra un pezzo e l'altro lo schermo si disegna sempre, e
+  /// la catena ha un tetto ([pezziSensiAlPiu]).
+  void _sensiFraUnAttimo() {
+    if (!_sensiAncoraDaGuardare) return;
+    _sensiDopo?.cancel();
+    _sensiDopo = Timer(Duration.zero, () {
+      _sensiDopo = null;
+      _sensiPiuAvanti();
+    });
+  }
+
+  Timer? _sensiDopo;
+
+  /// Se c'è ancora un pezzo davanti da guardare: senza, nessun timer.
+  bool get _sensiAncoraDaGuardare {
+    final p = pronto, g = _guida;
+    if (strade == null || p == null || g == null || !attiva) return false;
+    if (_sensiRiprovaDopo case final t? when _ora().isBefore(t)) return false;
+    if (!identical(g.percorso, p.viaggio.percorso)) return false;
+    if (!identical(_sensiDi, p.viaggio.percorso)) return true;
+    final qui = avanzamento?.percorsiM ?? 0.0;
+    final fine = math.min(g.linea.lunghezzaM, qui + avantiSensiM);
+    return qui.isFinite && fine.isFinite && _sensiFinoA < fine && _sensiPezzi < pezziSensiAlPiu;
+  }
+
   /// Il pezzo dopo quelli già guardati, fino a [avantiSensiM] davanti
   /// all'auto (o alla partenza): uno alla volta, finito uno parte l'altro.
   /// Senza strade si aspetta il tentativo a tempo di [_correggiISensi].
@@ -972,9 +1012,13 @@ class GestoreGuida extends ChangeNotifier {
     if (!identical(_sensiDi, percorso)) {
       _sensiDi = percorso;
       _sensiFinoA = -1;
+      _sensiPezzi = 0;
     }
     final fine = math.min(g.linea.lunghezzaM, qui + avantiSensiM);
-    if (_sensiFinoA >= fine) return;
+    // Un numero che non è un numero (una posizione storta) non finisce mai
+    // una catena: `_sensiFinoA >= NaN` è sempre falso.
+    if (!qui.isFinite || !fine.isFinite || _sensiFinoA >= fine) return;
+    if (_sensiPezzi++ >= pezziSensiAlPiu) return;
     final da = _sensiFinoA < 0 ? qui : math.max(qui, _sensiFinoA - 100);
     _sensiFinoA = da + finestraSensiM;
     unawaited(_correggiISensi(daM: da, aM: _sensiFinoA, protettoM: a == null ? 0 : qui + 30));
@@ -1094,7 +1138,7 @@ class GestoreGuida extends ChangeNotifier {
     } finally {
       _sensiInCorso = false;
       // E il pezzo dopo, finché non si è guardato abbastanza avanti.
-      if (attiva) scheduleMicrotask(_sensiPiuAvanti);
+      if (attiva) _sensiFraUnAttimo();
     }
   }
 
@@ -1685,6 +1729,7 @@ class GestoreGuida extends ChangeNotifier {
     _iscrizione?.cancel();
     _svegliaStima?.cancel();
     _sensiSveglia?.cancel();
+    _sensiDopo?.cancel();
     versioneSullaMappa.dispose();
     super.dispose();
   }
