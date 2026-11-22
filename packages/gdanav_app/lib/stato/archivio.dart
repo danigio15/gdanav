@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
+import '../componenti/riquadro_manovra.dart' show DimensioneIndicazioni;
 import '../mappa/controllo_mappa.dart' show VistaMappa;
 import '../mappa/segnaposto.dart';
 import '../servizi.dart';
@@ -47,6 +48,7 @@ class Archivio {
   // quando era l'interruttore «Mappa 3D», e vale ancora).
   static const _mappa3dEsito = 'mappa_3d_esito';
   static const _vistaPrima = 'vista_mappa_prima';
+  static const _dimensioneIndicazioni = 'dimensione_indicazioni';
 
   Future<Abbinamento?> abbinamento() async {
     final uri = await _p.read(key: _abbinamento);
@@ -193,6 +195,17 @@ class Archivio {
 
   Future<void> salvaVoceDiGuida(VoceDelTelefono? v) async =>
       v == null ? _p.delete(key: _voceScelta) : _p.write(key: _voceScelta, value: v.json);
+
+  /// Quanto è grande il riquadro della manovra in guida (vedi
+  /// [DimensioneIndicazioni]); di base automatica.
+  Future<DimensioneIndicazioni> dimensioneIndicazioni() async {
+    final nome = await _p.read(key: _dimensioneIndicazioni);
+    return DimensioneIndicazioni.values.where((d) => d.name == nome).firstOrNull ?? DimensioneIndicazioni.automatica;
+  }
+
+  Future<void> salvaDimensioneIndicazioni(DimensioneIndicazioni d) => d == DimensioneIndicazioni.automatica
+      ? _p.delete(key: _dimensioneIndicazioni)
+      : _p.write(key: _dimensioneIndicazioni, value: d.name);
 
   /// Gli avvisi della guida, uno per uno (vedi [ScelteAvvisi]).
   Future<Map<Avviso, ComeAvvisare>> scelteAvvisi() async => ScelteAvvisi.daJson(await _p.read(key: _avvisiScelti));

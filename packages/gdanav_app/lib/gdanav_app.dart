@@ -22,6 +22,7 @@ import 'stato/gestore_luoghi.dart';
 import 'stato/gestore_meteo.dart';
 import 'componenti/mini_lettore.dart';
 import 'componenti/musica_di_casa.dart';
+import 'componenti/riquadro_manovra.dart' show dimensioneIndicazioni;
 import 'stato/gestore_casa_in_guida.dart';
 import 'stato/gestore_persone.dart';
 import 'stato/gestore_posizione.dart';
@@ -174,6 +175,8 @@ Future<GdanavApp> preparaGdanav({
   regolazioniVoce.value = await archivio.regolazioniDellaVoce();
   // E la voce scelta («Voce di guida» nel menu).
   voceScelta.value = await archivio.voceDiGuida();
+  // E quanto è grande il riquadro della manovra in guida.
+  dimensioneIndicazioni.value = await archivio.dimensioneIndicazioni();
   final guida = GestoreGuida(
     viaggio: viaggio,
     auto: auto,

@@ -12,6 +12,7 @@ import '../componenti/tachimetro.dart';
 import '../componenti/avviso_di_casa.dart' show SchedaAvvisoDiCasa;
 import '../componenti/avvisi_in_guida.dart';
 import '../componenti/mini_lettore.dart' show InvitoMusica, MiniLettore;
+import '../componenti/riquadro_manovra.dart';
 import '../componenti/scheda_auto.dart';
 import '../componenti/vetro.dart';
 import '../mappa/controllo_mappa.dart';
@@ -550,6 +551,49 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
     }
   }
 
+  /// «Dimensione indicazioni»: il riquadro della manovra in guida, piccolo
+  /// lontano dalla svolta (automatica) o sempre grande (normale).
+  void _dimensioneIndicazioni() {
+    showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (contesto) => SafeArea(
+        top: false,
+        child: ValueListenableBuilder(
+          valueListenable: dimensioneIndicazioni,
+          builder: (contesto, scelta, _) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                child: Text('Dimensione indicazioni', style: Theme.of(contesto).textTheme.titleLarge),
+              ),
+              for (final d in DimensioneIndicazioni.values)
+                ListTile(
+                  key: Key('indicazioni-${d.name}'),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                  title: Text(d.nome),
+                  subtitle: Text(d.spiegazione),
+                  trailing: d == scelta
+                      ? Icon(Icons.check_rounded, color: Theme.of(contesto).colorScheme.primary)
+                      : null,
+                  selected: d == scelta,
+                  onTap: () {
+                    dimensioneIndicazioni.value = d;
+                    unawaited(widget.archivio.salvaDimensioneIndicazioni(d));
+                    Navigator.of(contesto).pop();
+                  },
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// «Fonte dati auto»: senza Premium le fonti automatiche portano a Premium.
   Future<void> _fonteDatiAuto() => mostraFonteDatiAuto(
     context,
@@ -581,6 +625,7 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
         widget.viaggio,
         luoghi,
         widget.guida.avvisi,
+        dimensioneIndicazioni,
         ?widget.premium,
         ?widget.pianificati,
         ?widget.casaInGuida,
@@ -676,6 +721,17 @@ class _SchermataPrincipaleState extends State<SchermataPrincipale> {
                         regolazioniVoce.value.$2.nome.toLowerCase(),
                       ].join(' · '),
                       onTap: () => vai(VoceGuidaSchermata(archivio: widget.archivio)),
+                    ),
+                    _VoceMenu(
+                      key: const Key('menu-indicazioni'),
+                      icona: Icons.turn_right_rounded,
+                      colore: const Color(0xFF475569),
+                      titolo: 'Dimensione indicazioni',
+                      sotto: dimensioneIndicazioni.value.nome,
+                      onTap: () {
+                        chiudi();
+                        _dimensioneIndicazioni();
+                      },
                     ),
                     // Gli avvisi di casa (dentro GdAHome) e la musica in guida.
                     if (widget.casaInGuida case final c? when c.coda != null || c.lettore != null)
