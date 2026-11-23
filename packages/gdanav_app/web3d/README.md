@@ -39,7 +39,12 @@ la mappa scarica già (OpenFreeMap, schema OpenMapTiles).
   finisce ancora in alto c'è la spalla. Le gallerie sono un nastro scuro e
   trasparente con gli imbocchi, e il percorso lì dentro è tenue e
   tratteggiato. Un ponte senza `layer` sta al primo livello (al più al
-  quinto), le rampe salgono da sole verso il ponte a cui si attaccano.
+  quinto), le rampe salgono da sole verso il ponte a cui si attaccano. I
+  binari che salgono al loro ponte (o restano in alto fra due ponti vicini)
+  stanno su un rilevato: la ghiaia in cima, le scarpate d'erba fino a terra,
+  un muro di sostegno dove una strada passa accanto e uno di testa contro il
+  ponte (le tessere non dicono se c'è un terrapieno: in alto senza un ponte,
+  nella realtà, c'è sempre).
 - **I viadotti sulle valli** (`segnaViadotti` in `src/tessera.js`): le
   tessere danno solo il livello, ma in Italia i ponti sulle valli si
   chiamano «Viadotto …» (e quello di Genova «(Ponte San Giorgio) A10 …»):
@@ -97,7 +102,12 @@ la mappa scarica già (OpenFreeMap, schema OpenMapTiles).
   strisce, le linee d'arresto e i semafori (`src/segnaletica.js`, tre
   geometrie per tessera); il percorso è una fascia verde sulla corsia da
   tenere (le frecce dipinte, o le corsie giuste della manovra se l'app le
-  manda), e l'auto ci sta dentro; la telecamera più bassa e vicina, gli
+  manda), e l'auto ci sta dentro; i ponti e i piloni fra la telecamera e
+  l'auto sono un fantasma a puntini fissi sullo schermo (un pixel su tre, col
+  bordo sfumato e una finestra libera davanti all'auto), non un taglio; la
+  quota dell'asfalto delle corsie si guarda almeno ogni otto metri (sui
+  rettilinei lunghi saliva dritta verso il ponte lontano e copriva il
+  percorso); la telecamera più bassa e vicina, gli
   edifici bianchi col bordo del tetto più scuro, il suolo chiaro a toni per
   zona. Niente di inventato: gli
   edifici sono quelli delle tessere (in prova, quelli di Overture al posto

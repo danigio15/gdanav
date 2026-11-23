@@ -5,8 +5,8 @@ import test from 'node:test';
 import { bordiCorsie, normalizza, preparaCorsie } from '../src/corsie.js';
 import { latDaMerc, lonDaMerc, sistemaTessera } from '../src/geo.js';
 import { ALTO_MARCIAPIEDE, ANGOLO, CORDOLO_M, angoloMarciapiede, lineaRicca, MARCIAPIEDI, RIGHE, SCIVOLO, costruisciSegnaletica, formaFreccia, semplificaPezzo, togli, trattini } from '../src/segnaletica.js';
-import { costruisciTessera } from '../src/tessera.js';
-import { cavalcavia } from './finte.js';
+import { costruisciTessera, infittisci, sfoltisciQuote } from '../src/tessera.js';
+import { cavalcavia, strato } from './finte.js';
 
 test('il tratteggio: dall’inizio della via, senza i buchi degli incroci', () => {
   assert.deepEqual(trattini(30, 3, 3), [
@@ -549,4 +549,98 @@ test('la zebratura dove la carreggiata si divide: nel triangolo, mai sulle corsi
   const z2 = zebrature(costruisciSegnaletica({ strade: [arriva, dritta, sovrapposta], meta: 1000 }));
   const sulleCorsie = z2.filter(([, y]) => y > -3.75);
   assert.deepEqual(sulleCorsie, [], `strisce sulle corsie: ${JSON.stringify(sulleCorsie)}`);
+});
+
+// ── La quota dell'asfalto lungo una via dritta ─────────────────────────
+// «Il percorso diventa tratteggiato e la freccia cambia colore», su un
+// rettilineo all'aperto: l'asfalto delle corsie stava sopra la strada vera.
+
+/** La quota dei triangoli di [g] (posizioni e indici) nel punto [x, y]; null fuori. */
+function quotaIn(g, x, y) {
+  const P = g.posizioni;
+  const I = g.indici;
+  let meglio = null;
+  for (let t = 0; t < I.length; t += 3) {
+    const [a, b, c] = [I[t], I[t + 1], I[t + 2]].map((i) => [P[3 * i], P[3 * i + 1], P[3 * i + 2]]);
+    const d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+    if (Math.abs(d) < 1e-9) continue;
+    const l1 = ((b[1] - c[1]) * (x - c[0]) + (c[0] - b[0]) * (y - c[1])) / d;
+    const l2 = ((c[1] - a[1]) * (x - c[0]) + (a[0] - c[0]) * (y - c[1])) / d;
+    const l3 = 1 - l1 - l2;
+    if (l1 < -1e-6 || l2 < -1e-6 || l3 < -1e-6) continue;
+    const z = l1 * a[2] + l2 * b[2] + l3 * c[2];
+    meglio = meglio === null ? z : Math.max(meglio, z);
+  }
+  return meglio;
+}
+
+test('una via dritta con due punti lontani: l’asfalto sale col ponte, non da lontano', () => {
+  // Un'autostrada inventata, da ovest a est, che più avanti passa su un
+  // ponte (sopra una strada da nord a sud); la via con le corsie ha solo i
+  // due capi fino al ponte, a più di settecento metri l'uno dall'altro.
+  const X = 8605;
+  const Y = 5860;
+  const ll = geo(14, X, Y);
+  const sys = sistemaTessera(14, X, Y);
+  const px = (m) => 2048 + (m * 4096) / sys.lato;
+  const livelli = {
+    '0,0': {
+      transportation: strato([
+        { p: { class: 'motorway', oneway: 1 }, g: [[[0, 2048], [px(200), 2048]]] },
+        { p: { class: 'motorway', oneway: 1, brunnel: 'bridge', layer: 1 }, g: [[[px(200), 2048], [px(260), 2048]]] },
+        { p: { class: 'motorway', oneway: 1 }, g: [[[px(260), 2048], [4096, 2048]]] },
+        { p: { class: 'secondary' }, g: [[[px(230), 0], [px(230), 4096]]] },
+      ]),
+    },
+  };
+  const dati = {
+    v: 1,
+    strade: [
+      { id: 1, hw: 'motorway', lanes: '3', oneway: 'yes', g: [...ll(-520, 0), ...ll(200, 0)] },
+      { id: 2, hw: 'motorway', lanes: '3', oneway: 'yes', bridge: 'yes', layer: '1', g: [...ll(200, 0), ...ll(260, 0)] },
+      { id: 3, hw: 'motorway', lanes: '3', oneway: 'yes', g: [...ll(260, 0), ...ll(700, 0)] },
+    ],
+    nodi: [],
+  };
+  const t = costruisciTessera({ z: 14, x: X, y: Y, livelli, datiCorsie: preparaCorsie(dati), vistaCorsie: true });
+  // La strada della mappa: a terra lontano dal ponte, in cima sul ponte.
+  const strada = (m) => {
+    let h = null;
+    for (let i = 0; i < t.segmenti.length; i += 8) {
+      const [ax, , az, bx, , bz] = t.segmenti.slice(i, i + 6);
+      if (Math.abs(t.segmenti[i + 1]) > 1 || (m - ax) * (m - bx) > 0 || ax === bx) continue;
+      h = Math.max(h ?? -1, az + ((bz - az) * (m - ax)) / (bx - ax));
+    }
+    return h;
+  };
+  assert.ok(strada(0) < 0.5 && strada(230) > 6, `la strada della mappa: ${strada(0)} a terra, ${strada(230)} sul ponte`);
+  // L'asfalto delle corsie sta sulla strada: a terra fin dove lei è a terra,
+  // e sul ponte in alto. Prima, a 200 m dal ponte, era già a più di due metri.
+  for (const m of [-400, -200, -100, 0, 50, 120, 180, 230]) {
+    const a = quotaIn(t.corsie.asfalto, m, -1);
+    assert.ok(a !== null, `l'asfalto a ${m} m`);
+    assert.ok(Math.abs(a - strada(m)) < 0.6, `a ${m} m l'asfalto è a ${a.toFixed(2)} m, la strada a ${strada(m).toFixed(2)} m`);
+  }
+});
+
+test('la quota delle vie: i punti in più restano solo dove la quota non va dritta', () => {
+  const { xy, nuovi } = infittisci(
+    [
+      [0, 0],
+      [100, 0],
+    ],
+    10,
+  );
+  assert.equal(xy.length, 11);
+  assert.deepEqual(nuovi, [false, ...Array(9).fill(true), false]);
+  // A terra fino a 60 m, poi su al 10%: restano i capi e il piede della salita.
+  const h = xy.map(([x]) => Math.max(0, (x - 60) * 0.1));
+  const via = sfoltisciQuote(xy, h, nuovi);
+  assert.deepEqual(
+    via.xy.map(([x]) => x),
+    [0, 60, 100],
+  );
+  assert.deepEqual(via.h, [h[0], h[6], h[10]]);
+  // Tutta dritta: solo i capi.
+  assert.equal(sfoltisciQuote(xy, xy.map(([x]) => x * 0.02), nuovi).xy.length, 2);
 });
