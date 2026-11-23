@@ -39,8 +39,10 @@ const SOPRA_GALLERIA = 0.06;
 /** Oltre questa quota (m) una strada non segnata come ponte si disegna come un viadotto. */
 const ALTO_COME_PONTE = 6.5;
 
-/** Quanto si allarga la trincea dei binari per metro di profondità (le scarpate). */
+/** Quanto si allarga la trincea dei binari per metro di profondità (le scarpate); e il rilevato per metro d'altezza. */
 const SCARPATA = 1.5;
+/** La ghiaia in cima al rilevato dei binari, oltre il binario, prima della scarpata (m). */
+const BANCHINA_RILEVATO = 0.8;
 /** Metri di strada per una ripetizione della trama. */
 export const PERIODO_STRADA = 12;
 export const PIANO = 3.2;
@@ -240,7 +242,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
       for (const q of [a, b]) {
         const key = Math.floor(q[0] / GRIGLIA) + ',' + Math.floor(q[1] / GRIGLIA);
         if (!aTerra.has(key)) aTerra.set(key, []);
-        aTerra.get(key).push([a, b, visibili[i].w / 2]);
+        aTerra.get(key).push([a, b, visibili[i].w / 2, visibili[i].cls === 'rail']);
       }
     }
   });
@@ -276,10 +278,12 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     }
     return false;
   };
-  const suStradaATerra = (px, py, margine) => {
+  // [senzaBinari]: solo le strade (per il rilevato dei binari, vedi sotto).
+  const suStradaATerra = (px, py, margine, senzaBinari = false) => {
     for (let ax = -1; ax <= 1; ax++) {
       for (let ay = -1; ay <= 1; ay++) {
-        for (const [a, b, hw] of aTerra.get(Math.floor(px / GRIGLIA) + ax + ',' + (Math.floor(py / GRIGLIA) + ay)) || []) {
+        for (const [a, b, hw, binari] of aTerra.get(Math.floor(px / GRIGLIA) + ax + ',' + (Math.floor(py / GRIGLIA) + ay)) || []) {
+          if (senzaBinari && binari) continue;
           if (distanzaSegmento(px, py, a[0], a[1], b[0], b[1]) < hw + margine) return true;
         }
       }
@@ -405,6 +409,18 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
       if (a.h < -0.3 || b.h < -0.3) binariSotto.push([a.x, a.y, b.x, b.y, g]);
     }
   }
+  // E quelli in alto (sul rilevato o su un ponte), per fare un rilevato solo
+  // sotto due binari affiancati.
+  const binariAlti = [];
+  for (const g of feats) {
+    if (g.cls !== 'rail' || g.galleria) continue;
+    for (let k = 1; k < g.nodi.length; k++) {
+      const a = nodi[g.nodi[k - 1]];
+      const b = nodi[g.nodi[k]];
+      if (a.h > 0.35 || b.h > 0.35) binariAlti.push([a.x, a.y, b.x, b.y, g]);
+    }
+  }
+  const altriBinariAlti = (x, y, f, entro) => binariAlti.some(([ax, ay, bx, by, g]) => g !== f && distanzaSegmento(x, y, ax, ay, bx, by) < entro);
   const altriBinariInTrincea = (x, y, f, entro) =>
     binariSotto.some(([ax, ay, bx, by, g]) => {
       if (g === f) return false;
@@ -645,6 +661,64 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
             const c1 = [pezzo[k][0] + nb[0] * hw, pezzo[k][1] + nb[1] * hw];
             opere.quad([c0[0], c0[1], za + 0.02], [c1[0], c1[1], zb + 0.02], [b[0], b[1], zb + 0.02], [a[0], a[1], za + 0.02], [0, 0, 1], ...sfuma(GHIAIA, 0.9, 1));
           }
+        }
+      }
+      /* «I binari continuano oltre il ponte alla stessa altezza, sospesi nel
+       * vuoto»: una ferrovia che scavalca una strada sale al suo ponte (o
+       * resta in alto fra due ponti vicini, come spesso in città), e fuori dal
+       * ponte non aveva niente sotto. OpenMapTiles non dice se c'è un
+       * terrapieno, ma dove i binari stanno in alto senza un ponte nella
+       * realtà c'è sempre: qui un rilevato, la ghiaia in cima e le scarpate
+       * d'erba fino a terra. Dove una strada passa accanto, al posto della
+       * scarpata un muro di sostegno; sotto due binari affiancati il rilevato
+       * è uno; dove finisce in alto (contro il ponte) lo chiude un muro. */
+      if (f.cls === 'rail' && !f.ponte && pezzo.some((q) => q[2] > 0.35)) {
+        const cima = hw + BANCHINA_RILEVATO;
+        for (let k = 1; k < n; k++) {
+          const A = pezzo[k - 1];
+          const B = pezzo[k];
+          const za = Math.max(0, A[2]);
+          const zb = Math.max(0, B[2]);
+          if (za < 0.35 && zb < 0.35) continue;
+          // Appena sotto il binario.
+          const ta = za + zs - 0.03;
+          const tb = zb + zs - 0.03;
+          const mx = (A[0] + B[0]) / 2;
+          const my = (A[1] + B[1]) / 2;
+          // Una strada che passa sotto (i binari la scavalcano senza un ponte
+          // nei dati): lì niente terra sopra l'asfalto.
+          if (za + zb > 5 && suStradaATerra(mx, my, 1, true)) continue;
+          for (const lato of [1, -1]) {
+            const na = [-A[4] * lato, A[3] * lato];
+            const nb = [-B[4] * lato, B[3] * lato];
+            const nm = [(na[0] + nb[0]) / 2, (na[1] + nb[1]) / 2];
+            const P = (Q, nn, d, z) => [Q[0] + nn[0] * d, Q[1] + nn[1] * d, z];
+            // Un altro binario in alto accanto: la ghiaia fino a lui, niente scarpata in mezzo.
+            if (altriBinariAlti(mx + nm[0] * (hw + 2.4), my + nm[1] * (hw + 2.4), f, 2.6)) {
+              opere.quad(P(A, na, hw - 0.05, ta), P(B, nb, hw - 0.05, tb), P(B, nb, hw + 2.6, tb), P(A, na, hw + 2.6, ta), [0, 0, 1], ...sfuma(GHIAIA, 0.9, 1));
+              continue;
+            }
+            opere.quad(P(A, na, hw - 0.05, ta), P(B, nb, hw - 0.05, tb), P(B, nb, cima, tb), P(A, na, cima, ta), [0, 0, 1], ...sfuma(GHIAIA, 0.9, 1));
+            const largo = ((za + zb) / 2) * SCARPATA;
+            const strada = [0.3, 0.65, 1].some((u) => suStradaATerra(mx + nm[0] * (cima + largo * u), my + nm[1] * (cima + largo * u), 0.3, true));
+            if (strada) {
+              opere.quad(P(A, na, cima, 0), P(B, nb, cima, 0), P(B, nb, cima, tb), P(A, na, cima, ta), [nm[0], nm[1], 0], ...sfuma(cCemento, 0.66, 0.98));
+            } else {
+              const l = Math.hypot(1, SCARPATA);
+              opere.quad(P(A, na, cima + za * SCARPATA, 0.02), P(B, nb, cima + zb * SCARPATA, 0.02), P(B, nb, cima, tb), P(A, na, cima, ta), [nm[0] / l, nm[1] / l, SCARPATA / l], ...sfuma(SCARPA, 0.72, 1));
+            }
+          }
+        }
+        // Dove il rilevato finisce in alto (contro il ponte), il muro di testa.
+        for (const e of [0, n - 1]) {
+          const Q = pezzo[e];
+          const capo = e === 0 ? Q[5] < 0.5 : Q[5] > lungo[n0 - 1] - 0.5;
+          if (!capo || Q[2] < 0.35 || !dentro(Q[0], Q[1])) continue;
+          const dir = e === 0 ? -1 : 1;
+          const nn = [-Q[4], Q[3]];
+          const base = cima + Q[2] * SCARPATA;
+          const P = (d, z) => [Q[0] + nn[0] * d, Q[1] + nn[1] * d, z];
+          opere.quad(P(-base, 0), P(base, 0), P(cima, Q[2] + zs - 0.03), P(-cima, Q[2] + zs - 0.03), [Q[3] * dir, Q[4] * dir, 0], ...sfuma(cCemento, 0.66, 0.98));
         }
       }
       if (f.galleria || (f.cls === 'rail' && !f.ponte)) continue;
@@ -2266,6 +2340,66 @@ export function limitaPendenza(h, xy, fissi = null) {
   return h;
 }
 
+/** Ogni quanti metri, al più, si guarda la quota di una via con le corsie (vedi [corsieDellaTessera]). */
+export const PASSO_QUOTE_CORSIE = 8;
+
+/**
+ * I punti [xy] con un punto in più ogni [passo] metri, al più, sui tratti
+ * più lunghi; `nuovi[k]` dice se il punto k è uno di quelli aggiunti.
+ */
+export function infittisci(xy, passo = PASSO_QUOTE_CORSIE) {
+  const out = [];
+  const nuovi = [];
+  xy.forEach((q, k) => {
+    if (k) {
+      const a = xy[k - 1];
+      const n = Math.ceil(Math.hypot(q[0] - a[0], q[1] - a[1]) / passo);
+      for (let j = 1; j < n; j++) {
+        out.push([a[0] + ((q[0] - a[0]) * j) / n, a[1] + ((q[1] - a[1]) * j) / n]);
+        nuovi.push(true);
+      }
+    }
+    out.push(q);
+    nuovi.push(false);
+  });
+  return { xy: out, nuovi };
+}
+
+/**
+ * Toglie i punti aggiunti da [infittisci] dove la quota va dritta: fra due
+ * punti tenuti, un punto aggiunto resta solo se la quota si scosta di più di
+ * [tolleranza] metri dalla retta (Douglas-Peucker sui metri lungo la via).
+ * I punti della via restano tutti. Restituisce `{xy, h}`.
+ */
+export function sfoltisciQuote(xy, h, nuovi, tolleranza = 0.05) {
+  const s = [0];
+  for (let k = 1; k < xy.length; k++) s.push(s[k - 1] + Math.hypot(xy[k][0] - xy[k - 1][0], xy[k][1] - xy[k - 1][1]));
+  const tieni = nuovi.map((n) => !n);
+  const fra = (a, b) => {
+    let peggio = -1;
+    let quanto = tolleranza;
+    for (let k = a + 1; k < b; k++) {
+      const t = s[b] > s[a] ? (s[k] - s[a]) / (s[b] - s[a]) : 0;
+      const d = Math.abs(h[k] - (h[a] + (h[b] - h[a]) * t));
+      if (d > quanto) {
+        quanto = d;
+        peggio = k;
+      }
+    }
+    if (peggio < 0) return;
+    tieni[peggio] = true;
+    fra(a, peggio);
+    fra(peggio, b);
+  };
+  let a = 0;
+  for (let k = 1; k < xy.length; k++) {
+    if (nuovi[k]) continue;
+    if (k - a > 1) fra(a, k);
+    a = k;
+  }
+  return { xy: xy.filter((_, k) => tieni[k]), h: h.filter((_, k) => tieni[k]) };
+}
+
 /** Quanto sopra la quota sta l'asfalto delle corsie: come il nastro della sua classe, un poco sopra. */
 function sopraCorsie(hw) {
   const b = String(hw ?? '').replace(/_link$/, '');
@@ -2333,8 +2467,21 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
   };
   const strade = [];
   for (const v0 of corsie.strade) {
-    const xy = inMetri(v0.ll);
-    if (!xy.some(vicina)) continue;
+    const xyVia = inMetri(v0.ll);
+    if (!xyVia.some(vicina)) continue;
+    /* «Il percorso diventa tratteggiato e la freccia cambia colore», su un
+     * rettilineo d'autostrada all'aperto: la via aveva due punti a quasi
+     * quattrocento metri l'uno dall'altro, e il secondo all'inizio di un
+     * ponte, a otto metri. La quota si prendeva solo nei punti della via, e
+     * fra i due l'asfalto saliva dritto: a trecento metri dal ponte stava già
+     * due metri e mezzo sopra la strada vera, coi suoi cinque metri e mezzo
+     * per cento che cominciano centoquaranta metri prima. Il percorso e
+     * l'auto, alla quota della strada vera, finivano sotto l'asfalto: il
+     * percorso coperto (tenue e tratteggiato) e la sagoma rossa dell'auto.
+     * Adesso la quota si guarda almeno ogni [PASSO_QUOTE_CORSIE] metri, e dei
+     * punti aggiunti restano solo quelli dove la via non va dritta. */
+    const fitta = infittisci(xyVia);
+    const xy = fitta.xy;
     const h = new Array(xy.length).fill(NaN);
     /* La quota di ogni punto: quella di una strada della mappa lì vicino.
      *
@@ -2413,7 +2560,8 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
       ultimo = k;
     }
     limitaPendenza(h, xy);
-    strade.push({ ...v0, xy, xyVia: inMetri(v0.llVia ?? v0.ll), h });
+    const via = sfoltisciQuote(xy, h, fitta.nuovi);
+    strade.push({ ...v0, xy: via.xy, xyVia: inMetri(v0.llVia ?? v0.ll), h: via.h });
   }
   const nodi = (corsie.nodi ?? []).map((n) => ({ ...n, xy: sys.daLonLat(n.g[0], n.g[1]) })).filter((n) => vicina(n.xy));
   // Gli alberi veri di questa tessera (quelli sul bordo li fa una sola), e

@@ -1006,8 +1006,15 @@ function strato3d() {
       if (S.auto) {
         const vs = new THREE.Vector3(S.auto.x, S.auto.y, S.auto.z + 1.2).project(camera);
         ue.uAutoSchermo.value.set(vs.x, vs.y, vs.z);
+        // Quanto è grande l'auto sullo schermo: tre metri e mezzo di lato (la
+        // freccia della vista «Corsie» è larga quasi cinque), nella misura di
+        // `uAutoSchermo` (l'altezza dello schermo vale due).
+        const destra = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).normalize().multiplyScalar(3.5);
+        const vd = new THREE.Vector3(S.auto.x + destra.x, S.auto.y + destra.y, S.auto.z + 1.2 + destra.z).project(camera);
+        const aspetto = gl.drawingBufferWidth / Math.max(1, gl.drawingBufferHeight);
+        scena.uniformiTaglio.uRaggioAuto.value = Math.min(0.5, Math.max(0.03, Math.hypot((vd.x - vs.x) * aspetto, vd.y - vs.y)));
       } else ue.uAutoSchermo.value.set(0, -2, -1);
-      // Le strade e i ponti sopra l'auto, fra lei e la telecamera, non si disegnano.
+      // Le strade e i ponti sopra l'auto, fra lei e la telecamera: in trasparenza (vedi `tagliaSopra`).
       if (S.auto) scena.uniformiTaglio.uAutoTaglio.value.set(S.auto.x, S.auto.y, S.auto.z);
       else scena.uniformiTaglio.uAutoTaglio.value.set(0, 0, 1e9);
       scena.uniformiTaglio.uOcchioTaglio.value.setFromMatrixPosition(camera.matrixWorld);
@@ -2494,9 +2501,10 @@ function copertaDaUnPonte(x, y, z, dir) {
   const dx = Math.cos(dir);
   const dy = Math.sin(dir);
   let coperta = false;
-  // Nella vista «Corsie» quello che sta sopra fra la telecamera e l'auto non
-  // si disegna (vedi `tagliaSopra` in scena.js): niente la copre, e la sagoma
-  // rossa piatta sembrava un'auto rotta.
+  // Nella vista «Corsie» quello che sta sopra fra la telecamera e l'auto è un
+  // fantasma a puntini, con una finestra libera davanti all'auto (vedi
+  // `tagliaSopra` in scena.js): niente la copre, e la sagoma rossa piatta
+  // sembrava un'auto rotta.
   for (let d = -40; d <= 6 && !coperta && !S.corsie; d += 4) {
     for (const c of indice.candidati(x + dx * d, y + dy * d, 0, 0, 9)) {
       if (c.h > z + 3) {

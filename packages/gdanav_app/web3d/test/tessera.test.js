@@ -444,3 +444,53 @@ test('due carreggiate affiancate a quote diverse si stringono dal lato dell\'alt
   for (const n of nodi) n.h = 0;
   assert.equal(carreggiateAffiancate(piane, nodi), 0);
 });
+
+test('i binari che salgono al loro ponte stanno su un rilevato, non sospesi nel vuoto', () => {
+  // Una ferrovia inventata da ovest a est, su un ponte (layer 1) sopra una
+  // strada da nord a sud: fuori dal ponte i binari salgono e scendono da soli.
+  const ferrovia = (accanto) =>
+    costruisciTessera({
+      z: 14,
+      x: X,
+      y: Y,
+      livelli: {
+        '0,0': {
+          transportation: strato([
+            { p: { class: 'rail' }, g: [[[0, 2048], [1900, 2048]]] },
+            { p: { class: 'rail', brunnel: 'bridge', layer: 1 }, g: [[[1900, 2048], [2200, 2048]]] },
+            { p: { class: 'rail' }, g: [[[2200, 2048], [4096, 2048]]] },
+            { p: { class: 'secondary' }, g: [[[2048, 0], [2048, 4096]]] },
+            // Con [accanto]: una strada che corre lungo i binari, a nord, a sette metri.
+            ...(accanto ? [{ p: { class: 'minor' }, g: [[[600, 2030], [1880, 2030]]] }] : []),
+          ]),
+        },
+      },
+    });
+  const lat = Math.atan(Math.sinh(Math.PI * (1 - (2 * (Y + 0.5)) / 2 ** 14)));
+  const k = (40075016.686 * Math.cos(lat)) / 2 ** 14 / 4096;
+  const x0 = (1900 - 2048) * k;
+  /** I vertici del cemento e della terra fra [da] e [a] metri prima del ponte. */
+  const opere = (t, da, a) => {
+    const P = t.opere.posizioni;
+    const out = [];
+    for (let i = 0; i < P.length; i += 3) if (P[i] > x0 - a && P[i] < x0 - da) out.push([P[i], P[i + 1], P[i + 2]]);
+    return out;
+  };
+  const t = ferrovia(false);
+  // I binari, lì, sono davvero in alto: a metà salita.
+  const R = t.strade.rail.posizioni;
+  const alti = [];
+  for (let i = 0; i < R.length; i += 3) if (R[i] > x0 - 90 && R[i] < x0 - 40) alti.push(R[i + 2]);
+  assert.ok(alti.length && Math.min(...alti) > 1.5, `i binari in salita (${Math.min(...alti)} m)`);
+  // Sotto, il rilevato: le scarpate arrivano a terra, tanto più larghe quanto è alto.
+  const piedi = opere(t, 40, 90).filter(([, , z]) => z < 0.1);
+  assert.ok(piedi.length >= 4, `il piede delle scarpate (${piedi.length} vertici)`);
+  const largo = Math.max(...piedi.map(([, y]) => Math.abs(y)));
+  assert.ok(largo > 5 && largo < 20, `largo ${largo.toFixed(1)} m dal binario`);
+  assert.ok(piedi.some(([, y]) => y > 0) && piedi.some(([, y]) => y < 0), 'dai due lati');
+  // Lontano dal ponte i binari sono a terra: niente rilevato.
+  assert.equal(opere(t, 260, 500).length, 0);
+  // Con la strada accanto, da quel lato un muro dritto e niente scarpata sull'asfalto.
+  const conStrada = opere(ferrovia(true), 40, 90).filter(([, y, z]) => z < 0.1 && y > 0);
+  assert.ok(conStrada.length > 0 && conStrada.every(([, y]) => y < 3.5), `il muro dal lato della strada (${Math.max(...conStrada.map(([, y]) => y)).toFixed(1)} m)`);
+});

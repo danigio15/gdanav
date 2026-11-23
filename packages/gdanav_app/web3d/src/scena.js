@@ -477,6 +477,11 @@ export const BIT_OMBRA_PONTE = 0x40;
  * nessuna (vedi `materiali`).
  */
 const SPINTA_DI_SBIECO = 0;
+/**
+ * Quanto si vede di un ponte (o di un pilone) fra la telecamera e l'auto
+ * nella vista «Corsie»: un pixel su tre, circa (vedi [Scena.tagliaSopra]).
+ */
+export const COPERTURA_FANTASMA = 0.3;
 
 /** Una geometria three.js dai dati del lavoratore. */
 function geometria(d, notte) {
@@ -796,7 +801,8 @@ export class Scena {
     // linea non può salire sul ponte se la strada è sotto».
     this.uniformiFantasma = { ...this.uniformiPercorso, uInizio: { value: -1e9 }, uOpacita: { value: 0.32 }, uSotto: { value: 1 } };
     // Le strade e i ponti sopra l'auto, fra lei e la telecamera (vedi [tagliaSopra]).
-    this.uniformiTaglio = { uAutoTaglio: { value: new THREE.Vector3(0, 0, 1e9) }, uOcchioTaglio: { value: new THREE.Vector3() } };
+    // [uRaggioAuto]: quanto è grande l'auto sullo schermo (come `uAutoSchermo`).
+    this.uniformiTaglio = { uAutoTaglio: { value: new THREE.Vector3(0, 0, 1e9) }, uOcchioTaglio: { value: new THREE.Vector3() }, uRaggioAuto: { value: 0.12 } };
     // Gli edifici di vetro attorno all'auto (vedi [vetroVicino]).
     this.uniformiEdifici = {
       uAuto: { value: new THREE.Vector2(1e9, 1e9) },
@@ -1111,9 +1117,11 @@ export class Scena {
    * telecamera sta dietro e sopra l'auto: con l'auto sotto un ponte, la
    * telecamera finiva dentro l'impalcato di sopra (o appena sopra), e il ponte
    * copriva tutto. I navigatori lo tolgono di mezzo: qui strade, ponti e
-   * piloni **più alti dell'auto di tre metri e fra lei e la telecamera** non
-   * si disegnano. Quello che sta oltre l'auto, o alla sua quota, o sotto,
-   * resta com'è: i ponti davanti si vedono, quello sopra la testa no.
+   * piloni **più alti dell'auto di tre metri e fra lei e la telecamera** si
+   * disegnano appena, in trasparenza (un fantasma a puntini fissi, col bordo
+   * sfumato). Quello che sta oltre l'auto, o alla sua quota, o sotto, resta
+   * com'è: i ponti davanti si vedono pieni, quello sopra la testa in
+   * trasparenza.
    *
    * Si aggiunge a quello che il materiale fa già nello shader (luce propria,
    * lastre dei marciapiedi): non lo sostituisce.
@@ -1127,10 +1135,14 @@ export class Scena {
     const prima = materiale.onBeforeCompile;
     const chiave = materiale.customProgramCacheKey;
     const u = this.uniformiTaglio;
+    const ue = this.uniformiEdifici;
     materiale.onBeforeCompile = (sh, renderer) => {
       if (prima && prima !== THREE.Material.prototype.onBeforeCompile) prima.call(materiale, sh, renderer);
       sh.uniforms.uAutoTaglio = u.uAutoTaglio;
       sh.uniforms.uOcchioTaglio = u.uOcchioTaglio;
+      sh.uniforms.uRaggioAuto = u.uRaggioAuto;
+      sh.uniforms.uAutoSchermo = ue.uAutoSchermo;
+      sh.uniforms.uSchermo = ue.uSchermo;
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', `#include <common>
           varying vec3 vMondoTaglio;`)
@@ -1149,19 +1161,48 @@ export class Scena {
       // attorno all'auto nel ponte che le passa sopra. Il resto della scena,
       // anche più in alto dell'auto, resta: prima, con la telecamera alta,
       // spariva mezza città.
+      //
+      // «Quando passo sotto al ponte lo taglia»: il tubo era un taglio netto,
+      // e il cavalcavia finiva di colpo sopra la strada. Adesso dentro il tubo
+      // il ponte è un fantasma: se ne disegna un pixel su tre o quattro
+      // ([COPERTURA_FANTASMA]), a una trama fissa sullo schermo (Bayer 4×4:
+      // niente rumore che sfarfalla muovendosi), e sul bordo del tubo la trama
+      // si riempie piano fino al ponte pieno (fra r e 1,4 r, e oltre l'auto in
+      // 0,4 r). Davanti all'auto sullo schermo resta una finestra libera
+      // ([uRaggioAuto]): l'auto si legge tutta, e la sua sagoma rossa non
+      // compare fra i puntini. Costa poco: qualche conto in più, solo per i
+      // pezzi nel tubo, e il `discard` c'era già.
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', `#include <common>
           varying vec3 vMondoTaglio;
           uniform vec3 uAutoTaglio;
-          uniform vec3 uOcchioTaglio;`)
+          uniform vec3 uOcchioTaglio;
+          uniform float uRaggioAuto;
+          uniform vec3 uAutoSchermo;
+          uniform vec2 uSchermo;
+          float bayerTaglio(vec2 q) {
+            // La matrice di Bayer 4×4 (0, 1/16 … 15/16) dal pixel.
+            vec2 a = mod(floor(q), 4.0);
+            vec2 b = floor(a * 0.5);
+            return fract(b.x * 0.5 + b.y * b.y * 0.75) * 0.25 + fract(a.x * 0.5 + a.y * a.y * 0.75);
+          }`)
         .replace(
           '#include <clipping_planes_fragment>',
           `#include <clipping_planes_fragment>
           if (vMondoTaglio.z > uAutoTaglio.z + ${sopra.toFixed(1)}) {
             vec3 ba = uAutoTaglio - uOcchioTaglio;
-            float k = dot(vMondoTaglio - uOcchioTaglio, ba) / max(dot(ba, ba), 1e-6);
-            float r = clamp(0.35 * length(ba), 10.0, 25.0);
-            if (k < 1.0 && length(vMondoTaglio - uOcchioTaglio - ba * clamp(k, 0.0, 1.0)) < r) discard;
+            float lba = length(ba);
+            float k = dot(vMondoTaglio - uOcchioTaglio, ba) / max(lba * lba, 1e-6);
+            float r = clamp(0.35 * lba, 10.0, 25.0);
+            float d = length(vMondoTaglio - uOcchioTaglio - ba * clamp(k, 0.0, 1.0));
+            float pieno = max(smoothstep(r, 1.4 * r, d), smoothstep(0.0, 0.4 * r, (k - 1.0) * lba));
+            if (pieno < 1.0) {
+              vec2 ndc = gl_FragCoord.xy / uSchermo * 2.0 - 1.0;
+              vec2 p = vec2((ndc.x - uAutoSchermo.x) * uSchermo.x / uSchermo.y, ndc.y - uAutoSchermo.y);
+              float finestra = smoothstep(uRaggioAuto, 1.5 * uRaggioAuto, length(p));
+              float copre = mix(${COPERTURA_FANTASMA.toFixed(2)} * finestra, 1.0, pieno);
+              if (copre <= bayerTaglio(gl_FragCoord.xy)) discard;
+            }
           }`,
         );
     };

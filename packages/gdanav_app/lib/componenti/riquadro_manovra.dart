@@ -1,5 +1,3 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/material.dart';
 import 'package:gdanav_core/gdanav_core.dart';
 
@@ -127,8 +125,12 @@ class _RiquadroManovraState extends State<RiquadroManovra> {
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       child: Column(
         children: [
-          // Il vetro: un'ombra leggera, e dentro il ritaglio una sola
-          // sfocatura, grande quanto il riquadro e non tutto lo schermo.
+          // Un fondo semitrasparente, senza sfocatura. «La freccia non è
+          // allineata in tempo reale, è peggiorata»: una sfocatura sopra la
+          // mappa (MapLibre e la scena 3D sono viste della piattaforma) su
+          // Android obbliga a ricomporre la mappa a ogni fotogramma per
+          // sfocarla, e i fotogrammi persi sono la freccia che resta indietro.
+          // La mappa si vede lo stesso attraverso il fondo.
           DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: raggio,
@@ -136,36 +138,33 @@ class _RiquadroManovraState extends State<RiquadroManovra> {
             ),
             child: ClipRRect(
               borderRadius: raggio,
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                child: DecoratedBox(
-                  key: const Key('riquadro-manovra'),
-                  decoration: BoxDecoration(
-                    color: scuro
-                        ? RiquadroManovra.fondoScuro.withValues(alpha: 0.84)
-                        : RiquadroManovra.fondo.withValues(alpha: 0.80),
-                    borderRadius: raggio,
-                    border: Border.all(color: Colors.white.withValues(alpha: scuro ? 0.12 : 0.18)),
-                  ),
-                  child: AnimatedSize(
+              child: DecoratedBox(
+                key: const Key('riquadro-manovra'),
+                decoration: BoxDecoration(
+                  color: scuro
+                      ? RiquadroManovra.fondoScuro.withValues(alpha: 0.90)
+                      : RiquadroManovra.fondo.withValues(alpha: 0.86),
+                  borderRadius: raggio,
+                  border: Border.all(color: Colors.white.withValues(alpha: scuro ? 0.12 : 0.18)),
+                ),
+                child: AnimatedSize(
+                  duration: durata,
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.topCenter,
+                  child: AnimatedSwitcher(
                     duration: durata,
-                    curve: Curves.easeOutCubic,
-                    alignment: Alignment.topCenter,
-                    child: AnimatedSwitcher(
-                      duration: durata,
-                      // La misura è quella del riquadro nuovo: quello che se ne
-                      // va sfuma sopra, senza tenere il posto.
-                      layoutBuilder: (adesso, prima) => Stack(
-                        alignment: Alignment.topLeft,
-                        children: [
-                          for (final p in prima) Positioned(left: 0, top: 0, right: 0, child: p),
-                          ?adesso,
-                        ],
-                      ),
-                      child: compatto
-                          ? _Riga(key: const Key('riquadro-compatto'), manovra: m, distanza: _distanza())
-                          : _Grande(key: const Key('riquadro-grande'), manovra: m, distanza: _distanza()),
+                    // La misura è quella del riquadro nuovo: quello che se ne
+                    // va sfuma sopra, senza tenere il posto.
+                    layoutBuilder: (adesso, prima) => Stack(
+                      alignment: Alignment.topLeft,
+                      children: [
+                        for (final p in prima) Positioned(left: 0, top: 0, right: 0, child: p),
+                        ?adesso,
+                      ],
                     ),
+                    child: compatto
+                        ? _Riga(key: const Key('riquadro-compatto'), manovra: m, distanza: _distanza())
+                        : _Grande(key: const Key('riquadro-grande'), manovra: m, distanza: _distanza()),
                   ),
                 ),
               ),
