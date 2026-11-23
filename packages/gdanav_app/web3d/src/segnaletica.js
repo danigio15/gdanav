@@ -15,6 +15,8 @@ import { ritagliaLinea } from './ritaglio.js';
 
 /** Più lunga di così una zebratura non è (m): oltre è una carreggiata a parte. */
 const ZEBRATURA_AL_PIU_M = 150;
+/** E fin dove i due rami sono così lontani (m). */
+const ZEBRATURA_LARGA_M = 4.5;
 /**
  * I marciapiedi delle strade di città (m): larghi secondo la strada, alti
  * [ALTO_MARCIAPIEDE] sopra l'asfalto, col cordolo. Non in autostrada, sulle
@@ -1145,7 +1147,7 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
 
   // ── La zebratura dove una carreggiata si divide ─────────────────────
   // Fra il bordo destro del ramo di sinistra e quello sinistro del ramo di
-  // destra (una rampa d'uscita), finché i due sono a meno di sette metri:
+  // destra (una rampa d'uscita), finché i due sono a meno di [ZEBRATURA_LARGA_M]:
   // strisce di sbieco, come sulle autostrade italiane.
   //
   // Solo nel triangolo, dove i due rami si allargano. «Ancora tutto
@@ -1206,7 +1208,11 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
         }
         aperto = s;
       }
-      if (g > 7) break;
+      /* Oltre i quattro metri e mezzo fra i due rami c'è il cordolo
+       * dell'isola, non più la vernice: le strisce (e il loro asfalto) si
+       * fermano. A sette metri finivano sull'isola, su un pezzo d'asfalto
+       * che non toccava l'altro ramo. */
+      if (g > ZEBRATURA_LARGA_M) break;
       // Non si allargano più (paralleli, o di nuovo vicini): fine del triangolo.
       if (s - aperto > 15 && g < gPrima + 0.1) break;
       gPrima = Math.max(gPrima, g);
