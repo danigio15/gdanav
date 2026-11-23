@@ -535,6 +535,8 @@ test('le strade della mappa senza una via vera: i pezzi lunghi no, quelli corti 
   // Si scosta per dieci metri soltanto (un incrocio): resta.
   const scosta = [...linea([-100, 0], [-5, 0], 6), [0, 12], ...linea([5, 0], [100, 0], 6)];
   assert.ok(senzaDati(scosta, 6, vie).every((x) => !x));
+  // Un pezzetto di dieci metri tutto senza via (un piazzale privato): non c'è.
+  assert.ok(senzaDati(linea([0, 30], [10, 30], 2), 4, vie).every((x) => x));
   // Una strada che passa sopra la via, di traverso: non è lei.
   assert.ok(senzaDati(linea([0, -100], [0, 100], 6), 6, vie).filter((x) => x).length > 25);
   // In costruzione per la mappa: solo con la via proprio sotto.

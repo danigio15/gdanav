@@ -2530,8 +2530,9 @@ export function vieDelRelay(linee, cella = 25) {
  * mappa che per più di [SENZA_DATI_LUNGO_M] metri di fila non ha una via del
  * relay a meno di [SENZA_DATI_M] metri dal suo bordo (al più a otto dal suo
  * mezzo) non c'è: né il nastro né l'impalcato, i parapetti, i piloni, né il
- * percorso sopra. I pezzi più corti (dove le due geometrie si scostano a un
- * incrocio) restano.
+ * percorso sopra; e così una strada tutta senza via, anche corta. I pezzi
+ * più corti di una strada che per il resto ha la sua via (dove le due
+ * geometrie si scostano a un incrocio) restano.
  */
 export function senzaDati(punti, w, vie, cantiere = false) {
   const n = punti.length;
@@ -2546,6 +2547,9 @@ export function senzaDati(punti, w, vie, cantiere = false) {
     const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
     return !vie.vicina(q[0], q[1], entro, (b[0] - a[0]) / l, (b[1] - a[1]) / l);
   });
+  // Una strada tutta senza via (anche corta: i pezzi di un piazzale privato
+  // sono tanti e brevi) non c'è.
+  if (senza.every(Boolean)) return senza;
   for (let k = 0; k < n; ) {
     if (!senza[k]) {
       k++;
