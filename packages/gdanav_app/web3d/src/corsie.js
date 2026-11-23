@@ -536,7 +536,13 @@ export function preparaCorsie(dati) {
   // Gli alberi veri: solo quelli che la mappa ha.
   const alberi = (dati?.alberi ?? []).filter((a) => Array.isArray(a) && a.length >= 2);
   const filari = (dati?.filari ?? []).filter((f) => Array.isArray(f?.g) && f.g.length >= 4);
-  return { strade, nodi, alberi, filari };
+  // Le altre vie guidabili del relay (le `service`), senza corsie: solo
+  // dove sono, per sapere quali strade della mappa ci sono davvero (vedi
+  // `stradeSenzaDati` in tessera.js).
+  const altre = (dati?.strade ?? [])
+    .filter((s) => !CLASSI_CORSIE.has(s.hw) && Array.isArray(s.g) && s.g.length >= 4)
+    .map((s) => ({ id: s.id, hw: s.hw, ll: Array.from(s.g), ponte: !!s.bridge && s.bridge !== 'no', galleria: !!s.tunnel && s.tunnel !== 'no', livello: intero(s.layer) ?? 0 }));
+  return { strade, nodi, alberi, filari, altre };
 }
 
 /**

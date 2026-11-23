@@ -306,6 +306,8 @@ export function grafoStrade(strade, metri) {
       senso: +(p.oneway ?? 0) || 0,
       // A pagamento: sopra, ai caselli, c'è una pensilina (vedi `tessera.js`).
       pedaggio: p.toll === 1 || p.toll === '1' || p.toll === true,
+      // Ancora in costruzione per la mappa (vedi `stradaVera` in tessera.js).
+      cantiere: !!p.cantiere,
       w: larghezzaStrada(p),
       nodi: pieno,
       nome: p.name,
