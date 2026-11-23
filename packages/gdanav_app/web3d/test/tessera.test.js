@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { bufferDellaTessera, carreggiateAffiancate, costruisciTessera, iSottopassi, LIMITI, NASTRI, stimaTriangoli, stradaVera } from '../src/tessera.js';
-import { ALTEZZA_LIVELLO, SPESSORE_IMPALCATO, altezzaViadotto } from '../src/elevazione.js';
+import { bufferDellaTessera, carreggiateAffiancate, costruisciTessera, iSottopassi, LIMITI, NASTRI, RAMPA_PIANO_M, senzaDati, stimaTriangoli, stradaVera, tettoDelleRampe, vieDelRelay } from '../src/tessera.js';
+import { preparaCorsie } from '../src/corsie.js';
+import { latDaMerc, lonDaMerc, sistemaTessera } from '../src/geo.js';
+import { ALTEZZA_LIVELLO, PENDENZA, SPESSORE_IMPALCATO, altezzaViadotto } from '../src/elevazione.js';
 import { cavalcavia, cavalcaviaConRampa, cavalcaviaDueCarreggiate, ponteLungo, sottopasso, sottopassoConNome, strato } from './finte.js';
 
 const X = 8605;
@@ -493,4 +495,90 @@ test('i binari che salgono al loro ponte stanno su un rilevato, non sospesi nel 
   // Con la strada accanto, da quel lato un muro dritto e niente scarpata sull'asfalto.
   const conStrada = opere(ferrovia(true), 40, 90).filter(([, y, z]) => z < 0.1 && y > 0);
   assert.ok(conStrada.length > 0 && conStrada.every(([, y]) => y < 3.5), `il muro dal lato della strada (${Math.max(...conStrada.map(([, y]) => y)).toFixed(1)} m)`);
+});
+
+// ── La vista «Corsie» con le corsie vere: niente strade che non ci sono ──
+
+/** Da metri della tessera X/Y a `[lon, lat]`. */
+function ll(mx, my) {
+  const sys = sistemaTessera(14, X, Y);
+  return [lonDaMerc(sys.mx + mx * sys.s), latDaMerc(sys.my - my * sys.s)];
+}
+/** I punti da [a] a [b], uno ogni [passo] metri. */
+const linea = (a, b, passo = 4) => {
+  const n = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / passo));
+  return Array.from({ length: n + 1 }, (_, k) => [a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
+};
+/** Le quote dei vertici di una geometria fatta. */
+const quote = (g) => (g ? [...g.posizioni].filter((_, k) => k % 3 === 2) : []);
+
+test('il tetto delle rampe: in alto solo attaccati a un ponte, scendendo come una rampa', () => {
+  const ponte = { xy: linea([0, 0], [100, 0]), alto: true, quote: linea([0, 0], [100, 0]).map(() => 8) };
+  const rampa = { xy: linea([100, 0], [300, 0]), alto: false };
+  // Una via che passa sotto il ponte senza toccarlo, e una lontana.
+  const sotto = { xy: linea([50, -100], [50, 100]), alto: false };
+  const [, tr, ts] = tettoDelleRampe([ponte, rampa, sotto]);
+  assert.ok(Math.abs(tr[0] - (8 + PENDENZA * RAMPA_PIANO_M)) < 1e-6, 'al capo del ponte, alla sua quota');
+  // A cento metri dal ponte, giù del 5,5% (oltre il tratto in piano).
+  const k = rampa.xy.findIndex(([x]) => Math.abs(x - 200) < 1e-6);
+  assert.ok(Math.abs(tr[k] - (8 + PENDENZA * RAMPA_PIANO_M - PENDENZA * 100)) < 1e-6);
+  assert.equal(tr.at(-1), 0, 'a duecento metri, a terra');
+  assert.ok(ts.every((t) => t === 0), 'chi passa sotto senza toccare il ponte resta a terra');
+});
+
+test('le strade della mappa senza una via vera: i pezzi lunghi no, quelli corti sì, non di traverso', () => {
+  const vie = vieDelRelay([linea([-200, 0], [200, 0])]);
+  // Lungo la via: c'è.
+  assert.ok(senzaDati(linea([-100, 1], [100, 1], 6), 6, vie).every((x) => !x));
+  // A venti metri, per duecento: non c'è.
+  assert.ok(senzaDati(linea([-100, 20], [100, 20], 6), 6, vie).every((x) => x));
+  // Si scosta per dieci metri soltanto (un incrocio): resta.
+  const scosta = [...linea([-100, 0], [-5, 0], 6), [0, 12], ...linea([5, 0], [100, 0], 6)];
+  assert.ok(senzaDati(scosta, 6, vie).every((x) => !x));
+  // Una strada che passa sopra la via, di traverso: non è lei.
+  assert.ok(senzaDati(linea([0, -100], [0, 100], 6), 6, vie).filter((x) => x).length > 25);
+  // In costruzione per la mappa: solo con la via proprio sotto.
+  assert.ok(senzaDati(linea([-100, 6], [100, 6], 6), 20, vie, true).every((x) => x));
+  assert.ok(senzaDati(linea([-100, 6], [100, 6], 6), 20, vie, false).every((x) => !x));
+});
+
+test('vista «Corsie»: una strada privata della mappa (il relay non l’ha) non si disegna, né il suo ponte', () => {
+  // Nel relay c'è solo l'autostrada: il cavalcavia della mappa è privato.
+  const dati = { v: 1, strade: [{ id: 1, hw: 'motorway', lanes: '3', oneway: 'yes', g: [...ll(-900, 0), ...ll(900, 0)] }] };
+  const t = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': cavalcavia() }, datiCorsie: preparaCorsie(dati), vistaCorsie: true });
+  assert.ok(!t.strade.primary2 && !t.strade['primary2-ponte'], `i nastri del cavalcavia: ${Object.keys(t.strade)}`);
+  assert.equal(t.capitelli.length, 0, 'nessun pilone');
+  assert.ok(Math.max(0, ...quote(t.opere)) < 1, 'nessun impalcato in alto');
+  // Con la via nei dati (una `service`, senza corsie, sul ponte), c'è.
+  dati.strade.push({ id: 2, hw: 'service', bridge: 'yes', layer: '1', g: [...ll(0, -900), ...ll(0, 900)] });
+  const con = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': cavalcavia() }, datiCorsie: preparaCorsie(dati), vistaCorsie: true });
+  assert.ok(con.strade['primary2-ponte'] && con.capitelli.length > 0);
+  // Senza le corsie vere (stimate) tutto come prima.
+  const stimate = preparaCorsie({ v: 1, strade: [{ id: -1, hw: 'motorway', oneway: 'yes', g: [...ll(-900, 0), ...ll(900, 0)] }] });
+  for (const v of stimate.strade) v.stimata = true;
+  const st = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': cavalcavia() }, datiCorsie: stimate, vistaCorsie: true });
+  assert.ok(st.strade['primary2-ponte']);
+});
+
+test('vista «Corsie»: una via che i dati danno a terra non sale col ponte della mappa', () => {
+  // Il relay dà la strada del cavalcavia a terra (nessun `bridge`): le sue
+  // corsie restano giù, e il ponte della mappa, una seconda strada sopra di
+  // lei, non si disegna.
+  const dati = {
+    v: 1,
+    strade: [
+      { id: 1, hw: 'motorway', lanes: '3', oneway: 'yes', g: [...ll(-900, 0), ...ll(900, 0)] },
+      { id: 2, hw: 'primary', g: [...ll(0, -900), ...ll(0, 900)] },
+    ],
+  };
+  const t = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': cavalcavia() }, datiCorsie: preparaCorsie(dati), vistaCorsie: true, grafo: true });
+  const primaria = t.grafo.corsie.find((v) => v.id === 2);
+  assert.ok(Math.max(...primaria.h) < 0.5, `le corsie salgono a ${Math.max(...primaria.h)}`);
+  assert.ok(Math.max(0, ...quote(t.opere)) < 1, 'nessun impalcato sopra le corsie');
+  // Con il ponte nei dati, invece, sale.
+  dati.strade[1] = { id: 2, hw: 'primary', g: [...ll(0, -900), ...ll(0, -231)] };
+  dati.strade.push({ id: 3, hw: 'primary', bridge: 'yes', layer: '1', g: [...ll(0, -231), ...ll(0, 229)] }, { id: 4, hw: 'primary', g: [...ll(0, 229), ...ll(0, 900)] });
+  const su = costruisciTessera({ z: 14, x: X, y: Y, livelli: { '0,0': cavalcavia() }, datiCorsie: preparaCorsie(dati), vistaCorsie: true, grafo: true });
+  assert.ok(Math.max(...su.grafo.corsie.find((v) => v.id === 3).h) > ALTEZZA_LIVELLO - 0.5);
+  assert.ok(Math.max(...su.grafo.corsie.find((v) => v.id === 2).h) > 2, 'la rampa sale verso il ponte');
 });
