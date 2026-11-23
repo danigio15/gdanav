@@ -17,6 +17,8 @@ import { ritagliaLinea } from './ritaglio.js';
 const ZEBRATURA_AL_PIU_M = 150;
 /** E fin dove i due rami sono così lontani (m). */
 const ZEBRATURA_LARGA_M = 4.5;
+/** E solo fra due rami che partono così vicini di direzione (a venti metri dal nodo, radianti). */
+const ZEBRATURA_APERTA = (30 * Math.PI) / 180;
 /**
  * I marciapiedi delle strade di città (m): larghi secondo la strada, alti
  * [ALTO_MARCIAPIEDE] sopra l'asfalto, col cordolo. Non in autostrada, sulle
@@ -1162,6 +1164,19 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
     const a = strade[finiscono[0].i];
     const pa = a.xyVia;
     const da = Math.atan2(pa[pa.length - 1][1] - pa[Math.max(0, pa.length - 4)][1], pa[pa.length - 1][0] - pa[Math.max(0, pa.length - 4)][0]);
+    // La direzione di un ramo a venti metri dal nodo, rispetto a chi arriva.
+    const verso20 = (v) => {
+      const p = v.xyVia;
+      let k = 1;
+      let d = 0;
+      while (k < p.length - 1) {
+        d += Math.hypot(p[k][0] - p[k - 1][0], p[k][1] - p[k - 1][1]);
+        if (d >= 20) break;
+        k++;
+      }
+      const t = Math.atan2(p[k][1] - p[0][1], p[k][0] - p[0][0]) - da;
+      return Math.atan2(Math.sin(t), Math.cos(t));
+    };
     const angolo = (v) => {
       const p = v.xyVia;
       const q = p[Math.min(p.length - 1, 3)];
@@ -1169,6 +1184,11 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       return Math.atan2(Math.sin(t), Math.cos(t));
     };
     const [sin, des] = partono.map(({ i }) => strade[i]).sort((p, q) => angolo(q) - angolo(p));
+    /* Solo dove i due rami partono quasi paralleli (una rampa che esce):
+     * dove si aprono subito di molto (una strada che finisce su un'altra, un
+     * ramo che gira a uncino) fra loro non c'è una zebratura ma un'isola, e
+     * le strisce passavano sopra l'altro ramo fino al prato. */
+    if (Math.abs(verso20(sin) - verso20(des)) > ZEBRATURA_APERTA) continue;
     const rS = lineaRicca(sin.xy, sin.h);
     const rD = lineaRicca(des.xy, des.h);
     const LS = rS[rS.length - 1][5];

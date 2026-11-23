@@ -720,3 +720,23 @@ test('il capo tondo di una via larga che sbocca su una stretta non sporge dall�
     for (const q of t) assert.ok(q[0] < mezzaStretta + 0.05, `oltre la stretta: ${q[0].toFixed(2)},${q[1].toFixed(2)}`);
   }
 });
+
+test('niente zebratura fra due rami che si aprono subito: lì c’è un’isola', () => {
+  // Una strada che arriva e si divide in due rami a senso unico che si
+  // allontanano a sessanta gradi l'uno dall'altro.
+  const arriva = via({ id: 1, hw: 'primary', lanes: '2', oneway: 'yes' }, [
+    [-200, 0],
+    [0, 0],
+  ]);
+  const su = via({ id: 2, hw: 'primary', oneway: 'yes' }, [
+    [0, 0],
+    [150, 87],
+  ]);
+  const giu = via({ id: 3, hw: 'primary', oneway: 'yes' }, [
+    [0, 0],
+    [150, -87],
+  ]);
+  // (Le righe dei due rami, lunghe e di sbieco, non contano: solo quello che sta fra loro.)
+  const fra = zebrature(costruisciSegnaletica({ strade: [arriva, su, giu], meta: 1000 })).filter(([x, y]) => x > 3 && Math.abs(Math.atan2(y, x)) < (20 * Math.PI) / 180);
+  assert.deepEqual(fra, []);
+});
