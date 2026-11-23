@@ -67,6 +67,18 @@ const SEMPLIFICA_M = 0.04;
 /** Larghezze delle righe (m): un poco più larghe del codice, che da lontano non spariscano. */
 export const RIGHE = { corsia: 0.18, corsiaGrande: 0.2, bordo: 0.2, bordoGrande: 0.25, mezzeria: 0.2, doppia: 0.16, decelerazione: 0.5, arresto: 0.5 };
 
+/**
+ * Quanto sopra la sua quota sta l'asfalto di una via: quello che dice
+ * [sopra] per la sua classe, e le gallerie appena sopra il suolo.
+ *
+ * «Incroci sbagliati»: una galleria sotto una strada, a terra, aveva il suo
+ * asfalto alla quota di quella di sopra (una galleria non scende: la quota è
+ * quella degli imbocchi), e le due strade parevano incrociarsi. Più in basso
+ * delle altre, la strada di sopra la copre: passa sotto.
+ */
+export const SOPRA_GALLERIA_CORSIE = 0.07;
+export const sopraAsfalto = (v, sopra) => (v.galleria ? SOPRA_GALLERIA_CORSIE : sopra(v.hw));
+
 const base = (hw) => String(hw ?? '').replace(/_link$/, '');
 const grande = (hw) => base(hw) === 'motorway' || base(hw) === 'trunk';
 const rampa = (hw) => String(hw ?? '').endsWith('_link');
@@ -430,6 +442,16 @@ export function asfaltoDelleVie(strade, ricche, bordi, cella = 16) {
       }
       return null;
     },
+    /** Se il punto sta sull'asfalto della via [i] (a [margine] metri dal bordo). */
+    diVia(x, y, h, i, margine = 0.3) {
+      for (const n of griglia.get(Math.floor(x / cella) * 100003 + Math.floor(y / cella)) ?? []) {
+        const q = pezzi[n];
+        if (q.i !== i || Math.abs(q.h - h) > 2.5) continue;
+        const u = Math.max(0, Math.min(q.l, (x - q.ax) * q.tx + (y - q.ay) * q.ty));
+        if (Math.hypot(x - q.ax - q.tx * u, y - q.ay - q.ty * u) < q.mezza + margine) return true;
+      }
+      return false;
+    },
   };
 }
 
@@ -704,6 +726,19 @@ export function angoloMarciapiede(A, Bv, strade, ricche, bordi, sopra, asfalto) 
   const be = -croce(f, a.dT) / crT;
   if (al < 0.3 || be < 0.3) return null;
   const C = [a.T[0] - a.dT[0] * al, a.T[1] - a.dT[1] * al];
+  /* Lo spigolo sta sul bordo delle due vie, e da lì fino all'arco il bordo è
+   * dritto. «Toppe d'incrocio fuori dall'asfalto»: dove una via curva prima
+   * dell'angolo (le svolte a destra che tagliano l'incrocio) le tangenti nei
+   * punti dell'arco si incontravano lontano dalle due vie, e l'asfalto che
+   * riempie l'angolo era un triangolo scuro sul prato, con il prato fra lui
+   * e le strade. Lì l'angolo tondo non si fa. */
+  if (asfalto?.diVia) {
+    for (const x of [a, b]) {
+      for (const u of [0, 0.35, 0.7]) {
+        if (!asfalto.diVia(C[0] + (x.T[0] - C[0]) * u, C[1] + (x.T[1] - C[1]) * u, x.T[2], x.i, 0.6)) return null;
+      }
+    }
+  }
   const thT = Math.atan2(crT, a.dT[0] * b.dT[0] + a.dT[1] * b.dT[1]);
   const om = Math.sin(Math.max(0.2, thT) / 2);
   const N = Math.max(2, Math.ceil((Math.PI - thT) / (Math.PI / 8)));
@@ -879,7 +914,7 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
     const L = r[r.length - 1][5];
     const Lvia = v.sVia[v.sVia.length - 1] || L;
     const daVia = (s) => (s * L) / Lvia;
-    const z0 = sopra(v.hw);
+    const z0 = sopraAsfalto(v, sopra);
     const B = bordiCorsie(v);
     const [mS, mD] = v.margini;
 
@@ -957,6 +992,14 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
         coperto = !!copertura.sotto(cx + ux * (rad - 0.15), cy + uy * (rad - 0.15), p[2], i, 0);
       }
       if (coperto) continue;
+      /* Dove la via finisce su un'altra che passa (un incrocio a T, o più
+       * vie), il capo tondo non va oltre l'asfalto delle altre: una via larga
+       * che sbocca su una stretta lo faceva sporgere dall'altra parte, un
+       * mezzo disco scuro sul marciapiede di fronte. Fra due vie che si
+       * continuano (il dente di una piega) resta intero. */
+      const nodo = fine ? v.xyVia[v.xyVia.length - 1] : v.xyVia[0];
+      const altre = (tocchi.get(chiave(nodo)) ?? []).filter((t) => t.i !== i);
+      const incrocio = altre.length >= 2 || altre.some((t) => t.k > 0 && t.k < strade[t.i].xyVia.length - 1);
       const centro = asfalto.v(cx, cy, p[2] + z0 - 0.004, 0, 0, 1);
       const giro = [];
       for (let j = 0; j <= N; j++) {
@@ -964,7 +1007,17 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
         // (fx, fy) avanti, (-fy, fx) a sinistra di quel verso.
         const ux = Math.cos(a) * fx - Math.sin(a) * fy;
         const uy = Math.cos(a) * fy + Math.sin(a) * fx;
-        giro.push(asfalto.v(cx + ux * rad, cy + uy * rad, p[2] + z0 - 0.004, 0, 0, 1));
+        let rr = rad;
+        if (incrocio) {
+          rr = 0;
+          for (const f of [1, 0.75, 0.5, 0.25]) {
+            if (copertura.sotto(cx + ux * rad * f, cy + uy * rad * f, p[2], i, 0)) {
+              rr = rad * f;
+              break;
+            }
+          }
+        }
+        giro.push(asfalto.v(cx + ux * rr, cy + uy * rr, p[2] + z0 - 0.004, 0, 0, 1));
       }
       for (let j = 1; j <= N; j++) {
         // Girati in su (verso antiorario visto dall'alto).
@@ -973,6 +1026,7 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
         const i1 = giro[j - 1];
         const i2 = giro[j];
         const cr = (a[3 * i1] - a[3 * i0]) * (a[3 * i2 + 1] - a[3 * i0 + 1]) - (a[3 * i1 + 1] - a[3 * i0 + 1]) * (a[3 * i2] - a[3 * i0]);
+        if (Math.abs(cr) < 1e-4) continue;
         if (cr >= 0) asfalto.tri(i0, i1, i2);
         else asfalto.tri(i0, i2, i1);
       }
@@ -1122,7 +1176,7 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
     // Il bordo di destra del ramo di sinistra, un punto ogni metro.
     const bordoS = [];
     for (let s = 0; s <= Math.min(LS, 300); s += 1) bordoS.push(puntoA(rS, s, bS));
-    const dz = sopra(des.hw) + 0.02;
+    const dz = sopraAsfalto(des, sopra) + 0.02;
     // Lo spazio fra i due rami, col segno: a destra del bordo del ramo di
     // sinistra. Vicino alla punta i due rami si sovrappongono ancora (i bordi
     // delle corsie si incrociano): lì, prima, le strisce andavano di traverso
@@ -1130,6 +1184,8 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
     // e finivano proprio dove il triangolo cominciava.
     let gPrima = -Infinity;
     let aperto = null;
+    // L'ultimo paio di bordi, per l'asfalto sotto le strisce.
+    let paio = null;
     for (let s = 3; s < Math.min(LD, ZEBRATURA_AL_PIU_M); s += 2.5) {
       const P = puntoA(rD, s, bD);
       let Q = null;
@@ -1156,6 +1212,15 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       gPrima = Math.max(gPrima, g);
       // Dove un ramo sale e l'altro no, il triangolo è finito (niente strisce sospese).
       if (Math.abs(P[2] - Q[2]) > 0.4) break;
+      /* L'asfalto fra i due bordi, sotto le strisce: la zebratura è dipinta
+       * sull'asfalto. Prima le strisce del triangolo stavano sul prato fra
+       * le due carreggiate (fuori dal loro asfalto anche di due metri). */
+      if (paio && dentro(P[0], P[1])) {
+        const za = Math.max(paio[0][2], paio[1][2]) + dz - 0.026;
+        const zb = Math.max(P[2], Q[2]) + dz - 0.026;
+        asfalto.quad([paio[1][0], paio[1][1], za], [paio[0][0], paio[0][1], za], [P[0], P[1], zb], [Q[0], Q[1], zb], [0, 0, 1]);
+      }
+      paio = [P, Q];
       if (!dentro(P[0], P[1]) || (s - aperto) % 5 > 0.01) continue;
       // Di sbieco: dal bordo della rampa indietro verso la punta del triangolo.
       const qx = P[0] - ty * g - tx * g * 0.8;
@@ -1193,7 +1258,7 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       if (versoDetto === 'forward' && !arrivaAvanti) continue;
       if (versoDetto === 'backward' && arrivaAvanti) continue;
       const B = bordiCorsie(v);
-      const dz = sopra(v.hw) + 0.022;
+      const dz = sopraAsfalto(v, sopra) + 0.022;
       // Per chi arriva, in fila: la linea d'arresto, le strisce, l'incrocio.
       // All'incrocio le strisce stanno prima delle altre strade (mai sopra);
       // su una via sola (le strisce a metà strada) sul nodo, e la linea
