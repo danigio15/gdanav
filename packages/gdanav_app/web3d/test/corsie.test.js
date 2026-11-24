@@ -306,3 +306,56 @@ test('dove le due vie si toccano, il percorso passa dall\'una all\'altra', () =>
   const usate = new Set([...r.vie].filter((v) => v >= 0));
   assert.equal(usate.size, 2);
 });
+
+test('una rampa che entra o esce in mezzo alla carreggiata prende la corsia dalla sua parte', () => {
+  // La carreggiata a due corsie non è spezzata dove le rampe la toccano:
+  // una entra da destra in (0, 0), una esce a destra in (400, 0).
+  const strade = [
+    { id: 1, hw: 'trunk', oneway: 'yes', lanes: '2', g: [-400, 0, 0, 0, 400, 0, 800, 0] },
+    { id: 2, hw: 'trunk_link', oneway: 'yes', g: [-300, -60, -120, -14, 0, 0] },
+    { id: 3, hw: 'trunk_link', oneway: 'yes', g: [400, 0, 520, -14, 700, -60] },
+    // E una da sinistra, più avanti (in un altro punto: un nodo in più sulla stessa via non c'è, ne serve un'altra).
+    { id: 4, hw: 'trunk', oneway: 'yes', lanes: '2', g: [-400, 300, 0, 300, 400, 300] },
+    { id: 5, hw: 'trunk_link', oneway: 'yes', g: [-300, 360, -120, 314, 0, 300] },
+  ].map(normalizza);
+  for (const v of strade) {
+    v.xy = [];
+    for (let i = 0; i < v.ll.length; i += 2) v.xy.push([v.ll[i], v.ll[i + 1]]);
+  }
+  const [carreggiata, entra, esce, , daSinistra] = strade;
+  const r = raccordi(strade);
+  // La corsia di destra della carreggiata: mezza corsia a destra della linea.
+  const destra = centroCorsia(carreggiata, 1);
+  assert.ok(destra < -1.5);
+  assert.ok(vicino(r[1].o1, destra), `chi entra finisce sulla corsia di destra (${r[1].o1})`);
+  assert.ok(r[1].t1 > 30 && r[1].t0 === 0);
+  assert.ok(vicino(r[2].o0, destra), `chi esce parte dalla corsia di destra (${r[2].o0})`);
+  assert.ok(r[2].t0 > 30 && r[2].t1 === 0);
+  assert.ok(vicino(r[4].o1, centroCorsia(strade[3], 0)), `chi entra da sinistra finisce sulla corsia di sinistra (${r[4].o1})`);
+  assert.deepEqual(r[0], { o0: 0, t0: 0, o1: 0, t1: 0 }, 'la carreggiata che passa resta dov’è');
+  assert.ok(entra && esce && daSinistra);
+  // Due sensi unici che si incrociano (una via che finisce di traverso su un'altra) non sono uno svincolo.
+  const incrocio = [
+    { id: 1, hw: 'secondary', oneway: 'yes', lanes: '2', g: [-200, 0, 0, 0, 200, 0] },
+    { id: 2, hw: 'residential', oneway: 'yes', g: [-30, -150, 0, 0] },
+  ].map(normalizza);
+  for (const v of incrocio) {
+    v.xy = [];
+    for (let i = 0; i < v.ll.length; i += 2) v.xy.push([v.ll[i], v.ll[i + 1]]);
+  }
+  assert.deepEqual(raccordi(incrocio)[1], { o0: 0, t0: 0, o1: 0, t1: 0 });
+});
+
+test('a doppio senso la banchina è la stessa dei due sensi unici in cui la strada si divide', () => {
+  const rampa = normalizza({ id: 1, hw: 'trunk_link', g: [0, 0, 100, 0] });
+  const ramo = normalizza({ id: 2, hw: 'trunk_link', oneway: 'yes', g: [100, 0, 200, 0] });
+  assert.ok(!rampa.senso && rampa.avanti === 1 && rampa.indietro === 1);
+  assert.equal(rampa.margini[0], ramo.margini[1], 'a sinistra, la destra di chi va al contrario');
+  assert.equal(rampa.margini[1], ramo.margini[1]);
+  const superstrada = normalizza({ id: 3, hw: 'trunk', g: [0, 0, 100, 0] });
+  const carreggiata = normalizza({ id: 4, hw: 'trunk', oneway: 'yes', lanes: '2', g: [100, 0, 200, 0] });
+  assert.equal(superstrada.margini[1], carreggiata.margini[1]);
+  assert.equal(superstrada.margini[0], carreggiata.margini[1]);
+  // Le strade di città restano com'erano.
+  assert.deepEqual(normalizza({ id: 5, hw: 'tertiary', g: [0, 0, 100, 0] }).margini, [0.35, 0.35]);
+});
