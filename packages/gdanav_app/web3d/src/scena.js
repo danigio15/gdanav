@@ -261,6 +261,8 @@ function tramaStrada(nome, P, notte) {
   const g = c.getContext('2d');
   const grande = tipo === 'motorway' || tipo === 'trunk' || tipo === 'ramp';
   g.fillStyle = ponte ? (grande ? P.asfaltoPonteGrande : P.asfaltoPonte) : grande ? P.asfaltoGrande : P.asfalto;
+  // Le strade di servizio della vista «Corsie»: chiare (vedi `tipoDi` in tessera.js).
+  if (tipo === 'servizio' && P.asfaltoServizio) g.fillStyle = P.asfaltoServizio;
   g.fillRect(0, 0, W, H);
   const r = generatore(tipo.length * 977);
   for (let i = 0; i < 2600; i++) {
@@ -479,9 +481,23 @@ export const BIT_OMBRA_PONTE = 0x40;
 const SPINTA_DI_SBIECO = 0;
 /**
  * Quanto si vede di un ponte (o di un pilone) fra la telecamera e l'auto
- * nella vista «Corsie»: un pixel su tre, circa (vedi [Scena.tagliaSopra]).
+ * nella vista «Corsie»: tre pixel su sedici (vedi [Scena.tagliaSopra]).
+ * Erano cinque: sopra la strada restava una fascia chiara che si leggeva
+ * come un'altra strada.
  */
-export const COPERTURA_FANTASMA = 0.3;
+export const COPERTURA_FANTASMA = 0.15;
+/**
+ * Il tubo del fantasma attorno alla linea fra la telecamera e l'auto: il
+ * raggio (questa parte della distanza fra le due, fra un minimo e un massimo
+ * in metri) e fin dove, oltre il raggio, il ponte torna pieno.
+ *
+ * Era largo fino a venticinque metri: diventavano fantasmi anche il
+ * viadotto accanto e i parapetti delle rampe vicine, che non coprono né
+ * l'auto né la strada davanti, e accanto alla corsia correvano fasce di
+ * puntini. Fantasma è solo quello che sta davvero fra l'occhio e l'auto (la
+ * sua carreggiata, più o meno); il resto del ponte resta un ponte.
+ */
+export const TUBO_FANTASMA = { parte: 0.12, minimo: 5, massimo: 8, sfumato: 1.25 };
 /**
  * Fin dove un parapetto, una spalla o un muro stanno «alla quota dell'auto»
  * (metri sopra di lei): fin lì restano pieni, più in alto sono fantasmi.
@@ -1184,8 +1200,8 @@ export class Scena {
       // il ponte è un fantasma: se ne disegna un pixel su tre o quattro
       // ([COPERTURA_FANTASMA]), a una trama fissa sullo schermo (Bayer 4×4:
       // niente rumore che sfarfalla muovendosi), e sul bordo del tubo la trama
-      // si riempie piano fino al ponte pieno (fra r e 1,4 r, e oltre l'auto in
-      // 0,4 r). Davanti all'auto sullo schermo resta una finestra libera
+      // si riempie fino al ponte pieno (fra r e 1,25 r, e oltre l'auto in
+      // 0,4 r; il raggio in [TUBO_FANTASMA]). Davanti all'auto sullo schermo resta una finestra libera
       // ([uRaggioAuto]): l'auto si legge tutta, e la sua sagoma rossa non
       // compare fra i puntini. Costa poco: qualche conto in più, solo per i
       // pezzi nel tubo, e il `discard` c'era già.
@@ -1210,9 +1226,9 @@ export class Scena {
             vec3 ba = uAutoTaglio - uOcchioTaglio;
             float lba = length(ba);
             float k = dot(vMondoTaglio - uOcchioTaglio, ba) / max(lba * lba, 1e-6);
-            float r = clamp(0.35 * lba, 10.0, 25.0);
+            float r = clamp(${TUBO_FANTASMA.parte.toFixed(2)} * lba, ${TUBO_FANTASMA.minimo.toFixed(1)}, ${TUBO_FANTASMA.massimo.toFixed(1)});
             float d = length(vMondoTaglio - uOcchioTaglio - ba * clamp(k, 0.0, 1.0));
-            float pieno = max(smoothstep(r, 1.4 * r, d), smoothstep(0.0, 0.4 * r, (k - 1.0) * lba));
+            float pieno = max(smoothstep(r, ${TUBO_FANTASMA.sfumato.toFixed(2)} * r, d), smoothstep(0.0, 0.4 * r, (k - 1.0) * lba));
             if (pieno < 1.0) {
               vec2 ndc = gl_FragCoord.xy / uSchermo * 2.0 - 1.0;
               vec2 p = vec2((ndc.x - uAutoSchermo.x) * uSchermo.x / uSchermo.y, ndc.y - uAutoSchermo.y);

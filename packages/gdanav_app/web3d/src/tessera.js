@@ -11,6 +11,7 @@
 import { generatore, mescola, semeTessera } from './caso.js';
 import { Costruttore, matrice } from './costruttore.js';
 import { ALTEZZA_LIVELLO, CLASSI_STRADE, PENDENZA, PENDENZA_MAX, SPESSORE_IMPALCATO, altezzaViadotto, grafoStrade, uniscIBordi } from './elevazione.js';
+import { bordiCorsie } from './corsie.js';
 import { ESTENSIONE, sistemaTessera } from './geo.js';
 import {
   anelliPoligoni,
@@ -24,8 +25,12 @@ import { CHIOME, FACCIATE, TETTI, rgb, spostamentoOmbra } from './tavolozza.js';
 import { costruisciSegnaletica } from './segnaletica.js';
 import earcut from 'earcut';
 
-/** I tipi di nastro d'asfalto (ognuno con la sua trama di righe). */
-export const TIPI_STRADA = ['motorway', 'trunk', 'ramp', 'primary1', 'primary2', 'tertiary', 'plain', 'rail'];
+/**
+ * I tipi di nastro d'asfalto (ognuno con la sua trama di righe). `servizio`
+ * solo nella vista «Corsie»: le strade di servizio (i piazzali, i
+ * parcheggi, gli accessi), che lì non hanno corsie disegnate.
+ */
+export const TIPI_STRADA = ['motorway', 'trunk', 'ramp', 'primary1', 'primary2', 'tertiary', 'plain', 'servizio', 'rail'];
 
 /**
  * Tutti i nastri: i tipi a terra, gli stessi sui ponti (`-ponte`, un asfalto
@@ -571,7 +576,41 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     }
     // [x, y, h, tx, ty, s]: si taglia sulla tessera e tutto si interpola.
     // (Con le mezze larghezze a sinistra e a destra, dove la strada si stringe fra le case.)
-    const ricca = tutta.map((p, k) => (f.larghezze ? [p[0], p[1], p[2], tang[k][0], tang[k][1], lungo[k], f.larghezze[k][0], f.larghezze[k][1]] : [p[0], p[1], p[2], tang[k][0], tang[k][1], lungo[k]]));
+    // Nella vista «Corsie» le opere di una strada in quota (il ventre, il
+    // cordolo, i parapetti, i muri) stanno sul bordo dell'asfalto delle vie
+    // vere, non su quello della strada della mappa (vedi [bordiSullAsfalto]).
+    //
+    // E alla sua quota. La strada della mappa e la via vera non stanno
+    // sempre alla stessa (fino a due metri l'una dall'altra, dove la mappa
+    // dà un ponte e il relay una rampa che sale): i parapetti correvano
+    // sospesi sopra l'asfalto, o ci affondavano, e la spalla del ponte
+    // spuntava di traverso alla carreggiata. Lì le opere prendono la quota
+    // dell'asfalto che hanno accanto, un bordo per volta (due vie affiancate
+    // possono salire diversamente). I segmenti del percorso restano alla
+    // quota della strada della mappa (l'ultimo numero).
+    //
+    // [x, y, h, tx, ty, s, sinistra, destra, sulle corsie, h a sinistra, h a destra, h della mappa,
+    //  senza bordo a sinistra, senza bordo a destra].
+    let larghezze = f.larghezze;
+    // I varchi nell'asfalto di ogni punto (per i metri lungo la strada): vedi il piano dell'impalcato.
+    const varchi = new Map();
+    // (Non le strade di servizio: non hanno corsie loro, e accanto a una
+    // carreggiata prenderebbero per suo l'asfalto di lei.)
+    if (conCorsie && f.cls !== 'rail' && f.cls !== 'service' && !f.galleria && tutta.some((p) => p[2] > 0.35)) {
+      larghezze = tutta.map((p, k) => {
+        const suoi = f.larghezze?.[k] ?? [f.w / 2, f.w / 2];
+        if (p[2] <= 0.35) return suoi;
+        const [tx, ty] = tang[k];
+        const veri = conCorsie.bordiQui(p[0], p[1], p[2], tx, ty, suoi[0], suoi[1]);
+        if (veri?.[5].length) varchi.set(lungo[k], veri[5]);
+        return veri ? [veri[0], veri[1], 1, veri[2], veri[3], veri[4], veri[6] ? 1 : 0, veri[7] ? 1 : 0] : suoi;
+      });
+    }
+    const ricca = tutta.map((p, k) => {
+      if (!larghezze) return [p[0], p[1], p[2], tang[k][0], tang[k][1], lungo[k]];
+      const l = larghezze[k];
+      return [p[0], p[1], l[5] ?? p[2], tang[k][0], tang[k][1], lungo[k], l[0], l[1], l[2] ?? 0, l[3] ?? p[2], l[4] ?? p[2], p[2], l[6] ?? 0, l[7] ?? 0];
+    });
     const semePezzo = mescola(Math.round(tutta[0][0] * 7), Math.round(tutta[0][1] * 7));
     // I pezzi senza una via vera sotto (vedi [senzaDati]): niente nastro né opere.
     const senza = vieVere && f.cls !== 'rail' ? senzaDati(tutta, f.w, vieVere, f.cantiere) : null;
@@ -602,7 +641,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           const a = pezzo[k - 1];
           const b = pezzo[k];
           if (senza && nascostoA((a[5] + b[5]) / 2)) continue;
-          segmenti.push(a[0], a[1], a[2] + zs, b[0], b[1], b[2] + zs, f.w, codice + (f.rampa ? 16 : 0) + (f.ponte ? 32 : 0) + (f.galleria ? 64 : 0));
+          segmenti.push(a[0], a[1], (a[11] ?? a[2]) + zs, b[0], b[1], (b[11] ?? b[2]) + zs, f.w, codice + (f.rampa ? 16 : 0) + (f.ponte ? 32 : 0) + (f.galleria ? 64 : 0));
           latiSegmenti?.push(((a[6] ?? f.w / 2) + (b[6] ?? f.w / 2)) / 2, ((a[7] ?? f.w / 2) + (b[7] ?? f.w / 2)) / 2);
         }
       }
@@ -639,7 +678,14 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     for (const pezzo of ritagliaLinea(ricca, -meta, -meta, meta, meta)) {
       const n = pezzo.length;
       const hw = f.w / 2;
-      const gb = nastri[f.galleria ? 'galleria' : tipoDi(f) + (f.ponte ? '-ponte' : '')];
+      /* «Un grande ventaglio di spicchi bianchi su asfalto scuro»: sotto un
+       * viadotto, le corsie di un parcheggio. Nella vista «Corsie» le strade
+       * di servizio avevano lo stesso asfalto blu notte delle carreggiate, ma
+       * senza righe: una macchia scura a spicchi che pareva un pezzo di
+       * svincolo. Lì hanno un nastro loro, chiaro (vedi `asfaltoServizio`):
+       * si vede dove sono, e non si confondono con le strade che contano. */
+      const tipo = conCorsie && f.cls === 'service' ? 'servizio' : tipoDi(f);
+      const gb = nastri[f.galleria ? 'galleria' : tipo + (f.ponte ? '-ponte' : '')];
       const L = [];
       const R = [];
       for (let k = 0; k < n; k++) {
@@ -656,15 +702,15 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         if (k > 0 && k < n - 1) {
           const sx = pezzo[k + 1][0] - pezzo[k][0];
           const sy = pezzo[k + 1][1] - pezzo[k][1];
-          const sl = Math.hypot(sx, sy) || 1;
-          m = 1 / Math.max(0.5, Math.abs((-sy / sl) * nx + (sx / sl) * ny));
+          const sl = Math.hypot(sx, sy);
+          // (Un tratto lungo zero non ha direzione: il bordo resta dov'è.)
+          if (sl > 1e-6) m = 1 / Math.max(0.5, Math.abs((-sy / sl) * nx + (sx / sl) * ny));
         }
-        const zz = pezzo[k][2] + zs;
         const v = pezzo[k][5] / PERIODO_STRADA;
         const hs = pezzo[k][6] ?? hw;
         const hd = pezzo[k][7] ?? hw;
-        L.push([pezzo[k][0] + nx * hs * m, pezzo[k][1] + ny * hs * m, zz, 0, v]);
-        R.push([pezzo[k][0] - nx * hd * m, pezzo[k][1] - ny * hd * m, zz, 1, v]);
+        L.push([pezzo[k][0] + nx * hs * m, pezzo[k][1] + ny * hs * m, (pezzo[k][9] ?? pezzo[k][2]) + zs, 0, v]);
+        R.push([pezzo[k][0] - nx * hd * m, pezzo[k][1] - ny * hd * m, (pezzo[k][10] ?? pezzo[k][2]) + zs, 1, v]);
       }
       // Dove c'è la via con le corsie, il nastro di sempre non c'è.
       const coperto = conCorsie ? pezzo.map((q) => conCorsie.copre(q[0], q[1], q[3], q[4], q[2])) : null;
@@ -826,6 +872,27 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
             ombrePonti.quad(largo(a, nl0, 2.6, 0), largo(b, nl1, 2.6, 0), largo(c, nl1, -2.6, 0), largo(d, nl0, -2.6, 0), [0, 0, 1]);
           }
         }
+        // Coi bordi presi dall'asfalto delle corsie (vedi [bordiSullAsfalto]).
+        const sulleCorsie = (pezzo[k - 1][8] ?? 0) > 0.5 && (pezzo[k][8] ?? 0) > 0.5;
+        /* Il piano dell'impalcato nei varchi dell'asfalto: dove fra due vie
+         * resta un varco stretto (lo spartitraffico fra le due carreggiate
+         * dello stesso viadotto, il cuneo dove una rampa si stacca) si vede
+         * il cemento del ponte, non il vuoto fino al ventre. Solo nel varco,
+         * da un bordo all'altro, ognuno alla quota del suo asfalto (e un
+         * palmo sotto: due carreggiate non stanno mai proprio alla stessa). */
+        const lungoTratto = Math.hypot(pezzo[k][0] - pezzo[k - 1][0], pezzo[k][1] - pezzo[k - 1][1]);
+        const salta = (col) => Math.abs((pezzo[k][col] ?? hw) - (pezzo[k - 1][col] ?? hw)) > Math.max(1.5, 0.5 * lungoTratto);
+        const [va, vb] = [varchi.get(pezzo[k - 1][5]), varchi.get(pezzo[k][5])];
+        if (sulleCorsie && va && vb && va.length === vb.length) {
+          const P = (q, o, z) => [q[0] - q[4] * o, q[1] + q[3] * o, z + 0.04];
+          va.forEach((a, j) => {
+            const b = vb[j];
+            // (Lo stesso varco nei due punti: non uno che comincia dove l'altro è già finito.)
+            const stesso = Math.max(1, 0.4 * lungoTratto);
+            if (Math.abs(a[0] - b[0]) > stesso || Math.abs(a[2] - b[2]) > stesso) return;
+            opere.quad(P(pezzo[k - 1], a[2] + 0.3, a[3]), P(pezzo[k], b[2] + 0.3, b[3]), P(pezzo[k], b[0] - 0.3, b[1]), P(pezzo[k - 1], a[0] - 0.3, a[1]), [0, 0, 1], ...sfuma(cCemento, 0.74, 0.74));
+          });
+        }
         for (const lato of [1, -1]) {
           const A = lato > 0 ? L : R;
           const onA = [-pezzo[k - 1][4] * lato, pezzo[k - 1][3] * lato];
@@ -834,6 +901,15 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           const mix = (p, q, u) => p.map((v, i) => v + (q[i] - v) * u);
           const AA = A[k - 1];
           const BB = A[k];
+          /* Dove il bordo dell'asfalto fa un salto di lato (comincia o
+           * finisce l'asfalto di un'altra via accanto) da un punto all'altro
+           * non c'è un bordo da seguire: un parapetto tirato fra i due
+           * sarebbe un pezzo di traverso sulla carreggiata. */
+          if (salta(lato > 0 ? 6 : 7)) continue;
+          // E dove da questa parte l'asfalto continua oltre (la carreggiata
+          // accanto sullo stesso impalcato): il bordo è il suo, più in là.
+          const senzaBordo = lato > 0 ? 12 : 13;
+          if ((pezzo[k - 1][senzaBordo] ?? 0) > 0.5 || (pezzo[k][senzaBordo] ?? 0) > 0.5) continue;
           // Sull'asfalto di un'altra strada (vedi [suAltraStrada]): dove il
           // bordo ci passa sopra solo in parte, si taglia a pezzi di 8 m.
           const sopraAltra = (u) => {
@@ -841,6 +917,10 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
             const on = mix(onA, onB, u);
             const px = q[0] + on[0] * 0.12;
             const py = q[1] + on[1] * 0.12;
+            // Sul bordo dell'asfalto delle corsie conta solo quello: le
+            // strade della mappa stanno un poco altrove, e a guardare loro
+            // il parapetto del bordo vero spariva a tratti.
+            if (sulleCorsie) return conCorsie.inMezzoAllAsfalto(px, py, q[2], 0.5);
             // Con le corsie anche il loro asfalto: le vie vere sono spesso più
             // larghe della strada della mappa, e un parapetto in mezzo a una
             // corsia (fra due rampe che si separano) non c'è.
@@ -866,7 +946,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
             const inr = [-nrm[0], -nrm[1], 0];
             const sopra = pezzi === 1 ? prove[2] && prove.every((x) => x) : sopraAltra((u0 + u1) / 2);
             if (sopra) continue;
-            if (f.cls !== 'rail' && !f.cucita && !vicinoASvincolo((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 40)) {
+            if (f.cls !== 'rail' && !f.cucita && (sulleCorsie || !vicinoASvincolo((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 40))) {
               // Il parapetto: cemento chiaro, e sopra il corrimano scuro.
               const ph = f.ponte ? 1.05 : 0.9;
               const pr = 0.16;
@@ -925,11 +1005,16 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           const capo = e === 0 ? P[5] < 0.5 : P[5] > lungo[n0 - 1] - 0.5;
           if (!capo || P[2] < 2.5 || !dentro(P[0], P[1]) || nascostoA(P[5])) continue;
           const dir = e === 0 ? -1 : 1;
+          // Larga quanto la strada com'è disegnata lì (nella vista «Corsie»
+          // l'asfalto delle vie vere: larga quanto la strada della mappa,
+          // spuntava di lato fra le due carreggiate).
+          const mezzaSpalla = ((P[6] ?? hw) + (P[7] ?? hw)) / 2;
+          const diLato = ((P[6] ?? hw) - (P[7] ?? hw)) / 2;
           // Un ponte spezzato in più pezzi può finire sopra una strada: lì niente spalla.
-          const cx0 = P[0] + P[3] * 0.7 * dir;
-          const cy0 = P[1] + P[4] * 0.7 * dir;
+          const cx0 = P[0] + P[3] * 0.7 * dir - P[4] * diLato;
+          const cy0 = P[1] + P[4] * 0.7 * dir + P[3] * diLato;
           let sullaStrada = false;
-          for (let q = -1; q <= 1; q += 0.5) if (suStradaATerra(cx0 - P[4] * hw * q, cy0 + P[3] * hw * q, 1)) sullaStrada = true;
+          for (let q = -1; q <= 1; q += 0.5) if (suStradaATerra(cx0 - P[4] * mezzaSpalla * q, cy0 + P[3] * mezzaSpalla * q, 1)) sullaStrada = true;
           if (sullaStrada) continue;
           // Nella vista «Corsie» l'asfalto che si vede è quello delle vie
           // vere, che qui può stare mezzo metro più giù del ponte della
@@ -940,13 +1025,13 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           if (conCorsie) {
             for (let q = -1; q <= 1; q += 0.25) {
               for (const lungoVia of [0, 0.7, 1.4]) {
-                const z = conCorsie.asfaltoQui(P[0] + P[3] * lungoVia * dir - P[4] * (hw + 0.35) * q, P[1] + P[4] * lungoVia * dir + P[3] * (hw + 0.35) * q, P[2]);
+                const z = conCorsie.asfaltoQui(P[0] + P[3] * lungoVia * dir - P[4] * (diLato + (mezzaSpalla + 0.35) * q), P[1] + P[4] * lungoVia * dir + P[3] * (diLato + (mezzaSpalla + 0.35) * q), P[2]);
                 if (z !== null) cima = Math.min(cima, z - SOTTO_L_ASFALTO_M);
               }
             }
           }
           if (cima < 1) continue;
-          scatola(P[0] + P[3] * 0.7 * dir, P[1] + P[4] * 0.7 * dir, 0, cima, P[3], P[4], 0.7, hw + 0.35, cCemento);
+          scatola(cx0, cy0, 0, cima, P[3], P[4], 0.7, mezzaSpalla + 0.35, cCemento);
         }
       }
       // I piloni: ai due lati di ogni strada che passa sotto (mai sopra), e
@@ -956,7 +1041,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           let k = 1;
           while (k < n - 1 && pezzo[k][5] < sv) k++;
           const t = Math.max(0, Math.min(1, (sv - pezzo[k - 1][5]) / Math.max(1e-6, pezzo[k][5] - pezzo[k - 1][5])));
-          return [0, 1, 2, 3, 4].map((j) => pezzo[k - 1][j] + (pezzo[k][j] - pezzo[k - 1][j]) * t);
+          return [0, 1, 2, 3, 4, 6, 7].map((j) => (pezzo[k - 1][j] ?? hw) + ((pezzo[k][j] ?? hw) - (pezzo[k - 1][j] ?? hw)) * t);
         };
         const vietati = [];
         const appoggi = [];
@@ -992,12 +1077,20 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         const libero = (sv) => !vietati.some(([a, b]) => sv > a && sv < b);
         const metti = (sv) => {
           if (sv < pezzo[0][5] || sv > pezzo[n - 1][5] || !libero(sv) || nascostoA(sv)) return false;
-          const [px, py, h, tx, ty] = aS(sv);
+          const [x0, y0, h, tx, ty, sinistra, destra] = aS(sv);
           if (h < (f.ponte ? 2.5 : ALTO_COME_PONTE)) return false;
           const tl = Math.hypot(tx, ty) || 1;
-          const offs = f.w > 9 ? [-f.w * 0.27, f.w * 0.27] : [0];
+          // Sotto l'impalcato com'è disegnato lì (nella vista «Corsie» largo
+          // quanto l'asfalto delle vie vere, e non sempre sul mezzo della
+          // strada della mappa: il capitello, largo quanto lei, spuntava di lato).
+          const larga = Math.min(sinistra + destra, f.w + 2 * OLTRE_IL_BORDO_M);
+          if (larga < 2) return false;
+          const diLato = (sinistra - destra) / 2;
+          const px = x0 - (ty / tl) * diLato;
+          const py = y0 + (tx / tl) * diLato;
+          const offs = larga > 9 ? [-larga * 0.27, larga * 0.27] : [0];
           for (const o of offs) if (suStradaATerra(px - (ty / tl) * o, py + (tx / tl) * o, 0.8) || suStradaSotto(px - (ty / tl) * o, py + (tx / tl) * o, 0.8, h)) return false;
-          piloni.push({ x: px, y: py, h: h + zs - SPESSORE_IMPALCATO, ang: Math.atan2(ty, tx), w: f.w, offs, alto: h > 14 });
+          piloni.push({ x: px, y: py, h: h + zs - SPESSORE_IMPALCATO, ang: Math.atan2(ty, tx), w: larga, offs, alto: h > 14 });
           return true;
         };
         // Nello spartitraffico fra due carreggiate di sotto: un pilone a metà.
@@ -2587,6 +2680,96 @@ export function senzaDati(punti, w, vie, cantiere = false) {
   return senza;
 }
 
+/**
+ * Un varco nell'asfalto più stretto di così (m) non divide due carreggiate:
+ * è la zebratura fra due rami che si separano (`ZEBRATURA_LARGA_M` in
+ * segnaletica.js), o lo spartitraffico fra le due carreggiate di un viadotto.
+ */
+const VARCO_ASFALTO_M = 4.5;
+/** Fra due punti a un palmo l'uno dall'altro, più di così (m) è uno scalino: l'asfalto di un'altra carreggiata, più su o più giù. */
+const SCALINO_ASFALTO_M = 0.35;
+/** Fin dove, oltre il bordo della strada della mappa, si cerca il bordo dell'asfalto delle corsie (m). */
+const OLTRE_IL_BORDO_M = 8;
+
+/**
+ * Dove finisce davvero l'asfalto ai due lati di una strada della mappa, nel
+ * punto (px, py) dove va verso (tx, ty) (un versore): `[sinistra, destra]`,
+ * le due mezze larghezze dal suo mezzo, o `null` se lì l'asfalto delle corsie
+ * non c'è (allora la strada resta larga com'è: [hs] a sinistra, [hd] a destra).
+ * [su]`(x, y, z)` dice se un punto sta sull'asfalto delle corsie: la sua
+ * quota lì (la più vicina a [z]), o `true`, o niente. Con le quote, dopo le
+ * due larghezze vengono quella dell'asfalto ai due bordi e in mezzo; [h] è la
+ * quota della strada. Poi i varchi passati: `[da, quota, a, quota]` (metri a
+ * sinistra del mezzo, da destra a sinistra), e se a sinistra e a destra il
+ * bordo non si è trovato: a [oltre] metri dal bordo della strada l'asfalto
+ * continua ancora (un'altra carreggiata accanto: il bordo è il suo).
+ *
+ * «Larghe fasce grigie accanto alla corsia, tante strisce parallele sopra le
+ * corsie»: nella vista «Corsie» l'asfalto è quello delle vie vere, ma il
+ * ponte sotto (il ventre, il cordolo, i parapetti, i muri) era ancora largo
+ * quanto la strada della mappa, che non ne sa niente: più larga, e accanto
+ * alla corsia spuntava il ventre dell'impalcato con il parapetto un metro più
+ * in là; più stretta o spostata, e il parapetto correva sull'asfalto. Le
+ * opere stanno invece sul bordo dell'asfalto che c'è: dal mezzo della strada
+ * verso fuori, fin dove l'asfalto continua (un varco più stretto di
+ * [VARCO_ASFALTO_M] non lo interrompe) alla stessa quota: la carreggiata
+ * accanto, più su o più giù di uno scalino, è un'altra strada col suo ponte.
+ */
+export function bordiSullAsfalto(su, px, py, tx, ty, hs, hd, h = 0, oltre = OLTRE_IL_BORDO_M) {
+  const nx = -ty;
+  const ny = tx;
+  const PASSO = 0.25;
+  // La quota dell'asfalto a [o] metri a sinistra del mezzo (la più vicina a [z]), o null.
+  const a = (o, z) => {
+    const r = su(px + nx * o, py + ny * o, z);
+    return r === true ? z : typeof r === 'number' ? r : null;
+  };
+  // Da dove si parte: il mezzo, o l'asfalto più vicino dentro la strada.
+  let o0 = null;
+  let z0 = null;
+  for (let d = 0; d <= Math.max(hs, hd) && o0 === null; d += PASSO) {
+    for (const o of d ? [d, -d] : [0]) {
+      if (o0 !== null || (o > 0 ? d > hs : d > hd)) continue;
+      const z = a(o, h);
+      if (z !== null) [o0, z0] = [o, z];
+    }
+  }
+  if (o0 === null) return null;
+  const varchi = [];
+  const fin = (verso, limite) => {
+    let ultimo = o0;
+    let quota = z0;
+    let vuoti = 0;
+    // (Uno scalino non è lo stesso asfalto: oltre un varco la quota può cambiare un poco di più.)
+    const continua = (z) => z !== null && Math.abs(z - quota) <= SCALINO_ASFALTO_M + 0.08 * vuoti * PASSO;
+    for (let o = o0 + verso * PASSO; verso * o <= limite; o += verso * PASSO) {
+      const z = a(o, quota);
+      if (continua(z)) {
+        // Un varco appena passato: da dove finiva l'asfalto a dove riprende.
+        if (vuoti) varchi.push(verso > 0 ? [ultimo, quota, o, z] : [o, z, ultimo, quota]);
+        ultimo = o;
+        quota = z;
+        vuoti = 0;
+      } else if (++vuoti * PASSO >= VARCO_ASFALTO_M) break;
+    }
+    // Il bordo vero, fra l'ultimo punto sull'asfalto e il primo fuori.
+    const inFondo = vuoti === 0;
+    vuoti = 0;
+    let dentro = ultimo;
+    let fuori = ultimo + verso * PASSO;
+    for (let giro = 0; giro < 4; giro++) {
+      const m = (dentro + fuori) / 2;
+      if (continua(a(m, quota))) dentro = m;
+      else fuori = m;
+    }
+    // Arrivati in fondo ancora sull'asfalto: da questa parte il bordo non c'è (è più in là).
+    return [dentro, quota, inFondo && verso * (ultimo + verso * PASSO) > limite];
+  };
+  const [sinistra, zs, apertaS] = fin(1, hs + oltre);
+  const [destra, zd, apertaD] = fin(-1, hd + oltre);
+  return [sinistra, -destra, zs, zd, z0, varchi, apertaS, apertaD];
+}
+
 /** Quanto sopra la quota sta l'asfalto delle corsie: come il nastro della sua classe, un poco sopra. */
 function sopraCorsie(hw) {
   const b = String(hw ?? '').replace(/_link$/, '');
@@ -2851,6 +3034,10 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
   const coperte = new Map();
   for (const v of strade) {
     const mezza = ((v.avanti + v.indietro) * v.lw + v.margini[0] + v.margini[1]) / 2;
+    // I due bordi dell'asfalto, a sinistra della linea (come in segnaletica.js).
+    const B = bordiCorsie(v);
+    const bordoS = B.sinistra + v.margini[0];
+    const bordoD = B.destra - v.margini[1];
     for (let k = 1; k < v.xy.length; k++) {
       const a = [...v.xy[k - 1], v.h[k - 1]];
       const b = [...v.xy[k], v.h[k]];
@@ -2858,7 +3045,7 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
         for (let cy = Math.floor((Math.min(a[1], b[1]) - mezza) / G); cy <= Math.floor((Math.max(a[1], b[1]) + mezza) / G); cy++) {
           const key = cx + ',' + cy;
           if (!coperte.has(key)) coperte.set(key, []);
-          coperte.get(key).push([a, b, mezza + Math.abs(v.posa), classeMappa(v.hw)]);
+          coperte.get(key).push([a, b, mezza + Math.abs(v.posa), classeMappa(v.hw), bordoS, bordoD]);
         }
       }
     }
@@ -2960,9 +3147,34 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
     }
     return giu;
   };
+  /**
+   * Sull'asfalto di una via con le corsie che va come (tx, ty) (o al
+   * contrario), a meno di due metri dalla quota [h], proprio fra i suoi due
+   * bordi: la sua quota lì (la più vicina a [h]), o null.
+   */
+  const sullAsfaltoLungo = (px, py, h, tx, ty) => {
+    let meglio = null;
+    for (const [a, b, , , bordoS, bordoD] of coperte.get(Math.floor(px / G) + ',' + Math.floor(py / G)) ?? []) {
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const l = Math.hypot(dx, dy) || 1e-9;
+      // (Un metro oltre i capi del tratto: nelle curve fra un tratto e l'altro non resta un buco.)
+      const lungo = ((px - a[0]) * dx + (py - a[1]) * dy) / l;
+      if (lungo < -1 || lungo > l + 1) continue;
+      const o = ((py - a[1]) * dx - (px - a[0]) * dy) / l;
+      if (o > bordoS + 0.02 || o < bordoD - 0.02) continue;
+      if (Math.abs((dx * tx + dy * ty) / l) < 0.7) continue;
+      const u = Math.max(0, Math.min(1, lungo / l));
+      const z = a[2] + (b[2] - a[2]) * u;
+      if (Math.abs(z - h) < 2 && (meglio === null || Math.abs(z - h) < Math.abs(meglio - h))) meglio = z;
+    }
+    return meglio;
+  };
+  /** I bordi dell'asfalto delle corsie attorno a una strada della mappa (vedi [bordiSullAsfalto]). */
+  const bordiQui = (px, py, h, tx, ty, hs, hd) => bordiSullAsfalto((x, y, z) => sullAsfaltoLungo(x, y, z, tx, ty), px, py, tx, ty, hs, hd, h);
   // Mai sull'asfalto (un nodo messo male, o la strada disegnata più larga).
   const alberi = puntiAlberi.filter((q) => nellaTessera(q) && !sullAsfalto(q[0], q[1])).map((q) => [q[0], q[1], 0.6 + mescola(Math.round(q[0] * 7), Math.round(q[1] * 7)) * 0.25]);
-  return { strade, nodi, copre, doppia, sullAsfalto, inMezzoAllAsfalto, asfaltoQui, alberi, tettoQui, quotaCorsie };
+  return { strade, nodi, copre, doppia, sullAsfalto, inMezzoAllAsfalto, asfaltoQui, alberi, tettoQui, quotaCorsie, bordiQui };
 }
 
 /** La classe della mappa (OpenMapTiles) di una via di OpenStreetMap. */

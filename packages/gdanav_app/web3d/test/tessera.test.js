@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { bufferDellaTessera, carreggiateAffiancate, costruisciTessera, iSottopassi, LIMITI, NASTRI, RAMPA_PIANO_M, senzaDati, stimaTriangoli, stradaVera, tettoDelleRampe, vieDelRelay } from '../src/tessera.js';
+import { bordiSullAsfalto, bufferDellaTessera, carreggiateAffiancate, costruisciTessera, iSottopassi, LIMITI, NASTRI, RAMPA_PIANO_M, senzaDati, stimaTriangoli, stradaVera, tettoDelleRampe, vieDelRelay } from '../src/tessera.js';
 import { preparaCorsie } from '../src/corsie.js';
 import { latDaMerc, lonDaMerc, sistemaTessera } from '../src/geo.js';
 import { ALTEZZA_LIVELLO, PENDENZA, SPESSORE_IMPALCATO, altezzaViadotto } from '../src/elevazione.js';
@@ -621,4 +621,46 @@ test('vista «Corsie»: la rampa di un ponte che finisce fuori dalla tessera sce
   let sulBordo = -Infinity;
   for (let i = 0; i < t.segmenti.length; i += 8) if (Math.abs(t.segmenti[i + 1] - meta) < 8) sulBordo = Math.max(sulBordo, t.segmenti[i + 2]);
   assert.ok(Math.abs(sulBordo - rampa.h[k]) < 1, `i segmenti a ${sulBordo.toFixed(2)}, l'asfalto a ${rampa.h[k].toFixed(2)}`);
+});
+
+test('le opere di un ponte stanno sul bordo dell’asfalto delle corsie, non su quello della strada della mappa', () => {
+  // La strada della mappa va verso est, larga dieci metri (cinque per parte).
+  // L'asfalto vero è più stretto e spostato: da 3,2 m a sinistra a 2,1 m a destra.
+  const stretto = (x, y) => y <= 3.2 && y >= -2.1;
+  const b = bordiSullAsfalto(stretto, 0, 0, 1, 0, 5, 5);
+  assert.ok(Math.abs(b[0] - 3.2) < 0.03 && Math.abs(b[1] - 2.1) < 0.03, `stretto: ${b}`);
+  // Più largo della strada della mappa: il bordo esce con lui.
+  const largo = (x, y) => Math.abs(y) <= 7.4;
+  const c = bordiSullAsfalto(largo, 0, 0, 1, 0, 5, 5);
+  assert.ok(Math.abs(c[0] - 7.4) < 0.03 && Math.abs(c[1] - 7.4) < 0.03, `largo: ${c}`);
+  // Tutto da una parte (la mappa e le vie vere non stanno una sull'altra): il
+  // bordo sinistro sta a destra del mezzo, la strada resta larga quanto l'asfalto.
+  const diLato = (x, y) => y <= -1 && y >= -4.5;
+  const d = bordiSullAsfalto(diLato, 0, 0, 1, 0, 5, 5);
+  assert.ok(Math.abs(d[0] + 1) < 0.03 && Math.abs(d[1] - 4.5) < 0.03, `di lato: ${d}`);
+  // Un varco stretto (lo spartitraffico, la zebratura) non divide: il bordo è oltre l'altra carreggiata.
+  const due = (x, y) => (y <= 4 && y >= -4) || (y >= 6 && y <= 11);
+  const e = bordiSullAsfalto(due, 0, 0, 1, 0, 5, 5);
+  assert.ok(Math.abs(e[0] - 11) < 0.03 && Math.abs(e[1] - 4) < 0.03, `varco stretto: ${e}`);
+  // Uno largo sì: l'altra è un'altra strada.
+  const lontane = (x, y) => (y <= 4 && y >= -4) || (y >= 9.5 && y <= 14);
+  const g = bordiSullAsfalto(lontane, 0, 0, 1, 0, 5, 5);
+  assert.ok(Math.abs(g[0] - 4) < 0.03 && Math.abs(g[1] - 4) < 0.03, `varco largo: ${g}`);
+  // Con le quote: la carreggiata accanto, un metro e mezzo più giù, è un'altra strada
+  // (il bordo sta sullo scalino); e ai due bordi la quota è quella del loro asfalto.
+  const scalino = (x, y) => (y >= 2 ? (y <= 9 ? 6.5 : null) : y >= -4 ? 8 + 0.02 * y : null);
+  const q = bordiSullAsfalto(scalino, 0, 0, 1, 0, 5, 5, 8.3);
+  assert.ok(Math.abs(q[0] - 2) < 0.03 && Math.abs(q[1] - 4) < 0.03, `scalino: ${q}`);
+  assert.ok(Math.abs(q[2] - 8.04) < 0.02 && Math.abs(q[3] - 7.92) < 0.02 && Math.abs(q[4] - 8) < 0.01, `le quote ai bordi e in mezzo: ${q}`);
+  // L'asfalto che continua oltre dove si guarda (un'altra carreggiata accanto): da quella parte niente bordo.
+  const oltre = bordiSullAsfalto((x, y) => y >= -4 && y <= 40, 0, 0, 1, 0, 5, 5);
+  assert.equal(oltre[6], true, 'a sinistra il bordo non c’è');
+  assert.equal(oltre[7], false);
+  assert.ok(Math.abs(oltre[1] - 4) < 0.03);
+  assert.deepEqual([b[6], b[7], c[6], c[7]], [false, false, false, false]);
+  // Senza asfalto lì attorno la strada resta com'è.
+  assert.equal(bordiSullAsfalto(() => false, 0, 0, 1, 0, 5, 5), null);
+  // E in un altro verso: la strada verso nord, la sinistra è a ovest.
+  const nord = bordiSullAsfalto((x) => x >= -6 && x <= 2, 0, 0, 0, 1, 5, 5);
+  assert.ok(Math.abs(nord[0] - 6) < 0.03 && Math.abs(nord[1] - 2) < 0.03, `verso nord: ${nord}`);
 });

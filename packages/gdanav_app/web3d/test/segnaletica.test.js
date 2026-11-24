@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { bordiCorsie, normalizza, preparaCorsie } from '../src/corsie.js';
 import { latDaMerc, lonDaMerc, sistemaTessera } from '../src/geo.js';
-import { ALTO_MARCIAPIEDE, ANGOLO, CORDOLO_M, SOPRA_GALLERIA_CORSIE, angoloMarciapiede, lineaRicca, MARCIAPIEDI, RIGHE, SCIVOLO, costruisciSegnaletica, formaFreccia, semplificaPezzo, sopraAsfalto, togli, trattini } from '../src/segnaletica.js';
+import { ALTO_MARCIAPIEDE, ANGOLO, CORDOLO_M, SOPRA_GALLERIA_CORSIE, allineaICapi, angoloMarciapiede, rastrematureDeiCapi, lineaRicca, MARCIAPIEDI, RIGHE, SCIVOLO, costruisciSegnaletica, formaFreccia, semplificaPezzo, sopraAsfalto, togli, trattini } from '../src/segnaletica.js';
 import { costruisciTessera, infittisci, sfoltisciQuote } from '../src/tessera.js';
 import { cavalcavia, strato } from './finte.js';
 
@@ -739,4 +739,232 @@ test('niente zebratura fra due rami che si aprono subito: lì c’è un’isola'
   // (Le righe dei due rami, lunghe e di sbieco, non contano: solo quello che sta fra loro.)
   const fra = zebrature(costruisciSegnaletica({ strade: [arriva, su, giu], meta: 1000 })).filter(([x, y]) => x > 3 && Math.abs(Math.atan2(y, x)) < (20 * Math.PI) / 180);
   assert.deepEqual(fra, []);
+});
+
+/** Se il punto (x, y) sta sotto un triangolo dell'asfalto; con [quote] le restituisce tutte. */
+function asfaltoSotto(sg, x, y) {
+  const p = sg.asfalto.p;
+  const ix = sg.asfalto.i;
+  const out = [];
+  for (let t = 0; t < ix.length; t += 3) {
+    const [a, b, c] = [ix[t], ix[t + 1], ix[t + 2]].map((i) => [p[3 * i], p[3 * i + 1], p[3 * i + 2]]);
+    const d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+    if (Math.abs(d) < 1e-9) continue;
+    const l1 = ((b[1] - c[1]) * (x - c[0]) + (c[0] - b[0]) * (y - c[1])) / d;
+    const l2 = ((c[1] - a[1]) * (x - c[0]) + (a[0] - c[0]) * (y - c[1])) / d;
+    if (l1 < -1e-9 || l2 < -1e-9 || 1 - l1 - l2 < -1e-9) continue;
+    out.push(l1 * a[2] + l2 * b[2] + (1 - l1 - l2) * c[2]);
+  }
+  return out;
+}
+
+test('due vie che si continuano piegando: nessuna fessura nell’asfalto dalla parte di fuori', () => {
+  // La prima arriva da ovest, la seconda riparte piegando di dodici gradi a
+  // sinistra: a destra (fuori dalla piega) fra le due strisce resta uno spicchio.
+  const g = (12 * Math.PI) / 180;
+  const prima = via({ id: 1, hw: 'trunk', oneway: 'yes', lanes: '2' }, [
+    [-120, 0],
+    [0, 0],
+  ]);
+  const seconda = via({ id: 2, hw: 'trunk', oneway: 'yes', lanes: '2' }, [
+    [0, 0],
+    [120 * Math.cos(g), 120 * Math.sin(g)],
+  ]);
+  const sg = costruisciSegnaletica({ strade: [prima, seconda], meta: 1000 });
+  const B = bordiCorsie(prima);
+  const destra = B.destra - prima.margini[1];
+  // Lungo la bisettrice dello spicchio, dal nodo fin quasi al bordo.
+  const b = -Math.PI / 2 + g / 2;
+  for (let d = 0.3; d < -destra - 0.3; d += 0.3) {
+    assert.ok(asfaltoSotto(sg, Math.cos(b) * d, Math.sin(b) * d).length > 0, `a ${d.toFixed(1)} m dal nodo, fuori dalla piega, c'è l'asfalto`);
+  }
+});
+
+test('il capo tondo di un ponte in piano non copre la rampa che da lì scende', () => {
+  // Il ponte in piano a otto metri finisce in (0, 0); la via dopo scende del 6%.
+  const ponte = via({ id: 1, hw: 'trunk', oneway: 'yes', lanes: '2', bridge: 'yes' }, [
+    [-80, 0],
+    [0, 0],
+  ]);
+  ponte.h = [8, 8];
+  const discesa = via({ id: 2, hw: 'trunk', oneway: 'yes', lanes: '2' }, [
+    [0, 0],
+    [20, 2],
+    [100, 4],
+  ]);
+  discesa.h = [8, 6.8, 2];
+  const sg = costruisciSegnaletica({ strade: [ponte, discesa], meta: 1000 });
+  // A tre metri dal nodo, sulla discesa: nessun asfalto più in alto del suo.
+  for (const [x, y] of [
+    [3, 0.3],
+    [3, 2],
+    [3, -2.5],
+    [4, 0.4],
+  ]) {
+    const zz = asfaltoSotto(sg, x, y);
+    assert.ok(zz.length > 0, `asfalto in ${x}, ${y}`);
+    const sua = 8 - (1.2 * Math.hypot(x, y * 0)) / Math.hypot(20, 2);
+    assert.ok(Math.max(...zz) - Math.min(...zz) < 0.06, `in ${x}, ${y} l'asfalto a una quota sola (${zz.map((z) => z.toFixed(2)).join(', ')}; la discesa a ${sua.toFixed(2)})`);
+  }
+});
+
+test('la zebratura è un cuneo chiuso: strisce fitte da un bordo all’altro, e le due righe attorno', () => {
+  const arriva = via({ id: 1, hw: 'motorway', lanes: '3', oneway: 'yes' }, [
+    [-200, 0],
+    [0, 0],
+  ]);
+  const dritta = via({ id: 2, hw: 'motorway', lanes: '2', oneway: 'yes' }, [
+    [0, 0],
+    [300, 0],
+  ]);
+  const esce = via({ id: 3, hw: 'motorway_link', lanes: '1', oneway: 'yes' }, [
+    [0, 0],
+    [300, -60],
+  ]);
+  const sg = costruisciSegnaletica({ strade: [arriva, dritta, esce], meta: 1000 });
+  // I due bordi del cuneo: il destro delle corsie di chi va dritto (y fisso), il sinistro della rampa.
+  const yDritta = bordiCorsie(dritta).destra;
+  const sinistraRampa = bordiCorsie(esce).sinistra;
+  const l = Math.hypot(300, 60);
+  // Quanto sta a sinistra della linea della rampa il punto (x, y).
+  const dallaRampa = (x, y) => (y * 300 + x * 60) / l;
+  // Le strisce: i quadrilateri di sbieco. I loro due capi (in mezzo ai lati corti).
+  const p = sg.vernice.p;
+  const strisce = [];
+  for (let i = 0; i + 11 < p.length; i += 12) {
+    const dy = p[i + 7] - p[i + 4];
+    const dx = p[i + 6] - p[i + 3];
+    if (Math.abs(dy) > 0.8 && Math.abs(dy) > Math.abs(dx) * 0.5) strisce.push([[(p[i] + p[i + 3]) / 2, (p[i + 1] + p[i + 4]) / 2], [(p[i + 6] + p[i + 9]) / 2, (p[i + 7] + p[i + 10]) / 2]]);
+  }
+  assert.ok(strisce.length >= 5, `strisce fitte (${strisce.length})`);
+  for (const [a, b] of strisce) {
+    // Un capo sul bordo della rampa, l'altro su quello delle corsie dritte: né più corta né oltre.
+    assert.ok(Math.abs(dallaRampa(a[0], a[1]) - sinistraRampa) < 0.15, `il capo sulla rampa a ${dallaRampa(a[0], a[1]).toFixed(2)} dalla sua linea (bordo ${sinistraRampa})`);
+    assert.ok(Math.abs(b[1] - yDritta) < 0.15, `l'altro capo sul bordo delle corsie dritte (${b[1].toFixed(2)}, bordo ${yDritta})`);
+  }
+  // Una ogni due metri e mezzo lungo la rampa.
+  const xs = strisce.map(([a]) => a[0]).sort((u, v) => u - v);
+  for (let k = 1; k < xs.length; k++) assert.ok(xs[k] - xs[k - 1] < 3, `fra due strisce ${(xs[k] - xs[k - 1]).toFixed(1)} m`);
+  // La riga che chiude il cuneo dalla parte di chi va dritto: vernice lungo il suo bordo, dove ci sono le strisce.
+  const xm = (xs[0] + xs.at(-1)) / 2;
+  let riga = false;
+  for (let i = 0; i < p.length; i += 3) if (Math.abs(p[i] - xm) < 3 && Math.abs(p[i + 1] - yDritta) < 0.01) riga = true;
+  assert.ok(riga, 'la riga di bordo del cuneo lungo le corsie dritte');
+});
+
+test('i capi delle vie tagliati come la via in cui continuano: niente denti né tacche', () => {
+  const chiave = (q) => Math.round(q[0] * 2) + ',' + Math.round(q[1] * 2);
+  const prepara = (strade) => {
+    const tocchi = new Map();
+    strade.forEach((v, i) =>
+      v.xyVia.forEach((q, k) => {
+        if (!tocchi.has(chiave(q))) tocchi.set(chiave(q), []);
+        tocchi.get(chiave(q)).push({ i, k });
+      }),
+    );
+    const ricche = strade.map((v) => lineaRicca(v.xy, v.h));
+    allineaICapi(strade, ricche, tocchi, chiave);
+    return ricche;
+  };
+  const uguali = (a, b) => Math.abs(a[3] - b[3]) < 1e-9 && Math.abs(a[4] - b[4]) < 1e-9;
+  // La stessa strada spezzata in due, che piega di venti gradi: i due capi lungo la bisettrice.
+  const g = (20 * Math.PI) / 180;
+  const [a, b] = prepara([
+    via({ id: 1, hw: 'secondary' }, [[-100, 0], [0, 0]]),
+    via({ id: 2, hw: 'secondary' }, [[0, 0], [100 * Math.cos(g), 100 * Math.sin(g)]]),
+  ]);
+  assert.ok(uguali(a.at(-1), b[0]), 'lo stesso taglio per tutte e due');
+  assert.ok(Math.abs(Math.atan2(a.at(-1)[4], a.at(-1)[3]) - (Math.PI / 2 + g / 2)) < 1e-6, 'la bisettrice');
+  assert.deepEqual([a[0][3], a[0][4]], [-0, 1], 'il capo libero resta di traverso alla sua via');
+  // Anche se la seconda è scritta al contrario: stesso taglio, ognuna col suo verso.
+  const [c, d] = prepara([
+    via({ id: 1, hw: 'secondary' }, [[-100, 0], [0, 0]]),
+    via({ id: 2, hw: 'secondary' }, [[100 * Math.cos(g), 100 * Math.sin(g)], [0, 0]]),
+  ]);
+  assert.ok(Math.abs(c.at(-1)[3] + d.at(-1)[3]) < 1e-9 && Math.abs(c.at(-1)[4] + d.at(-1)[4]) < 1e-9, 'la stessa linea, al contrario');
+  // Una rampa che entra di sbieco in una carreggiata (in un suo nodo di mezzo, o al capo): tagliata come lei.
+  const [carreggiata, rampa] = prepara([
+    via({ id: 1, hw: 'trunk', oneway: 'yes', lanes: '2' }, [[-100, 0], [0, 0], [100, 0]]),
+    via({ id: 2, hw: 'trunk_link', oneway: 'yes' }, [[-80, -30], [0, 0]]),
+  ]);
+  assert.deepEqual([rampa.at(-1)[3], rampa.at(-1)[4]], [carreggiata[1][3], carreggiata[1][4]]);
+  assert.deepEqual([carreggiata[1][3], carreggiata[1][4]], [-0, 1], 'la carreggiata non cambia');
+  // Dove la carreggiata si divide in due, chi arriva non si gira verso nessuno dei due rami.
+  const [arriva, dritta, esce] = prepara([
+    via({ id: 1, hw: 'motorway', oneway: 'yes', lanes: '3' }, [[-100, 0], [0, 0]]),
+    via({ id: 2, hw: 'motorway', oneway: 'yes', lanes: '2' }, [[0, 0], [100, 0]]),
+    via({ id: 3, hw: 'motorway_link', oneway: 'yes' }, [[0, 0], [100, -20]]),
+  ]);
+  assert.deepEqual([arriva.at(-1)[3], arriva.at(-1)[4]], [-0, 1]);
+  assert.ok(uguali(esce[0], arriva.at(-1)) && uguali(dritta[0], arriva.at(-1)), 'i due rami partono tagliati come chi arriva');
+  // Un incrocio ad angolo retto non si tocca.
+  const [e, f] = prepara([
+    via({ id: 1, hw: 'tertiary', oneway: 'yes' }, [[-100, 0], [0, 0]]),
+    via({ id: 2, hw: 'tertiary', oneway: 'yes' }, [[0, 0], [0, 100]]),
+  ]);
+  assert.deepEqual([e.at(-1)[3], e.at(-1)[4]], [-0, 1]);
+  assert.ok(Math.abs(f[0][3] + 1) < 1e-9);
+});
+
+test('una via che continua in una più stretta: il bordo dell’asfalto rientra piano, senza tacca', () => {
+  // Una superstrada a senso unico (un metro e mezzo di banchina a destra) diventa una via di città.
+  const larga = via({ id: 1, hw: 'trunk', oneway: 'yes', lanes: '1' }, [
+    [-200, 0],
+    [0, 0],
+  ]);
+  const stretta = via({ id: 2, hw: 'secondary', oneway: 'yes', lanes: '1' }, [
+    [0, 0],
+    [200, 0],
+  ]);
+  assert.ok(larga.margini[1] - stretta.margini[1] > 1);
+  const sg = costruisciSegnaletica({ strade: [larga, stretta], meta: 1000 });
+  // Il bordo destro dell'asfalto a ogni x: il vertice più a destra (y più bassa) lì attorno.
+  const destroA = (x) => {
+    const zz = [];
+    for (let y = -0.5; y > -8; y -= 0.05) if (asfaltoSotto(sg, x, y).length) zz.push(y);
+    return Math.min(...zz);
+  };
+  const lontano = destroA(-100);
+  const dopo = destroA(50);
+  assert.ok(lontano < dopo - 1, `la superstrada è più larga (${lontano} contro ${dopo})`);
+  // Niente scalino: fra un metro prima e un metro dopo il nodo il bordo non salta.
+  assert.ok(Math.abs(destroA(-1) - destroA(1)) < 0.2, `al nodo ${destroA(-1).toFixed(2)} e ${destroA(1).toFixed(2)}`);
+  // E rientra piano: mai più di mezzo metro in cinque metri.
+  for (let x = -40; x < 0; x += 5) assert.ok(Math.abs(destroA(x + 5) - destroA(x)) < 0.5, `fra ${x} e ${x + 5}: ${destroA(x).toFixed(2)} → ${destroA(x + 5).toFixed(2)}`);
+  // A trenta metri e più dal nodo è larga com'era.
+  assert.ok(Math.abs(destroA(-35) - lontano) < 0.06);
+  // La via stretta non cambia; due vie uguali nemmeno.
+  const uguali = [via({ id: 1, hw: 'secondary' }, [[-100, 0], [0, 0]]), via({ id: 2, hw: 'secondary' }, [[0, 0], [100, 0]])];
+  const chiave = (q) => Math.round(q[0] * 2) + ',' + Math.round(q[1] * 2);
+  const tocchi = new Map();
+  uguali.forEach((v, i) => v.xyVia.forEach((q, k) => tocchi.set(chiave(q), [...(tocchi.get(chiave(q)) ?? []), { i, k }])));
+  const bordi = uguali.map((v) => [bordiCorsie(v).sinistra + v.margini[0], bordiCorsie(v).destra - v.margini[1]]);
+  assert.deepEqual(rastrematureDeiCapi(uguali, uguali.map((v) => lineaRicca(v.xy, v.h)), bordi, tocchi, chiave), [null, null]);
+});
+
+test('una rampa con la banchina che entra in una strada senza: il suo bordo rientra piano fino al nodo', () => {
+  // Due sensi unici si uniscono in (0, 0) in una strada a due corsie senza banchina:
+  // quello di destra è una superstrada a una corsia, con un metro e mezzo di banchina.
+  const strade = [
+    { id: 1, hw: 'trunk', oneway: 'yes', lanes: '1', g: [-300, -40, -150, -8, 0, 0] },
+    { id: 2, hw: 'primary', oneway: 'yes', lanes: '1', g: [-300, 40, -150, 8, 0, 0] },
+    { id: 3, hw: 'primary', oneway: 'yes', lanes: '2', g: [0, 0, 300, 0] },
+  ];
+  const pronte = preparaCorsie({ strade: strade.map((s) => ({ ...s, g: s.g.map((v, k) => (k % 2 ? v / 111195 : v / 111195)) })) });
+  const vie = pronte.strade.map((v) => {
+    const xy = [];
+    for (let i = 0; i < v.ll.length; i += 2) xy.push([v.ll[i] * 111195, v.ll[i + 1] * 111195]);
+    const xyVia = [];
+    for (let i = 0; i < v.llVia.length; i += 2) xyVia.push([v.llVia[i] * 111195, v.llVia[i + 1] * 111195]);
+    return { ...v, xy, xyVia, h: xy.map(() => 0) };
+  });
+  const sg = costruisciSegnaletica({ strade: vie, meta: 2000 });
+  // Il bordo destro di tutto l'asfalto a ogni x (il punto più a sud con l'asfalto sotto).
+  const destroA = (x) => {
+    let giu = null;
+    for (let y = 2; y > -14; y -= 0.05) if (asfaltoSotto(sg, x, y).length) giu = y;
+    return giu;
+  };
+  assert.ok(Math.abs(destroA(-1.5) - destroA(1.5)) < 0.3, `al nodo nessuno scalino: ${destroA(-1.5).toFixed(2)} e ${destroA(1.5).toFixed(2)}`);
+  for (let x = -40; x < 0; x += 4) assert.ok(Math.abs(destroA(x + 4) - destroA(x)) < 0.75, `fra ${x} e ${x + 4}: ${destroA(x).toFixed(2)} → ${destroA(x + 4).toFixed(2)}`);
 });

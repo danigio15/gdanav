@@ -280,7 +280,12 @@ export function grafoStrade(strade, metri) {
     const p = r.p;
     const grandi = p.class !== 'minor' && p.class !== 'service';
     const passo = grandi ? PASSO_FITTO : PASSO_RADO;
-    const idx = r.g.map(([x, y]) => nodoPer(x, y));
+    /* Mai due volte di fila lo stesso nodo. Due archi di [arrotonda] uno dopo
+     * l'altro si toccano a metà del tratto, e quel punto arrivava doppio: un
+     * tratto lungo zero, senza direzione, dove il bordo della strada usciva
+     * del doppio («lame» e spuntoni di parapetto, di muro e d'impalcato a
+     * ogni curva stretta delle rampe). */
+    const idx = r.g.map(([x, y]) => nodoPer(x, y)).filter((i, k, tutti) => k === 0 || i !== tutti[k - 1]);
     const pieno = [idx[0]];
     for (let k = 1; k < idx.length; k++) {
       const a = nodi[idx[k - 1]];

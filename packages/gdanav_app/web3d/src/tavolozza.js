@@ -84,6 +84,9 @@ export const CORSIE = {
   asfaltoGrande: '#2B3648',
   asfaltoPonte: '#3A465B',
   asfaltoPonteGrande: '#374359',
+  // Le strade di servizio (piazzali, parcheggi, accessi): senza corsie, in
+  // secondo piano, fra il suolo e i marciapiedi.
+  asfaltoServizio: '#B3BAC6',
   righe: '#F7F9FC',
   facciata: '#ECEEF1',
   tetto: '#FBFCFD',
@@ -102,6 +105,7 @@ export const CORSIE_NOTTE = {
   asfaltoGrande: '#182030',
   asfaltoPonte: '#252E40',
   asfaltoPonteGrande: '#232C3E',
+  asfaltoServizio: '#2C3547',
   righe: '#E8EDF5',
   facciata: '#5A6274',
   tetto: '#6A7286',
