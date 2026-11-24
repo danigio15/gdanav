@@ -252,3 +252,17 @@ test('le curve arrotondate: niente spigoli, gli incroci restano dove sono', () =
   const f = arrotonda([[0, 0], [100, 0], [100, 100]], 35, 1, (q) => q[0] === 100 && q[1] === 0);
   assert.deepEqual(f, [[0, 0], [100, 0], [100, 100]]);
 });
+
+test('due curve di fila: mai due volte lo stesso nodo (un tratto lungo zero)', () => {
+  // Due archi che si toccano a metà del tratto: quel punto arrivava doppio, e
+  // lì i bordi, i parapetti e l'impalcato della rampa uscivano a spuntone.
+  const mezzoMetro = (x, y) => [x * 0.5, -y * 0.5];
+  const g = grafoStrade([{ p: { class: 'motorway', ramp: 1 }, g: [[0, 0], [40, 0], [60, 20], [60, 60], [80, 80], [120, 80]] }], mezzoMetro);
+  const f = g.feats[0];
+  for (let k = 1; k < f.nodi.length; k++) {
+    const a = g.nodi[f.nodi[k - 1]];
+    const b = g.nodi[f.nodi[k]];
+    assert.notEqual(f.nodi[k], f.nodi[k - 1], `il nodo ${k} è quello di prima`);
+    assert.ok(Math.hypot(b.x - a.x, b.y - a.y) > 1e-3, `il tratto ${k} è lungo zero`);
+  }
+});

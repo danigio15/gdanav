@@ -35,7 +35,13 @@
 //    di una via; scalino-mappa, compenetrati, corsie-compenetrate, pilone:
 //    quelli di `verifica-strade.mjs`;
 // e) segnaletica-fuori: righe, frecce, strisce fuori dalla carreggiata;
-//    segnaletica-sospesa: più in alto (o più in basso) dell'asfalto.
+//    segnaletica-sospesa: più in alto (o più in basso) dell'asfalto;
+// f) opere-sulla-carreggiata: il cemento dei ponti (parapetti, muri,
+//    spalle, il piano dell'impalcato) che spunta dall'asfalto delle corsie,
+//    a più di 80 cm dal bordo: un parapetto di traverso, una spalla che
+//    esce dalla strada; opere-a-spuntone: un triangolo in piano delle
+//    opere (il ventre, il cordolo) che esce di più di tre metri da ogni
+//    strada disegnata.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -663,6 +669,36 @@ export function difetti(T) {
         for (const [r, k] of gC.vicini(c[0], c[1], 0)) fuori = Math.min(fuori, sulTratto(c, r.p[k - 1], r.p[k]).d - r.largo);
         metti('segnaletica-fuori', c[0], c[1], c[2], Number.isFinite(fuori) ? fuori : 5, `${Number.isFinite(fuori) ? fuori.toFixed(1) : '?'} m fuori`);
       } else metti('segnaletica-sospesa', c[0], c[1], c[2], Math.abs(su.dh), `${su.dh.toFixed(2)} m dall'asfalto (${su.r.v.hw} ${su.r.v.id})`);
+    }
+  }
+
+  // ── f) Le opere sull'asfalto delle corsie, o a spuntone ────────────────
+  {
+    const visti = new Set();
+    for (const tri of triangoli(t.opere)) {
+      const c = baricentro(tri);
+      if (!dentro(c[0], c[1])) continue;
+      const alto = Math.max(tri[0][2], tri[1][2], tri[2][2]);
+      const kk = Math.round(c[0] / 2) + ',' + Math.round(c[1] / 2);
+      // Ben dentro l'asfalto (80 cm dal bordo), e da un palmo a due metri e mezzo sopra.
+      const su = sullAsfalto(c[0], c[1], alto, -0.8, 2.8);
+      if (su && !visti.has(kk)) {
+        const sopra = su.dh - sopraAsfalto(su.r.v, () => 0.2);
+        if (sopra > 0.08 && sopra < 2.5) {
+          visti.add(kk);
+          metti('opere-sulla-carreggiata', c[0], c[1], alto, sopra, `${sopra.toFixed(2)} m sopra l'asfalto (${su.r.v.hw} ${su.r.v.id})`);
+        }
+      }
+      // Un triangolo in piano lontano da ogni strada: uno spuntone.
+      if (alto - Math.min(tri[0][2], tri[1][2], tri[2][2]) > 0.3 || areaDi(tri) < 2) continue;
+      let fuori = 0;
+      for (const q of tri) {
+        let d = Infinity;
+        for (const [r, k] of gC.vicini(q[0], q[1], 12)) d = Math.min(d, sulTratto(q, r.p[k - 1], r.p[k]).d - r.largo);
+        for (const [f, a, b] of gFeat.vicini(q[0], q[1], 12)) d = Math.min(d, sulTratto(q, a, b).d - f.w / 2);
+        fuori = Math.max(fuori, d);
+      }
+      if (fuori > 3 && Number.isFinite(fuori)) metti('opere-a-spuntone', c[0], c[1], alto, fuori, `${fuori.toFixed(1)} m fuori da ogni strada, ${areaDi(tri).toFixed(0)} m²`);
     }
   }
   return { difetti: out, conCorsie: true };

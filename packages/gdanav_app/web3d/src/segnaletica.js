@@ -13,6 +13,8 @@ import { bordiCorsie, centroCorsia, larghezzaCorsie, normali, progressive } from
 import { ritagliaLinea } from './ritaglio.js';
 
 
+/** Quanto le strisce (asfalto, righe) vanno oltre il bordo della tessera (m): vedi [striscia]. */
+export const SORMONTO_M = 0.25;
 /** Più lunga di così una zebratura non è (m): oltre è una carreggiata a parte. */
 const ZEBRATURA_AL_PIU_M = 150;
 /** E fin dove i due rami sono così lontani (m). */
@@ -228,7 +230,15 @@ export function pezzoFra(r, s0, s1) {
 export function striscia(c, r, oa, ob, dz, meta) {
   const fa = typeof oa === 'function' ? oa : () => oa;
   const fb = typeof ob === 'function' ? ob : () => ob;
-  for (const pezzo of ritagliaLinea(r, -meta, -meta, meta, meta)) {
+  /* Un palmo oltre il bordo della tessera. «Righe sottili di traverso sulla
+   * carreggiata»: la striscia finisce di traverso alla via nel punto dove la
+   * sua linea esce dalla tessera, e la tessera accanto riparte da lì; ma in
+   * curva le due non hanno gli stessi punti (ognuna tiene quelli che servono
+   * alle sue quote), i due tagli non sono proprio paralleli, e dalla parte
+   * di fuori restava una fessura a cuneo da cui si vedeva quello che c'è
+   * sotto. Così le due strisce si sormontano. */
+  const m = meta + SORMONTO_M;
+  for (const pezzo of ritagliaLinea(r, -m, -m, m, m)) {
     if (pezzo.length < 2) continue;
     const base = c.vertici;
     for (const p of pezzo) {
@@ -423,7 +433,7 @@ export function asfaltoDelleVie(strade, ricche, bordi, cella = 16) {
       const by = b[1] + (b[4] / nb) * oc;
       const l = Math.hypot(bx - ax, by - ay);
       if (l < 1e-6) continue;
-      const q = { i, ax, ay, bx, by, l, tx: (bx - ax) / l, ty: (by - ay) / l, mezza, h: (a[2] + b[2]) / 2 };
+      const q = { i, ax, ay, bx, by, l, tx: (bx - ax) / l, ty: (by - ay) / l, mezza, h: (a[2] + b[2]) / 2, ha: a[2], hb: b[2] };
       const n = pezzi.push(q) - 1;
       const m = mezza + 1;
       for (let cx = Math.floor((Math.min(ax, bx) - m) / cella); cx <= Math.floor((Math.max(ax, bx) + m) / cella); cx++) {
@@ -443,6 +453,21 @@ export function asfaltoDelleVie(strade, ricche, bordi, cella = 16) {
         if (q.i === salvo || Math.abs(q.h - h) > 2.5) continue;
         const u = Math.max(0, Math.min(q.l, (x - q.ax) * q.tx + (y - q.ay) * q.ty));
         if (Math.hypot(x - q.ax - q.tx * u, y - q.ay - q.ty * u) < q.mezza + margine) return q;
+      }
+      return null;
+    },
+    /**
+     * Come [sotto], ma solo sulla striscia vera: fra i due capi del tratto
+     * (non nel mezzo disco oltre il capo) e fra i due bordi. Restituisce il
+     * tratto e `quota`, quella della via in quel punto.
+     */
+    sullaStriscia(x, y, h, salvo, margine = 0) {
+      for (const n of griglia.get(Math.floor(x / cella) * 100003 + Math.floor(y / cella)) ?? []) {
+        const q = pezzi[n];
+        if (q.i === salvo || Math.abs(q.h - h) > 2.5) continue;
+        const u = (x - q.ax) * q.tx + (y - q.ay) * q.ty;
+        if (u < -0.02 || u > q.l + 0.02) continue;
+        if (Math.abs((x - q.ax) * q.ty - (y - q.ay) * q.tx) < q.mezza + margine) return { ...q, quota: q.ha + ((q.hb - q.ha) * Math.max(0, Math.min(q.l, u))) / q.l };
       }
       return null;
     },
@@ -786,6 +811,157 @@ export function angoloMarciapiede(A, Bv, strade, ricche, bordi, sopra, asfalto) 
   return { a, b, C, riempi, zC: (punti[0].zb + punti[N].zb) / 2, punti };
 }
 
+/** Su quanti metri, al più, l'asfalto di una via si stringe verso quello della via in cui continua. */
+const RASTREMA_M = 30;
+
+/**
+ * Dove una via continua in un'altra con l'asfalto più stretto, il suo bordo
+ * le va incontro piano invece di finire a scalino.
+ *
+ * «L'asfalto a destra fa una tacca»: una superstrada con la sua banchina che
+ * diventa una strada di città (in OpenStreetMap cambia classe in un nodo), o
+ * una carreggiata che perde la corsia di emergenza: il bordo dell'asfalto
+ * rientrava di colpo, di un metro e più. Negli ultimi [RASTREMA_M] metri
+ * (meno, su una via corta) il bordo più largo si stringe fino a quello della
+ * via dopo; quello più stretto resta dov'è. Solo fra due capi soli in un
+ * nodo, quasi dritti (la stessa strada), e per differenze da banchina (le
+ * corsie che cambiano le mettono in fila i raccordi).
+ *
+ * Restituisce, per ogni via che si stringe, `{sinistra(s), destra(s),
+ * tagli}`: di quanto si spostano i due bordi a [s] metri (a sinistra
+ * positivo), e dove servono dei punti.
+ */
+export function rastrematureDeiCapi(strade, ricche, bordi, tocchi, chiave) {
+  const morbido = (u) => {
+    const t = Math.max(0, Math.min(1, u));
+    return t * t * (3 - 2 * t);
+  };
+  const out = strade.map(() => null);
+  strade.forEach((v, i) => {
+    const r = ricche[i];
+    const n = v.xyVia.length;
+    if (r.length < 2 || n < 2) return;
+    const L = r[r.length - 1][5];
+    // Per capo: di quanto rientrano il bordo sinistro e il destro, e in quanti metri.
+    const capi = [null, null];
+    for (const fine of [0, 1]) {
+      const nodo = v.xyVia[fine ? n - 1 : 0];
+      const altri = (tocchi.get(chiave(nodo)) ?? []).filter((t) => t.i !== i);
+      if (altri.length !== 1) continue;
+      const o = altri[0];
+      const ro = ricche[o.i];
+      const no = strade[o.i].xyVia.length;
+      if (ro.length < 2 || (o.k !== 0 && o.k !== no - 1)) continue;
+      const mio = r[fine ? r.length - 1 : 0];
+      const suo = ro[o.k ? ro.length - 1 : 0];
+      const norma = (p) => {
+        const l = Math.hypot(p[3], p[4]) || 1;
+        return [p[3] / l, p[4] / l];
+      };
+      const [mx, my] = norma(mio);
+      const [sx, sy] = norma(suo);
+      // La stessa strada: quasi dritta (le normali lungo la stessa linea).
+      const cos = mx * sx + my * sy;
+      if (Math.abs(cos) < 0.94) continue;
+      // I bordi dell'altra visti da questa: il suo mezzo di lato, e girata se va al contrario.
+      const diLato = (suo[0] - mio[0]) * mx + (suo[1] - mio[1]) * my;
+      const [bs, bd] = bordi[o.i];
+      const suoi = cos > 0 ? [diLato + bs, diLato + bd] : [diLato - bd, diLato - bs];
+      const [ms, md] = bordi[i];
+      // Solo dove l'altra è più stretta, e di poco (una banchina, non una corsia).
+      const ds = suoi[0] < ms - 0.15 && ms - suoi[0] < 2.6 ? suoi[0] - ms : 0;
+      const dd = suoi[1] > md + 0.15 && suoi[1] - md < 2.6 ? suoi[1] - md : 0;
+      if (ds || dd) capi[fine] = { ds, dd, t: Math.min(RASTREMA_M, L * 0.45) };
+    }
+    if (!capi[0] && !capi[1]) return;
+    const peso = (sv, fine) => (capi[fine] ? 1 - morbido((fine ? L - sv : sv) / capi[fine].t) : 0);
+    const tagli = [];
+    for (const fine of [0, 1]) {
+      if (!capi[fine]) continue;
+      for (const u of [0.2, 0.4, 0.6, 0.8, 1]) tagli.push(fine ? L - capi[fine].t * u : capi[fine].t * u);
+    }
+    out[i] = {
+      sinistra: (sv) => (capi[0]?.ds ?? 0) * peso(sv, 0) + (capi[1]?.ds ?? 0) * peso(sv, 1),
+      destra: (sv) => (capi[0]?.dd ?? 0) * peso(sv, 0) + (capi[1]?.dd ?? 0) * peso(sv, 1),
+      tagli,
+    };
+  });
+  return out;
+}
+
+/**
+ * Di quanto, al più, si gira il taglio in capo a una via per allinearlo a
+ * quella in cui continua (il coseno: trenta gradi). Di più è un incrocio; e
+ * girato tanto il capo si stringerebbe troppo.
+ */
+const ALLINEA_COS = Math.cos((30 * Math.PI) / 180);
+
+/**
+ * I capi delle vie tagliati come la via in cui continuano.
+ *
+ * «La carreggiata con rientranze e gradini»: ogni striscia d'asfalto finisce
+ * di traverso alla *sua* via. Dove una rampa entra di sbieco in una
+ * carreggiata, o una via continua in un'altra piegando, i due tagli non
+ * combaciano: da una parte lo spigolo della rampa sporge dal bordo della
+ * carreggiata (un dente), dall'altra resta una tacca. Qui il capo di una via
+ * si taglia invece lungo la stessa linea della via in cui continua:
+ *  - due capi soli in un nodo (la stessa strada, spezzata lì): tutti e due
+ *    lungo la bisettrice, come una cornice;
+ *  - un ramo a senso unico che entra in una carreggiata o ne esce (l'altra
+ *    via lì continua da sola, o ci passa): il ramo come la carreggiata.
+ * Cambia le normali ai capi delle linee ricche [ricche] (i bordi, le righe e
+ * i marciapiedi le seguono). [tocchi]: chi tocca ogni nodo (`{i, k}` per
+ * [chiave] del punto di `xyVia`).
+ */
+export function allineaICapi(strade, ricche, tocchi, chiave) {
+  // La normale della linea ricca [r] nel punto più vicino a [q].
+  const normaleA = (r, q) => {
+    let meglio = r[0];
+    let d = Infinity;
+    for (const p of r) {
+      const dd = Math.hypot(p[0] - q[0], p[1] - q[1]);
+      if (dd < d) [d, meglio] = [dd, p];
+    }
+    const l = Math.hypot(meglio[3], meglio[4]) || 1;
+    return [meglio[3] / l, meglio[4] / l];
+  };
+  const nuove = [];
+  strade.forEach((v, i) => {
+    const r = ricche[i];
+    const n = v.xyVia.length;
+    if (r.length < 2 || n < 2) return;
+    for (const fine of [0, 1]) {
+      const nodo = v.xyVia[fine ? n - 1 : 0];
+      const altri = (tocchi.get(chiave(nodo)) ?? []).filter((t) => t.i !== i);
+      if (!altri.length) continue;
+      const mia = r[fine ? r.length - 1 : 0];
+      const capoDi = (t) => t.k === 0 || t.k === strade[t.i].xyVia.length - 1;
+      let nuova = null;
+      if (altri.length === 1 && capoDi(altri[0])) {
+        // La stessa strada che continua: la bisettrice delle due normali (girata come la mia).
+        const o = normaleA(ricche[altri[0].i], nodo);
+        const verso = o[0] * mia[3] + o[1] * mia[4] >= 0 ? 1 : -1;
+        nuova = [mia[3] + o[0] * verso, mia[4] + o[1] * verso];
+      } else if (v.senso) {
+        // Un ramo: la via a senso unico che da qui continua da sola (o che qui passa).
+        const dopo = altri.filter((t) => strade[t.i].senso && (fine ? t.k < strade[t.i].xyVia.length - 1 : t.k > 0));
+        if (dopo.length === 1) nuova = normaleA(ricche[dopo[0].i], nodo);
+      }
+      if (!nuova) continue;
+      const l = Math.hypot(nuova[0], nuova[1]);
+      if (l < 1e-6) continue;
+      const cos = (nuova[0] * mia[3] + nuova[1] * mia[4]) / l;
+      if (cos < ALLINEA_COS) continue;
+      nuove.push([mia, nuova[0] / l, nuova[1] / l]);
+    }
+  });
+  // Tutte insieme: ognuna guarda le altre com'erano.
+  for (const [p, nx, ny] of nuove) {
+    p[3] = nx;
+    p[4] = ny;
+  }
+}
+
 /**
  * La segnaletica di una tessera. [strade]: le vie (vedi `normalizza` in
  * corsie.js) con `xy` (la geometria da disegnare, metri della tessera),
@@ -865,10 +1041,12 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
 
   // Le linee da disegnare e l'asfalto di tutte (per dove il marciapiede non va).
   const ricche = strade.map((v) => lineaRicca(v.xy, v.h));
+  allineaICapi(strade, ricche, tocchi, chiave);
   const bordiAsfalto = strade.map((v) => {
     const B = bordiCorsie(v);
     return [B.sinistra + v.margini[0], B.destra - v.margini[1]];
   });
+  const rastremature = rastrematureDeiCapi(strade, ricche, bordiAsfalto, tocchi, chiave);
   let copertura = null;
   // I pezzi a senso unico corti attaccati ad altre vie ai due capi: dentro l'incrocio.
   const dentroLIncrocio = (v, i) => {
@@ -969,7 +1147,12 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
     // Coi punti che servono (dopo i raccordi uno ogni quattro metri anche
     // sulle vie dritte): i triangoli risparmiati qui e nelle righe pagano
     // gli angoli tondi dei marciapiedi.
-    striscia(asfalto, semplificaPezzo(r, B.sinistra + mS, B.destra - mD, SEMPLIFICA_M * 0.75), B.sinistra + mS, B.destra - mD, z0, meta);
+    const stretta = rastremature[i];
+    if (stretta) {
+      // Con dei punti lungo la rastrematura (su un rettilineo la via ne ha due soli).
+      const { pz, fissi } = pezzoConTagli(r, 0, L, stretta.tagli);
+      striscia(asfalto, semplificaPezzo(pz, B.sinistra + mS, B.destra - mD, SEMPLIFICA_M * 0.75, fissi), (sv) => B.sinistra + mS + stretta.sinistra(sv), (sv) => B.destra - mD + stretta.destra(sv), z0, meta);
+    } else striscia(asfalto, semplificaPezzo(r, B.sinistra + mS, B.destra - mD, SEMPLIFICA_M * 0.75), B.sinistra + mS, B.destra - mD, z0, meta);
     // I capi tondi: dove due vie si incontrano di sbieco non resta un dente.
     for (const fine of [0, 1]) {
       const p = r[fine ? r.length - 1 : 0];
@@ -977,8 +1160,11 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       const nl = Math.hypot(p[3], p[4]) || 1;
       const nx = p[3] / nl;
       const ny = p[4] / nl;
-      const oc = (B.sinistra + mS + B.destra - mD) / 2;
-      const rad = (B.sinistra + mS - (B.destra - mD)) / 2;
+      // (Coi bordi com'è l'asfalto lì: rastremato, se continua in una via più stretta.)
+      const bordoS = B.sinistra + mS + (stretta?.sinistra(p[5]) ?? 0);
+      const bordoD = B.destra - mD + (stretta?.destra(p[5]) ?? 0);
+      const oc = (bordoS + bordoD) / 2;
+      const rad = (bordoS - bordoD) / 2;
       const cx = p[0] + nx * oc;
       const cy = p[1] + ny * oc;
       // Verso fuori: avanti alla fine, indietro all'inizio.
@@ -987,13 +1173,23 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       const N = 6;
       // Dove il capo sta tutto sull'asfalto di un'altra via (la via che
       // continua, quella in cui sbocca) non serve: triangoli risparmiati.
+      //
+      // Sulla sua striscia vera, però. «Righe sottili di traverso sulla
+      // carreggiata»: dove una via continua in un'altra piegando appena, fra
+      // le due strisce resta uno spicchio aperto dalla parte di fuori della
+      // piega, e il capo tondo è lì per chiuderlo. Ma per sapere se il capo
+      // serviva si guardava l'asfalto dell'altra via col suo mezzo disco in
+      // fondo, cioè proprio col capo tondo che anche lei, per la stessa
+      // ragione, non faceva: nessuna delle due chiudeva lo spicchio, e dalla
+      // fessura si vedeva quello che c'è sotto (il cemento della spalla del
+      // ponte, una lama chiara).
       copertura ??= asfaltoDelleVie(strade, ricche, bordiAsfalto);
-      let coperto = !!copertura.sotto(cx, cy, p[2], i, 0);
+      let coperto = !!copertura.sullaStriscia(cx, cy, p[2], i);
       for (let j = 0; j <= N && coperto; j++) {
         const a = -Math.PI / 2 + (Math.PI * j) / N;
         const ux = Math.cos(a) * fx - Math.sin(a) * fy;
         const uy = Math.cos(a) * fy + Math.sin(a) * fx;
-        coperto = !!copertura.sotto(cx + ux * (rad - 0.15), cy + uy * (rad - 0.15), p[2], i, 0);
+        coperto = !!copertura.sullaStriscia(cx + ux * (rad - 0.15), cy + uy * (rad - 0.15), p[2], i);
       }
       if (coperto) continue;
       /* Dove la via finisce su un'altra che passa (un incrocio a T, o più
@@ -1021,7 +1217,14 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
             }
           }
         }
-        giro.push(asfalto.v(cx + ux * rr, cy + uy * rr, p[2] + z0 - 0.004, 0, 0, 1));
+        /* Dove il capo finisce sopra un'altra via le sta appena sotto, alla
+         * sua quota: in piano alla quota del capo, il mezzo disco di un ponte
+         * copriva le righe della rampa che da lì scende (e più in là stava
+         * sospeso un palmo sopra il suo asfalto). */
+        let z = p[2] + z0 - 0.004;
+        const sotto = copertura.sullaStriscia(cx + ux * rr, cy + uy * rr, p[2], i);
+        if (sotto) z = Math.min(z, sotto.quota + sopraAsfalto(strade[sotto.i], sopra) - 0.004);
+        giro.push(asfalto.v(cx + ux * rr, cy + uy * rr, z, 0, 0, 1));
       }
       for (let j = 1; j <= N; j++) {
         // Girati in su (verso antiorario visto dall'alto).
@@ -1206,8 +1409,8 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
     // e finivano proprio dove il triangolo cominciava.
     let gPrima = -Infinity;
     let aperto = null;
-    // L'ultimo paio di bordi, per l'asfalto sotto le strisce.
-    let paio = null;
+    // Le coppie di bordi del triangolo, da dove si apre: `{P, Q, g, s}`.
+    const coppie = [];
     for (let s = 3; s < Math.min(LD, ZEBRATURA_AL_PIU_M); s += 2.5) {
       const P = puntoA(rD, s, bD);
       let Q = null;
@@ -1238,21 +1441,58 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       gPrima = Math.max(gPrima, g);
       // Dove un ramo sale e l'altro no, il triangolo è finito (niente strisce sospese).
       if (Math.abs(P[2] - Q[2]) > 0.4) break;
+      coppie.push({ P, Q, g, s });
+    }
+    /* La forma della zebratura.
+     *
+     * «Ventagli di zebrature»: erano poche strisce lunghe, una ogni cinque
+     * metri, tirate dal bordo della rampa verso l'altro ramo senza arrivarci
+     * e senza niente attorno: dove l'altro ramo entra subito in una
+     * carreggiata larga, sbarre bianche sparse su un mare d'asfalto. Come
+     * sulla strada: il cuneo chiuso dalle due righe di bordo (quella del ramo
+     * di sinistra spesso non c'è più: sta sull'asfalto della carreggiata in
+     * cui entra, vedi `sullAltra`), e dentro le strisce di sbieco, fitte, da
+     * una riga all'altra e non oltre. */
+    const zVernice = (c) => Math.max(c.P[2], c.Q[2]) + dz;
+    // Il bordo di sinistra del cuneo a [sv] metri lungo il ramo di destra (fra una coppia e l'altra).
+    const sinistraA = (sv) => {
+      let k = 1;
+      while (k < coppie.length - 1 && coppie[k].s < sv) k++;
+      const [a, b] = [coppie[k - 1], coppie[k]];
+      const t = Math.max(0, Math.min(1, (sv - a.s) / (b.s - a.s)));
+      return [a.Q[0] + (b.Q[0] - a.Q[0]) * t, a.Q[1] + (b.Q[1] - a.Q[1]) * t];
+    };
+    for (let k = 1; k < coppie.length; k++) {
+      const [prima, ora] = [coppie[k - 1], coppie[k]];
+      const { P, Q, g } = ora;
+      if (!dentro(P[0], P[1])) continue;
       /* L'asfalto fra i due bordi, sotto le strisce: la zebratura è dipinta
        * sull'asfalto. Prima le strisce del triangolo stavano sul prato fra
        * le due carreggiate (fuori dal loro asfalto anche di due metri). */
-      if (paio && dentro(P[0], P[1])) {
-        const za = Math.max(paio[0][2], paio[1][2]) + dz - 0.026;
-        const zb = Math.max(P[2], Q[2]) + dz - 0.026;
-        asfalto.quad([paio[1][0], paio[1][1], za], [paio[0][0], paio[0][1], za], [P[0], P[1], zb], [Q[0], Q[1], zb], [0, 0, 1]);
+      const za = zVernice(prima) - 0.026;
+      const zb = zVernice(ora) - 0.026;
+      asfalto.quad([prima.Q[0], prima.Q[1], za], [prima.P[0], prima.P[1], za], [P[0], P[1], zb], [Q[0], Q[1], zb], [0, 0, 1]);
+      // Le due righe che chiudono il cuneo, dove starebbero quelle di bordo dei due rami.
+      const wB = RIGHE.bordo;
+      for (const [x, verso] of [
+        ['P', -1],
+        ['Q', 1],
+      ]) {
+        const [a, b] = [prima[x], ora[x]];
+        // A sinistra di chi va: (-ty, tx). Il ramo di destra sta a destra del suo bordo, quello di sinistra a sinistra.
+        const A = [a[0] - a[4] * wB * verso, a[1] + a[3] * wB * verso];
+        const Bq = [b[0] - b[4] * wB * verso, b[1] + b[3] * wB * verso];
+        const z0 = zVernice(prima);
+        const z1 = zVernice(ora);
+        if (verso > 0) vernice.quad([a[0], a[1], z0], [b[0], b[1], z1], [Bq[0], Bq[1], z1], [A[0], A[1], z0], [0, 0, 1]);
+        else vernice.quad([A[0], A[1], z0], [Bq[0], Bq[1], z1], [b[0], b[1], z1], [a[0], a[1], z0], [0, 0, 1]);
       }
-      paio = [P, Q];
-      if (!dentro(P[0], P[1]) || (s - aperto) % 5 > 0.01) continue;
-      // Di sbieco: dal bordo della rampa indietro verso la punta del triangolo.
-      const qx = P[0] - ty * g - tx * g * 0.8;
-      const qy = P[1] + tx * g - ty * g * 0.8;
+      // La striscia: dal bordo della rampa indietro, di sbieco, fino all'altro bordo.
+      const [tx, ty] = [P[3], P[4]];
+      const [qx, qy] = sinistraA(ora.s - g);
+      if (Math.hypot(qx - P[0], qy - P[1]) < 1.2) continue;
       const w = 0.25;
-      const z = Math.max(P[2], Q[2]) + dz;
+      const z = zVernice(ora);
       vernice.quad([P[0] - tx * w, P[1] - ty * w, z], [P[0] + tx * w, P[1] + ty * w, z], [qx + tx * w, qy + ty * w, z], [qx - tx * w, qy - ty * w, z], [0, 0, 1]);
     }
   }

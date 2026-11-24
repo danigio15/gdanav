@@ -256,7 +256,14 @@ export function margini(v) {
   const esce = ultima.some((f) => f.includes('right'));
   if (v.senso && !raccordo(v.hw) && b === 'motorway') return [0.7, esce ? 0.6 : 3.0];
   if (v.senso && !raccordo(v.hw) && b === 'trunk') return [0.5, esce ? 0.6 : 1.5];
-  if (raccordo(v.hw) && grande(v.hw)) return [0.6, 1.0];
+  /* A doppio senso ogni lato è la destra di chi ci va: la stessa banchina
+   * delle due carreggiate (o delle due rampe) in cui la strada poi si
+   * divide. Con la banchina stretta delle strade di città, dove una
+   * superstrada o una rampa a doppio senso si divideva in due sensi unici
+   * il bordo dell'asfalto faceva uno scalino («l'asfalto spezzato», «una
+   * tacca»). */
+  if (!v.senso && !raccordo(v.hw) && b === 'trunk') return [1.5, 1.5];
+  if (raccordo(v.hw) && grande(v.hw)) return v.senso ? [0.6, 1.0] : [1.0, 1.0];
   return [0.35, 0.35];
 }
 
@@ -511,7 +518,7 @@ export function raccordi(strade) {
     if (!v.senso || v.xy.length < 2) return;
     for (const fine of [0, 1]) {
       const k = chiave(fine ? v.xy[v.xy.length - 1] : v.xy[0]);
-      if (!capi.has(k)) capi.set(k, { entrano: [], escono: [] });
+      if (!capi.has(k)) capi.set(k, { entrano: [], escono: [], passano: [] });
       capi.get(k)[fine ? 'entrano' : 'escono'].push(i);
     }
   });
@@ -554,7 +561,52 @@ export function raccordi(strade) {
     });
     return res;
   };
-  for (const { entrano, escono } of capi.values()) {
+  // La direzione di chi va sulla via [a] dal punto [k] verso [passo] (o ci arriva, con [arriva]).
+  const versoSu = (a, k, passo, arriva) => {
+    const p = a.xy;
+    let j = k;
+    let d = 0;
+    while (j + passo >= 0 && j + passo < p.length && d < 15) {
+      d += Math.hypot(p[j + passo][0] - p[j][0], p[j + passo][1] - p[j][1]);
+      j += passo;
+    }
+    if (j === k) return null;
+    const ang = Math.atan2(p[j][1] - p[k][1], p[j][0] - p[k][0]);
+    return arriva ? ang + Math.PI : ang;
+  };
+  /* Una rampa che entra o esce in un nodo in mezzo alla carreggiata.
+   *
+   * «Righe che convergono a Y, una larga macchia d'asfalto»: OpenStreetMap
+   * non sempre spezza la carreggiata dove una rampa la tocca, e allora lì
+   * non c'è un capo che ne incontra altri due: la rampa arrivava fin sulla
+   * linea di mezzo della carreggiata, di traverso su tutte le sue corsie, coi
+   * suoi bordi che le tagliavano. È lo stesso svincolo: la carreggiata che
+   * passa fa da via che arriva e da via che riparte, e la rampa prende la
+   * corsia dalla sua parte. */
+  strade.forEach((v, i) => {
+    if (!v.senso || v.xy.length < 3) return;
+    for (let k = 1; k < v.xy.length - 1; k++) capi.get(chiave(v.xy[k]))?.passano.push({ i, k });
+  });
+  for (const { entrano, escono, passano } of capi.values()) {
+    if (passano.length === 1 && !entrano.length !== !escono.length) {
+      const { i, k } = passano[0];
+      const t = strade[i];
+      const arriva = versoSu(t, k, -1, true);
+      const riparte = versoSu(t, k, 1, false);
+      if (arriva === null || riparte === null || entrano.includes(i) || escono.includes(i)) continue;
+      const entra = entrano.length > 0;
+      const sp = entra
+        ? blocchi(t, [...entrano, i], (j) => giro((j === i ? arriva : verso(strade[j], false) + Math.PI) - riparte) * -1)
+        : blocchi(t, [...escono, i], (j) => giro((j === i ? riparte : verso(strade[j], true)) - arriva));
+      for (const [j, o] of sp) {
+        const v = strade[j];
+        if (j === i || Math.abs(o) < 0.05) continue;
+        const lungo = Math.min(grande(v.hw) ? RACCORDO_M.grande : RACCORDO_M.altro, lunghezza(v) * 0.6);
+        if (entra) Object.assign(out[j], { o1: o, t1: lungo });
+        else Object.assign(out[j], { o0: o, t0: lungo });
+      }
+      continue;
+    }
     if (!entrano.length || !escono.length) continue;
     if (entrano.length === 1) {
       const a = strade[entrano[0]];
@@ -592,19 +644,6 @@ export function raccordi(strade) {
       tutti.get(kk).push({ i, k });
     });
   });
-  // La direzione di chi va sulla via [a] dal punto [k] verso [passo] (o ci arriva, con [arriva]).
-  const versoSu = (a, k, passo, arriva) => {
-    const p = a.xy;
-    let j = k;
-    let d = 0;
-    while (j + passo >= 0 && j + passo < p.length && d < 15) {
-      d += Math.hypot(p[j + passo][0] - p[j][0], p[j + passo][1] - p[j][1]);
-      j += passo;
-    }
-    if (j === k) return null;
-    const ang = Math.atan2(p[j][1] - p[k][1], p[j][0] - p[k][0]);
-    return arriva ? ang + Math.PI : ang;
-  };
   strade.forEach((v, j) => {
     if (!v.senso || v.xy.length < 2) return;
     for (const fine of [0, 1]) {
