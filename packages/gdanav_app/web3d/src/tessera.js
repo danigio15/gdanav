@@ -38,6 +38,8 @@ const SOPRA_GALLERIA = 0.06;
 
 /** Oltre questa quota (m) una strada non segnata come ponte si disegna come un viadotto. */
 const ALTO_COME_PONTE = 6.5;
+/** Quanto sotto l'asfalto delle corsie resta la cima di una spalla. */
+const SOTTO_L_ASFALTO_M = 0.3;
 
 /** Quanto si allarga la trincea dei binari per metro di profondità (le scarpate); e il rilevato per metro d'altezza. */
 const SCARPATA = 1.5;
@@ -842,7 +844,10 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
             // Con le corsie anche il loro asfalto: le vie vere sono spesso più
             // larghe della strada della mappa, e un parapetto in mezzo a una
             // corsia (fra due rampe che si separano) non c'è.
-            if (suAltraStrada(px, py, q[2], fi) || conCorsie?.inMezzoAllAsfalto(px, py, q[2])) return true;
+            // Basta mezzo metro dentro: il ponte della mappa è spesso più
+            // stretto delle corsie vere, e il suo parapetto correva
+            // sull'asfalto a un metro dal bordo, entrando e uscendo a zig-zag.
+            if (suAltraStrada(px, py, q[2], fi) || conCorsie?.inMezzoAllAsfalto(px, py, q[2], 0.5)) return true;
             // Fra due rampe che si separano, finché sono a meno di due metri
             // l'una dall'altra, c'è la zebratura sull'asfalto, non un muro.
             return suAltraStrada(q[0] + on[0] * 2, q[1] + on[1] * 2, q[2], fi);
@@ -926,7 +931,22 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           let sullaStrada = false;
           for (let q = -1; q <= 1; q += 0.5) if (suStradaATerra(cx0 - P[4] * hw * q, cy0 + P[3] * hw * q, 1)) sullaStrada = true;
           if (sullaStrada) continue;
-          scatola(P[0] + P[3] * 0.7 * dir, P[1] + P[4] * 0.7 * dir, 0, P[2] + zs - 0.1, P[3], P[4], 0.7, hw + 0.35, cCemento);
+          // Nella vista «Corsie» l'asfalto che si vede è quello delle vie
+          // vere, che qui può stare mezzo metro più giù del ponte della
+          // mappa (la sua rampa scende prima): la spalla, larga quanto la
+          // strada, spuntava dall'asfalto — una riga di cemento di traverso
+          // su tutta la carreggiata. Resta sotto l'asfalto che ha sopra.
+          let cima = P[2] + zs - 0.1;
+          if (conCorsie) {
+            for (let q = -1; q <= 1; q += 0.25) {
+              for (const lungoVia of [0, 0.7, 1.4]) {
+                const z = conCorsie.asfaltoQui(P[0] + P[3] * lungoVia * dir - P[4] * (hw + 0.35) * q, P[1] + P[4] * lungoVia * dir + P[3] * (hw + 0.35) * q, P[2]);
+                if (z !== null) cima = Math.min(cima, z - SOTTO_L_ASFALTO_M);
+              }
+            }
+          }
+          if (cima < 1) continue;
+          scatola(P[0] + P[3] * 0.7 * dir, P[1] + P[4] * 0.7 * dir, 0, cima, P[3], P[4], 0.7, hw + 0.35, cCemento);
         }
       }
       // I piloni: ai due lati di ogni strada che passa sotto (mai sopra), e
@@ -2912,9 +2932,26 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
     }
     return false;
   };
+  /**
+   * La quota dell'asfalto delle corsie in (px, py), la più bassa fra le vie
+   * che lì passano a meno di [entro] metri da [h]; `null` fuori dall'asfalto.
+   */
+  const asfaltoQui = (px, py, h, entro = 3) => {
+    let giu = null;
+    for (const [a, b, mezza] of coperte.get(Math.floor(px / G) + ',' + Math.floor(py / G)) ?? []) {
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const l2 = dx * dx + dy * dy || 1e-9;
+      const u = Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / l2));
+      if (Math.hypot(a[0] + dx * u - px, a[1] + dy * u - py) > mezza + 0.6) continue;
+      const z = a[2] + (b[2] - a[2]) * u;
+      if (Math.abs(z - h) < entro && (giu === null || z < giu)) giu = z;
+    }
+    return giu;
+  };
   // Mai sull'asfalto (un nodo messo male, o la strada disegnata più larga).
   const alberi = puntiAlberi.filter((q) => nellaTessera(q) && !sullAsfalto(q[0], q[1])).map((q) => [q[0], q[1], 0.6 + mescola(Math.round(q[0] * 7), Math.round(q[1] * 7)) * 0.25]);
-  return { strade, nodi, copre, doppia, sullAsfalto, inMezzoAllAsfalto, alberi, tettoQui, quotaCorsie };
+  return { strade, nodi, copre, doppia, sullAsfalto, inMezzoAllAsfalto, asfaltoQui, alberi, tettoQui, quotaCorsie };
 }
 
 /** La classe della mappa (OpenMapTiles) di una via di OpenStreetMap. */

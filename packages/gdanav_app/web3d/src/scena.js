@@ -482,6 +482,11 @@ const SPINTA_DI_SBIECO = 0;
  * nella vista «Corsie»: un pixel su tre, circa (vedi [Scena.tagliaSopra]).
  */
 export const COPERTURA_FANTASMA = 0.3;
+/**
+ * Fin dove un parapetto, una spalla o un muro stanno «alla quota dell'auto»
+ * (metri sopra di lei): fin lì restano pieni, più in alto sono fantasmi.
+ */
+const ALTO_COME_L_AUTO_M = 1.6;
 
 /** Una geometria three.js dai dati del lavoratore. */
 function geometria(d, notte) {
@@ -1131,7 +1136,17 @@ export class Scena {
     // telecamera e l'auto, tutti: da sotto un viadotto un pilone riempiva lo
     // schermo, e la spalla della rampa copriva mezza strada. Dietro l'auto
     // non dicono niente a chi guida.
-    const sopra = nome === 'fusto' || nome === 'capitello' || nome === 'opere' ? -1e6 : 3.0;
+    //
+    // «Sopraelevate dove non ci sono strade, con incroci sbagliati»: il
+    // fantasma del ponte di sopra portava con sé le sue righe bianche, e una
+    // riga a puntini di traverso sulla propria corsia si legge come una
+    // strada che la incrocia. La vernice e i segnali del ponte di sopra nel
+    // tubo non si disegnano affatto: del ponte resta l'ombra dell'asfalto.
+    // E i parapetti della strada su cui si sta (alti quanto l'auto, non di
+    // più) restano pieni: a puntini facevano una fascia grigia sbavata lungo
+    // tutta la corsia, e non coprivano niente.
+    const sopra = nome === 'fusto' || nome === 'capitello' ? -1e6 : nome === 'opere' ? ALTO_COME_L_AUTO_M : 3.0;
+    const copertura = nome === 'corsie-vernice' || nome === 'corsie-segnali' ? 0 : COPERTURA_FANTASMA;
     const prima = materiale.onBeforeCompile;
     const chiave = materiale.customProgramCacheKey;
     const u = this.uniformiTaglio;
@@ -1200,13 +1215,13 @@ export class Scena {
               vec2 ndc = gl_FragCoord.xy / uSchermo * 2.0 - 1.0;
               vec2 p = vec2((ndc.x - uAutoSchermo.x) * uSchermo.x / uSchermo.y, ndc.y - uAutoSchermo.y);
               float finestra = smoothstep(uRaggioAuto, 1.5 * uRaggioAuto, length(p));
-              float copre = mix(${COPERTURA_FANTASMA.toFixed(2)} * finestra, 1.0, pieno);
+              float copre = mix(${copertura.toFixed(2)} * finestra, 1.0, pieno);
               if (copre <= bayerTaglio(gl_FragCoord.xy)) discard;
             }
           }`,
         );
     };
-    materiale.customProgramCacheKey = () => (chiave && chiave !== THREE.Material.prototype.customProgramCacheKey ? chiave.call(materiale) : nome) + '-taglio';
+    materiale.customProgramCacheKey = () => (chiave && chiave !== THREE.Material.prototype.customProgramCacheKey ? chiave.call(materiale) : nome) + '-taglio-' + sopra + '-' + copertura;
   }
 
   /**

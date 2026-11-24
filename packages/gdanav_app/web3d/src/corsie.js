@@ -332,6 +332,157 @@ export function spostata(p, spost, s = progressive(p), nn = normali(p)) {
   });
 }
 
+// ── Le curve ─────────────────────────────────────────────────────────────
+
+/** Quanto, al più, la curva arrotondata passa lontano dal nodo della via. */
+const SCARTO_CURVA_M = 1.0;
+/** Il raggio più largo con cui si arrotonda una piega. */
+const RAGGIO_CURVA_M = 80;
+/** Le pieghe che si arrotondano: sotto non si vedono, sopra è un'inversione. */
+const PIEGA_RAD = { da: (3 * Math.PI) / 180, a: (150 * Math.PI) / 180 };
+/** Ogni quanti gradi un punto dell'arco. */
+const PASSO_ARCO_RAD = (5 * Math.PI) / 180;
+
+/** Quanta tangente chiede la piega di [ang] radianti, col raggio più largo che lo scarto concede. */
+function tangenteDellaPiega(ang, scarto, raggio) {
+  if (!(ang >= PIEGA_RAD.da && ang <= PIEGA_RAD.a)) return 0;
+  const r = Math.min(raggio, scarto / (1 / Math.cos(ang / 2) - 1));
+  return r * Math.tan(ang / 2);
+}
+
+/**
+ * L'arco che arrotonda la piega in [v] fra chi arriva nel verso [u] e chi
+ * riparte nel verso [w] (versori), con la tangente lunga [t]: i punti da
+ * dove la linea lascia il primo tratto a dove riprende il secondo, col
+ * colmo (il mezzo dell'arco) all'indice che dice `colmo`.
+ */
+function arcoDellaPiega(v, u, w, t) {
+  const ang = Math.acos(Math.max(-1, Math.min(1, u[0] * w[0] + u[1] * w[1])));
+  const r = t / Math.tan(ang / 2);
+  const verso = u[0] * w[1] - u[1] * w[0] >= 0 ? 1 : -1;
+  const a = [v[0] - u[0] * t, v[1] - u[1] * t];
+  const c = [a[0] - u[1] * verso * r, a[1] + u[0] * verso * r];
+  // Passi pari: il colmo è un punto dell'arco, lo stesso per le due vie che lì si toccano.
+  const passi = 2 * Math.max(1, Math.ceil(ang / PASSO_ARCO_RAD / 2));
+  const punti = [];
+  for (let j = 0; j <= passi; j++) {
+    const g = (verso * ang * j) / passi;
+    const cs = Math.cos(g);
+    const sn = Math.sin(g);
+    const dx = a[0] - c[0];
+    const dy = a[1] - c[1];
+    punti.push([c[0] + dx * cs - dy * sn, c[1] + dx * sn + dy * cs]);
+  }
+  return { punti, colmo: passi / 2 };
+}
+
+/**
+ * Le vie con le curve arrotondate.
+ *
+ * OpenStreetMap una curva la scrive a tratti dritti, un nodo ogni tanto: a
+ * disegnarla così com'è la strada piega a spigoli, e con lei i bordi, le
+ * righe e la fascia del percorso («strade sballate»). Ogni piega diventa un
+ * arco tangente ai due tratti, largo quanto si può senza passare a più di
+ * [scarto] metri dal nodo: la strada resta dov'è, ma gira come una strada.
+ *
+ * Non si toccano i nodi dove la via ne incontra un'altra (un incrocio in
+ * mezzo, un capo a tre o più, un nodo che si disegna): lì le vie devono
+ * restare attaccate allo stesso punto. Dove invece la stessa strada
+ * continua in un'altra via — OpenStreetMap la spezza a ogni cambio di tag —
+ * l'arco si fa a cavallo delle due, che si incontrano al suo colmo.
+ *
+ * [linee]: `[[x, y], …]` in metri per ogni via, cambiate sul posto.
+ * [fermo]`(i, k)`: il nodo [k] della via [i] non si muove. Restituisce
+ * quali vie sono cambiate.
+ */
+export function arrotondaLeCurve(linee, fermo = () => false, { scarto = SCARTO_CURVA_M, raggio = RAGGIO_CURVA_M } = {}) {
+  const versore = (a, b) => {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const l = Math.hypot(dx, dy);
+    return l > 1e-6 ? [dx / l, dy / l, l] : null;
+  };
+  const angolo = (u, w) => Math.acos(Math.max(-1, Math.min(1, u[0] * w[0] + u[1] * w[1])));
+  // I capi dove due vie sole si continuano l'una nell'altra.
+  const chiave = (q) => Math.round(q[0] * 100) + ',' + Math.round(q[1] * 100);
+  const capi = new Map();
+  linee.forEach((p, i) => {
+    if (p.length < 2) return;
+    for (const k of [0, p.length - 1]) {
+      const c = chiave(p[k]);
+      if (!capi.has(c)) capi.set(c, []);
+      capi.get(c).push([i, k]);
+    }
+  });
+  // Per ogni via i versori dei tratti e la tangente voluta a ogni nodo.
+  const tratti = linee.map((p) => p.slice(1).map((q, k) => versore(p[k], q)));
+  const t = linee.map((p) => new Array(p.length).fill(0));
+  const giunti = [];
+  linee.forEach((p, i) => {
+    const d = tratti[i];
+    if (d.some((x) => !x)) return;
+    for (let k = 1; k < p.length - 1; k++) if (!fermo(i, k)) t[i][k] = tangenteDellaPiega(angolo(d[k - 1], d[k]), scarto, raggio);
+  });
+  for (const cc of capi.values()) {
+    if (cc.length !== 2 || cc[0][0] === cc[1][0]) continue;
+    const [[i, k], [j, h]] = cc;
+    if (fermo(i, k) || fermo(j, h) || tratti[i].some((x) => !x) || tratti[j].some((x) => !x)) continue;
+    // Chi arriva lungo la via [i] e riparte lungo la [j].
+    const u = k ? tratti[i].at(-1) : tratti[i][0].map((x, n) => (n < 2 ? -x : x));
+    const w = h ? tratti[j].at(-1).map((x, n) => (n < 2 ? -x : x)) : tratti[j][0];
+    const tt = tangenteDellaPiega(angolo(u, w), scarto, raggio);
+    if (!tt) continue;
+    t[i][k] = t[j][h] = tt;
+    giunti.push({ i, k, j, h, u, w });
+  }
+  // Su ogni tratto le due tangenti ci devono stare: si stringono insieme.
+  const quanto = linee.map((p) => new Array(p.length).fill(1));
+  linee.forEach((p, i) => {
+    tratti[i].forEach((d, k) => {
+      if (!d) return;
+      const somma = t[i][k] + t[i][k + 1];
+      if (somma <= d[2] * 0.96) return;
+      const f = (d[2] * 0.96) / somma;
+      quanto[i][k] = Math.min(quanto[i][k], f);
+      quanto[i][k + 1] = Math.min(quanto[i][k + 1], f);
+    });
+  });
+  for (const g of giunti) quanto[g.i][g.k] = quanto[g.j][g.h] = Math.min(quanto[g.i][g.k], quanto[g.j][g.h]);
+  // I capi nuovi delle vie che si continuano: mezzo arco per una.
+  const capoNuovo = linee.map(() => ({}));
+  for (const g of giunti) {
+    const tt = t[g.i][g.k] * quanto[g.i][g.k];
+    if (tt < 0.3) continue;
+    const { punti, colmo } = arcoDellaPiega(linee[g.i][g.k], g.u, g.w, tt);
+    const prima = punti.slice(0, colmo + 1);
+    const dopo = punti.slice(colmo);
+    capoNuovo[g.i][g.k] = g.k ? prima : prima.slice().reverse();
+    capoNuovo[g.j][g.h] = g.h ? dopo.slice().reverse() : dopo;
+  }
+  const cambiate = new Set();
+  linee.forEach((p, i) => {
+    const d = tratti[i];
+    const n = p.length;
+    if (n < 2 || d.some((x) => !x)) return;
+    const out = [];
+    const inizio = capoNuovo[i][0];
+    if (inizio) out.push(...inizio);
+    else out.push(p[0]);
+    for (let k = 1; k < n - 1; k++) {
+      const tt = t[i][k] * quanto[i][k];
+      if (tt < 0.3) out.push(p[k]);
+      else out.push(...arcoDellaPiega(p[k], d[k - 1], d[k], tt).punti);
+    }
+    const fine = capoNuovo[i][n - 1];
+    if (fine) out.push(...fine);
+    else out.push(p[n - 1]);
+    if (out.length === n && !inizio && !fine) return;
+    linee[i] = out;
+    cambiate.add(i);
+  });
+  return cambiate;
+}
+
 // ── I raccordi dove le carreggiate si dividono e si uniscono ─────────────
 
 /** Quanto è lungo, al più, il raccordo all'inizio o alla fine di una via. */
@@ -513,6 +664,35 @@ export function preparaCorsie(dati) {
   for (const v of strade) {
     v.xy = [];
     for (let i = 0; i < v.ll.length; i += 2) v.xy.push([(v.ll[i] - lon0) * mLon, (v.ll[i + 1] - lat0) * mLat]);
+  }
+  // Le curve, prima di tutto il resto: i raccordi, l'asfalto, le righe e
+  // il percorso partono tutti dalla stessa linea, già arrotondata. Fermi i
+  // nodi che più vie hanno in comune (chi tocca chi non cambia) e quelli
+  // che si disegnano (le strisce, i semafori stanno sul nodo).
+  const quante = new Map();
+  const conta = (ll, capi) => {
+    for (let i = 0; i < ll.length; i += 2) {
+      const k = ll[i] + ',' + ll[i + 1];
+      const capo = capi && (i === 0 || i === ll.length - 2);
+      const c = quante.get(k) ?? [0, 0];
+      c[capo ? 0 : 1]++;
+      quante.set(k, c);
+    }
+  };
+  for (const v of strade) conta(v.ll, true);
+  for (const s of dati?.strade ?? []) if (!CLASSI_CORSIE.has(s.hw) && Array.isArray(s.g)) conta(s.g, false);
+  for (const n of dati?.nodi ?? []) if (Array.isArray(n.g)) conta(n.g, false);
+  const fermo = (i, k) => {
+    const ll = strade[i].ll;
+    const [capi, altri] = quante.get(ll[2 * k] + ',' + ll[2 * k + 1]) ?? [0, 0];
+    // In mezzo alla via: fermo se lo tocca chiunque altro. Al capo: fermo
+    // se non sono due capi soli che si continuano.
+    return k === 0 || 2 * k === ll.length - 2 ? capi !== 2 || altri > 0 : capi + altri > 1;
+  };
+  const linee = strade.map((v) => v.xy);
+  for (const i of arrotondaLeCurve(linee, fermo)) {
+    strade[i].xy = linee[i];
+    strade[i].ll = linee[i].flatMap(([x, y]) => [lon0 + x / mLon, lat0 + y / mLat]);
   }
   const rr = raccordi(strade);
   strade.forEach((v, i) => {
