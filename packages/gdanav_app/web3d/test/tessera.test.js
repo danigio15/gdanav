@@ -584,3 +584,41 @@ test('vista «Corsie»: una via che i dati danno a terra non sale col ponte dell
   assert.ok(Math.max(...su.grafo.corsie.find((v) => v.id === 3).h) > ALTEZZA_LIVELLO - 0.5);
   assert.ok(Math.max(...su.grafo.corsie.find((v) => v.id === 2).h) > 2, 'la rampa sale verso il ponte');
 });
+
+test('vista «Corsie»: la rampa di un ponte che finisce fuori dalla tessera scende fin dentro, non parte da terra sul bordo', () => {
+  // Una strada da nord a sud: il ponte sta nella tessera a nord e finisce
+  // centoventi metri prima del bordo; la rampa che ne scende entra qui.
+  // Prima il ponte, più lontano di sessanta metri, qui non contava: la
+  // rampa stava a terra fin dal bordo, e nella tessera a nord a tre metri
+  // e mezzo: uno scalino nell'asfalto, e il percorso sospeso sopra.
+  const sys = sistemaTessera(14, X, Y);
+  const meta = sys.lato / 2;
+  const px = (m) => Math.round((m / sys.lato) * 4096);
+  const livelli = {
+    '0,0': { transportation: strato([{ p: { class: 'primary', oneway: 1 }, g: [[[2048, 0], [2048, 4096]]] }]) },
+    '0,-1': {
+      transportation: strato([
+        { p: { class: 'primary', oneway: 1, brunnel: 'bridge', layer: 1 }, g: [[[2048, 4096 - px(900)], [2048, 4096 - px(120)]]] },
+        { p: { class: 'primary', oneway: 1 }, g: [[[2048, 4096 - px(120)], [2048, 4096]]] },
+      ]),
+    },
+  };
+  const dati = {
+    v: 1,
+    strade: [
+      { id: 1, hw: 'primary', oneway: 'yes', lanes: '2', bridge: 'yes', layer: '1', g: [...ll(0, meta + 900), ...ll(0, meta + 120)] },
+      { id: 2, hw: 'primary', oneway: 'yes', lanes: '2', g: [...ll(0, meta + 120), ...ll(0, -meta)] },
+    ],
+  };
+  const t = costruisciTessera({ z: 14, x: X, y: Y, livelli, datiCorsie: preparaCorsie(dati), vistaCorsie: true, grafo: true });
+  const rampa = t.grafo.corsie.find((v) => v.id === 2);
+  // Sul bordo, a centoventi metri dal ponte: scesa quanto scende la strada della mappa.
+  const k = rampa.xy.reduce((m, q, i) => (Math.abs(q[1] - meta) < Math.abs(rampa.xy[m][1] - meta) ? i : m), 0);
+  const attesa = ALTEZZA_LIVELLO - PENDENZA * 120;
+  assert.ok(rampa.h[k] > attesa - 0.6, `sul bordo la rampa sta a ${rampa.h[k].toFixed(2)} m (ne aspetto ${attesa.toFixed(2)})`);
+  assert.ok(Math.abs(rampa.h.at(-1)) < 0.3, 'e più in là arriva a terra');
+  // E il percorso sopra: i segmenti della tessera, sul bordo, alla stessa quota (un metro: sono lunghi qualche metro).
+  let sulBordo = -Infinity;
+  for (let i = 0; i < t.segmenti.length; i += 8) if (Math.abs(t.segmenti[i + 1] - meta) < 8) sulBordo = Math.max(sulBordo, t.segmenti[i + 2]);
+  assert.ok(Math.abs(sulBordo - rampa.h[k]) < 1, `i segmenti a ${sulBordo.toFixed(2)}, l'asfalto a ${rampa.h[k].toFixed(2)}`);
+});

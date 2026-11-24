@@ -13,7 +13,7 @@ import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, lon
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { AggancioStrada, SOGLIA_M } from './aggancio.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
-import { alzataDeiNastri, dentroLAsfalto, direzioneDisegnata, fasciaSullaCorsia, IndiceSegmenti, levigaFascia, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, riempiQuote, sensiDiMarcia, spostamenti, staccatiDallaVia, togliDenti } from './percorso.js';
+import { alzataDeiNastri, direzioneDisegnata, fasciaDelPercorso, IndiceSegmenti, Linea, lungoLaLinea, nastro, Origine, Profilo, profiloDi, quote, quoteSullaFascia, riempiQuote, sensiDiMarcia, spostamenti } from './percorso.js';
 import { BIT_OMBRA, BIT_OMBRA_PONTE, Scena } from './scena.js';
 import { dallaScorta, nellaScorta } from './scorte.js';
 import { SORGENTE_OLTRE, STRATO_3D, ZOOM_3D, adattaStile, filtroNomi } from './stile3d.js';
@@ -1607,50 +1607,15 @@ function sullaCorsia(p) {
     punti.push([x + pr.dx[k], y + pr.dy[k]]);
   }
   const r = corsieLungoIlPercorso(punti, S.indiceCorsie, { passo: pr.passo, s0: pr.s0, suggerimenti: S.suggerimenti });
-  // Sulla corsia, dentro l'asfalto, e per ultima levigata anche rispetto
-  // alla linea vera: l'aggancio alle strade (gli spostamenti) a volte salta
-  // da un punto all'altro, e la levigatura sui soli punti agganciati quei
-  // salti non li vedeva (lo zig-zag).
-  const sullaStrada = levigaFascia(punti, fasciaSullaCorsia(punti, r, pr.passo), pr.passo);
-  const dentro = dentroLAsfalto(sullaStrada, pr.h, (x, y, h) => [...indice.asfaltoVicino(x, y, h), ...asfaltoDelleCorsie(S.indiceCorsie, x, y)]);
-  const fascia = togliDenti(levigaFascia(linea, dentro, pr.passo, staccatiDallaVia(r.scarti, pr.passo)));
+  const fascia = fasciaDelPercorso(linea, punti, r, pr.h, (x, y, h) => [...indice.asfaltoVicino(x, y, h), ...asfaltoDelleCorsie(S.indiceCorsie, x, y)], pr.passo);
   for (let k = 0; k < n; k++) {
     pr.dx[k] = fascia[k][0] - linea[k][0];
     pr.dy[k] = fascia[k][1] - linea[k][1];
   }
-  quoteSullaFascia(pr, punti, fascia);
+  quoteSullaFascia(pr, punti, fascia, indice, r.vie, S.indiceCorsie.strade);
   pr.ancora(p.linea);
   p.manovreCorsie = r.manovre.map((m) => ({ s: m.s, dir: m.dir }));
 }
-
-/**
- * Le quote della fascia dove è andata su una strada lontana dalla linea del
- * calcolatore: quella della strada sotto, non quella del punto da cui è
- * partita. Sotto Via Porzio la linea taglia sul prato, la fascia segue la
- * bretella che scende al sottopasso: con la quota del prato restava a pezzi
- * sotto l'asfalto.
- */
-function quoteSullaFascia(pr, punti, fascia) {
-  const n = fascia.length;
-  for (let k = 0; k < n; k++) {
-    const [x, y] = fascia[k];
-    const lontano = Math.hypot(x - punti[k][0], y - punti[k][1]);
-    const peso = Math.min(1, Math.max(0, (lontano - QUOTA_FASCIA_DA_M) / 3));
-    if (!peso) continue;
-    const a = fascia[Math.max(0, k - 1)];
-    const b = fascia[Math.min(n - 1, k + 1)];
-    let meglio = null;
-    for (const c of indice.candidati(x, y, b[0] - a[0], b[1] - a[1], 4, 1)) {
-      // La strada sotto la fascia, al piano più vicino a quello di prima.
-      const voto = c.d + Math.abs(c.h - pr.h[k]) / 2;
-      if (Math.abs(c.h - pr.h[k]) < 7 && (!meglio || voto < meglio.voto)) meglio = { h: c.h, voto };
-    }
-    if (meglio) pr.h[k] += (meglio.h - pr.h[k]) * peso;
-  }
-}
-
-/** Da quanti metri dalla linea in su la fascia prende la quota della strada sotto. */
-const QUOTA_FASCIA_DA_M = 2.5;
 
 /** La strada già fatta: gli ultimi [FATTO_M] metri, all'altezza giusta. */
 function aggiornaFatto() {

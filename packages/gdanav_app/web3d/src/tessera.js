@@ -2653,9 +2653,14 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
     return out;
   };
   const strade = [];
+  // Le vie più in là (fin dove arrivano i dati): solo per il tetto delle rampe, qui sotto.
+  const lontane = [];
   for (const v0 of corsie.strade) {
     const xyVia = inMetri(v0.ll);
-    if (!xyVia.some(vicina)) continue;
+    if (!xyVia.some(vicina)) {
+      lontane.push({ xy: inMetri(v0.llVia ?? v0.ll), alto: v0.ponte || v0.livello > 0 });
+      continue;
+    }
     /* «Il percorso diventa tratteggiato e la freccia cambia colore», su un
      * rettilineo d'autostrada all'aperto: la via aveva due punti a quasi
      * quattrocento metri l'uno dall'altro, e il secondo all'inizio di un
@@ -2760,9 +2765,15 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
   // (Le corsie stimate vengono dalla mappa: non dicono niente di più.)
   const vere = strade.some((v) => !v.stimata);
   const altre = (corsie.altre ?? []).map((a) => ({ ...a, xy: inMetri(a.ll) })).filter((a) => a.xy.some(vicina));
+  /* Anche con le vie più lontane di sessanta metri dalla tessera: un ponte
+   * che finisce cento metri fuori ha la rampa che scende fin dentro, e
+   * senza di lui la rampa qui stava a terra mentre la tessera accanto (che
+   * il ponte lo vede) la teneva in alto: sul bordo uno scalino di due metri
+   * nell'asfalto, e la fascia del percorso sospesa sopra. */
   const tetti = tettoDelleRampe([
     ...strade.map((v) => ({ xy: v.xyVia, alto: v.ponte || v.livello > 0, quote: quoteSullaVia(v) })),
     ...altre.map((a) => ({ xy: a.xy, alto: a.ponte || a.livello > 0 })),
+    ...lontane,
   ]);
   strade.forEach((v, i) => {
     if (!vere || v.ponte || v.livello > 0 || v.galleria) return;

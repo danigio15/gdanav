@@ -497,7 +497,9 @@ const RACCORDO_M = { grande: 90, altro: 35 };
  * sinistra, il più a destra quelle a destra — e la sua linea parte da lì,
  * per tornare piano (in [RACCORDO_M]) dov'è disegnata. Lo stesso dove una
  * corsia nasce o finisce (la corsia di decelerazione): le corsie di sinistra
- * restano dritte, quella di destra si aggiunge.
+ * restano dritte, quella di destra si aggiunge. Tranne la corsia per
+ * svoltare a sinistra, che le frecce (`turn:lanes`) dicono qual è: quella
+ * nasce e finisce a sinistra, e le altre restano dritte.
  *
  * [strade]: le vie normalizzate ([normalizza]) con `xy` (metri, `[[x, y],
  * …]`). Restituisce per ogni via `{o0, t0, o1, t1}`: lo spostamento (a
@@ -533,6 +535,18 @@ export function raccordi(strade) {
     for (let j = da; j < da + n; j++) c += centroCorsia(v, Math.min(v.avanti - 1, Math.max(0, j)));
     return c / n;
   };
+  /* Quante corsie di [v], da sinistra, sono solo per girare a sinistra (le
+   * frecce di `turn:lanes`): quelle non continuano nella via che va dritta,
+   * e non vengono da lei. «Un'S attraverso l'incrocio»: dove a due corsie
+   * se ne aggiunge una per svoltare a sinistra (`left|through|through`), la
+   * corsia nuova si faceva nascere a destra, come quella di decelerazione, e
+   * dopo l'incrocio finire a destra: l'asfalto, le righe e la fascia con
+   * loro si spostavano di una corsia verso il marciapiede e ritorno. */
+  const soloSinistra = (v) => {
+    let k = 0;
+    while (k < (v.frecce?.length ?? 0) && v.frecce[k].length && v.frecce[k].every((f) => f.includes('left') || f === 'reverse')) k++;
+    return k;
+  };
   // A [unica] (una via) toccano [rami] (più vie): le corsie di [unica] in
   // fila da sinistra, ogni ramo un blocco. Restituisce lo spostamento di ognuno.
   const blocchi = (unica, rami, angolo) => {
@@ -540,17 +554,23 @@ export function raccordi(strade) {
     const n = unica.avanti;
     const res = new Map();
     let dopo = 0;
+    // Una via sola che continua, più o meno dritta.
+    const continua = ordinati.length === 1 && Math.abs(ordinati[0].a) < Math.PI / 6;
     ordinati.forEach(({ j }, r) => {
       const ramo = strade[j];
       const m = Math.min(ramo.avanti, n);
       // Il primo a sinistra, l'ultimo a destra, quelli in mezzo in fila.
-      const da = r === ordinati.length - 1 && r > 0 ? n - m : Math.min(dopo, n - m);
+      // (Chi continua dritto non prende le corsie di chi svolta a sinistra.)
+      const da = r === ordinati.length - 1 && r > 0 ? n - m : Math.min(continua ? Math.max(dopo, soloSinistra(unica)) : dopo, n - m);
       dopo = da + m;
       const blocco = centro(unica, da, m);
       // Il blocco del ramo: le sue m corsie a sinistra (se ne ha di più, la
-      // nuova nasce a destra).
-      const suo = centro(ramo, 0, m);
+      // nuova nasce a destra; a sinistra quelle solo per svoltare a sinistra).
+      const suo = centro(ramo, continua ? Math.min(ramo.avanti - m, soloSinistra(ramo)) : 0, m);
       res.set(j, blocco - suo);
+      // La corsia di chi svolta a sinistra finisce all'incrocio: è la via
+      // di prima che arriva spostata, non quella di dopo che parte storta.
+      if (continua && da > 0 && da === soloSinistra(unica)) res.sullUnica = true;
     });
     return res;
   };
@@ -563,6 +583,11 @@ export function raccordi(strade) {
       for (const [j, o] of sp) {
         const v = strade[j];
         if (Math.abs(o) < 0.05) continue;
+        if (sp.sullUnica) {
+          out[entrano[0]].o1 = -o;
+          out[entrano[0]].t1 = Math.min(grande(a.hw) ? RACCORDO_M.grande : RACCORDO_M.altro, lunghezza(a) * 0.6);
+          continue;
+        }
         out[j].o0 = o;
         out[j].t0 = Math.min(grande(v.hw) ? RACCORDO_M.grande : RACCORDO_M.altro, lunghezza(v) * 0.6);
       }
@@ -636,6 +661,12 @@ export function raccordi(strade) {
       if (fine) Object.assign(out[j], { o1: o, t1: t });
       else Object.assign(out[j], { o0: o, t0: t });
     }
+  });
+  // Spostata uguale ai due capi (il pezzo con la corsia in più per svoltare,
+  // fra due pezzi senza): spostata tutta, non a onda fra un capo e l'altro.
+  strade.forEach((v, i) => {
+    const r = out[i];
+    if (r.t0 > 0 && r.t1 > 0 && Math.abs(r.o0 - r.o1) < 0.05) r.t0 = r.t1 = lunghezza(v);
   });
   return out;
 }
@@ -1029,6 +1060,117 @@ function viePerIlPercorso(punti, dir, indice, passo) {
   return fuori.reverse();
 }
 
+/** Fin dove, lungo il percorso, si cerca la via che continua quella lasciata (m). */
+const PONTE_AL_PIU_M = 160;
+/** Da quanto lontano dalle vie, in mezzo, il percorso si è staccato da loro (m). */
+const PONTE_STACCATO_M = 6;
+/** Quante vie di fila, al più, fra quella lasciata e quella ritrovata. */
+const PONTE_VIE = 3;
+
+/**
+ * Dove il percorso si stacca dalle vie e poi le ritrova, in mezzo sta sulla
+ * via che le unisce.
+ *
+ * «La fascia attraversa il prato a zig-zag invece di seguire una strada»: in
+ * un sottopasso la linea del calcolatore (la sua mappa non è questa) passava
+ * a venti metri dalla galleria disegnata, oltre quanto si concede a una via
+ * già seguita; lì sotto «non si sapeva», e la fascia seguiva la linea sul
+ * prato, per poi agganciarsi per qualche metro a un'altra galleria che
+ * arriva allo stesso nodo. Ma da una via si esce solo dai suoi capi: se la
+ * via [A] su cui il percorso stava finisce dove comincia (o dove passa) una
+ * via [B] su cui lo si ritrova più avanti — direttamente o con un paio di
+ * vie in mezzo — e la strada lungo le vie è lunga quanto quella fatta dal
+ * percorso, allora in mezzo il percorso sta su quelle vie. I punti in mezzo
+ * si mettono lungo la catena, a passo uguale. Solo dove il percorso si
+ * stacca davvero ([PONTE_STACCATO_M]): dentro un incrocio qualunque, dove
+ * taglia l'angolo di poco, resta tutto com'era.
+ *
+ * Cambia [via], [avanti] e [sul] (vedi `corsieLungoIlPercorso`).
+ */
+function pontiLungoLeVie(punti, indice, via, avanti, sul, passo) {
+  const strade = indice.strade;
+  const n = punti.length;
+  /** Il punto a [s] metri della via [v], con la sua direzione. */
+  const sulla = (v, s) => {
+    const p = v.xy;
+    let k = 1;
+    while (k < p.length - 1 && v.sxy[k] < s) k++;
+    const l = v.sxy[k] - v.sxy[k - 1] || 1e-9;
+    const u = Math.max(0, Math.min(1, (s - v.sxy[k - 1]) / l));
+    return { qx: p[k - 1][0] + (p[k][0] - p[k - 1][0]) * u, qy: p[k - 1][1] + (p[k][1] - p[k - 1][1]) * u, tx: (p[k][0] - p[k - 1][0]) / l, ty: (p[k][1] - p[k - 1][1]) / l, s };
+  };
+  /**
+   * Le catene di vie dal punto [s] della via [i] (percorsa [av]) fino alla
+   * via [ib] (percorsa [avb]) al suo punto [sb]: i pezzi `[via, av, da, a]`
+   * in metri lungo ogni via, al più lunghi [resta] in tutto.
+   */
+  const catena = (i, av, s, ib, avb, sb, resta, fatte = []) => {
+    const v = strade[i];
+    if (i === ib && av === avb && (av ? sb >= s : sb <= s)) return Math.abs(sb - s) <= resta ? [[i, av, s, sb]] : null;
+    if (fatte.length >= PONTE_VIE || fatte.includes(i)) return null;
+    const capo = av ? v.xy.length - 1 : 0;
+    const lungo = Math.abs(v.sxy[capo] - s);
+    if (lungo > resta) return null;
+    for (const [j, k] of indice.nodi.get(indice.chiaveNodo(v.xy[capo])) ?? []) {
+      if (j === i) continue;
+      const w = strade[j];
+      for (const avw of [true, false]) {
+        if (avw ? k >= w.xy.length - 1 : k <= 0 || w.senso) continue;
+        const c = catena(j, avw, w.sxy[k], ib, avb, sb, resta - lungo, [...fatte, i]);
+        if (c) return [[i, av, s, v.sxy[capo]], ...c];
+      }
+    }
+    return null;
+  };
+  // I tratti di fila sulla stessa via: [da, a] (indici dei punti).
+  const tratti = [];
+  for (let k = 0; k < n; ) {
+    let j = k;
+    while (j < n && via[j] === via[k] && avanti[j] === avanti[k]) j++;
+    if (via[k] >= 0) tratti.push([k, j - 1]);
+    k = j;
+  }
+  for (let t = 0; t + 1 < tratti.length; t++) {
+    const ka = tratti[t][1];
+    for (let u = t + 1; u < tratti.length; u++) {
+      const kb = tratti[u][0];
+      const fatta = (kb - ka) * passo;
+      if (fatta > PONTE_AL_PIU_M) break;
+      // (Due tratti attaccati: fra loro non manca niente.)
+      if (kb - ka < 2) break;
+      const pezzi = catena(via[ka], avanti[ka] === 1, sul[ka].s, via[kb], avanti[kb] === 1, sul[kb].s, fatta * 1.3 + 8);
+      if (!pezzi) continue;
+      const lunga = pezzi.reduce((m, q) => m + Math.abs(q[3] - q[2]), 0);
+      if (Math.abs(lunga - fatta) > Math.max(8, 0.3 * fatta)) continue;
+      // I punti in mezzo lungo la catena, a passo uguale.
+      const nuovi = [];
+      let staccato = 0;
+      for (let k = ka + 1; k < kb; k++) {
+        let resta = (lunga * (k - ka)) / (kb - ka);
+        let q = pezzi[0];
+        for (const p of pezzi) {
+          q = p;
+          if (resta <= Math.abs(p[3] - p[2])) break;
+          resta -= Math.abs(p[3] - p[2]);
+        }
+        const c = sulla(strade[q[0]], q[2] + (q[1] ? 1 : -1) * Math.min(resta, Math.abs(q[3] - q[2])));
+        c.d = Math.hypot(punti[k][0] - c.qx, punti[k][1] - c.qy);
+        // (Quanto il percorso sta lontano dalle vie: dalla via che aveva, se ne aveva una vicina.)
+        staccato = Math.max(staccato, via[k] === q[0] ? Math.min(c.d, sul[k].d) : c.d);
+        nuovi.push([q[0], q[1], c]);
+      }
+      if (staccato <= PONTE_STACCATO_M) break;
+      nuovi.forEach(([i, av, c], j) => {
+        via[ka + 1 + j] = i;
+        avanti[ka + 1 + j] = av ? 1 : 0;
+        sul[ka + 1 + j] = c;
+      });
+      t = u - 1;
+      break;
+    }
+  }
+}
+
 /** Il tratto [k-1, k] della via [v] più vicino a [x, y]: distanza, punto, direzione, normale, scostamento. */
 function sulTratto(v, k, x, y) {
   const a = v.xy[k - 1];
@@ -1076,13 +1218,14 @@ const TRAVERSO_COS = Math.cos(Math.PI / 18);
  * verso). Lo spigolo della fascia lo mette `fasciaSullaCorsia` (percorso.js)
  * dove le due corsie si incontrano.
  *
- * Restituisce `{sposta, vie, corsie, manovre, spigoli, centri, versi}`:
+ * Restituisce `{sposta, resto, vie, corsie, manovre, spigoli, centri, versi}`:
  * lo spostamento di ogni punto, la via e la corsia sotto (-1 dove non si
  * sa), le manovre trovate, le svolte (`{k, kb, pA, tA, pB, tB, gradi}`:
  * l'ultimo punto prima dello spigolo e il primo noto dopo, il mezzo della
  * corsia in quei punti e la sua direzione, e di quanto si gira), il mezzo
  * della corsia sotto ogni punto (`[x, y]`, `null` dove non si sa) e la sua
- * direzione.
+ * direzione; e `resto`, di quanto la fascia sta ancora di lato rispetto a
+ * quel mezzo mentre passa da una corsia all'altra (vedi il punto 6).
  */
 export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzonte = 300, orizzonteGrande = 1200, suggerimenti = [], morbidezza = 32 } = {}) {
   const n = punti.length;
@@ -1102,15 +1245,31 @@ export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzo
     avanti[k] = c.av ? 1 : 0;
     sul[k] = c.t;
   }
+  pontiLungoLeVie(punti, indice, via, avanti, sul, passo);
   // Un pezzo di via di un paio di punti fra due altre (dove due vie partono
   // dallo stesso nodo, una rampa e la strada che continua) non è la via
-  // del percorso: lì non si sa.
+  // del percorso: lì non si sa. Ma una via corta fatta quasi tutta, e in
+  // fila con quelle di prima e di dopo, sì (un sottopasso di dieci metri fra
+  // due pezzi all'aperto: lì sotto la fascia, senza una corsia, ballava).
+  // Non il pezzetto di traverso che in un incrocio unisce due vie: con lui
+  // la fascia rifarebbe la sua piega.
+  const comeVa = (k) => (avanti[k] ? [sul[k].tx, sul[k].ty] : [-sul[k].tx, -sul[k].ty]);
+  const inFila = (a, b) => {
+    if (via[a] < 0 || via[b] < 0) return false;
+    const [u, w] = [comeVa(a), comeVa(b)];
+    return u[0] * w[0] + u[1] * w[1] >= Math.cos((SPIGOLO_GRADI * Math.PI) / 180);
+  };
+  const corti = [];
   for (let k = 0; k < n; ) {
     let j = k;
     while (j < n && via[j] === via[k]) j++;
-    if (via[k] >= 0 && (j - k) * passo < 12 && k > 0 && j < n) via.fill(-1, k, j);
+    if (via[k] >= 0 && (j - k) * passo < 12 && k > 0 && j < n) {
+      const tutta = Math.abs(sul[j - 1].s - sul[k].s) + passo >= 0.6 * strade[via[k]].sxy.at(-1);
+      if (!tutta || !inFila(k - 1, k) || !inFila(j - 1, j)) corti.push([k, j]);
+    }
     k = j;
   }
+  for (const [k, j] of corti) via.fill(-1, k, j);
   // 2. Le manovre: dove si cambia via, con altri rami da cui uscire. E per
   // ogni punto quante corsie ha la via dopo, se ci si arriva senza manovra:
   // chi va dritto non prende una corsia che finisce (quella d'accelerazione).
@@ -1139,6 +1298,8 @@ export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzo
   const centro = new Array(n).fill(null);
   const versoCorsia = new Array(n).fill(null);
   const raccordo = new Float64Array(n);
+  const raccordoInizio = new Float64Array(n);
+  const raccordoFine = new Float64Array(n);
   const diRaccordo = new Float64Array(n).fill(NaN);
   /** Lo spostamento di lato del punto [k] fino al mezzo della corsia, per chi va verso [d]. */
   const di = (k, d) => {
@@ -1170,7 +1331,12 @@ export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzo
     // Il mezzo della corsia (col raccordo della via, vedi [raccordi]), e
     // quanto sta di lato rispetto al percorso.
     const t = sul[k];
-    const or = (v.raccordo && v.sxy ? spostamentoRaccordo(v.raccordo, t.s, v.sxy.at(-1)) : 0) * (av ? 1 : -1);
+    const lunga = v.sxy?.at(-1) ?? 0;
+    const verso = av ? 1 : -1;
+    // (Il raccordo dell'inizio della via e quello della fine, ognuno per sé: vedi sotto.)
+    raccordoInizio[k] = v.raccordo?.t0 > 0 && v.sxy ? spostamentoRaccordo({ ...v.raccordo, t1: 0 }, t.s, lunga) * verso : 0;
+    raccordoFine[k] = v.raccordo?.t1 > 0 && v.sxy ? spostamentoRaccordo({ ...v.raccordo, t0: 0 }, t.s, lunga) * verso : 0;
+    const or = raccordoInizio[k] + raccordoFine[k];
     const o = centroCorsia(v, c, av) + or;
     const nx = (av ? -t.ty : t.ty) * o;
     const ny = (av ? t.tx : -t.tx) * o;
@@ -1178,6 +1344,44 @@ export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzo
     versoCorsia[k] = av ? [t.tx, t.ty] : [-t.tx, -t.ty];
     raccordo[k] = or;
     di(k, dir[k]);
+  }
+  /* Dove si passa da una via alla successiva e la corsia da tenere sta più
+   * in là (una corsia sola che diventa tre: chi va dritto tiene la destra),
+   * il raccordo della via nuova la fa partire ancora più in là, per poi
+   * tornare: inseguendola, la fascia andava oltre e tornava indietro,
+   * un'onda di un metro in trenta. La fascia punta invece a dove la corsia
+   * sta a raccordo finito: del raccordo si toglie quanto allontana la corsia
+   * da quella di prima (tutto, o quel tanto che basta a farle combaciare).
+   * Chi prende una rampa, la cui corsia grazie al raccordo comincia proprio
+   * sotto di lui, non ha niente da togliere. */
+  for (let b = 1; b < n; b++) {
+    const a = b - 1;
+    if (!centro[a] || !centro[b] || (via[a] === via[b] && avanti[a] === avanti[b])) continue;
+    let tx = versoCorsia[a][0] + versoCorsia[b][0];
+    let ty = versoCorsia[a][1] + versoCorsia[b][1];
+    const l = Math.hypot(tx, ty);
+    // (Uno spigolo: lì la curva la fa la svolta.)
+    if (versoCorsia[a][0] * versoCorsia[b][0] + versoCorsia[a][1] * versoCorsia[b][1] < Math.cos((SPIGOLO_GRADI * Math.PI) / 180) || l < 1e-6) continue;
+    tx /= l;
+    ty /= l;
+    let salto = (centro[b][0] - centro[a][0]) * -ty + (centro[b][1] - centro[a][1]) * tx;
+    /** Toglie al punto [k] la parte [quanto] del raccordo [parte]. */
+    const togli = (k, parte, quanto) => {
+      const d = parte[k] * quanto;
+      centro[k] = [centro[k][0] + versoCorsia[k][1] * d, centro[k][1] - versoCorsia[k][0] * d];
+      parte[k] -= d;
+      raccordo[k] -= d;
+      di(k, dir[k]);
+    };
+    if (raccordoInizio[b] * salto > 1e-3) {
+      const quanto = Math.min(1, salto / raccordoInizio[b]);
+      salto -= quanto * raccordoInizio[b];
+      for (let k = b; k < n && via[k] === via[b] && avanti[k] === avanti[b]; k++) togli(k, raccordoInizio, quanto);
+    }
+    if (raccordoFine[a] * salto < -1e-3) {
+      const quanto = Math.min(1, -salto / raccordoFine[a]);
+      for (let k = a; k >= 0 && via[k] === via[a] && avanti[k] === avanti[a]; k--) togli(k, raccordoFine, quanto);
+    }
   }
   // 4. Gli spigoli: dove si passa da una via all'altra (o si torna indietro
   // sulla stessa) girando di almeno [SPIGOLO_GRADI].
@@ -1271,9 +1475,70 @@ export function corsieLungoIlPercorso(punti, indice, { passo = 4, s0 = 0, orizzo
     for (let j = 0; j < pezzo.length; j++) liscio[lo + j] = l[prima + j] + racc[j];
     lo = hi + 1;
   }
-  // Quanto la linea agganciata sta lontana dall'asse della sua via (vedi `fasciaSullaCorsia`).
+  /* 6. Gli scalini. «La fascia fa una piega brusca in mezzo alla corsia»: lo
+   * spostamento di lato qui sopra si misura dalla linea del calcolatore, e
+   * levigato perde quello che di quella linea compensava le pieghe: dove lei
+   * fa un dente (due punti a scatto, una corda che taglia la curva) la
+   * fascia lo rifaceva, in mezzo a una corsia dritta. La fascia sta invece
+   * sul mezzo della corsia ([centri]: liscio quanto l'asfalto, che parte
+   * dalla stessa linea), e di morbido serve solo il passaggio fra un mezzo e
+   * l'altro: il cambio di corsia, la via di dopo con la corsia un po' più
+   * in là. Qui, per ogni punto, quanto manca ancora (o già) a quel
+   * passaggio, a sinistra positivo: gli scalini fra un mezzo e l'altro
+   * messi in fila e levigati, meno gli scalini stessi. Zero lungo una
+   * corsia, lontano dai cambi. */
+  const resto = new Float64Array(n);
+  /** Di quanto il mezzo della corsia scatta di lato fra i punti [a] e [b] (i due noti di fila). */
+  const scalinoFra = (a, b) => {
+    if (b === a + 1) {
+      if (via[a] === via[b] && corsie[a] === corsie[b] && avanti[a] === avanti[b]) return 0;
+      // Due punti accanto: di traverso alle due corsie, quanto dista un mezzo dall'altro.
+      let tx = versoCorsia[a][0] + versoCorsia[b][0];
+      let ty = versoCorsia[a][1] + versoCorsia[b][1];
+      const l = Math.hypot(tx, ty);
+      if (l < 1e-6) return 0;
+      tx /= l;
+      ty /= l;
+      return (centro[b][0] - centro[a][0]) * -ty + (centro[b][1] - centro[a][1]) * tx;
+    }
+    // Con un buco in mezzo (un incrocio): quanto cambia, di lato, la strada
+    // dal percorso al mezzo della corsia (nel buco la fascia segue il
+    // percorso, spostato piano dall'uno all'altro: vedi `fasciaSullaCorsia`).
+    const dx = punti[b][0] - punti[a][0];
+    const dy = punti[b][1] - punti[a][1];
+    const l = Math.hypot(dx, dy);
+    if (l < 1e-6) return 0;
+    const vx = centro[b][0] - punti[b][0] - (centro[a][0] - punti[a][0]);
+    const vy = centro[b][1] - punti[b][1] - (centro[a][1] - punti[a][1]);
+    return (vx * -dy + vy * dx) / l;
+  };
+  lo = 0;
+  for (const hi of [...spigoli.map((g) => g.k), n - 1]) {
+    const scala = new Float64Array(hi + 1 - lo).fill(NaN);
+    let prima = -1;
+    let somma = 0;
+    for (let k = lo; k <= hi; k++) {
+      if (!centro[k]) continue;
+      if (prima >= 0) somma += scalinoFra(prima, k);
+      scala[k - lo] = somma;
+      prima = k;
+    }
+    if (prima >= 0) {
+      riempi(scala);
+      const prima2 = lo > 0 ? 2 * r : 0;
+      const dopo = hi < n - 1 ? 2 * r : 0;
+      const lungo = new Float64Array(prima2 + scala.length + dopo);
+      lungo.fill(scala[0], 0, prima2);
+      lungo.set(scala, prima2);
+      lungo.fill(scala[scala.length - 1], prima2 + scala.length);
+      const l = liscia(lungo, r);
+      for (let j = 0; j < scala.length; j++) resto[lo + j] = l[prima2 + j] - scala[j];
+    }
+    lo = hi + 1;
+  }
+  // Quanto la linea agganciata sta lontana dall'asse della sua via.
   const scarti = sul.map((t) => t?.d ?? 0);
-  return { sposta: liscio, vie: via, corsie, manovre, spigoli, centri: centro, versi: versoCorsia, scarti };
+  return { sposta: liscio, resto, vie: via, corsie, manovre, spigoli, centri: centro, versi: versoCorsia, scarti };
 }
 
 /** Le direzioni dei rami da cui si esce dal nodo [q], in radianti, senza quello da cui si arriva. */
@@ -1402,7 +1667,9 @@ export function asfaltoDelleCorsie(indice, x, y) {
     const v = indice.strade[i];
     const t = sulTratto(v, k, x, y);
     if (t.d > 20) continue;
-    const meta = ((v.avanti + v.indietro) * v.lw) / 2 + Math.abs(v.posa || 0) + Math.max(...(v.margini ?? [0.35, 0.35]));
+    // (Col raccordo: lì l'asfalto disegnato sta di lato rispetto alla linea della via.)
+    const racc = v.raccordo && v.sxy ? Math.abs(spostamentoRaccordo(v.raccordo, t.s, v.sxy.at(-1))) : 0;
+    const meta = ((v.avanti + v.indietro) * v.lw) / 2 + Math.abs(v.posa || 0) + racc + Math.max(...(v.margini ?? [0.35, 0.35]));
     out.push({ qx: t.qx, qy: t.qy, meta });
   }
   return out;

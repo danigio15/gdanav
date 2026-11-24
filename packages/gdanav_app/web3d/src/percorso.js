@@ -693,13 +693,15 @@ const SVOLTA_LONTANO_M = 20;
 
 /**
  * La fascia della vista «Corsie»: il percorso [punti] (`[x, y]` sulla
- * strada, uno ogni [passo] metri) spostato di lato fino al mezzo della
- * corsia, e alle svolte la curva vera da una corsia all'altra. [corsie]: il
- * risultato di `corsieLungoIlPercorso` (corsie.js) sugli stessi punti, di
- * cui servono `sposta` (lo spostamento di lato), `spigoli` (le svolte),
+ * strada, uno ogni [passo] metri) sul mezzo della corsia, e alle svolte la
+ * curva vera da una corsia all'altra. [corsie]: il risultato di
+ * `corsieLungoIlPercorso` (corsie.js) sugli stessi punti, di cui servono
  * `centri` e `versi` (il mezzo della corsia sotto ogni punto, dove si sa, e
- * la sua direzione). Restituisce i punti `[x, y]` della fascia, uno per
- * punto del percorso.
+ * la sua direzione), `resto` (quanto manca al mezzo, nei passaggi da una
+ * corsia all'altra) e `spigoli` (le svolte); senza `resto`, `sposta` (lo
+ * spostamento di lato dal percorso, come si faceva prima). Restituisce i
+ * punti `[x, y]` della fascia, uno per punto del percorso, e in `ferme`
+ * quali stanno su una corsia o su una curva (gli altri seguono il percorso).
  *
  * «Ancora non va»: il percorso gira dove si incontrano le linee di mezzo
  * delle due vie, e la fascia, sulla corsia di destra prima e nel mezzo del
@@ -720,19 +722,58 @@ const SVOLTA_LONTANO_M = 20;
  * (il percorso del calcolatore taglia l'angolo, o lo supera di qualche
  * metro).
  */
-export function fasciaSullaCorsia(punti, { sposta, spigoli = [], centri = null, versi = null, scarti = null }, passo = 4) {
+export function fasciaSullaCorsia(punti, { sposta, resto = null, spigoli = [], centri = null, versi = null, scarti = null }, passo = 4) {
   const n = punti.length;
   const out = new Array(n);
-  // Lo spostamento di lato, con le normali di ogni pezzo fra due spigoli.
+  // I punti messi sul mezzo di una corsia (o sulla curva di una svolta): lì
+  // la fascia è già al suo posto, e chi leviga dopo non li tocca.
+  const ferme = new Uint8Array(n);
   const tagli = [...spigoli.map((g) => g.k), n - 1];
   let lo = 0;
   for (const hi of tagli) {
-    for (let k = lo; k <= hi; k++) {
+    /** La normale (a sinistra) del pezzo di percorso attorno a [k]. */
+    const normale = (k) => {
       const a = punti[Math.max(lo, k - 1)];
       const b = punti[Math.min(hi, k + 1)];
       const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      return [-(b[1] - a[1]) / l, (b[0] - a[0]) / l];
+    };
+    if (resto && centri && versi) {
+      /* Sul mezzo della corsia, dove si sa: è liscio quanto l'asfalto, che
+       * nasce dalla stessa linea, mentre il percorso del calcolatore ha le
+       * sue pieghe (due punti a scatto, le corde che tagliano le curve) e,
+       * spostato di lato e basta, le portava nella fascia: «un dente in
+       * mezzo alla corsia». Di lato rispetto alla corsia resta solo [resto]:
+       * il passaggio morbido da una corsia all'altra. Dove non si sa (dentro
+       * un incrocio) la fascia segue il percorso, spostato di quanto lo
+       * erano i punti noti prima e dopo, piano dall'uno all'altro. */
+      const scarto = (k) => [centri[k][0] - punti[k][0], centri[k][1] - punti[k][1]];
+      const buco = (a, b) => {
+        const da = a >= lo ? scarto(a) : null;
+        const db = b <= hi ? scarto(b) : null;
+        for (let k = Math.max(lo, a + 1); k < b; k++) {
+          const f = da && db ? (k - a) / (b - a) : 0;
+          const d = da && db ? [da[0] + (db[0] - da[0]) * f, da[1] + (db[1] - da[1]) * f] : (da ?? db ?? [0, 0]);
+          const [nx, ny] = normale(k);
+          out[k] = [punti[k][0] + d[0] + nx * resto[k], punti[k][1] + d[1] + ny * resto[k]];
+        }
+      };
+      let prima = lo - 1;
+      for (let k = lo; k <= hi; k++) {
+        if (!centri[k] || !versi[k]) continue;
+        out[k] = [centri[k][0] - versi[k][1] * resto[k], centri[k][1] + versi[k][0] * resto[k]];
+        ferme[k] = 1;
+        buco(prima, k);
+        prima = k;
+      }
+      buco(prima, hi + 1);
+      lo = hi + 1;
+      continue;
+    }
+    for (let k = lo; k <= hi; k++) {
+      const [nx, ny] = normale(k);
       const o = sposta[k] || 0;
-      out[k] = [punti[k][0] - ((b[1] - a[1]) / l) * o, punti[k][1] + ((b[0] - a[0]) / l) * o];
+      out[k] = [punti[k][0] + nx * o, punti[k][1] + ny * o];
       // Dove la linea di TomTom si stacca dalla via (taglia in mezzo
       // all'aiuola di un incrocio invece di seguire il raccordo), spostarla
       // di lato non basta: la fascia va sul mezzo della corsia della via,
@@ -791,9 +832,11 @@ export function fasciaSullaCorsia(punti, { sposta, spigoli = [], centri = null, 
       while (q < via.length - 1 && lunghi[q] < s) q++;
       const f = (s - lunghi[q - 1]) / Math.max(1e-9, lunghi[q] - lunghi[q - 1]);
       out[m] = [via[q - 1][0] + (via[q][0] - via[q - 1][0]) * f, via[q - 1][1] + (via[q][1] - via[q - 1][1]) * f];
+      ferme[m] = 1;
     }
     libero = i1;
   });
+  out.ferme = ferme;
   return out;
 }
 
@@ -860,11 +903,14 @@ export function dentroLAsfalto(fascia, h, cerca, { margine = 0.6, lontano = 6, r
         vx -= lungo * tx;
         vy -= lungo * ty;
       }
-      if (Math.hypot(vx, vy) < 0.05) continue;
       const costo = fuori + Math.hypot(vx - px, vy - py);
       if (!meglio || costo < meglio.costo) meglio = { vx, vy, costo };
     }
-    if (dentro || !meglio) {
+    // La strada più vicina sta dritta davanti (ci si arriva di testa, da
+    // una stradina che la mappa non ha): di lato non c'è niente da fare.
+    // Prima si passava alla strada dopo, di sbieco, e gli ultimi metri
+    // prima dell'asfalto piegavano di lato di tre o quattro metri.
+    if (dentro || !meglio || Math.hypot(meglio.vx, meglio.vy) < 0.05) {
       px = py = 0;
       continue;
     }
@@ -958,6 +1004,137 @@ export function togliDenti(fascia, { gradi = 20, massimo = 1.5, giri = 12 } = {}
   return p;
 }
 
+/**
+ * La fascia della vista «Corsie», fatta e finita: i punti `[x, y]`, uno per
+ * punto del percorso. [linea]: la linea del calcolatore; [punti]: la stessa
+ * già sulle strade (il profilo), uno ogni [passo] metri; [corsie]: il
+ * risultato di `corsieLungoIlPercorso` su [punti]; [h]: le quote; [cerca]:
+ * l'asfalto vicino a un punto (vedi [dentroLAsfalto]).
+ *
+ * Sul mezzo della corsia dove si sa ([fasciaSullaCorsia]), e quei punti non
+ * si toccano più; gli altri (dentro gli incroci, dove le vie mancano)
+ * levigati rispetto ai punti agganciati e rispetto alla linea vera —
+ * l'aggancio alle strade a volte salta da un punto all'altro, e la
+ * levigatura sui soli punti agganciati quei salti non li vedeva (lo
+ * zig-zag) —, dentro l'asfalto, e senza denti.
+ */
+export function fasciaDelPercorso(linea, punti, corsie, h, cerca, passo) {
+  const sulleCorsie = fasciaSullaCorsia(punti, corsie, passo);
+  const ferme = sulleCorsie.ferme;
+  const sullaStrada = levigaFascia(punti, sulleCorsie, passo, ferme);
+  const dentro = dentroLAsfalto(sullaStrada, h, cerca);
+  const liberi = staccatiDallaVia(corsie.scarti, passo);
+  for (let k = 0; k < liberi.length; k++) if (ferme[k]) liberi[k] = 1;
+  return smussaGliSpigoli(togliDenti(levigaFascia(linea, dentro, passo, liberi)));
+}
+
+/**
+ * Gli spigoli vivi della [fascia] diventano curve: dove gira di più di
+ * [gradi] in un punto solo, i punti fino a [tangente] metri prima e dopo si
+ * mettono su una curva che parte e arriva lungo i due lati (una Bézier con
+ * lo spigolo per punto di controllo).
+ *
+ * Alle svolte fra due vie la curva c'è già ([fasciaSullaCorsia]). Ma dove
+ * il percorso entra in strada da un posto che la mappa non ha (la partenza
+ * dal piazzale, l'arrivo nel cortile), o piega dentro un incrocio senza
+ * corsie, la fascia aveva lo spigolo del percorso, ad angolo retto.
+ */
+export function smussaGliSpigoli(fascia, { gradi = 50, tangente = 4 } = {}) {
+  const n = fascia.length;
+  if (n < 3) return fascia;
+  const out = fascia.map((q) => [q[0], q[1]]);
+  const limite = (gradi * Math.PI) / 180;
+  const lungo = (a, b) => Math.hypot(fascia[b][0] - fascia[a][0], fascia[b][1] - fascia[a][1]);
+  /** Il punto a [tangente] metri dallo spigolo [k] andando verso [passo] (-1 o 1), e l'ultimo indice toccato. */
+  const capo = (k, passo) => {
+    let fatti = 0;
+    let j = k;
+    while (j + passo >= 0 && j + passo < n) {
+      const l = lungo(j, j + passo);
+      if (fatti + l >= tangente) {
+        const f = (tangente - fatti) / (l || 1);
+        return { p: [fascia[j][0] + (fascia[j + passo][0] - fascia[j][0]) * f, fascia[j][1] + (fascia[j + passo][1] - fascia[j][1]) * f], j, fatti: tangente };
+      }
+      fatti += l;
+      j += passo;
+    }
+    return { p: fascia[j], j, fatti };
+  };
+  for (let k = 1; k < n - 1; k++) {
+    const a = fascia[k - 1];
+    const b = fascia[k];
+    const c = fascia[k + 1];
+    const ux = b[0] - a[0];
+    const uy = b[1] - a[1];
+    const vx = c[0] - b[0];
+    const vy = c[1] - b[1];
+    if (Math.hypot(ux, uy) < 1e-6 || Math.hypot(vx, vy) < 1e-6) continue;
+    if (Math.abs(Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy)) < limite) continue;
+    const prima = capo(k, -1);
+    const dopo = capo(k, 1);
+    const tutta = prima.fatti + dopo.fatti;
+    if (tutta < 1e-6) continue;
+    // Ogni punto fra i due capi: sulla curva, alla sua frazione di strada.
+    let fatti = prima.fatti;
+    for (let j = k; j >= prima.j; j--) {
+      if (j < k) fatti -= lungo(j, j + 1);
+      if (fatti <= 1e-9 && j < k) break;
+      const u = Math.max(0, fatti) / tutta;
+      out[j] = [(1 - u) ** 2 * prima.p[0] + 2 * u * (1 - u) * b[0] + u * u * dopo.p[0], (1 - u) ** 2 * prima.p[1] + 2 * u * (1 - u) * b[1] + u * u * dopo.p[1]];
+    }
+    fatti = prima.fatti;
+    for (let j = k + 1; j <= dopo.j; j++) {
+      fatti += lungo(j - 1, j);
+      if (fatti >= tutta - 1e-9) break;
+      const u = fatti / tutta;
+      out[j] = [(1 - u) ** 2 * prima.p[0] + 2 * u * (1 - u) * b[0] + u * u * dopo.p[0], (1 - u) ** 2 * prima.p[1] + 2 * u * (1 - u) * b[1] + u * u * dopo.p[1]];
+    }
+    k = dopo.j;
+  }
+  return out;
+}
+
+/** Da quanti metri dalla linea in su la fascia prende la quota della strada sotto. */
+const QUOTA_FASCIA_DA_M = 2.5;
+
+/**
+ * Le quote della fascia dove è andata su una strada lontana dalla linea del
+ * calcolatore: quella della strada sotto, non quella del punto da cui è
+ * partita. Dove la linea taglia sul prato e la fascia segue la bretella che
+ * scende al sottopasso, con la quota del prato restava a pezzi sotto
+ * l'asfalto. E se quella strada è in galleria, lì la fascia è «dentro».
+ *
+ * [pr]: il profilo (cambia `h` e `galleria`); [punti]: la linea agganciata;
+ * [fascia]: la fascia; [indice]: i segmenti delle strade. [vie] e [strade]
+ * (di `corsieLungoIlPercorso`): la via sotto ogni punto. Dove si sa, in
+ * galleria ci si è quando lo è la via — è lei che si disegna, con le corsie
+ * o scura e senza righe, e la fascia tenue e tratteggiata sopra un pezzo
+ * all'aperto (o piena sopra un sottopasso) non diceva la stessa cosa della
+ * strada.
+ */
+export function quoteSullaFascia(pr, punti, fascia, indice, vie = null, strade = null) {
+  const n = fascia.length;
+  for (let k = 0; k < n; k++) {
+    const [x, y] = fascia[k];
+    const via = vie && strade ? strade[vie[k]] : null;
+    if (via && pr.galleria) pr.galleria[k] = via.galleria ? 1 : 0;
+    const lontano = Math.hypot(x - punti[k][0], y - punti[k][1]);
+    const peso = Math.min(1, Math.max(0, (lontano - QUOTA_FASCIA_DA_M) / 3));
+    if (!peso) continue;
+    const a = fascia[Math.max(0, k - 1)];
+    const b = fascia[Math.min(n - 1, k + 1)];
+    let meglio = null;
+    for (const c of indice.candidati(x, y, b[0] - a[0], b[1] - a[1], 4, 1)) {
+      // La strada sotto la fascia, al piano più vicino a quello di prima.
+      const voto = c.d + Math.abs(c.h - pr.h[k]) / 2;
+      if (Math.abs(c.h - pr.h[k]) < 7 && (!meglio || voto < meglio.voto)) meglio = { h: c.h, voto, galleria: c.galleria };
+    }
+    if (!meglio) continue;
+    pr.h[k] += (meglio.h - pr.h[k]) * peso;
+    if (!via && pr.galleria && peso >= 0.5) pr.galleria[k] = meglio.galleria ? 1 : 0;
+  }
+}
+
 /** Da quanto piega la linea fra un punto e l'altro, uno scalino (vedi [levigaFascia]). */
 const SCALINO = (15 * Math.PI) / 180;
 
@@ -1045,6 +1222,20 @@ function curvaDellaSvolta(g, punti, passo, centri, versi) {
   let { pA, tA, pB, tB } = g;
   const O = punti[k];
   let X = spigoloDelleCorsie(O, pA, tA, pB, tB);
+  if (!X && centri && versi) {
+    // Il primo punto dopo lo spigolo può cadere sul capo di un altro pezzo
+    // della via di dopo (che al nodo continua anche dall'altra parte): lì la
+    // sua direzione è quella di quel pezzo, magari al contrario di come si
+    // arriva, e pareva un'inversione. Un tornante stretto a un bivio a «V»
+    // veniva una punta, girata dalla parte sbagliata. Si guarda dove va la
+    // corsia di dopo qualche punto più in là.
+    for (let j = 1; j <= 3 && !X; j++) {
+      const m = (g.kb ?? k + 1) + j;
+      if (!centri[m] || !versi[m]) continue;
+      const Y = spigoloDelleCorsie(O, pA, tA, centri[m], versi[m]);
+      if (Y) [X, pB, tB] = [Y, centri[m], versi[m]];
+    }
+  }
   if (X && centri && versi) {
     // La via di prima (o di dopo) può piegare vicino al nodo: la corsia si
     // prende nel suo punto più vicino allo spigolo, da questa parte (prima

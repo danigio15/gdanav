@@ -671,9 +671,11 @@ void main() {
   // correva sul prato e sui tornanti del sottopasso, a zig zag («ancora tutto
   // sbagliato»). Come nella vista di sempre: tenue e tratteggiata, senza punte,
   // così si capisce che passa sotto.
+  // (Non troppo tenue: adesso sotto ha la strada del sottopasso, scura, e
+  // su quella a un quarto di opacità non si leggeva più.)
   float sotto = step(9.5, vLivello);
   c = mix(c, mix(core, vec3(1.0), 0.2), sotto * chev);
-  a *= mix(1.0, (0.35 + 0.65 * step(0.5, fract(vUv.y / 6.0))) * 0.55, sotto);
+  a *= mix(1.0, (0.5 + 0.5 * step(0.5, fract(vUv.y / 6.0))) * 0.8, sotto);
   gl_FragColor = vec4(c * (1.0 + 0.25 * uNotte), a * uOpacita);
   #include <colorspace_fragment>
 }`;
