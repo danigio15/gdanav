@@ -823,9 +823,11 @@ const RASTREMA_M = 30;
  * una carreggiata che perde la corsia di emergenza: il bordo dell'asfalto
  * rientrava di colpo, di un metro e più. Negli ultimi [RASTREMA_M] metri
  * (meno, su una via corta) il bordo più largo si stringe fino a quello della
- * via dopo; quello più stretto resta dov'è. Solo fra due capi soli in un
- * nodo, quasi dritti (la stessa strada), e per differenze da banchina (le
- * corsie che cambiano le mettono in fila i raccordi).
+ * via dopo; quello più stretto resta dov'è. Fra due capi soli in un nodo, o
+ * fra un ramo a senso unico e la carreggiata in cui entra (o da cui esce:
+ * una rampa con la sua banchina che entra in una strada che non ne ha),
+ * quasi dritti, e per differenze da banchina (le corsie che cambiano le
+ * mettono in fila i raccordi).
  *
  * Restituisce, per ogni via che si stringe, `{sinistra(s), destra(s),
  * tagli}`: di quanto si spostano i due bordi a [s] metri (a sinistra
@@ -847,8 +849,14 @@ export function rastrematureDeiCapi(strade, ricche, bordi, tocchi, chiave) {
     for (const fine of [0, 1]) {
       const nodo = v.xyVia[fine ? n - 1 : 0];
       const altri = (tocchi.get(chiave(nodo)) ?? []).filter((t) => t.i !== i);
-      if (altri.length !== 1) continue;
-      const o = altri[0];
+      // La via in cui continua: l'unica altra, o (dove due carreggiate si
+      // uniscono o una si divide) l'unico senso unico che da lì riparte, o ci arriva.
+      let o = altri.length === 1 ? altri[0] : null;
+      if (!o && v.senso) {
+        const dopo = altri.filter((t) => strade[t.i].senso && (fine ? t.k === 0 : t.k === strade[t.i].xyVia.length - 1));
+        if (dopo.length === 1) o = dopo[0];
+      }
+      if (!o) continue;
       const ro = ricche[o.i];
       const no = strade[o.i].xyVia.length;
       if (ro.length < 2 || (o.k !== 0 && o.k !== no - 1)) continue;

@@ -941,3 +941,30 @@ test('una via che continua in una più stretta: il bordo dell’asfalto rientra 
   const bordi = uguali.map((v) => [bordiCorsie(v).sinistra + v.margini[0], bordiCorsie(v).destra - v.margini[1]]);
   assert.deepEqual(rastrematureDeiCapi(uguali, uguali.map((v) => lineaRicca(v.xy, v.h)), bordi, tocchi, chiave), [null, null]);
 });
+
+test('una rampa con la banchina che entra in una strada senza: il suo bordo rientra piano fino al nodo', () => {
+  // Due sensi unici si uniscono in (0, 0) in una strada a due corsie senza banchina:
+  // quello di destra è una superstrada a una corsia, con un metro e mezzo di banchina.
+  const strade = [
+    { id: 1, hw: 'trunk', oneway: 'yes', lanes: '1', g: [-300, -40, -150, -8, 0, 0] },
+    { id: 2, hw: 'primary', oneway: 'yes', lanes: '1', g: [-300, 40, -150, 8, 0, 0] },
+    { id: 3, hw: 'primary', oneway: 'yes', lanes: '2', g: [0, 0, 300, 0] },
+  ];
+  const pronte = preparaCorsie({ strade: strade.map((s) => ({ ...s, g: s.g.map((v, k) => (k % 2 ? v / 111195 : v / 111195)) })) });
+  const vie = pronte.strade.map((v) => {
+    const xy = [];
+    for (let i = 0; i < v.ll.length; i += 2) xy.push([v.ll[i] * 111195, v.ll[i + 1] * 111195]);
+    const xyVia = [];
+    for (let i = 0; i < v.llVia.length; i += 2) xyVia.push([v.llVia[i] * 111195, v.llVia[i + 1] * 111195]);
+    return { ...v, xy, xyVia, h: xy.map(() => 0) };
+  });
+  const sg = costruisciSegnaletica({ strade: vie, meta: 2000 });
+  // Il bordo destro di tutto l'asfalto a ogni x (il punto più a sud con l'asfalto sotto).
+  const destroA = (x) => {
+    let giu = null;
+    for (let y = 2; y > -14; y -= 0.05) if (asfaltoSotto(sg, x, y).length) giu = y;
+    return giu;
+  };
+  assert.ok(Math.abs(destroA(-1.5) - destroA(1.5)) < 0.3, `al nodo nessuno scalino: ${destroA(-1.5).toFixed(2)} e ${destroA(1.5).toFixed(2)}`);
+  for (let x = -40; x < 0; x += 4) assert.ok(Math.abs(destroA(x + 4) - destroA(x)) < 0.75, `fra ${x} e ${x + 4}: ${destroA(x).toFixed(2)} → ${destroA(x + 4).toFixed(2)}`);
+});
