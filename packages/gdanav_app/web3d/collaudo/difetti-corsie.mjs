@@ -662,9 +662,10 @@ export function difetti(T) {
         return dh >= 0.05 && dh <= 0.45 && s.o <= r.sx + 0.3 && s.o >= r.dx - 0.3;
       });
       if (bene) continue;
+      // La zebratura fra due rami: sull'asfalto suo, sotto di lei (vedi `segnaletica.js`),
+      // anche dove il cuneo tocca il capo tondo di una delle due vie.
+      if (fraDueRami(c) && t.corsie.asfalto && asfaltoSotto(c)) continue;
       if (!su) {
-        // La zebratura fra due rami: sull'asfalto suo, sotto di lei (vedi `segnaletica.js`).
-        if (fraDueRami(c) && t.corsie.asfalto && asfaltoSotto(c)) continue;
         let fuori = Infinity;
         for (const [r, k] of gC.vicini(c[0], c[1], 0)) fuori = Math.min(fuori, sulTratto(c, r.p[k - 1], r.p[k]).d - r.largo);
         metti('segnaletica-fuori', c[0], c[1], c[2], Number.isFinite(fuori) ? fuori : 5, `${Number.isFinite(fuori) ? fuori.toFixed(1) : '?'} m fuori`);

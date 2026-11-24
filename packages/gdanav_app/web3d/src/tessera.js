@@ -594,7 +594,9 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     let larghezze = f.larghezze;
     // I varchi nell'asfalto di ogni punto (per i metri lungo la strada): vedi il piano dell'impalcato.
     const varchi = new Map();
-    if (conCorsie && f.cls !== 'rail' && !f.galleria && tutta.some((p) => p[2] > 0.35)) {
+    // (Non le strade di servizio: non hanno corsie loro, e accanto a una
+    // carreggiata prenderebbero per suo l'asfalto di lei.)
+    if (conCorsie && f.cls !== 'rail' && f.cls !== 'service' && !f.galleria && tutta.some((p) => p[2] > 0.35)) {
       larghezze = tutta.map((p, k) => {
         const suoi = f.larghezze?.[k] ?? [f.w / 2, f.w / 2];
         if (p[2] <= 0.35) return suoi;

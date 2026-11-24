@@ -492,6 +492,8 @@ export function arrotondaLeCurve(linee, fermo = () => false, { scarto = SCARTO_C
 
 // ── I raccordi dove le carreggiate si dividono e si uniscono ─────────────
 
+/** Di quanto, al più, piega una rampa che entra o esce in mezzo a una carreggiata (radianti): di più è un incrocio. */
+const RAMPA_AL_PIU_RAD = (40 * Math.PI) / 180;
 /** Quanto è lungo, al più, il raccordo all'inizio o alla fine di una via. */
 const RACCORDO_M = { grande: 90, altro: 35 };
 
@@ -601,6 +603,10 @@ export function raccordi(strade) {
       for (const [j, o] of sp) {
         const v = strade[j];
         if (j === i || Math.abs(o) < 0.05) continue;
+        // Solo chi entra o esce quasi nel verso della carreggiata: di
+        // traverso è un incrocio (due sensi unici di città), non una rampa.
+        const piega = entra ? giro(verso(v, false) + Math.PI - riparte) : giro(verso(v, true) - arriva);
+        if (Math.abs(piega) > RAMPA_AL_PIU_RAD) continue;
         const lungo = Math.min(grande(v.hw) ? RACCORDO_M.grande : RACCORDO_M.altro, lunghezza(v) * 0.6);
         if (entra) Object.assign(out[j], { o1: o, t1: lungo });
         else Object.assign(out[j], { o0: o, t0: lungo });

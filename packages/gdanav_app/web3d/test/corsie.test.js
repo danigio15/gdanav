@@ -334,6 +334,16 @@ test('una rampa che entra o esce in mezzo alla carreggiata prende la corsia dall
   assert.ok(vicino(r[4].o1, centroCorsia(strade[3], 0)), `chi entra da sinistra finisce sulla corsia di sinistra (${r[4].o1})`);
   assert.deepEqual(r[0], { o0: 0, t0: 0, o1: 0, t1: 0 }, 'la carreggiata che passa resta dov’è');
   assert.ok(entra && esce && daSinistra);
+  // Due sensi unici che si incrociano (una via che finisce di traverso su un'altra) non sono uno svincolo.
+  const incrocio = [
+    { id: 1, hw: 'secondary', oneway: 'yes', lanes: '2', g: [-200, 0, 0, 0, 200, 0] },
+    { id: 2, hw: 'residential', oneway: 'yes', g: [-30, -150, 0, 0] },
+  ].map(normalizza);
+  for (const v of incrocio) {
+    v.xy = [];
+    for (let i = 0; i < v.ll.length; i += 2) v.xy.push([v.ll[i], v.ll[i + 1]]);
+  }
+  assert.deepEqual(raccordi(incrocio)[1], { o0: 0, t0: 0, o1: 0, t1: 0 });
 });
 
 test('a doppio senso la banchina è la stessa dei due sensi unici in cui la strada si divide', () => {

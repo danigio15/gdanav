@@ -907,8 +907,8 @@ const ALLINEA_COS = Math.cos((30 * Math.PI) / 180);
  * si taglia invece lungo la stessa linea della via in cui continua:
  *  - due capi soli in un nodo (la stessa strada, spezzata lì): tutti e due
  *    lungo la bisettrice, come una cornice;
- *  - un ramo a senso unico che entra in una carreggiata o ne esce (l'altra
- *    via lì continua da sola, o ci passa): il ramo come la carreggiata.
+ *  - una rampa a senso unico che entra in una carreggiata o ne esce (l'altra
+ *    via lì continua da sola, o ci passa): la rampa come la carreggiata.
  * Cambia le normali ai capi delle linee ricche [ricche] (i bordi, le righe e
  * i marciapiedi le seguono). [tocchi]: chi tocca ogni nodo (`{i, k}` per
  * [chiave] del punto di `xyVia`).
@@ -942,8 +942,9 @@ export function allineaICapi(strade, ricche, tocchi, chiave) {
         const o = normaleA(ricche[altri[0].i], nodo);
         const verso = o[0] * mia[3] + o[1] * mia[4] >= 0 ? 1 : -1;
         nuova = [mia[3] + o[0] * verso, mia[4] + o[1] * verso];
-      } else if (v.senso) {
+      } else if (v.senso && !MARCIAPIEDI[v.hw]) {
         // Un ramo: la via a senso unico che da qui continua da sola (o che qui passa).
+        // (Le rampe, non le vie di città: lì l'angolo è del marciapiede, coi suoi conti.)
         const dopo = altri.filter((t) => strade[t.i].senso && (fine ? t.k < strade[t.i].xyVia.length - 1 : t.k > 0));
         if (dopo.length === 1) nuova = normaleA(ricche[dopo[0].i], nodo);
       }
@@ -1453,14 +1454,18 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
      * di sinistra spesso non c'è più: sta sull'asfalto della carreggiata in
      * cui entra, vedi `sullAltra`), e dentro le strisce di sbieco, fitte, da
      * una riga all'altra e non oltre. */
-    const zVernice = (c) => Math.max(c.P[2], c.Q[2]) + dz;
+    // Ogni bordo alla quota del suo asfalto (i due rami possono già salire
+    // diversamente: tutto alla quota del più alto, la riga dell'altro restava sospesa).
+    const dzS = sopraAsfalto(sin, sopra) + 0.02;
+    const zP = (p) => p[2] + dz;
+    const zQ = (q) => q[2] + dzS;
     // Il bordo di sinistra del cuneo a [sv] metri lungo il ramo di destra (fra una coppia e l'altra).
     const sinistraA = (sv) => {
       let k = 1;
       while (k < coppie.length - 1 && coppie[k].s < sv) k++;
       const [a, b] = [coppie[k - 1], coppie[k]];
       const t = Math.max(0, Math.min(1, (sv - a.s) / (b.s - a.s)));
-      return [a.Q[0] + (b.Q[0] - a.Q[0]) * t, a.Q[1] + (b.Q[1] - a.Q[1]) * t];
+      return [0, 1, 2].map((j) => a.Q[j] + (b.Q[j] - a.Q[j]) * t);
     };
     for (let k = 1; k < coppie.length; k++) {
       const [prima, ora] = [coppie[k - 1], coppie[k]];
@@ -1469,31 +1474,29 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
       /* L'asfalto fra i due bordi, sotto le strisce: la zebratura è dipinta
        * sull'asfalto. Prima le strisce del triangolo stavano sul prato fra
        * le due carreggiate (fuori dal loro asfalto anche di due metri). */
-      const za = zVernice(prima) - 0.026;
-      const zb = zVernice(ora) - 0.026;
-      asfalto.quad([prima.Q[0], prima.Q[1], za], [prima.P[0], prima.P[1], za], [P[0], P[1], zb], [Q[0], Q[1], zb], [0, 0, 1]);
+      const giu = 0.026;
+      asfalto.quad([prima.Q[0], prima.Q[1], zQ(prima.Q) - giu], [prima.P[0], prima.P[1], zP(prima.P) - giu], [P[0], P[1], zP(P) - giu], [Q[0], Q[1], zQ(Q) - giu], [0, 0, 1]);
       // Le due righe che chiudono il cuneo, dove starebbero quelle di bordo dei due rami.
       const wB = RIGHE.bordo;
-      for (const [x, verso] of [
-        ['P', -1],
-        ['Q', 1],
+      for (const [x, verso, zDi] of [
+        ['P', -1, zP],
+        ['Q', 1, zQ],
       ]) {
         const [a, b] = [prima[x], ora[x]];
         // A sinistra di chi va: (-ty, tx). Il ramo di destra sta a destra del suo bordo, quello di sinistra a sinistra.
         const A = [a[0] - a[4] * wB * verso, a[1] + a[3] * wB * verso];
         const Bq = [b[0] - b[4] * wB * verso, b[1] + b[3] * wB * verso];
-        const z0 = zVernice(prima);
-        const z1 = zVernice(ora);
+        const z0 = zDi(a);
+        const z1 = zDi(b);
         if (verso > 0) vernice.quad([a[0], a[1], z0], [b[0], b[1], z1], [Bq[0], Bq[1], z1], [A[0], A[1], z0], [0, 0, 1]);
         else vernice.quad([A[0], A[1], z0], [Bq[0], Bq[1], z1], [b[0], b[1], z1], [a[0], a[1], z0], [0, 0, 1]);
       }
       // La striscia: dal bordo della rampa indietro, di sbieco, fino all'altro bordo.
       const [tx, ty] = [P[3], P[4]];
-      const [qx, qy] = sinistraA(ora.s - g);
-      if (Math.hypot(qx - P[0], qy - P[1]) < 1.2) continue;
+      const q = sinistraA(ora.s - g);
+      if (Math.hypot(q[0] - P[0], q[1] - P[1]) < 1.2) continue;
       const w = 0.25;
-      const z = zVernice(ora);
-      vernice.quad([P[0] - tx * w, P[1] - ty * w, z], [P[0] + tx * w, P[1] + ty * w, z], [qx + tx * w, qy + ty * w, z], [qx - tx * w, qy - ty * w, z], [0, 0, 1]);
+      vernice.quad([P[0] - tx * w, P[1] - ty * w, zP(P)], [P[0] + tx * w, P[1] + ty * w, zP(P)], [q[0] + tx * w, q[1] + ty * w, zQ(q)], [q[0] - tx * w, q[1] - ty * w, zQ(q)], [0, 0, 1]);
     }
   }
 
