@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { bordiCorsie, normalizza, preparaCorsie } from '../src/corsie.js';
 import { latDaMerc, lonDaMerc, sistemaTessera } from '../src/geo.js';
-import { ALTO_MARCIAPIEDE, ANGOLO, CORDOLO_M, angoloMarciapiede, lineaRicca, MARCIAPIEDI, RIGHE, SCIVOLO, costruisciSegnaletica, formaFreccia, semplificaPezzo, togli, trattini } from '../src/segnaletica.js';
+import { ALTO_MARCIAPIEDE, ANGOLO, CORDOLO_M, SOPRA_GALLERIA_CORSIE, angoloMarciapiede, lineaRicca, MARCIAPIEDI, RIGHE, SCIVOLO, costruisciSegnaletica, formaFreccia, semplificaPezzo, sopraAsfalto, togli, trattini } from '../src/segnaletica.js';
 import { costruisciTessera, infittisci, sfoltisciQuote } from '../src/tessera.js';
 import { cavalcavia, strato } from './finte.js';
 
@@ -212,6 +212,8 @@ test('la tessera con le corsie: le geometrie in più, i nastri coperti spenti; s
       { id: 1, hw: 'motorway', lanes: '3', 'turn:lanes': '||slight_right', g: [...ll(-800, 0), ...ll(0, 0)] },
       { id: 2, hw: 'motorway', lanes: '2', g: [...ll(0, 0), ...ll(800, 0)] },
       { id: 3, hw: 'motorway_link', g: [...ll(0, 0), ...ll(300, -80)] },
+      // La strada del cavalcavia c'è anche nei dati (senza corsie), sul ponte.
+      { id: 4, hw: 'service', bridge: 'yes', layer: '1', g: [...ll(0, -900), ...ll(0, 900)] },
     ],
     nodi: [],
   };
@@ -643,4 +645,98 @@ test('la quota delle vie: i punti in più restano solo dove la quota non va drit
   assert.deepEqual(via.h, [h[0], h[6], h[10]]);
   // Tutta dritta: solo i capi.
   assert.equal(sfoltisciQuote(xy, xy.map(([x]) => x * 0.02), nuovi).xy.length, 2);
+});
+
+// ── Le strade sballate della vista «Corsie»: le regole, su strade inventate ──
+
+test('la zebratura sta sull’asfalto: fra i due rami che si dividono c’è l’asfalto sotto le strisce', () => {
+  const arriva = via({ id: 1, hw: 'motorway', lanes: '3', oneway: 'yes' }, [
+    [-200, 0],
+    [0, 0],
+  ]);
+  const dritta = via({ id: 2, hw: 'motorway', lanes: '2', oneway: 'yes' }, [
+    [0, 0],
+    [300, 0],
+  ]);
+  const esce = via({ id: 3, hw: 'motorway_link', lanes: '1', oneway: 'yes' }, [
+    [0, 0],
+    [300, -60],
+  ]);
+  const sg = costruisciSegnaletica({ strade: [arriva, dritta, esce], meta: 1000 });
+  const z = zebrature(sg);
+  assert.ok(z.length >= 3);
+  const asfalto = triangoliDi(sg.asfalto);
+  for (const [x, y] of z) assert.ok(sotto(asfalto, x, y), `una striscia sul prato: ${x.toFixed(1)},${y.toFixed(1)}`);
+  // E sotto le strisce, non sopra: l'asfalto della zebratura sta sotto la vernice.
+  const zv = Math.min(...sg.vernice.p.filter((_, k) => k % 3 === 2));
+  const za = Math.max(...asfalto.flat().map((q) => q[2]));
+  assert.ok(za < zv, `asfalto ${za} sotto la vernice ${zv}`);
+});
+
+test('una galleria passa sotto la strada a terra: il suo asfalto più in basso, mai alla stessa quota', () => {
+  const sopra = () => 0.2;
+  const strada = via({ id: 1, hw: 'primary' }, fitta([-100, 0], [100, 0], 4));
+  const galleria = via({ id: 2, hw: 'primary', tunnel: 'yes', layer: '-1' }, fitta([0, -100], [0, 100], 4));
+  assert.ok(galleria.galleria);
+  assert.equal(sopraAsfalto(galleria, sopra), SOPRA_GALLERIA_CORSIE);
+  assert.ok(sopraAsfalto(galleria, sopra) < sopraAsfalto(strada, sopra) - 0.05);
+  const sg = costruisciSegnaletica({ strade: [strada, galleria], sopra, meta: 1000 });
+  // L'asfalto della galleria (lontano dall'incrocio) sta sotto quello della strada.
+  const tri = triangoliDi(sg.asfalto);
+  const quota = (x, y) => Math.max(...tri.filter((t) => sotto([t], x, y)).map((t) => t[0][2]));
+  assert.ok(quota(0, 50) < quota(50, 0) - 0.05, `${quota(0, 50)} / ${quota(50, 0)}`);
+  // All'incrocio vince la strada di sopra.
+  assert.ok(Math.abs(quota(0, 0) - 0.2) < 0.01);
+});
+
+test('l’angolo tondo non esce dall’asfalto dove una via curva subito dopo l’angolo', () => {
+  // Una strada da ovest a est; un ramo a senso unico che se ne stacca a
+  // trenta gradi e dopo otto metri piega ancora: le tangenti nei punti dove
+  // comincia l'arco si incontravano fuori dalle due vie, e l'asfalto che
+  // riempie l'angolo era un triangolo sul prato.
+  const a = via({ id: 1, hw: 'primary' }, fitta([-120, 0], [120, 0], 4));
+  const curva = [[0, 0]];
+  let th = (-30 * Math.PI) / 180;
+  for (let k = 1; k <= 40; k++) {
+    if (k > 4 && k < 12) th -= (6 * Math.PI) / 180;
+    curva.push([curva[k - 1][0] + Math.cos(th) * 2, curva[k - 1][1] + Math.sin(th) * 2]);
+  }
+  const b = via({ id: 2, hw: 'residential', oneway: 'yes' }, curva);
+  const sg = costruisciSegnaletica({ strade: [a, b], meta: 1000 });
+  for (const t of triangoliDi(sg.asfalto)) {
+    const c = [(t[0][0] + t[1][0] + t[2][0]) / 3, (t[0][1] + t[1][1] + t[2][1]) / 3];
+    const fuori = Math.min(...[a, b].map((v) => Math.min(...v.xy.map((q) => Math.hypot(q[0] - c[0], q[1] - c[1]))) - (bordiCorsie(v).sinistra + v.margini[0])));
+    assert.ok(fuori < 2, `asfalto a ${fuori.toFixed(1)} m dalle vie: ${c[0].toFixed(1)},${c[1].toFixed(1)}`);
+  }
+});
+
+test('il capo tondo di una via larga che sbocca su una stretta non sporge dall’altra parte', () => {
+  // Una stretta da sud a nord; una larga (quattro corsie) da ovest che finisce sul suo mezzo.
+  const stretta = via({ id: 1, hw: 'residential', oneway: 'yes', lanes: '1' }, fitta([0, -100], [0, 100], 4));
+  const larga = via({ id: 2, hw: 'primary', lanes: '4' }, fitta([-100, 0], [0, 0], 4));
+  const sg = costruisciSegnaletica({ strade: [stretta, larga], meta: 1000 });
+  const mezzaStretta = bordiCorsie(stretta).sinistra + stretta.margini[0];
+  for (const t of triangoliDi(sg.asfalto)) {
+    for (const q of t) assert.ok(q[0] < mezzaStretta + 0.05, `oltre la stretta: ${q[0].toFixed(2)},${q[1].toFixed(2)}`);
+  }
+});
+
+test('niente zebratura fra due rami che si aprono subito: lì c’è un’isola', () => {
+  // Una strada che arriva e si divide in due rami a senso unico che si
+  // allontanano a sessanta gradi l'uno dall'altro.
+  const arriva = via({ id: 1, hw: 'primary', lanes: '2', oneway: 'yes' }, [
+    [-200, 0],
+    [0, 0],
+  ]);
+  const su = via({ id: 2, hw: 'primary', oneway: 'yes' }, [
+    [0, 0],
+    [150, 87],
+  ]);
+  const giu = via({ id: 3, hw: 'primary', oneway: 'yes' }, [
+    [0, 0],
+    [150, -87],
+  ]);
+  // (Le righe dei due rami, lunghe e di sbieco, non contano: solo quello che sta fra loro.)
+  const fra = zebrature(costruisciSegnaletica({ strade: [arriva, su, giu], meta: 1000 })).filter(([x, y]) => x > 3 && Math.abs(Math.atan2(y, x)) < (20 * Math.PI) / 180);
+  assert.deepEqual(fra, []);
 });

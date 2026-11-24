@@ -1329,7 +1329,7 @@ function prendiCorsie() {
     for (const f of d.filari ?? []) filari.set(f.id ?? f.g.join(), f);
   }
   S.corsiePronte = preparaCorsie({ strade: [...strade.values()], nodi: [...nodi.values()], alberi: [...alberi.values()], filari: [...filari.values()] });
-  for (const v of S.corsiePronte.strade) v.riquadro = riquadroLonLat(v.ll);
+  for (const v of [...S.corsiePronte.strade, ...S.corsiePronte.altre]) v.riquadro = riquadroLonLat(v.ll);
   indicizzaCorsie();
   if (S.corsie) {
     // Le tessere costruite che le vie nuove toccano (coi raccordi delle
@@ -1371,7 +1371,9 @@ function corsiePerTessera(z, x, y) {
   const e = lonDaMerc((x + 1) / n) + MARGINE_CORSIE;
   const nord = latDaMerc(y / n) + MARGINE_CORSIE;
   const sud = latDaMerc((y + 1) / n) - MARGINE_CORSIE;
-  const strade = c.strade.filter((v) => v.riquadro[2] >= o && v.riquadro[0] <= e && v.riquadro[3] >= sud && v.riquadro[1] <= nord).map(({ xy, sxy, riquadro, ...v }) => v);
+  const tocca = (v) => v.riquadro[2] >= o && v.riquadro[0] <= e && v.riquadro[3] >= sud && v.riquadro[1] <= nord;
+  const strade = c.strade.filter(tocca).map(({ xy, sxy, riquadro, ...v }) => v);
+  const altre = (c.altre ?? []).filter(tocca).map(({ riquadro, ...v }) => v);
   if (!strade.length && !c.alberi.length) return null;
   const dentro = (lon, lat) => lon >= o && lon <= e && lat >= sud && lat <= nord;
   const nodi = c.nodi.filter((q) => dentro(q.g[0], q.g[1]));
@@ -1380,7 +1382,7 @@ function corsiePerTessera(z, x, y) {
     for (let i = 0; i < f.g.length; i += 2) if (dentro(f.g[i], f.g[i + 1])) return true;
     return false;
   });
-  return { strade, nodi, alberi, filari };
+  return { strade, nodi, alberi, filari, altre };
 }
 
 /**

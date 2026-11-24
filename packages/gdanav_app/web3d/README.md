@@ -122,7 +122,14 @@ la mappa scarica già (OpenFreeMap, schema OpenMapTiles).
   le corsie le chiede la regia al relay, una tessera z14 alla volta lungo i
   prossimi tre chilometri (`lib/stato/corsie_relay.dart`); le corsie giuste
   di TomTom vanno nel messaggio `manovra`, e dove c'è coda la fascia prende
-  il colore del traffico. Su Android Auto c'è l'interruttore «Corsie» come
+  il colore del traffico. Con le corsie vere il relay ha l'ultima parola
+  sulle strade: una strada della mappa senza una via guidabile del relay
+  (privata, in costruzione, tolta) non si disegna, né i suoi ponti
+  (`senzaDati` in `src/tessera.js`); una via che OpenStreetMap non dà come
+  ponte sale solo come una rampa attaccata a un ponte (`tettoDelleRampe`), e
+  la strada della mappa lungo di lei scende con lei; le gallerie hanno
+  l'asfalto sotto quello delle strade che passano sopra, la zebratura il suo
+  asfalto, gli angoli e i capi tondi restano dentro le strade. Su Android Auto c'è l'interruttore «Corsie» come
   quello del 3D aumentato; su CarPlay, come il 3D aumentato, non c'è.
 
 L'app parla con la pagina coi messaggi di `src/messaggi.js` (lo stesso
@@ -164,6 +171,18 @@ Bologna (Casalecchio).
 NODE_USE_ENV_PROXY=1 node collaudo/collaudo.mjs collaudo/uscita [caso…]
 NODE_USE_ENV_PROXY=1 node collaudo/video.mjs collaudo/uscita rho 1700 2150 70
 NODE_USE_ENV_PROXY=1 node collaudo/auto.mjs collaudo/uscita
+```
+
+`collaudo/difetti-corsie.mjs` cerca da sé i difetti della vista «Corsie»
+su tante tessere vere (le zone in un file fuori dal repo): strade in alto
+senza un ponte nei dati, strade che nei dati non ci sono o doppie, incroci
+fusi fra livelli diversi, toppe d'asfalto fuori dalle strade, rotonde
+rotte, scalini, segnaletica fuori dalla carreggiata; conta i casi per tipo,
+i tempi di costruzione, fa la pianta dall'alto dei peggiori e confronta
+con un rapporto di prima.
+
+```sh
+NODE_USE_ENV_PROXY=1 node collaudo/difetti-corsie.mjs zone.json uscita [prima/rapporto.json]
 ```
 
 I casi: Rho/Pero (rampa sul viadotto A52 e cavalcavia di secondo livello),

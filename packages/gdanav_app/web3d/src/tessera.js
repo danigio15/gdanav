@@ -10,7 +10,7 @@
 
 import { generatore, mescola, semeTessera } from './caso.js';
 import { Costruttore, matrice } from './costruttore.js';
-import { CLASSI_STRADE, PENDENZA_MAX, SPESSORE_IMPALCATO, altezzaViadotto, grafoStrade, uniscIBordi } from './elevazione.js';
+import { ALTEZZA_LIVELLO, CLASSI_STRADE, PENDENZA, PENDENZA_MAX, SPESSORE_IMPALCATO, altezzaViadotto, grafoStrade, uniscIBordi } from './elevazione.js';
 import { ESTENSIONE, sistemaTessera } from './geo.js';
 import {
   anelliPoligoni,
@@ -214,6 +214,55 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
   // `corsie.js`), alle quote delle strade della tessera; i nastri di sempre
   // che quelle vie coprono non si disegnano.
   const conCorsie = datiCorsie?.strade?.length ? corsieDellaTessera(datiCorsie, sys, linee, visibili, meta) : null;
+  // Con le corsie vere (non stimate), le vie guidabili del relay: le strade
+  // della mappa che non ci sono non si disegnano (vedi [senzaDati]).
+  const vieVere =
+    conCorsie && datiCorsie.strade.some((v) => !v.stimata)
+      ? vieDelRelay([
+          ...conCorsie.strade.map((v) => v.xyVia),
+          ...(datiCorsie.altre ?? []).map((a) => {
+            const out = [];
+            for (let i = 0; i + 1 < a.ll.length; i += 2) out.push(sys.daLonLat(a.ll[i], a.ll[i + 1]));
+            return out;
+          }),
+        ])
+      : null;
+  /* Le strade della mappa lungo una via con le corsie stanno alla sua quota
+   * (`quotaCorsie`), e lungo le altre vie del relay non più in alto di loro
+   * (`tettoQui`, vedi [corsieDellaTessera]): le opere, i piloni e il
+   * percorso alla quota dell'asfalto. Anche i ponti della mappa: dove il
+   * relay dà la stessa strada a terra, il ponte non c'è (un viadotto sopra
+   * una strada che gli corre sotto ha la sua via, alta, e resta). Il resto
+   * della strada le viene incontro senza scalini. Solo con le corsie vere:
+   * quelle stimate vengono dalla mappa, e non sanno niente di più. */
+  if (vieVere) {
+    linee.forEach((pts, i) => {
+      const f = visibili[i];
+      if (f.galleria || f.cls === 'rail') return;
+      let cambiata = false;
+      pts.forEach((q, k) => {
+        const a = pts[Math.max(0, k - 1)];
+        const b = pts[Math.min(pts.length - 1, k + 1)];
+        // Lungo la sua via con le corsie (della stessa classe), alla sua
+        // quota (un ponte della mappa solo se è poco più su o più giù: molto
+        // più in alto è un'altra strada, o la stessa due volte, vedi `doppia`).
+        const c = conCorsie.quotaCorsie(q[0], q[1], b[0] - a[0], b[1] - a[1], q[2], Math.min(f.w / 2, 4) + 2, f.cls);
+        if (c !== null && Math.abs(c - q[2]) > 0.05 && (!f.ponte || Math.abs(c - q[2]) <= 2)) {
+          q[2] = c;
+          cambiata = true;
+          return;
+        }
+        const t = conCorsie.tettoQui(q[0], q[1], b[0] - a[0], b[1] - a[1], Math.min(f.w / 2, 4) + 3);
+        if (t === null || q[2] <= t + 0.05) return;
+        q[2] = t;
+        cambiata = true;
+      });
+      if (!cambiata) return;
+      const h = pts.map((q) => q[2]);
+      limitaPendenza(h, pts);
+      pts.forEach((q, k) => (q[2] = h[k]));
+    });
+  }
   const estremi = new Map();
   linee.forEach((pts, i) => {
     if (pts.length < 2) return;
@@ -522,9 +571,26 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     // (Con le mezze larghezze a sinistra e a destra, dove la strada si stringe fra le case.)
     const ricca = tutta.map((p, k) => (f.larghezze ? [p[0], p[1], p[2], tang[k][0], tang[k][1], lungo[k], f.larghezze[k][0], f.larghezze[k][1]] : [p[0], p[1], p[2], tang[k][0], tang[k][1], lungo[k]]));
     const semePezzo = mescola(Math.round(tutta[0][0] * 7), Math.round(tutta[0][1] * 7));
+    // I pezzi senza una via vera sotto (vedi [senzaDati]): niente nastro né opere.
+    const senza = vieVere && f.cls !== 'rail' ? senzaDati(tutta, f.w, vieVere, f.cantiere) : null;
+    /* E dove la stessa strada, con le corsie, passa a un'altra quota: la
+     * mappa, coi suoi dati di prima, la dà a terra e il relay su un ponte (o
+     * il contrario), e si vedevano tutte e due, una sotto l'altra. */
+    if (senza && f.cls !== 'rail' && !f.galleria) {
+      tutta.forEach((q, k) => {
+        if (!senza[k] && conCorsie.doppia(q[0], q[1], tang[k][0], tang[k][1], q[2], f.cls)) senza[k] = true;
+      });
+    }
+    const nascostoA = (sv) => {
+      if (!senza) return false;
+      let k = 1;
+      while (k < n0 - 1 && lungo[k] < sv) k++;
+      return senza[k - 1] && senza[k];
+    };
     const zs = f.galleria ? SOPRA_GALLERIA : (SOPRA[f.cls] ?? 0.15) + (fi % 7) * 0.002;
 
-    // I segmenti con le quote, un poco oltre il bordo (per il percorso).
+    // I segmenti con le quote, un poco oltre il bordo (per il percorso). Non
+    // dove la strada non si disegna: il percorso non ci sale.
     if (f.cls !== 'rail') {
       // Il senso unico (OpenMapTiles: 1 come la linea, -1 al contrario): 128 o
       // 256, perché il percorso non si agganci alla carreggiata opposta.
@@ -533,6 +599,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         for (let k = 1; k < pezzo.length; k++) {
           const a = pezzo[k - 1];
           const b = pezzo[k];
+          if (senza && nascostoA((a[5] + b[5]) / 2)) continue;
           segmenti.push(a[0], a[1], a[2] + zs, b[0], b[1], b[2] + zs, f.w, codice + (f.rampa ? 16 : 0) + (f.ponte ? 32 : 0) + (f.galleria ? 64 : 0));
           latiSegmenti?.push(((a[6] ?? f.w / 2) + (b[6] ?? f.w / 2)) / 2, ((a[7] ?? f.w / 2) + (b[7] ?? f.w / 2)) / 2);
         }
@@ -545,7 +612,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     if (f.galleria && !sottopassi.has(f)) {
       for (const e of [0, n0 - 1]) {
         const nodo = nodi[f.nodi[e]];
-        if (!nodo.feats.some((j) => !feats[j].galleria) || !dentro(nodo.x, nodo.y)) continue;
+        if (!nodo.feats.some((j) => !feats[j].galleria) || !dentro(nodo.x, nodo.y) || senza?.[e]) continue;
         const [ux, uy] = versoFuori(tutta, e);
         const vx = -uy;
         const vy = ux;
@@ -612,6 +679,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         const l1 = base + 2 * k;
         const r1 = l1 + 1;
         if (coperto && coperto[k - 1] && coperto[k]) continue;
+        if (senza && nascostoA(pezzo[k - 1][5] + 0.01) && nascostoA(pezzo[k][5] - 0.01)) continue;
         const ux = R[k - 1][0] - L[k - 1][0];
         const uy = R[k - 1][1] - L[k - 1][1];
         const vx = R[k][0] - L[k - 1][0];
@@ -728,6 +796,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         const ha = pezzo[k - 1][2];
         const hb = pezzo[k][2];
         if (ha < 0.35 && hb < 0.35) continue;
+        if (senza && nascostoA((pezzo[k - 1][5] + pezzo[k][5]) / 2)) continue;
         // Una strada non segnata come ponte ma alta (la salita di un viadotto
         // alto): da qui in su è un viadotto anche lei, non un muro.
         const comePonte = f.ponte || (ha > ALTO_COME_PONTE && hb > ALTO_COME_PONTE);
@@ -849,7 +918,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         for (const e of [0, n - 1]) {
           const P = pezzo[e];
           const capo = e === 0 ? P[5] < 0.5 : P[5] > lungo[n0 - 1] - 0.5;
-          if (!capo || P[2] < 2.5 || !dentro(P[0], P[1])) continue;
+          if (!capo || P[2] < 2.5 || !dentro(P[0], P[1]) || nascostoA(P[5])) continue;
           const dir = e === 0 ? -1 : 1;
           // Un ponte spezzato in più pezzi può finire sopra una strada: lì niente spalla.
           const cx0 = P[0] + P[3] * 0.7 * dir;
@@ -902,7 +971,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
         }
         const libero = (sv) => !vietati.some(([a, b]) => sv > a && sv < b);
         const metti = (sv) => {
-          if (sv < pezzo[0][5] || sv > pezzo[n - 1][5] || !libero(sv)) return false;
+          if (sv < pezzo[0][5] || sv > pezzo[n - 1][5] || !libero(sv) || nascostoA(sv)) return false;
           const [px, py, h, tx, ty] = aS(sv);
           if (h < (f.ponte ? 2.5 : ALTO_COME_PONTE)) return false;
           const tl = Math.hypot(tx, ty) || 1;
@@ -946,6 +1015,10 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
           const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
           if (!d) continue;
           while (b[5] >= prossimo) {
+            if (nascostoA(prossimo)) {
+              prossimo += 48;
+              continue;
+            }
             const t = (prossimo - a[5]) / Math.max(1e-6, b[5] - a[5]);
             const px = a[0] + (b[0] - a[0]) * t;
             const py = a[1] + (b[1] - a[1]) * t;
@@ -2400,6 +2473,100 @@ export function sfoltisciQuote(xy, h, nuovi, tolleranza = 0.05) {
   return { xy: xy.filter((_, k) => tieni[k]), h: h.filter((_, k) => tieni[k]) };
 }
 
+/** Oltre la sua mezza larghezza, fin dove una via del relay fa «vera» una strada della mappa (m). */
+const SENZA_DATI_M = 4;
+/** E per una strada che la mappa dà in costruzione, quanto vicina deve essere la via (m). */
+const CANTIERE_M = 3;
+/** Da quanti metri di fila in su un pezzo senza una via vera non si disegna. */
+const SENZA_DATI_LUNGO_M = 15;
+
+/**
+ * Le vie guidabili del relay ([linee]: `[[x, y], …]` nei metri della
+ * tessera) in una griglia: `vicina(x, y, r, tx, ty)` dice se una passa a
+ * meno di [r] metri, nel verso (tx, ty) o al contrario (non di traverso: una
+ * via che passa sotto non fa vera la strada di sopra).
+ */
+export function vieDelRelay(linee, cella = 25) {
+  const griglia = new Map();
+  for (const p of linee) {
+    for (let k = 1; k < p.length; k++) {
+      const [a, b] = [p[k - 1], p[k]];
+      for (let cx = Math.floor(Math.min(a[0], b[0]) / cella); cx <= Math.floor(Math.max(a[0], b[0]) / cella); cx++) {
+        for (let cy = Math.floor(Math.min(a[1], b[1]) / cella); cy <= Math.floor(Math.max(a[1], b[1]) / cella); cy++) {
+          const kk = cx + ',' + cy;
+          if (!griglia.has(kk)) griglia.set(kk, []);
+          griglia.get(kk).push([a, b]);
+        }
+      }
+    }
+  }
+  return {
+    vicina(x, y, r, tx = 0, ty = 0) {
+      for (let cx = Math.floor((x - r) / cella); cx <= Math.floor((x + r) / cella); cx++) {
+        for (let cy = Math.floor((y - r) / cella); cy <= Math.floor((y + r) / cella); cy++) {
+          for (const [a, b] of griglia.get(cx + ',' + cy) ?? []) {
+            if (distanzaSegmento(x, y, a[0], a[1], b[0], b[1]) >= r) continue;
+            const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+            if ((tx || ty) && Math.abs(((b[0] - a[0]) * tx + (b[1] - a[1]) * ty) / l) < 0.6) continue;
+            return true;
+          }
+        }
+      }
+      return false;
+    },
+  };
+}
+
+/**
+ * Nella vista «Corsie», dove una strada della mappa ([punti]: `[x, y, …]`,
+ * larga [w]) non ha una via guidabile del relay ([vie], da [vieDelRelay]):
+ * per ogni punto, `true` se lì non si disegna.
+ *
+ * «Sopraelevate dove non ci sono strade, strade dove non ce ne sono»: la
+ * mappa disegna anche le strade private (i viali chiusi di una fiera, i
+ * piazzali di una fabbrica, coi loro cavalcavia) e quelle che per lei sono
+ * ancora in costruzione; il relay, da OpenStreetMap, dà solo quelle dove si
+ * può passare. Nella vista «Corsie», con le corsie vere, una strada della
+ * mappa che per più di [SENZA_DATI_LUNGO_M] metri di fila non ha una via del
+ * relay a meno di [SENZA_DATI_M] metri dal suo bordo (al più a otto dal suo
+ * mezzo) non c'è: né il nastro né l'impalcato, i parapetti, i piloni, né il
+ * percorso sopra; e così una strada tutta senza via, anche corta. I pezzi
+ * più corti di una strada che per il resto ha la sua via (dove le due
+ * geometrie si scostano a un incrocio) restano.
+ */
+export function senzaDati(punti, w, vie, cantiere = false) {
+  const n = punti.length;
+  // (Al più quattro metri di mezza larghezza: una strada larga della mappa
+  // non prende per sua la via a dieci metri. Una strada in costruzione per
+  // la mappa, solo la via che le sta proprio sopra: il viadotto nuovo
+  // accanto a quello vecchio, per la mappa ancora un cantiere, non c'è.)
+  const entro = cantiere ? CANTIERE_M : Math.min(w / 2, 4) + SENZA_DATI_M;
+  const senza = punti.map((q, k) => {
+    const a = punti[Math.max(0, k - 1)];
+    const b = punti[Math.min(n - 1, k + 1)];
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    return !vie.vicina(q[0], q[1], entro, (b[0] - a[0]) / l, (b[1] - a[1]) / l);
+  });
+  // Una strada tutta senza via (anche corta: i pezzi di un piazzale privato
+  // sono tanti e brevi) non c'è.
+  if (senza.every(Boolean)) return senza;
+  for (let k = 0; k < n; ) {
+    if (!senza[k]) {
+      k++;
+      continue;
+    }
+    let j = k;
+    while (j < n && senza[j]) j++;
+    // Il pezzo da k a j-1, con metà dei tratti fino ai punti con la via accanto.
+    const tratto = (q) => (q >= 1 && q < n ? Math.hypot(punti[q][0] - punti[q - 1][0], punti[q][1] - punti[q - 1][1]) : 0);
+    let lungo = (tratto(k) + tratto(j)) / 2;
+    for (let q = k + 1; q < j; q++) lungo += tratto(q);
+    if (lungo < SENZA_DATI_LUNGO_M) senza.fill(false, k, j);
+    k = j;
+  }
+  return senza;
+}
+
 /** Quanto sopra la quota sta l'asfalto delle corsie: come il nastro della sua classe, un poco sopra. */
 function sopraCorsie(hw) {
   const b = String(hw ?? '').replace(/_link$/, '');
@@ -2560,8 +2727,81 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
       ultimo = k;
     }
     limitaPendenza(h, xy);
-    const via = sfoltisciQuote(xy, h, fitta.nuovi);
-    strade.push({ ...v0, xy: via.xy, xyVia: inMetri(v0.llVia ?? v0.ll), h: via.h });
+    strade.push({ ...v0, xy, xyVia: inMetri(v0.llVia ?? v0.ll), h, nuovi: fitta.nuovi });
+  }
+  /* Niente in alto senza un ponte nei dati: una via che OpenStreetMap non
+   * dà come ponte (né con un `layer` sopra zero) sale solo come una rampa,
+   * attaccata a un ponte (vedi [tettoDelleRampe]). Le quote vengono dalle
+   * strade della mappa, e la mappa a volte sbaglia: le sue tessere hanno
+   * dati di qualche settimana prima, e una rotonda sotto un viadotto, che
+   * per lei aveva un nodo in comune col viadotto, saliva a tre metri con
+   * l'asfalto delle corsie sopra. Lo stesso tetto vale per le strade della
+   * mappa lungo le vie (`tettoQui`). */
+  // (Le corsie stimate vengono dalla mappa: non dicono niente di più.)
+  const vere = strade.some((v) => !v.stimata);
+  const altre = (corsie.altre ?? []).map((a) => ({ ...a, xy: inMetri(a.ll) })).filter((a) => a.xy.some(vicina));
+  const tetti = tettoDelleRampe([
+    ...strade.map((v) => ({ xy: v.xyVia, alto: v.ponte || v.livello > 0, quote: quoteSullaVia(v) })),
+    ...altre.map((a) => ({ xy: a.xy, alto: a.ponte || a.livello > 0 })),
+  ]);
+  strade.forEach((v, i) => {
+    if (!vere || v.ponte || v.livello > 0 || v.galleria) return;
+    const tetto = tetti[i];
+    const sv = progressivi(v.xyVia);
+    const sd = progressivi(v.xy);
+    let cambiata = false;
+    for (let k = 0; k < v.xy.length; k++) {
+      const s = sd.at(-1) > 0 ? (sd[k] / sd.at(-1)) * sv.at(-1) : 0;
+      const t = Math.max(0, tettoA(tetto, sv, s));
+      if (v.h[k] > t + 0.05) {
+        v.h[k] = t;
+        cambiata = true;
+      }
+    }
+    if (cambiata) limitaPendenza(v.h, v.xy);
+  });
+  // Il tetto lungo le vie, in una griglia: per le strade della mappa.
+  const GT = new Map();
+  [...strade.map((v, i) => [v.xyVia, tetti[i], v.ponte || v.livello > 0 || v.galleria]), ...altre.map((a, j) => [a.xy, tetti[strade.length + j], a.ponte || a.livello > 0 || a.galleria])].forEach(([xy, tetto, libera]) => {
+    for (let k = 1; k < xy.length; k++) {
+      const [a, b] = [xy[k - 1], xy[k]];
+      const voce = [a, b, libera ? Infinity : tetto[k - 1], libera ? Infinity : tetto[k]];
+      for (let cx = Math.floor((Math.min(a[0], b[0]) - 8) / G); cx <= Math.floor((Math.max(a[0], b[0]) + 8) / G); cx++) {
+        for (let cy = Math.floor((Math.min(a[1], b[1]) - 8) / G); cy <= Math.floor((Math.max(a[1], b[1]) + 8) / G); cy++) {
+          const key = cx + ',' + cy;
+          if (!GT.has(key)) GT.set(key, []);
+          GT.get(key).push(voce);
+        }
+      }
+    }
+  });
+  /**
+   * Fin dove può salire una strada della mappa in (px, py), verso (tx, ty):
+   * il tetto della via lungo lei (la più vicina entro [entro] metri; con due
+   * vie una sopra l'altra, la più alta), o null se non ce n'è.
+   */
+  const tettoQui = (px, py, tx, ty, entro) => {
+    const vicine = [];
+    for (const [a, b, ta, tb] of GT.get(Math.floor(px / G) + ',' + Math.floor(py / G)) ?? []) {
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const l = Math.hypot(dx, dy) || 1e-9;
+      const u = Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / (l * l)));
+      const d = Math.hypot(a[0] + dx * u - px, a[1] + dy * u - py);
+      if (d > entro) continue;
+      if (Math.abs((dx * tx + dy * ty) / l) < 0.7 * Math.hypot(tx, ty)) continue;
+      vicine.push([d, Math.max(0, ta - PENDENZA * u * l, tb - PENDENZA * (1 - u) * l)]);
+    }
+    if (!vicine.length) return null;
+    const d0 = Math.min(...vicine.map((v) => v[0]));
+    // (Una rampa accanto, a qualche metro, non è la via di questa strada.)
+    return Math.max(...vicine.filter((v) => v[0] < d0 + 1.5).map((v) => v[1]));
+  };
+  for (let i = 0; i < strade.length; i++) {
+    const v = strade[i];
+    const via = sfoltisciQuote(v.xy, v.h, v.nuovi);
+    const { nuovi, ...resto } = v;
+    strade[i] = { ...resto, xy: via.xy, h: via.h };
   }
   const nodi = (corsie.nodi ?? []).map((n) => ({ ...n, xy: sys.daLonLat(n.g[0], n.g[1]) })).filter((n) => vicina(n.xy));
   // Gli alberi veri di questa tessera (quelli sul bordo li fa una sola), e
@@ -2587,7 +2827,7 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
         for (let cy = Math.floor((Math.min(a[1], b[1]) - mezza) / G); cy <= Math.floor((Math.max(a[1], b[1]) + mezza) / G); cy++) {
           const key = cx + ',' + cy;
           if (!coperte.has(key)) coperte.set(key, []);
-          coperte.get(key).push([a, b, mezza + Math.abs(v.posa)]);
+          coperte.get(key).push([a, b, mezza + Math.abs(v.posa), classeMappa(v.hw)]);
         }
       }
     }
@@ -2616,6 +2856,50 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
     }
     return false;
   };
+  /**
+   * La quota della via con le corsie lungo una strada della mappa di classe
+   * [cls] in (px, py), verso (tx, ty), alla quota [h]: fra le vie della
+   * stessa classe (la stessa strada) nello stesso verso entro
+   * [entro] metri (le più vicine; con due vie una sopra l'altra, quella alla
+   * quota più simile). `null` se non ce n'è.
+   */
+  const quotaCorsie = (px, py, tx, ty, h, entro, cls) => {
+    const vicine = [];
+    for (const [a, b, , c] of coperte.get(Math.floor(px / G) + ',' + Math.floor(py / G)) ?? []) {
+      if (c !== cls) continue;
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const l = Math.hypot(dx, dy) || 1e-9;
+      const u = Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / (l * l)));
+      const d = Math.hypot(a[0] + dx * u - px, a[1] + dy * u - py);
+      if (d > entro || Math.abs((dx * tx + dy * ty) / l) < 0.7 * Math.hypot(tx, ty)) continue;
+      vicine.push([d, a[2] + (b[2] - a[2]) * u]);
+    }
+    if (!vicine.length) return null;
+    const d0 = Math.min(...vicine.map((v) => v[0]));
+    return vicine.filter((v) => v[0] < d0 + 1.5).reduce((m, v) => (Math.abs(v[1] - h) < Math.abs(m - h) ? v[1] : m), Infinity);
+  };
+  /**
+   * Lungo una via con le corsie della stessa classe, nello stesso verso, ma
+   * a più di due metri di quota (e nessuna della stessa classe alla sua): la
+   * stessa strada, una seconda volta.
+   */
+  const doppia = (px, py, tx, ty, h, cls) => {
+    let altrove = false;
+    for (const [a, b, mezza, c] of coperte.get(Math.floor(px / G) + ',' + Math.floor(py / G)) ?? []) {
+      if (c !== cls) continue;
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const l2 = dx * dx + dy * dy || 1e-9;
+      const u = Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / l2));
+      if (Math.hypot(a[0] + dx * u - px, a[1] + dy * u - py) > mezza + 1.5) continue;
+      const tl = Math.hypot(tx, ty) || 1;
+      if (Math.abs((dx * tx + dy * ty) / (Math.sqrt(l2) * tl)) < 0.8) continue;
+      if (Math.abs(a[2] + (b[2] - a[2]) * u - h) <= 2) return false;
+      altrove = true;
+    }
+    return altrove;
+  };
   /** Ben dentro l'asfalto di una via con le corsie (più di [dentro] metri dal bordo), alla quota [h]. */
   const inMezzoAllAsfalto = (px, py, h, dentro = 1.5) => {
     for (const [a, b, mezza] of coperte.get(Math.floor(px / G) + ',' + Math.floor(py / G)) ?? []) {
@@ -2630,7 +2914,126 @@ function corsieDellaTessera(corsie, sys, linee, visibili, meta) {
   };
   // Mai sull'asfalto (un nodo messo male, o la strada disegnata più larga).
   const alberi = puntiAlberi.filter((q) => nellaTessera(q) && !sullAsfalto(q[0], q[1])).map((q) => [q[0], q[1], 0.6 + mescola(Math.round(q[0] * 7), Math.round(q[1] * 7)) * 0.25]);
-  return { strade, nodi, copre, sullAsfalto, inMezzoAllAsfalto, alberi };
+  return { strade, nodi, copre, doppia, sullAsfalto, inMezzoAllAsfalto, alberi, tettoQui, quotaCorsie };
+}
+
+/** La classe della mappa (OpenMapTiles) di una via di OpenStreetMap. */
+function classeMappa(hw) {
+  const b = String(hw ?? '').replace(/_link$/, '');
+  return ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'service'].includes(b) ? b : 'minor';
+}
+
+/** I metri progressivi lungo i punti [p]. */
+function progressivi(p) {
+  const s = [0];
+  for (let k = 1; k < p.length; k++) s.push(s[k - 1] + Math.hypot(p[k][0] - p[k - 1][0], p[k][1] - p[k - 1][1]));
+  return s;
+}
+
+/** Le quote di una via con le corsie nei punti della sua geometria vera (`xyVia`), dai metri. */
+function quoteSullaVia(v) {
+  const sv = progressivi(v.xyVia);
+  const sd = progressivi(v.xy);
+  const L = sd.at(-1);
+  return sv.map((s) => {
+    const q = sv.at(-1) > 0 ? (s / sv.at(-1)) * L : 0;
+    let k = 1;
+    while (k < sd.length - 1 && sd[k] < q) k++;
+    const t = sd[k] > sd[k - 1] ? Math.max(0, Math.min(1, (q - sd[k - 1]) / (sd[k] - sd[k - 1]))) : 0;
+    return v.h[k - 1] + (v.h[k] - v.h[k - 1]) * t;
+  });
+}
+
+/** Il tetto ([tettoDelleRampe]) a [s] metri lungo la via, coi metri [sv] dei suoi punti. */
+function tettoA(tetto, sv, s) {
+  let k = 1;
+  while (k < sv.length - 1 && sv[k] < s) k++;
+  return Math.max(tetto[k - 1] - PENDENZA * Math.max(0, s - sv[k - 1]), tetto[k] - PENDENZA * Math.max(0, sv[k] - s));
+}
+
+/** Per quanti metri dal capo di un ponte la via che continua può restare alla sua quota. */
+export const RAMPA_PIANO_M = 40;
+
+/**
+ * Fin dove può salire ogni punto di ogni via di [vie] (`{xy, alto, quote}`:
+ * i punti in metri, se è un ponte nei dati, e la quota dei suoi punti): sulle
+ * vie alte quanto sono, sulle altre quanto una rampa che scende da un ponte
+ * a cui si attacca, nodo per nodo (le vie si toccano dove hanno un punto in
+ * comune): alla sua quota per [RAMPA_PIANO_M] metri (fra due ponti vicini la
+ * strada resta in alto), poi giù del [PENDENZA]. Lontano dai ponti, zero.
+ * Restituisce per ogni via il tetto in ognuno dei suoi punti.
+ */
+export function tettoDelleRampe(vie) {
+  const chiave = (q) => Math.round(q[0] * 2) + ',' + Math.round(q[1] * 2);
+  const indice = new Map();
+  const valore = [];
+  const lati = [];
+  const nodo = (q) => {
+    const k = chiave(q);
+    let i = indice.get(k);
+    if (i === undefined) {
+      i = valore.length;
+      indice.set(k, i);
+      valore.push(-Infinity);
+      lati.push([]);
+    }
+    return i;
+  };
+  const suoi = vie.map((v) => v.xy.map(nodo));
+  vie.forEach((v, j) => {
+    const n = suoi[j];
+    for (let k = 1; k < n.length; k++) {
+      const d = Math.hypot(v.xy[k][0] - v.xy[k - 1][0], v.xy[k][1] - v.xy[k - 1][1]);
+      lati[n[k - 1]].push([n[k], d]);
+      lati[n[k]].push([n[k - 1], d]);
+    }
+    if (!v.alto) return;
+    n.forEach((i, k) => (valore[i] = Math.max(valore[i], (v.quote?.[k] ?? ALTEZZA_LIVELLO) + PENDENZA * RAMPA_PIANO_M)));
+  });
+  // Dal più alto in giù (Dijkstra, col massimo al posto del minimo).
+  const mucchio = [];
+  const spingi = (x) => {
+    mucchio.push(x);
+    let c = mucchio.length - 1;
+    while (c > 0) {
+      const p = (c - 1) >> 1;
+      if (mucchio[p][0] >= mucchio[c][0]) break;
+      [mucchio[p], mucchio[c]] = [mucchio[c], mucchio[p]];
+      c = p;
+    }
+  };
+  const togli = () => {
+    const top = mucchio[0];
+    const ultimo = mucchio.pop();
+    if (mucchio.length) {
+      mucchio[0] = ultimo;
+      let c = 0;
+      for (;;) {
+        const l = 2 * c + 1;
+        const r = l + 1;
+        let m = c;
+        if (l < mucchio.length && mucchio[l][0] > mucchio[m][0]) m = l;
+        if (r < mucchio.length && mucchio[r][0] > mucchio[m][0]) m = r;
+        if (m === c) break;
+        [mucchio[m], mucchio[c]] = [mucchio[c], mucchio[m]];
+        c = m;
+      }
+    }
+    return top;
+  };
+  valore.forEach((v, i) => v > 0 && spingi([v, i]));
+  while (mucchio.length) {
+    const [v, i] = togli();
+    if (v < valore[i]) continue;
+    for (const [j, d] of lati[i]) {
+      const w = v - PENDENZA * d;
+      if (w > valore[j] && w > 0) {
+        valore[j] = w;
+        spingi([w, j]);
+      }
+    }
+  }
+  return suoi.map((n, j) => n.map((i) => (vie[j].alto ? Infinity : Math.max(0, valore[i]))));
 }
 
 /** Tutti i buffer di una tessera fatta, da trasferire. */
