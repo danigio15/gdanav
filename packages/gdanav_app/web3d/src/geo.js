@@ -80,6 +80,27 @@ export function marginiAiLati(sinistra, destra, larghezza) {
 }
 
 /**
+ * Quanto allontanare la vista, in livelli di zoom (zero o meno), quando la
+ * parte libera dello schermo è piccola: `[largo, alto]` in punti della pagina.
+ *
+ * «Metà schermo piccolo, non si vede il percorso»: sull'auto a schermo
+ * diviso la mappa sta in un pannello stretto, e sopra c'è la scheda della
+ * musica. Lo zoom è in punti: in un pannello largo duecento punti, alla
+ * stessa distanza di un telefono, si vedeva un palazzo e basta — la strada
+ * e il percorso fuori dai bordi. Qui la vista si allontana quanto serve
+ * perché la parte libera mostri il pezzo di mondo di un telefono in
+ * verticale ([SPAZIO_DI_RIFERIMENTO]); mai più vicina di com'è, e al più di
+ * [massimo] livelli.
+ */
+export const SPAZIO_DI_RIFERIMENTO = Object.freeze({ largo: 420, alto: 560 });
+export function zoomPerLoSpazio(largo, alto, { massimo = 1.6 } = {}) {
+  const l = Number.isFinite(largo) && largo > 0 ? largo : SPAZIO_DI_RIFERIMENTO.largo;
+  const a = Number.isFinite(alto) && alto > 0 ? alto : SPAZIO_DI_RIFERIMENTO.alto;
+  const k = Math.min(1, l / SPAZIO_DI_RIFERIMENTO.largo, a / SPAZIO_DI_RIFERIMENTO.alto);
+  return Math.max(-massimo, Math.log2(k)) || 0;
+}
+
+/**
  * Gli ultimi [metri] (almeno) della linea `[lon, lat, lon, lat, …]`
  * [lonlat], contati a ritroso dall'ultimo punto; la linea intera se è più
  * corta. Le distanze sono quelle piatte (un metro su qualche migliaio):
