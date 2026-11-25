@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { codaDi, marginiAiLati } from '../src/geo.js';
+import { SPAZIO_DI_RIFERIMENTO, codaDi, marginiAiLati, zoomPerLoSpazio } from '../src/geo.js';
 
 test("l'auto sta in mezzo alla parte libera, anche quando è meno di metà schermo", () => {
   // Lo schermo intero: le schede di Android Auto a sinistra, per un terzo.
@@ -32,4 +32,19 @@ test('la coda di una traccia: gli ultimi metri, non tutta', () => {
   // Più corta: tutta.
   assert.equal(codaDi(lonlat.slice(0, 40), 1800).length, 40);
   assert.deepEqual(codaDi([], 100), []);
+});
+
+test('il pannello piccolo allontana la vista, quello grande no', () => {
+  // un telefono in verticale, lo schermo dell'auto intero: niente
+  assert.equal(zoomPerLoSpazio(412, 640), Math.log2(412 / SPAZIO_DI_RIFERIMENTO.largo));
+  assert.equal(zoomPerLoSpazio(880, 720), 0);
+  assert.equal(zoomPerLoSpazio(1280, 720), 0);
+  // mezzo pannello stretto con la scheda della musica sopra: un livello abbondante
+  const meta = zoomPerLoSpazio(230, 270);
+  assert.ok(meta < -1 && meta > -1.2, String(meta));
+  // mai oltre il tetto, mai più vicina
+  assert.equal(zoomPerLoSpazio(40, 40), -1.6);
+  assert.equal(zoomPerLoSpazio(40, 40, { massimo: 1 }), -1);
+  // misure che non ci sono ancora: niente
+  assert.equal(zoomPerLoSpazio(0, NaN), 0);
 });

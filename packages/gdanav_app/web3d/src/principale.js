@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import codiceLavoratore from 'gdanav:lavoratore';
 import { BUDGET, daDisegnare, pianoTessere } from './budget.js';
 import { intervalloPerLaSonda, livelloDiCarico, rapportoPixel, Ritmo, valutaPrestazioni, valutaWebgl } from './capacita.js';
-import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, lonDaMerc, marginiAiLati } from './geo.js';
+import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, lonDaMerc, marginiAiLati, zoomPerLoSpazio } from './geo.js';
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { AggancioStrada, SOGLIA_M } from './aggancio.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
@@ -34,6 +34,8 @@ const VISTE = { inclinata: { pitch: 70, zoom: 17.9 }, immersiva: { pitch: 74, zo
  * l'auto nel terzo basso dello schermo: davanti c'è la strada da fare.
  */
 const VISTA_CORSIE = { pitch: 62, zoom: 18.6 };
+/** Quanti gradi più dall'alto la vista «Corsie» per ogni livello che si allontana nel pannello piccolo. */
+const PITCH_PER_LO_SPAZIO = 8;
 const OBIETTIVO_CORSIE_GRADI = 44;
 /** La fascia della corsia: quanto è larga (m) e quanto sta sopra l'asfalto. */
 // Larga meno di una corsia, che ci stia dentro con un margine: in città la
@@ -2392,10 +2394,18 @@ function muovi(adesso, dt) {
   if (S.camera.modo === 'segui') {
     // Nella vista «Corsie» più vicini di quanto chiede l'app, sempre con la
     // sua inclinazione (anche sull'auto).
-    const zoomVoluto = S.corsie ? zoomCorsie(S.zoomVoluto ?? 17.9, S.zoomScelto ?? 0) : (S.zoomVoluto ?? vista.zoom);
+    const H0 = m.getCanvas().clientHeight;
+    const W0 = m.getCanvas().clientWidth;
+    /* Il pannello piccolo (lo schermo diviso dell'auto, con la scheda della
+     * musica sopra): la vista si allontana fin che si vede il pezzo di mondo
+     * di un telefono (`zoomPerLoSpazio`), e nella vista «Corsie» guarda un
+     * po' più dall'alto, che i palazzi accanto non chiudano la strada. */
+    const [ls, ld] = marginiAiLati(S.camera.sinistra ?? 0, S.camera.destra ?? 0, W0);
+    const lontano = zoomPerLoSpazio(W0 - ls - ld, H0 - Math.min(S.camera.sopra ?? 0, H0 * 0.5));
+    const zoomVoluto = (S.corsie ? zoomCorsie(S.zoomVoluto ?? 17.9, S.zoomScelto ?? 0) : (S.zoomVoluto ?? vista.zoom)) + lontano;
     // L'inclinazione: quella della vista, o quella chiesta (sull'auto più
     // dall'alto: «voglio vederla un po' più dall'alto»).
-    const pitchVoluto = S.corsie ? vista.pitch : (S.camera.pitch ?? vista.pitch);
+    const pitchVoluto = S.corsie ? vista.pitch + PITCH_PER_LO_SPAZIO * lontano : (S.camera.pitch ?? vista.pitch);
     const c = (S.cam ??= { rotta: rottaCamera, zoom: zoomVoluto, quota: z, pitch: pitchVoluto });
     c.rotta = angoloVerso(c.rotta, rottaCamera, 1 - Math.exp(-dt / 400));
     /* Lo zoom cambia da sé (in autostrada si allontana, vicino a una manovra
