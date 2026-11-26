@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import codiceLavoratore from 'gdanav:lavoratore';
 import { BUDGET, daDisegnare, pianoTessere } from './budget.js';
 import { intervalloPerLaSonda, livelloDiCarico, rapportoPixel, Ritmo, valutaPrestazioni, valutaWebgl } from './capacita.js';
-import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, lonDaMerc, marginiAiLati, zoomPerLoSpazio } from './geo.js';
+import { chiave as chiaveTessera, codaDi, daChiave, mercPerMetro, latDaMerc, lonDaMerc, marginiAiLati, semaforoDiUnAltroPiano, zoomPerLoSpazio } from './geo.js';
 import { codeOrdinate, decodifica } from './messaggi.js';
 import { AggancioStrada, SOGLIA_M } from './aggancio.js';
 import { angoloVerso, Moto, Raccordo, smorza, svolteDi } from './moto.js';
@@ -2118,11 +2118,14 @@ function aggiornaSegni(adesso) {
     const semafori = [];
     for (const c of S.costruite.values()) {
       const t = scena.tessere.get(c.chiave)?.dati.semafori;
-      for (let i = 0; t && i < t.length; i += 3) {
+      for (let i = 0; t && i < t.length; i += 4) {
         const x = c.cx + t[i] * c.scala;
         const y = c.cy + t[i + 1] * c.scala;
         const d = Math.hypot(x - qui[0], y - qui[1]);
-        if (d < SEMAFORI_VICINI_M) semafori.push({ x, y, z: t[i + 2], d });
+        if (d >= SEMAFORI_VICINI_M) continue;
+        // Quello dell'incrocio sotto il viadotto (o sopra la strada su cui si è) non è il nostro.
+        if (S.auto && semaforoDiUnAltroPiano(t[i + 3], S.auto.z, indice.candidati(x, y, 0, 0, 12).map((q) => q.h))) continue;
+        semafori.push({ x, y, z: t[i + 2], d });
       }
     }
     semafori.sort((a, b) => a.d - b.d);

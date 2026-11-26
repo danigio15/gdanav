@@ -48,3 +48,18 @@ test('il pannello piccolo allontana la vista, quello grande no', () => {
   // misure che non ci sono ancora: niente
   assert.equal(zoomPerLoSpazio(0, NaN), 0);
 });
+
+test('il fumetto del semaforo resta del piano dell\'auto', async () => {
+  const { semaforoDiUnAltroPiano } = await import('../src/geo.js');
+  // Sul viadotto (quota 8), il semaforo dell'incrocio a terra sotto: non è nostro.
+  assert.equal(semaforoDiUnAltroPiano(0, 8, [0, 8]), true);
+  // A terra sotto il viadotto, il semaforo a terra: è nostro.
+  assert.equal(semaforoDiUnAltroPiano(0, 0.2, [0, 8]), false);
+  // A terra, il semaforo sul viadotto sopra: non è nostro.
+  assert.equal(semaforoDiUnAltroPiano(8, 0, [0, 8]), true);
+  // Una strada in salita, niente sopra né sotto: anche dieci metri più su è nostro.
+  assert.equal(semaforoDiUnAltroPiano(10, 0, [10]), false);
+  // Senza quote non si toglie niente.
+  assert.equal(semaforoDiUnAltroPiano(0, 8, []), false);
+  assert.equal(semaforoDiUnAltroPiano(undefined, 8, [0, 8]), false);
+});

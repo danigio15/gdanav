@@ -144,7 +144,7 @@ test('un semaforo: la linea d’arresto, le strisce e il palo con le luci', () =
   assert.ok(qui(-7.4, -4.4), 'le strisce');
   assert.ok(!qui(-4.2, -0.5), 'niente strisce dentro l’incrocio');
   assert.ok(!qui(-8.2, -7.5), 'fra la linea e le strisce un metro di asfalto');
-  assert.equal(sg.semafori.length, 3, 'un segno per incrocio');
+  assert.equal(sg.semafori.length, 4, 'un segno per incrocio (x, y, cima, quota della strada)');
 });
 
 /** Da metri della tessera z/x/y a `[lon, lat]`. */

@@ -1715,7 +1715,7 @@ export function costruisciTessera({ z, x, y, livelli, dettaglio = 'pieno', limit
     etichette,
     nascosti: [...nascosti],
     corsie: segnaletica,
-    // Dove stanno i semafori (x, y, la cima): il loro segno sulla pagina.
+    // Dove stanno i semafori (x, y, la cima, la quota della strada): il loro segno sulla pagina.
     semafori: new Float32Array(semafori),
   };
   const triStrade = Object.values(nastri).reduce((s, g) => s + g.triangoli, 0);

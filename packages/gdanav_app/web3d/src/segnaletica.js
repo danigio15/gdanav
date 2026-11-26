@@ -1628,7 +1628,9 @@ export function costruisciSegnaletica({ strade, nodi = [], sopra = () => 0.2, me
         }
         const z1 = cima;
         if (!semaforoMesso && dentro(px, py)) {
-          semafori.push(px, py, z1 + 0.3);
+          // E la quota della sua strada: il fumetto si mette solo ai semafori
+          // del piano dell'auto (vedi `semaforoDiUnAltroPiano`).
+          semafori.push(px, py, z1 + 0.3, ph);
           semaforoMesso = true;
         }
       }

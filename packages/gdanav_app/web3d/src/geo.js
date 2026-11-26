@@ -118,3 +118,18 @@ export function codaDi(lonlat, metri) {
   }
   return lonlat;
 }
+
+/**
+ * Se il semaforo sta su un altro piano rispetto all'auto. «Il semaforo è
+ * sulla strada sotto»: il fumetto del semaforo si disegna sopra la scena,
+ * senza nascondersi dietro le cose, e quello di un incrocio a terra sotto il
+ * viadotto compariva sul viadotto, come se fosse lì. Altro piano vuol dire:
+ * nello stesso posto ([quoteQui], le quote delle strade lì) c'è una strada a
+ * più di [stacco] metri dalla sua e più vicina alla quota dell'auto. Una
+ * strada in salita, senza niente sopra o sotto, resta del piano dell'auto.
+ */
+export function semaforoDiUnAltroPiano(hSemaforo, hAuto, quoteQui, stacco = 4) {
+  if (!Number.isFinite(hSemaforo) || !Number.isFinite(hAuto) || !quoteQui?.length) return false;
+  const lontano = Math.abs(hSemaforo - hAuto);
+  return quoteQui.some((h) => Math.abs(h - hSemaforo) > stacco && Math.abs(h - hAuto) < lontano);
+}
