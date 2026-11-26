@@ -10,7 +10,8 @@
 </p>
 
 <p align="center">
-  Android · iPhone · Android Auto · CarPlay · Home Assistant
+  Android · iPhone · Android Auto · CarPlay · Home Assistant<br>
+  Dentro l'app <b><a href="https://github.com/danigio15/gdahomeapp">GdAHome</a></b>
 </p>
 
 ---
@@ -108,15 +109,22 @@ ci passi e poi il viaggio prosegue.
 
 ## Come si usa
 
-1. **Installa GdANav** dal **[Play Store](https://play.google.com/store/apps/details?id=it.gdanav.gdanav)**
-   (Android) o dall'**App Store** (iPhone).
-2. Apri il menu (☰) → **La tua auto**: scegli **Elettrica** o **Termica**.
-   Con l'elettrica cerca il tuo modello; con la termica scegli il carburante.
-3. **La batteria** (solo elettrica): la scrivi tu con il cursore in **Fonte
+GdANav non si scarica a parte: è **dentro l'app GdAHome**.
+
+1. **Installa GdAHome** da
+   **[Google Play](https://play.google.com/store/apps/details?id=com.gdahome.gdahome)**
+   (Android) o dall'**[App Store](https://apps.apple.com/app/id6816421418)**
+   (iPhone e iPad). Come si prepara la casa è nel
+   [README di GdAHome](https://github.com/danigio15/gdahomeapp).
+2. Nel menu dell'app GdAHome tocca **GdANav**, in alto.
+3. Apri il menu di GdANav (☰ sulla mappa) → **La tua auto**: scegli
+   **Elettrica** o **Termica**. Con l'elettrica cerca il tuo modello; con la
+   termica scegli il carburante.
+4. **La batteria** (solo elettrica): la scrivi tu con il cursore in **Fonte
    dati auto**, e GdANav la stima man mano che guidi. Con Premium la legge da
-   sola: dall'auto con Android Auto, da un dongle OBD Bluetooth, da GdAHome o
-   da Home Assistant.
-4. **Pianifica il viaggio**: tocca «Dove andiamo?», scrivi la destinazione,
+   sola: dall'auto con Android Auto, da un dongle OBD Bluetooth o dalla
+   plancia di GdAHome.
+5. **Pianifica il viaggio**: tocca «Dove andiamo?», scrivi la destinazione,
    guarda arrivo, durata e soste, e premi **Avvia**.
 
 <p align="center">
@@ -131,47 +139,41 @@ scheda del viaggio.
 
 ## Prezzi
 
-GdANav si scarica gratis. Non ha pubblicità e non chiede di creare un account.
+GdANav non ha un abbonamento suo: va con quello di **GdAHome**. Non ha
+pubblicità e non chiede di creare un account.
 
-| | Gratis | Premium |
+| | GdAHome Base<br>gratis | GdAHome Premium |
 | --- | :---: | :---: |
 | Percorso, guida con la voce, corsie, svincoli in 3D | ✓ | ✓ |
 | Traffico, autovelox, segnalazioni della comunità, meteo | ✓ | ✓ |
 | Auto termica: distributori con i prezzi del giorno | ✓ | ✓ |
 | Auto elettrica con la batteria scritta a mano | ✓ | ✓ |
 | Mappe offline, preferiti, Siri e «Ok Google» | ✓ | ✓ |
-| Batteria letta dall'auto: Android Auto, dongle OBD, GdAHome, Home Assistant | | ✓ |
+| Batteria letta dall'auto: Android Auto, dongle OBD, GdAHome | | ✓ |
 | Percorso con le soste di ricarica, colonnine libere o occupate | | ✓ |
-| Home Assistant | | ✓ |
 | Android Auto e CarPlay | | ✓ |
 
-**Premium costa 2,99 € al mese oppure 29,99 € all'anno** (l'anno costa il
-16% in meno). I **primi 14 giorni sono gratis**, una volta sola: se disdici
-durante la prova non paghi niente. Si compra dal menu → **Premium**, si paga
-e si disdice dal Play Store o dall'App Store, e il rinnovo è automatico.
-Premium lo vende **CRV Immobiliare S.r.l.** attraverso il Play Store e l'App
-Store: le ricevute arrivano da Google o da Apple, come per ogni abbonamento.
-
-<p align="center">
-  <img src="docs/immagini/premium.png" alt="Premium: annuale 29,99 €, mensile 2,99 €, prova gratis per 14 giorni" width="260">
-  &nbsp;
-  <img src="docs/immagini/premium_codice_regalo.png" alt="Il codice regalo: GDA-XXXX-XXXX-XXXX" width="260">
-</p>
-
-**Codice regalo.** Se qualcuno ti ha regalato Premium hai un codice come
-`GDA-7KQM-2XRT-9HVB`: menu → **Premium** → **Ho un codice regalo**, lo scrivi
-e premi **Riscatta**. Vale per qualche mese o per sempre, secondo il codice.
-I codici e le licenze GdANav li può dare anche **l'installatore** che ti ha
-montato GdAHome.
-
-**Hai GdAHome Premium?** Allora hai già anche **GdANav Premium**: è compreso.
-Dentro l'app GdAHome, GdANav non ti chiede niente: lo sblocca GdAHome.
+**GdAHome Premium costa 4,99 € al mese oppure 49,99 € all'anno**, e i
+**primi 14 giorni sono gratis**. Comprende GdANav Premium e tutto il resto di
+GdAHome. Si prende dall'app GdAHome, menu → **GdAHome Premium**, e si paga e
+si disdice dal Play Store o dall'App Store. Premium è della casa: vale per
+tutti i telefoni abbinati a quella casa.
 
 <p align="center">
   <img src="docs/immagini/premium_dentro_gdahome.png" alt="Dentro GdAHome: Premium si attiva dall'app GdAHome" width="260">
 </p>
 
+**Codice regalo.** Se qualcuno ti ha regalato Premium hai un codice come
+`GDA-7KQM-2XRT-9HVB`: nell'app GdAHome, menu → **GdAHome Premium** → **Ho un
+codice regalo**, lo scrivi e premi **Riscatta**. Vale per qualche mese o per
+sempre, secondo il codice. I codici li può dare anche **l'installatore** che
+ti ha montato GdAHome.
+
 ## Home Assistant
+
+> **Con l'app GdAHome questa parte non serve.** GdANav prende l'auto e la
+> casa direttamente dalla plancia di GdAHome, senza integrazione e senza QR.
+> L'integrazione qui sotto è per GdANav da solo, che oggi non è negli store.
 
 Con Home Assistant GdANav legge la batteria della tua auto dalla casa, e la
 casa sa del tuo viaggio: dove vai, quando arrivi, con quanta batteria. Serve
